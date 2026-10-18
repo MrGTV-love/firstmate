@@ -296,7 +296,8 @@ status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>] [<out
   [ "$offset" -lt "$size" ] || return 0
   # The span is held in memory, not in a scratch file beside the cursor: a drain
   # killed mid-read (SIGKILL cannot be trapped) must leave nothing behind, and the
-  # reader window (bin/fm-status-cap-lib.sh) bounds what it holds.
+  # read limit (bin/fm-status-cap-lib.sh) bounds what it holds. A span past the limit
+  # fails the read, so the caller leaves its cursor where it was; it is never clipped.
   chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null) || return 1
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
@@ -566,8 +567,8 @@ status_span_first_actionable_record() {  # <status-file> <start-offset> [record-
     return 1
   fi
   # The span stays in memory, never in a scratch file beside the cursor: a reader
-  # killed mid-read must leave nothing behind, and the reader window
-  # (bin/fm-status-cap-lib.sh) bounds what is held.
+  # killed mid-read must leave nothing behind, and the read limit
+  # (bin/fm-status-cap-lib.sh) bounds what is held; a span past it fails the read.
   chunk=$(_fm_status_read_span "$f" "$start" "$((size - start))" 2>/dev/null) || return 2
   cur_ident=$(_fm_open_decisions_file_ident "$f") || return 2
   [ "$cur_ident" = "$ident" ] || return 2

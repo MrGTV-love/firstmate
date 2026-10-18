@@ -467,7 +467,7 @@ shell_quote() {
 
 STATUS_FILE=$(shell_quote "$STATE/$ID.status")
 # The worker's status command: the sanctioned capped append always carries the
-# line (bin/fm-status-append.sh owns the size bound and the repeat counter, and
+# line (bin/fm-status-append.sh owns the size bound, and
 # docs/configuration.md "Status log size bounds" the reason), then the opt-in fleet
 # ledger (docs/fleet-ledger.md) records it at once, costing one file test when the
 # flag is absent. A host without that flag, such as a remote second mate's, runs only

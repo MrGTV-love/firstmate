@@ -2292,6 +2292,9 @@ reconcile_close() {
 # The status-stream line number of the line that opened <key>'s current call,
 # found with the fold's own readers; empty when the key is not open. Status
 # logs are append-only, so the number names one opening for the life of the log.
+# The log is read whole and exactly (bin/fm-status-cap-lib.sh read limit), never a
+# clipped copy, so the number is the same whatever the log's size; a log past the
+# read limit is refused on stderr and the result is empty, which every caller fails on.
 key_opening_line() {  # <status-file> <key>
   local f=$1 key=$2 line verb open='' kind resolve held n=0 row tab=$'\t'
   _fm_status_kind "$f" '' kind
@@ -2305,7 +2308,7 @@ key_opening_line() {  # <status-file> <key>
         _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open "$n"
         ;;
     esac
-  done < <(fm_status_window_bytes_cat "$f" 2>/dev/null)
+  done < <(fm_status_cat "$f" 0)
   while IFS= read -r row; do
     case "$row" in
       "$key$tab"*) row=${row#*"$tab"}; printf '%s' "${row#*"$tab"}"; return 0 ;;

@@ -614,8 +614,8 @@ _fm_pending_reply_corr_candidates() {  # <status-file> <corr_id>
   local status_file=$1 corr=$2
   case "$corr" in
     '') return 0 ;;
-    *[!A-Za-z0-9_]*) fm_status_window_bytes_cat "$status_file" 2>/dev/null | LC_ALL=C grep -na '' ;;
-    *) fm_status_window_bytes_cat "$status_file" 2>/dev/null | LC_ALL=C grep -naF -- "${FM_PENDING_REPLY_CORR_PREFIX}${corr}" ;;
+    *[!A-Za-z0-9_]*) fm_status_cat "$status_file" 0 2>/dev/null | LC_ALL=C grep -na '' ;;
+    *) fm_status_cat "$status_file" 0 2>/dev/null | LC_ALL=C grep -naF -- "${FM_PENDING_REPLY_CORR_PREFIX}${corr}" ;;
   esac
   return 0
 }
@@ -1187,7 +1187,7 @@ fm_pending_reply_escalation_line() {  # <status-file> <record-path> <corr_id>
         "blocked [key=$own_key]: $payload "*|"blocked: $payload "*) found=$line; break ;;
       esac
     done
-  done < <(fm_status_fold_cat "$status_file" 2>/dev/null)
+  done < <(fm_status_cat "$status_file" 2>/dev/null)
   printf '%s' "$found"
 }
 
@@ -1356,7 +1356,7 @@ _fm_pending_reply_maybe_escalate_locked() {  # <state-dir> <corr_id>
     esac
   fi
   if [ "$new_episode" -eq 0 ] || ! status_event_recorded "$parent_status" "$line"; then
-    fm_status_append_line "$parent_status" "$(status_stamp_line "$line")" >/dev/null 2>&1 || return 1
+    fm_status_append_line "$parent_status" "$(status_stamp_line "$line")" || return 1
   fi
   now=$(fm_pending_reply_now)
   fm_pending_reply_set "$rec" escalated_epoch "$now" || return 1

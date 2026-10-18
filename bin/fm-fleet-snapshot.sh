@@ -724,34 +724,18 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
   fi
 }
 
-# Copy a task's status log into the snapshot, bounded like every status reader
-# (bin/fm-status-cap-lib.sh). A log within the reader window is copied whole with
-# its mtime, exactly as before. A longer one is captured as its last window of
-# whole lines, with the source's mtime, and the caller must not carry a fold
-# checkpoint onto it: that checkpoint's offset names bytes of the full log.
-# Sets SNAPSHOT_STATUS_TRUNCATED to 1 for that case.
-SNAPSHOT_STATUS_TRUNCATED=0
+# Copy a task's status log into the snapshot. A log past the read limit
+# (bin/fm-status-cap-lib.sh) is refused, named on stderr, and not copied: the task is
+# then observed without a status log, and one runaway log neither fills the disk a
+# second time nor fails the whole snapshot. Any other log is copied whole with its
+# mtime, exactly as before.
 snapshot_capture_status() {  # <source> <destination>
-  local source=$1 destination=$2 size window
-  SNAPSHOT_STATUS_TRUNCATED=0
-  [ -f "$source" ] || return 0
+  local source=$1 size
   if size=$(_fm_status_file_size "$source" 2>/dev/null); then
     size=${size//[[:space:]]/}
-    fm_status_window_bytes window
-    case "$size" in ''|*[!0-9]*) ;; *)
-      if [ "$size" -gt "$window" ]; then
-        SNAPSHOT_STATUS_TRUNCATED=1
-        if fm_status_window_cat "$source" > "$destination" 2>/dev/null; then
-          touch -r "$source" "$destination" 2>/dev/null || true
-          return 0
-        fi
-        rm -f -- "$destination"
-        [ -e "$source" ] || return 0
-        return 1
-      fi
-    ;; esac
+    case "$size" in ''|*[!0-9]*) ;; *) fm_status_read_allowed "$source" "$size" || return 0 ;; esac
   fi
-  snapshot_capture_optional "$source" "$destination"
+  snapshot_capture_optional "$@"
 }
 
 prefetch_task_observations() {  # <meta> <id>
@@ -770,8 +754,7 @@ prefetch_task_observations() {  # <meta> <id>
   if [ "$generation_current" = 1 ]; then
     status_ident=$(_fm_open_decisions_file_ident "$status_log" 2>/dev/null) || status_ident=''
     snapshot_capture_status "$status_log" "$status_capture" || current_rc=1
-    [ "$SNAPSHOT_STATUS_TRUNCATED" -eq 1 ] \
-      || status_open_decisions_checkpoint_carry "$status_log" "$status_capture" "$status_ident"
+    status_open_decisions_checkpoint_carry "$status_log" "$status_capture" "$status_ident"
     snapshot_mark_optional_present "$report_path" "$report_capture" || current_rc=1
   fi
 

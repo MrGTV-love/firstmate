@@ -105,9 +105,10 @@
 #   check: status-log-over-cap: file=<name> size=<bytes> (cap <bytes>) growth=<bytes/s> writer=<pid cmd|none>; <action>
 #                          a status log or per-task sidecar passed the size cap
 #                          (docs/configuration.md "Status log size bounds"); one
-#                          wake per file episode, raised within one poll, naming
-#                          the writer lsof found. An omp writer is stopped with
-#                          SIGSTOP; nothing is deleted or rewritten.
+#                          wake per growth step of one cap, raised within one poll
+#                          of the growth being seen, naming the writer lsof found.
+#                          An omp writer is stopped with SIGSTOP; nothing is
+#                          deleted or rewritten.
 #                          bin/fm-status-cap-guard.sh owns the investigation
 #   heartbeat              fleet-scan backstop found an unsurfaced captain-relevant
 #                          status, unless afk is active
@@ -2884,21 +2885,22 @@ lavish_auto_retire_tick() {
 
 # A status log or sidecar over the size cap (bin/fm-status-cap-lib.sh) means a
 # writer outside the sanctioned append is running away. Detection costs one stat
-# per poll (fm_status_cap_unalerted); only a file with no alert yet reaches the
-# guard (bin/fm-status-cap-guard.sh), which names the writer and contains it. The
-# wake is queued before the episode is marked, so a failed append is retried on
-# the next poll instead of being lost, and a file already alerted never wakes again
-# until it drops under the cap or is replaced.
+# per poll (fm_status_cap_unalerted); only a file due an alert reaches the guard
+# (bin/fm-status-cap-guard.sh), which names the writer and contains it. A file is
+# due when it first passes the cap and again each time it has grown by more than
+# one cap since its marker, so a resumed writer is caught again and an unchanged
+# file never wakes twice. The wake is queued before the marker is written, so a
+# failed append is retried on the next poll instead of being lost.
 status_cap_tick() {
-  local rows records reason='' ident path text keys='' key
+  local rows records reason='' ident path size text keys='' key
   rows=$(fm_status_cap_unalerted "$STATE") || return 0
   [ -n "$rows" ] || return 0
   records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
   [ -n "$records" ] || return 0
-  while IFS=$'\t' read -r ident path text; do
+  while IFS=$'\t' read -r ident path size text; do
     [ -n "$path" ] || continue
     reason="${reason:+$reason ; }${text#check: }"
-    keys="$keys$ident:$path "
+    keys="$keys$ident:$path:$size "
   done <<EOF
 $records
 EOF
@@ -2906,9 +2908,9 @@ EOF
   reason="check: $reason"
   key="status-log-over-cap-$(printf '%s' "$keys" | cksum | awk '{print $1}')"
   fm_wake_append check "$key" "$reason" || exit 1
-  while IFS=$'\t' read -r ident path text; do
+  while IFS=$'\t' read -r ident path size text; do
     [ -n "$path" ] || continue
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" || :
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" "$size" || :
   done <<EOF
 $records
 EOF
@@ -3664,6 +3666,12 @@ while :; do
 
   watcher_beat force
 
+  # A runaway writer makes every status signal fire first, and the fleet-ledger
+  # capture below reads status logs, so the over-cap check runs ahead of both: it is
+  # one stat when nothing is over the cap, and the stop it makes must not wait behind
+  # a slow reader or the deferral further down.
+  status_cap_tick
+
   [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
   watcher_beat
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
@@ -3678,11 +3686,6 @@ while :; do
     || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
     open_loops_refresh_detached
   fi
-
-  # A runaway writer makes every status signal fire first, so the over-cap check
-  # runs ahead of both phases: it is one stat when nothing is over the cap, and it
-  # is the wake that must not wait behind the deferral below.
-  status_cap_tick
 
   prelude_defer_load
   if [ "$PRELUDE_DEFER_COUNT" -ge "$PRELUDE_MAX_DEFER" ]; then

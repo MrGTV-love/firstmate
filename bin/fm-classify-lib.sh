@@ -166,9 +166,9 @@ status_key_closing_verb() {  # <status-file> <key>
   kind=$(_fm_status_kind "$f")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  candidates=$(fm_status_window_bytes_cat "$f" 2>/dev/null | grep -a -E \
+  candidates=$(fm_status_cat "$f" 0 2>/dev/null | grep -a -E \
     "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]") \
-    || [ "$?" -eq 1 ] || candidates=$(fm_status_window_cat "$f" 2>/dev/null)
+    || [ "$?" -eq 1 ] || candidates=$(fm_status_cat "$f" 0 2>/dev/null)
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" event
     case "$event:$kind" in
@@ -346,11 +346,10 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     # In memory rather than a scratch file beside the cursor, so a drain killed
     # mid-fold leaves nothing behind; the trailing sentinel keeps the exact byte
     # count that a command substitution would otherwise trim.
-    chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 0 2>/dev/null && printf x) \
+    chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null && printf x) \
       || { printf '%s' "$trusted_open"; return 0; }
     chunk=${chunk%x}
     chunk_size=$(LC_ALL=C; printf '%s' "${#chunk}")
-    chunk=$(printf '%s' "$chunk" | fm_status_transition_lines)
     # Test-only observability seam (off by default, no production behavior
     # change): when set, records exactly how many bytes THIS call folded, so a
     # test can assert the incremental path stays bounded by new appends rather
@@ -803,7 +802,7 @@ status_open_activities() {  # <status-file-or-dash>
     return 0
   fi
   [ -f "$f" ] || return 0
-  _fm_status_open_activities_stream < <(fm_status_window_cat "$f" 2>/dev/null)
+  _fm_status_open_activities_stream < <(fm_status_cat "$f" 2>/dev/null)
 }
 
 # task id from a recorded window target, falling back to the tmux-shaped

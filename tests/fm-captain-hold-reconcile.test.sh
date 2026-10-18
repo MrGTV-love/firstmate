@@ -999,6 +999,25 @@ test_operational_key_closes_with_durable_evidence_and_replay() {
   pass "status-only operational closes preserve evidence, unrelated calls, and reopened-key replay safety"
 }
 
+test_key_opening_binding_is_a_position_in_the_whole_log() {
+  local home binding
+  home=$(make_home key-opening-large-log)
+  printf 'kind=secondmate\n' > "$home/state/lane.meta"
+  # 4500 padded lines, the keyed call as line 4501, then 200 more: about 5.3 MB, past the
+  # 4 MiB tail window. The staged evidence is bound to the opening's line number, which
+  # the log's append-only order keeps stable for its whole life, so it must be 4501
+  # however large the log is.
+  perl -e 'my $pad = "p" x 1100; print "working [at=$_]: step $_ $pad\n" for 1 .. 4500; print "needs-decision [key=big-call]: captain must choose\n"; print "working [at=$_]: later step $_ $pad\n" for 1 .. 200;' \
+    > "$home/state/lane.status"
+  printf 'Verified source captured.txt: the answer was recorded elsewhere.\n' > "$home/evidence.txt"
+  run_captain "$home" reconcile close-key lane --key big-call --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "the close of a key opened in a 5 MB log failed"
+  binding=$(find "$home/state/reconcile-evidence/lane" -name 'big-call-*.opening' -type f)
+  [ -f "$binding" ] || fail "the close staged no opening binding"
+  [ "$(cat "$binding")" = 4501 ] || fail "the opening binding is $(cat "$binding"), not the opening's line number 4501"
+  pass "a key close binds its staged evidence to the opening's true line number in a log past the tail window"
+}
+
 test_operational_key_close_refusals_and_interrupted_append() {
   local home key before open evidence
   home=$(make_home operational-key-refusals)
@@ -1597,6 +1616,7 @@ test_verified_close_retry_matrix
 test_verified_closes_refuse_unanswered_or_unsupported_calls
 test_close_key_leaves_a_migrated_captain_hold_to_its_owner
 test_operational_key_closes_with_durable_evidence_and_replay
+test_key_opening_binding_is_a_position_in_the_whole_log
 test_operational_key_close_refusals_and_interrupted_append
 test_standalone_closes_follow_the_supervision_role_partition
 test_unbound_source_closes_no_hold

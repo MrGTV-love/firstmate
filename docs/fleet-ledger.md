@@ -32,7 +32,7 @@ Readers must ignore members and events they do not recognize, so later versions 
 | ------------------ | ---------------------------------------------- | ------------ |
 | `task.dispatched`  | `kind`, `project`, `harness`, `model`          | A new worker or second mate is launched. A relaunch of an existing task is not recorded. |
 | `task.status`      | `state`, `key`, `text`                         | A complete, nonblank line in the task's status log is captured. |
-| `task.status.skipped` | `bytes`                                     | A status log grew by more than one reader window since the last capture, so the capture took only its last whole lines. `bytes` is how much it skipped ([`configuration.md`](configuration.md#status-log-size-bounds-fm_status_cap_bytes) owns the window). |
+| `task.status.skipped` | `bytes`                                     | A status log grew by more than 4 MiB or more than 256 lines since the last capture, so the capture took only its last whole lines. `bytes` is how much it skipped ([`configuration.md`](configuration.md#status-log-size-bounds-fm_status_cap_bytes) owns the bounds). |
 | `task.pr_ready`    | `pr`                                           | Firstmate records the task's PR as ready for review. |
 | `task.merged`      | `via` (`"pr"` or `"local"`), plus `pr` when `via` is `"pr"` | The task's PR merge is recorded, or its local-only branch landed. |
 | `task.cleaned_up`  | none                                           | The task's worker and local copy were removed. |

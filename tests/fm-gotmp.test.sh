@@ -83,6 +83,9 @@ SH
   ln -s "$ROOT/bin/fm-status-event-lib.sh" "$fake/bin/fm-status-event-lib.sh"
   ln -s "$ROOT/bin/fm-status-wake-lib.sh" "$fake/bin/fm-status-wake-lib.sh"
   ln -s "$ROOT/bin/fm-status-io-lib.sh" "$fake/bin/fm-status-io-lib.sh"
+  # fm-status-cap-lib.sh: the status record and io libraries source it for the
+  # size bounds every status read and append applies.
+  ln -s "$ROOT/bin/fm-status-cap-lib.sh" "$fake/bin/fm-status-cap-lib.sh"
   ln -s "$ROOT/bin/fm-utc-lib.sh" "$fake/bin/fm-utc-lib.sh"
   # fm-timeout-lib.sh: the shared hard bound fm-classify-lib.sh sources for the
   # wedge detector's bounded worktree write probe.

@@ -10,18 +10,15 @@
 #
 # Why a helper and not a bare `>>`: a status log is a record every supervision
 # reader walks, and on 2026-10-18 a loop appending to three of them filled the
-# disk. This command makes that impossible through the sanctioned path:
-#   - an exact consecutive repeat of the last event (compared without its
-#     [at=<epoch>] stamp) is counted in ONE note line that follows it, whose
-#     fixed-width number is rewritten in place, so a loop adds one line and no
-#     further bytes, and the count stays exact;
-#   - a line that would pass the cap is refused, loudly, with exit 75, and nothing
-#     is written; only a decision or terminal line (anything but working: and
-#     note:) may use the reserve above the cap, so a worker at the cap can still
-#     report done: or blocked:.
-# It never deletes, truncates or rewrites an existing event line. Exit status: 0
-# when every line was appended or counted, 75 when one was refused at the cap, 2
-# for a malformed call, 1 for any other failure.
+# disk. This command makes that impossible through the sanctioned path: a line that
+# would pass the cap is refused, loudly, with exit 75, and nothing is written. Only
+# a decision or terminal line (anything but working: and note:) may use the reserve
+# above the cap, so a worker at the cap can still report done: or blocked:. A line
+# repeated by a loop is written like any other until the cap refuses it. A log
+# already past cap plus reserve refuses every line, terminal ones included, and each
+# refusal names the file on stderr. It never deletes, truncates or rewrites an
+# existing event line. Exit status: 0 when every line was appended, 75 when one was
+# refused at the cap, 2 for a malformed call, 1 for any other failure.
 #
 # tests/fm-status-runaway-guard.test.sh is the regression entry point.
 set -u
@@ -44,13 +41,4 @@ if [ -L "$FILE" ]; then
   exit 1
 fi
 
-# stdout of the library is one token per line; only a counted repeat is news to
-# the worker, and it goes to stderr with the refusal messages.
-tokens=$(fm_status_append_lines "$FILE" "$@")
-rc=$?
-for token in $tokens; do
-  case "$token" in
-    collapsed:*) echo "fm-status-append: repeat ${token#collapsed:} of the previous event counted in its note line, not written again" >&2 ;;
-  esac
-done
-exit "$rc"
+fm_status_append_lines "$FILE" "$@"

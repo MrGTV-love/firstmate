@@ -58,9 +58,9 @@ last_status_line() {  # <status-file> [<previous-event-var>]
   local f=$1 scan=''
   [ -f "$f" ] && [ -r "$f" ] || return 0
   if [ "$#" -gt 1 ]; then
-    scan=$(fm_status_window_cat "$f" 2>/dev/null | _fm_status_event_scan) || :
+    scan=$(fm_status_cat "$f" 2>/dev/null | _fm_status_event_scan) || :
   elif ! scan=$(fm_status_tail_lines "$f" "$FM_CLASSIFY_EVENT_WINDOW_LINES" | _fm_status_event_scan); then
-    scan=$(fm_status_window_cat "$f" 2>/dev/null | _fm_status_event_scan) || :
+    scan=$(fm_status_cat "$f" 2>/dev/null | _fm_status_event_scan) || :
   fi
   [ "$#" -lt 2 ] || printf -v "$2" '%s' "${scan%%$'\n'*}"
   printf '%s\n' "${scan##*$'\n'}"
@@ -275,7 +275,7 @@ status_declared_wait_line() {  # <status-file>
   legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
   fm_status_tail_lines "$f" "$FM_CLASSIFY_EVENT_WINDOW_LINES" \
     | _fm_status_declared_wait_scan "$resolve" "$legacy_re" \
-    || fm_status_window_cat "$f" 2>/dev/null | _fm_status_declared_wait_scan "$resolve" "$legacy_re" || :
+    || fm_status_cat "$f" 2>/dev/null | _fm_status_declared_wait_scan "$resolve" "$legacy_re" || :
 }
 
 # Walk the status lines on stdin back from the newest event past resolved lines
@@ -334,7 +334,7 @@ status_declared_wait_identity() {  # <status-file>
   endpoint=$(_fm_status_file_size "$f") || return 1
   endpoint=${endpoint//[[:space:]]/}
   snapshot="$(_fm_status_span_scratch "$f").wait"
-  _fm_status_read_span "$f" 0 "$endpoint" > "$snapshot" 2>/dev/null \
+  _fm_status_read_span "$f" 0 "$endpoint" 0 > "$snapshot" 2>/dev/null \
     || { rm -f "$snapshot"; return 1; }
   declared=$(status_declared_wait_line "$snapshot")
   [ -n "$declared" ] || { rm -f "$snapshot"; return 1; }

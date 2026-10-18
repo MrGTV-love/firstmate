@@ -5,38 +5,47 @@
 # A status log (state/<task>.status) and its per-task sidecars are append-only
 # records that every supervision reader walks. On 2026-10-18 a shell loop inside
 # an agent harness wrote three of them to 140 GB, 265 GB and 122 GB, and every
-# reader multiplied the damage. Three numbers bound that, all owned here and
+# reader multiplied the damage. Five numbers bound that, all owned here and
 # described for operators in docs/configuration.md "Status log size bounds":
 #
 #   cap      the byte size a status log may reach through the sanctioned writer
 #            (fm_status_append_lines, bin/fm-status-append.sh). The watcher
-#            guard (bin/fm-status-cap-guard.sh) also raises its one wake when any
+#            guard (bin/fm-status-cap-guard.sh) also raises its wake when any
 #            status log or sidecar passes it.
 #   reserve  headroom above the cap that only a decision or terminal event
 #            (anything but working: and note:) may use, so a worker can still
 #            report done: or blocked: from a log that is at the cap.
-#   window   the most bytes (and, for a log of tiny lines, the most lines) any
-#            reader takes from a log in one pass. A larger span is read from its
-#            tail, aligned to a line start, and one line on stderr names what was
-#            skipped (bin/fm-status-io-lib.sh).
+#   limit    cap plus reserve: the most a status log can be through the sanctioned
+#            writer, and so the most a reader that needs the log's history takes
+#            from it. A log up to the limit is read whole and exactly; a log past it
+#            is refused, one line on stderr names the file, and nothing is read.
+#            A reader never takes a clipped copy of such a log, so no position it
+#            returns (a byte offset, a line number) can be relative to a copy.
+#   lines    the most lines a reader that loops over a log line by line in the
+#            shell takes in one pass. It is the same kind of limit as the byte
+#            limit: a span with more lines is refused and named, never clipped, and
+#            a reader that only filters with grep or awk, or that must return an
+#            exact position, asks for the byte limit alone.
+#   window   the most bytes a reader that needs only a log's latest events takes
+#            from its end (the last line, the declared wait, a tail for display).
+#            It is a tail read, never a substitute for history.
 #
 # The defaults come from measurement, not guesswork: the largest status log in a
-# healthy fleet on 2026-10-18 was 3,230,479 bytes (state/vernant-d7-steward.status).
-# The cap is 32 MiB, about ten times that, so only a runaway reaches it. The window
-# is 4 MiB and 4096 lines. The byte bound is 1.3 times that log, so it is read whole.
-# The line bound is what keeps a flood of tiny lines from costing minutes in a shell
-# loop: measured 2026-10-18, about 2.7 ms per line in the watcher's span classifier
-# (11 s at 4096 lines) and 0.06 to 1.2 ms per line in the open-decisions fold. A log
-# with more than 4096 lines is therefore read from its last 4096 when nothing narrower
-# is asked; the longest healthy log has 5,338, and an incremental reader asks for far
-# less than that because it starts from its saved position.
+# healthy fleet on 2026-10-18 was 3,230,479 bytes (state/vernant-d7-steward.status,
+# 5,338 lines). The cap is 32 MiB, about ten times that, so only a runaway reaches
+# it. The window is 4 MiB, 1.3 times that log, so a healthy log is read whole by a
+# tail reader too. The line limit is 32768, 6.1 times that log's 5,338 lines, so a
+# healthy log is read whole by a line-by-line reader with room to grow. It exists
+# because a shell loop costs about 2.7 ms per line in the watcher's span classifier
+# (measured 2026-10-18): a flood of tiny lines under the byte limit would otherwise
+# hold the watcher for hours, and the watcher is what raises the over-cap wake.
 # Each can be overridden by the environment for a test or a deliberate site choice;
 # a value that is not a positive integer falls back to the default.
 
 FM_STATUS_CAP_BYTES_DEFAULT=33554432
 FM_STATUS_CAP_RESERVE_BYTES_DEFAULT=1048576
 FM_STATUS_READ_WINDOW_BYTES_DEFAULT=4194304
-FM_STATUS_READ_WINDOW_LINES_DEFAULT=4096
+FM_STATUS_READ_LIMIT_LINES_DEFAULT=32768
 
 # Printed, or assigned to <out-var> when one is given, so a reader takes the bound
 # without forking a command substitution. Locals carry the __fm_cb_ prefix because
@@ -63,51 +72,93 @@ fm_status_window_bytes() {  # [<out-var>]
   _fm_status_bound_value "${FM_STATUS_READ_WINDOW_BYTES:-}" "$FM_STATUS_READ_WINDOW_BYTES_DEFAULT" "${1-}"
 }
 
-fm_status_window_lines() {  # [<out-var>]
-  _fm_status_bound_value "${FM_STATUS_READ_WINDOW_LINES:-}" "$FM_STATUS_READ_WINDOW_LINES_DEFAULT" "${1-}"
+fm_status_read_limit_lines() {  # [<out-var>]
+  _fm_status_bound_value "${FM_STATUS_READ_LIMIT_LINES:-}" "$FM_STATUS_READ_LIMIT_LINES_DEFAULT" "${1-}"
 }
 
-# One perl program owns the capped append so the size check, the repeat check and
-# the write happen under one lock on the log itself. Advisory only: a foreign raw
-# writer ignores the lock, which is what the watcher guard exists to catch.
+# cap plus reserve. The locals carry the __fm_rl_ prefix for the same reason as above.
+fm_status_read_limit_bytes() {  # [<out-var>]
+  local __fm_rl_cap __fm_rl_reserve
+  fm_status_cap_bytes __fm_rl_cap
+  fm_status_cap_reserve_bytes __fm_rl_reserve
+  if [ -n "${1-}" ]; then
+    printf -v "$1" '%s' "$((__fm_rl_cap + __fm_rl_reserve))"
+  else
+    printf '%s' "$((__fm_rl_cap + __fm_rl_reserve))"
+  fi
+}
+
+# 0 when a reader may take <bytes> bytes of <status-file> in one pass, 1 when that is
+# past the read limit: one line on stderr then names the file and both numbers, and the
+# reader must take nothing. Every reader that needs a log's history asks here, so a log
+# past the limit is refused the same way, and named, wherever it is read.
+fm_status_read_allowed() {  # <status-file> <bytes>
+  local __fm_ra_limit
+  fm_status_read_limit_bytes __fm_ra_limit
+  [ "$2" -le "$__fm_ra_limit" ] && return 0
+  echo "fm-status: refused to read ${1##*/}: $2 bytes is past the read limit of $__fm_ra_limit bytes (cap plus reserve); nothing was read" >&2
+  return 1
+}
+
+# Print exactly <byte-length> bytes of <status-file> from <start-offset>, or nothing.
+# Past the byte limit, and past the line limit unless <max-lines> is 0 (byte limit
+# alone), the read is refused: one line on stderr names the file and the limit, nothing
+# is printed, and the status is 1. A span is never clipped, so a caller that turns the
+# bytes into a position measures it against the span it asked for. Any other failure
+# (a file that cannot be opened or is shorter than asked) is status 1 with no message.
+fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lines>]
+  local f=$1 start=$2 length=$3 lines rc=0
+  fm_status_read_allowed "$f" "$length" || return 1
+  case "${4-}" in
+    0) lines=0 ;;
+    ''|*[!0-9]*) fm_status_read_limit_lines lines ;;
+    *) lines=$4 ;;
+  esac
+  perl -MFcntl=:DEFAULT -e '
+    my ($path, $start, $length, $max_lines) = @ARGV;
+    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;
+    sysseek($file, $start, 0) == $start or exit 1;
+    my $held = "";
+    while ($length > 0) {
+      my $want = $length > 65536 ? 65536 : $length;
+      my $read = sysread($file, my $chunk, $want);
+      defined($read) && $read > 0 or exit 1;
+      $length -= $read;
+      if ($max_lines > 0) { $held .= $chunk; } else { print $chunk or exit 1; }
+    }
+    if ($max_lines > 0) {
+      exit 3 if ($held =~ tr/\n//) > $max_lines;
+      print $held or exit 1;
+    }
+  ' "$f" "$start" "$length" "$lines" || rc=$?
+  if [ "$rc" -eq 3 ]; then
+    echo "fm-status: refused to read ${f##*/}: more than $lines lines in the span, the line-by-line read limit; nothing was read" >&2
+    return 1
+  fi
+  return "$rc"
+}
+
+# One perl program owns the capped append so the size check and the write happen
+# under one lock on the log itself. Advisory only: a foreign raw writer ignores
+# the lock, which is what the watcher guard exists to catch.
 #
-# Per line it does one of three things:
+# Per line it does one of two things:
 #   append    the line is written, unless it would pass the cap. Past the cap only
 #             a line whose verb is not working or note may use the reserve; any
-#             other line is refused and the program exits 75 after saying so.
-#   collapse  the line equals the last real line (compared without its [at=...]
-#             stamp). The log gets ONE counter line after that real line, and each
-#             further repeat rewrites that counter line's fixed-width number in
-#             place, so a loop of any length adds one line and zero bytes. The
-#             count is exact; no repeat is dropped without being counted.
+#             other line is refused and the program exits 75 after saying so on
+#             stderr, naming the file. Nothing is written for a refused line, and
+#             a later line in the same call is judged on its own.
 #   frame     a log whose last byte is not a newline gets one first, so a torn
 #             foreign write cannot glue itself onto a new event.
-# stdout carries one token per input line: appended, collapsed:<count>, or
-# refused:<size>. The counter line is a note: event so every reader already
-# treats it as informational.
+# stdout stays empty: the exit status and stderr are the whole contract. A repeated
+# line is written like any other; the cap is what stops a loop, and it stops it
+# loudly.
 IFS= command read -r -d '' _FM_STATUS_APPEND_PERL <<'PERL' || :
 use strict;
 use warnings;
 use Fcntl qw(:DEFAULT :flock);
 
 my ($path, $cap, $reserve, @lines) = @ARGV;
-my $window = 65536;
-my $max_count = 999999999999;
-my $counter_re = qr/^note \[at=\d+\]: \[fm-status-collapsed\] repeats=(\d{12}) /;
-
-# State of the log's tail, kept across the lines of one call while this process is the
-# only writer (the lock is held and the size is what the last write left); any other
-# size reloads it from a bounded tail read.
-my ($cached_size, $real, $real_norm, $counter_pos, $count) = (-1);
-
-sub normalize {
-    my ($line) = @_;
-    my $colon = index($line, ':');
-    return $line if $colon < 0;
-    my $head = substr($line, 0, $colon);
-    $head =~ s/ ?\[at=\d{1,12}\]//g;
-    return $head . substr($line, $colon);
-}
 
 sub ends_with_newline {
     my ($handle, $size) = @_;
@@ -117,45 +168,6 @@ sub ends_with_newline {
     return $last eq "\n";
 }
 
-# The last real line, and the counter line that may follow it, from a bounded tail.
-sub load_state {
-    my ($handle, $size) = @_;
-    ($real, $real_norm, $counter_pos, $count) = (undef, undef, undef, undef);
-    $cached_size = $size;
-    return if $size <= 0;
-    my $take = $size < $window ? $size : $window;
-    my $buf = '';
-    sysseek($handle, $size - $take, 0);
-    sysread($handle, $buf, $take);
-    my $base = $size - $take;
-    if ($base > 0) {
-        my $nl = index($buf, "\n");
-        if ($nl < 0) { $buf = ''; } else { $buf = substr($buf, $nl + 1); $base += $nl + 1; }
-    }
-    my @rows;
-    my $pos = 0;
-    while ($pos < length($buf)) {
-        my $nl = index($buf, "\n", $pos);
-        my $end = $nl < 0 ? length($buf) : $nl;
-        my $text = substr($buf, $pos, $end - $pos);
-        if ($text =~ /\S/) {
-            my $digits_at = $text =~ $counter_re ? $-[1] : undef;
-            push @rows, [$base + $pos, $text, $digits_at, $digits_at ? $1 + 0 : undef];
-        }
-        $pos = $nl < 0 ? length($buf) : $nl + 1;
-    }
-    return unless @rows;
-    my $last = $rows[-1];
-    if (defined $last->[2]) {
-        $counter_pos = $last->[0] + $last->[2];
-        $count = $last->[3];
-        $real = $rows[-2][1] if @rows > 1;
-    } else {
-        $real = $last->[1];
-    }
-    $real_norm = normalize($real) if defined $real;
-}
-
 sysopen(my $fh, $path, O_RDWR | O_APPEND | O_CREAT | O_NOFOLLOW, 0644)
     or do { print STDERR "fm-status-append: cannot open $path: $!\n"; exit 1 };
 flock($fh, LOCK_EX) or do { print STDERR "fm-status-append: cannot lock $path: $!\n"; exit 1 };
@@ -163,32 +175,11 @@ flock($fh, LOCK_EX) or do { print STDERR "fm-status-append: cannot lock $path: $
 my $rc = 0;
 for my $line (@lines) {
     my $size = (stat($fh))[7];
-    load_state($fh, $size) if $size != $cached_size;
-
-    my $norm = normalize($line);
-    my $same = defined $real_norm && $norm eq $real_norm;
-
-    if ($same && defined $counter_pos) {
-        $count++ if $count < $max_count;
-        sysopen(my $w, $path, O_WRONLY | O_NOFOLLOW)
-            or do { print STDERR "fm-status-append: cannot reopen $path: $!\n"; exit 1 };
-        sysseek($w, $counter_pos, 0);
-        syswrite($w, sprintf('%012d', $count));
-        close($w);
-        print "collapsed:$count\n";
-        next;
-    }
-
-    my $text = $same
-        ? sprintf('note [at=%d]: [fm-status-collapsed] repeats=%012d of the line above (bin/fm-status-append.sh counts exact consecutive repeats in this one line instead of writing each)', time(), 1)
-        : $line;
     my $frame = ($size > 0 && !ends_with_newline($fh, $size)) ? "\n" : '';
-    my $out = $frame . $text . "\n";
-    my $after = $size + length($out);
-    my $terminal = $text !~ /^\s*(?:working|note)\b/;
-    my $limit = ($terminal || $same) ? $cap + $reserve : $cap;
-    if ($after > $limit) {
-        print "refused:$size\n";
+    my $out = $frame . $line . "\n";
+    my $terminal = $line !~ /^\s*(?:working|note)\b/;
+    my $limit = $terminal ? $cap + $reserve : $cap;
+    if ($size + length($out) > $limit) {
         print STDERR "fm-status-append: refused: $path is $size bytes and this line would pass the limit of $limit bytes (cap $cap, reserve $reserve for decision and terminal lines)\n";
         $rc = 75;
         next;
@@ -196,25 +187,14 @@ for my $line (@lines) {
     my $written = syswrite($fh, $out);
     (defined $written && $written == length($out))
         or do { print STDERR "fm-status-append: short write to $path: $!\n"; exit 1 };
-    $cached_size = $after;
-    if ($same) {
-        $counter_pos = $size + length($frame) + index($text, 'repeats=') + 8;
-        $count = 1;
-        print "collapsed:1\n";
-    } else {
-        ($real, $real_norm, $counter_pos, $count) = ($line, $norm, undef, undef);
-        print "appended\n";
-    }
 }
 close($fh);
 exit $rc;
 PERL
 
-# Append <line>... to <status-file> through the cap and the repeat counter above.
-# Each line is one status event without its newline. Returns 0 when every line was
-# appended or counted, 75 when a line was refused at the cap, 1 on any other
-# failure. stdout carries the per-line tokens (appended, collapsed:<count>,
-# refused:<size>); callers that only need the status discard it.
+# Append <line>... to <status-file> through the cap above. Each line is one status
+# event without its newline. Returns 0 when every line was appended, 75 when a line
+# was refused at the cap (stderr names the file), 1 on any other failure.
 fm_status_append_lines() {  # <status-file> <line>...
   local file=$1 cap reserve
   shift
@@ -233,10 +213,15 @@ fm_status_append_line() {  # <status-file> <line>
 # The writers above only bound the sanctioned path. A foreign process that opens
 # the log itself (a raw `>>` loop, which is how 2026-10-18 happened) is caught here:
 # one stat over every status log and per-task sidecar in <state> per watcher poll,
-# no other process, and a durable marker per episode so exactly ONE wake is raised
-# for a file however long it stays over the cap. bin/fm-status-cap-guard.sh turns a
-# row into the wake text and the containment; the watcher (bin/fm-watch.sh) owns
-# the wake itself.
+# no other process, and a durable marker per file that records the size at which it
+# was last alerted. An existing log is never deleted or rewritten, so a log that
+# went over the cap stays over it; detection therefore keys on GROWTH, not on being
+# over the cap. A file raises one wake when it first passes the cap and one more each
+# time it has grown by more than one cap since its marker, so a writer that is
+# resumed after a stop, or a relaunch that appends to the same inode, is caught
+# again, and a file that has not grown raises nothing. At most one wake per poll
+# covers every file that is due. bin/fm-status-cap-guard.sh turns a row into the wake
+# text and the containment; the watcher (bin/fm-watch.sh) owns the wake itself.
 
 # Print "<size>\t<ident>\t<path>" for every status log and sidecar in <state> that
 # a bounded reader could meet: state/*.status and the dot-sidecars that carry a
@@ -262,12 +247,13 @@ fm_status_cap_marker_path() {  # <state> <path> [<out-var>]
   if [ -n "${3-}" ]; then printf -v "$3" '%s' "$__fm_cm_path"; else printf '%s' "$__fm_cm_path"; fi
 }
 
-# Print "<size>\t<ident>\t<path>" for each file over the cap that has no marker for
-# its current identity, and delete the markers of files that are gone, replaced,
-# or back under the cap so a later episode alarms again. Cheap in the quiet case:
-# one stat, plus a read per marker.
+# Print "<size>\t<ident>\t<path>" for each file over the cap that is due an alert:
+# one with no marker for its current identity, or one that has grown by more than one
+# cap since the size its marker holds. Delete the markers of files that are gone,
+# replaced, or back under the cap so a later episode alarms again. Cheap in the quiet
+# case: one stat, plus a read per marker.
 fm_status_cap_unalerted() {  # <state>
-  local state=$1 cap size ident path marker held_ident held_path
+  local state=$1 cap size ident path marker held_ident held_path held_size
   local rows over_paths=$'\n'
   fm_status_cap_bytes cap
   rows=$(fm_status_cap_stat_rows "$state")
@@ -276,9 +262,12 @@ fm_status_cap_unalerted() {  # <state>
     [ "$size" -gt "$cap" ] || continue
     over_paths="$over_paths$path"$'\t'"$ident"$'\n'
     fm_status_cap_marker_path "$state" "$path" marker
-    held_ident=
-    if [ -f "$marker" ]; then IFS=$'\t' read -r held_ident held_path < "$marker" || :; fi
-    [ "$held_ident" = "$ident" ] && continue
+    held_ident='' held_size=''
+    if [ -f "$marker" ]; then IFS=$'\t' read -r held_ident held_path held_size < "$marker" || :; fi
+    if [ "$held_ident" = "$ident" ]; then
+      case "$held_size" in ''|*[!0-9]*) held_size=0 ;; esac
+      [ "$size" -gt $((held_size + cap)) ] || continue
+    fi
     printf '%s\t%s\t%s\n' "$size" "$ident" "$path"
   done <<EOF
 $rows
@@ -286,7 +275,7 @@ EOF
   for marker in "$state"/.status-cap-alerted.*; do
     [ -f "$marker" ] || continue
     held_ident='' held_path=''
-    IFS=$'\t' read -r held_ident held_path < "$marker" || :
+    IFS=$'\t' read -r held_ident held_path _ < "$marker" || :
     case "$over_paths" in
       *$'\n'"$held_path"$'\t'"$held_ident"$'\n'*) ;;
       *) rm -f -- "$marker" ;;

@@ -2840,7 +2840,7 @@ fm_wake_status_append_self_announced() {  # <state> <status-file> <line>...
     pre_size=$(_fm_status_file_size "$file") || pre_size=''
     pre_ident=$(_fm_open_decisions_file_ident "$file") || pre_ident=''
   fi
-  fm_status_append_lines "$file" "${stamped[@]}" >/dev/null 2>&1 || return 2
+  fm_status_append_lines "$file" "${stamped[@]}" || return 2
   case "$pre_size" in ''|*[!0-9]*) return 1 ;; esac
   post_size=$(_fm_status_file_size "$file") || return 1
   post_ident=$(_fm_open_decisions_file_ident "$file") || return 1

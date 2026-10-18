@@ -163,7 +163,7 @@ fm_parent_channel_append_once() {  # <path> <line>
   if status_event_recorded "$path" "$line"; then
     return 0
   fi
-  fm_status_append_line "$path" "$line" >/dev/null 2>&1
+  fm_status_append_line "$path" "$line"
 }
 
 # Publish one parent-facing line from <home>. See the return codes above.

@@ -654,6 +654,7 @@ for _teardown_source in \
   fm-status-event-lib.sh \
   fm-status-wake-lib.sh \
   fm-status-io-lib.sh \
+  fm-status-cap-lib.sh \
   fm-utc-lib.sh \
   fm-gate-refuse-lib.sh \
   fm-pr-lib.sh \

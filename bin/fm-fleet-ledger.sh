@@ -215,6 +215,13 @@ append_status() { # <task> <status-line>
     --arg state "$verb" --arg key "$key" --arg text "$text"
 }
 
+# The most status lines one capture turns into ledger events. Each line costs a jq run,
+# 27 ms measured on 2026-10-18, so a burst of tens of thousands would hold the
+# watcher's poll loop for minutes; 256 lines is about seven seconds. A log that grew
+# by more than this since the last capture is captured from its last lines and the
+# ledger records how much it skipped.
+CAPTURE_MAX_LINES=256
+
 capture_task() { # <task>; caller holds the lock
   local task=$1 log offset data complete tail line saved window window_lines skipped clamped=0 head lines drop
   log="$STATE/$task.status"
@@ -225,13 +232,14 @@ capture_task() { # <task>; caller holds the lock
   data=${data//[[:space:]]/}
   [ "$data" -ge "$offset" ] || offset=0
   [ "$data" -gt "$offset" ] || return 0
-  # Bounded like every status reader (bin/fm-status-cap-lib.sh): a log that grew by
-  # more than one reader window since the saved offset is captured from its last
-  # window of whole lines, and the ledger says how much it skipped, so a runaway
-  # writer cannot make this read the whole log into memory or start thousands of jq
-  # processes. The saved offset still advances to the end of what was read.
+  # Bounded: a log that grew by more than one tail window (bin/fm-status-cap-lib.sh)
+  # or more than CAPTURE_MAX_LINES lines since the saved offset is captured from its
+  # last whole lines, and the ledger records a task.status.skipped event saying how
+  # much it skipped, so a runaway writer cannot make this read the whole log into
+  # memory or start thousands of jq processes. The saved offset advances to the end
+  # of what was read.
   fm_status_window_bytes window
-  fm_status_window_lines window_lines
+  window_lines=$CAPTURE_MAX_LINES
   skipped=0
   if [ $((data - offset)) -gt "$window" ]; then
     skipped=$((data - window - offset))
