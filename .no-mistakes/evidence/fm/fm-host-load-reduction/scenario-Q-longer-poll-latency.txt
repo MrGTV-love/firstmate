@@ -1,0 +1,4 @@
+### Scenario Q: status change noticed by a secondmate-home watcher with the default 30s poll
+watcher reached its first 30s wait (sleeps asked: 30 )
+watcher exited 32s after the write; output:
+  signal: /Users/charlesabrooker/tmp/fm-lab.XkAE7j/state/task.status

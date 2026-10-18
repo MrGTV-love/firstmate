@@ -1,0 +1,53 @@
+### Scenario M: real 'fm-procevent-lavish.sh sweep --auto' against a disposable Lavish store
+--- dry run (sweep --dry-run --auto):
+kept: lavish-2c23df8302704c5b queued-open.html - Lavish holds queued feedback for the board
+kept: lavish-3f03120305a82cfc ended-queued-missing.html - Lavish holds queued feedback for the board
+kept: lavish-589b2d46069f0512 open-missing.html - the Lavish session is live
+kept: lavish-58fa89f84e537f12 open-present-old.html - the Lavish session is live
+kept: lavish-904cb10982ed5444 open-missing-old.html - the Lavish session is live
+kept: lavish-a9eb650c65d05edc nosession-present.html - the board's complete card-key set cannot be established
+kept: lavish-b5bb3cf65b6a716e ended-present.html - the board's complete card-key set cannot be established
+kept: lavish-c31de02dcbe8f7fa feedback-missing.html - Lavish holds queued feedback for the board
+kept: lavish-c3c4e523333d3510 open-present.html - the Lavish session is live
+sweep: would-retire=2 kept=9
+would-retire: lavish-1e5738cc249acb37 nosession-missing.html - the board file is gone
+would-retire: lavish-d7467c655ef3b9f8 ended-missing.html - the board file is gone
+--- real run (sweep --auto):
+kept: lavish-2c23df8302704c5b queued-open.html - Lavish holds queued feedback for the board
+kept: lavish-3f03120305a82cfc ended-queued-missing.html - Lavish holds queued feedback for the board
+kept: lavish-589b2d46069f0512 open-missing.html - the Lavish session is live
+kept: lavish-58fa89f84e537f12 open-present-old.html - the Lavish session is live
+kept: lavish-904cb10982ed5444 open-missing-old.html - the Lavish session is live
+kept: lavish-a9eb650c65d05edc nosession-present.html - the board's complete card-key set cannot be established
+kept: lavish-b5bb3cf65b6a716e ended-present.html - the board's complete card-key set cannot be established
+kept: lavish-c31de02dcbe8f7fa feedback-missing.html - Lavish holds queued feedback for the board
+kept: lavish-c3c4e523333d3510 open-present.html - the Lavish session is live
+retired: lavish-1e5738cc249acb37 nosession-missing.html - the board file is gone
+retired: lavish-d7467c655ef3b9f8 ended-missing.html - the board file is gone
+sweep: retired=2 kept=9
+--- retirement record state/lavish-auto-retire.log:
+1792302358 retired lavish-1e5738cc249acb37 nosession-missing.html - the board file is gone
+1792302358 retired lavish-d7467c655ef3b9f8 ended-missing.html - the board file is gone
+--- registered sources after the sweep:
+  RETIRED:    ended-missing
+  RETIRED:    nosession-missing
+  registered: ended-present
+  registered: ended-queued-missing
+  registered: feedback-missing
+  registered: nosession-present
+  registered: open-missing
+  registered: open-missing-old
+  registered: open-present
+  registered: open-present-old
+  registered: queued-open
+--- for contrast, MANUAL sweep (no --auto) dry run on the remaining sources:
+kept: lavish-2c23df8302704c5b queued-open.html - Lavish holds queued feedback for the board
+kept: lavish-3f03120305a82cfc ended-queued-missing.html - Lavish holds queued feedback for the board
+kept: lavish-58fa89f84e537f12 open-present-old.html - active within the last 48 hours
+kept: lavish-a9eb650c65d05edc nosession-present.html - the board's complete card-key set cannot be established
+kept: lavish-b5bb3cf65b6a716e ended-present.html - the board's complete card-key set cannot be established
+kept: lavish-c31de02dcbe8f7fa feedback-missing.html - Lavish holds queued feedback for the board
+kept: lavish-c3c4e523333d3510 open-present.html - active within the last 48 hours
+sweep: would-retire=2 kept=7
+would-retire: lavish-589b2d46069f0512 open-missing.html - the board file is gone
+would-retire: lavish-904cb10982ed5444 open-missing-old.html - the board file is gone

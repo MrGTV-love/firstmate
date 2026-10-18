@@ -1,0 +1,18 @@
+### Scenario I: flock fails with a NON-busy OSError (ENOTSUP) -> runs at once without a slot, no 7200s wait
+fm-duration: running test.tests/enotsup.test.sh without a slot: [Errno 45] Operation not supported
+command-ran
+fm-duration: waiting 2s for a free slot of test.tests/busy.test.sh (limit 1, FM_TEST_KEY_SLOTS; gives up after 2s); holders: holder unknown
+fm-duration: waited 2s for a free slot of test.tests/busy.test.sh (limit 1); running it without a slot
+ran-after-wait
+rc=0 elapsed=0.02s (default wait would be 7200s)
+busy case: rc=0 elapsed=2.03s (waited, then ran without slot)
+
+### Scenario J: stale-holder flag - gone pid, reused pid, 1s-late start (slack), live holder
+live sleep pid 60830 ps-start epoch 1792302210
+live, acquired 1s after start                  -> pid=60830 alive held 0s
+live, recorded epoch == start                  -> pid=60830 alive held 1s
+live, ps start 1s LATER than epoch (slack)     -> pid=60830 alive held 2s
+live, ps start 2s later (slack edge)           -> pid=60830 alive held 3s
+reused pid, ps start 3s later than epoch       -> pid=60830 record does not match a live process (pid gone or reused) held 4s
+reused pid, epoch an hour before start         -> pid=60830 record does not match a live process (pid gone or reused) held 3601s
+gone pid                                       -> pid=999999 record does not match a live process (pid gone or reused) held 1s

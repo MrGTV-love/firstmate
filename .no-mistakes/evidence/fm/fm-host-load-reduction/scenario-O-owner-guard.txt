@@ -1,0 +1,11 @@
+### Scenario O: owner-guard interval on real running guards
+registered: default-src (lavish)
+default (FM_PROCEVENT_OWNER_CHECK_SECONDS unset): guard child processes:
+  sleep 30
+--- explicit FM_PROCEVENT_OWNER_CHECK_SECONDS=10 on a second source:
+no sources registered
+--- explicit FM_PROCEVENT_OWNER_CHECK_SECONDS=10 on a second source (expect sleep 5):
+registered: explicit-src (lavish)
+  sleep 5
+--- invalid value is refused by name (FM_PROCEVENT_OWNER_CHECK_SECONDS=0):
+reconciled: published=0 started=0 stopped=0 uncertain=0 failed=0

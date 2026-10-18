@@ -1,0 +1,17 @@
+### Scenario P: 3 simultaneous 'bin/fm-test-run.sh tests/fm-heavy.test.sh' (script sleeps 6s), default limit 2
+all three finished in 16s (serial would be ~18s+, two-at-a-time ~12s)
+--- run 1: FM_TEST_END 2026-10-18T05:53:17Z tests/fm-heavy.test.sh exit=0 duration_ms=6755 gate_skip=false ; FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8294
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=6755 failed=0
+--- run 2: FM_TEST_END 2026-10-18T05:53:18Z tests/fm-heavy.test.sh exit=0 duration_ms=6884 gate_skip=false ; FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8220
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=6884 failed=0
+--- run 3: FM_TEST_END 2026-10-18T05:53:24Z tests/fm-heavy.test.sh exit=0 duration_ms=7085 gate_skip=false ; FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=14460
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=7085 failed=0
+    stderr: fm-duration: waiting 3s for a free slot of test.tests/fm-heavy.test.sh (limit 2, FM_TEST_KEY_SLOTS; gives up after 7200s); holders: pid=97147 alive held 4s; pid=97811 alive held 4s
+    stderr: fm-duration: got a slot of test.tests/fm-heavy.test.sh after 5s
+--- recorded samples:
+  test.tests/fm-heavy.test.sh duration_ms=6755 load_start=69.99 load_end=70.228515625
+  test.tests/fm-heavy.test.sh duration_ms=6884 load_start=69.99 load_end=70.228515625
+  test-suite.scripts;jobs=1 duration_ms=8294 load_start=69.99 load_end=68.7685546875
+  test-suite.scripts;jobs=1 duration_ms=8220 load_start=69.99 load_end=68.7685546875
+  test.tests/fm-heavy.test.sh duration_ms=7085 load_start=None load_end=66.22412109375
+  test-suite.scripts;jobs=1 duration_ms=14460 load_start=69.99 load_end=66.22412109375

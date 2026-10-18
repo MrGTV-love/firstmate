@@ -1,0 +1,9 @@
+### Scenario N: watcher-driven automatic retirement (interval 4s, poll 1s), board files all deleted
+before watcher: watch-ended-gone=registered watch-open-gone=registered
++2s (inside first interval, no sweep yet): watch-ended-gone=registered; watcher alive=yes; deadline file: 1792302700
+after 9s: watch-ended-gone=RETIRED watch-open-gone=registered
+after another sweep window: watch-open-gone=registered (live session must stay registered); watcher alive=yes
+--- state/lavish-auto-retire.log:
+1792302704 retired lavish-9c322df656858430 watch-ended-gone.html - the board file is gone
+--- resident listener processes (pid files -> alive?):
+--- watcher output:

@@ -1,0 +1,12 @@
+### Scenario A: 3 copies of one key, default limit 2 (FM_TEST_KEY_SLOTS unset)
+[c1] copy1 start 0.4
+[c1] copy1 end 5.4
+[c2] copy2 start 0.7
+[c2] copy2 end 5.7
+[c3] fm-duration: waiting 3s for a free slot of test.tests/fake-heavy.test.sh (limit 2, FM_TEST_KEY_SLOTS; gives up after 7200s); holders: pid=67134 alive held 3s; pid=67982 alive held 3s
+[c3] fm-duration: got a slot of test.tests/fake-heavy.test.sh after 5s
+[c3] copy3 start 6.3
+[c3] copy3 end 11.4
+wait-file copy1: 0
+wait-file copy2: 0
+wait-file copy3: 5227

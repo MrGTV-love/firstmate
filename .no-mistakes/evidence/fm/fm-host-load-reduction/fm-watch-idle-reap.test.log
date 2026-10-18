@@ -1,0 +1,16 @@
+ok - the poll loop starts the sweep detached, on its interval, for this home, without a wake
+ok - the stock-layout lab watcher reaches real teardown admission and cleans up an eligible scout
+ok - a fresh watcher leaves session start alone: the first sweep waits one full interval
+ok - FM_IDLE_REAP_INTERVAL=0 turns the sweep off
+ok - a failing sweep is retried quietly and never stops the poll
+ok - a sweep still running is never started twice, and the poll keeps running
+ok - actionable watcher handoffs preserve the initial and subsequent sweep deadlines, including disabled and repeated ticks
+ok - the poll loop starts the automatic Lavish sweep detached, on its interval, for this home, without a wake
+ok - the first Lavish sweep waits one full interval, and FM_LAVISH_AUTO_RETIRE_INTERVAL=0 turns it off
+ok - a failing Lavish sweep is retried quietly and a hung one is never doubled, and the poll keeps running
+ok - primary homes poll every 15 seconds and secondmate homes every 30
+ok - fm-wake-lib.sh sources alone under set -eu and loads the primary-scope library only to resolve the poll
+ok - config/watch-poll overrides a home within 1..240 and bad values fall back to the role default
+ok - a running watcher sleeps the resolved interval: role default, config override, FM_POLL first
+ok - a status change is noticed within one longer interval (10s after the write, 4s interval)
+exit=0

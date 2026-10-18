@@ -1,0 +1,6 @@
+### Scenario L: real bin/fm-watch.sh in lab homes - which interval does the running watcher sleep?
+primary: sleeps asked for = 15 
+secondmate: sleeps asked for = 30 
+secondmate-FM_POLL7: sleeps asked for = 7 
+secondmate-config41: sleeps asked for = 41 
+primary-config200: sleeps asked for = 200 

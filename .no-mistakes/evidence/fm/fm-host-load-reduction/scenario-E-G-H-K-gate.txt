@@ -1,0 +1,32 @@
+### Scenario E: wait expires -> runs WITHOUT a slot and says so (limit 1, wait 3s)
+fm-duration: waiting 3s for a free slot of test.tests/exp.test.sh (limit 1, FM_TEST_KEY_SLOTS; gives up after 3s); holders: pid=81496 alive held 5s
+fm-duration: waited 3s for a free slot of test.tests/exp.test.sh (limit 1); running it without a slot
+ran-after-giving-up
+rc=0
+waiter ran after 3.7s; wait-file ms: 3005
+
+### Scenario G: nested run of a held key takes no second slot (limit 1) - no deadlock
+outer holds: FM_TEST_SLOT_HELD=[test.tests/nest.test.sh]
+inner-ran-at-once
+inner rc=0
+total 0.8s; inner wait-file: 0
+
+### Scenario H: a test's leftover daemon never holds the slot (limit 1)
+leftover daemon pid 97093
+parent-exits-now
+second-copy-ran
+second copy waited 0 ms (daemon still alive:        1 proc)
+
+### Scenario K: 'run' (timing wrapper) also takes a slot; wait is not in the recorded sample
+calibration: "0 of 5 samples for test.tests/runk.test.sh on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.tests/runk.test.sh elapsed=1.1s output_bytes=0 tree_cpu=0.01s"
+fm-duration: waiting 3s for a free slot of test.tests/runk.test.sh (limit 1, FM_TEST_KEY_SLOTS; gives up after 7200s); holders: pid=99610 alive held 4s
+fm-duration: got a slot of test.tests/runk.test.sh after 5s
+calibration: "1 of 5 samples for test.tests/runk.test.sh on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.tests/runk.test.sh elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+second-run-done
+recorded samples (ms):
+test.tests/runk.test.sh 4059 exit 0
+test.tests/runk.test.sh 1086 exit 0

@@ -1,0 +1,28 @@
+### Scenario B: different keys never wait on each other (3 distinct keys, limit 1)
+total seconds for 3 distinct keys run together: 2.7 (expect ~2, not ~6)
+wait-file a: 0
+wait-file b: 0
+wait-file c: 0
+
+### Scenario C: SIGKILL the holder, the waiter gets the slot at once (limit 1)
+killing holder gate pid 40083 with SIGKILL at +1.7s
+[waiter] fm-duration: got a slot of test.tests/kill.test.sh after 3s
+[waiter] waiter-ran
+waiter finished 3.7s after it began (holder killed at ~1.5s)
+waiter wait-file ms: 3169
+
+### Scenario D: FM_TEST_KEY_SLOTS=0 turns gate off; non test.* key takes no slot
+ran-off
+rc=0 wait=0
+ls: /Users/charlesabrooker/tmp/fm-gate-lab.R4Q0gM/slots-off: No such file or directory
+ran-lint
+rc=0 wait=0
+ls: /Users/charlesabrooker/tmp/fm-gate-lab.R4Q0gM/slots-off: No such file or directory
+
+### Scenario F: malformed settings refuse the command by name (exit 125)
+fm-duration: FM_TEST_KEY_SLOTS='abc' must be a whole number from 0 (off) to 16
+rc=125
+fm-duration: FM_TEST_KEY_SLOTS='17' must be a whole number from 0 (off) to 16
+rc=125
+fm-duration: FM_TEST_SLOT_WAIT_SECONDS='0' must be a whole number of seconds of at least 1
+rc=125

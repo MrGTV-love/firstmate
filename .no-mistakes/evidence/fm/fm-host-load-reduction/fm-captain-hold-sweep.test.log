@@ -1,0 +1,14 @@
+ok - the sweep retires finished boards and keeps every board that could still carry an answer
+ok - the automatic sweep retires finished boards, never a live or unanswered one whose listener cannot start, and records why
+ok - the automatic sweep keeps a live board whose file is gone and retires it once the session has ended
+ok - the sweep stops the resident poll of a finished board's live listener
+ok - deleted boards retain standing, feedback, ownership and captured-result protections
+ok - filesystem permission errors keep ended, sessionless and idle board listeners
+ok - stale sweeps preserve replacement generations and newly captured rounds
+ok - recent acknowledgements keep only their own listeners in literal home paths
+ok - unknown inbox evidence keeps listeners at sweep and locked retirement boundaries
+ok - unknown and dynamic card discovery keeps ended, sessionless and idle listeners
+ok - bound sweep keys share exact and legacy answer precedence without cross-source cache leakage
+ok - sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+exit=0
