@@ -1,0 +1,20 @@
+$ fm-teardown.sh vernant-provision-adopt-existing-branch   (work NOT landed)
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+97e6531 vernant-provision-adopt-existing-branch unlanded commit 2
+22b344c vernant-provision-adopt-existing-branch unlanded commit 1
+0fb0bb6 initial
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+--- AFTER refused teardown (nothing changed) ---
+worktree registrations:
+worktree proj
+worktree old
+worktree pool/139/repo
+worktree pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling
+worktree pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch
+record vernant-provision-adopt-existing-branch: worktree=pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch prior_worktree=pool/139/repo 
+record vernant-b2b-recovery-coupling: worktree=pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling prior_worktree=pool/139/repo 
+claim: task=vernant-provision-adopt-existing-branch home=home 
+treehouse calls: none
+ok - unlanded refused

@@ -1,0 +1,31 @@
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+ok - a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records
+ok - a fresh allocation in the enclosing-slot window leaves the claimant slot and the retiring copy untouched
+ok - a slot claim decides slot administration while the retiring copy decides runtime retirement, for every claimant and copy shape
+ok - teardown of a reassociated record keeps the non-pool current copy and every prior copy untouched
+ok - teardown of a reassociated record still refuses unlanded work in the current copy
+ok - teardown of a record whose old slot was released keeps the non-pool current copy
+ok - teardown refuses to return a pool slot another record preserves as a prior copy
+ok - own prior copies refuse only a pool return that cannot prove them landed; a prior that is or encloses the slot does not block it, with or without --force
+ok - the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot
+ok - a landed, clean own nested copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an own copy whose lock names a pid that started after the lock was written is released by the same driver path
+ok - a live lock launcher outside the task keeps a locked own copy and is named by pid
+ok - a locked own copy with unlanded commits, unsaved or unique ignored files, or a lock that is not Vernant's is refused and nothing changes
+ok - a foreign copy that is still refused keeps the locked own copy, the slot and the record in place
+ok - the closeout driver releases a locked own copy before the shared project lock is taken, and the slot return still runs under it
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place
+ok - returning the enclosing slot aborts its parked run and retires its launch agent before the return
+ok - shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work
+ok - a stale-lock cleanup in the enclosing slot proves it again before the reset, with or without --force
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands
+ok - a plain re-run of a landed local-only nested ship is recorded as landed, not dropped
+ok - a refusal at the slot proof, the retire step, either proof before removal or the return is safe to re-run with a plain teardown
+ok - a removed nested copy is judged by its own branch ref: unlanded refuses, content landed by squash passes
+ok - a removed nested copy whose branch is gone is settled by its recorded PR: merged finishes as landed, otherwise it refuses
+ok - the enclosing slot is measured at its own HEAD, not proven by the nested copy's pipeline-input record
+ok - a removed nested copy whose branch was the merged run's input is proven by the run record
+ok - an endpoint-refused retry keeps the reservation until closure and records the nested ship landed
+ok - the post-lock proof does not refuse over nested copies teardown itself already removed
+ok - ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage
+exit=0

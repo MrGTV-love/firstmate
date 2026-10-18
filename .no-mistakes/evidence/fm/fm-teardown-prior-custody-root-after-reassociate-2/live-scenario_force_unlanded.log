@@ -1,0 +1,17 @@
+$ fm-teardown.sh vernant-provision-adopt-existing-branch --force   (work not landed; --force waives only the landed test)
+teardown vernant-provision-adopt-existing-branch complete (window fmses:fm-vernant-provision-adopt-existing-branch; nested reassociated worktree pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch removed; pool slot pool/139/repo left in place, since task vernant-b2b-recovery-coupling still works in it)
+notice: vernant-provision-adopt-existing-branch's prior copy pool/139/repo (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+Backlog: vernant-provision-adopt-existing-branch just finished (this home keeps no markdown backlog at home/data/backlog.md). Update home/data/backlog.md - move vernant-provision-adopt-existing-branch to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+--- AFTER forced teardown ---
+worktree registrations:
+worktree proj
+worktree old
+worktree pool/139/repo
+worktree pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling
+record vernant-provision-adopt-existing-branch: GONE
+record vernant-b2b-recovery-coupling: worktree=pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling prior_worktree=pool/139/repo 
+claim: task=vernant-b2b-recovery-coupling home=home 
+treehouse calls: none
+branch fm/vernant-provision-adopt-existing-branch-v2 still at b2f453263003ca2ce242508b450876c846eee657 (commits preserved)
+ok - forced unlanded: peer, root, lease untouched

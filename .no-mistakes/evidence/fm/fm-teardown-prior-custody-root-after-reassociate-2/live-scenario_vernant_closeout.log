@@ -1,0 +1,56 @@
+--- BEFORE: two live records on one shared root ---
+worktree registrations:
+worktree proj
+worktree old
+worktree pool/139/repo
+worktree pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling
+worktree pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch
+record vernant-provision-adopt-existing-branch: worktree=pool/139/repo 
+record vernant-b2b-recovery-coupling: worktree=pool/139/repo 
+claim: task=vernant-provision-adopt-existing-branch home=home 
+treehouse calls: none
+--- AFTER reassociate --also (records re-pointed, root still named as prior custody) ---
+worktree registrations:
+worktree proj
+worktree old
+worktree pool/139/repo
+worktree pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling
+worktree pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch
+record vernant-provision-adopt-existing-branch: worktree=pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch prior_worktree=pool/139/repo 
+record vernant-b2b-recovery-coupling: worktree=pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling prior_worktree=pool/139/repo 
+claim: task=vernant-provision-adopt-existing-branch home=home 
+treehouse calls: none
+
+$ fm-teardown.sh vernant-provision-adopt-existing-branch   (first record, work landed)
+teardown vernant-provision-adopt-existing-branch complete (window fmses:fm-vernant-provision-adopt-existing-branch; nested reassociated worktree pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch removed; pool slot pool/139/repo left in place, since task vernant-b2b-recovery-coupling still works in it)
+notice: vernant-provision-adopt-existing-branch's prior copy pool/139/repo (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+Backlog: vernant-provision-adopt-existing-branch just finished (this home keeps no markdown backlog at home/data/backlog.md). Update home/data/backlog.md - move vernant-provision-adopt-existing-branch to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+--- AFTER first teardown ---
+worktree registrations:
+worktree proj
+worktree old
+worktree pool/139/repo
+worktree pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling
+record vernant-provision-adopt-existing-branch: GONE
+record vernant-b2b-recovery-coupling: worktree=pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling prior_worktree=pool/139/repo 
+claim: task=vernant-b2b-recovery-coupling home=home 
+treehouse calls: none
+
+$ fm-teardown.sh vernant-b2b-recovery-coupling   (second record, work landed)
+teardown vernant-b2b-recovery-coupling complete (window fmses:fm-vernant-b2b-recovery-coupling; nested reassociated worktree pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling removed and its pool slot pool/139/repo returned)
+Backlog: vernant-b2b-recovery-coupling just finished (this home keeps no markdown backlog at home/data/backlog.md). Update home/data/backlog.md - move vernant-b2b-recovery-coupling to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+--- AFTER second teardown ---
+worktree registrations:
+worktree proj
+worktree old
+worktree pool/139/repo
+record vernant-provision-adopt-existing-branch: GONE
+record vernant-b2b-recovery-coupling: GONE
+claim: none
+treehouse calls: return --force pool/139/repo;
+branches kept in primary clone:
+refs/heads/fm/vernant-b2b-recovery-coupling-v2
+refs/heads/fm/vernant-provision-adopt-existing-branch-v2
+ok - vernant closeout

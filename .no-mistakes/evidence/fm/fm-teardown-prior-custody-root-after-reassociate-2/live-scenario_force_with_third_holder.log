@@ -1,0 +1,4 @@
+$ fm-teardown.sh vernant-provision-adopt-existing-branch --force   (a third live record still names the root as worktree=)
+REFUSED: task vernant-provision-adopt-existing-branch's cleanup target pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch is also task vernant-b2b-recovery-coupling's recorded prior_worktree (pool/139/repo); preserved prior_worktree custody overlaps it, so nothing was changed - not even with --force.
+exit=1
+ok - third holder refused even with --force

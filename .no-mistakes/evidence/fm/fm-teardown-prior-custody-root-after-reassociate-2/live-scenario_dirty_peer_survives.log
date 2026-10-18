@@ -1,0 +1,13 @@
+$ fm-teardown.sh vernant-provision-adopt-existing-branch   (peer vernant-b2b-recovery-coupling has uncommitted file)
+teardown vernant-provision-adopt-existing-branch complete (window fmses:fm-vernant-provision-adopt-existing-branch; nested reassociated worktree pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch removed; pool slot pool/139/repo left in place, since task vernant-b2b-recovery-coupling still works in it)
+notice: vernant-provision-adopt-existing-branch's prior copy pool/139/repo (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+Backlog: vernant-provision-adopt-existing-branch just finished (this home keeps no markdown backlog at home/data/backlog.md). Update home/data/backlog.md - move vernant-provision-adopt-existing-branch to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+$ fm-teardown.sh vernant-b2b-recovery-coupling   (its own copy is dirty, work landed)
+REFUSED: worktree pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  peer-scratch.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+ok - dirty peer survives, dirty own refused
