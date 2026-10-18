@@ -1,0 +1,38 @@
+=== S1: slower than p99x3 but still progressing -> finishes, reported, no timeout row
+  measured: "adv host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+  step 0
+  progress: "adv elapsed=0.0s output_bytes=7 tree_cpu=0.01s"
+  step 1
+  step 2
+  step 3
+  step 4
+  step 5
+  step 6
+  slower_than_usual: "adv elapsed=3.0s measured_ceiling=3s; still making progress, so this is reported and not stopped"
+  step 7
+  [exit=0 wall=4s]
+  timeout rows for adv: 0
+=== S2: silent stall -> stopped by no-progress bound (2s override), timeout row filed
+  measured: "stall host=Mac-Studio.local p99=1ms margin=3 samples=5 measured=1s bound=0s"
+  progress: "stall elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+  slower_than_usual: "stall elapsed=1.0s measured_ceiling=1s; still making progress, so this is reported and not stopped"
+  no_progress: "stall made no output or CPU progress for 2s; stopping"
+  [exit=124 wall=4s]
+  timeout rows for stall: 1
+=== S3: low-CPU command that prints steadily outlives the 3s no-progress bound
+  tick 13
+  tick 14
+  tick 15
+  [exit=0 wall=8s]
+  timeout rows for talk: 0
+=== S4: absolute limit (2s override) stops even a command that keeps printing
+  calibration: "0 of 5 samples for abs on Mac-Studio.local"
+  fallback: "no destructive deadline; collect samples"
+  progress: "abs elapsed=0.0s output_bytes=5 tree_cpu=0.00s"
+  absolute_limit: "abs reached the 2s absolute limit; stopping"
+  [exit=124 wall=3s]
+  timeout rows for abs: 1
+=== S5: silent cleanup after TERM (leader sleeps 60s on TERM) killed only after one no-progress interval (3s)
+  exit=1 killed_after=3s (expected ~3-6s, never 60s+)
+=== S6: productive cleanup after TERM runs 75 real seconds (longer than the old 60s clock) and is NOT killed
+  exit=143 cleanup_wall=75s cleaning_lines=75 done_marker=yes

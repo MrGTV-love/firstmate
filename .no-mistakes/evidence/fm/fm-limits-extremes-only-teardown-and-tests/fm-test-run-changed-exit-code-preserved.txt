@@ -1,0 +1,7 @@
+runner exit=1
+FM_TEST_END 2026-10-18T05:59:43Z tests/fm-pi-watch-extension.test.sh exit=0 duration_ms=817 gate_skip=false
+FM_TEST_END 2026-10-18T05:59:44Z tests/fm-daemon.test.sh exit=3 duration_ms=767 gate_skip=false
+failure output replayed:
+not ok - a real assertion failure
+timeout rows in ledger: 0
+0

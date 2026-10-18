@@ -1,0 +1,21 @@
+### test_changed_uses_bounded_automatic_concurrency
+ok - changed defaults to bounded automatic scheduling with serial override
+exit=0 wall=82s
+### test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene
+ok - the changed progress guard keeps a delayed gate skip a gate skip and out of calibration
+exit=0 wall=36s
+### test_changed_parallel_guard_counts_low_cpu_script_output_as_progress
+ok - the concurrent changed progress guard treats a low-CPU script's output as progress
+exit=0 wall=39s
+### test_changed_progress_guard_gives_slow_watcher_suites_headroom
+ok - the automatic --changed progress guard lets a slow suite that keeps producing output finish
+exit=0 wall=22s
+### test_per_script_timeout_bounds_a_hang
+ok - --per-script-timeout-secs turns a hung script into a bounded failure
+exit=0 wall=15s
+### test_portable_serial_hint_coverage_is_reported_and_bounded
+ok - coverage guard bounds the unmeasured share and serial packing within twenty minutes
+exit=0 wall=91s
+### test_herdr_ci_family_run_has_a_step_timeout
+ok - Herdr CI family-run step times out at 20 min under a 120 min job backstop
+exit=0 wall=38s

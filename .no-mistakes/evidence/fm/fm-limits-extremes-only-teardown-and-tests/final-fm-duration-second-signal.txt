@@ -1,0 +1,2 @@
+after first TERM + 4s: runner alive? yes (cleanup is printing, so it must be left alone); cleaning lines so far: 4
+after SECOND TERM: runner exit=143 after 0s; leader gone: 0 leaked processes

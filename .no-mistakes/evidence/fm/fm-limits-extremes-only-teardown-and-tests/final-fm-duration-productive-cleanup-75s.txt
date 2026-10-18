@@ -1,0 +1,7 @@
+S6: runner exit=143 cleanup_wall=80s cleaning_lines=75 done_marker=yes
+stderr runner lines: 3 non-progress; sample:
+calibration: "0 of 5 samples for cleankey on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "cleankey elapsed=0.0s output_bytes=6 tree_cpu=0.00s"
+Terminated: 15
+progress: "cleankey elapsed=61.0s output_bytes=696 tree_cpu=0.04s"

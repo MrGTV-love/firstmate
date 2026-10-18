@@ -1,0 +1,3 @@
+ok - primary workers and secondmates receive the authority rule through generated instructions
+bash tests/fm-ask-user-authority.test.sh  1.07s user 3.06s system 74% cpu 5.506 total
+exit=0

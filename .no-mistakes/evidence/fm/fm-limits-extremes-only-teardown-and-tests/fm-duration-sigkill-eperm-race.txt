@@ -1,0 +1,20 @@
+Finding: bin/fm-duration.py can exit 1 with `error: "[Errno 1] Operation not permitted"` instead of 143/124
+when it SIGKILLs a leader that ignored TERM. macOS (Darwin) only seen; Linux not tried.
+
+Cause (read from code, reproduced live): the stop branch calls signal_group(child, SIGKILL) on EVERY loop pass while
+child.poll() is None. After the first SIGKILL the leader is still exiting (not yet reapable). The next pass sends
+SIGKILL again; macOS killpg() returns EPERM for a group that is only exiting; signal_group() re-raises because the
+leader is not yet reaped; main() prints `error:` to STDOUT and exits 1. The timed-out sample is then never recorded.
+
+Reproduction: leader traps TERM and sleeps 60s; FM_DURATION_NO_PROGRESS_SECS=3; send TERM to the runner after
+the leader printed "ready"; expect rc=143. Run with 8 busy-loop processes + 6 parallel workers on an 18-CPU Mac.
+  WORKTREE HEAD (4f3f1dd3) : 6 of 72 runs rc=1  (error text captured in all 6)    ; 66 rc=143
+  BASE (6eb60860, old ceiling kill path, 3s calibrated ceiling, no signal from us): 3 of 60 runs rc=1 same error; 57 rc=124
+  Idle host: 0 of 10 standalone runs failed.
+So the latent bug pre-dates this change; this change's new tests (cleanup.silent, cleanup.ignored, cleanup.loud in
+tests/fm-duration.test.sh) assert exact exit codes 143/124 on that path, so they can flake on a loaded Mac.
+
+Candidate fix checked in a scratch copy only (worktree untouched): send the stalled-cleanup SIGKILL once
+(a `killed_once` flag around the signal_group(child, signal.SIGKILL) call in the `child.poll() is None and stopping_since`
+branch of run()). Same load, same reproduction: 0 of 90 runs failed (90 x rc=143).
+No leaked leader processes were found after the failing runs.

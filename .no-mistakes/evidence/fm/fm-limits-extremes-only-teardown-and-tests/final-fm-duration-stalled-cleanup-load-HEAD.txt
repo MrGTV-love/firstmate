@@ -1,0 +1,22 @@
+S5/S7 at HEAD c25a2243: leader traps TERM and sleeps 60s silently; runner gets one TERM; no-progress bound 3s
+Load: 8 busy-loop processes + 6 parallel workers on an 18-CPU Mac (host load average was already ~90).
+
+== HEAD summary (workers=6 runs/worker=12, 8 busy loops, 18 CPUs)
+total runs: 72
+  rc=143: 72
+runs with leaked leaders: 0
+runs with error text:
+
+single-run S5 (idle host): idle-s5 rc=143 wall=3s leaked=0
+
+first 10 raw lines:
+HEAD-w1-n1 rc=143 wall=4s leaked=0 
+HEAD-w5-n1 rc=143 wall=4s leaked=0 
+HEAD-w3-n1 rc=143 wall=5s leaked=0 
+HEAD-w4-n1 rc=143 wall=5s leaked=0 
+HEAD-w6-n1 rc=143 wall=6s leaked=0 
+HEAD-w2-n1 rc=143 wall=5s leaked=0 
+HEAD-w5-n2 rc=143 wall=5s leaked=0 
+HEAD-w4-n2 rc=143 wall=4s leaked=0 
+HEAD-w2-n2 rc=143 wall=4s leaked=0 
+HEAD-w1-n2 rc=143 wall=6s leaked=0 

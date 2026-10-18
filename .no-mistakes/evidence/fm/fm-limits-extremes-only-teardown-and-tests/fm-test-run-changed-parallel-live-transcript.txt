@@ -1,0 +1,24 @@
+--- run: bin/fm-test-run.sh --changed --base HEAD   (FM_DURATION_NO_PROGRESS_SECS=3, parallel path)
+runner exit=1 wall=12s
+--- FM_TEST_BEGIN/END lines:
+FM_TEST_BEGIN 2026-10-18T05:55:20Z tests/fm-wake-queue.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-18T05:55:20Z tests/fm-pi-watch-extension.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-18T05:55:20Z tests/fm-task-inbox.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-18T05:55:20Z tests/fm-daemon.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_END 2026-10-18T05:55:21Z tests/fm-wake-queue.test.sh exit=0 duration_ms=666 gate_skip=false
+FM_TEST_BEGIN 2026-10-18T05:55:21Z tests/fm-supervision-events.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_END 2026-10-18T05:55:21Z tests/fm-task-inbox.test.sh exit=0 duration_ms=651 gate_skip=false
+FM_TEST_END 2026-10-18T05:55:23Z tests/fm-supervision-events.test.sh exit=0 duration_ms=919 gate_skip=false
+FM_TEST_END 2026-10-18T05:55:25Z tests/fm-daemon.test.sh exit=124 duration_ms=3999 gate_skip=false
+FM_TEST_END 2026-10-18T05:55:30Z tests/fm-pi-watch-extension.test.sh exit=0 duration_ms=9759 gate_skip=false
+FM_TEST_BEGIN 2026-10-18T05:55:30Z tests/fm-backend-herdr-smoke.test.sh family=real-herdr-gated expected_gate_skip=herdr
+FM_TEST_END 2026-10-18T05:55:31Z tests/fm-backend-herdr-smoke.test.sh exit=0 duration_ms=571 gate_skip=false
+--- patient script output replayed:
+tick 17
+ok - patient low-CPU script finished
+--- runner stderr (guard lines):
+no_progress: "test.tests/fm-daemon.test.sh made no output or CPU progress for 3s; stopping"
+--- duration ledger timeout rows:
+{'key': 'test.tests/fm-daemon.test.sh', 'exit': 124, 'timed_out': True, 'calibration': True}
+{'key': 'test.tests/fm-daemon.test.sh', 'event': 'timeout'}
+{'key': 'test.tests/fm-pi-watch-extension.test.sh', 'exit': 0, 'timed_out': False, 'calibration': True}

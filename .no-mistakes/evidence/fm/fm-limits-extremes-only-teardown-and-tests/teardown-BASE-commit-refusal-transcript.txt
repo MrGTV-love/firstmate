@@ -1,0 +1,12 @@
+BEFORE teardown, ignored files in the copy:
+  .next/cache/chunk
+  .tac/loop-state/cursor
+  .tac/tmp/work
+  app.tsbuildinfo
+  notes/draft.txt
+  unique.dat
+teardown exit=1
+stderr preserve line:
+copy still exists? YES
+AFTER, preserved tree under data/task-x1/nested-copy-preserved:
+tests/fm-teardown.test.sh: line 13021: cd: /Users/charlesabrooker/tmp/fm-teardown-tests.IUPutR/demo-listing/data/task-x1/nested-copy-preserved: No such file or directory

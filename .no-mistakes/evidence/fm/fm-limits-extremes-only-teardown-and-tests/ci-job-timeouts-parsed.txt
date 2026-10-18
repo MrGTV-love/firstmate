@@ -1,0 +1,9 @@
+lint: timeout-minutes=60
+test-coverage: timeout-minutes=5
+tests-portable-parallel-1: timeout-minutes=60
+tests-portable-parallel-2: timeout-minutes=60
+tests-portable-serial: timeout-minutes=60
+tests-herdr: timeout-minutes=120
+tests-timing-aggregate: timeout-minutes=5
+macos-stock-bash: timeout-minutes=60
+invariants: timeout-minutes=5

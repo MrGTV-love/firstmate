@@ -1,0 +1,28 @@
+=== S1: runs past measured p99 x 3 (3s) but keeps printing -> finishes (exit 0), reported, no timeout row
+measured: "adv host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+slower_than_usual: "adv elapsed=3.0s measured_ceiling=3s; still making progress, so this is reported and not stopped"
+step 7
+  [exit=0 wall=8s] timeout rows: 0
+=== S2: silent stall -> stopped by no-progress bound (2s override), exit 124, timeout row filed
+no_progress: "stall made no output or CPU progress for 2s; stopping"
+  [exit=124 wall=4s] timeout rows: 2
+=== S3: low-CPU command that prints steadily for 15s outlives a 3s no-progress bound
+tick 14
+tick 15
+  [exit=0 wall=16s] timeout rows: 0
+=== S4: absolute limit (2s override) stops a command that keeps printing
+absolute_limit: "abs reached the 2s absolute limit; stopping"
+  [exit=124 wall=3s] timeout rows: 2
+=== S4b: unset overrides -> defaults are 900s / 21600s (bad override values fall back, not zero)
+done
+  [exit=0 wall=4s] (0 and abc must not stop the command) timeout rows: 0
+--- ledger rows for stall not from seeding (case-s2):
+   {'key': 'stall', 'exit': 124, 'duration_ms': 3238, 'timed_out': True, 'event': None, 'calibration': True}
+   {'key': 'stall', 'exit': None, 'duration_ms': 3238, 'timed_out': None, 'event': 'timeout', 'calibration': None}
+--- ledger rows for abs not from seeding (case-s4):
+   {'key': 'abs', 'exit': 124, 'duration_ms': 2587, 'timed_out': True, 'event': None, 'calibration': True}
+   {'key': 'abs', 'exit': None, 'duration_ms': 2587, 'timed_out': None, 'event': 'timeout', 'calibration': None}
+--- ledger rows for adv not from seeding (case-s1):
+   {'key': 'adv', 'exit': 0, 'duration_ms': 8261, 'timed_out': False, 'event': None, 'calibration': True}
+--- ledger rows for talk not from seeding (case-s3):
+   {'key': 'talk', 'exit': 0, 'duration_ms': 15208, 'timed_out': False, 'event': None, 'calibration': True}

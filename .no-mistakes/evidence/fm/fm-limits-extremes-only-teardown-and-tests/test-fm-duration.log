@@ -1,0 +1,12 @@
+ok - empty home variables are unset and never resolve against the caller directory
+ok - a ledger or lock location inside a project work tree is refused without writing
+ok - a declared home that is a project work tree is refused without writing
+ok - the calibration scratch file never lands in a project work tree
+ok - real backlog owns the second timeout exactly once
+ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work
+ok - repeated-timeout work routes to the registered project, else to firstmate
+ok - a failed backlog publication is retried without duplicating events, and imports never guess a timeout
+ok - sample-count limits, retention, progress, leader exit, progress stops, pipeline imports and literal guard
+ok - measured command behavior
+bash tests/fm-duration.test.sh  14.96s user 9.62s system 29% cpu 1:24.46 total
+exit=0

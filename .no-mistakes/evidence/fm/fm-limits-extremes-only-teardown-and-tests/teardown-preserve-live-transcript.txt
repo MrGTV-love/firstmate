@@ -1,0 +1,27 @@
+BEFORE teardown, ignored files in the copy:
+  .next/cache/chunk
+  .tac/loop-state/cursor
+  .tac/tmp/work
+  app.tsbuildinfo
+  notes/draft.txt
+  unique.dat
+teardown exit=0
+stderr preserve line:
+  teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.g7oXdr/demo-listing/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.g7oXdr/demo-listing/data/task-x1/nested-copy-preserved/a3c9e03b04e4443346d282f2e95761f2a2e5b90a2712ef3cfaadc938e08c1a02
+copy still exists? no
+AFTER, preserved tree under data/task-x1/nested-copy-preserved:
+  ./a3c9e03b04e4443346d282f2e95761f2a2e5b90a2712ef3cfaadc938e08c1a02/.tac/loop-state/cursor
+  ./a3c9e03b04e4443346d282f2e95761f2a2e5b90a2712ef3cfaadc938e08c1a02/SHA256SUMS
+  ./a3c9e03b04e4443346d282f2e95761f2a2e5b90a2712ef3cfaadc938e08c1a02/copy-path
+  ./a3c9e03b04e4443346d282f2e95761f2a2e5b90a2712ef3cfaadc938e08c1a02/notes/draft.txt
+  ./a3c9e03b04e4443346d282f2e95761f2a2e5b90a2712ef3cfaadc938e08c1a02/unique.dat
+SHA256SUMS:
+  bd5a4cdd5c2fdc4242827fab74edc9da37133d164ce0e98a73ce19e14edf1331  .tac/loop-state/cursor
+  06a249dc6db689997a013cc33683678c6dcb98c676d91d44de2764ceb58521ce  unique.dat
+  2870b31693842952a36a92433c40d39d6076eba074b58d5510e36d625c63a850  notes/draft.txt
+shasum -c:
+  .tac/loop-state/cursor: OK
+  unique.dat: OK
+  notes/draft.txt: OK
+regenerable .next / tsbuildinfo / .tac/tmp preserved? 0 files (expect 0)
+ok - demo listing

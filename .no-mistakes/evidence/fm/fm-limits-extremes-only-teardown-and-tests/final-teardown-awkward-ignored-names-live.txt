@@ -1,0 +1,24 @@
+BEFORE (ignored entries):
+  .next/
+  big blob.dat
+  cache-keep/
+  my notes/
+  "unicode-\303\251.txt"
+teardown exit=0
+stderr:
+  teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.0Qwfj5/demo-awkward/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.0Qwfj5/demo-awkward/data/task-x1/nested-copy-preserved/b18c61d65c2
+copy still exists? no
+preserved tree:
+  ./SHA256SUMS
+  ./big blob.dat
+  ./cache-keep/link-out
+  ./copy-path
+  ./my notes/deep dir/a file with spaces.txt
+  ./unicode-é.txt
+shasum -c:
+  unicode-é.txt: OK
+  my notes/deep dir/a file with spaces.txt: OK
+  big blob.dat: OK
+big blob preserved identical? yes  mode=600
+regenerable .next preserved? 0 files (expect 0)
+copy-path file: /Users/charlesabrooker/tmp/fm-teardown-tests.0Qwfj5/demo-awkward/pool/1/project/.claude/worktrees/fc-one
