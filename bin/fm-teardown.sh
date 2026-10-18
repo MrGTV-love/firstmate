@@ -4048,11 +4048,11 @@ teardown_reprove_same_route() {
   local was=$TEARDOWN_HELD_SLOT
   teardown_nested_slot reprove || return 1
   if [ -n "$was" ] && [ -z "$TEARDOWN_HELD_SLOT" ]; then
-    echo "REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies; nothing was removed. $TEARDOWN_PROOF_OUTCOME." >&2
+    echo "REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME." >&2
     return 1
   fi
   if [ -z "$was" ] && [ -n "$TEARDOWN_HELD_SLOT" ]; then
-    echo "REFUSED: a foreign copy in pool slot $TEARDOWN_HELD_SLOT changed since the slot was proved, so the slot is not returned; nothing was removed. $TEARDOWN_PROOF_OUTCOME." >&2
+    echo "REFUSED: a foreign copy in pool slot $TEARDOWN_HELD_SLOT changed since the slot was proved, so the slot is not returned. $TEARDOWN_PROOF_OUTCOME." >&2
     return 1
   fi
 }
@@ -4166,7 +4166,7 @@ teardown_own_copy_disposable() {  # <canonical-copy>
 # already removed by then.
 teardown_nested_slot_reprove_after_lock() {
   TEARDOWN_PROOF_OUTCOME="the slot was not returned, but earlier cleanup steps already ran, including removing its nested and foreign copies; --force does not waive this proof"
-  teardown_nested_slot reprove
+  teardown_reprove_same_route
 }
 
 teardown_nested_slot() {  # prove | landed | retire | reprove | return
@@ -4321,7 +4321,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then
         TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
-        teardown_nested_slot reprove || exit 1
+        teardown_reprove_same_route || exit 1
       fi
       # Foreign copies are released before anything else is removed, each proved
       # again first; a refusal leaves the slot as it is.

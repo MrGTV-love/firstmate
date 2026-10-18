@@ -10814,6 +10814,161 @@ test_a_held_close_removes_only_the_tasks_own_nested_copy() {
   pass "a held close removes the task's own nested copy, through the driver when it is locked, and leaves the slot, its lease and claim and the held foreign copy alone"
 }
 
+test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal() {
+  local rc shape locked pid inner second target
+  local -a watch
+  for shape in held-inside provable-inside; do
+    for locked in plain locked; do
+      pid=
+      if [ "$locked" = locked ]; then
+        dead_launcher_pid
+        pid=$FOREIGN_DEAD_PID
+      fi
+      make_own_locked_copy_case "held-inside-$shape-$locked" enclosing "$pid"
+      printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+      seed_backlog_in_flight "$FOREIGN_CASE"
+      inner=$FOREIGN_COPY/.claude/worktrees/fc-inner
+      second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+      git -C "$FOREIGN_CASE/project" worktree add -q -b fm/inner-lane "$inner" main
+      if [ "$shape" = held-inside ]; then
+        held_foreign_ignored "$inner"
+        target=$inner
+        watch=("$inner")
+      else
+        git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+        held_foreign_ignored "$second"
+        target=$second
+        watch=("$inner" "$second")
+      fi
+      held_snapshot "$FOREIGN_CASE" "${watch[@]}"
+      run_foreign_teardown rc
+      expect_code 1 "$rc" "held-inside-$shape-$locked: removing the own copy would take a foreign copy with it, so the close must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "contains registered copy $target" "$FOREIGN_CASE/stderr" "held-inside-$shape-$locked: the refusal did not name the copy that stays"
+      assert_present "$FOREIGN_COPY" "held-inside-$shape-$locked: the own nested copy was removed"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-inside-$shape-$locked: the task record was removed"
+      assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-inside-$shape-$locked: a refused close wrote a held-copy record"
+      git -C "$FOREIGN_CASE/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null \
+        || fail "held-inside-$shape-$locked: the own copy's branch was deleted"
+      assert_present "$inner/.git" "held-inside-$shape-$locked: the foreign copy inside the own copy is gone"
+      [ "$shape" != held-inside ] || assert_present "$inner/unique.dat" "held-inside-$shape-$locked: the foreign copy's unique file is gone"
+      held_assert_untouched "held-inside-$shape-$locked" "$FOREIGN_CASE" "${watch[@]}"
+    done
+  done
+  pass "a foreign copy inside the own nested copy is never held or swept away: the close refuses and every copy, the slot, its lease and claim stay as they were"
+}
+
+test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wait() {
+  local rc lock holder actor late i
+  make_own_locked_copy_case route-flip-wait enclosing
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  lock=$(FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+    bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$FOREIGN_CASE/project") \
+    || fail "route-flip-wait: cannot resolve the shared Treehouse project lock"
+  late=$FOREIGN_SLOT/.claude/worktrees/fc-late
+  cat > "$FOREIGN_CASE/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  kill-window)
+    : > "$FOREIGN_CASE/closing"
+    i=0
+    while [ ! -f "$FOREIGN_CASE/project-held" ]; do
+      i=\$((i + 1)); [ "\$i" -lt 2000 ] || exit 1
+      sleep 0.05
+    done
+    ;;
+esac
+exit 0
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/tmux"
+  (
+    run_foreign_teardown actor_rc FM_PROJECT_LOCK_POLL_SECS=0.05
+    printf '%s' "$actor_rc" > "$FOREIGN_CASE/actor.rc"
+  ) &
+  actor=$!
+  i=0
+  while [ ! -f "$FOREIGN_CASE/closing" ]; do
+    i=$((i + 1)); [ "$i" -lt 1000 ] || { kill "$actor" 2>/dev/null || true; fail "route-flip-wait: teardown did not reach the endpoint close: $(cat "$FOREIGN_CASE/stderr")"; }
+    sleep 0.05
+  done
+  hold_project_lock_until_release "$FOREIGN_CASE" "$lock" &
+  holder=$!
+  i=0
+  while [ "$(queued_tickets "$lock")" = 0 ]; do
+    if ! kill -0 "$actor" 2>/dev/null; then
+      : > "$FOREIGN_CASE/release"; wait "$holder" || true
+      fail "route-flip-wait: teardown exited instead of waiting for the project lock: $(cat "$FOREIGN_CASE/stderr")"
+    fi
+    i=$((i + 1)); [ "$i" -lt 1000 ] || {
+      : > "$FOREIGN_CASE/release"; wait "$holder" || true; wait "$actor" || true
+      fail "route-flip-wait: teardown never queued for the project lock: $(cat "$FOREIGN_CASE/stderr")"
+    }
+    sleep 0.05
+  done
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/late-lane "$late" main
+  held_foreign_ignored "$late"
+  held_snapshot "$FOREIGN_CASE" "$late"
+  : > "$FOREIGN_CASE/release"
+  wait "$holder" || fail "route-flip-wait: the project lock holder could not release"
+  wait "$actor" || true
+  rc=$(cat "$FOREIGN_CASE/actor.rc")
+  expect_code 1 "$rc" "route-flip-wait: a foreign copy that appeared during the wait must stop the close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "a foreign copy in pool slot $FOREIGN_SLOT changed since the slot was proved, so the slot is not returned" "$FOREIGN_CASE/stderr" \
+    "route-flip-wait: the refusal did not say the route changed"
+  assert_present "$FOREIGN_COPY" "route-flip-wait: the own nested copy was removed before the refusal"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "route-flip-wait: the task record was removed"
+  assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "route-flip-wait: a refused close wrote a held-copy record"
+  git -C "$FOREIGN_CASE/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null \
+    || fail "route-flip-wait: the own copy's branch was deleted"
+  held_assert_untouched route-flip-wait "$FOREIGN_CASE" "$late"
+  assert_present "$late/unique.dat" "route-flip-wait: the late foreign copy's unique file is gone"
+  pass "an ordinary close whose slot gains a copy holding unique files during the project-lock wait refuses with nothing removed"
+}
+
+test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close() {
+  local case_dir rc lock late
+  make_nested_slot_case route-flip-stale-lock enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  late=$NESTED_SLOT/.claude/worktrees/fc-late
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = return ] || exit 0
+wt=\${@: -1}
+lock=\$(git -C "\$wt" rev-parse --path-format=absolute --git-path index.lock 2>/dev/null || true)
+if [ -n "\$lock" ] && [ -e "\$lock" ]; then
+  calls=\$(( \$(cat "$case_dir/return-calls" 2>/dev/null || echo 0) + 1 ))
+  printf '%s' "\$calls" > "$case_dir/return-calls"
+  if [ "\$calls" = 2 ]; then
+    git -C "$case_dir/project" worktree add -q -b fm/late-lane "$late" main
+    exclude=\$(git -C "$late" rev-parse --path-format=absolute --git-path info/exclude)
+    printf 'unique.dat\n' >> "\$exclude"
+    printf 'only here\n' > "$late/unique.dat"
+  fi
+  echo "fatal: Unable to create '\$lock': File exists." >&2
+  exit 128
+fi
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  add_lsof_no_holder "$case_dir"
+  lock=$(git_index_lock_path "$NESTED_SLOT")
+  : > "$lock"
+  touch -t 200001010000 "$lock"
+  rc=0
+  FM_HOME="$case_dir/home" FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "route-flip-stale-lock: a foreign copy that appeared during the return must stop it: $(cat "$case_dir/stderr")"
+  assert_grep "removed provably-stale git lock" "$case_dir/stderr" "route-flip-stale-lock: the stale lock was not cleaned up, so the probe proves nothing"
+  assert_grep "a foreign copy in pool slot $NESTED_SLOT changed since the slot was proved, so the slot is not returned" "$case_dir/stderr" \
+    "route-flip-stale-lock: the refusal did not say the route changed"
+  assert_absent "$case_dir/treehouse.log" "route-flip-stale-lock: the slot was returned"
+  assert_present "$late/unique.dat" "route-flip-stale-lock: the late foreign copy's unique file is gone"
+  assert_present "$case_dir/state/task-x1.meta" "route-flip-stale-lock: the task record was removed"
+  assert_absent "$case_dir/data/held-foreign-copies.log" "route-flip-stale-lock: a refused close wrote a held-copy record"
+  pass "a stale-lock cleanup refuses when the slot gained a copy holding unique files, instead of turning the close into a held close"
+}
+
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
   local rc second
   make_held_case held-notice
@@ -13119,6 +13274,9 @@ test_task_closes_beside_a_foreign_copy_with_unique_ignored_files
 test_task_closes_beside_a_foreign_copy_with_unpushed_commits
 test_held_copy_record_has_one_exact_line_per_copy
 test_a_held_close_removes_only_the_tasks_own_nested_copy
+test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal
+test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wait
+test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist
 test_a_held_close_that_a_later_step_refuses_writes_no_record_line
 test_a_held_copy_record_that_cannot_be_written_warns_and_the_close_completes

@@ -302,6 +302,8 @@ Only once the close is final, with the task record gone, teardown appends each s
 A close that a later step refuses writes no line, and teardown never edits or clears the file.
 A record that cannot be written prints a warning on stdout and does not refuse the close; the output then lists the held copies as their only trace.
 These notices follow whichever completion line the close prints, including the line of a `--legacy-record` close.
+A foreign copy that lies inside one of the task's own nested copies is never held, because removing the own copy would take it along.
+When such a copy cannot be released, or when one that can be released lies there beside a copy that would be held, the whole close refuses as it does without this rule.
 A foreign copy that is also dirty, named by another record, running a process, or locked by anything other than a Vernant creation lock whose launcher is gone still refuses the whole close, and so does an own copy that is dirty or unlanded, or any other refusal of the ordinary close.
 `--force` never holds a foreign copy.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.

@@ -282,17 +282,29 @@ teardown_foreign_copy_unowned() {  # <copy>
   esac
 }
 
+# Does <copy> lie strictly inside one of the task's own nested copies? Removing
+# that own copy then takes <copy> with it, so a held close never leaves it behind.
+teardown_copy_inside_own_nested() {  # <copy>
+  local copy=$1 own
+  for own in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    case "$copy" in "$own"/*) return 0 ;; esac
+  done
+  return 1
+}
+
 # May foreign copy <copy>, refused for TEARDOWN_FOREIGN_WHY, be left standing
 # while the task closes? Only when teardown_foreign_copy_prove found it a clean
 # worktree root and no record, no process outside this teardown and no live
 # launcher owns it, so the one reason it stays is work only it holds. The
 # ownership proof runs again here for the ignored-files case, whose reason is
 # judged before it; a copy any process runs in is never
-# held, so retire never signals a process inside a copy that stays. The reason
-# text is kept, and a path that would break the one-line record is not held.
+# held, so retire never signals a process inside a copy that stays. A copy inside
+# an own nested copy is never held. The reason text is kept, and a path that would
+# break the one-line record is not held.
 teardown_foreign_copy_holdable() {  # <copy>
   local copy=$1 why=$TEARDOWN_FOREIGN_WHY procs=$TEARDOWN_FOREIGN_PROCS_BASE rc=0
   case "$FORCE:$KIND" in --force:*|*:secondmate) return 1 ;; esac
+  ! teardown_copy_inside_own_nested "$copy" || return 1
   case "$copy$why$ID$TEARDOWN_RETURN_SLOT" in *$'\t'*|*$'\n'*) return 1 ;; esac
   teardown_foreign_copy_unowned "$copy" || rc=1
   TEARDOWN_FOREIGN_WHY=$why
@@ -348,9 +360,11 @@ teardown_foreign_copy_prove() {  # <copy>
 # unprovable copy is named here and then refused by the registered-copy check,
 # which does not list it as allowed. When every refused copy is held, nothing is
 # refused here: bin/fm-teardown.sh then closes the task and names the held
-# copies, so no REFUSED line is printed for a close that succeeds.
+# copies, so no REFUSED line is printed for a close that succeeds. A provable
+# copy inside an own nested copy would be swept away by a held close, so it
+# makes the held copies refuse instead and the close takes the ordinary route.
 teardown_foreign_copies_prove() {  # <slot>
-  local slot=$1 copy known allowed line
+  local slot=$1 copy known allowed line swept=0
   local -a lines=()
   TEARDOWN_FOREIGN_COPIES=()
   TEARDOWN_FOREIGN_PROCS=()
@@ -366,6 +380,7 @@ teardown_foreign_copies_prove() {  # <slot>
     [ "$known" = 0 ] || continue
     if teardown_foreign_copy_prove "$copy"; then
       TEARDOWN_FOREIGN_COPIES+=("$copy")
+      ! teardown_copy_inside_own_nested "$copy" || swept=1
     else
       [ -z "$TEARDOWN_FOREIGN_DIAG" ] || lines+=("$TEARDOWN_FOREIGN_DIAG")
       lines+=("REFUSED: foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY.")
@@ -376,6 +391,7 @@ teardown_foreign_copies_prove() {  # <slot>
       fi
     fi
   done
+  [ "$swept" = 0 ] || [ "${#TEARDOWN_FOREIGN_HELD[@]}" -eq 0 ] || TEARDOWN_FOREIGN_REFUSED=$((TEARDOWN_FOREIGN_REFUSED + 1))
   [ "$TEARDOWN_FOREIGN_REFUSED" -gt 0 ] || [ "${#TEARDOWN_FOREIGN_HELD[@]}" -eq 0 ] || return 0
   for line in ${lines[@]+"${lines[@]}"}; do
     echo "$line" >&2
