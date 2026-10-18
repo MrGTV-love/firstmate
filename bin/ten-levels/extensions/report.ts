@@ -235,7 +235,13 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         for (;;) {
           tries++;
           try {
-            return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
+            const result = await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
+            if (tries > 1) {
+              // Client metadata covers only its final call; earlier guard tries still consumed time and may have cost.
+              result.meta.attempts += tries - 1;
+              result.meta.elapsedMs = Math.round(performance.now() - started);
+            }
+            return result;
           } catch (cause) {
             const backoff = budget.backoffMs * tries;
             if (tries >= budget.tries || !mayRetry(cause, backoff)) throw cause;

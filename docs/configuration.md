@@ -2306,7 +2306,7 @@ Complete successful `SystemOneResult` objects, including raw exchanges and provi
 The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
-A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
+A row that holds a provider answer keeps the client's `attempts` and `ms`, including any earlier guard-level failed tries and their backoff before a later answer, whether the call succeeded or the answer was then rejected as invalid.
 A payload screened in pieces records `planned_chunks` separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
 Its usage totals every answered piece, its attempts include every answered and failed piece, and `ms` is the longest elapsed time because pieces run concurrently.
 The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.

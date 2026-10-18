@@ -8,7 +8,7 @@ export AUDIT_ROOT="$ROOT" AUDIT_TMP="$TMP_ROOT"
 node --experimental-strip-types --experimental-test-module-mocks --no-warnings --input-type=module <<'JS' || fail 'guard settlement/audit regression'
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const reportUrl = pathToFileURL(`${process.env.AUDIT_ROOT}/bin/ten-levels/extensions/report.ts`).href;
 const report = await import(reportUrl);
@@ -36,6 +36,35 @@ async function run(values, tool = 'result') {
   else await handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text: 'fixture' }] }, { cwd: state });
   return row();
 }
+await test('real decide: retry then reported success retains attempts, time and incomplete cost', async () => {
+  // Stub only the client boundary: exercise the real preflight, retry loop and recorder without network egress.
+  const { JevClient } = await import(new URL('../src/core/client.ts', reportUrl));
+  const { SCREEN_QUESTIONS } = await import(new URL('../src/levels/level06/index.ts', reportUrl));
+  writeFileSync(`${state}/.env`, 'TYPESAFE_API_KEY=offline-audit-fixture\n');
+  let calls = 0;
+  const client = mock.method(JevClient.prototype, 'systemOne', async () => {
+    if (++calls === 1) throw new Error('offline transient failure');
+    return answer();
+  });
+  try {
+    const result = await service.decide({ content: 'ordinary fixture' }, SCREEN_QUESTIONS);
+    assert.equal(calls, 2, 'the real service retried the failed client call');
+    assert.equal(result.meta.attempts, 2, 'the success includes the earlier guard try');
+    assert.ok(result.meta.elapsedMs >= 500, 'the success keeps the retry backoff in its elapsed time');
+    service.record({ hook: 'tool_result', tool: 'bash', decision: 'clear', enforcement: 'result_pass', branch: 'policy',
+      error_type: null, request_started: true, result });
+    const r = row();
+    assert.equal(r.attempts, 2);
+    assert.equal(r.ms, result.meta.elapsedMs);
+    assert.equal(r.chunks, 1, 'two tries of one piece are not two chunks');
+    assert.equal(r.cost.incomplete, true, 'the unreported failed try cannot become a complete charge');
+    assert.equal(r.cost.source, 'unknown');
+    assert.equal(r.cost.amount, null);
+    assert.equal(r.cost.reported_amount, 0.001, 'the final reported charge remains visible');
+  } finally {
+    client.mock.restore();
+  }
+});
 const failed = (attempts, ms) => new report.GuardUnavailableError('TimeoutError', true, undefined, { attempts, elapsedMs: ms });
 for (const tool of ['result', 'write']) {
   await test(`${tool}: every failed chunk survives settlement`, async () => {
