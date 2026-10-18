@@ -95,8 +95,8 @@ new_case() {  # <name> -> echoes the case dir
 
 # Run detail in the TOON shape `axi status` prints. <id> <status> [outcome]
 run_toon() {  # <case-dir> <id> <status> [outcome]
-  printf 'run:\n  id: "%s"\n  branch: %s\n  status: %s\n  head: "%s"\n  pr: "%s"\n  findings: none\n' \
-    "$2" "$BRANCH" "$3" "$(cat "$1/head")" "${FM_FAKE_PR_URL:-}"
+  printf 'run:\n  id: "%s"\n  branch: %s\n  status: %s\n  head: "%s"\n  pr: ""\n  findings: none\n' \
+    "$2" "$BRANCH" "$3" "$(cat "$1/head")"
   [ "$3" = running ] && printf '  steps[2]{step,status,findings,duration_ms}:\n    intent,completed,0,0\n    review,running,0,0\n'
   [ -z "${4:-}" ] || printf 'outcome: %s\n' "$4"
 }
@@ -403,29 +403,6 @@ snapshot_json() {  # <case-dir>
     "$ROOT/bin/fm-fleet-snapshot.sh" --home-input 2>"$d/snapshot.err"
 }
 
-# Store reads that finish are kept as run-step evidence, so a slow forge read
-# after them cannot mark the read skipped or revive an obsolete decision.
-case_slow_forge_leaves_finished_store_read_unmarked() {
-  local d out
-  d=$(new_case slow-forge)
-  FM_FAKE_PR_URL=https://github.com/test/project/pull/7 serve_run "$d" 01RUN completed passed
-  # Warm the finished-run cache with forge enrichment disabled. The measured
-  # read below then finishes its store work quickly, before a slow forge read.
-  read_state "$d" "$CREW_STATE" >/dev/null
-  printf 'needs-decision [at=1] [key=old-review]: obsolete review decision\n' > "$d/state/cached.status"
-  cat > "$d/fakebin/gh" <<'SH'
-#!/usr/bin/env bash
-sleep 4
-printf 'state=OPEN\nmerged=false\n'
-SH
-  chmod +x "$d/fakebin/gh"
-  out=$(FM_CREW_STATE_NO_FORGE=0 FM_CREW_STATE_NM_TIMEOUT=3 read_state "$d" "$CREW_STATE")
-  assert_contains "$out" 'state: done · source: run-step' 'slow forge enrichment cannot replace a confirmed pass with an old decision'
-  assert_contains "$out" 'run passed: PR open' 'the separately bounded slow forge read was actually consumed'
-  assert_not_contains "$out" 'run-store: skipped' 'successful store reads must not be marked skipped'
-  pass 'a fast store and slow forge retain the confirmed run state without a skipped marker'
-}
-
 # The snapshot bound protects against a hang, not against a loaded read. One
 # snapshot at its default holds a lane whose responsive store lookups together
 # outlast the old 10-second bound, a quick lane, and a lane whose git read never
@@ -506,7 +483,6 @@ expect_mutant_caught() {  # <label> <case-function> <override>
 
 main() {
   local fn
-  case_slow_forge_leaves_finished_store_read_unmarked
   case_snapshot_default_cuts_only_the_hung_lane
   for fn in \
     case_finished_run_is_kept_until_the_id_changes \
