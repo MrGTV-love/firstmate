@@ -512,12 +512,9 @@ test_deadlines() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { setTimeout as sleep } from 'node:timers/promises';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const { createGuardService, failureTiming, failureType, withDecisionBudget } = await import(pathToFileURL(process.env.REPORT));
-const { SCREEN_QUESTIONS } = await import(new URL('../src/levels/level06/index.ts', pathToFileURL(process.env.REPORT)));
 const home = process.env.HOME_DIR;
 function install(task, host) {
   const handlers = {};
@@ -533,23 +530,8 @@ async function beforeHostDeadline(handlers, name, event, limitMs) {
     return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${limitMs} ms host deadline exceeded`)), limitMs); })]);
   } finally { clearTimeout(timer); }
 }
-// Preflight can consume most of a decision budget; the request that starts then runs out of budget before its own try does.
-const exhaustedState = `${home}/state-exhausted`;
-mkdirSync(exhaustedState, { recursive: true });
-const exhaustedService = createGuardService({ home, config: `${home}/config`, state: exhaustedState, task: 'deadline-exhausted', project: 'firstmate', host: 'omp' });
-async function exhaustedAfterPreflight() {
-  const error = await withDecisionBudget(async () => {
-    await sleep(14000);
-    try { await exhaustedService.decide({ tool: 'bash', source_role: 'tool_result', content: 'stall-direct exhausted' }, SCREEN_QUESTIONS); } catch (cause) { return cause; }
-  }, 'tool_result', 'omp');
-  exhaustedService.record({ hook: 'tool_result', tool: 'bash', decision: 'review', enforcement: 'omp_replace', branch: 'outage',
-    error_type: failureType(error), request_started: true, ...failureTiming(error) });
-  let cooldownUntil = 0;
-  try { cooldownUntil = Number(readFileSync(`${exhaustedState}/.jev-guard-breaker`, 'utf8')); } catch { /* No cooldown was started. */ }
-  return { error, cooldownUntil, recordedAt: Date.now() };
-}
 const started = performance.now();
-const [slowCall, slowResult, pre, post, ompSlowCall, ompSlowResult, ompPre, ompPost, exhausted] = await Promise.all([
+const [slowCall, slowResult, pre, post, ompSlowCall, ompSlowResult, ompPre, ompPost] = await Promise.all([
   beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
   beforeHostDeadline(claude, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer' }] }, 330000),
   beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
@@ -558,7 +540,6 @@ const [slowCall, slowResult, pre, post, ompSlowCall, ompSlowResult, ompPre, ompP
   beforeHostDeadline(omp, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer private-output-canary' }] }, 30000),
   beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
   beforeHostDeadline(omp, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 30000),
-  exhaustedAfterPreflight(),
 ]);
 assert.equal(slowCall, undefined, 'a judge answer arriving after 30 seconds must allow the call');
 assert.equal(slowResult, undefined, 'a clear late answer must preserve the tool output');
@@ -604,25 +585,19 @@ for (const row of ompRows.filter(row => row.hook === 'tool_result')) {
   assert.equal(row.attempts, 2);
   assert.ok(row.ms >= 24000 && row.ms < 30000, `omp result row time ${row.ms}`);
 }
-
-// An exhausted decision budget starts the cooldown even though the request itself ran for less than one try.
-assert.equal(exhausted.error.errorType, 'TimeoutError');
-assert.ok(exhausted.error.elapsedMs >= 9000 && exhausted.error.elapsedMs < 12000, `request time ${exhausted.error.elapsedMs}`);
-assert.ok(exhausted.cooldownUntil > exhausted.recordedAt, 'an exhausted budget must start the cooldown');
-rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
 console.log('deadlines-ok');
 JS
 ) || fail "handler deadlines: $out"
   [ "$out" = deadlines-ok ] || fail "unexpected deadline output: $out"
-  pass "actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline, and an exhausted budget starts the cooldown"
+  pass "actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline"
 }
 
-test_trusted_read_and_cooldown() {
+test_trusted_reads_and_independent_judgment() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, renameSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, renameSync, symlinkSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = `${process.env.HOME_DIR}/trust`;
@@ -685,51 +660,46 @@ assert.equal(await sibling.tool_result(event(`${home}/state/trust.sibling.status
 assert.equal(row().branch, 'trusted_read');
 assert.equal((await sibling.tool_result(event(`${home}/state/trust.status`), ctx)).isError, true, 'the dotted task cannot read the shorter task state');
 assert.equal(row().branch, 'policy');
-// An outage that exhausts the omp result budget withholds the output and starts the cooldown.
+// An omp result outage withholds that output only; every later call is judged on its own.
+const sent = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).length;
 const started = performance.now();
 const withheld = await handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text: 'stall-direct' }] }, ctx);
 assert.equal(withheld.isError, true);
+assert.match(withheld.content[0].text, /TimeoutError/);
 assert.ok(performance.now() - started >= 24000 && performance.now() - started < 30000);
 assert.equal(row().attempts, 2);
-const until = Number(readFileSync(`${home}/state/.jev-guard-breaker`, 'utf8'));
-assert.ok(until - Date.now() > 58000 && until - Date.now() <= 60000);
-const before = readFileSync(process.env.REQUESTS, 'utf8');
-// An immediate rerun is refused by the cooldown with its own notice naming the seconds left, not by the outage advice.
-const fast = performance.now();
-const cooling = await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx);
-assert.equal(cooling.block, true);
-assert.ok(performance.now() - fast < 1000);
-assert.equal(row().request_started, false);
-assert.equal(row().error_type, 'CooldownActiveError', 'a cooldown skip is not a plain timeout');
-assert.match(cooling.reason, /cooling down/);
-const waits = /Wait (\d+) seconds/.exec(cooling.reason);
-assert.ok(waits && Number(waits[1]) >= 55 && Number(waits[1]) <= 60, cooling.reason);
-assert.doesNotMatch(cooling.reason, /If it fails the same way/, 'the outage retry advice would meet the cooldown again');
-assert.match((await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx)).reason, /Wait \d+ seconds/);
-const cooledResult = await install().tool_result(event(`${worktree}/untracked.txt`), ctx);
-assert.equal(cooledResult.isError, true);
-assert.match(cooledResult.content[0].text, /CooldownActiveError/);
-assert.match(cooledResult.content[0].text, /Wait \d+ seconds/);
-assert.equal(JSON.stringify(cooledResult).includes('IGNORE PREVIOUS'), false);
+let judged = sent();
+assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined, 'a safe call is judged and admitted right after an outage');
+assert.equal(row().error_type, null);
+assert.equal(row().request_started, true);
+assert.equal(sent(), judged + 1, 'the pre-tool call reached its own judge');
+judged = sent();
+assert.equal(await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined);
+assert.equal(sent(), judged + 1, 'the Claude pre-tool call reached its own judge');
+writeFileSync(`${worktree}/plain.txt`, 'plain notes\n');
+judged = sent();
+assert.equal(await install().tool_result(event(`${worktree}/plain.txt`), ctx), undefined, 'a benign untrusted read passes on its own judgment');
+assert.equal(row().decision, 'clear');
+assert.equal(row().request_started, true);
+assert.equal(sent(), judged + 1);
+const flagged = await install().tool_result(event(`${worktree}/untracked.txt`), ctx);
+assert.equal(flagged.isError, true, 'a flagged untrusted read is withheld by its own verdict');
+assert.equal(row().decision, 'flag');
+assert.equal(row().error_type, null, 'the verdict is a policy answer, not an outage');
+judged = sent();
 assert.equal(await install().tool_result(event(trusted), ctx), undefined);
 assert.equal(row().branch, 'trusted_read');
 assert.equal(row().error_type, null, 'trusted admission is not an unavailable judgment');
-assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), before);
-// After the cooldown expires the same call is judged and proceeds.
-writeFileSync(`${home}/state/.jev-guard-breaker`, String(Date.now() - 1));
-assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined);
-assert.equal(row().error_type, null);
-assert.equal(row().request_started, true);
+assert.equal(sent(), judged, 'a trusted read never reaches the judge');
 for (const [text, expected] of [['timeout-reset', 'TypeError'], ['slow502', 'Error']]) {
-  rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
   const denied = await install().tool_result({ toolName: 'bash', content: [{ type: 'text', text }] }, ctx);
   assert.equal(denied.isError, true);
   assert.equal(row().error_type, expected);
-  assert.ok(Number(readFileSync(`${home}/state/.jev-guard-breaker`, 'utf8')) > Date.now(), 'slow mixed outages must trip cooldown');
+  assert.equal(row().request_started, true);
 }
-rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
-await install().tool_call({ toolName: 'bash', input: { command: 'fail500' } }, ctx);
-assert.throws(() => readFileSync(`${home}/state/.jev-guard-breaker`), { code: 'ENOENT' }, 'fast failures must not trip cooldown');
+const failed = await install().tool_call({ toolName: 'bash', input: { command: 'fail500' } }, ctx);
+assert.equal(failed.block, true);
+assert.equal(row().error_type, 'Error');
 for (const toolName of ['write', 'edit']) {
   const path = '/etc/guard-refused';
   const refused = await handlers.tool_call({ toolName, input: { path, content: 'x', new_string: 'x' } }, ctx);
@@ -737,11 +707,11 @@ for (const toolName of ['write', 'edit']) {
   assert.ok(refused.reason.includes(path));
   assert.equal(row().refused_path, path);
 }
-console.log('trusted-cooldown-ok');
+console.log('trusted-independent-ok');
 JS
-) || fail "trusted reads and cooldown: $out"
-  [ "$out" = trusted-cooldown-ok ] || fail "unexpected trusted-read output: $out"
-  pass "task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; slow mixed outages trip cooldown but fast errors do not"
+) || fail "trusted reads and independent judgment: $out"
+  [ "$out" = trusted-independent-ok ] || fail "unexpected trusted-read output: $out"
+  pass "task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible"
 }
 
 test_ledger_privacy() {
@@ -1124,7 +1094,6 @@ assert.equal(stalledRow.request_started, true);
 assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
 assert.ok(stalledRow.ms >= 24000 && stalledRow.ms < 30000, `row time ${stalledRow.ms}`);
 assert.ok(stalledRow.chunks >= 3);
-rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
 console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
@@ -1164,7 +1133,7 @@ test_claude_channel_context
 test_channel_consistency
 test_omp_permissions
 test_deadlines
-test_trusted_read_and_cooldown
+test_trusted_reads_and_independent_judgment
 test_oversize_screening
 test_claude_oversize
 test_ledger_privacy

@@ -2075,8 +2075,7 @@ This section is the single owner of the alert contract; the script header owns i
 - A probe is one POST through `fm_typesafe_post` in [`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) with a constant two-option Choice question and no brief text, so it is a few hundred bytes of fixed text and the never-send list has nothing to check.
   The key comes from `fm_typesafe_key` and follows the [key-handling contract](#typed-dispatch-resolution-env-typesafe_api_key): never exported, never on argv, never written to output, state, or a wake.
 - `bin/fm-dispatch-resolve.sh` and `bin/fm-skill-pick.sh` also pass the code they saw to `fm-typesafe-health.sh record` the moment it arrives, so an alert does not wait for the next probe.
-  Only 402, 401, 403, and a 200 act for ordinary consumers; every other code is left to the probe.
-  The guard additionally reports `record 000 jev-guard` only after exhausting a judgment budget; the [guard contract](#jev-guard) owns its separate rolling alert threshold and cooldown.
+  Only 402, 401, 403, and a 200 act; every other code is left to the probe.
   The picker reports a TypeSafe failure even when its OpenRouter fallback then answered.
 
 **Classes and alerts**
@@ -2222,10 +2221,7 @@ Its 25-second result budget must therefore remain below that native deadline; ex
 That setting is the pre-tool deadline, 30 seconds by default, and omp refuses the call when a `tool_call` handler outlasts it (measured on 18.12.0: the host logged `handler timed out after 30000ms` and returned an extension timeout instead of running the tool).
 [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) raises it to 330 seconds, above the 300-second pre-tool budget, for worker launches through the existing per-launch `--config` overlay; no global or user omp setting is changed.
 A raw launch that omits the overlay keeps the 30-second default, so a pre-tool judgment slower than that is refused by the host rather than reviewed; that failure stays closed.
-After any outage that exhausts the decision budget or consumes at least one full per-try timeout of elapsed judge time, a home-local durable breaker skips judge requests for 60 seconds while preserving ordinary outage handling and pre-tool denial, regardless of whether the final error type is `TimeoutError`, `TypeError` or `Error`.
-Three such exhausted decisions within 15 minutes notify the existing TypeSafe health channel once; skipped cooldown calls do not count as new exhausted budgets, and ordinary health recovery clears alert deduplication.
-A call refused by the cooldown gets its own notice, not the outage advice: it names the seconds left, tells the worker to wait that long and run the same call once more (repeat the read for an omp result; a command only if repeating it is safe), and to stop and tell the user only if the call is refused the same way after the wait.
-Its ledger row records the type `CooldownActiveError` with no request started, so a cooldown skip is never counted as a judge timeout and never extends the cooldown.
+Each call obtains its own bounded judgment; no outcome of one call is carried to another, so a slow or failed judgment never refuses a later call by itself.
 This is not sustained-outage permission to execute shell commands or write files.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.

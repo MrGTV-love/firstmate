@@ -711,7 +711,7 @@ The [operator contract](../configuration.md#jev-guard) owns the narrower current
 Installed omp 18.12.0 was exercised with the current guard extension, native built-in `read`, a scripted loopback model, and a synthetic judge whose flag arrived after 31 seconds.
 With the proposed shared 300-second budget, the host logged `handler timed out after 30000ms` and delivered the original untrusted output to the next model request; increasing the pre-tool timeout did not protect results.
 With omp's separate 25-second guard budget and two tries capped at 12 seconds, the same 31-second judge scenario returned `TimeoutError` after 24,504 ms of provider time, replaced the output, and completed the native session in 28.205 seconds without a host handler timeout.
-The original canary was absent from the next model request, and the existing TypeSafe health record received one exhausted-guard observation.
+The original canary was absent from the next model request.
 No omp timeout configuration override was needed for result handling.
 
 The pre-tool (`tool_call`) handler has its own deadline, so the result timings above are not evidence for it.
@@ -728,7 +728,7 @@ The band case retained the original text plus an advisory, with a `review` / `po
 These sessions completed in 3.763 and 3.416 seconds respectively.
 Claude Code 2.1.302 consumed the delayed flag after 31,037 ms with the 330-second hook envelope, preserved the answered policy judgment rather than an outage, and delivered its advisory alongside the original text in the next model request.
 All providers and credentials in these native measurements were synthetic and local; each proof stopped its own fixture and proxy.
-The [operator contract](../configuration.md#jev-guard) owns the distinct host budgets, advisory band, trusted-read boundary, cooldown and unchanged pre-tool outage denial.
+The [operator contract](../configuration.md#jev-guard) owns the distinct host budgets, advisory band, trusted-read boundary and unchanged pre-tool outage denial.
 These observations establish actual host delivery of controlled judgments, not live-model accuracy or production activation.
 Both maintained native entrypoints also passed their 20-case matrices on these installed versions, covering exact channel consistency, untracked copy withholding/advisory, newly trusted changed home-state reads, privacy, missing credentials, provider outage and audit outage.
 

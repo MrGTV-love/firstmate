@@ -45,7 +45,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
   Durable-record failure is explicit rather than silently optional while active.
   It allows Claude, and omp's pre-tool shell and write judgments, up to three 90-second tries with cancellable one-second then two-second backoff inside a 300-second decision budget; the worker overlay raises omp's pre-tool handler deadline above that budget.
   It keeps omp's result screening at two 12-second tries with 500 ms backoff inside 25 seconds because that native handler times out at 30 seconds, without a setting, and forwards the original output.
-  It retains outage-only deny guidance, gives a cooldown refusal its own notice naming the seconds left, records elapsed tries and time, and applies the operator-owned cooldown and health alert when an outage exhausts the decision budget or consumes a full try's elapsed budget regardless of its final retryable error type.
+  It retains outage-only deny guidance and records elapsed tries and time; each call is judged on its own, with no state carried between calls.
   These Firstmate-only changes leave the upstream client, questions, thresholds, egress checks and `REVIEW_ON_UNAVAILABLE_V1` pre-tool denial unchanged; the operator contract above owns measurements and enclosing host limits.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.

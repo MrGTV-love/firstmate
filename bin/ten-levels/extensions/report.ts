@@ -1,9 +1,8 @@
 /** Firstmate's bounded Jev service and minimized audit owner; see docs/configuration.md. */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Buffer } from "node:buffer";
-import { randomUUID } from "node:crypto";
-import { execFileSync, spawn } from "node:child_process";
-import { appendFileSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -22,13 +21,6 @@ export const CHUNK_OVERLAP_BYTES = 1_024;
 /** Outage-only deny guidance; the worker adapter owns policy-refusal next steps. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
-/** A cooldown refusal names the wait, so the retry it invites cannot meet the cooldown again. */
-export function cooldownNotice(seconds: number, ran: boolean): string {
-  const again = ran ? "repeat the read once more (a command only if repeating it is safe)" : "run the same call once more";
-  return `The review could not run because the judge is cooling down after a recent outage, so this is not a verdict on the ${ran ? "output" : "call"}. `
-    + `Wait ${seconds} seconds, then ${again}. `
-    + "If it is refused the same way after the wait, stop and tell the user; do not work around it with another command, tool, path or encoding.";
-}
 
 interface Budget { tryMs: number; tries: number; decisionMs: number; backoffMs: number; reserveWholeTry: boolean }
 // The per-try limit guards only against a judge that never answers; answered calls are far faster
@@ -38,7 +30,6 @@ const WIDE_BUDGET: Budget = { tryMs: 90_000, tries: 3, decisionMs: 300_000, back
 // Its tool_call deadline (extensionHandlers.toolCallTimeoutMs) is raised past WIDE_BUDGET by .omp/fm-worker-overlay.yml.
 const OMP_RESULT_BUDGET: Budget = { tryMs: 12_000, tries: 2, decisionMs: 25_000, backoffMs: 500, reserveWholeTry: false };
 const budgetFor = (hook: GuardTerminal["hook"], host: "omp" | "claude"): Budget => host === "omp" && hook === "tool_result" ? OMP_RESULT_BUDGET : WIDE_BUDGET;
-const COOLDOWN_MS = 60_000;
 const RETRYABLE_FAILURES: ReadonlySet<GuardFailureType> = new Set(["TimeoutError", "TypeError", "Error"]);
 const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal; budget: Budget }>();
@@ -46,7 +37,7 @@ const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal; budg
 export type GuardFailureType = "ContractError" | "QuestionValidationError" | "TimeoutError" | "AbortError"
   | "TypeError" | "Error" | "PrivacyWithheldError" | "CredentialUnavailableError" | "RequestTooLargeError"
   | "AuditUnavailableError" | "InvalidToolInputError" | "UnsupportedToolResultError"
-  | "InactiveGuardError" | "CooldownActiveError";
+  | "InactiveGuardError";
 
 export class GuardUnavailableError extends Error {
   readonly errorType: GuardFailureType;
@@ -54,28 +45,19 @@ export class GuardUnavailableError extends Error {
   /** Provider tries and elapsed time; null when no request started. */
   readonly attempts: number | null;
   readonly elapsedMs: number | null;
-  /** True when the whole decision budget ran out; a request that started then counts as an exhausted decision. */
-  readonly exhausted: boolean;
-  /** Whole seconds left on the judge cooldown; set only on the cooldown refusal. */
-  readonly cooldownSeconds: number | null;
-  constructor(errorType: GuardFailureType, requestStarted = false, cause?: unknown, timing?: { attempts: number; elapsedMs: number; exhausted: boolean },
-    cooldownSeconds?: number) {
+  constructor(errorType: GuardFailureType, requestStarted = false, cause?: unknown, timing?: { attempts: number; elapsedMs: number }) {
     super("Jev guard requires review.", { cause });
     this.name = errorType;
     this.errorType = errorType;
     this.requestStarted = requestStarted;
     this.attempts = timing?.attempts ?? null;
     this.elapsedMs = timing?.elapsedMs ?? null;
-    this.exhausted = timing?.exhausted ?? false;
-    this.cooldownSeconds = cooldownSeconds ?? null;
   }
 }
 
 /** Failure rows carry the guard's own try count and elapsed time, so a timeout can be told from an error. */
-export function failureTiming(error: unknown): { attempts: number | null; ms: number | null; exhausted: boolean; cooldown_s: number | null } {
-  return error instanceof GuardUnavailableError
-    ? { attempts: error.attempts, ms: error.elapsedMs, exhausted: error.exhausted, cooldown_s: error.cooldownSeconds }
-    : { attempts: null, ms: null, exhausted: false, cooldown_s: null };
+export function failureTiming(error: unknown): { attempts: number | null; ms: number | null } {
+  return error instanceof GuardUnavailableError ? { attempts: error.attempts, ms: error.elapsedMs } : { attempts: null, ms: null };
 }
 
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
@@ -120,10 +102,6 @@ export interface GuardTerminal {
   /** Set on failure rows, where no result carries meta. */
   attempts?: number | null;
   ms?: number | null;
-  /** The whole decision budget ran out; with a started request it starts the judge cooldown. Never logged. */
-  exhausted?: boolean;
-  /** Seconds left on the judge cooldown when it refused the call; the worker notice only, never logged. */
-  cooldown_s?: number | null;
   result?: SystemOneResult;
   /** Set only when an oversized payload was screened in pieces: the piece count and every answered piece. */
   chunks?: number;
@@ -203,7 +181,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
   let apiKey: string | undefined;
   const clients = new Map<number, JevClient>();
   const ledger = resolve(context.state, "jev-guard.jsonl");
-  const breaker = resolve(context.state, ".jev-guard-breaker");
 
   function permitted(requestText: string): void {
     const timeout = preflightTimeout();
@@ -238,11 +215,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       let started = 0;
       try {
         if (!active) throw new GuardUnavailableError("InactiveGuardError");
-        let until = 0;
-        try { until = Number(readFileSync(breaker, "utf8")); } catch { /* No observed outage means no cooldown. */ }
-        if (Number.isFinite(until) && until > Date.now()) {
-          throw new GuardUnavailableError("CooldownActiveError", false, undefined, undefined, Math.ceil((until - Date.now()) / 1000));
-        }
         const body = { model: GUARD_MODEL, state, questions };
         validateRequest(body);
         const requestText = JSON.stringify(body);
@@ -272,7 +244,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       } catch (cause) {
         if (cause instanceof GuardUnavailableError) throw cause;
         throw new GuardUnavailableError(failureType(cause), requestStarted, cause,
-          requestStarted ? { attempts: tries, elapsedMs: Math.round(performance.now() - started), exhausted: budgets.getStore()?.signal.aborted === true } : undefined);
+          requestStarted ? { attempts: tries, elapsedMs: Math.round(performance.now() - started) } : undefined);
       }
     },
     plan(state, field, questions) {
@@ -318,19 +290,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       };
       try {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });
-        if ((terminal.error_type === "TimeoutError" || terminal.error_type === "TypeError" || terminal.error_type === "Error")
-          && terminal.request_started && (terminal.exhausted === true || (terminal.ms ?? 0) >= budgetFor(terminal.hook, host).tryMs)) {
-          const temporary = `${breaker}.${process.pid}.${randomUUID()}`;
-          writeFileSync(temporary, String(Date.now() + COOLDOWN_MS), { mode: 0o600 });
-          renameSync(temporary, breaker);
-          // The existing health owner serializes and deduplicates alerts. Never spend the remaining host budget waiting on it.
-          const health = spawn(resolve(dirname(lib), "fm-typesafe-health.sh"), ["record", "000", "jev-guard"], {
-            env: { ...process.env, FM_HOME: context.home, FM_STATE_OVERRIDE: context.state, FM_CONFIG_OVERRIDE: context.config },
-            stdio: "ignore",
-          });
-          health.on("error", () => {});
-          health.unref();
-        }
       } catch (cause) {
         throw new GuardUnavailableError("AuditUnavailableError", terminal.request_started, cause);
       }
