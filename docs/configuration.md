@@ -634,7 +634,7 @@ The receipt prevents accidental publication through supported paths; it proves c
 The optional local, gitignored `config/wait-no-turns` presence flag opts this home into keeping a waiting worker from spending turns until it is answered.
 With it present, ship and scout briefs gain the `# Waiting` section and the foreground no-mistakes drive text, every brief's inbox section keeps the natural-checkpoint check and adds that a waiting worker does not poll or list its inbox because a waiting instruction rings, a pending-reply recovery waits while that mate has its own open decision or blocker, and a fire-and-forget steer whose doorbell did not land gets one later ring.
 With the file absent, generated briefs omit the waiting section and the no-poll inbox line, the drive text backgrounds the call, recovery sends during an open decision, and a fire-and-forget steer is not owed a retry ring.
-Long-command and pipeline-drive lifetimes remain progress-based in either posture; `bin/fm-duration.py --help` owns measured ceilings and calibration fallbacks.
+Long-command and pipeline-drive lifetimes remain progress-based in either posture; `bin/fm-duration.py --help` owns the no-progress and absolute stop limits, the measured slower-than-usual report, and calibration fallbacks.
 The flag is a home-local preference and is not inherited by secondmate homes.
 
 ## No-mistakes pipeline spend (config/pipeline-spend)
@@ -950,7 +950,7 @@ A longer interval needs `FM_POLL` set in the environment of every process that d
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
 The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many scripts run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
-`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a measured ceiling or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
 `--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
 A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
 The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the bounded wait, the nested-run rule and the exit codes.

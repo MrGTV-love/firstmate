@@ -92,7 +92,7 @@ Per-key slot gate. A test.* key admits at most FM_TEST_KEY_SLOTS concurrent
 copies (default 2; 0 turns the gate off; whole numbers up to 16) host-wide, so
 the same heavy suite started in several worktrees takes turns instead of
 multiplying its process churn. run takes a slot before it starts its clock, so
-the wait is in neither the recorded sample nor the measured ceiling; gate is for
+the wait is in neither the recorded sample nor run's stop and report clocks; gate is for
 a caller that times COMMAND itself (bin/fm-test-run.sh wraps each script in it):
 it runs COMMAND with this process's stdio and the --log-fd descriptor, and
 writes the milliseconds it queued behind busy slots to --wait-file before COMMAND
