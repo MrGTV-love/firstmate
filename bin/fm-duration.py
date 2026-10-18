@@ -84,8 +84,9 @@ multiplying its process churn. run takes a slot before it starts its clock, so
 the wait is in neither the recorded sample nor the measured ceiling; gate is for
 a caller that times COMMAND itself (bin/fm-test-run.sh wraps each script in it):
 it runs COMMAND with this process's stdio and the --log-fd descriptor, and
-writes the milliseconds it waited for the slot to --wait-file before COMMAND
-starts, so that caller can leave the wait out of its sample. Slots are exclusive
+writes the milliseconds it queued behind busy slots to --wait-file before COMMAND
+starts (0 when a slot was free at once), so that caller can leave the wait out of
+its sample. Slots are exclusive
 non-blocking flock files in a per-key directory under FM_TEST_SLOT_DIR, else
 $HOME/.cache/fm-test-slots, created mode 0700 and owned by the caller. The
 kernel releases a flock on every exit, SIGKILL included, so no lock directory
@@ -652,8 +653,11 @@ def slot_log(log_fd, message):
         pass
 
 
-def acquire_slot(key, log_fd=2):
-    """An open fd holding one of the key's slots, or None when this key takes none."""
+def acquire_slot(key, log_fd=2, queued=None):
+    """An open fd holding one of the key's slots, or None when this key takes none.
+
+    A list passed as QUEUED receives the seconds spent queued behind busy slots, and stays empty when a slot was free at once.
+    """
     if not key.startswith(SLOT_PREFIX):
         return None
     limit = slot_limit()
@@ -664,13 +668,13 @@ def acquire_slot(key, log_fd=2):
         slot_log(log_fd, f'running {key} without a slot: this Python has no POSIX file locks')
         return None
     try:
-        return queue_for_slot(key, slot_directory(key), limit, wait, log_fd)
+        return queue_for_slot(key, slot_directory(key), limit, wait, log_fd, queued)
     except (OSError, ValueError) as error:
         slot_log(log_fd, f'running {key} without a slot: {error}')
         return None
 
 
-def queue_for_slot(key, directory, limit, wait, log_fd):
+def queue_for_slot(key, directory, limit, wait, log_fd, queued=None):
     started = time.monotonic()
     next_notice = started + SLOT_FIRST_NOTICE
     delay = 0.05
@@ -694,10 +698,14 @@ def queue_for_slot(key, directory, limit, wait, log_fd):
             held = [item for item in os.environ.get(SLOT_HELD_ENV, '').split('\t') if item]
             os.environ[SLOT_HELD_ENV] = '\t'.join(held + [key])
             waited = int(time.monotonic() - started)
+            if queued:
+                queued[:] = [time.monotonic() - started]
             if waited >= SLOT_FIRST_NOTICE:
                 slot_log(log_fd, f'got a slot of {key} after {waited}s')
             return fd
         now = time.monotonic()
+        if queued is not None:
+            queued[:] = [now - started]
         expired = now - started >= wait
         if now >= next_notice or (expired and next_notice == started + SLOT_FIRST_NOTICE):
             holders = '; '.join(text for _, text in slot_holders(directory, limit)) or 'holders unknown'
@@ -724,9 +732,9 @@ def gate(key, command, log_fd, wait_file=None):
             kept = (log_fd,)
         except OSError:
             log_fd = 2
-    began = time.monotonic()
+    queued = []
     try:
-        fd = acquire_slot(key, log_fd)
+        fd = acquire_slot(key, log_fd, queued)
     except ValueError as error:
         slot_log(log_fd, str(error))
         return 125
@@ -734,7 +742,7 @@ def gate(key, command, log_fd, wait_file=None):
         return 130
     if wait_file:
         try:
-            Path(wait_file).write_text(f'{round((time.monotonic() - began) * 1000)}\n')
+            Path(wait_file).write_text(f'{round(queued[0] * 1000) if queued else 0}\n')
         except OSError as error:
             slot_log(log_fd, f'cannot report the slot wait to {wait_file}: {error}')
     posix = os.name == 'posix'

@@ -243,6 +243,12 @@ slot_end = re.search(r'FM_TEST_END \S+ tests/fm-slot\.test\.sh exit=0 duration_m
 slot_sample = [r for r in rows() if r.get('key') == 'test.tests/fm-slot.test.sh' and 'event' not in r][-1]
 assert slot_end and int(slot_end.group(1)) <= slot_run_elapsed_ms - 2900, (slot_end, slot_run_elapsed_ms)
 assert slot_sample['duration_ms'] <= slot_run_elapsed_ms - 2900, (slot_sample, slot_run_elapsed_ms)
+# The load it read before the queue says nothing about the run, so the queued sample has none; a run that finds a free slot keeps its load.
+assert slot_sample['load_start'] is None and slot_sample['load_end'] is not None, slot_sample
+slot_free_run = subprocess.run([str(runrepo / 'bin/fm-test-run.sh'), 'tests/fm-slot.test.sh'], env=slot_run_env, cwd=runrepo, capture_output=True, text=True, timeout=120)
+assert slot_free_run.returncode == 0 and 'waiting' not in slot_free_run.stderr, slot_free_run
+slot_free_sample = [r for r in rows() if r.get('key') == 'test.tests/fm-slot.test.sh' and 'event' not in r][-1]
+assert slot_free_sample['recorded_at'] != slot_sample['recorded_at'] and slot_free_sample['load_start'] is not None, (slot_free_sample, slot_sample)
 print('ok - the test runner waits on a held per-key slot, names the holder, runs once the bounded wait ends, and leaves the wait out of the sample')
 
 # A stop sends TERM and waits for the leader: its own TERM cleanup of a child in
@@ -773,7 +779,7 @@ wait_holder.kill()
 wait_holder.communicate()
 assert queued.returncode == 0 and 2900 <= int(waited_file.read_text()) < 60000, (queued, waited_file.read_text())
 subprocess.run([sys.executable, str(helper), 'gate', '--wait-file', str(unwaited_file), 'test.slot.wait', '--', 'true'], env=wait_env, cwd=workrepo, check=True, capture_output=True, timeout=60)
-assert int(unwaited_file.read_text()) < 2900, unwaited_file.read_text()
+assert unwaited_file.read_text() == '0\n', unwaited_file.read_text()
 unwritable = subprocess.run([sys.executable, str(helper), 'gate', '--wait-file', str(tmp / 'no-such-dir/waited.ms'), 'test.slot.wait', '--', 'echo', 'ran'], env=wait_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
 assert unwritable.returncode == 0 and unwritable.stdout == 'ran\n', unwritable
 

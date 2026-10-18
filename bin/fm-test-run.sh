@@ -145,7 +145,8 @@
 # gives up after FM_TEST_SLOT_WAIT_SECONDS and then runs without a slot; a nested
 # run of a key already held (FM_TEST_SLOT_HELD) takes none. The time a script
 # queued for its slot is left out of its recorded duration, its FM_TEST_END
-# duration_ms and its test.<script> sample; the run's own wall time (--max-wall-ms,
+# duration_ms and its test.<script> sample, and that sample records no start load
+# (the load was read before the queue); the run's own wall time (--max-wall-ms,
 # FM_TEST_SUMMARY) still counts it. bin/fm-duration.py's header owns the protocol.
 # FM_TEST_KEY_SLOTS=0, no python3 or helper beside this script, or a native
 # Windows bash (uname MINGW, MSYS or CYGWIN) runs scripts without a slot.
@@ -2827,6 +2828,9 @@ record_script_result() {
   if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1; then
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
+    fi
+    if [ "$(slot_wait_ms "$out")" -gt 0 ]; then
+      load_start=
     fi
     fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start" "$timed_out"
   fi
