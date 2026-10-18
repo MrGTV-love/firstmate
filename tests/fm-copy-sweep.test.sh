@@ -1,0 +1,642 @@
+#!/usr/bin/env bash
+# Behavioral coverage for bin/fm-copy-sweep.sh: the proof matrix, the report-only
+# default, the one-wake byte budget, the load and du limits, and the refusal to
+# force anything. Every world is a throwaway directory under a temp root with
+# real `git worktree add` copies; no real pool, home, state file or backlog is
+# read or written. FM_COPY_SWEEP_BIN points the suite at a mutant of the script
+# to prove each assertion can fail.
+set -u
+
+# shellcheck source=tests/lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+TMP_ROOT=$(fm_test_tmproot fm-copy-sweep)
+SWEEP=${FM_COPY_SWEEP_BIN:-$ROOT/bin/fm-copy-sweep.sh}
+ORIGINAL_PATH=$PATH
+REAL_GIT=$(command -v git)
+REAL_RM=$(command -v rm)
+GIB=1048576
+fm_git_identity
+
+# Sets W, HOMED, TH, SLOT, FAKEBIN for a fresh world: a Firstmate home, a
+# Treehouse root with one pool slot whose clone has a local bare origin, and the
+# fake tools every case runs against.
+make_world() {  # <name>
+  W="$TMP_ROOT/$1"
+  HOMED="$W/home"
+  TH="$W/th"
+  SLOT="$TH/pool1/1/repo"
+  FAKEBIN="$W/fakebin"
+  mkdir -p "$HOMED/state" "$HOMED/config" "$HOMED/data" "$TH/pool1/1" "$FAKEBIN"
+  fm_git_init_commit "$SLOT"
+  fm_git_add_origin "$SLOT" "$W/origin.git"
+  git -C "$SLOT" fetch -q origin
+  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$SLOT" > "$TH/pool1/treehouse-state.json"
+  : > "$W/du-table"
+  install_fakes
+}
+
+install_fakes() {
+  cat > "$FAKEBIN/lsof" <<'EOF'
+#!/usr/bin/env bash
+[ -n "${FAKE_LSOF_CWD:-}" ] || exit 0
+printf 'p4242\nfcwd\nn%s\n' "$FAKE_LSOF_CWD"
+EOF
+  cat > "$FAKEBIN/uptime" <<'EOF'
+#!/usr/bin/env bash
+if [ "${FAKE_UPTIME_STYLE:-mac}" = linux ]; then
+  printf ' 10:00:00 up 1 day,  1 user,  load average: %s, 1.00, 1.00\n' "${FAKE_LOAD:-0.50}"
+else
+  printf '10:00  up 1 day,  1 user,  load averages: %s 1.00 1.00\n' "${FAKE_LOAD:-0.50}"
+fi
+EOF
+  cat > "$FAKEBIN/nice" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_NICE_LOG"
+[ "$1" = -n ] && [ "$2" = 20 ] || exit 99
+shift 2
+exec "$@"
+EOF
+  cat > "$FAKEBIN/du" <<'EOF'
+#!/usr/bin/env bash
+path=${*: -1}
+mkdir -p "$FAKE_DU_ACTIVE"
+: > "$FAKE_DU_ACTIVE/$$"
+find "$FAKE_DU_ACTIVE" -type f | wc -l | tr -d ' ' >> "$FAKE_DU_LOG.conc"
+sleep "${FAKE_DU_SLEEP:-0.05}"
+rm -f "$FAKE_DU_ACTIVE/$$"
+printf '%s\n' "$path" >> "$FAKE_DU_LOG"
+kib=$(awk -F '\t' -v p="$path" '$1 == p { print $2 }' "$FAKE_DU_TABLE")
+printf '%s\t%s\n' "${kib:-100}" "$path"
+EOF
+  cat > "$FAKEBIN/git" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_GIT_LOG"
+case " $* " in
+  *" worktree remove "*)
+    if [ -n "${FAKE_GIT_FAIL_REMOVE:-}" ]; then
+      echo "fatal: injected failure" >&2
+      exit 1
+    fi
+    ;;
+esac
+exec "$FAKE_REAL_GIT" "$@"
+EOF
+  cat > "$FAKEBIN/rm" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_RM_LOG"
+exec "$FAKE_REAL_RM" "$@"
+EOF
+  cat > "$FAKEBIN/treehouse" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_TREEHOUSE_LOG"
+exit 0
+EOF
+  chmod +x "$FAKEBIN"/*
+}
+
+# Runs the sweep in the current world; sets OUT and RC.
+run_sweep() {
+  RC=0
+  OUT=$(env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_DATA_OVERRIDE \
+    PATH="$FAKEBIN:$ORIGINAL_PATH" FAKE_REAL_GIT="$REAL_GIT" FAKE_REAL_RM="$REAL_RM" \
+    FM_HOME="$HOMED" FM_COPY_SWEEP_TREEHOUSE_ROOT="$TH" \
+    FAKE_DU_TABLE="$W/du-table" FAKE_DU_LOG="$W/du.log" FAKE_DU_ACTIVE="$W/du-active" \
+    FAKE_NICE_LOG="$W/nice.log" FAKE_GIT_LOG="$W/git.log" FAKE_RM_LOG="$W/rm.log" \
+    FAKE_TREEHOUSE_LOG="$W/treehouse.log" \
+    "$SWEEP" "$@" 2>&1) || RC=$?
+}
+
+# add_copy <name>: a nested copy of the slot on branch fm/<name>, one commit,
+# pushed to the origin: clean, on a remote, nobody's.
+add_copy() {
+  local name=$1 copy="$SLOT/.claude/worktrees/$1"
+  git -C "$SLOT" worktree add -q -b "fm/$name" "$copy"
+  printf '%s\n' "$name" > "$copy/$name.txt"
+  git -C "$copy" add "$name.txt"
+  git -C "$copy" commit -qm "$name"
+  git -C "$copy" push -q origin "fm/$name"
+}
+
+copy_path() { printf '%s\n' "$SLOT/.claude/worktrees/$1"; }
+
+# A file listing and the sha256 of every file, so "byte-identical" is literal.
+snap() {  # <dir>
+  local dir=$1
+  (
+    cd "$dir" || exit 1
+    find . -print | LC_ALL=C sort
+    find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256
+  )
+}
+
+class_of() {  # <name> -> class of nested copy <name> in $OUT
+  printf '%s\n' "$OUT" | awk -F '\t' -v p="$(copy_path "$1")" '$3 == p { print $1 }'
+}
+
+assert_class() {  # <name> <class>
+  local got
+  got=$(class_of "$1")
+  [ "$got" = "$2" ] || fail "copy $1 should be $2, got '${got:-none}': $OUT"
+}
+
+registered() {  # <name> -> 0 when the slot still registers the copy
+  git -C "$SLOT" worktree list --porcelain | grep -qxF "worktree $(copy_path "$1")"
+}
+
+du_calls() { [ -f "$W/du.log" ] && wc -l < "$W/du.log" | tr -d ' ' || printf '0\n'; }
+
+# The classes the matrix needs, one copy of each.
+make_matrix() {  # <name>
+  make_world "$1"
+  add_copy reap
+  add_copy dirty
+  printf 'scratch\n' > "$(copy_path dirty)/untracked.txt"
+  add_copy unpushed
+  git -C "$SLOT" worktree add -q -b fm/unpushed-extra "$SLOT/.claude/worktrees/unpushed2"
+  printf 'x\n' > "$SLOT/.claude/worktrees/unpushed2/local.txt"
+  git -C "$SLOT/.claude/worktrees/unpushed2" add local.txt
+  git -C "$SLOT/.claude/worktrees/unpushed2" commit -qm local-only
+  printf 'y\n' > "$(copy_path unpushed)/local.txt"
+  git -C "$(copy_path unpushed)" add local.txt
+  git -C "$(copy_path unpushed)" commit -qm local-only
+  add_copy live
+  fm_write_meta "$HOMED/state/live-task.meta" "worktree=$(copy_path live)" "kind=ship"
+  add_copy orphan
+  printf 'garbage\n' > "$(copy_path orphan)/.git"
+  add_copy locked
+  git -C "$SLOT" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$(copy_path locked)"
+  add_copy proc
+}
+
+take_snapshots() {  # <suffix> <names...>
+  local suffix=$1 name
+  shift
+  for name in "$@"; do
+    snap "$(copy_path "$name")" > "$W/snap-$name-$suffix"
+  done
+}
+
+assert_untouched() {  # <names...>: before and after snapshots match
+  local name
+  for name in "$@"; do
+    cmp -s "$W/snap-$name-before" "$W/snap-$name-after" \
+      || fail "copy $name is no longer byte-identical: $(diff "$W/snap-$name-before" "$W/snap-$name-after" | head -5)"
+    registered "$name" || fail "copy $name is no longer registered with its clone"
+  done
+}
+
+HELD_NAMES=(dirty unpushed unpushed2 live orphan locked proc)
+
+test_report_lists_every_copy_and_changes_nothing() {
+  local first second
+  make_matrix report
+  take_snapshots before reap "${HELD_NAMES[@]}"
+  git -C "$SLOT" worktree list --porcelain > "$W/list-before"
+  FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  first=$OUT
+  assert_class reap REAPABLE-PROVEN
+  assert_class dirty HELD-DIRTY
+  assert_class unpushed HELD-UNPUSHED
+  assert_class unpushed2 HELD-UNPUSHED
+  assert_class live HELD-LIVE-TASK
+  assert_class orphan ORPHAN-NO-RECORD
+  assert_class locked HELD-LOCKED
+  assert_class proc HELD-LIVE-TASK
+  assert_contains "$OUT" "task live-task's active record names it as its worktree" "report did not name the live record"
+  assert_contains "$OUT" "process 4242 is running inside it" "report did not name the process"
+  assert_contains "$OUT" "launcher 999999 is gone" "report did not explain the Vernant lock"
+  assert_contains "$OUT" "untracked.txt" "report did not name the untracked file"
+  assert_contains "$OUT" "summary: REAPABLE-PROVEN=1" "report summary missing"
+  take_snapshots after reap "${HELD_NAMES[@]}"
+  assert_untouched reap "${HELD_NAMES[@]}"
+  git -C "$SLOT" worktree list --porcelain > "$W/list-after"
+  cmp -s "$W/list-before" "$W/list-after" || fail "report changed the worktree registrations"
+  assert_absent "$HOMED/data/copy-sweep.log" "report wrote a removal log"
+  assert_absent "$HOMED/state/copy-sweep.record" "report wrote a budget record"
+  assert_absent "$HOMED/state/copy-sweep.sizes" "report wrote a size cache"
+  assert_absent "$HOMED/state/.wake-queue" "report raised a wake"
+  FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep
+  second=$OUT
+  [ "$first" = "$second" ] || fail "a second report differs from the first: $(diff <(printf '%s\n' "$first") <(printf '%s\n' "$second") | head -5)"
+  pass "report mode lists every copy with class and reason, changes nothing, and repeats exactly"
+}
+
+test_apply_removes_only_the_reapable_copy() {
+  make_matrix apply
+  take_snapshots before "${HELD_NAMES[@]}"
+  FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path reap)" "apply did not report the removal"
+  assert_class dirty HELD-DIRTY
+  assert_class live HELD-LIVE-TASK
+  assert_contains "$OUT" "summary: REAPABLE-PROVEN=0" "the post-removal report still counts the removed copy"
+  assert_contains "$OUT" "summary: HELD-LIVE-TASK=2" "the post-removal report lost the held copies"
+  [ ! -e "$(copy_path reap)" ] || fail "the REAPABLE-PROVEN copy is still on disk"
+  ! registered reap || fail "the removed copy is still registered"
+  take_snapshots after "${HELD_NAMES[@]}"
+  assert_untouched "${HELD_NAMES[@]}"
+  [ -f "$HOMED/data/copy-sweep.log" ] || fail "no removal log was written"
+  [ "$(wc -l < "$HOMED/data/copy-sweep.log" | tr -d ' ')" = 1 ] || fail "the log should hold exactly one line: $(cat "$HOMED/data/copy-sweep.log")"
+  assert_contains "$(cat "$HOMED/data/copy-sweep.log")" "$(copy_path reap)" "the log line does not name the copy"
+  assert_contains "$(cat "$HOMED/data/copy-sweep.log")" "branch=fm/reap" "the log line does not name the branch"
+  git -C "$SLOT" rev-parse --verify --quiet refs/heads/fm/reap >/dev/null || fail "the removed copy's branch ref was lost"
+  FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep --apply
+  [ "$RC" = 0 ] || fail "second apply failed ($RC): $OUT"
+  assert_no_grep "REMOVED" <(printf '%s\n' "$OUT") "a second apply removed something again"
+  [ "$(wc -l < "$HOMED/data/copy-sweep.log" | tr -d ' ')" = 1 ] || fail "a second apply appended to the log"
+  take_snapshots after "${HELD_NAMES[@]}"
+  assert_untouched "${HELD_NAMES[@]}"
+  pass "apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent"
+}
+
+test_copy_with_one_untracked_file_and_unpushed_tip_are_kept() {
+  make_world edges
+  add_copy one
+  printf 'u\n' > "$(copy_path one)/just-one-untracked-file"
+  add_copy two
+  git -C "$(copy_path two)" commit -q --allow-empty -m unpushed
+  take_snapshots before one two
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_class one HELD-DIRTY
+  assert_class two HELD-UNPUSHED
+  take_snapshots after one two
+  assert_untouched one two
+  pass "a copy with one untracked file and a copy whose tip is on no remote are both kept"
+}
+
+test_landed_content_without_a_pushed_tip_is_reaped_by_apply() {
+  make_world landed
+  git -C "$SLOT" worktree add -q -b fm/landed "$SLOT/.claude/worktrees/landed"
+  printf 'same\n' > "$(copy_path landed)/landed.txt"
+  git -C "$(copy_path landed)" add landed.txt
+  git -C "$(copy_path landed)" commit -qm "copy side"
+  printf 'same\n' > "$SLOT/landed.txt"
+  git -C "$SLOT" add landed.txt
+  git -C "$SLOT" commit -qm "main side"
+  git -C "$SLOT" push -q origin main
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_contains "$OUT" "content already in the default branch" "the landed proof was not named"
+  [ ! -e "$(copy_path landed)" ] || fail "a copy whose content is already in the default branch was not removed"
+  pass "a copy whose tip is on no remote but whose content already landed is removed by the teardown landed rule"
+}
+
+test_lane_home_project_clone_is_swept() {
+  local proj copy
+  make_world lanehome
+  proj="$HOMED/projects/proj"
+  fm_git_init_commit "$proj"
+  fm_git_add_origin "$proj" "$W/proj-origin.git"
+  git -C "$proj" fetch -q origin
+  copy="$proj/.claude/worktrees/stale"
+  git -C "$proj" worktree add -q -b fm/stale "$copy"
+  git -C "$copy" push -q origin fm/stale
+  run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_contains "$OUT" "REAPABLE-PROVEN"$'\t'"0.00 GiB"$'\t'"$copy" "the lane home's nested copy was not found"
+  assert_contains "$OUT" "budget container $HOMED:" "the home was not budgeted as a container"
+  run_sweep --apply
+  [ ! -e "$copy" ] || fail "apply did not remove the lane home's stale copy"
+  pass "a project clone under a Firstmate home is enumerated, budgeted as a container, and swept"
+}
+
+test_failing_remove_leaves_the_copy_and_is_never_forced() {
+  make_world failing
+  add_copy reap
+  take_snapshots before reap
+  FAKE_GIT_FAIL_REMOVE=1 run_sweep --apply
+  [ "$RC" = 1 ] || fail "a failed removal should exit 1, got $RC: $OUT"
+  assert_contains "$OUT" "FAILED"$'\t'"$(copy_path reap)" "the failure was not reported"
+  assert_contains "$OUT" "injected failure" "the git refusal was not reported"
+  take_snapshots after reap
+  assert_untouched reap
+  [ "$(grep -c 'worktree remove' "$W/git.log")" = 1 ] || fail "the removal was retried: $(grep 'worktree remove' "$W/git.log")"
+  [ ! -f "$HOMED/data/copy-sweep.log" ] || fail "a failed removal was logged as a removal"
+  pass "a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once"
+}
+
+test_nothing_is_forced_deleted_cleaned_or_returned() {
+  make_matrix noforce
+  FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  grep -q 'worktree remove' "$W/git.log" || fail "no worktree remove was recorded, so this test saw nothing"
+  grep -E 'worktree remove' "$W/git.log" | grep -qE ' (--force|-f|-ff)( |$)' && fail "a worktree remove was forced"
+  grep -E '(^| )(clean|stash|checkout|reset|rm|gc|prune)( |$)' "$W/git.log" && fail "git was asked to clean, stash, reset or prune"
+  grep -qE ' (--force|-f|-ff)( |$)' "$W/git.log" && fail "a forced git command was recorded"
+  grep -q 'worktree unlock' "$W/git.log" && fail "a lock was released"
+  if [ -f "$W/rm.log" ]; then
+    grep -qF "$TH" "$W/rm.log" && fail "rm touched a path under the pool: $(grep -F "$TH" "$W/rm.log")"
+    grep -qE '(^| )-[a-zA-Z]*[rR]' "$W/rm.log" && fail "rm was run recursively: $(cat "$W/rm.log")"
+  fi
+  [ ! -f "$W/treehouse.log" ] || fail "treehouse was called: $(cat "$W/treehouse.log")"
+  pass "apply never forces, cleans, unlocks, recursively deletes or calls treehouse"
+}
+
+test_load_guard_blocks_a_scan() {
+  make_world load
+  add_copy reap
+  printf 'load-limit 40\n' > "$HOMED/config/copy-budget"
+  FAKE_LOAD=40.01 run_sweep --apply
+  [ "$RC" = 75 ] || fail "a load above the limit should exit 75, got $RC: $OUT"
+  assert_contains "$OUT" "load average 40.01 is above the limit 40" "the guard did not name the load"
+  [ -d "$(copy_path reap)" ] || fail "apply removed a copy while the load guard held"
+  [ ! -f "$W/du.log" ] || fail "du ran while the load guard held"
+  FAKE_UPTIME_STYLE=linux FAKE_LOAD=40.01 run_sweep --apply
+  [ "$RC" = 75 ] || fail "a Linux-style load line was not read, got $RC: $OUT"
+  FAKE_LOAD=40.00 run_sweep
+  [ "$RC" = 0 ] || fail "a load equal to the limit should scan, got $RC: $OUT"
+  FAKE_LOAD=99 run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "check must stay silent under load: $RC $OUT"
+  [ ! -f "$HOMED/state/copy-sweep.record" ] || fail "check wrote a record while the guard held"
+  printf 'load-limit 100000\n' > "$HOMED/config/copy-budget"
+  run_sweep
+  [ "$RC" = 0 ] || fail "the host's own uptime output was not understood ($RC): $OUT"
+  pass "the load guard stops a scan above the limit, reads both uptime formats, and the host's real uptime parses"
+}
+
+test_one_du_at_a_time_under_nice() {
+  local max mode
+  make_world du
+  add_copy a
+  add_copy b
+  add_copy c
+  add_copy d
+  # A direct run measures without a deadline; check measures under one. Neither
+  # path may run du in parallel or without nice -n 20.
+  for mode in direct check; do
+    : > "$W/du.log"
+    : > "$W/nice.log"
+    rm -f "$W/du.log.conc"
+    if [ "$mode" = direct ]; then run_sweep; else run_sweep check; fi
+    [ "$RC" = 0 ] || fail "$mode run failed ($RC): $OUT"
+    [ "$(du_calls)" = 4 ] || fail "$mode run: expected one du per copy, got $(du_calls)"
+    max=$(sort -n "$W/du.log.conc" | tail -1)
+    [ "$max" = 1 ] || fail "$mode run: du ran concurrently, at most $max at once"
+    [ "$(wc -l < "$W/nice.log" | tr -d ' ')" = 4 ] || fail "$mode run: every du should run under nice: $(cat "$W/nice.log")"
+    [ "$(sed 's/ -- .*//' "$W/nice.log" | sort -u)" = "-n 20 du -sk" ] || fail "$mode run: du did not run as nice -n 20 du -sk: $(sort -u "$W/nice.log")"
+  done
+  pass "du runs one at a time as nice -n 20 du -sk, with and without a deadline"
+}
+
+test_sizes_are_cached_by_path_and_mtime() {
+  make_world cache
+  add_copy a
+  add_copy b
+  printf 'interval 0\n' > "$HOMED/config/copy-budget"
+  FM_COPY_SWEEP_NOW=1000 run_sweep check
+  [ "$(du_calls)" = 2 ] || fail "first scan should measure both copies, got $(du_calls)"
+  FM_COPY_SWEEP_NOW=1100 run_sweep check
+  [ "$(du_calls)" = 2 ] || fail "an unchanged copy was measured again, got $(du_calls)"
+  touch -t 203001010000 "$(copy_path a)"
+  FM_COPY_SWEEP_NOW=1200 run_sweep check
+  [ "$(du_calls)" = 3 ] || fail "only the copy with a new mtime should be measured again, got $(du_calls)"
+  [ "$(tail -1 "$W/du.log")" = "$(copy_path a)" ] || fail "the wrong copy was measured again: $(tail -1 "$W/du.log")"
+  FM_COPY_SWEEP_NOW=200000 run_sweep check
+  [ "$(du_calls)" = 5 ] || fail "entries older than cache-max-age should be measured again, got $(du_calls)"
+  assert_present "$HOMED/state/copy-sweep.sizes" "no size cache was written"
+  pass "sizes are cached by copy path and mtime and expire with cache-max-age"
+}
+
+test_nested_copy_bytes_are_not_counted_twice() {
+  make_world nest
+  add_copy outer
+  git -C "$(copy_path outer)" worktree add -q -b fm/inner "$(copy_path outer)/inner"
+  printf '%s\t%s\n%s\t%s\n' "$(copy_path outer)" $((3 * GIB)) "$(copy_path outer)/inner" $((1 * GIB)) > "$W/du-table"
+  run_sweep
+  printf '%s\n' "$OUT" | awk -F '\t' -v p="$(copy_path outer)" '$3 == p { print $2 }' | grep -qx '2.00 GiB' \
+    || fail "the enclosing copy should show its own 2.00 GiB: $OUT"
+  assert_contains "$OUT" "budget container $SLOT: 3.00 GiB" "the container total double-counted the nested copy: $OUT"
+  pass "a copy nested in another copy is subtracted from the enclosing one"
+}
+
+# Six dirty copies of the stated sizes, so apply leaves them in place.
+make_budget_world() {  # <name> <gib-each...>
+  local name=$1 i=0 gib
+  shift
+  make_world "$name"
+  : > "$W/du-table"
+  for gib in "$@"; do
+    i=$((i + 1))
+    add_copy "c$i"
+    printf 'dirty\n' > "$(copy_path "c$i")/untracked.txt"
+    printf '%s\t%s\n' "$(copy_path "c$i")" $((gib * GIB)) >> "$W/du-table"
+  done
+}
+
+set_sizes() {  # <gib-each...>
+  local i=0 gib
+  : > "$W/du-table"
+  for gib in "$@"; do
+    i=$((i + 1))
+    printf '%s\t%s\n' "$(copy_path "c$i")" $((gib * GIB)) >> "$W/du-table"
+  done
+}
+
+test_budget_wake_names_budget_total_and_five_largest_and_fires_once() {
+  local lines
+  make_budget_world budget 1 2 3 4 5 6 7
+  printf 'default-pool off\ncontainer %s 10\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  run_sweep check
+  [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
+  lines=$(printf '%s\n' "$OUT" | grep -c '^copy-sweep:')
+  [ "$lines" = 1 ] || fail "expected exactly one wake line, got $lines: $OUT"
+  assert_contains "$OUT" "container $SLOT is over its budget: 28.00 GiB against 10 GiB" "the wake did not name the budget and total"
+  assert_contains "$OUT" "largest copies: $(copy_path c7) 7.00 GiB HELD-DIRTY, $(copy_path c6) 6.00 GiB HELD-DIRTY, $(copy_path c5) 5.00 GiB HELD-DIRTY, $(copy_path c4) 4.00 GiB HELD-DIRTY, $(copy_path c3) 3.00 GiB HELD-DIRTY" "the wake did not name the five largest copies with their class"
+  assert_not_contains "$OUT" "$(copy_path c2) " "the wake named a sixth copy"
+  WAKE_TEXT=$OUT
+  run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "the same standing condition woke again: $OUT"
+  run_sweep check
+  [ -z "$OUT" ] || fail "the same standing condition woke a third time: $OUT"
+  set_sizes 1 1 1 1 1 1 1
+  run_sweep check
+  [ -z "$OUT" ] || fail "dropping under the budget should not wake: $OUT"
+  assert_no_grep "over" "$HOMED/state/copy-sweep.record" "the record kept a budget that is back under"
+  set_sizes 2 2 2 2 2 2 2
+  run_sweep check
+  assert_contains "$OUT" "container $SLOT is over its budget: 14.00 GiB against 10 GiB" "exceeding again did not wake again: $OUT"
+  printf 'budget wake text: %s\n' "$WAKE_TEXT" > "$W/wake-text"
+  pass "the budget wake names budget, total and the five largest copies with class, fires once, and fires again after a drop and a new overrun"
+}
+
+test_pool_budget_and_two_budgets_share_one_wake() {
+  make_budget_world poolbudget 5 5 5
+  printf 'pool pool1 8\ncontainer %s 8\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  run_sweep check
+  [ "$(printf '%s\n' "$OUT" | grep -c '^copy-sweep:')" = 1 ] || fail "two budgets must share one wake line: $OUT"
+  assert_contains "$OUT" "pool $TH/pool1 is over its budget: 15.00 GiB against 8 GiB" "the pool budget was not named"
+  assert_contains "$OUT" "container $SLOT is over its budget: 15.00 GiB against 8 GiB" "the container budget was not named"
+  run_sweep check
+  [ -z "$OUT" ] || fail "two standing budgets woke again: $OUT"
+  pass "a pool budget and a container budget that go over together raise one wake"
+}
+
+test_apply_raises_the_wake_through_the_queue_once() {
+  local rows
+  make_budget_world queue 4 4 4
+  printf 'default-pool off\ncontainer %s 5\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  rows=$(grep -c . "$HOMED/state/.wake-queue")
+  [ "$rows" = 1 ] || fail "expected one queued wake, got $rows"
+  awk -F '\t' '$3 == "check" && $5 ~ /copy-sweep: container .* is over its budget: 12.00 GiB against 5 GiB/' "$HOMED/state/.wake-queue" | grep -q . \
+    || fail "the queued wake is not the budget wake: $(cat "$HOMED/state/.wake-queue")"
+  run_sweep --apply
+  [ "$(grep -c . "$HOMED/state/.wake-queue")" = 1 ] || fail "a second apply queued another wake"
+  pass "apply raises the budget wake once through the wake queue"
+}
+
+test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
+  make_budget_world cut 10 10 10
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  # The first du finishes inside the bound; the second is cut by it; the third never starts.
+  FAKE_DU_SLEEP=1.6 FM_COPY_SWEEP_BUDGET_SECS=3 run_sweep check
+  [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
+  assert_contains "$OUT" "is over its budget: 10.00 GiB against 5 GiB" "a lower bound already over the budget should wake"
+  assert_contains "$OUT" "2 copies unmeasured" "the wake did not disclose the unmeasured copies"
+  assert_no_grep "last_scan" "$HOMED/state/copy-sweep.record" "a cut scan was recorded as complete"
+  [ "$(du_calls)" = 1 ] || fail "a du that could not finish inside the bound was counted, or one ran past it: $(du_calls) completed"
+  make_budget_world cutquiet 1 1 1
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  FAKE_DU_SLEEP=1.6 FM_COPY_SWEEP_BUDGET_SECS=3 run_sweep check
+  [ -z "$OUT" ] || fail "a cut scan that proved nothing over still woke: $OUT"
+  pass "a scan cut at its time bound wakes only on bytes it measured and records no completed scan"
+}
+
+test_check_classifies_only_the_copies_it_names() {
+  make_budget_world lazy 9 8 1 1 1 1 1
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  run_sweep check
+  assert_contains "$OUT" "$(copy_path c1) 9.00 GiB HELD-DIRTY" "the named copy was not classified"
+  assert_no_grep "UNCLASSIFIED" <(printf '%s\n' "$OUT") "a named copy was left unclassified with time to spare"
+  [ "$(grep -c 'status' "$W/git.log")" = 5 ] || fail "check should classify exactly the five copies it names, ran git status $(grep -c 'status' "$W/git.log") times"
+  pass "check classifies exactly the copies its wake names"
+}
+
+test_check_respects_its_interval() {
+  make_world interval
+  add_copy a
+  printf 'interval 3600\n' > "$HOMED/config/copy-budget"
+  FM_COPY_SWEEP_NOW=1000 run_sweep check
+  [ "$(du_calls)" = 1 ] || fail "the first check should scan, du ran $(du_calls) times"
+  FM_COPY_SWEEP_NOW=1100 run_sweep check
+  [ "$(du_calls)" = 1 ] || fail "a poll inside the interval scanned again"
+  grep -q 'worktree list' "$W/git.log" || fail "the first check never enumerated"
+  : > "$W/git.log"
+  FM_COPY_SWEEP_NOW=1200 run_sweep check
+  [ ! -s "$W/git.log" ] || fail "a poll inside the interval ran git: $(cat "$W/git.log")"
+  FM_COPY_SWEEP_NOW=5000 run_sweep check
+  [ -s "$W/git.log" ] || fail "a due check did not scan"
+  pass "check scans at most once per interval and polls inside it do nothing"
+}
+
+test_check_never_removes() {
+  make_world checkonly
+  add_copy reap
+  run_sweep check
+  [ -d "$(copy_path reap)" ] || fail "check removed a copy"
+  pass "check is report-only"
+}
+
+test_bad_config_is_refused() {
+  make_world badconfig
+  add_copy a
+  printf 'container relative/path 5\n' > "$HOMED/config/copy-budget"
+  run_sweep --apply
+  [ "$RC" = 2 ] || fail "a bad config should exit 2, got $RC: $OUT"
+  assert_contains "$OUT" "config/copy-budget line 1: container wants an absolute path" "the bad line was not named"
+  [ -d "$(copy_path a)" ] || fail "a bad config still changed a copy"
+  printf 'pool pool1 lots\n' > "$HOMED/config/copy-budget"
+  run_sweep
+  [ "$RC" = 2 ] || fail "a non-numeric budget should exit 2, got $RC"
+  printf 'default-pool 1\nbogus 3\n' > "$HOMED/config/copy-budget"
+  run_sweep check
+  assert_contains "$OUT" "unknown key 'bogus'" "check did not report a bad config"
+  run_sweep check
+  [ -z "$OUT" ] || fail "check repeated the same config error: $OUT"
+  pass "a malformed config/copy-budget is refused with its line named and reported once by check"
+}
+
+test_real_lsof_sees_a_process_inside_a_copy() {
+  local pid
+  command -v lsof >/dev/null 2>&1 || { pass "real lsof absent on this host; skipped"; return 0; }
+  make_world reallsof
+  add_copy busy
+  (cd "$(copy_path busy)" && exec sleep 60) &
+  pid=$!
+  sleep 1
+  # The same fakes without the lsof stand-in, so the host's own lsof answers.
+  mkdir -p "$W/fakebin-real-lsof"
+  cp "$FAKEBIN/uptime" "$FAKEBIN/nice" "$FAKEBIN/du" "$FAKEBIN/git" "$FAKEBIN/rm" "$W/fakebin-real-lsof/"
+  FAKEBIN="$W/fakebin-real-lsof" run_sweep
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_class busy HELD-LIVE-TASK
+  assert_contains "$OUT" "process $pid is running inside it" "the real lsof did not find the process"
+  pass "the host's own lsof finds a process whose working directory is inside a copy"
+}
+
+test_arm_and_disarm_bind_the_check() {
+  local out
+  make_world arm
+  add_copy a
+  out=$(env FM_HOME="$HOMED" "$SWEEP" arm 2>&1) || fail "arm failed: $out"
+  assert_contains "$out" "armed: state/copy-sweep.check.sh" "arm did not report"
+  assert_present "$HOMED/state/copy-sweep.check.sh" "arm did not write the shim"
+  assert_present "$HOMED/state/copy-sweep.check-trust" "arm did not write the trust binding"
+  [ -x "$HOMED/state/copy-sweep.check.sh" ] || fail "the shim is not executable"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.check.sh")" "fm-proc-budget.sh" "the shim does not run under the process budget"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.check.sh")" "fm-copy-sweep.sh" "the shim does not run the sweep"
+  out=$(env -u FM_HOME PATH="$FAKEBIN:$ORIGINAL_PATH" FAKE_REAL_GIT="$REAL_GIT" FAKE_REAL_RM="$REAL_RM" FAKE_DU_TABLE="$W/du-table" \
+    FAKE_DU_LOG="$W/du.log" FAKE_DU_ACTIVE="$W/du-active" FAKE_NICE_LOG="$W/nice.log" \
+    FM_COPY_SWEEP_TREEHOUSE_ROOT="$TH" "$HOMED/state/copy-sweep.check.sh" 2>&1) || fail "the registered shim failed: $out"
+  assert_present "$HOMED/state/copy-sweep.record" "the shim did not run the check in its pinned home"
+  out=$(env FM_HOME="$HOMED" "$SWEEP" disarm 2>&1) || fail "disarm failed: $out"
+  assert_absent "$HOMED/state/copy-sweep.check.sh" "disarm left the shim"
+  assert_absent "$HOMED/state/copy-sweep.check-trust" "disarm left the trust binding"
+  assert_absent "$HOMED/state/copy-sweep.record" "disarm left the record"
+  pass "arm binds the check to the existing watcher cadence and disarm removes it"
+}
+
+test_help_and_bad_calls() {
+  local out
+  out=$("$SWEEP" --help 2>&1) || fail "--help failed"
+  assert_contains "$out" "bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply" "--help does not carry the hourly command"
+  "$SWEEP" --bogus >/dev/null 2>&1 && fail "an unknown option was accepted"
+  "$SWEEP" --apply extra >/dev/null 2>&1 && fail "an extra argument was accepted"
+  pass "help carries the hourly command and bad calls are refused"
+}
+
+# FM_COPY_SWEEP_CASE=<function> runs one case, which keeps a mutation proof quick.
+run_case() {
+  [ -z "${FM_COPY_SWEEP_CASE:-}" ] || [ "$FM_COPY_SWEEP_CASE" = "$1" ] || return 0
+  "$1"
+}
+
+run_case test_report_lists_every_copy_and_changes_nothing
+run_case test_apply_removes_only_the_reapable_copy
+run_case test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
+run_case test_landed_content_without_a_pushed_tip_is_reaped_by_apply
+run_case test_lane_home_project_clone_is_swept
+run_case test_failing_remove_leaves_the_copy_and_is_never_forced
+run_case test_nothing_is_forced_deleted_cleaned_or_returned
+run_case test_load_guard_blocks_a_scan
+run_case test_one_du_at_a_time_under_nice
+run_case test_sizes_are_cached_by_path_and_mtime
+run_case test_nested_copy_bytes_are_not_counted_twice
+run_case test_budget_wake_names_budget_total_and_five_largest_and_fires_once
+run_case test_pool_budget_and_two_budgets_share_one_wake
+run_case test_apply_raises_the_wake_through_the_queue_once
+run_case test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one
+run_case test_check_classifies_only_the_copies_it_names
+run_case test_check_respects_its_interval
+run_case test_check_never_removes
+run_case test_bad_config_is_refused
+run_case test_real_lsof_sees_a_process_inside_a_copy
+run_case test_arm_and_disarm_bind_the_check
+run_case test_help_and_bad_calls
+pass "fm-copy-sweep"
