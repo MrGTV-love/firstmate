@@ -11,7 +11,7 @@
 #   fm-procevent-lavish.sh read <result-file>
 #   fm-procevent-lavish.sh source-id <artifact.html>
 #   fm-procevent-lavish.sh retire <artifact.html>
-#   fm-procevent-lavish.sh sweep [--dry-run]
+#   fm-procevent-lavish.sh sweep [--dry-run] [--auto]
 #   fm-procevent-lavish.sh orphans [--kill]
 #   fm-procevent-lavish.sh poll <artifact.html> [--agent-reply-file <path>]
 #   fm-procevent-lavish.sh deliver-reply poll <artifact.html> --agent-reply-file <path>
@@ -93,6 +93,17 @@
 #            header owns generation checks, inbox revalidation and capture limits.
 #            It stops the listener and releases its claim without ending the
 #            Lavish session, so the board stays readable and `arm` brings it back.
+#            --auto is the unattended subset the watcher runs on its own
+#            (FM_LAVISH_AUTO_RETIRE_INTERVAL). Every keep guard above still runs
+#            first, and then only two findings retire a listener, and only for a
+#            board with no live session: the board file is gone, or Lavish holds
+#            no session or an ended session and every card key is closed. A board
+#            with a live session is kept however idle it is, whether its file is
+#            present or gone, and whatever state its listener is in, so a board
+#            left open for review never loses its listener; the idle-hours rule
+#            is not applied.
+#            Each retirement is also appended with its reason and epoch to
+#            state/lavish-auto-retire.log.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
 #            and prints its response verbatim, absorbing only the exact
@@ -1847,17 +1858,28 @@ sweep_cards_closed() {
   return 0
 }
 
+# One line per automatic retirement, so a board that lost its listener can be
+# traced to the finding that retired it. Best effort: a record that cannot be
+# written never undoes a retirement that already happened.
+auto_retire_record() {  # <state-dir> <source-id> <artifact> <reason>
+  local stamp
+  fm_epoch_seconds_to stamp
+  printf '%s retired %s %s - %s\n' "$stamp" "$2" "$3" "$4" >> "$1/lavish-auto-retire.log" 2>/dev/null || true
+}
+
 cmd_sweep() {
-  local dry=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
+  local dry=0 auto=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
   local facts file_state sessions status queued activity keys captured evidence reason verdict out identity current_identity
   local retired=0 kept=0 idx
   local -a ids=() kinds=() identities=()
-  case "${1-}" in
-    '') ;;
-    --dry-run) dry=1; shift ;;
-    *) usage ;;
-  esac
-  [ "$#" -eq 0 ] || usage
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --dry-run) dry=1 ;;
+      --auto) auto=1 ;;
+      *) usage ;;
+    esac
+    shift
+  done
   idle=$(board_idle_seconds) \
     || die "FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to $BOARD_IDLE_HOURS_MAX"
   state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
@@ -1930,6 +1952,8 @@ cmd_sweep() {
       reason='Lavish holds queued feedback for the board'
     elif [ "$kind" = task-owned ]; then
       reason='owned by a worker task'
+    elif [ "$auto" = 1 ] && [ "$sessions" != 0 ] && [ "$status" != ended ]; then
+      reason='the Lavish session is live'
     elif [ "$file_state" = missing ]; then
       verdict=retire; reason='the board file is gone'
     elif [ "$sessions" != 0 ] && [ "$status" != ended ] && [ $((now - activity)) -lt "$idle" ]; then
@@ -1961,6 +1985,7 @@ cmd_sweep() {
         printf 'would-retire: %s %s - %s\n' "$id" "$artifact" "$reason"
       else
         printf 'retired: %s %s - %s\n' "$id" "$artifact" "$reason"
+        [ "$auto" = 0 ] || auto_retire_record "$state" "$id" "$artifact" "$reason"
       fi
     else
       kept=$((kept + 1))

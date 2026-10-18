@@ -14,11 +14,13 @@ import os
 import signal
 from pathlib import Path
 import platform
+import re
 import shlex
 import shutil
 import sqlite3
 import subprocess
 import sys
+import time
 
 root = Path(os.environ['FM_DURATION_TEST_ROOT'])
 tmp = Path(os.environ['FM_DURATION_TEST_TMP'])
@@ -210,6 +212,44 @@ suite_rows = [(r['key'], r['exit'], r['timed_out']) for r in rows() if r.get('ke
 assert suite_rows == [('test.tests/fm-self124.test.sh', 124, False), ('test.tests/fm-hang.test.sh', 124, True)] * 2, suite_rows
 events = [r['key'] for r in rows() if r.get('event') == 'timeout' and r.get('key', '').startswith('test.tests/fm-')]
 assert events == ['test.tests/fm-hang.test.sh'] * 2, events
+
+def hold_slot(key, name, run_env, cwd):
+    """Start `gate KEY` around a command that signals once it runs, so the slot is certainly held."""
+    ready = tmp / f'{name}.ready'
+    job = subprocess.Popen([sys.executable, str(helper), 'gate', key, '--', 'bash', '-c', 'touch "$1"; exec sleep 20', '_', str(ready)], env=run_env, cwd=cwd)
+    for _ in range(300):
+        if ready.exists():
+            return job
+        time.sleep(0.1)
+    job.kill()
+    raise AssertionError(f'the holder of {key} never started')
+
+
+# bin/fm-test-run.sh takes the same per-key slot around every script it runs: with the key's
+# only slot held elsewhere it names the key and the holder, and a bounded wait still runs it.
+(runrepo / 'tests/fm-slot.test.sh').write_text('echo slot-script-ran\n')
+slot_run_env = dict(env, FM_TEST_SLOT_DIR=str(tmp / 'runner-slots'), FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3')
+slot_holder = hold_slot('test.tests/fm-slot.test.sh', 'runner-holder', slot_run_env, runrepo)
+slot_run_started = time.monotonic()
+slot_run = subprocess.run([str(runrepo / 'bin/fm-test-run.sh'), 'tests/fm-slot.test.sh'], env=slot_run_env, cwd=runrepo, capture_output=True, text=True, timeout=120)
+slot_run_elapsed_ms = (time.monotonic() - slot_run_started) * 1000
+slot_holder.kill()
+slot_holder.communicate()
+assert slot_run.returncode == 0 and 'slot-script-ran' in slot_run.stdout, slot_run
+assert 'waiting' in slot_run.stderr and 'test.tests/fm-slot.test.sh' in slot_run.stderr and f'pid={slot_holder.pid}' in slot_run.stderr, slot_run.stderr
+assert 'running it without a slot' in slot_run.stderr, slot_run.stderr
+# The 3 seconds it queued are in neither the FM_TEST_END duration nor the test.* sample.
+slot_end = re.search(r'FM_TEST_END \S+ tests/fm-slot\.test\.sh exit=0 duration_ms=(\d+)', slot_run.stdout)
+slot_sample = [r for r in rows() if r.get('key') == 'test.tests/fm-slot.test.sh' and 'event' not in r][-1]
+assert slot_end and int(slot_end.group(1)) <= slot_run_elapsed_ms - 2900, (slot_end, slot_run_elapsed_ms)
+assert slot_sample['duration_ms'] <= slot_run_elapsed_ms - 2900, (slot_sample, slot_run_elapsed_ms)
+# The load it read before the queue says nothing about the run, so the queued sample has none; a run that finds a free slot keeps its load.
+assert slot_sample['load_start'] is None and slot_sample['load_end'] is not None, slot_sample
+slot_free_run = subprocess.run([str(runrepo / 'bin/fm-test-run.sh'), 'tests/fm-slot.test.sh'], env=slot_run_env, cwd=runrepo, capture_output=True, text=True, timeout=120)
+assert slot_free_run.returncode == 0 and 'waiting' not in slot_free_run.stderr, slot_free_run
+slot_free_sample = [r for r in rows() if r.get('key') == 'test.tests/fm-slot.test.sh' and 'event' not in r][-1]
+assert slot_free_sample['recorded_at'] != slot_sample['recorded_at'] and slot_free_sample['load_start'] is not None, (slot_free_sample, slot_sample)
+print('ok - the test runner waits on a held per-key slot, names the holder, runs once the bounded wait ends, and leaves the wait out of the sample')
 
 # A stop sends TERM and waits for the leader: its own TERM cleanup of a child in
 # a separate process group runs and leaves no survivor. The leader reports
@@ -574,5 +614,202 @@ cli('check-literals','--base','HEAD',expected=1,tool=guard)
 (repo / 'bin/fm-duration-existing-limits.tsv').write_text('# moved\nbin/example.sh\t30\tbound=$(fm_duration_limit "key.$h" 30)\n')
 cli('check-literals','--base','HEAD',tool=guard)
 print('ok - sample-count limits, retention, progress, leader exit, outer ceiling, pipeline imports and literal guard')
+
+# Per-key slot gate: at most FM_TEST_KEY_SLOTS concurrent copies of one test.* key, a clear
+# waiter notice, release on every exit path, a bounded wait, and no gate for other keys.
+slot_dir = tmp / 'slots'
+slot_env = dict(env, FM_TEST_SLOT_DIR=str(slot_dir), FM_TEST_KEY_SLOTS='2')
+hold_code = ('import os,pathlib,sys\n'
+             'pathlib.Path(sys.argv[2]).write_text(str(os.getpid()))\n'
+             'print("started", flush=True)\n'
+             'p = pathlib.Path(sys.argv[1])\n'
+             'while not p.exists(): pass\n'
+             'print("finished", flush=True)')
+
+
+def hold(key, name, extra=None, tool_args=('run',)):
+    """Start `fm-duration.py run KEY` around a command that waits for a release file."""
+    release, pidfile = tmp / f'{name}.release', tmp / f'{name}.pid'
+    job = subprocess.Popen([sys.executable, str(helper), *tool_args, key, '--', sys.executable, '-c', hold_code, str(release), str(pidfile)],
+                           env=dict(slot_env, **(extra or {})), cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return job, release, pidfile
+
+
+def finish(job, release):
+    release.touch()
+    return job.communicate(timeout=60)
+
+
+first, first_release, first_pid = hold('test.slot.key', 'slot-a')
+second, second_release, _ = hold('test.slot.key', 'slot-b')
+assert first.stdout.readline() == 'started\n' and second.stdout.readline() == 'started\n', 'two copies fit the default limit of two'
+third_launched = time.monotonic()
+third, third_release, _ = hold('test.slot.key', 'slot-c')
+notice = third.stderr.readline()
+assert 'waiting' in notice and 'test.slot.key' in notice and f'pid={first.pid}' in notice and f'pid={second.pid}' in notice, notice
+assert 'limit 2' in notice and 'FM_TEST_KEY_SLOTS' in notice, notice
+assert f'pid={first.pid} alive' in notice and f'pid={second.pid} alive' in notice, notice
+assert third.poll() is None, 'a third copy must wait, not run beside the other two'
+finish(first, first_release)
+assert third.stdout.readline() == 'started\n', 'a released slot goes to the waiter'
+third_waited = time.monotonic() - third_launched
+finish(second, second_release)
+third_out, third_err = finish(third, third_release)
+assert 'got a slot of test.slot.key' in third_err and third_out == 'finished\n', third_err
+third_total = time.monotonic() - third_launched
+third_sample = [r for r in rows() if r['key'] == 'test.slot.key' and 'event' not in r][-1]
+assert third_waited >= 2 and third_sample['duration_ms'] / 1000 <= third_total - third_waited + 1.5, (third_waited, third_total, third_sample)
+
+# Other keys take no slot, and the gate can be turned off.
+free = [hold('consumer.slot.key', f'free-{i}', dict(FM_TEST_KEY_SLOTS='1')) for i in range(2)]
+assert all(job.stdout.readline() == 'started\n' for job, _, _ in free), 'only test.* keys are gated'
+for job, release, _ in free:
+    finish(job, release)
+off = [hold('test.slot.off', f'off-{i}', dict(FM_TEST_KEY_SLOTS='0')) for i in range(3)]
+assert all(job.stdout.readline() == 'started\n' for job, _, _ in off), 'FM_TEST_KEY_SLOTS=0 turns the gate off'
+for job, release, _ in off:
+    finish(job, release)
+
+# A killed holder frees its slot at once: the kernel drops the lock with the process.
+one = dict(FM_TEST_KEY_SLOTS='1')
+victim, victim_release, victim_pid = hold('test.slot.kill', 'kill-a', one)
+assert victim.stdout.readline() == 'started\n'
+waiter, waiter_release, _ = hold('test.slot.kill', 'kill-b', one)
+assert 'waiting' in waiter.stderr.readline()
+victim.kill()
+victim.communicate()
+assert waiter.stdout.readline() == 'started\n', 'a SIGKILLed holder must release its slot'
+os.kill(int(victim_pid.read_text()), signal.SIGKILL)
+finish(waiter, waiter_release)
+
+# A bounded wait ends, says so, and runs the command. The waiter notice flags a holder whose pid is
+# gone, or whose process started more than 2 seconds after the epoch recorded when the slot was
+# taken (a reused pid), and calls a holder alive when ps rounds its start up to a second later.
+holder_code = (
+    'import fcntl,json,os,subprocess,sys,time\n'
+    'import importlib.util as u\n'
+    's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
+    'gone = subprocess.Popen(["true"]); gone.wait()\n'
+    'listed = subprocess.run(["ps", "-o", "lstart=", "-p", str(os.getpid())], capture_output=True, text=True, env=dict(os.environ, LC_ALL="C")).stdout\n'
+    'started = int(time.mktime(time.strptime(" ".join(listed.split()), "%a %b %d %H:%M:%S %Y")))\n'
+    'pid, since = {"gone": (gone.pid, int(time.time())), "reused": (os.getpid(), int(time.time()) - 3600), "live": (os.getpid(), int(time.time())), "later1": (os.getpid(), started - 1), "later3": (os.getpid(), started - 3)}[sys.argv[3]]\n'
+    'directory = d.slot_directory(sys.argv[2])\n'
+    'fd = os.open(directory / "slot-0.lock", os.O_RDWR | os.O_CREAT, 0o600)\n'
+    'fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n'
+    'os.write(fd, json.dumps(dict(pid=pid, since=since)).encode())\n'
+    'print("held", flush=True)\n'
+    'time.sleep(60)')
+for stale_case, flagged in (('gone', True), ('reused', True), ('live', False), ('later1', False), ('later3', True)):
+    stale_key = f'test.slot.stale-{stale_case}'
+    stale_holder = subprocess.Popen([sys.executable, '-c', holder_code, str(helper), stale_key, stale_case], env=slot_env, stdout=subprocess.PIPE, text=True)
+    assert stale_holder.stdout.readline() == 'held\n'
+    bounded = subprocess.run([sys.executable, str(helper), 'run', stale_key, '--', sys.executable, '-c', 'print("ran anyway")'],
+                             env=dict(slot_env, FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3'), cwd=workrepo, capture_output=True, text=True, timeout=60)
+    stale_holder.kill()
+    stale_holder.communicate()
+    assert bounded.returncode == 0 and bounded.stdout == 'ran anyway\n', (stale_case, bounded)
+    assert ('does not match a live process' in bounded.stderr) == flagged, (stale_case, bounded.stderr)
+    assert stale_case == 'gone' or f'pid={stale_holder.pid} ' in bounded.stderr, (stale_case, bounded.stderr)
+    assert flagged or f'pid={stale_holder.pid} alive' in bounded.stderr, (stale_case, bounded.stderr)
+    assert 'waited' in bounded.stderr and 'running it without a slot' in bounded.stderr, (stale_case, bounded.stderr)
+
+# A flock that fails for any reason but a held lock is an unusable slot: the command runs at once without
+# a slot and says so, and the holder probe lists no phantom holder.
+flock_driver = (
+    'import errno, sys\n'
+    'import importlib.util as u\n'
+    's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
+    'def refuse(*args):\n'
+    '    raise OSError(errno.ENOTSUP, "flock is not supported here")\n'
+    'd.fcntl.flock = refuse\n'
+    'if sys.argv[2] == "probe":\n'
+    '    import pathlib, tempfile\n'
+    '    try:\n'
+    '        print("listed", d.slot_holders(pathlib.Path(tempfile.mkdtemp()), 1))\n'
+    '    except OSError:\n'
+    '        print("raised")\n'
+    '    sys.exit(0)\n'
+    'sys.argv = ["fm-duration.py", "gate", "test.slot.flockfail", "--", "echo", "ran"]\n'
+    'sys.exit(d.main())')
+flock_started = time.monotonic()
+flock_failed = subprocess.run([sys.executable, '-c', flock_driver, str(helper), 'gate'], env=dict(slot_env, FM_TEST_SLOT_WAIT_SECONDS='30'), cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert flock_failed.returncode == 0 and flock_failed.stdout == 'ran\n' and 'running test.slot.flockfail without a slot' in flock_failed.stderr, flock_failed
+assert time.monotonic() - flock_started < 15, 'a flock that cannot work must not make the command wait for a slot'
+flock_probe = subprocess.run([sys.executable, '-c', flock_driver, str(helper), 'probe'], env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert flock_probe.stdout == 'raised\n', flock_probe
+
+# Taking a free slot runs no ps; a waiter's notice runs one ps call for each holder it names.
+ps_dir, ps_log = tmp / 'ps-stub', tmp / 'ps.calls'
+ps_dir.mkdir()
+(ps_dir / 'ps').write_text(f'#!/bin/sh\necho "$*" >> "{ps_log}"\nexec "{shutil.which("ps")}" "$@"\n')
+(ps_dir / 'ps').chmod(0o755)
+ps_env = dict(slot_env, PATH=f'{ps_dir}{os.pathsep}{os.environ["PATH"]}', FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3')
+free_slot = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.ps', '--', 'true'], env=ps_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert free_slot.returncode == 0 and not ps_log.exists(), (free_slot, ps_log.exists() and ps_log.read_text())
+ps_holder = hold_slot('test.slot.ps', 'ps-holder', ps_env, workrepo)
+queued_ps = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.ps', '--', 'true'], env=ps_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+ps_holder.kill()
+ps_holder.communicate()
+ps_calls = ps_log.read_text().splitlines()
+assert queued_ps.returncode == 0 and 'waiting' in queued_ps.stderr and len(ps_calls) == 1 and f'-p {ps_holder.pid}' in ps_calls[0], (queued_ps.stderr, ps_calls)
+
+# The same key nested inside a held slot takes no second slot, so a limit of one cannot deadlock.
+nested = subprocess.run([sys.executable, str(helper), 'run', 'test.slot.nest', '--', sys.executable, str(helper), 'run', 'test.slot.nest', '--', 'true'],
+                        env=dict(slot_env, FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='30'), cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert nested.returncode == 0 and 'waiting' not in nested.stderr, nested
+
+# gate runs a command under a slot with its exit status and output; bad settings are refused by name.
+gated = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.gate', '--', 'bash', '-c', 'echo out; echo err >&2; exit 7'],
+                       env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert gated.returncode == 7 and gated.stdout == 'out\n' and gated.stderr == 'err\n', gated
+missing = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.gate', '--', str(tmp / 'no-such-command')], env=slot_env, cwd=workrepo, capture_output=True, text=True)
+assert missing.returncode == 127, missing
+for variable, value in (('FM_TEST_KEY_SLOTS', 'many'), ('FM_TEST_KEY_SLOTS', '17'), ('FM_TEST_SLOT_WAIT_SECONDS', '0')):
+    refused = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.gate', '--', 'true'], env=dict(slot_env, **{variable: value}), cwd=workrepo, capture_output=True, text=True)
+    assert refused.returncode == 125 and variable in refused.stderr, (variable, value, refused)
+    refused = subprocess.run([sys.executable, str(helper), 'run', 'test.slot.gate', '--', 'true'], env=dict(slot_env, **{variable: value}), cwd=workrepo, capture_output=True, text=True)
+    assert refused.returncode == 125 and variable in refused.stdout, (variable, value, refused)
+
+# gate reports the wait it spent, so a caller that times COMMAND itself can leave it out.
+wait_env = dict(slot_env, FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3')
+wait_holder = hold_slot('test.slot.wait', 'wait-holder', wait_env, workrepo)
+waited_file, unwaited_file = tmp / 'waited.ms', tmp / 'unwaited.ms'
+queued = subprocess.run([sys.executable, str(helper), 'gate', '--wait-file', str(waited_file), 'test.slot.wait', '--', 'true'], env=wait_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+wait_holder.kill()
+wait_holder.communicate()
+assert queued.returncode == 0 and 2900 <= int(waited_file.read_text()) < 60000, (queued, waited_file.read_text())
+subprocess.run([sys.executable, str(helper), 'gate', '--wait-file', str(unwaited_file), 'test.slot.wait', '--', 'true'], env=wait_env, cwd=workrepo, check=True, capture_output=True, timeout=60)
+assert unwaited_file.read_text() == '0\n', unwaited_file.read_text()
+unwritable = subprocess.run([sys.executable, str(helper), 'gate', '--wait-file', str(tmp / 'no-such-dir/waited.ms'), 'test.slot.wait', '--', 'echo', 'ran'], env=wait_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert unwritable.returncode == 0 and unwritable.stdout == 'ran\n', unwritable
+
+# gate hands COMMAND its --log-fd descriptor, so a notice the command's own wrapper writes there is not lost.
+log_file = tmp / 'log-fd.out'
+passed = subprocess.run(['bash', '-c', 'exec 8>"$1"; shift; exec "$@"', '_', str(log_file), sys.executable, str(helper), 'gate', '--log-fd', '8', 'test.slot.logfd', '--', 'bash', '-c', 'echo from-command >&8'],
+                        env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert passed.returncode == 0 and log_file.read_text() == 'from-command\n', (passed, log_file.read_text())
+# A --log-fd that is not open falls back to stderr instead of stopping the command.
+closed = subprocess.run([sys.executable, str(helper), 'gate', '--log-fd', '57', 'test.slot.logfd', '--', 'echo', 'ran'], env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert closed.returncode == 0 and closed.stdout == 'ran\n', closed
+
+# An unusable slot file, or a Python with no POSIX file locks, runs the command without a slot and says so.
+fault_env = dict(slot_env, FM_TEST_SLOT_DIR=str(tmp / 'fault-slots'))
+subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.fault', '--', 'true'], env=fault_env, cwd=workrepo, check=True, capture_output=True, timeout=60)
+[fault_directory] = (tmp / 'fault-slots').iterdir()
+for index in range(2):
+    (fault_directory / f'slot-{index}.lock').unlink(missing_ok=True)
+    (fault_directory / f'slot-{index}.lock').mkdir()
+for action in ('gate', 'run'):
+    faulted = subprocess.run([sys.executable, str(helper), action, 'test.slot.fault', '--', 'echo', 'ran'], env=fault_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+    assert faulted.returncode == 0 and faulted.stdout == 'ran\n' and 'running test.slot.fault without a slot' in faulted.stderr, (action, faulted)
+no_locks = subprocess.run([sys.executable, '-c', (
+    'import sys\n'
+    'sys.modules["fcntl"] = None\n'
+    'import importlib.util as u\n'
+    's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
+    'sys.argv = ["fm-duration.py", "gate", "test.slot.nolocks", "--", "echo", "ran"]\n'
+    'sys.exit(d.main())'), str(helper)], env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert no_locks.returncode == 0 and no_locks.stdout == 'ran\n' and 'without a slot' in no_locks.stderr and 'POSIX file locks' in no_locks.stderr, no_locks
+print('ok - a test.* key admits at most the configured copies, names its holders while waiting, frees a killed holder, reports its wait, keeps the log descriptor, never stops a command, and stays out of the sample')
 PY
 pass "measured command behavior"

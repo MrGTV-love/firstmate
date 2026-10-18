@@ -137,6 +137,20 @@
 # 0 denotes degraded work with no CPU-pass concurrency limit.
 # Without python3 or the pool tool beside it, scripts run without a CPU pass.
 #
+# Each executed script also takes one slot of its test.<script> key from the
+# host-wide per-key gate (python3 bin/fm-duration.py gate), outside the CPU pass
+# and the per-script bound, so the same heavy suite started in several worktrees
+# runs at most FM_TEST_KEY_SLOTS (default 2) copies at a time. A waiter prints
+# which key it waits on and who holds the slots on the CPU-pass log descriptor,
+# gives up after FM_TEST_SLOT_WAIT_SECONDS and then runs without a slot; a nested
+# run of a key already held (FM_TEST_SLOT_HELD) takes none. The time a script
+# queued for its slot is left out of its recorded duration, its FM_TEST_END
+# duration_ms and its test.<script> sample, and that sample records no start load
+# (the load was read before the queue); the run's own wall time (--max-wall-ms,
+# FM_TEST_SUMMARY) still counts it. bin/fm-duration.py's header owns the protocol.
+# FM_TEST_KEY_SLOTS=0, no python3 or helper beside this script, or a native
+# Windows bash (uname MINGW, MSYS or CYGWIN) runs scripts without a slot.
+#
 # When the sibling bin/fm-proc-budget.sh is present and executable, every
 # executed script runs through it; its header owns the process-budget contract.
 # The budget is taken when the script starts, after any pass wait. If the budget
@@ -2656,6 +2670,14 @@ elif ! command -v python3 >/dev/null 2>&1; then
   CPU_PASS_ACTIVE=0
   log "running without CPU passes: python3 not found"
 fi
+TEST_SLOT_ACTIVE=1
+if [ "${FM_TEST_KEY_SLOTS-}" = 0 ] || [ ! -r "$ROOT/bin/fm-duration.py" ] \
+  || ! command -v python3 >/dev/null 2>&1; then
+  TEST_SLOT_ACTIVE=0
+fi
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) TEST_SLOT_ACTIVE=0 ;;
+esac
 PROC_BUDGET_ACTIVE=1
 if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
   PROC_BUDGET_ACTIVE=0
@@ -2807,6 +2829,9 @@ record_script_result() {
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
     fi
+    if [ "$(slot_wait_ms "$out")" -gt 0 ]; then
+      load_start=
+    fi
     fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start" "$timed_out"
   fi
   family_bump "$family" "$duration" "$fail_delta"
@@ -2823,6 +2848,18 @@ reap_script_leftovers() {  # <script>
   return 0
 }
 
+# Milliseconds the script that wrote <out> queued for its slot, 0 when it did not.
+slot_wait_ms() {  # <out>
+  local waited=0
+  if [ -r "$1.slotwait" ]; then
+    read -r waited <"$1.slotwait" || true
+  fi
+  case "$waited" in
+    ''|*[!0-9]*) waited=0 ;;
+  esac
+  printf '%s\n' "$waited"
+}
+
 # Run <script>, capturing output to <out>. <stream> 1 also echoes it live.
 # <id> only has to be unique within this run. When PER_SCRIPT_TIMEOUT_SECS is
 # positive, a script that outruns it is terminated and reported as exit 124: a
@@ -2830,7 +2867,7 @@ reap_script_leftovers() {  # <script>
 # because an unbounded suite is what silently outruns its caller's budget.
 # When the CPU pass pool is active (see the header) the script's pass is taken
 # outside the per-script bound, so waiting for a pass never counts toward it;
-# the recorded duration and --max-wall-ms still include the wait.
+# the recorded duration and --max-wall-ms still include the pass wait.
 run_script_bounded() {  # <script> <out> <stream> <id>
   local script=$1 out=$2 stream=$3 id=$4
   # Declaring the variables local first keeps the helper's export scoped to this
@@ -2871,6 +2908,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
       --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
+  fi
+  if [ "$TEST_SLOT_ACTIVE" -eq 1 ]; then
+    # Outermost: a waiter holds neither a CPU pass nor any part of the bound.
+    cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
+      --wait-file "$out.slotwait" "test.$script" -- "${cmd[@]}")
   fi
   set +e
   if [ "$stream" -eq 1 ]; then
@@ -2913,7 +2955,7 @@ run_one_serial() {
 
   end_ms=$(now_ms)
   end_iso=$(now_iso)
-  duration=$((end_ms - begin_ms))
+  duration=$((end_ms - begin_ms - $(slot_wait_ms "$out")))
   if [ "$duration" -lt 0 ]; then
     duration=0
   fi
@@ -3043,7 +3085,7 @@ else
       rc=$?
       set -e
       end_ms=$(now_ms)
-      duration=$((end_ms - begin_ms))
+      duration=$((end_ms - begin_ms - $(slot_wait_ms "$work/output")))
       if [ "$duration" -lt 0 ]; then
         duration=0
       fi

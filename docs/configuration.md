@@ -100,6 +100,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
+- The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
@@ -931,6 +932,51 @@ With the flag absent the wedge timer spends no fold or current-state read for it
 The flag is a home-local supervision-noise preference and is not inherited by secondmate homes, which supervise their own crew and own that trade separately.
 
 [`architecture.md`](architecture.md) owns the wait-evidence contract and which records may take the ladder away; `bin/fm-watch.sh`'s `wedge_wait_evidence` owns the exact derivation and its fail-closed boundaries.
+
+## Watcher poll interval by home role (config/watch-poll)
+
+The watcher (`bin/fm-watch.sh`) looks at its home once per poll interval.
+`FM_POLL` wins when set, and an empty `FM_POLL` counts as unset.
+Otherwise the optional local, gitignored `config/watch-poll` file sets the interval for this home alone: its first line must be whole seconds from `1` to `240`, and a missing, unreadable, symlinked, malformed or out-of-range file is ignored.
+With no file, a secondmate home (one that carries a genuine `.fm-secondmate-home` marker) polls every `30` seconds and every other home polls every `15`.
+
+The interval changes only how often the watcher looks, never what it can detect: a status line or check written between two looks is noticed at the next look, and a quiet pane, which needs two unchanged looks to read as stale, is noticed at the second.
+Detection latency therefore grows by at most the interval difference for a status line and twice that for a quiet pane.
+The 240-second ceiling keeps `poll + 60` at or under the 300-second guard-grace floor, so the guard, the arm and the watcher still derive one grace (`fm_poll_derived_grace`, [`turnend-guard.md`](turnend-guard.md) "Guard grace and the poll cadence") although only the watcher reads this file.
+A longer interval needs `FM_POLL` set in the environment of every process that derives the grace.
+`bin/fm-wake-lib.sh`'s `fm_watch_poll_seconds` owns the resolution and [`tests/fm-watch-idle-reap.test.sh`](../tests/fm-watch-idle-reap.test.sh) covers it, including a status change noticed within one longer interval.
+
+## Test slots per key (FM_TEST_KEY_SLOTS)
+
+The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
+The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many scripts run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a measured ceiling or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
+`--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
+A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
+The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the bounded wait, the nested-run rule and the exit codes.
+
+| Setting | Default | Range | Purpose |
+| --- | --- | --- | --- |
+| `FM_TEST_KEY_SLOTS` | 2 | 0..16 | Concurrent copies of one `test.*` key allowed host-wide; `0` turns the gate off. Other keys are never gated. |
+| `FM_TEST_SLOT_WAIT_SECONDS` | 7200 | at least 1 | How long a waiter queues before it runs without a slot and says so. |
+| `FM_TEST_SLOT_DIR` | `$HOME/.cache/fm-test-slots` | an absolute path | Where the per-key slot directories live; tests point it at a fixture directory. |
+
+**Why two copies and 7200 seconds**
+
+A day of the host's own timings (`data/command-durations.jsonl`, 2026-10-17) shows `tests/fm-teardown.test.sh` run 6 times for 13,276 seconds in total, with a median of 2,175 seconds and a longest run of 6,884, and three copies alive at once in three worktrees.
+One slot would queue those six runs behind each other for about 3.7 hours of waiting between them; two slots cap the overlap at two copies while the third waits for the first of the two to finish, typically one median run.
+A waiter gives up after 7,200 seconds, a little longer than the longest run seen, so a queued copy outlasts a holder that is merely slow, and a holder that never finishes can delay a copy by at most that long.
+The gate shapes throughput and is not a safety boundary: a waiter that gives up, a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so.
+A native Windows bash (`uname` MINGW, MSYS or CYGWIN) never calls the gate.
+
+**Release and stale holders**
+
+A slot is an exclusive `flock` held by the wrapper alone, and the kernel releases it when that process exits for any reason, `SIGKILL` included, so a killed run frees its slot at once and no lock directory needs repair.
+The lock is not inherited by the command, so a leftover daemon of a finished test can never hold a slot for good.
+Each holder records its pid and the epoch at which it took the slot in its slot file, and a copy that takes a free slot runs no `ps`.
+A waiting copy runs one `ps` call for each holder in its notice and flags a record as stale when its pid is gone or its process started more than 2 seconds after the recorded epoch.
+The 2 seconds absorb the one-second resolution of `ps` start times, so a live holder is never flagged for clock rounding.
+A `flock` that fails for any reason other than a held lock runs the suite without a slot and says so.
 
 ## Gate defaults (.no-mistakes.yaml)
 
@@ -3013,6 +3059,8 @@ Other primary integrations retain their native supervision delivery paths.
 **Retire finished Lavish listeners**
 
 Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
+The watcher also runs `sweep --auto` detached every `FM_LAVISH_AUTO_RETIRE_INTERVAL` seconds (default 900, `0` turns it off): after the same keep guards it retires only a listener without a live Lavish session, one whose board file is gone or whose session has ended or is absent with every card closed, and it appends each retirement with its reason to `state/lavish-auto-retire.log`.
+A board with a live session is never retired by it, however idle it is and even when its board file is gone, and the adapter header owns the exact rules.
 Use `bin/fm-procevent-lavish.sh orphans` to list leftover poll processes that no listener owns; the same header owns its eligibility proof and the explicit `--kill` flag.
 For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
 The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
@@ -3333,7 +3381,7 @@ The group signal reaches the blocking child and everything under it exactly as r
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
 | `FM_PROCEVENT_OWNER_LEASE_SECONDS` | 600 | 1..86400 | How long a lease-bound runner continues without activity in its owning home; not the lifetime of a standing source. |
-| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 15 | 1..3600 | Guard detection interval; it reads lifetime authorization and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval. |
+| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 60 | 1..3600 | Guard detection interval; it reads lifetime authorization and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval; a longer interval means fewer guard wake-ups and detection that is later by at most one interval, and the 600-second lease default is ten intervals. |
 | `FM_PROCEVENT_LAUNCH_FLOOR_SECONDS` | 1 | 1..3600 | Minimum time between consecutive launches of one registration generation's stored command; bounds immediately returning sources during the lease window. |
 
 The generation's first launch is immediate, later launches share its monotonic pacing timestamp, a timestamp from before a reboot is treated as expired, and replacing the registration starts a fresh pacing generation.
@@ -3478,7 +3526,7 @@ FM_STARTUP_NETWORK_TIMEOUT=120   # deferred-stage bound in seconds; bin/fm-start
 FM_TASKS_AXI_COMPATIBLE=   # internal one-hop handoff of an already-computed tasks-axi compatibility verdict (0 or 1); consumed when bin/fm-tasks-axi-lib.sh is sourced
 FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppress drain, supervision repair, and checkout repair commands
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
-FM_POLL=15              # seconds between watcher poll cycles
+FM_POLL=15              # seconds between watcher poll cycles; unset means config/watch-poll, else 30 in a secondmate home and 15 elsewhere (docs/configuration.md "Watcher poll interval by home role")
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
@@ -3491,6 +3539,11 @@ FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of
 FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
+FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
+FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
+FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
+FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
+FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2
@@ -3519,7 +3572,7 @@ FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sw
 FM_PROCEVENT_MAX_OUTPUT_BYTES=1048576   # bound on one captured process-to-event result
 FM_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/firstmate/procevent-claims
 FM_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400
-FM_PROCEVENT_OWNER_CHECK_SECONDS=15     # a runner guard's detection interval, read twice per interval; 1..3600
+FM_PROCEVENT_OWNER_CHECK_SECONDS=60     # a runner guard's detection interval, read twice per interval; 1..3600
 FM_PROCEVENT_LAUNCH_FLOOR_SECONDS=1     # minimum interval between launches of one registration generation's source command; 1..3600
 FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=3   # fallback window; see "Confirm detached launches" above
 FM_WHEN_OUTPUT_TAIL_BYTES=8192          # bound on the command-output tail inside one condition->action outcome document

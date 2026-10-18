@@ -231,6 +231,133 @@ test_sweep_retires_only_finished_board_listeners() {
   pass "the sweep retires finished boards and keeps every board that could still carry an answer"
 }
 
+# The unattended mode the watcher runs (sweep --auto) retires a listener for two findings
+# only, and only for a board with no live session: the board file is gone, or the Lavish
+# session has ended or is absent with every card closed. A board with a live session keeps its
+# listener however idle it is, whether its file is present or gone, and whatever state its
+# listener is in, and every keep guard of the manual sweep still applies first.
+test_auto_sweep_retires_only_finished_listeners() {
+  local home store out log list marker source id
+  local gone ended nosession idle stuck
+  local gone_id ended_id nosession_id idle_id stuck_id
+  home=$(make_home auto-sweep)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  fm_fake_exit0 "$home/fakebin" lavish-axi
+  log="$home/state/lavish-auto-retire.log"
+  run_captain "$home" hold auto-open-call --title "Choose the open route" \
+    --reason "captain open route pending" --repo sample >/dev/null \
+    || fail "could not hold the call that stays unanswered"
+  run_captain "$home" hold auto-closed-call --title "Choose the closed route" \
+    --reason "captain closed route pending" --repo sample >/dev/null \
+    || fail "could not hold the call that is answered below"
+  printf 'north\n' > "$home/answer.txt"
+  run_captain "$home" answer auto-closed-call --decision-file "$home/answer.txt" >/dev/null \
+    || fail "could not answer the call"
+
+  # The captain's board: a live session, an unanswered call, and a registration the runner
+  # refuses to start, so the real reconcile reports the launch failed and leaves its marker.
+  stuck=$(sweep_board "$home" auto-stuck new auto-open-call)
+  stuck_id=$(sweep_register "$home" "$stuck")
+  sweep_session "$store" "$stuck" open 0 -
+  source="$home/state/procevent/$stuck_id.source"
+  sed 's/^argc=.*/argc=99/' "$source" > "$home/damaged.source" \
+    || fail "could not prepare the damaged registration"
+  cat "$home/damaged.source" > "$source"
+  out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 LAVISH_AXI_STATE_DIR="$store" run_procevent "$home" reconcile 2>&1)
+  assert_contains "$out" "failed=1" "reconcile did not report the unstartable listener as failed: $out"
+  marker="$home/state/procevent/.$stuck_id.launch-failed"
+  assert_present "$marker" "reconcile did not leave a launch-failure marker"
+  touch -t 200001010000 "$marker"
+
+  gone=$(sweep_board "$home" auto-gone old)
+  ended=$(sweep_board "$home" auto-ended new auto-closed-call)
+  nosession=$(sweep_board "$home" auto-nosession new auto-closed-call)
+  idle=$(sweep_board "$home" auto-idle old auto-closed-call)
+  gone_id=$(sweep_register "$home" "$gone")
+  ended_id=$(sweep_register "$home" "$ended")
+  nosession_id=$(sweep_register "$home" "$nosession")
+  idle_id=$(sweep_register "$home" "$idle")
+  sweep_session "$store" "$gone" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$ended" ended 0 -
+  sweep_session "$store" "$idle" open 0 2000-01-01T00:00:00.000Z
+  rm -f "$gone"
+
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto --dry-run) \
+    || fail "the dry-run automatic sweep failed: $out"
+  assert_contains "$out" "would-retire: $ended_id" "the dry run missed the listener of an ended session"
+  assert_contains "$out" "kept: $gone_id" "the dry run would retire a live board whose file is gone"
+  assert_contains "$out" "kept: $stuck_id" "the dry run would retire the captain's board"
+  [ ! -e "$log" ] || fail "a dry run wrote the retirement record"
+  list=$(run_procevent "$home" list)
+  assert_contains "$list" "$gone_id" "a dry run retired a registration"
+
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto) \
+    || fail "the automatic sweep failed: $out"
+  assert_contains "$out" "kept: $gone_id $gone - the Lavish session is live" \
+    "an automatic sweep retired a board left open for review because its file is gone: $out"
+  assert_contains "$out" "retired: $ended_id" "an automatic sweep kept the listener of an ended session"
+  assert_contains "$out" "retired: $nosession_id" "an automatic sweep kept the listener of a board with no session"
+  assert_contains "$out" "kept: $idle_id $idle - the Lavish session is live" \
+    "an automatic sweep retired a live idle board; only the manual sweep applies the idle rule"
+  assert_contains "$out" "kept: $stuck_id $stuck - the Lavish session is live" \
+    "an automatic sweep retired a live board whose listener cannot start: $out"
+  assert_contains "$out" "sweep: retired=2 kept=3" "the automatic sweep counted the wrong verdicts: $out"
+  list=$(run_procevent "$home" list)
+  for id in "$ended_id" "$nosession_id"; do
+    assert_not_contains "$list" "$id" "a retired listener is still registered"
+  done
+  for id in "$gone_id" "$idle_id" "$stuck_id"; do
+    assert_contains "$list" "$id" "a kept listener lost its registration"
+  done
+  assert_present "$marker" "the sweep removed the launch-failure marker of a kept board"
+  assert_present "$log" "the automatic sweep did not record why it retired"
+  [ "$(wc -l < "$log" | tr -d ' ')" = 2 ] || fail "the record must hold one line per retirement: $(cat "$log")"
+  assert_contains "$(cat "$log")" "retired $ended_id $ended - the Lavish session has ended" "the record lacks the ended-session reason"
+  assert_not_contains "$(cat "$log")" "$gone_id" "the record names a listener that was kept"
+  assert_not_contains "$(cat "$log")" "$stuck_id" "the record names a listener that was kept"
+  assert_not_contains "$(cat "$log")" "$idle_id" "the record names a listener that was kept"
+
+  # Once its session ends, the unanswered captain call still keeps the board's listener.
+  sweep_session "$store" "$stuck" ended 0 -
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto) \
+    || fail "the repeat automatic sweep failed: $out"
+  assert_contains "$out" "kept: $stuck_id" "an ended board with an unanswered captain call lost its listener: $out"
+  assert_contains "$out" "sweep: retired=0 kept=3" "the repeat automatic sweep counted the wrong verdicts: $out"
+  pass "the automatic sweep retires finished boards, never a live or unanswered one whose listener cannot start, and records why"
+}
+
+# A deleted board file does not end a review the captain left open: the unattended sweep keeps the
+# listener of a board whose session is open, and retires the otherwise identical board once its
+# session has ended.
+test_auto_sweep_keeps_a_live_board_whose_file_is_gone() {
+  local home store out list open_gone ended_gone open_id ended_id
+  home=$(make_home auto-sweep-gone)
+  fm_test_track_procevent_home "$home" "$home/procevent-claims"
+  store="$home/lavish-state"
+  fm_fake_exit0 "$home/fakebin" lavish-axi
+  open_gone=$(sweep_board "$home" gone-open old)
+  ended_gone=$(sweep_board "$home" gone-ended old)
+  open_id=$(sweep_register "$home" "$open_gone")
+  ended_id=$(sweep_register "$home" "$ended_gone")
+  sweep_session "$store" "$open_gone" open 0 2000-01-01T00:00:00.000Z
+  sweep_session "$store" "$ended_gone" ended 0 2000-01-01T00:00:00.000Z
+  rm -f "$open_gone" "$ended_gone"
+
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto) \
+    || fail "the automatic sweep failed: $out"
+  assert_contains "$out" "kept: $open_id $open_gone - the Lavish session is live" \
+    "an automatic sweep retired a board left open for review because its file is gone: $out"
+  assert_contains "$out" "retired: $ended_id $ended_gone - the board file is gone" \
+    "an automatic sweep kept the listener of a deleted board whose session has ended: $out"
+  assert_contains "$out" "sweep: retired=1 kept=1" "the automatic sweep counted the wrong verdicts: $out"
+  list=$(run_procevent "$home" list)
+  assert_contains "$list" "$open_id" "the live board lost its registration"
+  assert_not_contains "$list" "$ended_id" "the ended board is still registered"
+  pass "the automatic sweep keeps a live board whose file is gone and retires it once the session has ended"
+}
+
+
 test_sweep_keeps_recently_handled_boards_in_literal_home_paths() {
   local name home store board sid idle_board idle_sid out list
   for name in board-sweep-handled 'board sweep handled' 'board sweep [literal]*?'; do
@@ -983,6 +1110,8 @@ SH
 
 tests=(
 test_sweep_retires_only_finished_board_listeners
+test_auto_sweep_retires_only_finished_listeners
+test_auto_sweep_keeps_a_live_board_whose_file_is_gone
 test_sweep_stops_a_live_listener_of_a_finished_board
 test_sweep_preserves_deleted_board_keep_guards
 test_sweep_keeps_boards_with_unsearchable_parents
