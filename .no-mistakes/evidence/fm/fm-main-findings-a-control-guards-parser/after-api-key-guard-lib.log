@@ -1,0 +1,5 @@
+ok - padded API selectors are refused while subscription selectors remain admitted
+ok - padded role and fallback selectors are diagnosed without writes or secret output
+ok - all ordered role patterns are inspected and subscription-only lists stay unflagged
+all fm-api-key-guard-lib tests passed
+nice -n 20 bash tests/fm-api-key-guard-lib.test.sh  1.73s user 5.59s system 21% cpu 34.629 total

@@ -1,0 +1,4 @@
+=== BASE tree (30b4d720 bin/fm-control.sh) running new failed-state test ===
+not ok - completion output from a failed command is not proof of done
+note: task t1 finished, so exit chose "Exit and stop tasks" on the background-task exit picker
+stopped t1 harness=claude backend=tmux endpoint=fmses:fm-t1 worktree=/Users/charlesabrooker/tmp/fm-control.HccYFd/failed-done-state-22559/wt-t1: expected exit 1, got 0

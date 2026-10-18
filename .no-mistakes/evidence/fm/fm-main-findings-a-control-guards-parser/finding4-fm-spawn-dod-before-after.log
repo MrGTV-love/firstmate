@@ -1,0 +1,16 @@
+### BASE fm-spawn.sh t-fenced (brief: t-fenced)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0Jav6q
+error: /Users/charlesabrooker/tmp/fm-lab.0Jav6q/data/t-fenced/brief.md has an unfinished task Definition of Done (DoD file /nonexistent/example-only.md is not a readable file); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+
+### BASE fm-spawn.sh t-real (brief: t-real)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0Jav6q
+error: /Users/charlesabrooker/tmp/fm-lab.0Jav6q/data/t-real/brief.md has an unfinished task Definition of Done (DoD file /nonexistent/example-only.md is not a readable file); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+
+### TARGET fm-spawn.sh t-fenced (brief: t-fenced)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0Jav6q
+error: /Users/charlesabrooker/tmp/fm-lab.0Jav6q/data/t-fenced/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn
+
+### TARGET fm-spawn.sh t-real (brief: t-real)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0Jav6q
+error: /Users/charlesabrooker/tmp/fm-lab.0Jav6q/data/t-real/brief.md has an unfinished task Definition of Done (DoD file /nonexistent/real-criteria.md is not a readable file); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+

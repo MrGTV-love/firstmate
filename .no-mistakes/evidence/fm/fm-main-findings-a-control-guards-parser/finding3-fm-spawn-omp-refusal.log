@@ -1,0 +1,12 @@
+### fm-spawn.sh --harness omp --model [openai/gpt-6.1-sol]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0Jav6q
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+exit=
+### fm-spawn.sh --harness omp --model [ openai/gpt-6.1-sol ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0Jav6q
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+exit=
+### fm-spawn.sh --harness omp --model [ OpenAI / gpt-6.1-sol ]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0Jav6q
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+exit=
