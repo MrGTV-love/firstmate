@@ -2891,24 +2891,18 @@ idle_reap_tick() {
 }
 
 # Merged-task copy pruning, detached and single-flight like the sweep above. A
-# record in state/*.merge-prune is armed by the merge paths; the sweep publishes
-# the soonest retry time in state/.merge-prune-next, so a quiet tick costs one
-# glob and one read. The sweep only ever asks bin/fm-teardown.sh (and its proofs
-# in bin/fm-merge-prune-lib.sh), so a skipped or missed tick loses nothing.
+# record in state/*.merge-prune is armed by the merge paths; while one exists the
+# sweep is started at most once per FM_MERGE_PRUNE_INTERVAL and decides for
+# itself which records are due. The sweep only ever asks bin/fm-teardown.sh (and
+# its proofs in bin/fm-merge-prune-lib.sh), so a skipped or missed tick loses
+# nothing.
 MERGE_PRUNE_PID=
 merge_prune_tick() {
-  local now next=
+  local now
   [ "$MERGE_PRUNE_INTERVAL" -gt 0 ] || return 0
   compgen -G "$STATE/*.merge-prune" >/dev/null || return 0
   fm_epoch_seconds_to now
   [ $((now - MERGE_PRUNE_LAUNCHED)) -ge "$MERGE_PRUNE_INTERVAL" ] || return 0
-  if [ -r "$STATE/.merge-prune-next" ]; then
-    IFS= read -r next < "$STATE/.merge-prune-next" || true
-  fi
-  case "$next" in
-    ''|*[!0-9]*) ;;
-    *) [ "$now" -ge "$((10#$next))" ] || return 0 ;;
-  esac
   if [ -n "$MERGE_PRUNE_PID" ]; then
     if kill -0 "$MERGE_PRUNE_PID" 2>/dev/null; then
       return 0

@@ -19,7 +19,9 @@
 #     request's head: a commit that is an ancestor of refs/pull/<n>/head landed;
 #   - every ignored file is scratch (list below), a preserved record, or a
 #     symlink; anything else is unique and keeps the copy;
-#   - no process has its working directory or an open file inside it.
+#   - no process has its working directory or an open file inside it, except a
+#     system search indexer and the idle shell of the task's own terminal pane
+#     (fm_mp_pane_shell).
 # Ignored scratch: virtual environments, node_modules, tool and build caches
 # (.venv, venv, node_modules, __pycache__, .pytest_cache, .ruff_cache,
 # .mypy_cache, .next, graphify-out, .import_linter_cache, *.tsbuildinfo,
@@ -35,10 +37,12 @@
 # files) preserves other ignored files inside teardown's own nested-copy path;
 # this fallback is stricter by design and writes to its own preserve directory.
 #
-# Requires bin/fm-timeout-lib.sh to be sourced first.
+# Requires bin/fm-timeout-lib.sh and bin/fm-backend.sh to be sourced first.
 # Regression coverage: tests/fm-merge-prune.test.sh.
 
 FM_MP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-agent-process-lib.sh
+. "$FM_MP_LIB_DIR/fm-agent-process-lib.sh"
 # shellcheck disable=SC2034 # Output globals, read by bin/fm-merge-prune.sh.
 FM_MP_VERDICT=
 # shellcheck disable=SC2034 # Output globals, read by bin/fm-merge-prune.sh.
@@ -215,10 +219,10 @@ fm_mp_classify_entry() {  # <real-copy> <relative-path>
 
 # A process with a working directory or an open file under <real-copy> keeps it.
 # lsof is the same probe treehouse-reap-clean uses (minus system search
-# indexers, below); a missing probe cannot prove
-# absence and keeps the copy, a probe that times out is retried later.
-fm_mp_prove_unused() {  # <real-copy>
-  local copy=$1 out rc=0 kept pid
+# indexers and the task's own idle pane shell, below); a missing probe cannot
+# prove absence and keeps the copy, a probe that times out is retried later.
+fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
+  local copy=$1 pane=${2:-} out rc=0 kept pid
   if ! command -v lsof >/dev/null 2>&1; then
     fm_mp_verdict keep "cannot prove no process uses $copy: lsof is not installed"
     return 1
@@ -232,7 +236,7 @@ fm_mp_prove_unused() {  # <real-copy>
   out=${out% }
   kept=
   for pid in $out; do
-    fm_mp_indexer_pid "$pid" || kept="${kept:+$kept }$pid"
+    fm_mp_indexer_pid "$pid" || fm_mp_pane_shell "$pid" "$pane" || kept="${kept:+$kept }$pid"
   done
   if [ -n "$kept" ]; then
     fm_mp_verdict keep "process(es) inside $copy: $kept"
@@ -244,8 +248,9 @@ fm_mp_prove_unused() {  # <real-copy>
 # A system search indexer (macOS Spotlight) holds a recently written tree open
 # for as long as a minute while it reads it. It only reads, deleting the tree
 # under it harms nothing, and counting it would keep nearly every fresh copy on a
-# Mac. It is the one deliberate exception to "no process inside" (named in
-# docs/configuration.md); any other process, whatever it does, keeps the copy.
+# Mac. It and the task's own pane shell (fm_mp_pane_shell) are the deliberate
+# exceptions to "no process inside" (named in docs/configuration.md); any other
+# process, whatever it does, keeps the copy.
 fm_mp_indexer_pid() {  # <pid>
   local comm
   comm=$(ps -o comm= -p "$1" 2>/dev/null) || return 1
@@ -256,8 +261,54 @@ fm_mp_indexer_pid() {  # <pid>
   return 1
 }
 
+# The pid of the shell that the task's terminal pane was started with, for the
+# backends that report it (tmux, herdr); nothing for any other backend or when
+# the pane cannot be read, which exempts nothing.
+fm_mp_pane_pid() {  # <meta-file>
+  local meta=$1 target out pid=
+  target=$(fm_backend_target_of_meta "$meta") || return 0
+  case "$(fm_backend_of_meta "$meta")" in
+    tmux)
+      pid=$(fm_run_timed 15 tmux display-message -p -t "$target" '#{pane_pid}' 2>/dev/null </dev/null) || pid=
+      ;;
+    herdr)
+      out=$(fm_run_timed 30 bash -c '. "$1/fm-backend.sh" && fm_backend_source herdr && fm_backend_herdr_cli "$2" pane process-info --pane "$3"' \
+        _ "$FM_MP_LIB_DIR" "${target%%:*}" "${target#*:}" 2>/dev/null </dev/null) || out=
+      pid=$(printf '%s' "$out" | jq -r --arg pane "${target#*:}" \
+        'select(.result.process_info.pane_id == $pane) | .result.process_info.shell_pid // empty' 2>/dev/null) || pid=
+      ;;
+  esac
+  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$pid" -gt 1 ] || return 0
+  printf '%s' "$pid"
+}
+
+# Whether <pid> is the task's own pane shell: the idle shell that the pane keeps
+# in the copy after its agent exits (the pane entered the copy with a
+# `treehouse get` subshell). Only a recognized shell with no child process that
+# is the pane's shell (<pane-pid>) or descends from it qualifies. A build, an
+# editor, a test, or a shell running one is not it.
+fm_mp_pane_shell() {  # <pid> <pane-pid>
+  local pid=$1 pane=${2:-} comm
+  [ -n "$pane" ] || return 1
+  comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
+  comm=$(printf '%s' "$comm" | tr -d '[:space:]')
+  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1
+  ps -axo pid=,ppid= 2>/dev/null | awk -v p="$pid" -v pane="$pane" '
+    { parent[$1] = $2; if ($2 == p) child = 1 }
+    END {
+      if (child) exit 1
+      for (n = 0; p > 1 && n < 64; n++) {
+        if (p == pane) exit 0
+        p = parent[p]
+      }
+      exit 1
+    }'
+}
+
 # Copy one preserve-list path with checksums. <dest-dir> receives the tree under
 # its copy-relative path plus SHA256SUMS; the copy is verified before returning.
+# A path with no regular file has nothing to checksum and nothing to verify.
 fm_mp_preserve_one() {  # <real-copy> <relative-path> <dest-dir>
   local copy=$1 rel=$2 dest=$3 file
   mkdir -p "$dest/$(dirname "$rel")" || return 1
@@ -268,5 +319,5 @@ fm_mp_preserve_one() {  # <real-copy> <relative-path> <dest-dir>
       shasum -a 256 -- "$file" || exit 1
     done < <(find "$rel" -type f -print0 | LC_ALL=C sort -z)
   ) >> "$dest/SHA256SUMS" || return 1
-  (cd "$dest" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1) || return 1
+  [ ! -s "$dest/SHA256SUMS" ] || (cd "$dest" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1) || return 1
 }

@@ -33,22 +33,28 @@
 # that the copy and every nested copy is a pool copy, has no changed or
 # untracked file, has no commit missing from every remote (or from the merged
 # PR's head), holds only scratch or preserved ignored files, and has no process
-# inside. The finished worker session is stopped first (bin/fm-control.sh exit)
-# because it would otherwise always be the process inside. The preserve-list
-# files are copied to data/<id>/merge-prune-preserved/ with SHA-256 checksums,
-# then `treehouse destroy <copy> --include-leased --yes` removes the copy (the
-# same call the reaper makes; --include-unlanded, --include-in-use and --force
-# are never used), and teardown runs again to finish the task's records.
+# inside. The finished worker session is stopped first (bin/fm-control.sh exit).
+# That verb keeps the task's terminal pane open, and the pane's idle shell, the
+# one the pane entered the copy with, stays inside the copy. That one process
+# does not keep the copy: it is a shell with no child process that is the
+# pane's shell or descends from it, found by the pane's process id (tmux and
+# herdr; any other backend exempts nothing). Any other process, such as a build,
+# an editor or a test started in the pane, keeps the copy, and the pane is never
+# closed. The Treehouse project lock is held from the worker stop to the
+# destroy, the slot-owner claim is read again right before the destroy, and a
+# slot claimed by another task is left alone. The preserve-list files are copied
+# to data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
+# `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
+# call the reaper makes; --include-unlanded, --include-in-use and --force are
+# never used), and teardown runs again to finish the task's records.
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
 # naming the copy and the reason. A retained copy is retried silently every six
 # hours in case the cause cleared. The hourly `treehouse prune --all --yes`
 # safety net is not duplicated.
 #
-# Outcomes are one line each in data/<id>/merge-prune.log. While the task's
-# status file exists a `note:` line records the same outcome (reaped, or
-# retained with the reason); a successful teardown retires the status file, so
-# the log is the lasting record.
+# Outcomes are one line each in data/<id>/merge-prune.log. The task's status
+# file is never written.
 #
 # FM_MERGE_PRUNE=0 turns arming off. Test seams: FM_MERGE_PRUNE_TEARDOWN_BIN and
 # FM_MERGE_PRUNE_CONTROL_BIN replace bin/fm-teardown.sh and bin/fm-control.sh;
@@ -64,7 +70,6 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 SWEEP_LOCK="$STATE/.merge-prune-sweep.lock"
-NEXT_FILE="$STATE/.merge-prune-next"
 
 # shellcheck source=bin/fm-idle-reap-lib.sh
 . "$SCRIPT_DIR/fm-idle-reap-lib.sh"
@@ -161,14 +166,6 @@ log_line() {  # <text>
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(clean_detail "$1")" >> "$DATA/$ID/merge-prune.log" 2>/dev/null || true
 }
 
-# A status note never raises a wake of its own: the one wake is the explicit
-# check below. Skipped when teardown has already retired the status file.
-status_note() {  # <text>
-  local file="$STATE/$ID.status"
-  [ -f "$file" ] && [ ! -L "$file" ] || return 0
-  fm_wake_status_append_self_announced "$STATE" "$file" "note: $(clean_detail "$1")" >/dev/null 2>&1 || true
-}
-
 first_refusal_line() {  # <teardown-output>
   local line
   while IFS= read -r line || [ -n "$line" ]; do
@@ -212,7 +209,6 @@ run_teardown() {
 finish_reaped() {  # <detail>
   rm -f -- "$STATE/$ID.merge-prune"
   log_line "reaped: $1"
-  status_note "merge-prune reaped: $1"
 }
 
 backoff() {  # <detail>: a transient outcome, silent until the attempt limit
@@ -235,10 +231,10 @@ backoff() {  # <detail>: a transient outcome, silent until the attempt limit
   fi
 }
 
-# A copy that stays: one wake and one status note per reason, a quiet retry later.
+# A copy that stays: one wake and one log line per reason, a quiet retry later.
 retain() {  # <copy> <reason>
   local copy=$1 reason=$2 changed=1
-  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$reason" ] && changed=0
+  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$(clean_detail "$reason")" ] && changed=0
   R_ATTEMPTS=$((R_ATTEMPTS + 1))
   R_STATE=retained
   R_REASON=$reason
@@ -253,14 +249,13 @@ retain() {  # <copy> <reason>
   fi
   if [ "$changed" = 1 ]; then
     log_line "retained $copy: $reason"
-    status_note "merge-prune retained $copy: $reason"
   fi
 }
 
 # Read the live copy's proofs; on success the copy is destroyed.
 # Returns 0 destroyed or already absent, 1 retained or transient (already recorded).
 fallback() {
-  local wt real n label copies=() tags=() i dest waited=0 out rc=0 pr_number='' head
+  local wt real pr_number='' project plock rc=0
   wt=$(fm_meta_get "$META" worktree)
   if [ -z "$wt" ]; then
     retain "-" "teardown refused and the task record names no pool copy"
@@ -285,6 +280,28 @@ fallback() {
   if ! prove_all "$real" "$pr_number"; then
     return 1
   fi
+  # A process lease on the slot lapses when the worker exits, so the project
+  # lock, which every slot allocation takes, is held from the stop to the destroy.
+  project=$(fm_meta_get "$META" project)
+  if ! plock=$(fm_treehouse_project_lock_path "$project"); then
+    retain "$real" "cannot resolve the Treehouse project lock for ${project:-<no project recorded>}"
+    return 1
+  fi
+  fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    backoff "another operation holds or is queued for the task's project lock"
+    return 1
+  fi
+  rc=0
+  fallback_remove "$real" "$pr_number" || rc=$?
+  fm_project_lock_release "$plock" || true
+  return "$rc"
+}
+
+# Stop the finished worker, prove the copy once more, preserve, and destroy it.
+# The project lock is held by the caller.
+fallback_remove() {  # <real-copy> <pr-number>
+  local real=$1 pr_number=$2 n label copies=() tags=() i dest waited=0 out rc=0 head pane
   stop_worker
   # The control lock keeps a teardown, relaunch or spawn from racing the removal.
   if ! fm_lock_try_acquire "$LOCK_CONTROL"; then
@@ -295,8 +312,10 @@ fallback() {
     fm_lock_release "$LOCK_CONTROL" || true
     return 1
   fi
-  # The stopped worker may need a moment to leave; any other process keeps the copy.
-  until fm_mp_prove_unused "$real"; do
+  # The stopped worker may need a moment to leave; any other process keeps the
+  # copy, except the idle shell of the task's own pane.
+  pane=$(fm_mp_pane_pid "$META")
+  until fm_mp_prove_unused "$real" "$pane"; do
     case "$FM_MP_REASON" in
       "process(es) inside"*)
         if [ "$FM_MP_VERDICT" = keep ] && [ "$waited" -lt "$EXIT_WAIT" ]; then
@@ -330,6 +349,20 @@ fallback() {
       fi
     done
   done
+  fm_treehouse_slot_owner_state "$real" "$ID"
+  case "$FM_TREEHOUSE_SLOT_OWNER" in
+    mine|absent) ;;
+    other)
+      fm_lock_release "$LOCK_CONTROL" || true
+      retain "$real" "the pool slot was reassigned to task $FM_TREEHOUSE_SLOT_OWNER_ID"
+      return 1
+      ;;
+    *)
+      fm_lock_release "$LOCK_CONTROL" || true
+      retain "$real" "the pool slot's owner claim cannot be read"
+      return 1
+      ;;
+  esac
   head=$(git -C "$real" rev-parse --short HEAD 2>/dev/null || true)
   out=$(fm_run_timed "$(fm_mp_limit merge-prune.destroy 300)" treehouse destroy "$real" --include-leased --yes </dev/null 2>&1) || rc=$?
   fm_lock_release "$LOCK_CONTROL" || true
@@ -342,7 +375,6 @@ fallback() {
     return 1
   fi
   log_line "fallback destroyed $real (head ${head:-unknown}); preserved records, if any, are in $dest"
-  status_note "merge-prune reaped copy $real (clean, pushed, unused, head ${head:-unknown}); finishing teardown"
   return 0
 }
 
@@ -453,7 +485,6 @@ cmd_arm() {  # <task-id> [--run]
     fm_lock_release "$LOCK" || true
     log_line "armed for $pr"
   fi
-  rm -f -- "$NEXT_FILE"
   if [ "${2:-}" = --run ]; then
     FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-merge-prune.sh" run "$ID" --now </dev/null >/dev/null 2>&1 &
   fi
@@ -493,21 +524,8 @@ cmd_run() {  # <task-id> [--now]
   exit 0
 }
 
-next_due() {  # -> the soonest next_at over all records, capped at five minutes
-  local rec id soonest=$((NOW + 300))
-  for rec in "$STATE"/*.merge-prune; do
-    [ -e "$rec" ] || continue
-    id=${rec##*/}
-    id=${id%.merge-prune}
-    valid_id "$id" || continue
-    rec_load "$id" || continue
-    [ "$R_NEXT" -ge "$soonest" ] || soonest=$R_NEXT
-  done
-  printf '%s' "$soonest"
-}
-
 cmd_sweep() {
-  local rec id started=0 tmp due
+  local rec id started=0
   [ -d "$STATE" ] || die "state directory not found: $STATE"
   fm_lock_try_acquire "$SWEEP_LOCK" || exit 0
   trap 'fm_lock_release "$SWEEP_LOCK"' EXIT
@@ -522,14 +540,6 @@ cmd_sweep() {
     started=$((started + 1))
     FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-merge-prune.sh" run "$id" </dev/null >/dev/null 2>&1 || true
   done
-  fm_epoch_seconds_to NOW
-  due=$(next_due)
-  tmp=$(mktemp "$STATE/.merge-prune-next.XXXXXX" 2>/dev/null) || exit 0
-  if printf '%s\n' "$due" > "$tmp" && mv -f -- "$tmp" "$NEXT_FILE"; then
-    :
-  else
-    rm -f -- "$tmp"
-  fi
   exit 0
 }
 

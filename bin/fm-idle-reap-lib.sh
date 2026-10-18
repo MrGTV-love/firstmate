@@ -12,22 +12,6 @@ FM_IDLE_REAP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-pr-lib.sh"
 
-# bin/fm-merge-prune.sh records each outcome as a `note: merge-prune ...` status
-# line. Those lines report on the cleanup, not on the worker, so the worker's
-# newest event, for eligibility, is the one before them.
-fm_idle_reap_last_event() {  # <status-file> -> newest worker event on stdout
-  local status=$1 line tmp
-  line=$(last_status_line "$status")
-  case "$line" in
-    note*": merge-prune "*) ;;
-    *) printf '%s' "$line"; return 0 ;;
-  esac
-  tmp=$(mktemp "${TMPDIR:-/tmp}/fm-idle-reap-status.XXXXXX") || { printf '%s' "$line"; return 0; }
-  tail -n "${FM_CLASSIFY_EVENT_WINDOW_LINES:-200}" "$status" 2>/dev/null | grep -v '^note[^:]*: merge-prune ' > "$tmp" || true
-  last_status_line "$tmp"
-  rm -f -- "$tmp"
-}
-
 fm_idle_reap_terminal_age() {
   local line=$1 evidence=$2 now=$3 at m newest
   if ! at=$(status_line_at_epoch "$line" 2>/dev/null) || [ -z "$at" ] \
@@ -91,7 +75,7 @@ fm_idle_reap_classify() {
     *) IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="not an ordinary ship or scout"; return 0 ;;
   esac
   status="$state/$id.status"
-  IDLE_REAP_LAST=$(fm_idle_reap_last_event "$status")
+  IDLE_REAP_LAST=$(last_status_line "$status")
   # A teardown admitted this task, reserved its slot and was interrupted; it
   # may already have retired the busy state and status read below. Only a
   # worker that reads busy again keeps it from the next sweep.
