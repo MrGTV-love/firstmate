@@ -150,22 +150,21 @@ _fm_status_unstamped() {  # <status-line> <out-var> -> line with its stamp remov
 # its cursor) appends nothing. A caller that owns evidence of a new episode
 # decides that itself, as bin/fm-pending-reply-lib.sh's escalation does.
 status_event_recorded() {  # <status-file> <new-status-line>
-  local wanted line untimed window lines size skip=0
+  local wanted line untimed size
   [ -f "$1" ] || return 1
   _fm_status_untimed "$2" wanted
-  # Bounded like every status reader (bin/fm-status-cap-lib.sh): a log longer than
-  # the reader window is checked over its last window, so an event older than that
-  # is not found and is recorded again - the safe direction for a retry.
-  fm_status_window_bytes window
-  fm_status_window_lines lines
+  # The whole log is read, exactly, up to the read limit (bin/fm-status-cap-lib.sh): a
+  # match stays recorded for the life of the file, so no earlier part may be skipped.
+  # A log past the limit is refused and named, and the event then reads as not
+  # recorded; the capped writer decides whether it can be appended. Only the byte
+  # limit applies: the loop is short per line, and the answer must not depend on how
+  # many lines the log has.
   size=$(LC_ALL=C wc -c < "$1" 2>/dev/null) || return 1
   size=${size//[[:space:]]/}
   case "$size" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$size" -le "$window" ] || skip=1
   while IFS= read -r line || [ -n "$line" ]; do
-    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
     _fm_status_untimed "$line" untimed
     [ "$untimed" != "$wanted" ] || return 0
-  done < <(tail -c "$window" "$1" 2>/dev/null | tail -n "$lines")
+  done < <(fm_status_read_exact "$1" 0 "$size" 0)
   return 1
 }

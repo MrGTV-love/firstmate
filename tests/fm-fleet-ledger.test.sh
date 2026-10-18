@@ -266,6 +266,23 @@ test_worker_status_line_with_the_flag_absent() {
   pass "flag off: the worker's status command is a plain append and leaves no ledger file, offset, or lock"
 }
 
+test_a_burst_is_captured_from_its_last_lines_and_the_skip_is_recorded() {
+  local out events skipped first last
+  make_case burst on
+  : > "$HOME_DIR/state/$TASK.status"
+  perl -e 'print "working [at=1790000000]: burst line $_\n" for 1 .. 600' >> "$HOME_DIR/state/$TASK.status"
+  out=$(in_home "$ROOT/bin/fm-fleet-ledger.sh" capture 2>&1) || fail "the ledger capture failed: $out"
+  events=$(jq -c 'select(.event == "task.status")' "$HOME_DIR/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')
+  [ "$events" -eq 256 ] || fail "a 600 line burst became $events status events, not the 256 line bound"
+  skipped=$(jq -c 'select(.event == "task.status.skipped") | .bytes' "$HOME_DIR/state/fleet-ledger.jsonl")
+  [ -n "$skipped" ] && [ "$skipped" -gt 0 ] || fail "the skipped lines were not recorded: '$skipped'"
+  first=$(jq -r 'select(.event == "task.status") | .text' "$HOME_DIR/state/fleet-ledger.jsonl" | head -1)
+  last=$(jq -r 'select(.event == "task.status") | .text' "$HOME_DIR/state/fleet-ledger.jsonl" | tail -1)
+  [ "$first" = " burst line 345" ] && [ "$last" = " burst line 600" ] \
+    || fail "the capture is not the last 256 lines: first '$first', last '$last'"
+  pass "a burst past 256 lines is captured from its last 256 lines and the ledger records how many bytes it skipped"
+}
+
 test_flag_off_writes_nothing() {
   local leftovers
   make_case off-lifecycle off
@@ -437,6 +454,7 @@ test_worker_status_line_is_recorded_under_a_relative_config_override
 test_worker_status_command_fails_when_the_append_fails
 test_worker_status_line_lands_when_the_ledger_fails
 test_worker_status_line_with_the_flag_absent
+test_a_burst_is_captured_from_its_last_lines_and_the_skip_is_recorded
 test_flag_off_writes_nothing
 test_lifecycle_records_carry_exactly_their_fields
 test_closed_is_recorded_once_per_task_evidence_and_pr

@@ -2,17 +2,18 @@
 # fm-status-cap-guard.sh - detect and contain a status log that passed its size cap.
 #
 # Usage: fm-status-cap-guard.sh scan
-#        fm-status-cap-guard.sh mark <path> <identity>
+#        fm-status-cap-guard.sh mark <path> <identity> <size>
 #
 # bin/fm-status-append.sh bounds the sanctioned write path, but a foreign process
 # can open a status log itself. On 2026-10-18 the shell inside an agent harness
 # looped on a raw append and three logs reached 140 GB, 265 GB and 122 GB. The
 # watcher (bin/fm-watch.sh, status_cap_tick) finds any status log or per-task
 # sidecar over the cap with one stat per poll (fm_status_cap_unalerted,
-# bin/fm-status-cap-lib.sh) and runs `scan` only when one has no alert yet.
+# bin/fm-status-cap-lib.sh) and runs `scan` only when one is due an alert: it has
+# none yet, or it has grown by more than one cap since its last one.
 #
 # scan investigates each such file once and prints one record per file:
-#   <identity><TAB><path><TAB><wake reason>
+#   <identity><TAB><path><TAB><size after containment><TAB><wake reason>
 # The reason names the file, its size, its growth rate over a short sample, and the
 # writer process found by lsof. It then contains the damage: when the writer is an
 # omp process (the harness that produced the incident) it is stopped with SIGSTOP,
@@ -28,8 +29,13 @@
 # be the omp process lsof named, must not be this process or one of its ancestors,
 # and is checked again just before the signal.
 #
-# mark records that the watcher durably queued the wake for <path> at <identity>,
-# so the same episode never wakes twice (marker file named in the cap library).
+# mark records that the watcher durably queued the wake for <path> at <identity>
+# when the file was <size> bytes, so the file wakes again only after it grows by more
+# than one cap (marker file named in the cap library). The guard itself bounds
+# nothing for a foreign writer: it detects growth once per watcher poll and stops that
+# one writer, so how far a file passes the cap before the stop is the writer's growth
+# rate times the poll interval, which docs/configuration.md "Status log size bounds"
+# states with measured numbers.
 # Environment: FM_STATE_OVERRIDE (state dir), FM_STATUS_CAP_SAMPLE_SECS (growth
 # sample, default 1), FM_STATUS_CAP_STOP (0 observes only), FM_STATUS_CAP_LSOF (the
 # lsof command, for tests). The cap itself is FM_STATUS_CAP_BYTES.
@@ -210,9 +216,11 @@ EOF
     fi
   fi
   : "$retried"
+  # The size after containment is the one the marker keeps, so growth is measured from it.
+  size_b=$(file_size "$path") && size_end=$size_b
   reason=$(printf 'check: status-log-over-cap: file=%s size=%s bytes (cap %s) growth=%s bytes/s writer=%s; %s; nothing was deleted, truncated or rewritten' \
     "${path##*/}" "$size_end" "$cap" "$rate" "$writer_text" "$action_text" | clean)
-  printf '%s\t%s\t%s\n' "$ident" "$path" "$reason"
+  printf '%s\t%s\t%s\t%s\n' "$ident" "$path" "$size_end" "$reason"
 }
 
 case "${1:-}" in
@@ -223,13 +231,14 @@ case "${1:-}" in
     done
     ;;
   mark)
-    [ "$#" -eq 3 ] || { echo "usage: fm-status-cap-guard.sh mark <path> <identity>" >&2; exit 2; }
+    [ "$#" -eq 4 ] || { echo "usage: fm-status-cap-guard.sh mark <path> <identity> <size>" >&2; exit 2; }
+    case "$4" in ''|*[!0-9]*) echo "fm-status-cap-guard: size must be a number of bytes: $4" >&2; exit 2 ;; esac
     marker=
     fm_status_cap_marker_path "$STATE" "$2" marker
-    printf '%s\t%s\n' "$3" "$2" > "$marker"
+    printf '%s\t%s\t%s\n' "$3" "$2" "$4" > "$marker"
     ;;
   *)
-    echo "usage: fm-status-cap-guard.sh scan | mark <path> <identity>" >&2
+    echo "usage: fm-status-cap-guard.sh scan | mark <path> <identity> <size>" >&2
     exit 2
     ;;
 esac
