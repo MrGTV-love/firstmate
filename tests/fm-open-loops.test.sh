@@ -1720,8 +1720,12 @@ os.utime(meta_file, (now, now))
 (home / 'state/worker.status.hold').rename(status_file)
 status('worker', f'done [at={now - 2000}]: ready in branch\n', now - 2000)
 r = rows()['worker']; assert not r['overdue'] and r['informational'] and 'done/ready' in r['evidence'], r
-# Ordinary check-in uses the real inbox, requests a report before ack, never types payload or interrupts.
+# Fresh run evidence also prevents an explicitly requested filler check-in.
 status('worker', f'working [at={now - 901}]: building\n', now - 901)
+fresh_run = json.loads(call('--check-in', 'worker', '--json', extra={'FM_SILENCE_TEST_CREW_SOURCE': 'run-step'}))
+assert fresh_run['check_in'] == 'not_sent' and 'fresh machine evidence' in fresh_run['reason'], fresh_run
+assert not list(inbox.glob('*.msg')), 'a validating worker needs no filler steer'
+# Ordinary check-in uses the real inbox, requests a report before ack, never types payload or interrupts.
 call('--check-in', 'worker')
 messages = list(inbox.glob('*.msg')); assert len(messages) == 1, messages
 body = messages[0].read_text(); assert 'report progress, blockers, and cross-workstream dependencies' in body
@@ -3041,5 +3045,170 @@ assert snapshot_runs() == 1, ('an unreadable backlog was read again for each sta
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
       ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
       ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
+PY
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+# Machine evidence, standing receipts and canonical named-ship blockers through the real wake acknowledgement.
+import datetime as dt, json, os, re, shutil, sqlite3, subprocess, sys, time
+from pathlib import Path
+root, world = map(Path, sys.argv[1:])
+code = world / 'satisfaction-code'
+shutil.copytree(root / 'bin', code / 'bin')
+now = int(time.time())
+iso = lambda t: dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+reader = code / 'bin/fm-crew-state.sh'
+reader.write_text('#!/usr/bin/env bash\ncat "$FM_HOME/worker-state"\n')
+reader.chmod(0o755)
+shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
+snapshot = code / 'bin/fm-fleet-snapshot.sh'
+snapshot.write_text('#!/usr/bin/env bash\nset -eo pipefail\n'
+    'if [ "$1" = --home-input ]; then\n'
+    '  "$(dirname "$0")/real-fleet-snapshot.sh" --contribution-input | jq \' .schema="fm-fleet-home-input.v1" | .tasks=[] \'\n'
+    'else exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"; fi\n')
+snapshot.chmod(0o755)
+loops = code / 'bin/fm-open-loops.sh'
+
+def case(name, category='silent_report', **fields):
+    home = world / ('satisfaction-' + name)
+    for directory in ('state', 'config', 'data', 'projects', 'nm'):
+        (home / directory).mkdir(parents=True)
+    (home / 'worker-state').write_text('state: working · source: pane · harness busy\n')
+    (home / 'state/worker.meta').write_text('kind=ship\nspawn_gen=worker-generation\n')
+    (home / 'state/worker.status').write_text(f'working [at={now-7200}]: implementing\n')
+    (home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+    env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), NM_HOME=str(home / 'nm'),
+               FM_OPEN_LOOPS_NOW=str(now), FM_SUPERVISION_ACTOR='main', FM_TEST_HARNESS='codex')
+    for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE', 'FM_CREW_STATE_BIN'):
+        env.pop(key, None)
+    row = dict(id='row-' + name, category=category, subject='worker', owner='firstmate',
+               next_action='check in: progress, blockers, cross-workstream dependencies',
+               age_seconds=7200, limit_seconds=900, overdue=True, evidence='old report')
+    row.update(fields)
+    ledger = home / 'state/open-loops.json'
+    ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now, home=str(home),
+                                     complete=True, rows=[row])))
+    def call(*args):
+        return subprocess.run([str(a) for a in args], env=env, text=True, capture_output=True, timeout=120)
+    def ok(*args):
+        result = call(*args)
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+        return result
+    def drain():
+        ok('bash', '-c', '. "$1"; fm_wake_append check report "check: satisfaction"', '_', code / 'bin/fm-wake-lib.sh')
+        result = ok(code / 'bin/fm-wake-drain.sh')
+        match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+        assert match, result
+        return result, match.groups()
+    def ack(boundary):
+        return call(code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0], '--recovery-generation', boundary[1])
+    return home, row, ledger, env, call, ok, drain, ack
+
+# Fresh run-state proof satisfies an already presented requirement at acknowledgement time, without an inbox write.
+home, row, ledger, env, call, ok, drain, ack = case('live-run')
+result, boundary = drain()
+refused = ack(boundary)
+assert refused.returncode == 1 and row['id'] in refused.stdout and '--check-in "worker"' in refused.stdout, refused
+(home / 'worker-state').write_text('state: working · source: run-step · run: live-validation; test running\n')
+mtime = ledger.stat().st_mtime_ns
+assert ack(boundary).returncode == 0
+record = json.loads(ledger.read_text()); action = record['handling']['actions'][row['id']]
+assert action['kind'] == 'observed' and 'live-validation' in action['evidence'], action
+assert action['recheck_epoch'] == now + 900 and action['at_epoch'] == now, action
+assert ledger.stat().st_mtime_ns == mtime and not (home / 'state/worker.inbox').exists()
+# A new actor's stale requirement cannot defeat valid machine proof or an existing standing receipt.
+env['FM_SUPERVISION_ACTOR'] = 'branch'
+assert not ok(loops, '--present-overdue').stdout
+assert call(loops, '--check-actions').returncode == 0
+# A broken optional step store cannot hide an independent authoritative live-run reading.
+(home / 'state/worker.meta').write_text(f'kind=ship\nspawn_gen=worker-generation\nproject={home}/projects/example\nbranch=fm/worker\n')
+(home / 'nm/state.sqlite').write_text('unreadable optional step store\n')
+assert call(loops, '--check-actions').returncode == 0
+# Rechecking sees a stopped or silent worker even without another collector publication.
+(home / 'worker-state').write_text('state: paused · source: status-log · no progress\n')
+assert call(loops, '--check-actions').returncode == 1
+assert row['id'] in ok(loops, '--present-overdue').stdout
+
+# Recent canonical status and pipeline events are independent satisfaction routes; their inclusive expiry reopens.
+for source in ('status', 'run-step'):
+    home, row, ledger, env, call, ok, drain, ack = case('fresh-' + source)
+    (home / 'worker-state').write_text('state: unknown · source: none · current reader unavailable\n')
+    if source == 'status':
+        (home / 'state/worker.status').write_text(f'working [at={now-10}]: progress\n')
+    else:
+        project = home / 'projects/example'; project.mkdir()
+        (home / 'state/worker.meta').write_text(f'kind=ship\nspawn_gen=worker-generation\nproject={project}\nbranch=fm/worker\n')
+        with sqlite3.connect(home / 'nm/state.sqlite') as db:
+            db.executescript('CREATE TABLE repos(id INTEGER, working_path TEXT);'
+                'CREATE TABLE runs(id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT, status TEXT);'
+                'CREATE TABLE step_results(run_id INTEGER, step TEXT, started_at TEXT, completed_at TEXT);')
+            db.execute('INSERT INTO repos VALUES(1,?)', (str(project),))
+            db.execute('INSERT INTO runs VALUES(1,1,?,?,?)', ('fm/worker', iso(now-7200), 'running'))
+            db.execute('INSERT INTO step_results VALUES(1,?,?,NULL)', ('test', iso(now-10)))
+    _, boundary = drain()
+    assert ack(boundary).returncode == 0
+    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+    assert source + ' event' in action['evidence'] and action['recheck_epoch'] == now + 890, action
+    env['FM_OPEN_LOOPS_NOW'] = str(now + 890)
+    assert call(loops, '--check-actions').returncode == 1, source
+
+# A standing deferral with an older outstanding presentation must not gate acknowledgement.
+home, row, ledger, env, call, ok, drain, ack = case('standing', category='stalled_worker')
+_, boundary = drain()
+ok(loops, 'action', row['id'], 'deferred', '--evidence', 'first check scheduled', '--recheck', iso(now+600))
+record = json.loads(ledger.read_text())
+record['handling']['presentations']['main'][row['id']] = record['handling']['actions'][row['id']]['sequence']
+ledger.write_text(json.dumps(record))
+assert not ok(loops, '--present-overdue').stdout
+assert ack(boundary).returncode == 0, 'a row declared standing cannot still demand a new action'
+
+# Canonical blocked-by relationship, collected status provenance, and named open ship - no text guessing.
+for ending in ('done', 'missing', 'captain', 'nonship', 'mixed'):
+    home, row, ledger, env, call, ok, drain, ack = case('dependency-' + ending)
+    backlog = home / 'data/backlog.md'
+    original = ('## In flight\n\n## Queued\n- [ ] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n'
+                '- [ ] question - Await fix blocked-by: fix-ship (repo: firstmate) (kind: decision)\n\n## Done\n')
+    if ending == 'captain':
+        original = original.replace('(kind: decision)', '(kind: decision) (hold: choose next step) (hold-kind: captain)')
+    backlog.write_text(original)
+    (home / 'state/worker.status').write_text(f'needs-decision [at={now-7200}] [key=question]: await the named fix\n')
+    report = json.loads(ok(loops, '--heartbeat', '--json').stdout)
+    row = next(r for r in report['rows'] if r['subject'] == 'worker:question')
+    _, boundary = drain()
+    assert ack(boundary).returncode == 0
+    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+    assert action['kind'] == 'backlog_wait' and action['proof']['prerequisite_tasks'] == ['fix-ship'], action
+    assert not ok(loops, '--present-overdue').stdout
+    if ending == 'done':
+        backlog.write_text(original.replace('- [ ] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n', '')
+                           + '- [x] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n')
+    elif ending == 'missing':
+        backlog.write_text(original.replace('- [ ] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n', ''))
+    elif ending == 'captain':
+        backlog.write_text(original.replace(' blocked-by: fix-ship', ''))
+    elif ending == 'nonship':
+        backlog.write_text(original.replace('(kind: ship)', '(kind: scout)'))
+    else:
+        backlog.write_text(original.replace('blocked-by: fix-ship', 'blocked-by: fix-ship blocked-by: nonexistent'))
+    assert call(loops, '--check-actions').returncode == 1, ending
+    result = ok(loops, '--present-overdue')
+    assert row['id'] in result.stdout and 'STANDING' not in result.stdout, (ending, result)
+    refused = ack(boundary)
+    assert refused.returncode == 1 and row['id'] in refused.stdout and 'escalated --evidence' in refused.stdout, refused
+
+# Fresh machine state never excuses a genuinely stalled row, blocked question, captain hold or merge obligation.
+for category, fields in (
+    ('stalled_worker', {}), ('unanswered_question', {'subject': 'worker:blocker', 'evidence': 'blocked: external input'}),
+    ('unanswered_question', {'subject': 'worker:captain-hold', 'owner': 'captain'}),
+    ('review_pass_not_merged', {'subject': 'https://github.com/test/project/pull/9'})):
+    home, row, ledger, env, call, ok, drain, ack = case('negative-' + category + fields.get('owner', ''), category, **fields)
+    (home / 'worker-state').write_text('state: working · source: run-step · run: live-validation\n')
+    _, boundary = drain()
+    assert ack(boundary).returncode == 1, category
+    if category == 'stalled_worker':
+        ok(loops, 'action', row['id'], 'deferred', '--evidence', 'first recheck', '--recheck', iso(now+600))
+        second = call(loops, 'action', row['id'], 'deferred', '--evidence', 'still no proof', '--recheck', iso(now+700))
+        assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
+        assert ack(boundary).returncode == 1
+print('PASS: fresh live-run, status and run-step receipts; standing acknowledgement; named open ship waits reopen;'
+      ' silent/stalled, blocked, captain and merge requirements and unevidenced second deferrals retained', flush=True)
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"

@@ -414,6 +414,12 @@ class Collector:
         if not row["overdue"]:
             return dict(check_in="not_sent", subject=task_id,
                         reason="report is fresh, excluded, or already has a pending request")
+        try:
+            proof = SatisfactionVerifier(self.result(), self.state, self.now).check_in_evidence(row)
+        except SOURCE_ERRORS:
+            proof = None
+        if proof:
+            return dict(check_in="not_sent", subject=task_id, reason="fresh machine evidence: " + proof["evidence"])
         task = next(t for t in self.direct_reports if t["id"] == task_id)
         env = dict(self.env)
         if task.get("spawn_gen"):
@@ -499,7 +505,7 @@ class Collector:
                 self.source("progress " + task["id"], self.stalled, task)
             self.source("unlanded work " + task["id"], self.unlanded, task)
 
-    def pipeline_progress(self, worktree):
+    def pipeline_progress(self, worktree, steps_only=False):
         """Latest recorded pipeline step time per (project, branch); no store is not a failure."""
         self.pipeline_waits.clear()
         root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
@@ -526,7 +532,7 @@ class Collector:
                      + " FROM runs JOIN repos ON runs.repo_id = repos.id"
                      " LEFT JOIN step_results ON step_results.run_id = runs.id")
             for row in db.execute(query):
-                stamps = [epoch(row["created_at"])] + [epoch(row[f]) for f in fields]
+                stamps = ([] if steps_only else [epoch(row["created_at"])]) + [epoch(row[f]) for f in fields]
                 key = (str(Path(row["working_path"]).resolve()), row["branch"])
                 valid = [s for s in stamps if s is not None and s <= self.now]
                 if valid:
@@ -1428,6 +1434,73 @@ class WaitVerifier:
             return False  # unreadable or changed evidence never buys standing acknowledgement
 
 
+class SatisfactionVerifier(WaitVerifier):
+    """Automatic receipts use current local evidence, never a free-text claim or another row's ownership."""
+    def check_in_evidence(self, row):
+        c = self.collector
+        task = row.get("subject", "")
+        interval = row.get("limit_seconds", 0)
+        if row.get("category") != "silent_report" or interval <= 0 \
+                or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):
+            return None
+        source = c.task_source(task)
+        if not source.get("generation"):
+            return None
+        status_at, verb, decision, _, _, _ = c.report_status(task)
+        if decision or verb in ("done", "failed", "blocked", "needs-decision"):
+            return None
+        if status_at is not None and 0 <= c.now - status_at < interval:
+            return dict(source=source, evidence=f"status event at {status_at}",
+                        recheck_epoch=status_at + interval)
+        meta = c.read_fields(c.state / (task + ".meta"))
+        project, branch = meta.get("project"), meta.get("branch")
+        if project and branch:
+            try:
+                progress = c.pipeline_progress(meta.get("worktree"), steps_only=True)
+            except SOURCE_ERRORS:
+                progress = {}  # the authoritative current-state reader can still prove a live run
+            stamp = progress.get((str(Path(project).resolve()), branch))
+            if stamp is not None and 0 <= c.now - stamp < interval:
+                return dict(source=source, evidence=f"run-step event at {stamp}; project={project}; branch={branch}",
+                            recheck_epoch=stamp + interval)
+        reader = os.environ.get("FM_CREW_STATE_BIN") or BIN / "fm-crew-state.sh"
+        current = c.run([reader, task], env=dict(c.env, FM_CREW_STATE_NO_FORGE="1")).strip()
+        if re.match(r"state: working · source: run-step(?: · |$)", current):
+            return dict(source=source, evidence="fm-crew-state: " + current,
+                        recheck_epoch=c.now + interval)
+        return None
+
+    def named_ship_evidence(self, row):
+        # Only the backlog's explicit blocked-by relationship may park a status question.
+        # Captain holds, arbitrary blocked prose and delivery/merge obligations retain their own rules.
+        source = row.get("source") or {}
+        if row.get("category") != "unanswered_question" or row.get("owner") != "firstmate" \
+                or source.get("kind") != "status" \
+                or source.get("key", "").startswith(("pending-reply-", "remote-reply-continuity-")):
+            return None
+        self.verify_source(source)
+        records = {r["id"]: r for r in self.backlog_records() if r.get("structured")}
+        record = records.get(source.get("key")) or records.get(source.get("task"))
+        if not record or record.get("state") not in ("queued", "in_flight") \
+                or (record.get("hold_kind") == "captain" and record.get("hold_bucket") != "blocked"):
+            return None
+        tasks = record.get("blocked_by_ids", [])
+        if not tasks or record["id"] in tasks:
+            return None
+        if any(t not in records or records[t].get("state") not in ("queued", "in_flight")
+               or records[t].get("kind") != "ship" for t in tasks):
+            return None
+        return dict(source=source, task=record["id"], prerequisite_tasks=tasks,
+                    evidence="waiting on named open ship: " + ", ".join(tasks))
+
+    def automatic(self, row):
+        if row.get("category") == "silent_report":
+            proof = self.check_in_evidence(row)
+            return ("observed", proof) if proof else (None, None)
+        proof = self.named_ship_evidence(row)
+        return ("backlog_wait", proof) if proof else (None, None)
+
+
 def receipt_stands(action, row, now, waits=None):
     """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
     kind = action.get("kind")
@@ -1508,9 +1581,13 @@ def ledger_action(args, state, now):
     recorded = getattr(args, "kind", None)
     pending_waits = any(a.get("kind") == "waiting" or a.get("hold") for a in actions.values())
     parks = recorded == "escalated" and getattr(args, "row_id", None) in by_id and parkable(by_id[args.row_id])
-    if recorded == "waiting" or pending_waits or parks:
+    automatic_mode = args.present_overdue or args.check_actions
+    automatic_candidates = any(row.get("category") == "silent_report" or (
+        row.get("category") == "unanswered_question" and (row.get("source") or {}).get("kind") == "status")
+        for row in rows)
+    if recorded == "waiting" or pending_waits or parks or (automatic_mode and automatic_candidates):
         try:
-            waits = WaitVerifier(report, state, now)
+            waits = SatisfactionVerifier(report, state, now)
         except SOURCE_ERRORS as error:
             if recorded == "waiting":
                 raise
@@ -1518,6 +1595,33 @@ def ledger_action(args, state, now):
             if pending_waits:
                 print(f"error: standing evidence unavailable ({waits_error}); its obligations need follow-up",
                       file=sys.stderr)
+    automatic = set()
+    changed = False
+    if automatic_mode and waits is not None:
+        for row in rows:
+            # Existing standing receipts need no substitute action, even when their original
+            # presentation sequence predates another actor's requirement.
+            if receipt_stands(actions.get(row["id"], {}), row, now, waits):
+                continue
+            try:
+                kind, proof = waits.automatic(row)
+            except SOURCE_ERRORS:
+                continue  # missing machine evidence never excuses follow-up
+            if not proof:
+                continue
+            ident = row["id"]
+            automatic.add(ident)
+            old = actions.get(ident, {})
+            if old.get("kind") == kind and old.get("proof") == proof and old.get("digest") == row_digest(row):
+                continue
+            controls["sequence"] += 1
+            actions[ident] = dict(old, kind=kind, proof=proof, evidence=proof["evidence"], at_epoch=now,
+                                  sequence=controls["sequence"], digest=row_digest(row))
+            if "recheck_epoch" in proof:
+                actions[ident]["recheck_epoch"] = proof["recheck_epoch"]
+            changed = True
+    if changed:
+        write_ledger(state, report, receipt=True)
     for row in rows:
         row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
     pending = controls["presentations"].setdefault(actor, {})
@@ -1526,7 +1630,7 @@ def ledger_action(args, state, now):
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
-            if receipt_stands(action, row, now, waits):
+            if ident in automatic or receipt_stands(action, row, now, waits):
                 standing.append(row)
                 continue
             needing.append(row)
@@ -1545,14 +1649,25 @@ def ledger_action(args, state, now):
         return 0
     if args.check_actions:
         missing = [row for ident, row in by_id.items()
-                   if (ident in pending and (actions.get(ident, {}).get("sequence", 0) <= pending[ident]
-                       or (actions.get(ident, {}).get("kind") == "deferred"
-                           and actions[ident].get("recheck_epoch", 0) <= now)))
-                   or (actions.get(ident, {}).get("kind") == "waiting"
-                       and not receipt_stands(actions[ident], row, now, waits))]
+                   if ident not in automatic and not receipt_stands(actions.get(ident, {}), row, now, waits)
+                   and ((ident in pending and (actions.get(ident, {}).get("sequence", 0) <= pending[ident]
+                         or (actions.get(ident, {}).get("kind") == "deferred"
+                             and actions[ident].get("recheck_epoch", 0) <= now)))
+                        or actions.get(ident, {}).get("kind") in ("waiting", "observed", "backlog_wait"))]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
+            for row in missing:
+                ident = json.dumps(row["id"])
+                if row.get("category") == "silent_report":
+                    print(f"help: {ident}: send a real check-in with bin/fm-open-loops.sh --check-in "
+                          + json.dumps(row["subject"]) + f"; record its delivery with bin/fm-open-loops.sh action {ident}"
+                          + " steered --evidence <NNN.msg>")
+                else:
+                    print(f"help: {ident}: complete {json.dumps(row['next_action'])}; record the follow-up with "
+                          + f"bin/fm-open-loops.sh action {ident} escalated --evidence <concrete-follow-up>"
+                          + (f" or bin/fm-open-loops.sh action {ident} merged --evidence " + json.dumps(row["subject"])
+                             if row.get("category") in ("open_pr", "review_pass_not_merged") else ""))
             return 1
         return 0
     if args.report:
