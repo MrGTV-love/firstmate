@@ -287,8 +287,8 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       };
       try {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });
-        if (terminal.error_type === "TimeoutError" && (terminal.attempts ?? 0) > 0
-          && ((terminal.attempts ?? 0) >= limits.tries || (terminal.ms ?? 0) >= limits.decisionMs - 1000)) {
+        if ((terminal.error_type === "TimeoutError" || terminal.error_type === "TypeError" || terminal.error_type === "Error")
+          && terminal.request_started && (terminal.ms ?? 0) >= limits.tryMs) {
           const temporary = `${breaker}.${process.pid}.${randomUUID()}`;
           writeFileSync(temporary, String(Date.now() + 60_000), { mode: 0o600 });
           renameSync(temporary, breaker);

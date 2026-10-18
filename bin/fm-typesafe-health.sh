@@ -203,10 +203,12 @@ observe() {
       S_STATUS=ok S_ALERTED='' S_ALERTED_SINCE='' S_COUNT=0 S_LAST_OK=$now
       ;;
     credits|auth|unreachable)
-      if [ "$S_STATUS" != "$class" ] || [ -z "$S_SINCE" ]; then S_SINCE=$now; fi
-      S_STATUS=$class
-      if [ "$class" = unreachable ]; then S_COUNT=$((S_COUNT + 1)); else S_COUNT=0; fi
-      S_DETAIL=$detail S_SOURCE=$source
+      if [ "$source" != jev-guard ]; then
+        if [ "$S_STATUS" != "$class" ] || [ -z "$S_SINCE" ]; then S_SINCE=$now; fi
+        S_STATUS=$class
+        if [ "$class" = unreachable ]; then S_COUNT=$((S_COUNT + 1)); else S_COUNT=0; fi
+        S_DETAIL=$detail S_SOURCE=$source
+      fi
       payload=''
       case "$class" in
         credits|auth)
@@ -224,7 +226,7 @@ observe() {
       esac
       if [ -n "$payload" ]; then
         fm_wake_append check "typesafe-health-$class" "$payload" || { fm_lock_release "$HEALTH_LOCK"; return 1; }
-        S_ALERTED=$class S_ALERTED_SINCE=$S_SINCE
+        S_ALERTED=$class S_ALERTED_SINCE=${S_SINCE:-$now}
       fi
       ;;
   esac

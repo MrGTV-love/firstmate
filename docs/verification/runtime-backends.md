@@ -705,6 +705,9 @@ These guard-only observations establish native device transport and the bounded 
 
 ### 2026-10-17 latency and result-delivery verification
 
+The measurements in this dated subsection preceded the subsequent task-scoped immediate-read rule; home-wide trust and judge-dependent trusted reads are no longer current behavior.
+The [operator contract](../configuration.md#jev-guard) owns the narrower current boundary.
+
 Installed omp 18.12.0 was exercised with the current guard extension, native built-in `read`, a scripted loopback model, and a synthetic judge whose flag arrived after 31 seconds.
 With the proposed shared 300-second budget, the host logged `handler timed out after 30000ms` and delivered the original untrusted output to the next model request; increasing the pre-tool timeout did not protect results.
 With omp's separate 25-second guard budget and two tries capped at 12 seconds, the same 31-second judge scenario returned `TimeoutError` after 24,504 ms of provider time, replaced the output, and completed the native session in 28.205 seconds without a host handler timeout.

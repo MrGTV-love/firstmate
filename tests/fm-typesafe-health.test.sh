@@ -191,6 +191,7 @@ HOME_G=$(new_home guard-outages)
 health "$HOME_G" 000 record 000 jev-guard >/dev/null
 health "$HOME_G" 000 record 000 jev-guard >/dev/null
 assert_equals 0 "$(wakes "$HOME_G")" "two exhausted guard budgets do not alert"
+assert_equals 0 "$(state_field "$HOME_G" unreachable_count)" "guard observations must not advance probe misses"
 health "$HOME_G" 000 record 000 unrelated >/dev/null
 assert_equals 0 "$(wakes "$HOME_G")" "other consumer transport codes do not become guard outages"
 health "$HOME_G" 000 record 000 jev-guard >/dev/null

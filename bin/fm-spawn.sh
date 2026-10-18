@@ -6169,7 +6169,7 @@ EOF
     if [ "$OMP_NO_HELPERS" = 0 ]; then
       native_helper_role=$MODEL
       case "$native_helper_role" in '' | default) native_helper_role=pi/default ;; esac
-      native_helpers=$(jq -cn --arg role "$native_helper_role" --argjson base "$native_helpers" '$base + {modelRoles: {smol: $role, tiny: $role}}') || exit 1
+      native_helpers=$(jq -cn --arg role "$native_helper_role" '{modelRoles: {smol: $role, tiny: $role}}') || exit 1
     fi
     jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" --arg find "$native_find" --argjson helpers "$native_helpers" '
       def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;

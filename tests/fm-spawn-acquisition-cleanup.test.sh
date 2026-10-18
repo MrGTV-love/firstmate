@@ -265,6 +265,8 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   [ "$rc" -ne 0 ] || fail "$MODE spawn unexpectedly launched: $out"
   case "$MODE" in
     slow|spawning|earlyexit|laterexit|clock|gone)
+      assert_contains "$out" 'treehouse get did not enter an isolated worktree' 'missing acquisition refusal'
+      assert_contains "$out" 'aborting acquisition' 'missing explicit acquisition abort'
       [ ! -e "$FM_HOME/state/$ID.meta" ] || fail 'an unacquired spawn published task metadata'
       ;;
     foreign) assert_contains "$out" 'could not pre-register Claude workspace trust' 'missing foreign-copy refusal' ;;

@@ -863,7 +863,7 @@ tests/fm-inactive-reconcile.test.sh 60823
 tests/fm-inbox.test.sh 6685
 tests/fm-jev-guard-claude-live-e2e.test.sh 368
 tests/fm-jev-guard-omp-live-e2e.test.sh 293
-tests/fm-jev-guard.test.sh 70429
+tests/fm-jev-guard.test.sh 475590
 tests/fm-keep-ai-trailers-home-local.test.sh 34501
 tests/fm-kimi-harness.test.sh 58917
 tests/fm-launch-prompt-signals-live-e2e.test.sh 369

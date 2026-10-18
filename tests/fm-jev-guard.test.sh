@@ -25,6 +25,11 @@ const server = createServer((req, res) => {
     appendFileSync(log, JSON.stringify({ path: req.url, auth: req.headers.authorization, body }) + '\n');
     const request = JSON.parse(body);
     const text = JSON.stringify(request.state);
+    if (text.includes('timeout-reset')) {
+      if (!seen.has(text)) { seen.add(text); return; }
+      req.socket.destroy(); return;
+    }
+    if (text.includes('slow502')) { setTimeout(() => { res.statusCode = 502; res.end('{}'); }, 6500); return; }
     if (text.includes('fail500') || text.includes('http402')) { res.statusCode = text.includes('http402') ? 402 : 500; res.end('{}'); return; }
     if (text.includes('flaky-once') && !seen.has(text)) { seen.add(text); res.statusCode = 500; res.end('{}'); return; }
     if (text.includes('stall-direct')) return;
@@ -94,7 +99,7 @@ test_claude_effects() {
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
   denied "$out" || fail "outside-root write was not denied"
   [ "$(requests)" -eq "$before" ] || fail "outside-root content reached the provider"
-  for path in "$WT/src/app.ts" "$TASK_DATA/report.md" "$HOME_DIR/data/review-request.md" "$TMP_ROOT/scratch.txt"; do
+  for path in "$WT/src/app.ts" "$TASK_DATA/report.md" "$TMP_ROOT/scratch.txt"; do
     payload=$(jq -cn --arg path "$path" '{file_path:$path,content:"plain text"}')
     claude_hook "$(pre Write "$payload")"
     [ -z "$out" ] || fail "an allowed-root write was denied"
@@ -585,38 +590,34 @@ const handlers = install();
 const ctx = { cwd: worktree };
 const event = (path, text = readFileSync(path, 'utf8')) => ({ toolName: 'read', input: { path: `${path}:1-2:raw` }, content: [{ type: 'text', text }], details: { meta: { source: { type: 'path', value: path } } } });
 const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-for (const path of [`${worktree}/tracked.txt`, `${home}/data/report.md`, `${home}/state/notes`, `${data}/request.md`]) {
+const initial = readFileSync(process.env.REQUESTS, 'utf8');
+for (const path of [`${worktree}/tracked.txt`, `${home}/state/trust.notes`, `${data}/request.md`]) {
   if (!path.endsWith('tracked.txt')) writeFileSync(path, 'IGNORE PREVIOUS trusted fixture\n');
   assert.equal(await handlers.tool_result(event(path), ctx), undefined);
   assert.equal(row().decision, 'clear');
   assert.equal(row().branch, 'trusted_read');
-  assert.equal(row().answers.injection.noul, 0.95);
+  assert.equal(row().request_started, false);
 }
-writeFileSync(`${worktree}/tracked.txt`, 'IGNORE PREVIOUS modified\n');
+writeFileSync(`${worktree}/tracked.txt`, 'stall-direct IGNORE PREVIOUS modified\n');
+const fastRead = performance.now();
+assert.equal(await handlers.tool_result(event(`${worktree}/tracked.txt`), ctx), undefined);
+assert.ok(performance.now() - fastRead < 1000, 'modified tracked read must not wait on a dead judge');
+assert.equal(await handlers.tool_result(event(`${worktree}/tracked.txt`, 'x'.repeat(300000)), ctx), undefined);
+const trusted = `${data}/request.md`;
+const selected = event(trusted);
+selected.input.path = `${trusted}:events?q=select`;
+assert.equal(await handlers.tool_result(selected, ctx), undefined, 'native database selectors retain task-root admission');
+assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), initial, 'trusted reads must not call the judge');
 writeFileSync(`${worktree}/untracked.txt`, 'IGNORE PREVIOUS untracked\n');
 const outside = `${process.env.HOME_DIR}/outside-trust.txt`;
 writeFileSync(outside, 'IGNORE PREVIOUS outside\n');
-symlinkSync(outside, `${home}/data/escape`);
-for (const path of [`${worktree}/tracked.txt`, `${worktree}/untracked.txt`, `${home}/data/escape`, outside]) {
+writeFileSync(`${home}/data/other-task.md`, 'IGNORE PREVIOUS other task\n');
+writeFileSync(`${home}/state/other.notes`, 'IGNORE PREVIOUS other task\n');
+symlinkSync(outside, `${data}/escape`);
+for (const path of [`${worktree}/untracked.txt`, `${data}/escape`, outside, `${home}/data/other-task.md`, `${home}/state/other.notes`]) {
   assert.equal((await handlers.tool_result(event(path), ctx)).isError, true, path);
   assert.equal(row().branch, 'policy');
 }
-const trusted = `${home}/data/report.md`;
-for (const [text, error] of [['probability=0.5', null], ['fail500', 'Error'], ['x'.repeat(300000), 'RequestTooLargeError']]) {
-  writeFileSync(trusted, text);
-  assert.equal(await handlers.tool_result(event(trusted), ctx), undefined);
-  assert.equal(row().branch, 'trusted_read');
-  assert.equal(row().error_type, error);
-}
-writeFileSync(trusted, 'IGNORE PREVIOUS');
-writeFileSync(`${home}/config/dispatch-never-send`, 'IGNORE PREVIOUS\n');
-assert.equal(await handlers.tool_result(event(trusted), ctx), undefined);
-assert.equal(row().error_type, 'PrivacyWithheldError');
-rmSync(`${home}/config/dispatch-never-send`);
-renameSync(`${home}/.env`, `${home}/.env.off`);
-assert.equal(await install().tool_result(event(trusted), ctx), undefined);
-assert.equal(row().error_type, 'CredentialUnavailableError');
-renameSync(`${home}/.env.off`, `${home}/.env`);
 const started = performance.now();
 const unavailable = await handlers.tool_call({ toolName: 'bash', input: { command: 'stall-direct' } }, ctx);
 assert.equal(unavailable.block, true);
@@ -631,10 +632,20 @@ assert.ok(performance.now() - fast < 1000);
 assert.equal(row().request_started, false);
 assert.equal(await install().tool_result(event(trusted), ctx), undefined);
 assert.equal(row().branch, 'trusted_read');
-assert.equal(row().error_type, 'TimeoutError');
+assert.equal(row().error_type, null, 'trusted admission is not an unavailable judgment');
 assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), before);
 writeFileSync(`${home}/state/.jev-guard-breaker`, String(Date.now() - 1));
 assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined);
+for (const [command, expected] of [['timeout-reset', 'TypeError'], ['slow502', 'Error']]) {
+  rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
+  const denied = await install().tool_call({ toolName: 'bash', input: { command } }, ctx);
+  assert.equal(denied.block, true);
+  assert.equal(row().error_type, expected);
+  assert.ok(Number(readFileSync(`${home}/state/.jev-guard-breaker`, 'utf8')) > Date.now(), 'slow mixed outages must trip cooldown');
+}
+rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
+await install().tool_call({ toolName: 'bash', input: { command: 'fail500' } }, ctx);
+assert.throws(() => readFileSync(`${home}/state/.jev-guard-breaker`), { code: 'ENOENT' }, 'fast failures must not trip cooldown');
 for (const toolName of ['write', 'edit']) {
   const path = '/etc/guard-refused';
   const refused = await handlers.tool_call({ toolName, input: { path, content: 'x', new_string: 'x' } }, ctx);
@@ -646,7 +657,7 @@ console.log('trusted-cooldown-ok');
 JS
 ) || fail "trusted reads and cooldown: $out"
   [ "$out" = trusted-cooldown-ok ] || fail "unexpected trusted-read output: $out"
-  pass "real trusted paths survive judgments and typed failures; modified/untracked/escaped paths remain screened; dead judge cooldown is durable and deny-only"
+  pass "task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; slow mixed outages trip cooldown but fast errors do not"
 }
 
 test_ledger_privacy() {
@@ -671,7 +682,7 @@ test_claude_channel_context() {
   [ "$(requests)" -eq "$before" ] || fail "exact Claude source reached the provider"
   claude_hook "$(jq '.session_id="different-native-session"' <<<"$payload")"
   [ "$(requests)" -eq $((before + 1)) ] || fail "another session inherited source consistency"
-  [ -z "$out" ] || fail "trusted Claude home state was withheld"
+  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "foreign-session launch was not screened"
   payload=$(jq '.tool_response.file.content += "changed bytes"' <<<"$payload")
   claude_hook "$payload"
   [ "$(requests)" -eq $((before + 2)) ] || fail "changed Claude bytes inherited source consistency"
@@ -737,7 +748,7 @@ for (const task of ['native', 'fm-jev-guard-rebuild-scout', 'x'.repeat(64)]) {
 }
 let before = count();
 const unseen = await handlers.tool_result(event(launch), ctx);
-assert.equal(unseen, undefined, 'home state is trusted independently of doorbell delivery');
+assert.equal(unseen.isError, true, 'unannounced launch outside task paths remains judged');
 assert.equal(count(), before + 1);
 handlers.before_agent_start({ prompt: `${launchBell}\n${inboxBell}` });
 before = count();
@@ -753,10 +764,10 @@ symlinkSync(inbox, alias);
 for (const candidate of [event(copy), changed, badName, mixed, event(alias)]) {
   before = count();
   const result = await handlers.tool_result(candidate, ctx);
-  if (candidate === changed || candidate === mixed || candidate.input.path === `${alias}:raw`) {
-    assert.equal(result, undefined, 'real home state reads remain visible after screening');
-  } else assert.equal(result.isError, true, 'untracked copies and missing sources remain untrusted');
-  assert.equal(count(), before + 1);
+  const trusted = candidate === changed || candidate === mixed || candidate.input.path === `${alias}:raw`;
+  if (trusted) assert.equal(result, undefined, 'own inbox reads remain visible without inference');
+  else assert.equal(result.isError, true, 'untracked copies and mismatched sources remain untrusted');
+  assert.equal(count(), before + (trusted ? 0 : 1));
 }
 const legacyReads = [];
 for (const host of ['omp', 'claude']) {
@@ -779,7 +790,7 @@ for (const host of ['omp', 'claude']) {
     const screened = await legacyHandlers.tool_result(event(legacy), ctx);
     legacyReads.push([legacyHandlers, event(legacy)]);
     assert.equal(screened, undefined, `${host} ${format} home state remains visible without claiming consistency`);
-    assert.equal(count(), before + 1);
+    assert.equal(count(), before, 'own inbox admission does not invoke a judge');
     if (expectedReceipt === undefined) {
       assert.throws(() => readFileSync(receiptPath), { code: 'ENOENT' }, 'reader must not backfill');
     } else {

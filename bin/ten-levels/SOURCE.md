@@ -44,7 +44,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.
   Durable-record failure is explicit rather than silently optional while active.
   It allows Claude up to three 90-second tries with cancellable one-second then two-second backoff inside a 300-second decision budget, but keeps omp at two 12-second tries with 500 ms backoff inside 25 seconds because its native result handler times out at 30 seconds and forwards the original output.
-  It retains outage-only deny guidance, records its own tries and elapsed time on failures, persists a 60-second judge cooldown after budget exhaustion, and reports those exhausted budgets through the existing TypeSafe health channel, which alerts after three within 15 minutes.
+  It retains outage-only deny guidance, records elapsed tries and time, and applies the operator-owned cooldown and health alert when an outage consumes a full try's elapsed budget regardless of its final retryable error type.
   These Firstmate-only changes leave the upstream client, questions, thresholds, egress checks and `REVIEW_ON_UNAVAILABLE_V1` pre-tool denial unchanged; the operator contract above owns measurements and enclosing host limits.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
@@ -53,9 +53,11 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
   It judges every piece of an oversized payload with the unchanged level 6 policies; shell/write payloads pass only when every piece passes, while result handling applies the explicit advisory and trusted-read rules below.
-  Its host response handling preserves answered middle-band results with an advisory and audit row, and preserves native reads of real home data/state, task data, or tracked own-worktree files whose blob equals `HEAD`, recording `clear` / `trusted_read` with the original error type.
-  Untrusted flags at or above 0.80 remain withheld on omp; shell/write outages still deny, and neither source trust nor advisory handling bypasses egress checks.
-  Write/edit refusals record the target path and direct the worker to request an authorized correction, and allowed write roots include the owning home's data directory.
+  Its host response handling preserves answered middle-band results with an advisory and audit row.
+  Native reads of task-owned data/state and tracked own-worktree files, including modified tracked files, pass immediately without a judge; cross-task roots are not trusted.
+  Native source metadata normalizes numeric and database selectors before bounded path admission.
+  Untrusted flags at or above 0.80 remain withheld on omp; shell/write outages still deny.
+  Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
 - `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.

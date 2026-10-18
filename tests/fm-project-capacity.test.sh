@@ -1961,6 +1961,40 @@ SH
   pass 'a fresh same-ID spawn refuses at task admission during a slow teardown, so pool return still progresses'
 }
 
+test_cpu_sampler_portability_and_failure_extreme() {
+  local case_dir holder rc=0 out
+  case_dir=$(make_case sampler-failure)
+  out=$(FM_HOME="$case_dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    ps() {
+      case "$1" in -S) return 1 ;; esac
+      printf "42 1 00:02.00\n43 42 00:01.00\n"
+    }
+    fm_project_lock_cpu 42
+  ' _ "$ROOT")
+  assert_equals 300 "$out" "Linux-style ps fallback did not sum live-tree CPU"
+  project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  FM_HOME="$case_dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    fm_project_lock_cpu() { return 1; }
+    sleep() { SECONDS=$((SECONDS + 600)); command sleep 0.05; }
+    FM_PROJECT_LOCK_SERVICE_SECS=1
+    fm_project_lock_acquire "$2/actor.lock" waiter
+  ' _ "$ROOT" "$case_dir" > "$case_dir/waiter.out" 2>&1 || rc=$?
+  : > "$case_dir/release"
+  wait "$holder" || fail "sampler failure damaged the live holder"
+  expect_code 1 "$rc" "unavailable sampler waited forever"
+  assert_contains "$(cat "$case_dir/waiter.out")" 'idle 1800s' "sampler failure falsely counted progress or used the idle allowance"
+  assert_contains "$(cat "$case_dir/waiter.out")" 'CPU telemetry unknown' "missing uncertainty refusal"
+  assert_equals holder "$(cat "$case_dir/order")" "uncertainty bypassed the holder"
+  pass "Linux ps fallback sums CPU and unavailable telemetry reaches the absolute extreme without removing the holder"
+}
+
+test_cpu_sampler_portability_and_failure_extreme
 test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock
 test_locked_base_refresh_needs_no_network_once_the_base_is_fetched
 test_queued_spawn_never_rewinds_newer_shared_origin_refs

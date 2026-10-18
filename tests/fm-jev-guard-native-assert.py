@@ -46,7 +46,7 @@ error_type = {
     'normal': None, 'privacy': 'PrivacyWithheldError', 'credentials': 'CredentialUnavailableError',
     'provider': 'Error', 'audit': 'AuditUnavailableError',
 }[phase]
-expected_requests = 0 if positive or phase in ('privacy', 'credentials') else (3 if backend == 'claude' else 2) if phase == 'provider' else 1
+expected_requests = 0 if positive or trusted or phase in ('privacy', 'credentials') else (3 if backend == 'claude' else 2) if phase == 'provider' else 1
 assert len(requests) == expected_requests, f'unexpected Jev egress count: expected {expected_requests}, got {len(requests)}'
 if positive:
     if backend == 'omp':
@@ -80,7 +80,7 @@ if phase != 'audit':
     if positive:
         expected = ('clear', 'supervisor_consistency', None, False, 'result_pass')
     elif trusted:
-        expected = ('clear', 'trusted_read', error_type, phase in ('normal', 'provider'), 'result_pass')
+        expected = ('clear', 'trusted_read', None, False, 'result_pass')
     elif phase == 'normal':
         expected = ('flag', 'policy', None, True, 'claude_advisory_only' if backend == 'claude' else 'omp_replace')
     else:

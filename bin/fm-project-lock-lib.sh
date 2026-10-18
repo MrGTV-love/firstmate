@@ -13,11 +13,11 @@
 # this is a PID-owned directory lock, not the git-file/lsof lock in fm-lock-lib.
 # No live holder is removed, including at a refusal.
 #
-# The wait has no fixed deadline; it refuses only on a stall. Progress means
+# The wait refuses after 600 seconds without observed progress. Progress means
 # the holder or queue head changes, the holder updates its role record, or its
-# process tree consumes another CPU second (including reaped children).
-# A slow holder that keeps working never expires merely because of its age.
-# Missing process telemetry is uncertainty, not proof of a stalled holder.
+# process tree consumes another CPU second. A productive holder does not expire.
+# Unavailable CPU telemetry is not progress and uses a 30-minute absolute bound
+# for the same holder/queue episode rather than asserting an observed stall.
 # A dead holder is recovered by the existing identity-bound lock owner.
 #
 # fm_project_lock_try <project-lock> <operation>
@@ -143,13 +143,13 @@ fm_project_lock_describe() {  # <lock> <head>
   FM_PROJECT_LOCK_DESC="next turn ${label:-unlabelled waiter} (PID ${pid:-unknown})"
 }
 
-# Cumulative centiseconds for a holder and its live descendants. ps -S also
-# includes reaped child CPU, so short-lived helpers do not erase real progress.
-# A sampling failure returns nonzero and cannot establish a stalled holder.
+# Cumulative centiseconds for a holder and its live descendants. macOS ps -S
+# includes reaped child CPU; Linux procps uses the portable live-tree fallback.
+# A sampling failure returns nonzero and establishes no progress.
 fm_project_lock_cpu() {  # <holder-pid>
   (
     set -o pipefail
-    LC_ALL=C ps -S -axo pid=,ppid=,time= | LC_ALL=C awk -v root="$1" '
+    { LC_ALL=C ps -S -axo pid=,ppid=,time= 2>/dev/null || LC_ALL=C ps -axo pid=,ppid=,time=; } | LC_ALL=C awk -v root="$1" '
       {
         children[$2] = children[$2] " " $1
         n = split($3, clock, "-"); seconds = n > 1 ? clock[1] * 86400 : 0
@@ -174,7 +174,7 @@ fm_project_lock_acquire() {  # <lock> <operation>
   local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-600}
   local poll=${FM_PROJECT_LOCK_POLL_SECS:-1} number='^[0-9]+([.][0-9]+)?$' zero='^0*([.]0*)?$'
   local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime last_mtime=''
-  local cpu='' last_cpu='' next_sample=0 sample_interval
+  local cpu='' last_cpu='' next_sample=0 sample_interval telemetry=unknown episode=0 extreme=1800
   local next_message message_interval rc=1
   FM_PROJECT_LOCK_ERROR=
   case "$service" in
@@ -220,6 +220,8 @@ fm_project_lock_acquire() {  # <lock> <operation>
     if [ "$key" != "$last_key" ]; then
       last_key=$key
       since=$SECONDS
+      episode=$SECONDS
+      telemetry=unknown
       last_cpu=''
       last_mtime=''
       next_sample=$SECONDS
@@ -227,6 +229,7 @@ fm_project_lock_acquire() {  # <lock> <operation>
     if [ -n "$holder" ] && [ "$SECONDS" -ge "$next_sample" ]; then
       next_sample=$((SECONDS + sample_interval))
       if cpu=$(fm_project_lock_cpu "$holder"); then
+        telemetry=available
         if [ -z "$last_cpu" ]; then
           last_cpu=$cpu
         elif [ "$cpu" -ge $((last_cpu + 100)) ]; then
@@ -234,9 +237,8 @@ fm_project_lock_acquire() {  # <lock> <operation>
           last_cpu=$cpu
         fi
       else
-        # An unavailable sample cannot distinguish work from a dead service.
-        # Existing owner recovery still handles a holder whose death is proved.
-        since=$SECONDS
+        # No new information: retain the progress clock and use the extreme.
+        telemetry=unknown
       fi
       if mtime=$(fm_path_mtime "$lock/role"); then
         if [ -n "$last_mtime" ] && [ "$mtime" != "$last_mtime" ]; then
@@ -246,10 +248,14 @@ fm_project_lock_acquire() {  # <lock> <operation>
       fi
     fi
     stalled=$((SECONDS - since))
-    [ "$stalled" -lt "$service" ] || break
+    if [ "$telemetry" = available ] || [ -z "$holder" ]; then
+      [ "$stalled" -lt "$service" ] || break
+    else
+      [ "$((SECONDS - episode))" -lt "$extreme" ] || break
+    fi
     if [ "$SECONDS" -ge "$next_message" ]; then
       fm_project_lock_describe "$lock" "$head"
-      echo "fm-project-lock: waiting for $operation; $FM_PROJECT_LOCK_DESC; $((service - stalled))s left before the stall limit" >&2
+      echo "fm-project-lock: waiting for $operation; $FM_PROJECT_LOCK_DESC; idle ${stalled}s, CPU telemetry $telemetry; stall allowance ${service}s, absolute uncertainty extreme ${extreme}s" >&2
       next_message=$((SECONDS + message_interval))
     fi
     if ! sleep "$poll"; then
@@ -263,7 +269,7 @@ fm_project_lock_acquire() {  # <lock> <operation>
     echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR; $operation was not admitted" >&2
   else
     fm_project_lock_describe "$lock" "$head"
-    echo "fm-project-lock: stall limit reached for $operation: $FM_PROJECT_LOCK_DESC made no progress for ${stalled}s (allowance ${service}s); no live holder was removed" >&2
+    echo "fm-project-lock: stall limit reached for $operation: $FM_PROJECT_LOCK_DESC; idle ${stalled}s (allowance ${service}s), CPU telemetry $telemetry, uncertainty extreme ${extreme}s; no live holder was removed" >&2
   fi
   return 1
 }

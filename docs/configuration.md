@@ -2146,11 +2146,11 @@ omp captures native `before_agent_start` prompts in memory; Claude captures nati
 Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no channel-consistency exception.
 The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
 Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases do not gain channel consistency and still receive ordinary result screening.
-Separately, a native `read` result remains visible after a band, flag, oversize, outage, privacy or credential refusal when its real target is a regular file under the owning home's `data/` or `state/`, the task data directory, or a tracked file in the worker's own worktree whose current blob equals `HEAD`.
-The latter check requires both tracked membership and blob equality; modified or untracked files and symlink targets outside those real roots remain untrusted.
-Native omp source metadata must agree with the actual read argument, including ranged reads; paths claimed inside result text grant nothing.
-These passes retain the original `error_type` in a terminal row with decision `clear`, branch `trusted_read`, and result-pass enforcement.
-They do not exempt `bash` results or reads of other paths, do not bypass never-send checks, and do not authenticate the producer.
+Separately, a native `read` of a regular file is admitted immediately when its real target is under the task's own data directory, its own `state/<task>.*` files or inbox, or a git-tracked file in its own worktree, including modified tracked files.
+Other tasks' data and state, untracked worktree files, and symlink targets outside those roots remain judged.
+Native omp source metadata must agree with the actual read argument, including numeric and database selectors; paths claimed inside result text grant nothing.
+Trusted reads bypass the judge entirely, including for oversized content, and record decision `clear`, branch `trusted_read`, result-pass enforcement, no request started and null error type.
+They do not exempt `bash` results or reads of other paths and do not authenticate the producer.
 An audit failure adds a notice beside the original trusted read rather than erasing it.
 Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice rather than erasing them.
 On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
@@ -2161,7 +2161,7 @@ Native launch prompts carry the survivor doorbells separately from Claude's reco
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
 
-The allowed write roots are the task worktree, the owning home's `data/` directory, the task data directory, and the system temporary directory.
+The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
 File write and edit paths must use a plain absolute or worktree-relative spelling.
 A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
@@ -2218,13 +2218,14 @@ The Claude floor exceeds ten times the observed answered-call p99 at both docume
 Claude's host hook envelope uses `fm-duration.py limit` with a 330-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
 Installed omp 18.12.0 has a separate nonconfigurable 30-second result-handler deadline that forwards original output if an extension times out.
 Its 25-second guard budget must therefore remain below that native deadline; extending only `toolCallTimeoutMs` cannot protect results, and no timeout configuration overlay is installed.
-After a budget-exhausting timeout, a home-local durable breaker skips judge requests for 60 seconds while preserving the ordinary outage result and pre-tool denial.
+After any outage that exhausts the decision budget or consumes at least one full per-try timeout of elapsed judge time, a home-local durable breaker skips judge requests for 60 seconds while preserving ordinary outage handling and pre-tool denial, regardless of whether the final error type is `TimeoutError`, `TypeError` or `Error`.
 Three such exhausted decisions within 15 minutes notify the existing TypeSafe health channel once; skipped cooldown calls do not count as new exhausted budgets, and ordinary health recovery clears alert deduplication.
 This is not sustained-outage permission to execute shell commands or write files.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are too large to cover within the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
-On omp, answered judgments strictly between 0.20 and 0.80 retain the original result with an advisory note and audit row; clear scores at or below 0.20 pass without an advisory.
+On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude retains its existing advisory-only path.
+Clear scores at or below 0.20 pass without an advisory.
 Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.
 Non-text results that cannot be assessed also require review rather than an unexamined pass.
 Claude receives only the explicit advisory notice, not a quarantine claim.
@@ -3592,7 +3593,7 @@ FM_WORKTREE_WRITE_TIMEOUT=10       # wall-clock seconds that one walk may take, 
 FM_WATCH_TRIAGE_LOG_MAX_BYTES=262144   # size cap for the watcher's absorbed-wake debug log
 FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT=     # optional seconds allowed for bootstrap's best-effort clone refresh; unset/blank defaults to max(20, 5 + 3 * origin-backed-project-count)
 FM_FLEET_PRUNE=1        # set to 0 to skip pruning local branches whose upstream is gone
-FM_PROJECT_LOCK_SERVICE_SECS=     # optional measured stall allowance override: seconds one project-lock hold may last before waiters refuse; bin/fm-project-lock-lib.sh owns default sizing and the progress-based stall rule
+FM_PROJECT_LOCK_SERVICE_SECS=     # optional idle-progress allowance override, not holder age; bin/fm-project-lock-lib.sh owns default sizing and the 30-minute telemetry-uncertainty extreme
 FM_PROJECT_LOCK_POLL_SECS=        # optional project-lock sampling cadence override (positive seconds, decimals allowed); bin/fm-project-lock-lib.sh owns the default and holder progress messages
 FM_STALE_WORKTREE_LOCK_AGE_SECS=30       # min mtime age before fm-teardown.sh treats a leftover worktree git index.lock as provably stale
 FM_TREEHOUSE_RETURN_LOCK_RETRIES=3        # retries after a treehouse return fails on the transient git index.lock signature

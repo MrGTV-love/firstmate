@@ -278,11 +278,11 @@
 # attempts, so contention exits FM_PROJECT_LOCK_BUSY_EXIT with nothing closed
 # and the next sweep retries. Once processes or endpoints may be gone, the
 # reaper's return stage and every forced child return wait in that FIFO queue
-# instead, each waited admission bounded per holder by the same stall
-# allowance as every other waiter (490s, derived in
-# bin/fm-project-lock-lib.sh). The wait has no total bound of its own; the
-# reaper's 600s teardown limit ends an overlong teardown, which keeps its
-# durable record and is retried by the next sweep without a refusal memo.
+# instead, each waited admission follows the progress-based idle allowance and
+# 30-minute telemetry-uncertainty extreme owned by bin/fm-project-lock-lib.sh.
+# Independently, the reaper's 600s teardown limit ends an overlong teardown,
+# which keeps its durable record and is retried by the next sweep without a
+# refusal memo.
 # As soon as a slot is reserved, or this task's own claim
 # beside a slot another task leases awaits release, and before any cleanup
 # that can fail and before the pending backlog close is published, teardown
