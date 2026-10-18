@@ -1,0 +1,70 @@
+HEAD=bc162756e4d7221cfe9bba5ba43f753b288b95ee load=22.56 30.07 37.72
+== project lock: busy holder vs idle holder (real fm-project-lock-lib.sh, 4s allowance)
+HEAD | holder=busy (holds 14s, allowance 4s) | waiter rc=0 after 13.4s | waiter ADMITTED
+HEAD | holder=idle (holds 14s, allowance 4s) | waiter rc=1 after 3.6s | fm-project-lock: stall limit reached for waiter: current holder holder (PID 70024); idle 4s (allowance 4s), CPU telemetry available, uncertainty extreme 1800s; no live holder was removed
+== CPU sampler, native ps
+sample1 centiseconds=99 rc=0
+sample2 centiseconds=383 rc=0
+RESULT: busy holder tree CPU rises (99 -> 383)
+missing pid: output='' rc=1
+/Users/charlesabrooker/.no-mistakes/evidence/01M56FRCDWDJ3656WKSNB7AN30/round3/cpu-sampler-check.sh: line 14:  3024 Terminated: 15          ( bash -c 'while :; do :; done' & wait )
+== CPU sampler, ps that rejects -S
+sample1 centiseconds=105 rc=0
+sample2 centiseconds=405 rc=0
+RESULT: busy holder tree CPU rises (105 -> 405)
+missing pid: output='' rc=1
+/Users/charlesabrooker/.no-mistakes/evidence/01M56FRCDWDJ3656WKSNB7AN30/round3/cpu-sampler-check.sh: line 14:  7898 Terminated: 15          ( bash -c 'while :; do :; done' & wait )
+== native omp live e2e (real omp, scripted providers)
+FM_TEST_BEGIN 2026-10-18T11:57:26Z tests/fm-jev-guard-omp-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - omp (omp/18.12.0): omp: normal/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: normal/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: normal/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: normal/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): pre-tool shell judgment answered after 31 seconds decides the call under the worker overlay
+FM_TEST_END 2026-10-18T11:58:20Z tests/fm-jev-guard-omp-live-e2e.test.sh exit=0 duration_ms=53887 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=54426
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=53887 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-jev-guard-omp-live-e2e.test.sh duration_ms=53887
+== native claude live e2e (real claude CLI hooks)
+FM_TEST_BEGIN 2026-10-18T11:58:21Z tests/fm-jev-guard-claude-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - claude (2.1.302 (Claude Code)): claude: normal/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: normal/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: normal/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: normal/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/changed: native read and next model context consumed
+FM_TEST_END 2026-10-18T11:58:42Z tests/fm-jev-guard-claude-live-e2e.test.sh exit=0 duration_ms=21479 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=22054
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=21479 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-jev-guard-claude-live-e2e.test.sh duration_ms=21479
+ALL_DONE

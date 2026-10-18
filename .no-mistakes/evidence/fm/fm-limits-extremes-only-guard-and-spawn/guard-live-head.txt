@@ -1,0 +1,12 @@
+node:1: command not found: _nvm_lazy_load
+node:1: command not found: _nvm_lazy_load
+HEAD | R1 omp read: own MODIFIED tracked worktree file, judge dead | 283 ms | ALLOWED
+HEAD | R2 omp read: own task data file, judge dead | 241 ms | ALLOWED
+HEAD | R3 omp read: ANOTHER task data file, judge dead | 24562 ms | WITHHELD/BLOCKED: "[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withhe
+HEAD | R4 omp read: UNTRACKED worktree file, judge dead | 24557 ms | WITHHELD/BLOCKED: "[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withhe
+HEAD | B1 omp pre-tool bash ls, judge answers after 15 s | 15131 ms | ALLOWED
+HEAD | W1 omp pre-tool write of review request into own worktree, judge answers after 15 s | 15080 ms | ALLOWED
+HEAD | X1 omp bash result screening, judge answers after 11 s | 11052 ms | ALLOWED
+HEAD | N1 omp pre-tool bash ls right after the outages, healthy judge | 27 ms | ALLOWED
+HEAD | judge requests that carried a dead marker for trusted reads (R1,R2 expected 0 on head): 0
+HEAD | audit branches: ["tool_result/read:clear/trusted_read","tool_result/read:clear/trusted_read","tool_result/bash:clear/policy","tool_call/bash:allow/policy","tool_call/write:allow/policy","tool_result/read:review/outage/TimeoutError","tool_result/read:review/outage/TimeoutError","tool_call/bash:allow/policy"]

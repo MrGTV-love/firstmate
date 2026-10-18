@@ -1,0 +1,3 @@
+REALTIME-RESULT: spawn rc=0 after 174s wall clock; last output line: spawned get-cleanup-late-87102 harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-get-cleanup-late-87102 worktree=/Users/charlesabrooker/tmp/fm-spawn-acquisition.ZYffuu/late
+ok - tmux a get that outlasts the old 60-poll window is accepted
+exit=0

@@ -1,0 +1,98 @@
+== tmux copy: 2026-10-18T11:00:23Z load: 58.87 59.04 67.99
+FM_TEST_BEGIN 2026-10-18T11:00:23Z tests/fm-spawn-acquisition-cleanup.test.sh family=backend-dispatch expected_gate_skip=none
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - tmux a get that outlasts the old 60-poll window is accepted
+ok - tmux laterexit refusal returns its slot and ends its get subshell
+ok - tmux earlyexit refusal returns its slot and ends its get subshell
+ok - tmux clock refusal returns its slot and ends its get subshell
+ok - tmux gone refusal returns its slot and ends its get subshell
+FM_TEST_END 2026-10-18T11:02:05Z tests/fm-spawn-acquisition-cleanup.test.sh exit=0 duration_ms=101850 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=102881
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=101850 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-cleanup.test.sh duration_ms=101850
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+tmux exit=0
+== herdr e2e run 1: 2026-10-18T11:02:07Z load: 57.77 57.65 66.35
+FM_TEST_BEGIN 2026-10-18T11:02:08Z tests/fm-spawn-acquisition-herdr-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+not ok - fake get never started: warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/home/data/get-cleanup-spawning-46466/launch-brief.md records no ship branch; defaulting to legacy branch fm/get-cleanup-spawning-46466
+warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/home/data/get-cleanup-spawning-46466/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 61s; no path/output progress for 61s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 121s; no path/output progress for 121s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 182s; no path/output progress for 182s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 243s; no path/output progress for 243s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 303s; no path/output progress for 303s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 363s; no path/output progress for 363s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 424s; no path/output progress for 424s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 484s; no path/output progress for 484s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+waiting: treehouse get to enter an isolated worktree; foreground idle; elapsed 544s; no path/output progress for 544s; last path '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project' (it is the project checkout itself)
+error: treehouse get did not enter an isolated worktree after 11 polls (no path or output progress for 600s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project': it is the project checkout itself; spawning project '/Users/charlesabrooker/tmp/fm-spawn-acquisition.hoGvBA/project'); aborting acquisition
+warning: herdr presentation cleanup could not verify the exact pane; refusing focus-unsafe pane close
+FM_TEST_END 2026-10-18T11:04:04Z tests/fm-spawn-acquisition-herdr-e2e.test.sh exit=1 duration_ms=116351 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=117515
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=116351 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-herdr-e2e.test.sh duration_ms=116351
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+herdr run 1 exit=1
+== after herdr run 1 load: 62.08 61.14 66.75
+== herdr e2e run 2: 2026-10-18T11:04:05Z load: 62.08 61.14 66.75
+FM_TEST_BEGIN 2026-10-18T11:04:06Z tests/fm-spawn-acquisition-herdr-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+FM_TEST_END 2026-10-18T11:07:05Z tests/fm-spawn-acquisition-herdr-e2e.test.sh exit=0 duration_ms=179640 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=180488
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=179640 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-herdr-e2e.test.sh duration_ms=179640
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+herdr run 2 exit=0
+== after herdr run 2 load: 52.31 62.59 66.65
+== herdr e2e run 3: 2026-10-18T11:07:07Z load: 52.31 62.59 66.65
+FM_TEST_BEGIN 2026-10-18T11:07:07Z tests/fm-spawn-acquisition-herdr-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+FM_TEST_END 2026-10-18T11:10:56Z tests/fm-spawn-acquisition-herdr-e2e.test.sh exit=0 duration_ms=228482 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=229574
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=228482 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-herdr-e2e.test.sh duration_ms=228482
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+herdr run 3 exit=0
+== after herdr run 3 load: 40.88 56.96 63.75
+ALL_DONE

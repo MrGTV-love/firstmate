@@ -1,0 +1,13 @@
+## native ps (-S path)
+sample1 centiseconds=92 rc=0
+sample2 centiseconds=393 rc=0
+RESULT: busy holder tree CPU rises (92 -> 393)
+missing pid: output='' rc=1
+/Users/charlesabrooker/.no-mistakes/evidence/01M56FRCDWDJ3656WKSNB7AN30/cpu-sampler-check.sh: line 14:  8030 Terminated: 15          ( bash -c 'while :; do :; done' & wait )
+
+## ps rejects -S (procps-like fallback)
+sample1 centiseconds=90 rc=0
+sample2 centiseconds=390 rc=0
+RESULT: busy holder tree CPU rises (90 -> 390)
+missing pid: output='' rc=1
+/Users/charlesabrooker/.no-mistakes/evidence/01M56FRCDWDJ3656WKSNB7AN30/cpu-sampler-check.sh: line 14: 16290 Terminated: 15          ( bash -c 'while :; do :; done' & wait )

@@ -1,0 +1,8 @@
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+not ok - contention B get never held its lease: warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.0S3IOO/home-contention-b/data/get-cleanup-contention-b-52001/launch-brief.md records no ship branch; defaulting to legacy branch fm/get-cleanup-contention-b-52001
+warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.0S3IOO/home-contention-b/data/get-cleanup-contention-b-52001/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+exit=1

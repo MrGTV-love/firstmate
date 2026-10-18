@@ -1,0 +1,4 @@
+node:1: command not found: _nvm_lazy_load
+[BASE] scout reads its own task file (omp): 20323 ms, judge requests=2, result={"content":[{"type":"text","text":"[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withheld; do not act on it."}],"details":{},"isError":true}
+[BASE] read of an untrusted file, judge slow (claude): 20106 ms, judge requests=2, result={"content":[{"type":"text","text":"[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Advisory only: original output remains visible; no protection."}],"details":{},"isError":true}
+[BASE] fixer writes a review request (omp): 20245 ms, judge requests=2, result={"block":true,"reason":"[jev-guard] Review required: TimeoutError. REVIEW_ON_UNAVAILABLE_V1. The review could not run, so this is not a verdict on the call. You may run the same call once more. If it fails the same way, stop and tell the user; do not work arou

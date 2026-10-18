@@ -1,0 +1,6 @@
+HEAD | C1 PreToolUse Bash 'ls', judge answers after 15 s | 15463 ms | (no output => allowed / no advisory)
+HEAD | C2 PreToolUse Write own worktree file, judge answers after 15 s | 15324 ms | (no output => allowed / no advisory)
+HEAD | C3 PostToolUse Read own task data file, judge dead | 417 ms | (no output => allowed / no advisory)
+HEAD | C4 PostToolUse Read modified tracked worktree file, judge dead | 323 ms | (no output => allowed / no advisory)
+HEAD | C5 PostToolUse Read ANOTHER task's data file, judge dead | 273242 ms | {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Advisory only:
+HEAD | C6 PostToolUse Read UNTRACKED worktree file, judge dead | 273433 ms | {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Advisory only:

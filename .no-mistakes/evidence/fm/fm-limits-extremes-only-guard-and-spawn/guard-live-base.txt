@@ -1,0 +1,12 @@
+node:1: command not found: _nvm_lazy_load
+node:1: command not found: _nvm_lazy_load
+BASE | R1 omp read: own MODIFIED tracked worktree file, judge dead | 20090 ms | WITHHELD/BLOCKED: "[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withhe
+BASE | R2 omp read: own task data file, judge dead | 20039 ms | WITHHELD/BLOCKED: "[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withhe
+BASE | R3 omp read: ANOTHER task data file, judge dead | 20050 ms | WITHHELD/BLOCKED: "[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withhe
+BASE | R4 omp read: UNTRACKED worktree file, judge dead | 20043 ms | WITHHELD/BLOCKED: "[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withhe
+BASE | B1 omp pre-tool bash ls, judge answers after 15 s | 20038 ms | WITHHELD/BLOCKED: "[jev-guard] Review required: TimeoutError. REVIEW_ON_UNAVAILABLE_V1. The review could not run, so this is not
+BASE | W1 omp pre-tool write of review request into own worktree, judge answers after 15 s | 20042 ms | WITHHELD/BLOCKED: "[jev-guard] Review required: TimeoutError. REVIEW_ON_UNAVAILABLE_V1. The review could not run, so this is not
+BASE | X1 omp bash result screening, judge answers after 11 s | 20052 ms | WITHHELD/BLOCKED: "[jev-guard] Tool output requires review (TimeoutError). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withhe
+BASE | N1 omp pre-tool bash ls right after the outages, healthy judge | 127 ms | ALLOWED
+BASE | judge requests that carried a dead marker for trusted reads (R1,R2 expected 0 on head): 4
+BASE | audit branches: ["tool_result/read:review/outage/TimeoutError","tool_result/read:review/outage/TimeoutError","tool_result/read:review/outage/TimeoutError","tool_result/read:review/outage/TimeoutError","tool_call/bash:review/outage/TimeoutError","tool_call/write:review/outage/TimeoutError","tool_result/bash:review/outage/TimeoutError","tool_call/bash:allow/policy"]

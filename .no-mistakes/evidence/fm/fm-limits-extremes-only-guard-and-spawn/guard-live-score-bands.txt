@@ -1,0 +1,8 @@
+HEAD | omp untrusted bash result, judge score 0.15 | ALLOWED, no advisory
+HEAD | omp untrusted bash result, judge score 0.50 | ALLOWED + 1 extra part: [jev-guard] Advisory: an answered judgment is in the uncertain 0.20–0.80 band. Original output remai
+HEAD | omp untrusted bash result, judge score 0.79 | ALLOWED + 1 extra part: [jev-guard] Advisory: an answered judgment is in the uncertain 0.20–0.80 band. Original output remai
+HEAD | omp untrusted bash result, judge score 0.85 | WITHHELD
+BASE | omp untrusted bash result, judge score 0.15 | ALLOWED, no advisory
+BASE | omp untrusted bash result, judge score 0.50 | WITHHELD
+BASE | omp untrusted bash result, judge score 0.79 | WITHHELD
+BASE | omp untrusted bash result, judge score 0.85 | WITHHELD

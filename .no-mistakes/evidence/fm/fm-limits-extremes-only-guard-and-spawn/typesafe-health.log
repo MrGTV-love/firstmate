@@ -1,0 +1,13 @@
+FM_TEST_BEGIN 2026-10-18T10:51:19Z tests/fm-typesafe-health.test.sh family=standalone expected_gate_skip=none
+ok - 402: one alert, repeats suppressed, one recovery note, and a fresh alert after recovery
+ok - 401 and 403 alert as auth failures, and a change of class alerts again
+ok - unreachable and timeout stay internal below the threshold and alert once at it
+ok - a consumer-reported 402, 401, 403, or 200 acts at once and other codes are ignored
+ok - a secondmate home and a keyless home stay silent and make no request
+ok - the key never reaches argv, output, state, wakes, or the environment
+FM_TEST_END 2026-10-18T10:51:43Z tests/fm-typesafe-health.test.sh exit=0 duration_ms=23486 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=24524
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=23486 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-typesafe-health.test.sh duration_ms=23486
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M56FRCDWDJ3656WKSNB7AN30/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

@@ -1,0 +1,6 @@
+#!/bin/bash
+# Emulates a procps that rejects the BSD -S option.
+for a in "$@"; do
+  if [ "$a" = "-S" ]; then echo "ps: error: unsupported option -S" >&2; exit 1; fi
+done
+exec /bin/ps "$@"

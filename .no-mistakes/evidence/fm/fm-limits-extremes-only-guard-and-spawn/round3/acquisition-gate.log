@@ -1,0 +1,82 @@
+HEAD=bc162756e4d7221cfe9bba5ba43f753b288b95ee
+== tmux copy: 2026-10-18T11:59:09Z load: 14.67 24.21 34.19
+FM_TEST_BEGIN 2026-10-18T11:59:09Z tests/fm-spawn-acquisition-cleanup.test.sh family=backend-dispatch expected_gate_skip=none
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - tmux a get that outlasts the old 60-poll window is accepted
+ok - tmux laterexit refusal returns its slot and ends its get subshell
+ok - tmux earlyexit refusal returns its slot and ends its get subshell
+ok - tmux clock refusal returns its slot and ends its get subshell
+ok - tmux gone refusal returns its slot and ends its get subshell
+FM_TEST_END 2026-10-18T12:00:11Z tests/fm-spawn-acquisition-cleanup.test.sh exit=0 duration_ms=61349 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=61868
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=61349 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-cleanup.test.sh duration_ms=61349
+tmux exit=0
+== herdr e2e run 1: 2026-10-18T12:00:11Z load: 24.92 24.81 33.69
+FM_TEST_BEGIN 2026-10-18T12:00:12Z tests/fm-spawn-acquisition-herdr-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+FM_TEST_END 2026-10-18T12:02:21Z tests/fm-spawn-acquisition-herdr-e2e.test.sh exit=0 duration_ms=128812 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=129328
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=128812 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-herdr-e2e.test.sh duration_ms=128812
+herdr run 1 exit=0
+== after herdr run 1 load: 44.75 34.47 36.37
+== herdr e2e run 2: 2026-10-18T12:02:21Z load: 44.75 34.47 36.37
+FM_TEST_BEGIN 2026-10-18T12:02:21Z tests/fm-spawn-acquisition-herdr-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+FM_TEST_END 2026-10-18T12:05:02Z tests/fm-spawn-acquisition-herdr-e2e.test.sh exit=0 duration_ms=160834 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=161438
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=160834 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-herdr-e2e.test.sh duration_ms=160834
+herdr run 2 exit=0
+== after herdr run 2 load: 22.91 28.82 33.66
+== herdr e2e run 3: 2026-10-18T12:05:03Z load: 22.91 28.82 33.66
+FM_TEST_BEGIN 2026-10-18T12:05:03Z tests/fm-spawn-acquisition-herdr-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+FM_TEST_END 2026-10-18T12:08:00Z tests/fm-spawn-acquisition-herdr-e2e.test.sh exit=0 duration_ms=176770 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=177449
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=176770 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-acquisition-herdr-e2e.test.sh duration_ms=176770
+herdr run 3 exit=0
+== after herdr run 3 load: 25.78 29.76 33.31
+ALL_DONE

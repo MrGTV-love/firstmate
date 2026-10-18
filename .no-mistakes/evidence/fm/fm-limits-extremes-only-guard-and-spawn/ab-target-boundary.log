@@ -1,0 +1,7 @@
+node:1: command not found: _nvm_lazy_load
+[TARGET-1s] scout reads its own task file (omp): 1 ms, judge requests=0, result=undefined (allowed, output untouched)
+[TARGET-1s] read of an untrusted file, judge slow (claude): 1337 ms, judge requests=1, result=undefined (allowed, output untouched)
+[TARGET-1s] fixer writes a review request (omp): 1056 ms, judge requests=1, result=undefined (allowed, output untouched)
+[TARGET-1s] read of ANOTHER task data file is still judged (omp): 1220 ms, judge requests=1, result=undefined (allowed, output untouched)
+[TARGET-1s] read of an UNTRACKED worktree file is still judged (omp): 1134 ms, judge requests=1, result=undefined (allowed, output untouched)
+[TARGET-1s] read of a MODIFIED tracked worktree file is trusted (omp): 24 ms, judge requests=0, result=undefined (allowed, output untouched)

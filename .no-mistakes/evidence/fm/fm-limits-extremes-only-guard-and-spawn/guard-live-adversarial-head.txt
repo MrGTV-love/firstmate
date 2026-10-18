@@ -1,0 +1,12 @@
+A1 own sqlite db with selector suffix  (expect ALLOWED) => ALLOWED in 642 ms
+A2 arg = own file, host metadata names another task file (expect WITHHELD) => WITHHELD in 24702 ms
+A3 arg = another task file, metadata names own file (expect WITHHELD) => WITHHELD in 24591 ms
+A4 symlink inside own data dir pointing outside (expect WITHHELD) => WITHHELD in 24562 ms
+A5 ../ traversal from own data dir to another task (expect WITHHELD) => WITHHELD in 24547 ms
+A6 own state file state/scout1.status (expect ALLOWED) => ALLOWED in 239 ms
+A7 dotted sibling task state/scout1.sib.status (expect WITHHELD) => WITHHELD in 24570 ms
+A8 own steering inbox state/scout1.inbox/0001.md (expect ALLOWED) => ALLOWED in 171 ms
+A9 untracked file named n*.md (glob lookalike of tracked notes.md) (expect WITHHELD) => WITHHELD in 24566 ms
+A10 tracked 300 KB file in own worktree (expect ALLOWED) => ALLOWED in 109 ms
+A11 bash result whose text claims an own task path (expect WITHHELD) => WITHHELD in 24555 ms
+A12 read result with path claimed only inside text (no meta source) (expect WITHHELD) => WITHHELD in 24549 ms

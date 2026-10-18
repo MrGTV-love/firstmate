@@ -1,0 +1,7 @@
+ok - 402: one alert, repeats suppressed, one recovery note, and a fresh alert after recovery
+ok - 401 and 403 alert as auth failures, and a change of class alerts again
+ok - unreachable and timeout stay internal below the threshold and alert once at it
+ok - a consumer-reported 402, 401, 403, or 200 acts at once and other codes are ignored
+ok - a secondmate home and a keyless home stay silent and make no request
+ok - the key never reaches argv, output, state, wakes, or the environment
+exit=0

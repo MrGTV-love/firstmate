@@ -1,0 +1,4 @@
+node:1: command not found: _nvm_lazy_load
+[TARGET] scout reads its own task file (omp): 1 ms, judge requests=0, result=undefined (allowed, output untouched)
+[TARGET] read of an untrusted file, judge slow (claude): 15332 ms, judge requests=1, result=undefined (allowed, output untouched)
+[TARGET] fixer writes a review request (omp): 15142 ms, judge requests=1, result=undefined (allowed, output untouched)

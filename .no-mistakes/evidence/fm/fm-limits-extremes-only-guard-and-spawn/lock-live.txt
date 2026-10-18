@@ -1,0 +1,4 @@
+HEAD | holder=busy (holds 14s, allowance 4s) | waiter rc=0 after 14.2s | waiter ADMITTED
+HEAD | holder=idle (holds 14s, allowance 4s) | waiter rc=1 after 4.3s | fm-project-lock: stall limit reached for waiter: current holder holder (PID 23072); idle 4s (allowance 4s), CPU telemetry available, uncertainty extreme 1800s; no live holder was removed
+BASE | holder=busy (holds 14s, allowance 4s) | waiter rc=1 after 3.4s | fm-project-lock: stall limit reached for waiter: current holder holder (PID 52482) made no progress for 4s (allowance 4s); no live holder was removed
+BASE | holder=idle (holds 14s, allowance 4s) | waiter rc=1 after 3.7s | fm-project-lock: stall limit reached for waiter: current holder holder (PID 86222) made no progress for 4s (allowance 4s); no live holder was removed

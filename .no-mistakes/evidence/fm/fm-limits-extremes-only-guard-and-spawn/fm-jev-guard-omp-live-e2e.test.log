@@ -1,0 +1,22 @@
+ok - omp (omp/18.12.0): omp: normal/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: normal/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: normal/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: normal/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: privacy/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: credentials/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: provider/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/launch: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/inbox: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/copy: native read and next model context consumed
+ok - omp (omp/18.12.0): omp: audit/changed: native read and next model context consumed
+ok - omp (omp/18.12.0): pre-tool shell judgment answered after 31 seconds decides the call under the worker overlay
+exit=0

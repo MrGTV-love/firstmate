@@ -1,0 +1,105 @@
+HEAD=bc162756e4d7221cfe9bba5ba43f753b288b95ee
+== fm-typesafe-health: 2026-10-18T12:08:29Z load: 28.24 29.88 33.23
+FM_TEST_BEGIN 2026-10-18T12:08:30Z tests/fm-typesafe-health.test.sh family=standalone expected_gate_skip=none
+ok - 402: one alert, repeats suppressed, one recovery note, and a fresh alert after recovery
+ok - 401 and 403 alert as auth failures, and a change of class alerts again
+ok - unreachable and timeout stay internal below the threshold and alert once at it
+ok - a consumer-reported 402, 401, 403, or 200 acts at once and other codes are ignored
+ok - a secondmate home and a keyless home stay silent and make no request
+ok - the key never reaches argv, output, state, wakes, or the environment
+FM_TEST_END 2026-10-18T12:08:45Z tests/fm-typesafe-health.test.sh exit=0 duration_ms=15160 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=15842
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=15160 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-typesafe-health.test.sh duration_ms=15160
+fm-typesafe-health exit=0
+== fm-project-capacity: 2026-10-18T12:08:46Z load: 26.60 29.45 33.02
+FM_TEST_BEGIN 2026-10-18T12:08:46Z tests/fm-project-capacity.test.sh family=backend-dispatch expected_gate_skip=none
+ok - Linux ps fallback sums CPU and unavailable telemetry reaches the absolute extreme without removing the holder
+ok - a falling live-tree CPU total lowers the baseline, so later growth still counts as progress
+ok - a fresh spawn fetches its base before it queues, writes no shared ref outside custody, and cleans up its private ref
+ok - the locked base refresh uses the fetched commit and needs no network
+ok - a queued spawn starts from its own fetched tip without rewinding newer shared origin refs
+ok - a spawn follows a renamed remote default branch and repoints origin/HEAD
+ok - task ids that are not ref names still launch and clean up their private base refs
+ok - a project with no declared capacity keeps today's uncapped dispatch
+ok - a spawn is admitted while its project still has a free place
+ok - a spawn beyond capacity is deferred before any record, brief, endpoint, worktree, or backlog move exists
+ok - a project name with spaces is declared by taking the capacity from the last field
+ok - a project name beginning with # is declared, and a # comment stays a comment
+ok - a home reached through a symlink counts each of its workers once
+ok - a recorded PR handoff or a cleanup each frees exactly one place
+ok - a restart of a task id does not count that task's own record
+ok - only this project's ship and scout records hold places
+ok - every local home shares one declared capacity per project origin, and remote homes do not count
+ok - an unreadable state directory or task record refuses admission rather than undercounting
+ok - concurrent spawns can never both take the last place
+ok - spawn proceeds during slow process cleanup, clone sync and backlog completion while the retiring slot stays reserved until return
+ok - a forced child return queues for project custody after closure and returns the reserved slot
+ok - forced child cleanup keeps project custody only when the installed Treehouse cannot reserve the slot
+ok - a refused forced child return keeps its reserved slot and records, and the retry returns the slot
+ok - a refused forced child return without a reservation falls back to guarded removal and finishes cleanup
+ok - a refused forced child return keeps only the slot this teardown leased, whatever its siblings did, and the retry returns it
+ok - a fresh same-ID spawn refuses at task admission during a slow teardown, so pool return still progresses
+ok - spawn and teardown remain FIFO and a slow poller cannot starve behind a faster later spawn
+ok - a same-home spawn for another project launches while one spawn waits for its project
+ok - dead queued waiters are skipped and dead project holders are reclaimed without bypassing a live holder
+ok - bounded waiting identifies and preserves the live holder and removes its own expired ticket
+ok - a holder with ongoing progress can exceed the idle allowance without canceling queued work
+ok - a stalled holder refuses its waiters together, so a later waiter never goes ahead of an earlier one
+ok - an earlier waiter leaving the queue neither restarts a stalled holder's idle clock nor its telemetry-uncertainty extreme
+ok - a queue that keeps progressing admits every waiter in order and records each hold
+ok - nonwaiting admission refuses while the lock is held or an older waiter is queued
+ok - nonwaiting admission returns the busy status only for a live holder, and an error for a lock nobody holds
+ok - a departed waiter's reused PID does not reserve the queue for an unrelated live process
+ok - an observed steal-mutex contention remains transient when another reclaimer releases or renames its owner
+ok - invalid overrides and registration failures refuse before queueing, each with its own class
+ok - concurrent recursive cleanup with reversed child project order tries globally sorted project locks once and completes both homes
+ok - a spawn that fails after admission leaves no record and holds no place
+ok - an unreadable declaration refuses every fresh spawn rather than guessing the limit
+ok - a batch reports a capacity deferral as deferred, not failed
+ok - an Orca spawn takes the shared project lock whenever a same-origin clone is capped and defers before creating anything
+FM_TEST_END 2026-10-18T12:15:03Z tests/fm-project-capacity.test.sh exit=0 duration_ms=376768 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=377420
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=376768 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-project-capacity.test.sh duration_ms=376768
+fm-project-capacity exit=0
+== fm-spawn-worktree-settle: 2026-10-18T12:15:03Z load: 31.10 27.07 30.21
+FM_TEST_BEGIN 2026-10-18T12:15:04Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none
+ok - a single transient stale pane_current_path read is not accepted as the worktree
+ok - an already-settled pane confirms on the next read, not a whole extra cycle
+ok - a transient primary-checkout pane read is not accepted as the worktree
+ok - a pane stuck on the primary checkout fails loudly at the deadline
+ok - a get with changing output keeps waiting beyond ten minutes of scaled total time
+ok - output activity cannot keep an acquisition alive beyond the absolute extreme
+# all fm-spawn-worktree-settle tests passed
+FM_TEST_END 2026-10-18T12:15:39Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=34892 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=35411
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=34892 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=34892
+fm-spawn-worktree-settle exit=0
+== fm-jev-guard: 2026-10-18T12:15:39Z load: 34.62 28.24 30.50
+FM_TEST_BEGIN 2026-10-18T12:15:39Z tests/fm-jev-guard.test.sh family=unclassified expected_gate_skip=none
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline
+ok - task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible
+ok - oversized payloads are screened in complete pieces: benign allowed, any blocked or unscreenable piece blocks, uncoverable and never-send payloads send nothing, deadlines hold
+ok - Claude hooks screen oversized writes and results in pieces end to end
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+FM_TEST_END 2026-10-18T12:22:34Z tests/fm-jev-guard.test.sh exit=0 duration_ms=414038 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=414768
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=414038 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-jev-guard.test.sh duration_ms=414038
+fm-jev-guard exit=0
+ALL_DONE
