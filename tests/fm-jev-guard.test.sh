@@ -787,8 +787,10 @@ for (const host of ['omp', 'claude']) {
     }
     const expectedReceipt = format === 'pre-receipt' ? undefined : readFileSync(receiptPath, 'utf8');
     legacyHandlers.before_agent_start({ prompt: currentBell });
-    const screened = await legacyHandlers.tool_result(event(legacy), ctx);
-    legacyReads.push([legacyHandlers, event(legacy)]);
+    const candidate = event(legacy);
+    if (host === 'claude') candidate.input.path = legacy;
+    const screened = await legacyHandlers.tool_result(candidate, ctx);
+    legacyReads.push([legacyHandlers, candidate]);
     assert.equal(screened, undefined, `${host} ${format} home state remains visible without claiming consistency`);
     assert.equal(count(), before, 'own inbox admission does not invoke a judge');
     if (expectedReceipt === undefined) {
