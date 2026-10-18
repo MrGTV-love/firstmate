@@ -228,11 +228,14 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   [ "$MODE" != success ] || DEST=$CLEAN
   [ "$MODE" != late ] || DEST=$LATE
   GET_MODE=$MODE
-  TICK_SECONDS=60
+  # A get that must arrive keeps the real clock, so a slow host cannot spend its
+  # 600s no-progress allowance in a few polls. Only cases that must reach the limit scale it.
+  TICK_SECONDS=
   TTY_STALL=
   case "$MODE" in
+    slow|spawning|earlyexit) TICK_SECONDS=60 ;;
     clock) GET_MODE=slow; TICK_SECONDS=180 ;;
-    gone) GET_MODE=exits ;;
+    gone) GET_MODE=exits; TICK_SECONDS=60 ;;
     late) TICK_SECONDS=3; TTY_STALL=1.5 ;;
     laterexit) TICK_SECONDS=3 ;;
   esac
