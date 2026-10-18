@@ -1137,7 +1137,7 @@ test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections() {
     assert_grep "Mandatory items are pass or fail and release-blocking" "$brief" "$id: brief missing the mandatory rule"
     assert_grep "Supporting items earn partial credit and never offset a failed mandatory item" "$brief" \
       "$id: brief missing the supporting rule"
-    assert_grep 'Your `done:` status line is a signal to start checking, not a pass' "$brief" \
+    assert_grep "Your \`done:\` status line is a signal to start checking, not a pass" "$brief" \
       "$id: brief does not say what a done: line means"
     contract=$(grep -nxF '# Definition of done' "$brief" | head -n 1 | cut -d: -f1)
     task=$(grep -nxF '## Definition Of Done (task)' "$brief" | head -n 1 | cut -d: -f1)
