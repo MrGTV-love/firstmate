@@ -1117,6 +1117,77 @@ SH
   pass "Windows emulation exempts only synthetic POSIX modes"
 }
 
+# Native Windows Python cannot start bin/fm-duration.py run (it has no POSIX
+# process groups), so plain --changed must run the selected scripts itself on a
+# Windows bash host instead of routing each one through that runner. The fixture
+# helper refuses `run` the way that Python does and hands every other subcommand
+# to the real helper, and a fake uname emulates the host. The same fixture on a
+# POSIX host still sends every script through the progress runner, so the guard
+# is gone only where the runner cannot exist.
+test_changed_runs_unguarded_on_native_windows_bash() {
+  local tmp repo fakebin script out rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-windows-guard.XXXXXX")
+  repo="$tmp/repo"
+  fakebin="$tmp/fakebin"
+  init_changed_fixture_repo "$repo"
+  mkdir -p "$fakebin"
+  cat >"$fakebin/uname" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${FAKE_UNAME:-MINGW64_NT-10.0}"
+SH
+  chmod +x "$fakebin/uname"
+  cat >"$repo/bin/fm-duration.py" <<'PY'
+import os, sys
+if sys.argv[1:2] == ['run']:
+    with open(os.environ['FM_TEST_RUN_LOG'], 'a') as log:
+        log.write(' '.join(sys.argv[1:3]) + '\n')
+    sys.exit('error: progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
+os.execv(sys.executable, [sys.executable, os.environ['FM_TEST_REAL_DURATION'], *sys.argv[1:]])
+PY
+  for script in fm-daemon.test.sh fm-pi-watch-extension.test.sh; do
+    printf '#!/usr/bin/env bash\n: >"%s/ran.%s"\necho "ok - windows guard fixture"\n' \
+      "$tmp" "$script" >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  git -C "$repo" add .
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
+  printf '\n' >>"$repo/bin/shared-probe-lib.sh"
+
+  : >"$tmp/run.log"
+  set +e
+  out=$(cd "$repo" && PATH="$fakebin:$PATH" FM_DURATION_FILE="$tmp/durations.jsonl" \
+    FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
+    bin/fm-test-run.sh --changed --base HEAD 2>&1)
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "plain --changed on an emulated native Windows bash: $out"
+  for script in fm-daemon.test.sh fm-pi-watch-extension.test.sh; do
+    [ -e "$tmp/ran.$script" ] || fail "$script was not run on the emulated Windows host: $out"
+    grep -Fq "tests/$script exit=0 " <<<"$out" \
+      || fail "$script did not finish green on the emulated Windows host: $out"
+  done
+  [ ! -s "$tmp/run.log" ] \
+    || fail "the Windows host still routed scripts through the progress runner: $(cat "$tmp/run.log")"
+  assert_contains "$out" "failed=0" "the emulated Windows run did not report every script green"
+
+  rm -f "$tmp"/ran.*
+  : >"$tmp/run.log"
+  set +e
+  out=$(cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
+    FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
+    bin/fm-test-run.sh --changed --base HEAD 2>&1)
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "plain --changed on a POSIX host keeps the progress runner: $out"
+  assert_contains "$(cat "$tmp/run.log")" "run test.tests/fm-daemon.test.sh" \
+    "a POSIX host did not send the changed script through the progress runner"
+  [ ! -e "$tmp/ran.fm-daemon.test.sh" ] \
+    || fail "the refusing progress runner still let a guarded script run: $out"
+
+  rm -rf "$tmp"
+  pass "plain --changed runs unguarded on native Windows bash and stays guarded on POSIX"
+}
+
 # A local verification round names the subjects it cares about. Exercise begin/end
 # markers from real fixture processes to prove that a plain list of script paths
 # gets bounded automatic scheduling without changing its per-script timeout
@@ -2874,6 +2945,7 @@ test_changed_uses_bounded_automatic_concurrency
 test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene
 test_changed_parallel_guard_counts_low_cpu_script_output_as_progress
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs
+test_changed_runs_unguarded_on_native_windows_bash
 test_script_list_uses_bounded_automatic_concurrency
 test_family_proofs_run_in_separate_concurrent_phases
 test_empty_selection_emits_summary

@@ -82,8 +82,10 @@
 #                   progress guard with no fixed duration: a script stops only
 #                   after 15 minutes with no output and no process-tree CPU
 #                   progress, or at 6 hours, so a healthy but slow suite keeps
-#                   running and only a wedged one fails. --max-wall-ms is
-#                   checked after the run and so cannot catch a hang on its own.
+#                   running and only a wedged one fails. A native Windows bash
+#                   has no POSIX progress runner and runs it unguarded.
+#                   --max-wall-ms is checked after the run and so cannot catch
+#                   a hang on its own.
 #                   HUP, INT and TERM remove this runner's scratch directory
 #                   before it exits; configured per-script bounds remain authoritative.
 #   --max-wall-ms N fail the run when its measured invocation wall clock exceeds
@@ -2673,7 +2675,7 @@ if [ "${FM_TEST_KEY_SLOTS-}" = 0 ] || [ ! -r "$ROOT/bin/fm-duration.py" ] \
   TEST_SLOT_ACTIVE=0
 fi
 case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*) TEST_SLOT_ACTIVE=0 ;;
+  MINGW*|MSYS*|CYGWIN*) TEST_SLOT_ACTIVE=0; PROGRESS_GUARD=0 ;;
 esac
 PROC_BUDGET_ACTIVE=1
 if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
