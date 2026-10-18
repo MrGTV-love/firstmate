@@ -46,6 +46,7 @@
 # with a trailing `run-store: skipped (read budget exceeded)` component. No
 # partially read run can override that declaration, and a missing declaration
 # remains unknown. Snapshot/ledger readers preserve this partial-read marker.
+# The run-store budget ends before separately bounded forge-only enrichment.
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
@@ -257,6 +258,14 @@ nm_budget_fallback_if_expired() {
     emit "$state" status-log "$(status_line_note "$LOG_LINE")"
   fi
   emit unknown none "run-store skipped; no status declaration available"
+}
+
+# Call in the parent shell after the last store lookup, before forge-only
+# enrichment or other independently bounded evidence. Clearing it inside a
+# command substitution would leave emit's parent deadline armed.
+nm_finish_store_read() {
+  nm_budget_fallback_if_expired
+  unset FM_NM_READ_DEADLINE
 }
 
 # Emit the one canonical line and exit 0. Detail is optional.
@@ -887,6 +896,7 @@ EOF
 # prove current PR disposition: a subsequent close can itself end the monitor.
 nm_reclassify_failed_run_as_held_green() {
   nm_failed_run_is_green_held_ci || return 1
+  nm_finish_store_read
   local disposition pr_url
   disposition=$(passed_pr_detail)
   case "$disposition" in
@@ -1249,8 +1259,12 @@ if [ "$HAVE_RUN" = 1 ]; then
 
     if [ -n "$outcome" ]; then
       case "$outcome" in
-        passed|passed-with-override) RUN_STATE="done"; RUN_DETAIL=$(passed_pr_detail) ;;
-        passed-with-skips) RUN_STATE="done"; RUN_DETAIL="$(passed_pr_detail) (publication/CI verification skipped)" ;;
+        passed|passed-with-override|passed-with-skips)
+          nm_finish_store_read
+          RUN_STATE="done"
+          RUN_DETAIL=$(passed_pr_detail)
+          [ "$outcome" != passed-with-skips ] || RUN_DETAIL="$RUN_DETAIL (publication/CI verification skipped)"
+          ;;
         checks-passed) RUN_STATE="done"; RUN_DETAIL="checks green: PR ready for review" ;;
         failed)
           if nm_reclassify_failed_run_as_held_green; then :; else
@@ -1320,6 +1334,7 @@ if [ "$HAVE_RUN" = 1 ]; then
 
   if [ "$RUN_STATE" = working ] && log_reports_ci_ready; then
     if [ "$RUN_SOURCE" = coarse ]; then
+      nm_finish_store_read
       emit_ship_status_done "run still monitoring PR"
     fi
     [ -n "$CI_STEP_STATUS" ] || CI_STEP_STATUS=$(nm_effective_ci_step_status)
@@ -1331,9 +1346,12 @@ if [ "$HAVE_RUN" = 1 ]; then
       CI_LOG_STATE=not-ready
     fi
     if [ "$CI_LOG_STATE" != not-ready ]; then
+      nm_finish_store_read
       emit_ship_status_done "run still monitoring PR"
     fi
   fi
+
+  nm_finish_store_read
 
   # Reconcile the status log. A needs-decision/blocked log line that the run-step
   # has moved past (anything but a genuinely parked run) is deterministically
