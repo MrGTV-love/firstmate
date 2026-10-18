@@ -235,13 +235,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         for (;;) {
           tries++;
           try {
-            const result = await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
-            if (tries > 1) {
-              // Client metadata covers only its final call; earlier guard tries still consumed time and may have cost.
-              result.meta.attempts += tries - 1;
-              result.meta.elapsedMs = Math.round(performance.now() - started);
-            }
-            return result;
+            return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
           } catch (cause) {
             const backoff = budget.backoffMs * tries;
             if (tries >= budget.tries || !mayRetry(cause, backoff)) throw cause;
@@ -281,7 +275,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       const attempts = [...answered.map((r) => r.meta.attempts), ...sentFailures.flatMap((failure) => failure.attempts ?? [])];
       const times = [...answered.map((r) => r.meta.elapsedMs), ...sentFailures.flatMap((failure) => failure.ms ?? [])];
       const knownCost = totalCost(answered);
-      const incomplete = requestStarted && (answered.length < plannedChunks || attempts.some((count) => count > 1) || knownCost.source !== "reported");
+      const incomplete = requestStarted && (answered.length < plannedChunks || knownCost.source !== "reported");
       const cost = {
         ...(incomplete ? { amount: null, source: "unknown" } : requestStarted ? knownCost : { amount: null, source: "not_called" }),
         incomplete,

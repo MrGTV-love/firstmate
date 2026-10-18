@@ -225,7 +225,7 @@ function settle<D>(parts: Part<D>[], stops: (decision: D) => boolean, risk: (dec
     request_started: part.failure instanceof GuardUnavailableError && part.failure.requestStarted,
     ...failureTiming(part.failure),
   }] : []);
-  const trail: Trail = { chunks: parts.length, results, failures };
+  const trail: Trail = { chunks: parts.filter((part) => part.result || "failure" in part).length, results, failures };
   const judged = parts.flatMap((part, index) => ("decision" in part ? [{ part: index, result: part.result, decision: part.decision }] : []));
   const stopped = judged.find((piece) => stops(piece.decision));
   if (stopped) return { ...stopped, of: parts.length, trail };

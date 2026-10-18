@@ -2306,11 +2306,11 @@ Complete successful `SystemOneResult` objects, including raw exchanges and provi
 The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
-A row that holds a provider answer keeps the client's `attempts` and `ms`, including any earlier guard-level failed tries and their backoff before a later answer, whether the call succeeded or the answer was then rejected as invalid.
-A payload screened in pieces records `planned_chunks` separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
+A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
+A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer (a blank piece needs none and is not counted), separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
 Its usage totals every answered piece, its attempts include every answered and failed piece, and `ms` is the longest elapsed time because pieces run concurrently.
 The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.
-Cost is complete and reported only when every planned piece answered with a reported charge and no additional attempts have unreported charges; otherwise the total is unknown with `incomplete: true`, while `reported_amount` retains the known reported subtotal rather than hiding it or claiming it covers the whole payload.
+Cost is complete and reported only when every planned piece answered with a reported charge; otherwise the total is unknown with `incomplete: true`, while `reported_amount` retains the known reported subtotal rather than hiding it or claiming it covers the whole payload.
 `tests/fm-jev-guard-audit.test.sh` exercises settlement and these accounting boundaries offline, including multiple failures and unsent pieces.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
 Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
