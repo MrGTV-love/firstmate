@@ -225,6 +225,8 @@ test_primary_checkout_that_never_settles_fails_at_the_deadline() {
   [ "$status" -ne 0 ] || fail "spawn accepted a pane that never left the primary checkout"$'\n'"$out"
   assert_contains "$out" "did not enter an isolated worktree" \
     "spawn did not explain that the pane never reached an isolated worktree"
+  assert_contains "$out" "no path or output progress for 600s" \
+    "spawn did not name the no-progress limit that ended the wait"
   assert_contains "$out" "$STALE_DIR" \
     "the refusal did not name the path the pane kept reporting"
   assert_contains "$out" "repository's primary checkout" \
@@ -255,6 +257,10 @@ test_progress_cannot_outlast_absolute_extreme() {
   out=$(FM_FAKE_OUTPUT_PROGRESS=1 run_settle_spawn "$id")
   status=$?
   [ "$status" -ne 0 ] || fail "endlessly changing output bypassed the absolute extreme"
+  assert_contains "$out" "absolute extreme 1800s reached" \
+    "spawn did not name the absolute extreme that ended the runaway wait"
+  assert_not_contains "$out" "no path or output progress" \
+    "ongoing output was counted as a stall"
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "runaway acquisition published metadata"
   pass "output activity cannot keep an acquisition alive beyond the absolute extreme"
 }

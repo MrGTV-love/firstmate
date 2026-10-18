@@ -2146,7 +2146,8 @@ omp captures native `before_agent_start` prompts in memory; Claude captures nati
 Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no channel-consistency exception.
 The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
 Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases do not gain channel consistency and still receive ordinary result screening.
-Separately, a native `read` of a regular file is admitted immediately when its real target is under the task's own data directory, its own `state/<task>.*` files or inbox, or a git-tracked file in its own worktree, including modified tracked files.
+Separately, a native `read` of a regular file is admitted immediately when its real target is under the task's own data directory, its own `state/<task>.<name>` files or inbox, or a git-tracked file in its own worktree, including modified tracked files.
+A task's own state file has a single name segment after `<task>.`; task IDs may contain dots, so a longer name, such as `state/a.b.status` read by task `a`, could belong to task `a.b` and stays judged.
 Other tasks' data and state, untracked worktree files, and symlink targets outside those roots remain judged.
 Native omp source metadata must agree with the actual read argument, including numeric and database selectors; paths claimed inside result text grant nothing.
 Trusted reads bypass the judge entirely, including for oversized content, and record decision `clear`, branch `trusted_read`, result-pass enforcement, no request started and null error type.
@@ -2209,17 +2210,22 @@ The service uses the canonical shared Jev client, pinned to the calibrated model
 It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
 The client retains its existing internal retry behavior; service budgets include those retries and response bodies.
-Claude allows up to three 90-second service tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget.
-omp allows up to two 12-second service tries with 500 ms backoff inside a shared 25-second decision budget.
+Claude, and omp's pre-tool shell and write judgments, allow up to three 90-second service tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget.
+omp's result screening allows up to two 12-second service tries with 500 ms backoff inside a shared 25-second decision budget.
 Retries follow only a plain provider `Error`, `TimeoutError` or network `TypeError`.
-Claude reserves a complete further try and backoff before retrying; omp's second try uses only the time remaining in its strict 25-second handler budget after backoff and local preflight.
+The 300-second budget reserves a complete further try and backoff before retrying; omp's result second try uses only the time remaining in its strict 25-second handler budget after backoff and local preflight.
 The service never retries a flagged, ambiguous or policy-blocked answer, malformed response (`ContractError`), privacy, credential or oversize refusal, or handler cancellation.
-The Claude floor exceeds ten times the observed answered-call p99 at both documented lower load (276 ms, 55 calls) and high load (2,235 ms, 178 calls); answered-call measurements are censored by the previous timeout and do not establish the latency of unanswered calls.
+The 90-second per-try limit protects only against a judge that never answers; it is not derived from answered-call latency, which was far lower (the tracked 99th percentile of 535 ms over 15,640 answered calls under Unreachable threshold in [TypeSafe account health](#typesafe-account-health)), and answered-call measurements are censored by the previous timeout and do not establish the latency of unanswered calls.
 Claude's host hook envelope uses `fm-duration.py limit` with a 330-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
 Installed omp 18.12.0 has a separate nonconfigurable 30-second result-handler deadline that forwards original output if an extension times out.
-Its 25-second guard budget must therefore remain below that native deadline; extending only `toolCallTimeoutMs` cannot protect results, and no timeout configuration overlay is installed.
+Its 25-second result budget must therefore remain below that native deadline; extending `extensionHandlers.toolCallTimeoutMs` cannot protect results.
+That setting is the pre-tool deadline, 30 seconds by default, and omp refuses the call when a `tool_call` handler outlasts it (measured on 18.12.0: the host logged `handler timed out after 30000ms` and returned an extension timeout instead of running the tool).
+[`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) raises it to 330 seconds, above the 300-second pre-tool budget, for worker launches through the existing per-launch `--config` overlay; no global or user omp setting is changed.
+A raw launch that omits the overlay keeps the 30-second default, so a pre-tool judgment slower than that is refused by the host rather than reviewed; that failure stays closed.
 After any outage that exhausts the decision budget or consumes at least one full per-try timeout of elapsed judge time, a home-local durable breaker skips judge requests for 60 seconds while preserving ordinary outage handling and pre-tool denial, regardless of whether the final error type is `TimeoutError`, `TypeError` or `Error`.
 Three such exhausted decisions within 15 minutes notify the existing TypeSafe health channel once; skipped cooldown calls do not count as new exhausted budgets, and ordinary health recovery clears alert deduplication.
+A call refused by the cooldown gets its own notice, not the outage advice: it names the seconds left, tells the worker to wait that long and run the same call once more (repeat the read for an omp result; a command only if repeating it is safe), and to stop and tell the user only if the call is refused the same way after the wait.
+Its ledger row records the type `CooldownActiveError` with no request started, so a cooldown skip is never counted as a judge timeout and never extends the cooldown.
 This is not sustained-outage permission to execute shell commands or write files.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.

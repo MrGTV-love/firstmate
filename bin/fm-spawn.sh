@@ -325,6 +325,8 @@
 #   reports a differing model or an unrecovered run error beside the state.
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
+#   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
+#   300-second shell and write judgment budget (docs/configuration.md "Jev guard").
 #   Workers also enable eager native account rotation without waiting for usage
 #   resets and receive a task-owned --config overlay permitting only declared
 #   OMP model fallbacks, with an empty default chain so ambient role chains
@@ -5019,7 +5021,8 @@ spawn_acquisition_output() { # <target>
 # running (any foreground process is `treehouse get`), idle (only shells), or
 # unknown (the backend cannot say, the read failed, or a non-shell helper is
 # the only thing listed). zellij and cmux expose no foreground process, so they
-# always read unknown; path/output progress still governs their wait.
+# always read unknown. Only the minute waiting line reads this; path/output
+# progress governs the wait.
 spawn_get_state() { # <target>
   local lines line first shells=0 other=0
   case "$BACKEND" in
@@ -5527,7 +5530,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # as the transient it is and the wait continues, instead of being adopted and
   # then refused by the guard.
   # A candidate the screen rejects is never adopted, so a host where the pane
-  # never reaches an isolated worktree spends the whole window before refusing.
+  # never reaches an isolated worktree waits out the no-progress limit before refusing.
   # That wait is deliberate - telling a transient apart from a terminal
   # misconfiguration would need machinery this path does not want - so the
   # refusal has to be self-explaining instead: carry the last path seen and the
@@ -5554,12 +5557,6 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   tick=0
   while :; do
     tick=$((tick + 1))
-    # Read the foreground before the path. `treehouse get` moves the pane into
-    # the worktree and then hands the foreground to its subshell, so an idle read
-    # taken after a stale path read could come from a get that arrived in
-    # between, and would end the wait on a path that is already out of date.
-    # Read first, an idle foreground means the path read that follows is final.
-    state=$(spawn_get_state "$WT_TARGET")
     p=$(spawn_current_path "$WT_TARGET" || true)
     if [ -n "$p" ] && [ "$p" != "$last_seen" ]; then
       acquire_progress=$SECONDS
@@ -5593,6 +5590,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       break
     fi
     if [ "$SECONDS" -ge "$acquire_next_notice" ]; then
+      state=$(spawn_get_state "$WT_TARGET")
       echo "waiting: treehouse get to enter an isolated worktree; foreground $state; elapsed $((SECONDS - acquire_start))s; no path/output progress for $((SECONDS - acquire_progress))s; last path '${last_seen:-none}' ($last_reason)" >&2
       acquire_next_notice=$((SECONDS + acquire_notice))
     fi

@@ -230,7 +230,7 @@ fm_project_lock_acquire() {  # <lock> <operation>
       next_sample=$((SECONDS + sample_interval))
       if cpu=$(fm_project_lock_cpu "$holder"); then
         telemetry=available
-        if [ -z "$last_cpu" ]; then
+        if [ -z "$last_cpu" ] || [ "$cpu" -lt "$last_cpu" ]; then
           last_cpu=$cpu
         elif [ "$cpu" -ge $((last_cpu + 100)) ]; then
           since=$SECONDS

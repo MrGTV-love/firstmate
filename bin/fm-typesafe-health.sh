@@ -226,7 +226,8 @@ observe() {
       esac
       if [ -n "$payload" ]; then
         fm_wake_append check "typesafe-health-$class" "$payload" || { fm_lock_release "$HEALTH_LOCK"; return 1; }
-        S_ALERTED=$class S_ALERTED_SINCE=${S_SINCE:-$now}
+        S_ALERTED=$class
+        if [ "$source" = jev-guard ] && [ "$class" = unreachable ]; then S_ALERTED_SINCE=${S_GUARD_OUTAGES%% *}; else S_ALERTED_SINCE=${S_SINCE:-$now}; fi
       fi
       ;;
   esac

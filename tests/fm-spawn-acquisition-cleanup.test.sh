@@ -266,6 +266,8 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   case "$MODE" in
     slow|spawning|earlyexit|laterexit|clock|gone)
       assert_contains "$out" 'treehouse get did not enter an isolated worktree' 'missing acquisition refusal'
+      assert_contains "$out" 'no path or output progress for 600s' 'the refusal did not name the no-progress limit'
+      assert_not_contains "$out" 'absolute extreme' 'a stalled get was ended by the absolute extreme instead of the no-progress limit'
       assert_contains "$out" 'aborting acquisition' 'missing explicit acquisition abort'
       [ ! -e "$FM_HOME/state/$ID.meta" ] || fail 'an unacquired spawn published task metadata'
       ;;

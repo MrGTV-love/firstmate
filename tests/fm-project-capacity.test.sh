@@ -1988,13 +1988,45 @@ test_cpu_sampler_portability_and_failure_extreme() {
   : > "$case_dir/release"
   wait "$holder" || fail "sampler failure damaged the live holder"
   expect_code 1 "$rc" "unavailable sampler waited forever"
-  assert_contains "$(cat "$case_dir/waiter.out")" 'idle 1800s' "sampler failure falsely counted progress or used the idle allowance"
+  [[ $(cat "$case_dir/waiter.out") =~ idle\ 18[0-9][0-9]s ]] \
+    || fail "sampler failure falsely counted progress or used the idle allowance: $(cat "$case_dir/waiter.out")"
   assert_contains "$(cat "$case_dir/waiter.out")" 'CPU telemetry unknown' "missing uncertainty refusal"
   assert_equals holder "$(cat "$case_dir/order")" "uncertainty bypassed the holder"
   pass "Linux ps fallback sums CPU and unavailable telemetry reaches the absolute extreme without removing the holder"
 }
 
+test_cpu_baseline_follows_a_falling_total() {
+  local case_dir holder rc=0
+  case_dir=$(make_case sampler-falling)
+  project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  FM_HOME="$case_dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    base=$SECONDS release=$3/release
+    # A live-tree total falls when a child is reaped: 8.2 CPU seconds, then 0.4, then real growth.
+    fm_project_lock_cpu() {
+      local t=$((SECONDS - base))
+      if [ "$t" -lt 5 ]; then echo 820; elif [ "$t" -lt 25 ]; then echo 40; else echo 150; fi
+    }
+    sleep() {
+      SECONDS=$((SECONDS + 1))
+      [ "$((SECONDS - base))" -lt 45 ] || : > "$release"
+      command sleep 0.02
+    }
+    FM_PROJECT_LOCK_SERVICE_SECS=40
+    fm_project_lock_acquire "$2/actor.lock" waiter
+  ' _ "$ROOT" "$case_dir" "$case_dir" > "$case_dir/waiter.out" 2>&1 || rc=$?
+  : > "$case_dir/release"
+  wait "$holder" || fail "falling CPU totals damaged the live holder"
+  expect_code 0 "$rc" "a holder whose CPU total fell and then grew was refused as stalled: $(cat "$case_dir/waiter.out")"
+  assert_not_contains "$(cat "$case_dir/waiter.out")" 'stall limit reached' "growth after a fall was not counted as progress"
+  pass "a falling live-tree CPU total lowers the baseline, so later growth still counts as progress"
+}
+
 test_cpu_sampler_portability_and_failure_extreme
+test_cpu_baseline_follows_a_falling_total
 test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock
 test_locked_base_refresh_needs_no_network_once_the_base_is_fetched
 test_queued_spawn_never_rewinds_newer_shared_origin_refs

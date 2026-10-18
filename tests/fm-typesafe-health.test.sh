@@ -200,6 +200,20 @@ health "$HOME_G" 000 record 000 jev-guard >/dev/null
 assert_equals 1 "$(wakes "$HOME_G")" "repeated guard outages remain deduplicated"
 health "$HOME_G" 200 record 200 dispatch-resolve >/dev/null
 assert_equals 1 "$(wakes "$HOME_G" typesafe-health-recovered)" "normal health recovery clears a guard alert"
+# A guard episode starts when its own budgets ran out, not when the home last became healthy.
+HOME_G3=$(new_home guard-after-healthy-history)
+healthy_since=$(( $(date +%s) - 259200 ))
+printf 'status=ok\nsince=%s\nlast_ok=%s\n' "$healthy_since" "$healthy_since" > "$HOME_G3/state/.typesafe-health"
+for _ in 1 2 3; do health "$HOME_G3" 000 record 000 jev-guard >/dev/null; done
+assert_equals 1 "$(wakes "$HOME_G3" typesafe-health-unreachable)" "guard exhaustion alerts in a home with healthy history"
+alerted_since=$(state_field "$HOME_G3" alerted_since)
+[ -n "$alerted_since" ] && [ "$alerted_since" -ge "$(( $(date +%s) - 120 ))" ] \
+  || fail "the guard alert took the healthy-since stamp $alerted_since instead of its own episode start"
+assert_equals "$healthy_since" "$(state_field "$HOME_G3" since)" "guard observations must not rewrite the probe-owned healthy-since stamp"
+health "$HOME_G3" 200 record 200 dispatch-resolve >/dev/null
+recovered=$(wake_payloads "$HOME_G3" | grep 'typesafe-health: recovered')
+assert_contains "$recovered" 'after 0m' "the recovered note reports the guard episode, not days of healthy history"
+assert_not_contains "$recovered" '72h' "the recovered note counted the healthy history as outage time"
 HOME_G2=$(new_home guard-old-outages)
 health "$HOME_G2" 000 record 000 jev-guard >/dev/null
 old=$(( $(date +%s) - 901 ))

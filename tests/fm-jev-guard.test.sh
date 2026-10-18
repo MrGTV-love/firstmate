@@ -29,7 +29,7 @@ const server = createServer((req, res) => {
       if (!seen.has(text)) { seen.add(text); return; }
       req.socket.destroy(); return;
     }
-    if (text.includes('slow502')) { setTimeout(() => { res.statusCode = 502; res.end('{}'); }, 6500); return; }
+    if (text.includes('slow502')) { setTimeout(() => { res.statusCode = 502; res.end('{}'); }, 2500); return; }
     if (text.includes('fail500') || text.includes('http402')) { res.statusCode = text.includes('http402') ? 402 : 500; res.end('{}'); return; }
     if (text.includes('flaky-once') && !seen.has(text)) { seen.add(text); res.statusCode = 500; res.end('{}'); return; }
     if (text.includes('stall-direct')) return;
@@ -512,24 +512,53 @@ test_deadlines() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const { createGuardService, failureTiming, failureType, withDecisionBudget } = await import(pathToFileURL(process.env.REPORT));
+const { SCREEN_QUESTIONS } = await import(new URL('../src/levels/level06/index.ts', pathToFileURL(process.env.REPORT)));
 const home = process.env.HOME_DIR;
-const handlers = {};
-installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'deadline', host: 'claude', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
-async function beforeHostDeadline(name, event) {
+function install(task, host) {
+  const handlers = {};
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task, host, worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+  return handlers;
+}
+const claude = install('deadline', 'claude');
+const omp = install('deadline-omp', 'omp');
+// The Claude hook envelope and the raised omp tool_call deadline are 330 seconds; the omp tool_result deadline is 30.
+async function beforeHostDeadline(handlers, name, event, limitMs) {
   let timer;
   try {
-    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('330-second hook envelope exceeded')), 330000); })]);
+    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${limitMs} ms host deadline exceeded`)), limitMs); })]);
   } finally { clearTimeout(timer); }
 }
+// Preflight can consume most of a decision budget; the request that starts then runs out of budget before its own try does.
+const exhaustedState = `${home}/state-exhausted`;
+mkdirSync(exhaustedState, { recursive: true });
+const exhaustedService = createGuardService({ home, config: `${home}/config`, state: exhaustedState, task: 'deadline-exhausted', project: 'firstmate', host: 'omp' });
+async function exhaustedAfterPreflight() {
+  const error = await withDecisionBudget(async () => {
+    await sleep(14000);
+    try { await exhaustedService.decide({ tool: 'bash', source_role: 'tool_result', content: 'stall-direct exhausted' }, SCREEN_QUESTIONS); } catch (cause) { return cause; }
+  }, 'tool_result', 'omp');
+  exhaustedService.record({ hook: 'tool_result', tool: 'bash', decision: 'review', enforcement: 'omp_replace', branch: 'outage',
+    error_type: failureType(error), request_started: true, ...failureTiming(error) });
+  let cooldownUntil = 0;
+  try { cooldownUntil = Number(readFileSync(`${exhaustedState}/.jev-guard-breaker`, 'utf8')); } catch { /* No cooldown was started. */ }
+  return { error, cooldownUntil, recordedAt: Date.now() };
+}
 const started = performance.now();
-const [slowCall, slowResult, pre, post] = await Promise.all([
-  beforeHostDeadline('tool_call', { toolName: 'bash', input: { command: 'late-answer' } }),
-  beforeHostDeadline('tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer' }] }),
-  beforeHostDeadline('tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }),
-  beforeHostDeadline('tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }),
+const [slowCall, slowResult, pre, post, ompSlowCall, ompSlowResult, ompPre, ompPost, exhausted] = await Promise.all([
+  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
+  beforeHostDeadline(claude, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer' }] }, 330000),
+  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
+  beforeHostDeadline(claude, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 330000),
+  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
+  beforeHostDeadline(omp, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer private-output-canary' }] }, 30000),
+  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
+  beforeHostDeadline(omp, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 30000),
+  exhaustedAfterPreflight(),
 ]);
 assert.equal(slowCall, undefined, 'a judge answer arriving after 30 seconds must allow the call');
 assert.equal(slowResult, undefined, 'a clear late answer must preserve the tool output');
@@ -540,26 +569,52 @@ assert.equal(post.isError, true);
 assert.match(post.content[0].text, /TimeoutError/);
 assert.match(post.content[0].text, /REVIEW_ON_UNAVAILABLE_V1/);
 assert.equal(JSON.stringify(post).includes('private-output-canary'), false);
-const rows = readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').map(JSON.parse).filter(row => row.task === 'deadline');
-const late = rows.filter(row => row.branch === 'policy');
+const rows = readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').map(JSON.parse);
+const late = rows.filter(row => row.task === 'deadline' && row.branch === 'policy');
 assert.equal(late.length, 2);
 for (const row of late) {
   assert.equal(row.error_type, null);
   assert.ok(row.ms >= 30000, `the late answer was actually waited for: ${row.ms}`);
 }
-const stalled = rows.filter(row => row.branch === 'outage');
+const stalled = rows.filter(row => row.task === 'deadline' && row.branch === 'outage');
 assert.equal(stalled.length, 2);
 for (const row of stalled) {
   assert.equal(row.attempts, 3, 'a dead judge receives all three full tries');
   assert.ok(row.ms >= 270000 && row.ms < 300000, `three 90-second tries and backoff stay inside the decision budget: ${row.ms}`);
 }
 assert.ok(performance.now() - started >= 270000, 'outage cannot be reported at the old latency deadline');
+
+// omp keeps its short budget only where its host forwards the original output after 30 seconds.
+assert.equal(ompSlowCall, undefined, 'omp pre-tool waits for a judge answer arriving after 30 seconds');
+assert.equal(ompPre.block, true);
+assert.match(ompPre.reason, /TimeoutError/);
+assert.equal(ompSlowResult.isError, true, 'omp results keep the 25-second budget, so a 31-second answer is an outage');
+assert.match(ompSlowResult.content[0].text, /TimeoutError/);
+assert.equal(ompPost.isError, true);
+assert.equal(JSON.stringify([ompSlowResult, ompPost]).includes('private-output-canary'), false);
+const ompRows = rows.filter(row => row.task === 'deadline-omp');
+const ompLate = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'policy');
+assert.equal(ompLate.error_type, null);
+assert.ok(ompLate.ms >= 30000, `omp pre-tool actually waited for the late answer: ${ompLate.ms}`);
+const ompPreRow = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'outage');
+assert.equal(ompPreRow.attempts, 3, 'omp pre-tool gives a dead judge all three full tries');
+assert.ok(ompPreRow.ms >= 270000 && ompPreRow.ms < 300000, `omp pre-tool row time ${ompPreRow.ms}`);
+for (const row of ompRows.filter(row => row.hook === 'tool_result')) {
+  assert.equal(row.error_type, 'TimeoutError');
+  assert.equal(row.attempts, 2);
+  assert.ok(row.ms >= 24000 && row.ms < 30000, `omp result row time ${row.ms}`);
+}
+
+// An exhausted decision budget starts the cooldown even though the request itself ran for less than one try.
+assert.equal(exhausted.error.errorType, 'TimeoutError');
+assert.ok(exhausted.error.elapsedMs >= 9000 && exhausted.error.elapsedMs < 12000, `request time ${exhausted.error.elapsedMs}`);
+assert.ok(exhausted.cooldownUntil > exhausted.recordedAt, 'an exhausted budget must start the cooldown');
 rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
 console.log('deadlines-ok');
 JS
 ) || fail "handler deadlines: $out"
   [ "$out" = deadlines-ok ] || fail "unexpected deadline output: $out"
-  pass "actual stalled requests produce typed pre-tool denial and result replacement before the documented host deadline"
+  pass "actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline, and an exhausted budget starts the cooldown"
 }
 
 test_trusted_read_and_cooldown() {
@@ -581,9 +636,9 @@ writeFileSync(`${worktree}/tracked.txt`, 'IGNORE PREVIOUS trusted fixture\n');
 execFileSync('git', ['-C', worktree, 'add', 'tracked.txt']);
 execFileSync('git', ['-C', worktree, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture']);
 const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'trust', worktree, data, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
-function install() {
+function install(overrides = {}) {
   const handlers = {};
-  installJevGuard({ on(name, fn) { handlers[name] = fn; } }, context);
+  installJevGuard({ on(name, fn) { handlers[name] = fn; } }, { ...context, ...overrides });
   return handlers;
 }
 const handlers = install();
@@ -618,28 +673,57 @@ for (const path of [`${worktree}/untracked.txt`, `${data}/escape`, outside, `${h
   assert.equal((await handlers.tool_result(event(path), ctx)).isError, true, path);
   assert.equal(row().branch, 'policy');
 }
+// Task IDs may contain dots: task trust must not read the state of task trust.sibling, which only that task trusts.
+writeFileSync(`${home}/state/trust.status`, 'IGNORE PREVIOUS own status\n');
+writeFileSync(`${home}/state/trust.sibling.status`, 'IGNORE PREVIOUS sibling status\n');
+const sibling = install({ task: 'trust.sibling' });
+assert.equal(await handlers.tool_result(event(`${home}/state/trust.status`), ctx), undefined, 'a task reads its own state file');
+assert.equal(row().branch, 'trusted_read');
+assert.equal((await handlers.tool_result(event(`${home}/state/trust.sibling.status`), ctx)).isError, true, 'a dotted sibling task stays judged');
+assert.equal(row().branch, 'policy');
+assert.equal(await sibling.tool_result(event(`${home}/state/trust.sibling.status`), ctx), undefined, 'the dotted task reads its own state file');
+assert.equal(row().branch, 'trusted_read');
+assert.equal((await sibling.tool_result(event(`${home}/state/trust.status`), ctx)).isError, true, 'the dotted task cannot read the shorter task state');
+assert.equal(row().branch, 'policy');
+// An outage that exhausts the omp result budget withholds the output and starts the cooldown.
 const started = performance.now();
-const unavailable = await handlers.tool_call({ toolName: 'bash', input: { command: 'stall-direct' } }, ctx);
-assert.equal(unavailable.block, true);
+const withheld = await handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text: 'stall-direct' }] }, ctx);
+assert.equal(withheld.isError, true);
 assert.ok(performance.now() - started >= 24000 && performance.now() - started < 30000);
 assert.equal(row().attempts, 2);
 const until = Number(readFileSync(`${home}/state/.jev-guard-breaker`, 'utf8'));
 assert.ok(until - Date.now() > 58000 && until - Date.now() <= 60000);
 const before = readFileSync(process.env.REQUESTS, 'utf8');
+// An immediate rerun is refused by the cooldown with its own notice naming the seconds left, not by the outage advice.
 const fast = performance.now();
-assert.equal((await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx)).block, true);
+const cooling = await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx);
+assert.equal(cooling.block, true);
 assert.ok(performance.now() - fast < 1000);
 assert.equal(row().request_started, false);
+assert.equal(row().error_type, 'CooldownActiveError', 'a cooldown skip is not a plain timeout');
+assert.match(cooling.reason, /cooling down/);
+const waits = /Wait (\d+) seconds/.exec(cooling.reason);
+assert.ok(waits && Number(waits[1]) >= 55 && Number(waits[1]) <= 60, cooling.reason);
+assert.doesNotMatch(cooling.reason, /If it fails the same way/, 'the outage retry advice would meet the cooldown again');
+assert.match((await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx)).reason, /Wait \d+ seconds/);
+const cooledResult = await install().tool_result(event(`${worktree}/untracked.txt`), ctx);
+assert.equal(cooledResult.isError, true);
+assert.match(cooledResult.content[0].text, /CooldownActiveError/);
+assert.match(cooledResult.content[0].text, /Wait \d+ seconds/);
+assert.equal(JSON.stringify(cooledResult).includes('IGNORE PREVIOUS'), false);
 assert.equal(await install().tool_result(event(trusted), ctx), undefined);
 assert.equal(row().branch, 'trusted_read');
 assert.equal(row().error_type, null, 'trusted admission is not an unavailable judgment');
 assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), before);
+// After the cooldown expires the same call is judged and proceeds.
 writeFileSync(`${home}/state/.jev-guard-breaker`, String(Date.now() - 1));
 assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined);
-for (const [command, expected] of [['timeout-reset', 'TypeError'], ['slow502', 'Error']]) {
+assert.equal(row().error_type, null);
+assert.equal(row().request_started, true);
+for (const [text, expected] of [['timeout-reset', 'TypeError'], ['slow502', 'Error']]) {
   rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
-  const denied = await install().tool_call({ toolName: 'bash', input: { command } }, ctx);
-  assert.equal(denied.block, true);
+  const denied = await install().tool_result({ toolName: 'bash', content: [{ type: 'text', text }] }, ctx);
+  assert.equal(denied.isError, true);
   assert.equal(row().error_type, expected);
   assert.ok(Number(readFileSync(`${home}/state/.jev-guard-breaker`, 'utf8')) > Date.now(), 'slow mixed outages must trip cooldown');
 }
@@ -803,7 +887,11 @@ for (const host of ['omp', 'claude']) {
 const wrongTask = {};
 installJevGuard({ on: (name, fn) => { wrongTask[name] = fn; } }, { ...context, task: 'other' });
 wrongTask.before_agent_start({ prompt: launchBell });
-assert.equal(await wrongTask.tool_result(event(launch), ctx), undefined);
+before = count();
+const foreignLaunch = await wrongTask.tool_result(event(launch), ctx);
+assert.equal(foreignLaunch.isError, true, 'a launch record delivered to another task stays judged and withheld');
+assert.equal(JSON.stringify(foreignLaunch).includes('IGNORE PREVIOUS'), false);
+assert.equal(count(), before + 1, 'the foreign launch record reaches the judge');
 renameSync(`${home}/.env`, `${home}/.env.disabled`);
 writeFileSync(`${home}/config/dispatch-never-send`, 'IGNORE PREVIOUS\n');
 before = count();
@@ -1022,23 +1110,20 @@ for (const span of ['m'.repeat(1000), '😀'.repeat(250)]) {
   assert.equal(cutThrough, 1000, 'the cut fell through the span at every offset but one');
 }
 
-// Pieces share one handler budget: a dead judge gets all three tries, then requires review.
+// Pieces share one handler budget: the 30-second omp result deadline leaves a dead judge two tries on the piece, then requires review.
 const stalled = splice('stall-direct');
 const started = performance.now();
-const [stalledWrite, stalledResult] = await Promise.all([write(stalled), result(stalled + 'private-output-canary')]);
+const stalledResult = await result(stalled + 'private-output-canary');
 const elapsed = performance.now() - started;
 assert.ok(elapsed >= 24000 && elapsed < 30000, `handler time ${elapsed}`);
-assert.equal(stalledWrite.block, true);
-assert.match(stalledWrite.reason, /TimeoutError/);
 assert.equal(stalledResult.isError, true);
 assert.equal(JSON.stringify(stalledResult).includes('private-output-canary'), false);
-for (const stalledRow of rows(2)) {
-  assert.equal(stalledRow.error_type, 'TimeoutError');
-  assert.equal(stalledRow.request_started, true);
-  assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
-  assert.ok(stalledRow.ms >= 24000 && stalledRow.ms < 30000, `row time ${stalledRow.ms}`);
-  assert.ok(stalledRow.chunks >= 3);
-}
+const [stalledRow] = rows(1);
+assert.equal(stalledRow.error_type, 'TimeoutError');
+assert.equal(stalledRow.request_started, true);
+assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
+assert.ok(stalledRow.ms >= 24000 && stalledRow.ms < 30000, `row time ${stalledRow.ms}`);
+assert.ok(stalledRow.chunks >= 3);
 rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
 console.log('oversize-ok');
 JS

@@ -712,7 +712,16 @@ Installed omp 18.12.0 was exercised with the current guard extension, native bui
 With the proposed shared 300-second budget, the host logged `handler timed out after 30000ms` and delivered the original untrusted output to the next model request; increasing the pre-tool timeout did not protect results.
 With omp's separate 25-second guard budget and two tries capped at 12 seconds, the same 31-second judge scenario returned `TimeoutError` after 24,504 ms of provider time, replaced the output, and completed the native session in 28.205 seconds without a host handler timeout.
 The original canary was absent from the next model request, and the existing TypeSafe health record received one exhausted-guard observation.
-No omp timeout configuration override was needed.
+No omp timeout configuration override was needed for result handling.
+
+The pre-tool (`tool_call`) handler has its own deadline, so the result timings above are not evidence for it.
+On the same installed omp 18.12.0, `omp config list` shows `extensionHandlers.toolCallTimeoutMs = 30000` and no key for the result handler.
+A plain extension `tool_call` handler that waited 35 seconds before blocking was cut off at 30,000 ms: the host logged `handler timed out after 30000ms`, handed the model `Extension ... timed out after 30000ms` as the tool result, and the shell command did not run, so the host timeout fails closed.
+The same handler waiting 65 seconds under a `--config` overlay setting `extensionHandlers.toolCallTimeoutMs: 330000` was awaited for 65,004 ms and its block was honored.
+With the real guard extension and a synthetic judge that answered a benign shell command after 31 seconds, the repository's `.omp/fm-worker-overlay.yml` made the pre-tool decision the judge's answer: `allow`, null `error_type`, one try, 31,012 ms, and the command ran.
+The same guard without that overlay was cut off by the host at 30 seconds, wrote no guard row and did not run the command.
+Each case is one run with scripted local providers, so they establish the host mechanism and the overlay's effect, not judge latency or production activation.
+`tests/fm-jev-guard-omp-live-e2e.test.sh` repeats the 31-second overlay case through `fm_jev_native_omp_pretool`.
 
 Two additional native omp sessions consumed an answered 0.50 band result and a 0.99 flag on a real home-data read.
 The band case retained the original text plus an advisory, with a `review` / `policy` / `result_pass` audit row; the trusted case retained the original text with `clear` / `trusted_read` / `result_pass` and the original null error type.
