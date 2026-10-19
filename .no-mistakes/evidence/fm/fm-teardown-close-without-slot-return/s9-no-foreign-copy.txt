@@ -1,0 +1,11 @@
+--- stdout
+/Users/charlesabrooker/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/4/demo
+🌳 Worktree returned to pool.
+demo: already current
+teardown task-e1 complete (window firstmate:fm-task-e1, worktree /Users/charlesabrooker/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/4/demo)
+Backlog: task-e1 is closed in /Users/charlesabrooker/tmp/fm-lab.fbhxpn/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr
+🌳 Leased worktree 4 at ~/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/4/demo. Run 'treehouse return ~/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/4/demo' to release it.
+teardown: reaping leaked worktree process(es) for task-e1: 7478
+teardown: force-killing leaked worktree process(es) for task-e1: 7478
+--- exit code: 0

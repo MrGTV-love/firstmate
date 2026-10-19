@@ -1,0 +1,7 @@
+--- stdout
+--- stderr
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+3077d7e own unlanded commit
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- exit code: 1

@@ -1,0 +1,14 @@
+--- stdout
+/Users/charlesabrooker/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/1/demo
+notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+notice: held foreign copy /Users/charlesabrooker/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/1/demo/.claude/worktrees/fc-ignored stays in pool slot /Users/charlesabrooker/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/1/demo: it holds ignored files that exist nowhere else: unique.dat.
+notice: pool slot /Users/charlesabrooker/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/1/demo is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, so ask the supervisor.
+notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.fbhxpn/data/held-foreign-copies.log.
+demo: already current
+teardown task-a1 complete (window firstmate:fm-task-a1; the task's own work is landed and its record is closed, but pool slot /Users/charlesabrooker/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/1/demo is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+Backlog: task-a1 is closed in /Users/charlesabrooker/tmp/fm-lab.fbhxpn/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr
+🌳 Leased worktree 1 at ~/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/1/demo. Run 'treehouse return ~/tmp/fm-lab.fbhxpn/th/.treehouse/demo-830ded/1/demo' to release it.
+teardown: reaping leaked worktree process(es) for task-a1: 58532
+teardown: force-killing leaked worktree process(es) for task-a1: 58532
+--- exit code: 0
