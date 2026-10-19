@@ -61,6 +61,7 @@
 # HEAD is that run's input head (submitted_head_sha). A copy at any other commit,
 # a run that pushed another head, or a missing record
 # (state database, run row, pushed head, input head) refuses and names the record.
+# Anything else refuses unless the recorded bundle alternative below holds.
 # Recorded bundle preservation is a cleanup alternative, not proof of delivery.
 # Its record is $DATA/$ID/preservation-bundles.tsv (normally
 # $FM_HOME/data/<task-id>/preservation-bundles.tsv): exactly ONE line of three
@@ -80,18 +81,18 @@
 # must succeed and pass git fsck --connectivity-only.
 # <ref> is the copy's HEAD (detached included) or a removed copy's branch tip,
 # and it must carry a locally-only commit of its own: <branches> only widen
-# what the bundle must cover, they never make a pushed <ref> eligible.
+# what the bundle must cover, they never make a pushed <ref> eligible, so a
+# pushed-but-undelivered ship still requires the existing delivery proof.
 # <branches> are the local branches no live worktree has checked out, so side
 # branches count; a branch checked out in another worktree whose directory still
 # exists is that task's own, but a branch whose worktree directory is gone or
 # prunable counts. A thin bundle, a truncated pack or a missing tip refuses.
 # Ancestors need not be separate bundle heads.
-# No unlanded tip on <ref> itself means this alternative proves nothing:
-# pushed-but-undelivered ships still require the existing delivery proof. Every proof reads the record
-# and the bundle's digest again and verifies coverage again; only a completed
-# isolated restore is remembered in this process, by bundle digest, object
-# format and recorded tips, so the final custody rechecks and the nested, prior
-# and foreign copy proofs do not repeat it. Nothing is cached on disk.
+# Every proof reads the record and the bundle's digest again and verifies coverage
+# again; only a completed isolated restore is remembered in this process, by
+# bundle digest, object format and recorded tips, so the final custody rechecks
+# and the nested, prior and foreign copy proofs do not repeat it. Nothing is
+# cached on disk.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
 # A ship kept only by its bundle closes its backlog item with the note
@@ -111,7 +112,6 @@
 # Keep the bundle and record until the preserved commits are no longer needed;
 # data/<task> survives cleanup. Restore into a new repository with
 # git -C <restore-repo> fetch <bundle-path> <tip-sha>:refs/heads/recovered.
-# Anything else refuses.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
 # where the usual "checks green" fm-pr-check.sh trigger never fires) - by looking

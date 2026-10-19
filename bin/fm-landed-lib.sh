@@ -32,9 +32,11 @@
 # a delivery, whatever other links it retains. A ship row closed because only a
 # verified bundle holds its commits carries the note "preserved in bundle
 # <path>, not landed" and no artifact; bin/fm-fleet-snapshot.sh marks it
-# captain_drop too, so it is never listed as landed either. That mark needs the
-# row to be Done and the note to be its last body line: a row restarted after
-# such a close, or closed again with another delivery, is not marked.
+# captain_drop too, so it is never listed as landed either. That mark needs a
+# Done row with no PR or report and the note as its last body line: a restarted
+# row is not marked while it runs, nor once it is closed again with a PR, a
+# report or another note. A restarted row closed again with no flag keeps the old
+# note as its last line and is marked again.
 # The backlog-selection compatibility fallback keeps a structured Done row
 # whose three parsed artifact fields are absent when it does not retain
 # hold-kind captain.
