@@ -1,0 +1,3 @@
+teardown: bundle preservation unavailable: copy has no unlanded tips of its own; existing delivery proof is still required.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.

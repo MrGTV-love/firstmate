@@ -1,0 +1,7 @@
+teardown: bundle preservation unavailable: /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s8/durable/preservation/task.bundle: bundle cannot be restored in an isolated repository.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s8/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+99222ce unpublished work 2
+24cde4f unpublished work 1
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.

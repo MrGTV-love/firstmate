@@ -1,0 +1,12 @@
+{
+  "landed": [
+    {
+      "id": "real-local",
+      "artifact": "local main"
+    },
+    {
+      "id": "mate-landed",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/50"
+    }
+  ]
+}

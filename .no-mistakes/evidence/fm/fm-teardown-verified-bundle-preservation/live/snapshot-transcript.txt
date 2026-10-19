@@ -1,0 +1,32 @@
+ok - registry unavailability and bounded truncation remain explicit
+ok - repeated snapshots keep the same current landed baseline and ignore prior reports
+ok - default output is bounded, local-only, and marks omitted surfaces
+[
+  {
+    "id": "real-local",
+    "state": "done",
+    "captain_drop": false,
+    "pr_url": null,
+    "report_path": null
+  },
+  {
+    "id": "task-x1",
+    "state": "done",
+    "captain_drop": true,
+    "pr_url": null,
+    "report_path": null
+  }
+]
+{
+  "landed": [
+    {
+      "id": "real-local",
+      "artifact": "local main"
+    },
+    {
+      "id": "mate-landed",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/50"
+    }
+  ]
+}
+SNAP-OK: bundle-closed row absent from landed; real delivery present

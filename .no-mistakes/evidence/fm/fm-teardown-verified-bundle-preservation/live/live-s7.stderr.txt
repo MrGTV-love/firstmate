@@ -1,0 +1,5 @@
+REFUSED: worktree /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s7/pool/1/project/.claude/worktrees/live has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  dirty.txt
+Commit them (or get the captain's explicit OK to discard, then --force).

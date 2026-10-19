@@ -1,0 +1,17 @@
+ok - ordinary teardown removes a copy with one or two unpublished tips preserved in a verified recorded bundle
+ok - incomplete, unverifiable, changed, unrecorded, unsafe-path and malformed bundle records retain the original refusal
+ok - a branch another worktree has checked out never has to be in this copy's bundle
+ok - a removed copy's branch is judged by its own bundle, not by the project clone or sibling worktrees
+ok - a deleted but still registered worktree does not block a valid recorded bundle
+ok - a branch whose registered worktree is gone counts as a side branch the bundle must hold
+ok - repeated proofs of one unchanged bundle run the isolated restore once
+ok - a changed recorded tip set or changed bundle bytes is proved again, not taken from the remembered restore
+ok - the remembered restore is keyed by object format as well as bundle digest and tips
+ok - a ship kept only by a verified bundle closes its backlog row as preserved in that bundle, not landed
+ok - a copy with no local-only commits is not advised to build a bundle
+ok - a pushed copy whose only local-only commits sit on a side branch still needs its delivery proof
+ok - a HEAD that moves after a bundle admission refuses at final custody without advising a bundle
+ok - a bundle changed after admission is rejected before copy removal
+ok - a verified bundle never excuses uncommitted changes
+ok - foreign bundles permit ordinary cleanup but never excuse dirty bytes, unpreserved ignored files or live foreign processes
+nice -n 20 bash tests/fm-teardown.test.sh                  56.21s user 104.64s system 62% cpu 4:16.28 total

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "real-local",
+    "state": "done",
+    "captain_drop": false,
+    "pr_url": null,
+    "report_path": null
+  },
+  {
+    "id": "task-x1",
+    "state": "done",
+    "captain_drop": true,
+    "pr_url": null,
+    "report_path": null
+  }
+]

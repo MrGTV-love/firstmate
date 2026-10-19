@@ -1,0 +1,23 @@
+== stage + validate a pending-close marker with the bundle note
+stage: accepted
+id=task-m1
+data=/Users/charlesabrooker/tmp/fm-live-marker.oJ61Jw/data
+spawn_gen=gen-1
+cleanup_incomplete=0
+arg=--note
+arg=preserved in bundle /Users/charlesabrooker/tmp/fm-live-marker.oJ61Jw/bundles/task-m1.bundle, not landed
+== crash recovery replay (what bootstrap runs)
+replay rc=0 result=closed err=
+== backlog after replay
+# Backlog
+
+## In flight
+## Queued
+## Done
+- [x] task-m1 - marker replay fixture (kind: ship) (done 2026-10-19)
+  preserved in bundle /Users/charlesabrooker/tmp/fm-live-marker.oJ61Jw/bundles/task-m1.bundle, not landed
+== adversarial: forged notes must be rejected by the marker validator
+rejected: preserved in bundle relative/x.bundle, not landed
+rejected: preserved in bundle /x.bundle, and more
+rejected: dropped extra
+rejected: preserved in bundle /xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

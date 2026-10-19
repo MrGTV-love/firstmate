@@ -1,0 +1,74 @@
+S1 header recipe (verbatim) then ordinary teardown, no --force
+  ok: exit code 0
+  ok: copy removed
+  ok: task record retired
+  ok: pool slot returned by treehouse
+  ok: stderr names bundle path
+  ok: stderr names preserved tip 43463954810a92416ef4be397ed50283d07842b0
+  ok: no REFUSED line
+  ok: backlog row closed as not landed
+  ok: commits recoverable from bundle alone (work.txt)
+  ok: commits recoverable from bundle alone (work2.txt)
+  ok: bundle + record survive cleanup
+S2 baseline: unlanded commits and no bundle record still refuse (copy kept)
+  ok: exit code 1
+  ok: REFUSED line
+  ok: missing record named
+  ok: copy kept
+  ok: task record kept
+  ok: slot not returned
+S3 adversarial: bundle bytes changed after the record was written
+  ok: exit code 1
+  ok: sha256 mismatch named
+  ok: copy kept
+  ok: slot not returned
+S4 adversarial: new commit after bundling refuses; re-bundle then ordinary teardown works
+  ok: first run exit 1
+  ok: missing late tip named
+  ok: copy kept
+  ok: after re-bundle exit 0, no --force
+  ok: copy removed
+S5 adversarial: bundle stored inside the pool is not durable
+  ok: exit code 1
+  ok: inside pool named
+  ok: copy kept
+S6 adversarial: pushed copy, PR open, side branch unlanded, valid bundle -> delivery proof still required
+  ok: exit code 1
+  ok: delivery-proof reason
+  ok: bundle not accepted
+  ok: copy kept
+  ok: slot not returned
+S7 adversarial: valid bundle does not excuse uncommitted changes
+  ok: exit code nonzero
+  ok: dirty copy kept
+  ok: slot not returned
+  ok: uncommitted changes named
+S8 adversarial: thin bundle (needs a base the bundle lacks) cannot restore alone
+  ok: exit code 1
+  ok: restore failure named
+  ok: copy kept
+S9 (no-mistakes) plain task worktree (not nested) with unlanded commits: refuse without bundle, ordinary route with bundle
+  ok: no-mistakes: no bundle -> exit 1
+  ok: no-mistakes: no bundle -> REFUSED (unlanded)
+  ok: no-mistakes: no bundle -> not the home-resolution refusal
+  ok: no-mistakes: no bundle -> worktree kept
+  ok: no-mistakes: no bundle -> treehouse return NOT called
+  ok: no-mistakes: bundle -> exit 0, no --force
+  ok: no-mistakes: bundle -> treehouse return called for the worktree
+  ok: no-mistakes: bundle -> task record retired
+  ok: no-mistakes: bundle -> row not claimed landed
+  ok: no-mistakes: bundle -> no 'local main' claim
+  ok: no-mistakes: commit recoverable
+S9 (local-only) plain task worktree (not nested) with unlanded commits: refuse without bundle, ordinary route with bundle
+  ok: local-only: no bundle -> exit 1
+  ok: local-only: no bundle -> REFUSED (unlanded)
+  ok: local-only: no bundle -> not the home-resolution refusal
+  ok: local-only: no bundle -> worktree kept
+  ok: local-only: no bundle -> treehouse return NOT called
+  ok: local-only: bundle -> exit 0, no --force
+  ok: local-only: bundle -> treehouse return called for the worktree
+  ok: local-only: bundle -> task record retired
+  ok: local-only: bundle -> row not claimed landed
+  ok: local-only: bundle -> no 'local main' claim
+  ok: local-only: commit recoverable
+LIVE_FAILED=0

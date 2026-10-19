@@ -1,0 +1,4 @@
+--- cmd: fm-teardown.sh task-x1  (rc=0)
+/Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s1/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s1/pool/1/project/.claude/worktrees/live removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s1/pool/1/project returned)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s1/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.

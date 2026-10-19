@@ -1,0 +1,4 @@
+--- cmd: fm-teardown.sh task-x1  (rc=0)
+/Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s4/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1; nested reassociated worktree /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s4/pool/1/project/.claude/worktrees/live removed and its pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s4/pool/1/project returned)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s4/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s4/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.

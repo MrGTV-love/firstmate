@@ -1,0 +1,7 @@
+teardown: bundle preservation unavailable: missing preservation record (regular nonsymlink file required): /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s2/data/task-x1/preservation-bundles.tsv.
+Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in /Users/charlesabrooker/tmp/fm-teardown-tests.5yNQRa/live-s2/data/task-x1/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+d0caac2 unpublished work 2
+e279207 unpublished work 1
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
