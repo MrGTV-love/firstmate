@@ -1,0 +1,4 @@
+ok - ledger on: a close that session start replays records one task.closed, however often it arrives
+ok - a retained deliverable line reads back as the close arguments it was retained with
+ok - new work retires every earlier deliverable line, and only new work does
+exit=0

@@ -1,0 +1,52 @@
+ok - a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally
+ok - an interrupted legacy pool teardown keeps its record through session start and its retry returns the slot once
+ok - a rolled-back legacy stamp leaves its return-pending record bound to the unstamped record
+ok - a failed return-pending record write refuses before any destruction and the retry returns the slot once
+ok - a stale directory at the return-pending path refuses before any destruction and the retry returns the slot once
+ok - an unreadable return-pending generation refuses before any destruction and the retry returns the slot once
+ok - an endpoint refusal after reservation keeps its record through session start and the retry returns the slot
+ok - a waited return that meets a project-lock error exits 1, not the contention exit
+ok - a closed task whose return stalled survives session start and the next sweep finishes it behind a queued waiter
+ok - a refusal before cleanup leaves the pool slot unreserved, and the clean retry still returns it
+ok - recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot
+ok - an unleased pool slot is reserved only when the installed Treehouse has a lease command, else project custody covers the return
+ok - an automatic teardown that has closed its endpoint waits for project custody and returns its slot
+ok - ordinary pool return preserves dirt and new commits produced while final project custody is queued
+ok - a lease command without durable state proof cannot reap processes or return the slot, even with authorized discard
+ok - every forced return checks registered copies without pool inventory, and recovery names the owning home
+ok - an uncanonicalizable return target reports an explicit refusal and preserves its record
+ok - a custody refusal at a non-pool child return keeps the child worktree and its parked copy
+ok - a custody refusal at a deferred child pool return keeps the slot, its claim and its parked copy
+ok - a steer to another task completes while a cleanup holds its own task's lease lock
+ok - the lane-registry scan reads each distinct registry once however many records name it
+ok - task teardown completes without reaping another home's abandoned worker
+ok - a missing teardown startup source refuses before cleanup
+ok - an unreadable teardown startup source refuses before cleanup
+ok - a missing adapter sibling refuses before cleanup
+ok - a forced descendant with a missing adapter sibling refuses before cleanup
+ok - a forced secondmate with a missing own adapter sibling refuses before child cleanup
+ok - present required sources still reach the ordinary teardown refusal
+ok - process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay
+ok - manual and missing-backlog retries revoke old close authority before process refusal and restored replay
+ok - local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed
+ok - teardown does not wait for the home summary refresh
+ok - teardown closes its own backlog item before reporting success
+ok - ledger on: a completed teardown records one task.closed with the PR, and a repeat records none
+ok - ledger on: the closed record names local main and a captain's drop as its evidence
+ok - a refused teardown records nothing, and an unwritable ledger costs one stderr line without changing teardown
+ok - teardown closes a landed Gerrit task with its change URL as a note and a GitHub task with --pr
+ok - teardown honors config/backlog-backend=manual and still finishes cleanly
+ok - local-only worktree with truly unpushed work is refused (safety preserved)
+ok - local main landing succeeds independently of pushed and remote availability
+ok - a pushed but unmerged ship refuses, and only the captain's own words discard it
+ok - --drop-file needs --force and a readable words file
+ok - forced dirty ships record dropped and scouts retain delivered reports, with exact captain words retained for both
+ok - a scout completes only with a regular non-empty report
+ok - no-mistakes worktree with genuinely unlanded work is refused (safety preserved)
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+ok - fm-pr-check publishes the PR-ready line on a secondmate's parent channel once
+ok - a secondmate home's teardown delivers the child's final line or refuses until it can
+ok - teardown completes when an exact busy-state sidecar is already absent
+ok - herdr teardown removes pane-owned escalation dedupe state
+- killed full teardown/atomicity runs (teardown has no selector; 562 tests)
+exit=143

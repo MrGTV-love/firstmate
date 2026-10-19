@@ -1,0 +1,28 @@
+ok - bootstrap reports a regular code-root backlog and stays silent for a link into the home or no copy
+ok - bootstrap reports a code-root backlog linked elsewhere and a forked archive
+ok - bootstrap stays silent when the code root is the home
+ok - bare tasks-axi replaced the code-root link and bootstrap reported the fork
+ok - fm-tasks-axi.sh writes, holds, archives, and reads relative body files through to the home from the code root
+ok - fm-tasks-axi.sh pins the home's backlog over an ambient TASKS_AXI_FILE and serves the dashboard
+ok - fm-tasks-axi.sh refuses caller --file, a symlinked home backlog, and an unresolvable home
+ok - fm-tasks-axi.sh refuses add --start while plain add and start <id> pass through
+ok - fm-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog
+ok - fm-tasks-axi.sh closes a ship or scout only with its proved deliverable
+ok - fm-tasks-axi.sh records a captain's drop with the exact words and refuses a live task
+ok - all completion spellings preserve retained captain calls before accepting drop, report, or merged PR evidence
+ok - public reopen and start with either noun retire drop provenance in home and caller-relative data, preserving body and words
+ok - real snapshot and landed projection distinguish resumed deliveries from untouched captain drops
+ok - restart handles sole dropped bodies and refuses failed retirement updates without changing the row
+ok - unsupported leading global forms are refused by the wrapper without changing the task
+ok - bounded completion and restart grammar refuses before SDK calls, drop retention, retirement, or archiving
+ok - bounded backend refusals preserve rows and retained captain words under default, environment beads, and home beads configuration
+ok - only exact unconsumed help tokens reach production help without completion or restart side effects
+ok - documented numeric keep forms, no-prune, note, json, and optional noun preserve ordinary completion
+ok - completion and restart spellings wait for control then metadata custody before authoritative reads
+ok - a concurrent hold serializes before admission or after proved completion, never inside its evidence-to-mutation window
+ok - start and reopen keep body updates outside retirement, failed-command readback, and rollback custody
+ok - failed start and reopen with either noun read back home and caller-relative data before restoring only proved unchanged drops
+ok - ledger on: add records one task.filed with the stored fields, a repeat add records none, and output and status are unchanged
+ok - ledger off writes nothing, and an unwritable ledger costs one stderr line without changing the add
+ok - ledger on: a proven done records one task.closed, a refusal or a Done row records none, and a failing ledger leaves the close alone
+exit=0
