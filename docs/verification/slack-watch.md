@@ -105,7 +105,7 @@ Observed: one `check: slack 900.000001 - conflicting signals: Abort vs Wait`, ze
 (c) Two different reactions produced one check line and one notice; later polls stayed silent; removing one reaction changed the reaction set and recorded the remaining option.
 (d) A reaction the intake refused (`refused: typed-call`, call still open) was not submitted again by the next poll, and no second acknowledgement was posted.
 The conflict notice in the thread named the remedy: `Remove the :two: reaction, or type 2.` for a reaction against a typed reply, `Please reply once.` for two typed replies, and `Remove all but one reaction.` for two reactions.
-Two conflicting typed replies of 45,000 characters each produced one conflict notice that named each answer cut to 60 characters and still ended with its remedy, one check line shorter than 240 characters, no transport failure, and an unanswered call.
+Two conflicting typed replies of 45,000 characters each produced one conflict notice cut with `Full text remains in the local backlog.`, no transport failure, and an unanswered call.
 Result: pass.
 
 ## DOD-09 - duplicate and cross-channel answers record once
@@ -206,7 +206,8 @@ Result: pass.
 Command: unset or corrupt each configuration variable in turn and run `fm-slack-check.sh check`, `fm-slack-poll.sh`, and `fm-slack-check.sh arm` against `tests/fixtures/slack/config/unset.json` and `tests/fixtures/slack/arming/arm.json`.
 
 Observed: token unset and allowlist unset were silent and off from `fm-slack-check.sh check` and `fm-slack-poll.sh`.
-The same two cases through `fm-slack-check.sh arm` printed `slack: refused: unconfigured`, exited nonzero, and left no check registered.
+The same two cases through `fm-slack-check.sh arm`, with stdout and stderr captured apart, wrote `slack: refused: unconfigured` to stderr only, printed nothing to stdout, exited nonzero, and left no check registered.
+The periodic `fm-slack-check.sh check` in the same two cases wrote nothing to either stream and exited 0.
 Poll cap unset took the default and completed.
 The standing check printed nothing for `oops` as the allowlist, a malformed `FM_SLACK_DM_USER`, and a poll cap of `0`, `201`, or `many`.
 By hand, the same values printed `slack: refused: allowlist_unparseable`, `slack: refused: missing_or_invalid_FM_SLACK_DM_USER`, and `slack: refused: invalid_FM_SLACK_POLL_MAX_ANSWERS_1_to_200`.
@@ -226,7 +227,7 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 until the owner confirms it rides this PR.
 
-## X1..X18 - review-round regressions
+## X1..X20 - review-round regressions
 
 Each runs against replay transcripts and the real intake; none opens a socket.
 
@@ -249,6 +250,8 @@ Each runs against replay transcripts and the real intake; none opens a socket.
 - X16: `prepare` is no longer a command: the entry point exited 2 with `unknown command`.
 - X17: with the bot token in the process environment, every local child the poll and the mirror ran (the call-state probe, the answer intake, the fleet snapshot) saw it unset.
 - X18: a typed reply that Slack delivered as `merge 12 &amp; 13, skip CI &lt; 5 min &gt; see <https://example.com/b> and <https://example.com/a|the doc>` closed the call with the answer `merge 12 & 13, skip CI < 5 min > see https://example.com/b and the doc`, and the recorded label matched.
+- X19: two conflicts of 450-character wake lines on two threads, plus a later unmatched reply on a third, ran through the armed `check`. The first poll emitted the first conflict's line ending `; +2 queued` within 480 characters; the second conflict's replies and the unmatched reply were not marked seen, their rows stayed pending, and the second conflict's notice was not yet posted. The second poll emitted the second conflict ending `; +1 queued` and posted its notice. The third poll emitted the unmatched reply's line with no marker, and a fourth poll printed nothing. No conflict recorded an answer.
+- X20: an owner reply carrying only `subtype: thread_broadcast` closed the call with the typed words as the answer, while replies from the owner's id carrying `bot_id`, `app_id`, or `bot_profile` answered nothing and closed nothing.
 
 ## ACT-1 - live answer
 

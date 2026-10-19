@@ -17,7 +17,8 @@ Usage:
   fm_slack_watch_test.py thread-field <state.json> <task-id> <field>
   fm_slack_watch_test.py drop-threads <state.json>
   fm_slack_watch_test.py root-count <replay-state.json> <task-id>
-  fm_slack_watch_test.py reply <replay-state.json> <thread-ts> <ts> <user> <text>
+  fm_slack_watch_test.py reply <replay-state.json> <thread-ts> <ts> <user> <text> [extra-json]
+  fm_slack_watch_test.py seen-count <state.json> <thread-ts>
   fm_slack_watch_test.py react <replay-state.json> <ts> <name> <user>
   fm_slack_watch_test.py unreact <replay-state.json> <ts> <name> <user>
 """
@@ -125,8 +126,12 @@ def main(argv):
     elif command == 'drop-threads':
         edit(argv[1], lambda data: data['threads'].clear())
     elif command == 'reply':
+        extra = json.loads(argv[6]) if len(argv) > 6 else {}
         edit(argv[1], lambda data: data['messages'].append(
-            {'ts': argv[3], 'thread_ts': argv[2], 'user': argv[4], 'text': argv[5]}))
+            {'ts': argv[3], 'thread_ts': argv[2], 'user': argv[4], 'text': argv[5], **extra}))
+    elif command == 'seen-count':
+        seen = json.load(open(argv[1])).get('seen', {})
+        print(len([event for event in seen if '/' + argv[2] + '/' in event]))
     elif command in ('react', 'unreact'):
         def toggle(data):
             entries = data['reactions'].setdefault(argv[2], [])

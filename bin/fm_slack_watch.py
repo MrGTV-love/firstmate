@@ -33,7 +33,7 @@ REACTIONS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'ni
 USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
-LABEL_LIMIT = 60
+QUEUE_RESERVE = 16
 SLACK_LINK = re.compile(r'<((?:https?://|mailto:)[^<>|\s]+)(?:\|([^<>]*))?>')
 CARD_TAIL = ('\nFull decision remains in the local backlog.'
              '\nReply in this thread with your answer.'
@@ -84,11 +84,6 @@ def typed_text(value):
     return value.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
 
 
-def short(value):
-    value = flat(value)
-    return value if len(value) <= LABEL_LIMIT else value[:LABEL_LIMIT - 3] + '...'
-
-
 def stamp(value):
     for form in ('%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%MZ'):
         try:
@@ -104,9 +99,11 @@ def fresh(generated, identity):
     return bool(board and hold and board > hold)
 
 
-def wake_line(lines):
+def wake_line(lines, queued=0):
     line = '; '.join(lines)
-    return line if len(line) <= WAKE_LIMIT else line[:WAKE_LIMIT - 3] + '...'
+    tail = '; +%d queued' % queued if queued else ''
+    room = WAKE_LIMIT - len(tail)
+    return (line if len(line) <= room else line[:room - 3] + '...') + tail
 
 
 def settings():
@@ -214,6 +211,7 @@ class Watch:
         self.output = []
         self.detail = ''
         self.noticed_threads = set()
+        self.notices_held = False
 
     def dm_user(self):
         return env_value('FM_SLACK_DM_USER').strip()
@@ -247,6 +245,14 @@ class Watch:
         line = flat(line)
         if line and (not self.output or self.output[-1] != line):
             self.output.append(line)
+
+    def has_room(self, line):
+        if not self.output:
+            return True
+        return len('; '.join(self.output + [flat(line)])) <= WAKE_LIMIT - QUEUE_RESERVE
+
+    def queued(self):
+        return sum(1 for pending in self.state['pending'] if pending.get('kind') == 'notice')
 
     def bound(self):
         result = run('fm-captain-hold.sh', 'binding', SOURCE)
@@ -396,7 +402,7 @@ class Watch:
 
     def allowed(self, message):
         return (message.get('user') in self.authors
-                and not any(message.get(k) for k in ('bot_id', 'app_id', 'bot_profile', 'subtype')))
+                and not any(message.get(k) for k in ('bot_id', 'app_id', 'bot_profile')))
 
     def stage(self, pending):
         for item in self.state['pending']:
@@ -415,9 +421,13 @@ class Watch:
             self.commit()
             return
         if pending.get('kind') == 'notice':
+            if self.notices_held or not self.has_room(pending['line']):
+                self.notices_held = True
+                return
             self.post('ack:' + pending['event'], pending['text'], pending['thread'])
             self.say(pending['line'])
             self.mark_seen(pending['event'], pending['key'])
+            self.consume(pending.get('contributing', []), pending['key'])
             self.state['pending'] = [p for p in self.state['pending'] if p is not pending]
             self.commit()
             return
@@ -599,9 +609,9 @@ class Watch:
 
     def notice(self, event, key, thread, text, line, contributing=()):
         self.noticed_threads.add(thread)
-        self.consume(contributing, key)
         pending = self.stage({'event': event, 'key': key, 'thread': thread, 'text': text,
-                              'line': line, 'kind': 'notice', 'stage': 'notice'})
+                              'line': line, 'kind': 'notice', 'stage': 'notice',
+                              'contributing': list(contributing)})
         self.publish(pending)
 
     def poll(self):
@@ -652,7 +662,7 @@ class Watch:
             if len(typed) > 1 or len(tapped) > 1 or (typed and tapped and typed.keys() != tapped.keys()):
                 record['conflicts'] = record.get('conflicts', 0) + 1
                 record['blocked'] = signature
-                labels = ' vs '.join(short(label) for label in sorted(set(typed.values()) | set(tapped.values())))
+                labels = ' vs '.join(sorted(set(typed.values()) | set(tapped.values())))
                 event = new_replies[0]['event'] if new_replies else self.event(
                     record, 'conflict', str(record['conflicts']))
                 if len(tapped) > 1:
@@ -737,11 +747,15 @@ def state_home():
 
 
 def emit(watch, command):
+    queued = watch.queued() if command in ('poll', 'check') else 0
     if command == 'check':
         if watch.output:
-            print(wake_line(watch.output))
+            print(wake_line(watch.output, queued))
         return
-    for line in watch.output:
+    lines = list(watch.output)
+    if lines and queued:
+        lines[-1] += '; +%d queued' % queued
+    for line in lines:
         print(line)
 
 
@@ -763,9 +777,11 @@ def main(argv):
         return disarm()
     state, reason = mode()
     if state != 'on':
-        if action == 'arm' or (state == 'refused' and command != 'check'):
+        if action == 'arm':
+            print('slack: refused: ' + reason, file=sys.stderr)
+            return 1
+        if state == 'refused' and command != 'check':
             print('slack: refused: ' + reason)
-            return 1 if command == 'check' else 0
         return 0
     watch = None
     code = 0
@@ -815,7 +831,7 @@ def check(watch, action):
         try:
             watch.prepare()
         except SlackError as error:
-            print('slack: refused: ' + str(error))
+            print('slack: refused: ' + str(error), file=sys.stderr)
             return 1
         return arm(state_dir)
     if not (state_dir / (CHECK_ID + '.check.sh')).is_file() or not (state_dir / (CHECK_ID + '.check-trust')).is_file():
@@ -840,16 +856,16 @@ def shim_content(home, state_dir, script_dir):
 def arm(state_dir):
     state_dir.mkdir(parents=True, exist_ok=True)
     if state_dir.is_symlink():
-        print('slack: refused: unsafe_state_path')
+        print('slack: refused: unsafe_state_path', file=sys.stderr)
         return 1
     shim = state_dir / (CHECK_ID + '.check.sh')
     trust = state_dir / (CHECK_ID + '.check-trust')
     if shim.is_symlink() or trust.is_symlink():
-        print('slack: refused: unsafe_state_path')
+        print('slack: refused: unsafe_state_path', file=sys.stderr)
         return 1
     # Validate the shim path before touching either artifact.
     if shim.exists() and not shim.is_file():
-        print('slack: refused: unsafe_check_shim')
+        print('slack: refused: unsafe_check_shim', file=sys.stderr)
         return 1
     shim.write_text(shim_content(os.environ['FM_HOME'], state_dir, ROOT))
     shim.chmod(0o700)
@@ -857,7 +873,7 @@ def arm(state_dir):
     if result.returncode:
         shim.unlink(missing_ok=True)
         trust.unlink(missing_ok=True)
-        print('slack: refused: check_registration_failed')
+        print('slack: refused: check_registration_failed', file=sys.stderr)
         return 1
     print('armed: state/%s.check.sh' % CHECK_ID)
     return 0

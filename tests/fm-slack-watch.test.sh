@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X18.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X20.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -222,9 +222,7 @@ reply_to 900.000001 900.000012 "$(python3 -c 'print("b" * 45000)')"
 out=$(poll contradiction-typed)
 assert_not_contains "$out" 'transport failure' "DOD-08 a long conflict notice failed to post"
 assert_eq "$(check_count "$out")" 1 "DOD-08 long conflict surfaces once"
-assert_not_contains "$(thread_texts 900.000001)" 'Full text remains in the local backlog.' "DOD-08 long conflict notice was cut by size, not by label"
-assert_contains "$(thread_texts 900.000001)" 'Please reply once.' "DOD-08 long conflict notice lost its remedy"
-[ "$(printf '%s' "$out" | wc -c | tr -d ' ')" -lt 240 ] || fail "DOD-08 a long label filled the wake line"
+assert_contains "$(thread_texts 900.000001)" 'Full text remains in the local backlog.' "DOD-08 long conflict notice was not cut"
 assert_open conflict-call 0 "DOD-08 long conflict records nothing"
 new_home reaction-answer
 bind
@@ -439,21 +437,29 @@ assert_contains "$(run_with FM_SLACK_POLL_MAX_ANSWERS=0 fm-slack-poll.sh --repla
 assert_contains "$(run_unset FM_SLACK_DM_USER fm-slack-check.sh arm --replay "$ARM_REPLAY")" 'slack: refused: missing_or_invalid_FM_SLACK_DM_USER' "S2 arm names an unusable DM user"
 assert_contains "$(run_with FM_SLACK_ALLOWED_AUTHORS=oops fm-slack-check.sh arm --replay "$ARM_REPLAY")" 'slack: refused: allowlist_unparseable' "S2 arm names an unusable allowlist"
 [ ! -e "$FM_STATE_OVERRIDE/slack.check.sh" ] || fail "S2 a refused arm left a check"
-arm_without() {  # <variable>; arm with that variable left out of the environment
+without() {  # <variable> <command> [args...]; the variable is left out of the environment
   local var=$1 item
   local -a args=()
+  shift
   for item in "${base_env[@]}"; do
     [ "${item%%=*}" = "$var" ] || args+=("$item")
   done
-  env "${args[@]}" "$ROOT/bin/fm-slack-check.sh" arm --replay "$ARM_REPLAY" 2>&1
+  env "${args[@]}" "$@"
 }
 for var in SLACK_BOT_TOKEN FM_SLACK_ALLOWED_AUTHORS; do
   set +e
-  out=$(arm_without "$var"); rc=$?
+  out=$(without "$var" "$ROOT/bin/fm-slack-check.sh" arm --replay "$ARM_REPLAY" 2>"$TMP/arm.err"); rc=$?
   set -e
-  assert_contains "$out" 'slack: refused: unconfigured' "S2 arm names an unconfigured home without $var"
+  assert_eq "$out" "" "S2 arm without $var wrote to stdout"
+  assert_contains "$(cat "$TMP/arm.err")" 'slack: refused: unconfigured' "S2 arm names an unconfigured home without $var on stderr"
   [ "$rc" -ne 0 ] || fail "S2 arm without $var exited zero"
   [ ! -e "$FM_STATE_OVERRIDE/slack.check.sh" ] || fail "S2 arm without $var left a check"
+  set +e
+  out=$(without "$var" "$ROOT/bin/fm-slack-check.sh" check --replay "$CHECK_REPLAY" 2>"$TMP/check.err"); rc=$?
+  set -e
+  assert_eq "$out" "" "S2 the periodic check without $var wrote to stdout"
+  assert_eq "$(cat "$TMP/check.err")" "" "S2 the periodic check without $var wrote to stderr"
+  assert_eq "$rc" 0 "S2 the periodic check without $var exited nonzero"
 done
 printf 'ok - S2\n'
 
@@ -871,5 +877,70 @@ expected='merge 12 & 13, skip CI < 5 min > see https://example.com/b and the doc
 assert_eq "$(answer_line no-options)" "$expected" "X18 the recorded answer is what the owner typed"
 assert_eq "$(label_line no-options)" "$expected" "X18 the recorded label is what the owner typed"
 printf 'ok - X18\n'
+
+# X19: notices surface in order, as many as the wake line holds, the rest queue unchanged
+new_home mirror
+bind
+mirror mirror >/dev/null
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/mirror/transcript.json" >/dev/null
+ts_a=$(thread_field open-a ts)
+ts_b=$(thread_field open-b ts)
+ts_c=$(thread_field between ts)
+wide() { python3 -I -c 'import sys; print(sys.argv[1] * 200)' "$1"; }
+reply_to "$ts_a" 900.000101 "$(wide a)"
+reply_to "$ts_a" 900.000102 "$(wide b)"
+reply_to "$ts_b" 900.000201 "$(wide c)"
+reply_to "$ts_b" 900.000202 "$(wide d)"
+close_terminal between
+reply_to "$ts_c" 900.000301 hello
+wake() { "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/mirror/transcript.json"; }
+out=$(wake)
+[ "${#out}" -le 480 ] || fail "X19 the wake line is unbounded"
+assert_contains "$out" 'conflicting signals' "X19 first conflict surfaces first"
+assert_contains "$out" 'aaaa' "X19 first conflict names its answer"
+assert_not_contains "$out" 'cccc' "X19 second conflict jumped the queue"
+assert_not_contains "$out" 'unmatched reply' "X19 the later reply jumped the queue"
+assert_contains "$out" '; +2 queued$' "X19 the queue marker"
+assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_a")" 2 "X19 first conflict marked seen"
+assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_b")" 0 "X19 a queued conflict was marked seen without its line"
+assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_c")" 0 "X19 a queued reply was marked seen without its line"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 2 "X19 queued rows were not carried"
+assert_contains "$(thread_texts "$ts_a")" 'Conflicting signals' "X19 first notice post"
+assert_not_contains "$(thread_texts "$ts_b")" 'Conflicting signals' "X19 a queued notice was posted before its line"
+out=$(wake)
+[ "${#out}" -le 480 ] || fail "X19 the second wake line is unbounded"
+assert_contains "$out" 'cccc' "X19 second conflict surfaces next"
+assert_not_contains "$out" 'aaaa' "X19 first conflict repeated"
+assert_not_contains "$out" 'unmatched reply' "X19 the later reply surfaced early"
+assert_contains "$out" '; +1 queued$' "X19 the queue marker shrinks"
+assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_b")" 2 "X19 second conflict marked seen"
+assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_c")" 0 "X19 the later reply was marked seen without its line"
+assert_contains "$(thread_texts "$ts_b")" 'Conflicting signals' "X19 second notice post"
+out=$(wake)
+assert_contains "$out" "unmatched reply 900.000301" "X19 the later reply's line was lost"
+assert_not_contains "$out" 'queued' "X19 an empty queue left a marker"
+assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_c")" 1 "X19 the later reply marked seen"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X19 rows left after every line surfaced"
+assert_eq "$(wake)" "" "X19 a surfaced notice repeated"
+assert_open open-a 0 "X19 a conflict recorded an answer"
+assert_open open-b 0 "X19 a conflict recorded an answer"
+printf 'ok - X19\n'
+
+# X20: a Slack subtype alone never refuses the owner; a bot marker always does
+new_home card-payload
+bind
+mirror card-payload >/dev/null
+ts=$(thread_field no-options ts)
+python3 "$HELPER" reply "$(replay_file)" "$ts" 900.000096 U0TESTOWNER 'bot id' '{"bot_id":"BBOTLOOKALIKE"}'
+python3 "$HELPER" reply "$(replay_file)" "$ts" 900.000097 U0TESTOWNER 'app id' '{"app_id":"AAPPLOOKALIKE"}'
+python3 "$HELPER" reply "$(replay_file)" "$ts" 900.000098 U0TESTOWNER 'bot profile' '{"bot_profile":{"id":"BPROFILE"}}'
+out=$(poll card-payload)
+assert_eq "$(closed_count "$out")" 0 "X20 a bot-marked message answered"
+assert_open no-options 0 "X20 a bot-marked message closed the call"
+python3 "$HELPER" reply "$(replay_file)" "$ts" 900.000099 U0TESTOWNER 'ship the release' '{"subtype":"thread_broadcast"}'
+out=$(poll card-payload)
+assert_eq "$(closed_count "$out")" 1 "X20 a thread_broadcast reply from the owner"
+assert_eq "$(answer_line no-options)" "ship the release" "X20 the broadcast reply's words are the answer"
+printf 'ok - X20\n'
 
 printf 'ok - all Slack watch checks\n'

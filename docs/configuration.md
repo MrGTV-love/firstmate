@@ -2927,11 +2927,11 @@ FM_SLACK_POLL_MAX_ANSWERS=20 # optional whole number, 1..200; default 20
 ```
 
 A missing token or an empty allowlist means the plane is off: a silent no-op, before network calls, state creation, task reads, or notifications.
-The one exception is an explicit `fm-slack-check.sh arm`: it prints `slack: refused: unconfigured`, exits non-zero, and registers nothing, so an arm that did nothing never looks like success.
+The one exception is an explicit `fm-slack-check.sh arm`: it writes `slack: refused: unconfigured` to stderr, prints nothing to stdout, exits non-zero, and registers nothing, so an arm that did nothing never looks like success.
 An unparseable allowlist, an invalid `FM_SLACK_DM_USER`, or an out-of-range `FM_SLACK_POLL_MAX_ANSWERS` refuses everything.
-Run by hand (`fm-slack-poll.sh`, `fm-slack-mirror.sh`) or through `fm-slack-check.sh arm`, a refusal prints a named reason; the armed standing check stays silent on the same refusal, so a typo in `.env` never wakes firstmate every cycle.
+Run by hand (`fm-slack-poll.sh`, `fm-slack-mirror.sh`, which print the reason to stdout) or through `fm-slack-check.sh arm` (which writes every refusal to stderr and exits non-zero), a refusal names its reason; the armed standing check stays silent on the same refusal, so a typo in `.env` never wakes firstmate every cycle.
 Every allowlist token must match `[UW][A-Z0-9]{8,}`; names, email addresses, partially valid lists, and handles are refused rather than interpreted as authority.
-Typed bot/app/subtype messages are refused even when their user id is allowlisted.
+Typed messages carrying a bot marker (`bot_id`, `app_id`, or `bot_profile`) are refused even when their user id is allowlisted; a Slack message subtype alone, such as `thread_broadcast` for a thread reply also sent to the main window, does not refuse an allowlisted owner's reply.
 Reaction authors also require a read-only user lookup proving they are not a bot or app user.
 `FM_SLACK_FAULT` is a test-only crash-injection value (`after-delivery` or `after-answer`) read from the process environment only, never from `.env`; unset means normal operation.
 
@@ -2959,7 +2959,8 @@ A typed reply and a reaction seen in the same poll are compared: agreement recor
 Two contradictory typed replies, or two different reactions, likewise record nothing and surface once.
 A conflicted thread stays blocked until a fresh typed reply arrives or the reaction set changes; every typed reply in the conflict is consumed and is never recorded later.
 When a reaction is part of the conflict, the notice tells the captain to remove it or to type its option number, since a fresh reply alone cannot outvote a standing reaction.
-The notice and its wake line show each conflicting answer cut to 60 characters, so one long reply cannot push other pending conditions out of the wake line or the remedy out of the notice.
+Notices (conflicts and unmatched replies) surface in the order they arose, and a poll emits only as many of their lines as fit the wake line with room left for a queue marker; a notice is posted to its thread, reported, and marked seen only when its line is emitted, along with the replies that caused it.
+The notices that do not fit stay pending unchanged for the next poll, and the emitted line ends with `; +N queued` while N wait, so one long reply cannot push other pending conditions out of the wake line.
 A reply or reaction on a thread whose call has closed, or whose task was held again under a newer hold, is never applied; the old thread is retired and a typed reply there is surfaced as unmatched.
 When the call's state cannot be read, the poll leaves the reply unread and tries again next time; a thread mirrored while the state was unreadable is treated as replaced as soon as the call reads as open under a verified hold, so it never answers one.
 Each tap is attributed to the member who made it, and a staged answer is dropped if that member has left the allowlist before delivery.
