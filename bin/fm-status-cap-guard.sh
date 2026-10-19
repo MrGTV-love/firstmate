@@ -14,8 +14,11 @@
 #
 # scan investigates each such file once and prints one record per file:
 #   <identity><TAB><path><TAB><size after containment><TAB><wake reason>
-# The reason names the file, its size, its growth rate over a short sample, and the
-# writer process found by lsof. It then contains the damage: when the writer is an
+# The reason names the file, its size, its growth rate over the span of the looks, and
+# the writer process found by lsof. A writer that reopens the log on every append (the
+# incident's loop) has it open for a fraction of each look, so a log with no writer
+# found is looked at again, back to back, up to MAX_LOOKS times within LOOK_SECS.
+# It then contains the damage: when the writer is an
 # omp process (the harness that produced the incident) it is stopped with SIGSTOP,
 # which a later `kill -CONT <pid>` undoes. Exactly the pids lsof reported as holding
 # the file open for writing and recognized as omp are signalled; any other writer,
@@ -52,10 +55,15 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 
 LSOF=${FM_STATUS_CAP_LSOF:-lsof}
-# One second between the first lsof look and the second look for a writer that reopens
-# the log on every append. It is a sampling interval, not a deadline, and a constant.
-# measured: value=1 date=2026-10-18 host=Mac-Studio.local margin=5 (one lsof look takes 0.20 to 0.23 s)
-SAMPLE_SECS=1
+# A writer that reopens the log on every append (the loop `printf ... >> file`) has it
+# open for a fraction of each lsof read: 9 of 30 looks named an omp-named bash loop of
+# that shape on 2026-10-19, so one look misses it about 7 times in 10. A log with no
+# writer found is looked at again, back to back, until a look names one. Twenty looks
+# miss it 0.7^20 = 0.08% of the time; the deadline bounds a host so loaded that a look
+# takes seconds. Both are constants.
+MAX_LOOKS=20
+# measured: value=10 date=2026-10-19 host=Mac-Studio.local margin=40 (one lsof look takes 0.2 to 0.5 s, so twenty looks take 4 to 10 s)
+LOOK_SECS=10
 
 clean() { LC_ALL=C tr '\t\r\n' '   '; }
 
@@ -155,30 +163,26 @@ rate_between() {  # <size-a> <time-a> <size-b> <time-b>
   ' "$1" "$2" "$3" "$4"
 }
 
-# Containment first, measurement second: the growth rate is taken from the sample
-# lsof's own run already spans, and every omp writer is stopped before anything
-# sleeps, because at the incident's 0.2 to 0.7 GB/s each second costs hundreds of
-# megabytes. Only a log with no writer found yet waits one sample for a second look.
+# Containment first, measurement second: the growth rate is taken from the span the
+# lsof looks already cover, and every omp writer is stopped before anything else
+# waits, because at the incident's 0.2 to 0.7 GB/s each second costs hundreds of
+# megabytes. Only a log with no writer found yet is looked at again (MAX_LOOKS).
 investigate() {  # <size> <ident> <path>
   local size=$1 ident=$2 path=$3 cap size_a size_b size_end time_a time_b rate writers pid cmd name start line reason
-  local writer_text='' action_text='' omp_found=0 seen_other=''
+  local writer_text='' action_text='' omp_found=0 seen_other='' looks=1 started
   fm_status_cap_bytes cap
   size_a=$(file_size "$path") || size_a=$size
   time_a=$(now_hires)
   writers=$(unique_writers "$path")
+  started=$SECONDS
+  while [ -z "$writers" ] && [ "$looks" -lt "$MAX_LOOKS" ] && [ $((SECONDS - started)) -lt "$LOOK_SECS" ]; do
+    writers=$(unique_writers "$path")
+    looks=$((looks + 1))
+  done
   size_b=$(file_size "$path") || size_b=$size_a
   time_b=$(now_hires)
   rate=$(rate_between "$size_a" "$time_a" "$size_b" "$time_b")
-  if [ -z "$writers" ]; then
-    # A writer that reopens the log on every append is between opens for most of an
-    # lsof read; look once more after one sample, which also measures growth.
-    sleep "$SAMPLE_SECS"
-    writers=$(unique_writers "$path")
-    size_end=$(file_size "$path") || size_end=$size_b
-    time_b=$(now_hires)
-    rate=$(rate_between "$size_a" "$time_a" "$size_end" "$time_b")
-  fi
-  size_end=$(file_size "$path") || size_end=$size_b
+  size_end=$size_b
   [ -n "$rate" ] || rate=unmeasured
   if [ -z "$writers" ]; then
     writer_text='none found (lsof listed no process holding it open for writing)'
