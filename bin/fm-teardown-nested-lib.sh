@@ -309,9 +309,9 @@ teardown_ignored_sha256() {  # [<path>]
 # Bundle preservation is separate from delivery, and is deliberately rechecked
 # rather than placed in the immutable-HEAD landing cache. fm-teardown.sh's
 # header owns the record format and supported creation/recovery commands.
-teardown_bundle_refuse() {  # <predicate>
+teardown_bundle_refuse() {  # <predicate> [hint]
   echo "teardown: bundle preservation unavailable: $1." >&2
-  echo "Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in $DATA/$ID/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown." >&2
+  [ -z "${2:-}" ] || echo "Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in $DATA/$ID/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown." >&2
   return 1
 }
 
@@ -340,6 +340,7 @@ teardown_bundle_external() {  # <copy> <bundle>
   fi
   while IFS= read -r -d '' field; do
     case "$field" in 'worktree '*) root=${field#worktree } ;; *) continue ;; esac
+    [ -e "$root" ] || continue
     if ! root=$(fm_task_copy_canonical_dir "$root"); then
       TEARDOWN_BUNDLE_REASON="registered copy cannot be resolved: ${field#worktree }"
       incomplete=1
@@ -386,47 +387,12 @@ teardown_bundle_restorable() {  # <copy> <bundle> <tips>
 # starts at <ref> and adds each local branch no worktree has checked out; a
 # checked-out branch belongs to its own worktree's task. --children leaves
 # maximal tips as one-field lines.
-teardown_bundle_preserved() {  # <copy> <ref>
-  local copy=$1 ref=$2 record="$DATA/$ID/preservation-bundles.tsv"
+teardown_bundle_preserved() {  # <copy> <ref> [hint]
+  local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
   local line rest bundle hash tips tip walk required heads advertised digest i number=0 reason=
   local branches field checked_out='' side=''
   local -a bundles=() hashes=() tip_sets=() recorded=()
-  if [ ! -f "$record" ] || [ -L "$record" ]; then
-    teardown_bundle_refuse "missing preservation record (regular nonsymlink file required): $record"
-    return 1
-  fi
-  # Parse every line before accepting any bundle: a malformed trailing entry
-  # must never be hidden by a preceding valid entry.
-  while IFS= read -r line || [ -n "$line" ]; do
-    number=$((number + 1))
-    bundle=${line%%$'\t'*}
-    rest=${line#*$'\t'}
-    hash=${rest%%$'\t'*}
-    tips=${rest#*$'\t'}
-    if [ "$line" = "$rest" ] || [ "$rest" = "$tips" ] \
-        || [ -z "$bundle" ] || [ -z "$tips" ] \
-        || [[ "$tips" = *$'\t'* || "$line" = *$'\r'* ]] \
-        || ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
-      teardown_bundle_refuse "malformed preservation record line $number in $record (expected absolute path, SHA-256 and full tips in three TAB-separated fields)"
-      return 1
-    fi
-    read -r -a recorded <<< "$tips"
-    if [ "${#recorded[@]}" = 0 ]; then
-      teardown_bundle_refuse "malformed preservation record line $number in $record (no commit tips)"
-      return 1
-    fi
-    for tip in "${recorded[@]}"; do
-      if ! [[ "$tip" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
-        teardown_bundle_refuse "malformed preservation record line $number in $record (invalid full commit tip: $tip)"
-        return 1
-      fi
-    done
-    bundles+=("$bundle") hashes+=("$hash") tip_sets+=("${recorded[*]}")
-  done < "$record"
-  if [ "${#bundles[@]}" = 0 ]; then
-    teardown_bundle_refuse "empty preservation record: $record"
-    return 1
-  fi
+  TEARDOWN_BUNDLE_ACCEPTED=
   branches=$(git -C "$copy" for-each-ref --format='%(refname)' refs/heads 2>/dev/null) || {
     teardown_bundle_refuse "copy's branches cannot be inspected: $copy"; return 1;
   }
@@ -446,6 +412,42 @@ teardown_bundle_preserved() {  # <copy> <ref>
     teardown_bundle_refuse "copy has no unlanded tips to preserve; existing delivery proof is still required"
     return 1
   fi
+  if [ ! -f "$record" ] || [ -L "$record" ]; then
+    teardown_bundle_refuse "missing preservation record (regular nonsymlink file required): $record" "$hint"
+    return 1
+  fi
+  # Parse every line before accepting any bundle: a malformed trailing entry
+  # must never be hidden by a preceding valid entry.
+  while IFS= read -r line || [ -n "$line" ]; do
+    number=$((number + 1))
+    bundle=${line%%$'\t'*}
+    rest=${line#*$'\t'}
+    hash=${rest%%$'\t'*}
+    tips=${rest#*$'\t'}
+    if [ "$line" = "$rest" ] || [ "$rest" = "$tips" ] \
+        || [ -z "$bundle" ] || [ -z "$tips" ] \
+        || [[ "$tips" = *$'\t'* || "$line" = *$'\r'* ]] \
+        || ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
+      teardown_bundle_refuse "malformed preservation record line $number in $record (expected absolute path, SHA-256 and full tips in three TAB-separated fields)" "$hint"
+      return 1
+    fi
+    read -r -a recorded <<< "$tips"
+    if [ "${#recorded[@]}" = 0 ]; then
+      teardown_bundle_refuse "malformed preservation record line $number in $record (no commit tips)" "$hint"
+      return 1
+    fi
+    for tip in "${recorded[@]}"; do
+      if ! [[ "$tip" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+        teardown_bundle_refuse "malformed preservation record line $number in $record (invalid full commit tip: $tip)" "$hint"
+        return 1
+      fi
+    done
+    bundles+=("$bundle") hashes+=("$hash") tip_sets+=("${recorded[*]}")
+  done < "$record"
+  if [ "${#bundles[@]}" = 0 ]; then
+    teardown_bundle_refuse "empty preservation record: $record" "$hint"
+    return 1
+  fi
   for i in "${!bundles[@]}"; do
     bundle=${bundles[$i]} hash=${hashes[$i]} tips=${tip_sets[$i]}
     TEARDOWN_BUNDLE_REASON=
@@ -455,6 +457,8 @@ teardown_bundle_preserved() {  # <copy> <ref>
       TEARDOWN_BUNDLE_REASON='bundle sha256 cannot be read'
     elif [ "$digest" != "$hash" ]; then
       TEARDOWN_BUNDLE_REASON='bundle sha256 does not match record'
+    elif ! git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1; then
+      TEARDOWN_BUNDLE_REASON='git bundle verify failed'
     elif ! heads=$(git -C "$copy" bundle list-heads "$bundle" 2>/dev/null); then
       TEARDOWN_BUNDLE_REASON='bundle advertised tips cannot be read'
     else
@@ -480,11 +484,12 @@ teardown_bundle_preserved() {  # <copy> <ref>
     fi
     if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
       echo "teardown: preserved unlanded commits in bundle $bundle sha256=$hash tips=$tips" >&2
+      TEARDOWN_BUNDLE_ACCEPTED=$bundle
       return 0
     fi
     reason+="${reason:+; }$bundle: $TEARDOWN_BUNDLE_REASON"
   done
-  teardown_bundle_refuse "$reason"
+  teardown_bundle_refuse "$reason" "$hint"
 }
 
 # Copies every preservable ignored entry of <copy> into

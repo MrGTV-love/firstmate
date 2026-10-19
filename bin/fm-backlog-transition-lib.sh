@@ -1227,7 +1227,13 @@ fm_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
     0) ;;
     2)
       case "${args[0]}" in
-        --note) [ "${args[1]}" = "local%20main" ] || [ "${args[1]}" = dropped ] ;;
+        --note)
+          [ "${args[1]}" = "local%20main" ] || [ "${args[1]}" = dropped ] \
+            || case "${args[1]}" in
+              "preserved in bundle /"*", not landed") [ "${#args[1]}" -le 4096 ] ;;
+              *) false ;;
+            esac
+          ;;
         --pr)
           arg_value=${args[1]}
           [ "${#arg_value}" -le 2048 ] \

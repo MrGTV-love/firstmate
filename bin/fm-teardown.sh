@@ -70,11 +70,11 @@
 # The record and bundle must be regular nonsymlink files. The bundle's physical
 # parent must be outside every registered copy (symlink aliases included) and
 # every enclosing Treehouse pool, including non-copy directories in it.
-# One recorded bundle must match its recorded SHA-256, advertise and record every
-# maximal tip of git rev-list --children <ref> <branches> --not --remotes, and
-# restore on its own: fetching every recorded tip from it into a fresh empty
-# repository outside the copy and pool must succeed and pass git fsck
-# --connectivity-only. <ref> is the copy's HEAD (detached included) or a removed
+# One recorded bundle must pass git bundle verify in the copy, match its recorded
+# SHA-256, advertise and record every maximal tip of git rev-list --children
+# <ref> <branches> --not --remotes, and restore on its own: fetching every
+# recorded tip from it into a fresh empty repository outside the copy and pool
+# must succeed and pass git fsck --connectivity-only. <ref> is the copy's HEAD (detached included) or a removed
 # copy's branch tip; <branches> are the local branches no worktree has checked
 # out, so side branches count and a branch another worktree holds is that task's
 # own. A thin bundle, a truncated pack or a missing tip refuses. Ancestors need
@@ -84,6 +84,8 @@
 # final safety rechecks read the file and record and verify coverage again.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
+# A ship kept only by its bundle closes its backlog item with the note
+# "preserved in bundle <bundle path>, not landed", never a PR or "local main".
 # A Vernant-locked copy still needs its driver's independent landing verdict.
 # To create a self-contained bundle and its record (no creator is run by teardown),
 # choose an absolute durable bundle path OUTSIDE every copy and pool, set copy,
@@ -91,6 +93,7 @@
 #   bundle=/durable/preservation/task.bundle
 #   mkdir -p "${bundle%/*}" "$FM_HOME/data/$task"
 #   git -C "$copy" bundle create "$bundle" --all &&
+#   git -C "$copy" bundle verify "$bundle" &&
 #   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
 #   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
 #   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" >> "$FM_HOME/data/$task/preservation-bundles.tsv"
@@ -2387,6 +2390,11 @@ TEARDOWN_LANDED_HEADS=()
 # comparison), empty when it answered "not landed". A reader that types
 # refusals must not count an unasked proof as a policy refusal.
 TEARDOWN_LANDED_UNASKED=
+TEARDOWN_BUNDLE_PROOF=
+work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
+  teardown_bundle_preserved "$2" "$3" "${4:-}" || return 1
+  [ -z "$1" ] || TEARDOWN_BUNDLE_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
+}
 work_is_landed() {
   local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
   TEARDOWN_LANDED_UNASKED=
@@ -2403,7 +2411,7 @@ work_is_landed() {
   done
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] && [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
     # Bundle proofs are local, so re-read them even under final project custody.
-    teardown_bundle_preserved "$dir" "$head" && return 0
+    work_is_landed_bundle "$branch" "$dir" "$head" && return 0
     echo "REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof" >&2
     TEARDOWN_LANDED_UNASKED="HEAD changed to ${head:0:12} after its landing proof; retry for a fresh proof"
     return 1
@@ -2414,7 +2422,7 @@ work_is_landed() {
     TEARDOWN_LANDED_HEADS+=("$head")
     return 0
   fi
-  teardown_bundle_preserved "$dir" "$head"
+  work_is_landed_bundle "$branch" "$dir" "$head" hint
 }
 
 # A pushed branch proves recoverability, not delivery: require the landing
@@ -2557,8 +2565,9 @@ teardown_is_dropping() {
 }
 
 # The completion links this teardown already holds locally. A scout's
-# deliverable is its report, a local-only ship lands on local main, and every
-# other ship carries the PR recorded on its own record.
+# deliverable is its report, a ship whose commits only a recorded bundle holds
+# names that bundle and says it is not landed, a local-only ship lands on local
+# main, and every other ship carries the PR recorded on its own record.
 BACKLOG_DONE_ARGS=()
 TEARDOWN_RECORDED_PR_ONLY=0
 backlog_done_args() {
@@ -2574,7 +2583,9 @@ backlog_done_args() {
       BACKLOG_DONE_ARGS=(--report "$data_relative/$ID/report.md")
       ;;
     *)
-      if [ "$MODE" = local-only ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 0 ]; then
+      if [ -n "$TEARDOWN_BUNDLE_PROOF" ]; then
+        BACKLOG_DONE_ARGS=(--note "preserved in bundle $TEARDOWN_BUNDLE_PROOF, not landed")
+      elif [ "$MODE" = local-only ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 0 ]; then
         BACKLOG_DONE_ARGS=(--note "local main")
       elif [ -n "$PR_URL" ]; then
         BACKLOG_DONE_ARGS=(--pr "$PR_URL")
@@ -2930,6 +2941,7 @@ teardown_note_dirty_return() {
 
 validate_worktree_teardown_safety() {
   local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state wt_real
+  TEARDOWN_BUNDLE_PROOF=
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
     secondmate|scout) return 0 ;;
