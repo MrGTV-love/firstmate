@@ -3134,6 +3134,10 @@ EOF
   done <<EOF
 $records
 EOF
+  # wake() flushes the pending signals before it prints, and the status signal of a
+  # runaway log is pending: without this the flush would linger one more full grace and
+  # the supervisor would hear of a stop that has already happened a grace late.
+  SIGNAL_PHASE_NO_LINGER=1
   wake "$reason"
 }
 
@@ -3343,6 +3347,7 @@ SIGNAL_PHASE_FIRST=0
 PRELUDE_PROGRESS_MARKER="$STATE/.prelude-progress"
 PRELUDE_NEXT_STEP=
 SIGNAL_PHASE_DELIVERY_ONLY=0
+SIGNAL_PHASE_NO_LINGER=0
 SIGNAL_PHASE_QUEUED_REASON=
 SIGNAL_PHASE_LATE_MARKER="$STATE/.watch-late-signals"
 
@@ -3742,7 +3747,7 @@ signal_phase() {
   # test_procevent_wake_never_lingers_under_the_queue_lock).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
-    [ "$signal_append" = fm_wake_append_locked ] || signal_grace_linger
+    [ "$signal_append" = fm_wake_append_locked ] || [ "$SIGNAL_PHASE_NO_LINGER" -eq 1 ] || signal_grace_linger
     pending=$(printf '%s\n%s\n' "$pending" "$(scan_signals)" | LC_ALL=C awk -F '\t' '
       NF == 3 { if (!($3 in row)) order[++n] = $3; row[$3] = $0 }
       END { for (i = 1; i <= n; i++) print row[order[i]] }
