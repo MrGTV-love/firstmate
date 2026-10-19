@@ -734,10 +734,12 @@ teardown_foreign_procs_retire() {
 }
 
 # Runs Vernant's closeout driver on <copy>: it releases its own creation lock
-# and removes the copy. Output lands in TEARDOWN_CLOSEOUT_OUT. Exit 0 means the
-# driver allowed and ran the cleanup.
-teardown_run_closeout() {  # <slot> <copy>
-  local slot=$1 copy=$2 driver py rc=0
+# and removes the copy. With "plan" it omits --execute-cleanup, so the driver
+# only says whether it would. Output lands in TEARDOWN_CLOSEOUT_OUT. Exit 0 means
+# the driver allowed and, unless planning, ran the cleanup.
+teardown_run_closeout() {  # <slot> <copy> [plan]
+  local slot=$1 copy=$2 execute=--execute-cleanup driver py rc=0
+  [ "${3:-}" != plan ] || execute=
   TEARDOWN_CLOSEOUT_OUT=
   driver=$slot/scripts/git-stability/closeout_pr.py
   py=${FM_TEARDOWN_VERNANT_PYTHON:-$slot/.venv/bin/python}
@@ -749,7 +751,7 @@ teardown_run_closeout() {  # <slot> <copy>
   # newlines, so a refusal can save exactly the output the driver produced.
   TEARDOWN_CLOSEOUT_OUT=$(
     local status=0
-    ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" --execute-cleanup ) 2>&1 || status=$?
+    ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) 2>&1 || status=$?
     printf '.'
     exit "$status"
   ) || rc=$?

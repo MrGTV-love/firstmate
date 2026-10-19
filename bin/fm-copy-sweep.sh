@@ -32,7 +32,9 @@
 #                      A lock that is not Vernant's exact creation-lock format,
 #                      or whose launcher may still be alive, stays here: the
 #                      closeout driver is the only supported release and this
-#                      sweep never unlocks by hand.
+#                      sweep never unlocks by hand. A REAPABLE-DRIVER copy whose
+#                      driver plan refuses it in --apply joins this class, with
+#                      the driver's own reason as its reason.
 #   HELD-LIVE-TASK     an active task record in any local home names it (or a
 #                      path inside or around it, except a registered secondmate's
 #                      own home chain), a process has its working directory
@@ -69,7 +71,8 @@
 #                      after the lock file was written is recycled and owns
 #                      nothing, and a pid that started before it, still alive, is
 #                      the lock's launcher and keeps the copy locked. Only
-#                      Vernant's closeout driver releases it.
+#                      Vernant's closeout driver releases it, and --apply first
+#                      asks that driver for its plan.
 # HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
 # `git worktree remove`, so calling it live or orphaned would mislead.
 # Independently of class and byte budgets, one HELD-LIVE-TASK report line names
@@ -89,17 +92,25 @@
 #
 # --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
 # deepest path first, each re-proved just before its own removal. An unlocked
-# copy goes by a plain `git worktree remove` run from the parent clone; a locked
-# one is preserved and then released and removed by Vernant's own closeout
-# driver, run from that clone, exactly as bin/fm-teardown.sh does it. The
-# sweep's preserved ignored entries land in data/copy-sweep/nested-copy-preserved.
-# Never a force flag, never a recursive delete of a copy, never a hand unlock,
-# never a Treehouse call. A removal that fails leaves the copy and is
-# reported with the refusal text of git or of the closeout driver, and the run
-# exits 1; it is not retried in that run, and the next run proves the copy again.
-# A removed copy is reported with the GiB it freed, and the run totals them (a
-# size that was not measured counts as none and is said so). Each removal
-# appends one line to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
+# copy goes by a plain `git worktree remove` run from the parent clone. A locked
+# one first gets the closeout driver's plan, run from that clone without
+# --execute-cleanup and before anything is copied or hashed: a plan that exits
+# non-zero or says allowed is false holds the copy as HELD-LOCKED with the
+# driver's own words (the first 600 characters, on one line), copies nothing, and
+# is not a failure. A copy whose plan allows it has its ignored entries preserved
+# and is then released and removed by the driver, exactly as bin/fm-teardown.sh
+# does it. The preserved entries land in data/copy-sweep/<run stamp>-<HEAD>/
+# nested-copy-preserved/<sha256 of the path>, so no later run or copy at the same
+# path replaces them. Never a force flag, never a recursive delete of a copy
+# (the only recursive delete is the teardown library's of its own staging
+# directory under data/), never a hand unlock, never a Treehouse call. A removal
+# that fails after its plan was allowed, or that git refuses, leaves the copy and
+# is reported with the refusal text, and the run exits 1; it is not retried in
+# that run. Each REMOVED line reports "copy X GiB, preserved Y GiB, net freed Z
+# GiB" (the copy's size less the bytes it preserved; a size that was not measured
+# shows "-" and "unmeasured"), and the run ends with one line "freed X GiB
+# measured, N copies unmeasured". Each removal appends one line to
+# data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
 # in the same run is removed by the next run; a second run otherwise finds
 # nothing left to remove. Report mode (no flag) reads the size cache and writes
 # nothing; `check` writes only the size cache and the record (budgets and live copies).
@@ -724,10 +735,35 @@ cache_lookup() {  # <copy> <mtime> -> "<measured-at><TAB><KiB>" when fresh
     END { exit !found }' "$SIZE_CACHE"
 }
 
+# Sets SIZE_KIB to the KiB under <path>, or empty when du did not finish or
+# printed no size. A cut du marks the scan cut.
+du_kib() {  # <path>
+  local out rc=0
+  SIZE_KIB=
+  out=$(run_before_deadline nice -n 20 du -sk -- "$1" 2>/dev/null) || rc=$?
+  if fm_timed_out "$rc"; then
+    SCAN_CUT=1
+    return 0
+  fi
+  out=${out%%[[:space:]]*}
+  case "$out" in ''|*[!0-9]*) return 0 ;; esac
+  SIZE_KIB=$out
+}
+
+# Sets SIZE_KIB to the size of the directory <dir> in KiB: 0 when it does not
+# exist, empty when it was not measured.
+measure_dir() {  # <dir>
+  SIZE_KIB=0
+  [ -d "$1" ] || return 0
+  SIZE_KIB=
+  [ "$SIZING" = 1 ] || return 0
+  du_kib "$1"
+}
+
 # Sets SIZE_KIB to the copy's size in KiB, or empty when it was not measured.
 # One du at a time; a deadline stops new measurements, never one in flight.
 measure_copy() {  # <copy>
-  local copy=$1 mtime out kib hit rc measured=$CACHE_NOW
+  local copy=$1 mtime hit measured=$CACHE_NOW
   SIZE_KIB=
   if [ ! -d "$copy" ]; then
     SIZE_KIB=0
@@ -745,16 +781,9 @@ measure_copy() {  # <copy>
   [ "$SIZING" = 1 ] || return 0
   # The watcher kills a check that outlives its bound and keeps nothing, so a
   # measurement that cannot finish inside the time left is cut, not awaited.
-  rc=0
-  out=$(run_before_deadline nice -n 20 du -sk -- "$copy" 2>/dev/null) || rc=$?
-  if fm_timed_out "$rc"; then
-    SCAN_CUT=1
-    return 0
-  fi
-  kib=${out%%[[:space:]]*}
-  case "$kib" in ''|*[!0-9]*) return 0 ;; esac
-  SIZE_KIB=$kib
-  CACHE_NEW="$CACHE_NEW$copy"$'\t'"$mtime"$'\t'"$measured"$'\t'"$kib"$'\n'
+  du_kib "$copy"
+  [ -n "$SIZE_KIB" ] || return 0
+  CACHE_NEW="$CACHE_NEW$copy"$'\t'"$mtime"$'\t'"$measured"$'\t'"$SIZE_KIB"$'\n'
 }
 
 # --- the scan ----------------------------------------------------------------
@@ -868,21 +897,43 @@ FAILED_COUNT=0
 FREED_KIB=0
 FREED_UNMEASURED=0
 
-log_removal() {  # <copy> <clone> <head> <branch> <kib> <proof>
+log_removal() {  # <copy> <clone> <head> <branch> <kib> <preserved-kib> <proof>
   mkdir -p "$DATA_DIR" 2>/dev/null || return 1
-  printf '%s\tremoved\t%s\tclone=%s\thead=%s\tbranch=%s\tkib=%s\tproof=%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$3" "$4" "$5" "$6" >> "$REMOVAL_LOG"
+  printf '%s\tremoved\t%s\tclone=%s\thead=%s\tbranch=%s\tkib=%s\tpreserved_kib=%s\tproof=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$3" "$4" "$5" "$6" "$7" >> "$REMOVAL_LOG"
+}
+
+# <KiB> as GiB, or "-" when it was not measured.
+gib_or_dash() {  # <KiB or ->
+  case "$1" in ''|*[!0-9]*) printf -- '-' ;; *) kib_to_gib "$1" ;; esac
+}
+
+# Asks Vernant's closeout driver, in plan mode, whether it would release <copy>,
+# before anything is copied or hashed. Fails with PLAN_WHY holding the driver's
+# own words on one line when it exits non-zero or says allowed is false.
+PLAN_WHY=
+driver_plan_allows() {  # <clone> <copy>
+  local rc=0
+  teardown_run_closeout "$1" "$2" plan || rc=$?
+  PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
+  PLAN_WHY=${PLAN_WHY:0:600}
+  if [ "$rc" != 0 ] || printf '%s' "$TEARDOWN_CLOSEOUT_OUT" \
+    | grep -Eiq '(^|[^[:alnum:]_])allowed"?[[:space:]]*[:=][[:space:]]*"?false([^[:alnum:]_]|$)'; then
+    PLAN_WHY="its closeout driver would not release it (exit $rc): ${PLAN_WHY:-no output}"
+    return 1
+  fi
 }
 
 # Preserves the ignored entries of a REAPABLE-DRIVER copy, then releases and
 # removes it through Vernant's own closeout driver, which is the only supported
 # release for its creation lock. The preservation lands under this sweep's data
-# directory, because a swept copy no task record owns has no task id to file it
-# under. The teardown library owns both the preservation and the driver run.
-teardown_driver_release() {  # <clone> <copy>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} owner_id=copy-sweep
+# directory in <release-id>, which holds the run stamp and the copy's HEAD, so a
+# later copy at the same path never replaces it. The teardown library owns both
+# the preservation and the driver run.
+teardown_driver_release() {  # <clone> <copy> <release-id>
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-}
   DATA=$DATA_DIR
-  ID=$owner_id
+  ID=$3
   teardown_foreign_copy_dispose "$clone" "$copy" || rc=$?
   DATA=$saved_data
   ID=$saved_id
@@ -893,10 +944,13 @@ teardown_driver_release() {  # <clone> <copy>
 # path first, each proved again just before its own removal. An unlocked copy
 # goes by plain `git worktree remove` run from the registering clone: it refuses
 # a dirty or locked copy by itself. A driver-releasable copy goes through
-# Vernant's closeout driver. A refusal leaves the copy and is reported, never
-# retried harder.
+# Vernant's closeout driver, planned first: a copy the plan refuses is held with
+# the driver's reason and nothing is copied. A failure after the plan was allowed
+# leaves the copy and is reported, never retried harder.
 apply_removals() {
-  local line container pool clone copy kib head branch err refusal freed gone=
+  local line container pool clone copy kib head branch err refusal freed gone= held= stamp
+  local release_id preserve_dir preserved net
+  stamp=$(date -u +%Y%m%dT%H%M%SZ).$$
   REMOVAL_REPORT=
   REMOVED_COUNT=0
   FAILED_COUNT=0
@@ -917,11 +971,18 @@ apply_removals() {
     esac
     head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || head=unknown
     branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=detached
+    preserve_dir=
     if [ "$CLASS" = REAPABLE-DRIVER ]; then
       # The copy is Vernant-locked with a dead or recycled launcher. Its own
       # driver is the only supported release: it unlocks and removes, after the
       # teardown library preserved every ignored entry it holds.
-      if ! err=$(teardown_driver_release "$clone" "$copy" 2>&1); then
+      if ! driver_plan_allows "$clone" "$copy"; then
+        held="$held$copy"$'\t'"$PLAN_WHY"$'\n'
+        continue
+      fi
+      release_id="$CHECK_ID/$stamp-$head"
+      preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved"
+      if ! err=$(teardown_driver_release "$clone" "$copy" "$release_id" 2>&1); then
         FAILED_COUNT=$((FAILED_COUNT + 1))
         refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"the copy was left: $(printf '%s' "${refusal:-$err}" | tr '\n\t' '  ')"$'\n'
@@ -939,22 +1000,30 @@ apply_removals() {
     fi
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
     gone="$gone$copy"$'\n'
-    case "$kib" in
-      ''|*[!0-9]*)
-        FREED_UNMEASURED=$((FREED_UNMEASURED + 1))
-        freed='size not measured'
-        ;;
-      *)
-        FREED_KIB=$((FREED_KIB + kib))
-        freed="$(kib_to_gib "$kib") GiB freed"
-        ;;
-    esac
+    preserved=0
+    if [ -n "$preserve_dir" ]; then
+      measure_dir "$preserve_dir"
+      preserved=${SIZE_KIB:--}
+    fi
+    if [[ $kib =~ ^[0-9]+$ && $preserved =~ ^[0-9]+$ ]]; then
+      net=$((kib - preserved))
+      [ "$net" -ge 0 ] || net=0
+      FREED_KIB=$((FREED_KIB + net))
+      freed="net freed $(kib_to_gib "$net") GiB"
+    else
+      FREED_UNMEASURED=$((FREED_UNMEASURED + 1))
+      freed="net freed - GiB, unmeasured"
+    fi
+    freed="copy $(gib_or_dash "$kib") GiB, preserved $(gib_or_dash "$preserved") GiB, $freed"
     REMOVAL_REPORT="${REMOVAL_REPORT}REMOVED"$'\t'"$copy"$'\t'"branch $branch at ${head:0:12}, $freed (${REASON})"$'\n'
-    log_removal "$copy" "$clone" "$head" "$branch" "$kib" "$REASON" \
+    log_removal "$copy" "$clone" "$head" "$branch" "$kib" "$preserved" "$REASON" \
       || { FAILED_COUNT=$((FAILED_COUNT + 1)); REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it was removed but $REMOVAL_LOG could not be appended"$'\n'; }
   done < <(printf '%s\n' "$COPIES" | awk -F '\t' '$5 == "REAPABLE-PROVEN" || $5 == "REAPABLE-DRIVER"' | LC_ALL=C sort -t "$(printf '\t')" -k4,4r)
   if [ -n "$gone" ]; then
     COPIES=$(printf '%s\n' "$COPIES" | GONE=$gone awk -F '\t' 'BEGIN { n = split(ENVIRON["GONE"], g, "\n"); for (i = 1; i <= n; i++) if (g[i] != "") drop[g[i]] = 1 } !($4 in drop)')
+  fi
+  if [ -n "$held" ]; then
+    COPIES=$(printf '%s\n' "$COPIES" | HELD=$held awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["HELD"], h, "\n"); for (i = 1; i <= n; i++) if (h[i] != "") { split(h[i], kv, "\t"); why[kv[1]] = kv[2] } } $4 in why { $5 = "HELD-LOCKED"; $7 = why[$4] } { print }')
   fi
 }
 
@@ -1256,15 +1325,13 @@ print_report() {  # <mode>
     count=$(printf '%s\n' "$COPIES" | awk -F '\t' -v c="$class" '$5 == c { n++ } END { print n + 0 }')
     printf 'summary: %s=%s\n' "$class" "$count"
   done
-  if [ "$1" = apply ]; then
-    printf 'summary: removed=%s freed=%s GiB' "$REMOVED_COUNT" "$(kib_to_gib "$FREED_KIB")"
-    [ "$FREED_UNMEASURED" -eq 0 ] || printf ' (%s removed with no measured size)' "$FREED_UNMEASURED"
-    printf '\n'
-  fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     printf '%s\n' "$line"
   done <<< "$BUDGET_REPORT"
+  if [ "$1" = apply ]; then
+    printf 'freed %s GiB measured, %s copies unmeasured\n' "$(kib_to_gib "$FREED_KIB")" "$FREED_UNMEASURED"
+  fi
 }
 
 # --- arm and disarm ----------------------------------------------------------

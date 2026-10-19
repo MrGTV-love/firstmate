@@ -71,6 +71,7 @@ sleep 0.05
 rm -f "$FAKE_DU_ACTIVE/$$"
 printf '%s\n' "$path" >> "$FAKE_DU_LOG"
 kib=$(awk -F '\t' -v p="$path" '$1 == p { print $2 }' "$FAKE_DU_TABLE")
+case "$path" in */nested-copy-preserved) kib=${kib:-${FAKE_DU_PRESERVED_KIB:-}} ;; esac
 printf '%s\t%s\n' "${kib:-100}" "$path"
 EOF
   cat > "$FAKEBIN/git" <<'EOF'
@@ -448,29 +449,35 @@ test_apply_removes_only_the_reapable_copy() {
 }
 
 # Vernant's closeout driver and its interpreter, stubbed inside the slot. The
-# driver stands where the real one lives, is kept out of the slot's status by
-# info/exclude, and unlocks and plainly removes the copy it is given; with
-# "refuse" it prints two lines and exits 3 instead. The interpreter runs it as a
+# driver stands where the real one lives and is kept out of the slot's status by
+# info/exclude. Without --execute-cleanup it only plans: it says allowed true, or
+# allowed false with exit 3 while <log-dir>/refuse-plan exists. With it, it
+# unlocks and plainly removes the copy it is given, or prints two lines and
+# exits 3 while <log-dir>/refuse-execute exists. The interpreter runs it as a
 # shell script. Both log what they were asked to do.
-install_driver() {  # <slot> <log-dir> [refuse]
+install_driver() {  # <slot> <log-dir>
   local slot=$1 log=$2 exclude
   exclude=$(git -C "$slot" rev-parse --path-format=absolute --git-path info/exclude)
   printf '%s\n' scripts/ .venv/ >> "$exclude"
   mkdir -p "$slot/scripts/git-stability"
-  if [ "${3:-}" = refuse ]; then
-    cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
+  cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
 printf '%s|%s\n' "\$PWD" "\$*" >> "$log/closeout.log"
-echo 'refused: pull request is not merged'
-echo 'next: wait for the merge'
-exit 3
-SH
-  else
-    cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
-printf '%s|%s\n' "\$PWD" "\$*" >> "$log/closeout.log"
+if [ "\${3:-}" != --execute-cleanup ]; then
+  if [ -e "$log/refuse-plan" ]; then
+    echo '{"allowed": false, "reason": "pull_request_not_merged"}'
+    exit 3
+  fi
+  echo '{"allowed": true}'
+  exit 0
+fi
+if [ -e "$log/refuse-execute" ]; then
+  echo 'refused: pull request is not merged'
+  echo 'next: wait for the merge'
+  exit 3
+fi
 git worktree unlock "\$2" || exit 4
 git worktree remove "\$2"
 SH
-  fi
   printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$log/vernant-python"
   chmod +x "$log/vernant-python"
   DRIVER_PY="$log/vernant-python"
@@ -522,10 +529,11 @@ backdate() {  # <file>
   fi
 }
 
-# A locked copy with a gone launcher is preserved, released and removed by the
-# driver in one --apply run, and the run reports the GiB it freed.
+# A locked copy with a gone launcher is planned, preserved, released and removed
+# by the driver in one --apply run, and the run reports the GiB it freed net of
+# the bytes it preserved.
 assert_driver_release() {  # <name> <lock-mode>
-  local admin preserved sums hash branch
+  local admin preserved sums hash branch head plan execute
   make_locked_copy_case "$1" "$2"
   install_driver "$SLOT" "$W"
   admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
@@ -533,26 +541,32 @@ assert_driver_release() {  # <name> <lock-mode>
   printf 'durable state\n' > "$(copy_path locked)/unique.dat"
   printf '%s\t%s\n' "$(copy_path locked)" $((2 * GIB)) >> "$W/du-table"
   branch=$(git -C "$(copy_path locked)" symbolic-ref --short HEAD)
+  head=$(git -C "$(copy_path locked)" rev-parse HEAD)
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
   [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
   assert_class locked REAPABLE-DRIVER
   assert_contains "$OUT" "launcher" "the report did not explain the dead launcher"
   [ -e "$(copy_path locked)" ] || fail "report mode removed the copy"
-  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  assert_absent "$W/closeout.log" "report mode ran the closeout driver"
+  FAKE_DU_PRESERVED_KIB=$((GIB / 2)) FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "apply did not report the driver removal"
-  assert_contains "$OUT" "2.00 GiB freed" "the removal line did not report the GiB it freed"
-  assert_contains "$OUT" "summary: removed=1 freed=2.00 GiB" "the run did not total the GiB it freed"
+  assert_contains "$OUT" "copy 2.00 GiB, preserved 0.50 GiB, net freed 1.50 GiB" \
+    "the removal line did not report the copy, preserved and net GiB"
+  assert_equals "freed 1.50 GiB measured, 0 copies unmeasured" "$(printf '%s\n' "$OUT" | tail -n 1)" \
+    "the run did not end with the GiB it freed"
   [ ! -e "$(copy_path locked)" ] || fail "the driver did not remove the copy"
   ! registered locked || fail "the released copy is still registered"
   git -C "$SLOT" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null \
     || fail "the released copy's branch ref was lost"
   [ -f "$W/closeout.log" ] || fail "the closeout driver was never run"
-  assert_contains "$(cat "$W/closeout.log")" "$SLOT|" "the driver did not run from the slot"
-  assert_contains "$(cat "$W/closeout.log")" "--cleanup-worktree $(copy_path locked) --execute-cleanup" \
-    "the driver was not asked for the exact release"
-  preserved=$(find "$HOMED/data/copy-sweep/nested-copy-preserved" -name unique.dat -type f 2>/dev/null | head -n 1)
+  plan="$SLOT|--cleanup-worktree $(copy_path locked)"
+  execute="$plan --execute-cleanup"
+  assert_equals "$plan"$'\n'"$execute" "$(cat "$W/closeout.log")" \
+    "the driver was not asked to plan and then to release the exact copy from the slot"
+  preserved=$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -name unique.dat -type f 2>/dev/null | head -n 1)
   [ -n "$preserved" ] || fail "the copy's ignored state was not preserved before release"
+  assert_contains "$preserved" "$head" "the preserve directory is not keyed by the copy's HEAD"
   assert_equals 'durable state' "$(cat "$preserved")" 'the preserved ignored file changed'
   sums="$(dirname "$preserved")/SHA256SUMS"
   assert_present "$sums" "no SHA-256 manifest was written for the preserved state"
@@ -561,6 +575,8 @@ assert_driver_release() {  # <name> <lock-mode>
   [ -f "$HOMED/data/copy-sweep.log" ] || fail "the driver removal was not logged"
   assert_contains "$(cat "$HOMED/data/copy-sweep.log")" "proof=clean, no process, no record" \
     "the log line does not carry the proof"
+  assert_contains "$(cat "$HOMED/data/copy-sweep.log")" "preserved_kib=$((GIB / 2))" \
+    "the log line does not carry the preserved bytes"
   [ ! -e "$admin" ] || fail "the released copy's admin directory is still there"
   if [ -n "$LIVE_PID" ]; then
     kill "$LIVE_PID" 2>/dev/null || true
@@ -571,21 +587,55 @@ assert_driver_release() {  # <name> <lock-mode>
 
 test_recycled_launcher_lock_is_released_by_the_driver() {
   assert_driver_release driver-recycled recycled
-  pass "a locked copy whose launcher pid is recycled is preserved, released by the driver and removed, one run, with the GiB freed reported"
+  pass "a locked copy whose launcher pid is recycled is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported"
 }
 
 test_dead_launcher_lock_is_released_by_the_driver() {
   assert_driver_release driver-dead dead
-  pass "a locked copy whose launcher pid has finished is preserved, released by the driver and removed, one run, with the GiB freed reported"
+  pass "a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported"
 }
 
-test_a_driver_refusal_leaves_the_copy_and_records_its_whole_text() {
-  local admin line
-  make_locked_copy_case refused dead
-  install_driver "$SLOT" "$W" refuse
+test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero() {
+  local admin
+  make_locked_copy_case planrefused dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+  : > "$W/refuse-plan"
   admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
-  [ "$RC" = 1 ] || fail "a driver refusal should exit 1, got $RC: $OUT"
+  [ "$RC" = 0 ] || fail "a refused plan must not fail the run, got $RC: $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "pull_request_not_merged" "the driver's own reason is missing from the report"
+  assert_contains "$OUT" "(exit 3)" "the driver's exit code is missing from the report"
+  assert_contains "$OUT" "summary: REAPABLE-DRIVER=0" "a refused copy is still counted as reapable"
+  assert_contains "$OUT" "summary: HELD-LOCKED=1" "a refused copy is not counted as held"
+  assert_not_contains "$OUT" "FAILED" "a refused plan was reported as a failure"
+  assert_absent "$HOMED/data/copy-sweep" "a refused plan copied ignored entries into data"
+  assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
+    "the driver was asked for more than its plan"
+  [ -e "$(copy_path locked)" ] || fail "a refused copy was removed"
+  registered locked || fail "a refused copy is no longer registered"
+  [ -f "$admin/locked" ] || fail "a refused copy lost its lock"
+  assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "the refused copy's ignored file changed"
+  [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a refused copy was logged as removed"
+  assert_equals "freed 0.00 GiB measured, 0 copies unmeasured" "$(printf '%s\n' "$OUT" | tail -n 1)" \
+    "the run did not end with its total"
+  rm -f "$W/refuse-plan" "$W/closeout.log"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the allowed plan failed the run ($RC): $OUT"
+  [ ! -e "$(copy_path locked)" ] || fail "a copy whose plan became allowed was not released"
+  pass "a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it"
+}
+
+test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text() {
+  local admin line
+  make_locked_copy_case executerefused dead
+  install_driver "$SLOT" "$W"
+  : > "$W/refuse-execute"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a failure after an allowed plan should exit 1, got $RC: $OUT"
   line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
     || fail "the refusal was not reported as FAILED: $OUT"
   assert_contains "$line" "(exit 3)" "the driver's exit code was lost"
@@ -596,8 +646,49 @@ test_a_driver_refusal_leaves_the_copy_and_records_its_whole_text() {
   registered locked || fail "a refused copy is no longer registered"
   [ -f "$admin/locked" ] || fail "a refused copy lost its lock"
   [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a refused copy was logged as removed"
-  assert_equals 1 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the driver did not run exactly once"
-  pass "a copy the driver refuses stays locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code"
+  assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)"$'\n'"$SLOT|--cleanup-worktree $(copy_path locked) --execute-cleanup" \
+    "$(cat "$W/closeout.log")" "the driver did not run once to plan and once to release"
+  pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code"
+}
+
+test_two_sweeps_of_one_path_keep_both_preserved_directories() {
+  local second pid kept
+  make_locked_copy_case reusedpath dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'first copy\n' > "$(copy_path locked)/unique.dat"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the first apply failed ($RC): $OUT"
+  [ ! -e "$(copy_path locked)" ] || fail "the first copy was not released"
+  second=$(copy_path locked)
+  git -C "$SLOT" worktree add -q -b fm/locked-again "$second"
+  printf 'again\n' > "$second/again.txt"
+  git -C "$second" add again.txt
+  git -C "$second" commit -qm again
+  git -C "$second" push -q origin fm/locked-again
+  sleep 0.1 & pid=$!
+  wait "$pid" 2>/dev/null || true
+  git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$second"
+  printf 'second copy\n' > "$second/unique.dat"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the second apply failed ($RC): $OUT"
+  [ ! -e "$second" ] || fail "the second copy was not released"
+  kept=$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -name unique.dat -type f -exec cat {} + | LC_ALL=C sort | tr '\n' '|')
+  assert_equals "first copy|second copy|" "$kept" "the second sweep of the same path replaced the first preserved copy"
+  pass "two sweeps of the same copy path keep both preserved directories"
+}
+
+test_a_removal_with_no_measured_size_says_so() {
+  make_world unmeasured
+  add_copy reap
+  FAKE_LOAD=95 run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply above the load limit should finish, got $RC: $OUT"
+  [ ! -e "$(copy_path reap)" ] || fail "apply should still remove a proven copy while sizing is skipped"
+  assert_contains "$OUT" "copy - GiB, preserved 0.00 GiB, net freed - GiB, unmeasured" \
+    "the removal line did not say its size was not measured"
+  assert_equals "freed 0.00 GiB measured, 1 copies unmeasured" "$(printf '%s\n' "$OUT" | tail -n 1)" \
+    "the run did not count the unmeasured copy"
+  pass "a removal whose size was not measured shows - and unmeasured, and the closing total counts it"
 }
 
 test_locked_copy_with_an_unpushed_equivalence_is_still_held() {
@@ -1466,7 +1557,10 @@ run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy
 run_case test_recycled_launcher_lock_is_released_by_the_driver
 run_case test_dead_launcher_lock_is_released_by_the_driver
-run_case test_a_driver_refusal_leaves_the_copy_and_records_its_whole_text
+run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
+run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
+run_case test_two_sweeps_of_one_path_keep_both_preserved_directories
+run_case test_a_removal_with_no_measured_size_says_so
 run_case test_locked_copy_with_an_unpushed_equivalence_is_still_held
 run_case test_live_foreign_or_unreleasable_locks_are_kept
 run_case test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
