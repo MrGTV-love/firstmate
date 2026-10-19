@@ -10612,7 +10612,7 @@ test_verified_bundle_preserves_unlanded_copy() {
     head=$(git -C "$NESTED_COPY" rev-parse HEAD)
     second=
     if [ "$mode" = multiple ]; then
-      second=$(git -C "$NESTED_COPY" commit-tree HEAD^{tree} -p origin/main -m 'independent unpublished tip')
+      second=$(git -C "$NESTED_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'independent unpublished tip')
       git -C "$NESTED_COPY" update-ref refs/heads/fm/second "$second"
       record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot bundle both tips'
     fi
@@ -10644,7 +10644,7 @@ test_invalid_preservation_bundle_refuses() {
     record="$case_dir/data/task-x1/preservation-bundles.tsv"
     case "$shape" in
       missing-tip)
-        second=$(git -C "$NESTED_COPY" commit-tree HEAD^{tree} -p origin/main -m 'missing unpublished tip')
+        second=$(git -C "$NESTED_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'missing unpublished tip')
         git -C "$NESTED_COPY" update-ref refs/heads/fm/second "$second"
         reason="bundle does not list unlanded tip $second"
         ;;
