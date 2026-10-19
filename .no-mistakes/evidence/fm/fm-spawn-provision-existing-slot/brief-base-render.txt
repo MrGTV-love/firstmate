@@ -1,0 +1,7 @@
+=== BASE (df6448846) brief, Setup step 1 region ===
+1. First action: create your branch: `git checkout -b fm/live-base-old --`
+2. Run `no-mistakes doctor`; if it reports the repo is not initialized here, run `no-mistakes init`.
+
+# Rules
+--- grep ---
+(none: base brief says nothing about second trees)

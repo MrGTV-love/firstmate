@@ -1,0 +1,51 @@
+=== no-mistakes: Setup step 1 region ===
+1. First action: create your branch: `git checkout -b fm/live-no-mistakes --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+2. Run `no-mistakes doctor`; if it reports the repo is not initialized here, run `no-mistakes init`.
+
+# Rules
+
+--- start_task_worktree / provision lines in no-mistakes brief ---
+23:   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+24:   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+
+=== direct-PR: Setup step 1 region ===
+1. First action: create your branch: `git checkout -b fm/live-direct-PR --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+
+# Rules
+
+--- start_task_worktree / provision lines in direct-PR brief ---
+23:   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+24:   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+
+=== local-only: Setup step 1 region ===
+1. First action: create your branch: `git checkout -b fm/live-local-only --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+
+# Rules
+
+--- start_task_worktree / provision lines in local-only brief ---
+23:   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+24:   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+
+=== based: Setup step 1 region ===
+1. First action: create your branch: `git checkout -b fm/live-based --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+2. Run `no-mistakes doctor`; if it reports the repo is not initialized here, run `no-mistakes init`.
+
+# Rules
+
+--- start_task_worktree / provision lines in based brief ---
+24:   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+25:   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.
+
+=== scout: Setup step 1 region ===
+
+--- start_task_worktree / provision lines in scout brief ---
+(none)
+
