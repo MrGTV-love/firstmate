@@ -13,9 +13,13 @@
 # every nested copy found inside it, each checked one by one:
 #   - the path is a pool copy: <pool root>/<pool>/<slot>/<repo> (the pool root is
 #     $TREEHOUSE_ROOT, default $HOME/.treehouse);
-#   - git reports no changed or untracked file and the copy holds no stash entry;
-#   - no commit on HEAD or any local branch is missing from every remote (after a
-#     fetch), except that the task's own copy may also rely on the merged pull
+#   - git reports no changed or untracked file and the copy holds no stash entry
+#     of its own work: a stash made on another branch of the project is another
+#     task's (a linked worktree shares the project's stash list), while a stash
+#     made on the copy's branch, or any stash of a detached copy, counts;
+#   - no commit reachable from the copy's HEAD, which is its own checked-out
+#     branch, is missing from every remote (after a fetch); other branches of the
+#     project are other work. The task's own copy may also rely on the merged pull
 #     request's head: a commit that is an ancestor of refs/pull/<n>/head landed;
 #   - every ignored file is scratch (list below), a preserved record, or a
 #     symlink; anything else is unique and keeps the copy;
@@ -120,6 +124,28 @@ fm_mp_verdict() {  # <ok|keep|transient> <reason>
   FM_MP_REASON=$2
 }
 
+# The stash entries made on this copy's work, counted on stdout. Git names the
+# branch a stash was made on in its message ("WIP on <branch>: ..." or "On
+# <branch>: ..."), and a linked worktree shares its stash list with the project,
+# so a stash that names another branch is not this copy's. A detached copy, a
+# stash made with no branch, and a message that names no branch all count.
+fm_mp_own_stashes() {  # <real-copy>
+  local copy=$1 branch subject name n=0
+  branch=$(git -C "$copy" symbolic-ref -q --short HEAD 2>/dev/null) || branch=
+  while IFS= read -r subject; do
+    name=
+    case "$subject" in
+      "WIP on "*) name=${subject#"WIP on "} ;;
+      "On "*) name=${subject#"On "} ;;
+    esac
+    name=${name%%:*}
+    if [ -z "$branch" ] || [ -z "$name" ] || [ "$name" = "(no branch)" ] || [ "$name" = "$branch" ]; then
+      n=$((n + 1))
+    fi
+  done < <(git -C "$copy" stash list --format=%gs 2>/dev/null)
+  printf '%s' "$n"
+}
+
 # Status, stash and unpushed-commit proofs for one copy.
 # <pr-number> is empty for a nested copy; the task's own copy passes it so a
 # squash-merged pull request's head counts as the remote proof. The default mode
@@ -141,9 +167,9 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
     fm_mp_verdict keep "$copy has changed or untracked files ($(printf '%s\n' "$dirty" | wc -l | tr -d ' ') entries, first: $(printf '%s\n' "$dirty" | sed -n 1p))"
     return 1
   fi
-  stashes=$(git -C "$copy" stash list 2>/dev/null | wc -l | tr -d ' ')
+  stashes=$(fm_mp_own_stashes "$copy")
   if [ "$stashes" != 0 ]; then
-    fm_mp_verdict keep "$copy holds $stashes stash entries"
+    fm_mp_verdict keep "$copy holds $stashes stash entries of its own work"
     return 1
   fi
   if [ "$mode" = nofetch ]; then
@@ -159,7 +185,7 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
     fi
   fi
   [ -z "$prsha" ] || extra=("$prsha")
-  if ! unpushed=$(git -C "$copy" rev-list --count HEAD --branches --not --remotes ${extra[@]+"${extra[@]}"} 2>/dev/null); then
+  if ! unpushed=$(git -C "$copy" rev-list --count HEAD --not --remotes ${extra[@]+"${extra[@]}"} 2>/dev/null); then
     fm_mp_verdict keep "cannot compare $copy with its remotes"
     return 1
   fi

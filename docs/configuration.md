@@ -703,15 +703,15 @@ The retry waits 60 seconds, then doubles up to 3600 seconds.
 One wake is raised if the task is still not pruned after 24 attempts.
 
 Only a known landing refusal of teardown may be a false positive.
-Those are the ship deliverable reported as not landed (work not on a remote, or a squash merge), a closeout driver that reports the exact tree as not covered, an orphan nested copy whose HEAD is not proved landed, and ignored files that exist nowhere else.
+Those are the ship deliverable reported as not landed (the case that matters is a squash merge, which `treehouse destroy` counts as merged), a closeout driver that reports the exact tree as not covered, an orphan nested copy whose HEAD is not proved landed, and ignored files that exist nowhere else.
 Every refusal line of the teardown output must be one of them.
 Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent that is still loaded, a process whose ownership is not proven, a live pipeline, a captain call, and any refusal text that is not on that list.
 Only a known landing refusal makes the fallback re-prove the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
 The copy and every nested copy inside it, each checked one by one, must pass all of these:
 
 - It is a pool copy under the pool root (`TREEHOUSE_ROOT`, default `$HOME/.treehouse`).
-- Git reports no changed or untracked file and the copy holds no stash entry.
-- No commit on HEAD or any local branch is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head.
+- Git reports no changed or untracked file and the copy holds no stash entry of its own work: a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
+- No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; other branches of the project are other work and are not read.
 - Every ignored file is scratch, a symlink, or on the preserve list.
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
@@ -735,7 +735,7 @@ That second teardown asks the same automatic-reap admission check, which in this
 The ordinary finished-session sweep keeps its classification unchanged.
 It never uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
-Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy outside the pool, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, or a destroy that fails.
+Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy outside the pool, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged (`treehouse destroy` refuses an unmerged slot, and the fallback never uses `--include-unlanded`), or a destroy that fails.
 It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
 Each outcome is one line in `data/<id>/merge-prune.log`; the prune never writes to the task's status file.

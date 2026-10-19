@@ -27,21 +27,28 @@
 # pruned after 24 attempts.
 #
 # A teardown refusal (exit 1) that is one of teardown's known landing refusals
-# may be a false positive: the ship deliverable "not landed" (work not on a
-# remote, a squash merge), a closeout driver's "exact tree not covered", an
-# orphan nested copy with no task record whose HEAD is "not proved landed", or
-# ignored files that "exist nowhere else". Only then the fallback of
-# bin/fm-merge-prune-lib.sh runs; every other refusal, unknown text included
-# (a leaked process, a launch agent still loaded, a process whose ownership is
-# not proven, a live pipeline, a captain call), keeps the copy at once. Every
-# refusal line of the output must be one of the known landing refusals
-# (fallback_allowed names each message).
+# may be a false positive that `treehouse destroy` will settle: a squash-merged
+# copy that teardown calls "not landed" (treehouse counts it merged), a closeout
+# driver's "exact tree not covered", an orphan nested copy with no task record
+# whose HEAD is "not proved landed", or ignored files that "exist nowhere else".
+# Only then the fallback of bin/fm-merge-prune-lib.sh runs; every other refusal,
+# unknown text included (a leaked process, a launch agent still loaded, a
+# process whose ownership is not proven, a live pipeline, a captain call), keeps
+# the copy at once. Every refusal line of the output must be one of the known
+# landing refusals (fallback_allowed names each message). A copy whose work is
+# pushed but not merged (a follow-up commit after the merge) is refused by
+# `treehouse destroy` as unmerged, which only --include-unlanded would override
+# and which is never used, so it stays with one wake. The fallback also runs only
+# for a task whose PR URL is https://github.com/<owner>/<repo>/pull/<n>, the
+# form teardown can finish the records of once the copy is gone; a PR of any
+# other provider keeps the copy with one wake.
 #
 # The fallback re-proves from the live copy, by the criteria of
 # treehouse-reap-clean, that the copy and every nested copy is a pool copy, has
-# no changed or untracked file, has no commit missing from every remote (or from
-# the merged PR's head), holds only scratch or preserved ignored files, and has
-# no process inside. The finished worker session is stopped first
+# no changed or untracked file, holds no stash entry of its own work, has no
+# commit reachable from its HEAD (its own checked-out branch; never the project's
+# other branches) missing from every remote (or from the merged PR's head), holds
+# only scratch or preserved ignored files, and has no process inside. The finished worker session is stopped first
 # (bin/fm-control.sh exit). That verb keeps the task's terminal pane open, and
 # the pane's idle shell, the one the pane entered the copy with, stays inside
 # the copy. That one process does not keep the copy, but treehouse refuses to
@@ -312,9 +319,7 @@ fallback() {
     backoff "automatic reap ineligible: $IDLE_REAP_CLASS: $IDLE_REAP_DETAIL"
     return 1
   fi
-  if fm_pr_url_parse "$R_PR" && [ "$FM_PR_PROVIDER" = github ]; then
-    pr_number=$FM_PR_NUMBER
-  fi
+  pr_number=${R_PR##*/}
   if ! prove_all "$real" "$pr_number"; then
     return 1
   fi
@@ -419,7 +424,7 @@ fallback_remove() {  # <real-copy> <pr-number>
   out=$(fm_run_timed "$(fm_mp_limit merge-prune.destroy 300)" treehouse destroy "$real" --include-leased --yes </dev/null 2>&1) || rc=$?
   fm_lock_release "$LOCK_CONTROL" || true
   if [ "$rc" -ne 0 ]; then
-    retain "$real" "treehouse destroy refused or failed: $(clean_detail "$(first_refusal_line "$out")")"
+    retain "$real" "treehouse destroy refused or failed: $(clean_detail "$out")"
     return 1
   fi
   if [ -e "$real" ]; then
@@ -494,6 +499,10 @@ attempt() {
   fi
   if ! fallback_allowed "$TD_OUT"; then
     retain "$(fm_meta_get "$META" worktree)" "$reason"
+    return 0
+  fi
+  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then
+    retain "$(fm_meta_get "$META" worktree)" "teardown can finish the records of a removed copy only for a https://github.com/<owner>/<repo>/pull/<n> pull request, and this task records $R_PR"
     return 0
   fi
   # Teardown refused for a reason that may be a false positive: prove the copy

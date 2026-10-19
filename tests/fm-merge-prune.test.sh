@@ -84,9 +84,19 @@ make_world() {
   git -C "$COPY" add work.txt
   git -C "$COPY" commit -q -m "task work"
   git -C "$COPY" push -q origin fm/t1
+  squash_merge_into_main "$COPY"
   git clone -q "$ORIGIN" "$W/project" 2>/dev/null
   install_stubs
   mk_task t1 "$COPY"
+}
+
+# The task's PR is squash-merged: origin/main gets one new commit with exactly
+# the tree of <copy>'s HEAD, which is not a commit of the task's branch.
+squash_merge_into_main() {  # <copy>
+  local squash
+  squash=$(git -C "$1" commit-tree 'HEAD^{tree}' -p "$(git -C "$1" rev-parse origin/main)" -m "task work (#7)")
+  git -C "$1" push -q origin "$squash:refs/heads/main"
+  git -C "$1" fetch -q origin
 }
 
 install_stubs() {
@@ -94,9 +104,8 @@ install_stubs() {
 #!/usr/bin/env bash
 # Stand-in for treehouse. It accepts exactly the call the reaper makes and
 # removes the fake directory; every other call is logged and refused. Like the
-# real tool it refuses a copy that has a process with its working directory
-# inside it (the system lsof, not a fixture's); a process that only has a file
-# open there does not block it.
+# real tool it refuses a copy that has a process working inside it and a leased
+# slot that is not merged (th-gate).
 printf '%s\n' "$*" >> "$TH_LOG"
 if [ "${1:-}" = destroy ] && [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ "$4" = --yes ]; then
   case "$2" in
@@ -104,17 +113,42 @@ if [ "${1:-}" = destroy ] && [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ 
     *) echo "stub treehouse: $2 is outside the fake pool" >&2; exit 3 ;;
   esac
   [ ! -s "$TH_FAIL" ] || { echo "stub treehouse: destroy refused" >&2; exit 4; }
-  inuse=$(command -p lsof -a -d cwd +D "$2" -t 2>/dev/null | sort -u | tr '\n' ' ')
-  if [ -n "${inuse// /}" ]; then
-    echo "Skipped 1 worktree: [in-use:${inuse%% *}] $2" >&2
-    echo "did not destroy 1 (in-use); re-run with --include-in-use" >&2
-    exit 1
-  fi
+  "$(dirname "$0")/th-gate" "$2" || exit 1
   rm -rf "$2"
   exit 0
 fi
 echo "stub treehouse: unexpected arguments: $*" >&2
 exit 9
+SH
+  cat > "$W/bin/th-gate" <<'SH'
+#!/usr/bin/env bash
+# What the real `treehouse destroy <slot> --include-leased --yes` checks before
+# it removes a leased slot, in the real tool's words: a process with its working
+# directory inside the slot (the system lsof, not a fixture's; a process that
+# only has a file open there does not block it), and work that is not merged. A
+# slot counts as merged when its HEAD is on origin/main or its tree is exactly
+# origin/main's tree (a squash merge).
+copy=$1
+inuse=$(command -p lsof -a -d cwd +D "$copy" -t 2>/dev/null | sort -u | tr '\n' ' ')
+if [ -n "${inuse// /}" ]; then
+  echo "Skipped 1 worktree: [in-use:${inuse%% *}] $copy" >&2
+  echo "did not destroy 1 (in-use); re-run with --include-in-use" >&2
+  exit 1
+fi
+merged=0
+if git -C "$copy" merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+  merged=1
+else
+  head_tree=$(git -C "$copy" rev-parse 'HEAD^{tree}' 2>/dev/null) \
+    && main_tree=$(git -C "$copy" rev-parse 'origin/main^{tree}' 2>/dev/null) \
+    && [ "$head_tree" = "$main_tree" ] && merged=1
+fi
+if [ "$merged" != 1 ]; then
+  echo "Skipped 1 worktree: [leased,unmerged] $copy" >&2
+  echo "did not destroy 1 (leased); re-run with --include-unlanded" >&2
+  exit 1
+fi
+exit 0
 SH
   cat > "$W/bin/teardown-stub" <<'SH'
 #!/usr/bin/env bash
@@ -234,7 +268,7 @@ SH
 (cd / && exec sleep 300) &
 wait
 SH
-  chmod +x "$W/bin/treehouse" "$W/bin/teardown-stub" "$W/bin/control-stub" "$W/bin/tmux" "$W/bin/herdr" \
+  chmod +x "$W/bin/treehouse" "$W/bin/th-gate" "$W/bin/teardown-stub" "$W/bin/control-stub" "$W/bin/tmux" "$W/bin/herdr" \
     "$W/bin/pane-idle" "$W/bin/pane-busy" "$W/bin/pane-stubborn" "$W/bin/pane-holder"
   mkfifo "$W/hold"
   : > "$W/th.log"; : > "$W/stub.log"; : > "$W/control.log"; : > "$W/th.fail"
@@ -515,6 +549,7 @@ scn_pr_head_proves_a_squash_merged_commit() {
   git -C "$COPY" add last.txt
   git -C "$COPY" commit -q -m "landed through the PR head only"
   git -C "$COPY" push -q origin HEAD:refs/pull/7/head
+  squash_merge_into_main "$COPY"
   go
   [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a commit proved landed by the PR head kept the copy: $(rec_field t1 reason)" || return 1
   return 0
@@ -843,6 +878,108 @@ scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() {
   return 0
 }
 
+# `treehouse destroy` refuses a leased slot whose work is pushed but not merged
+# (only --include-unlanded would override it, which is never used): the copy
+# stays with one wake that names it.
+scn_pushed_but_unmerged_copy_is_kept() {
+  make_world
+  printf 'follow-up\n' > "$COPY/followup.txt"
+  git -C "$COPY" add followup.txt
+  git -C "$COPY" commit -q -m "follow-up after the merge"
+  git -C "$COPY" push -q origin fm/t1
+  go
+  [ -e "$COPY" ] || why "an unmerged copy was removed" || return 1
+  [ "$(cat "$W/th.log")" = "destroy $COPY --include-leased --yes" ] || why "treehouse was called as: $(cat "$W/th.log")" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'unmerged' || why "the wake does not name that the copy is unmerged" || return 1
+  if grep -Eq -- '--force|--include-unlanded|--include-in-use' "$W/th.log"; then
+    why "something was forced" || return 1
+  fi
+  return 0
+}
+
+# A pool slot is a linked worktree of the project: it shares the project's
+# branches and stash list. The git proofs read only this copy's work.
+make_linked_world() {
+  make_world
+  rm -rf "$COPY"
+  git -C "$W/project" worktree add -q -b fm/t1 "$COPY" origin/fm/t1
+}
+
+# Another task's work in the project: its own branch with a local-only commit,
+# and a stash made on that branch.
+add_other_task_work() {
+  git -C "$W/project" checkout -q -b fm/other
+  printf 'other\n' > "$W/project/other.txt"
+  git -C "$W/project" add other.txt
+  git -C "$W/project" commit -q -m "other task work, local only"
+  printf 'wip\n' >> "$W/project/README.md"
+  git -C "$W/project" stash -q
+}
+
+scn_linked_slot_ignores_other_tasks_work() {
+  make_linked_world
+  add_other_task_work
+  [ "$(git -C "$COPY" stash list | wc -l | tr -d ' ')" = 1 ] || why "the fixture's stash is not shared with the slot" || return 1
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "another task's local commit or stash kept the slot: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "another task's work raised a wake" || return 1
+  return 0
+}
+
+scn_linked_slot_own_unpushed_commit_is_kept() {
+  make_linked_world
+  add_other_task_work
+  printf 'later\n' > "$COPY/later.txt"
+  git -C "$COPY" add later.txt
+  git -C "$COPY" commit -q -m "unpushed"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the slot with its own unpushed commit was removed" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'commit(s) on no remote' || why "the wake does not name the unpushed commit" || return 1
+  return 0
+}
+
+scn_linked_slot_own_branch_stash_is_kept() {
+  make_linked_world
+  add_other_task_work
+  printf 'wip\n' >> "$COPY/README.md"
+  git -C "$COPY" stash -q
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the slot with a stash of its own branch was removed" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'stash' || why "the wake does not name the stash" || return 1
+  return 0
+}
+
+scn_linked_detached_slot_keeps_every_stash() {
+  make_linked_world
+  add_other_task_work
+  git -C "$COPY" checkout -q --detach
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a detached slot was removed although a stash exists that cannot be told from its own" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  return 0
+}
+
+# Teardown can finish the records of a removed copy only for a PR URL of the
+# exact form https://github.com/<owner>/<repo>/pull/<n>. For any other provider
+# the fallback does not run: the worker is not stopped, nothing is destroyed,
+# and one wake names the PR.
+scn_non_github_pr_keeps_the_copy() {  # <pr url>
+  make_world
+  prune arm t1 >/dev/null 2>&1
+  sed -i.bak "s#^pr=.*#pr=$1#" "$STATE/t1.meta" "$STATE/t1.merge-prune"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy of a task with the PR $1 was removed" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped for the PR $1" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q -- "$1" || why "the wake does not name the copy and the PR" || return 1
+  return 0
+}
+scn_enterprise_pr_keeps_the_copy() { scn_non_github_pr_keeps_the_copy https://github.example.com/acme/widget/pull/7; }
+scn_forgejo_pr_keeps_the_copy() { scn_non_github_pr_keeps_the_copy https://codeberg.org/acme/widget/pulls/7; }
+
 run_scenario() {  # <name>
   SCN_WHY=
   cleanup_workers
@@ -1062,6 +1199,13 @@ test_fallback_keeps_the_copy_while_a_launch_agent_is_loaded() { assert_scenario 
 test_fallback_keeps_the_copy_when_process_ownership_is_not_proven() { assert_scenario scn_ownership_unproven_keeps_the_copy "a process whose ownership is not proven keeps the copy with one wake and no fallback"; }
 test_fallback_keeps_the_copy_on_an_unknown_refusal() { assert_scenario scn_unknown_refusal_keeps_the_copy "an unknown new refusal text keeps the copy with one wake and no fallback"; }
 test_fallback_keeps_the_copy_when_any_refusal_line_is_not_a_landing_refusal() { assert_scenario scn_mixed_refusals_keep_the_copy "a landing refusal printed together with a non-landing refusal keeps the copy"; }
+test_fallback_keeps_a_pushed_but_unmerged_copy() { assert_scenario scn_pushed_but_unmerged_copy_is_kept "a pushed but unmerged copy is refused by destroy as unmerged and stays with one wake, nothing forced"; }
+test_fallback_ignores_other_tasks_work_in_a_linked_slot() { assert_scenario scn_linked_slot_ignores_other_tasks_work "in a linked worktree slot, another task's local-only commit and stash do not keep the copy"; }
+test_fallback_keeps_a_linked_slot_with_its_own_unpushed_commit() { assert_scenario scn_linked_slot_own_unpushed_commit_is_kept "in a linked worktree slot, the copy's own unpushed commit keeps it"; }
+test_fallback_keeps_a_linked_slot_with_a_stash_of_its_own_branch() { assert_scenario scn_linked_slot_own_branch_stash_is_kept "in a linked worktree slot, a stash made on the copy's branch keeps it"; }
+test_fallback_keeps_a_detached_linked_slot_with_a_stash() { assert_scenario scn_linked_detached_slot_keeps_every_stash "a detached linked worktree slot keeps the copy while any stash exists"; }
+test_fallback_keeps_the_copy_of_a_github_enterprise_pr() { assert_scenario scn_enterprise_pr_keeps_the_copy "a GitHub Enterprise PR keeps the copy with one wake and no fallback"; }
+test_fallback_keeps_the_copy_of_a_forgejo_pr() { assert_scenario scn_forgejo_pr_keeps_the_copy "a Forgejo PR keeps the copy with one wake and no fallback"; }
 test_fallback_destroy_failure_keeps_the_copy() { assert_scenario scn_destroy_failure_keeps_the_copy_with_one_wake "a destroy the tool refuses keeps the copy with one wake"; }
 test_retained_copy_is_reaped_quietly_when_the_cause_clears() { assert_scenario scn_retained_copy_is_reaped_when_the_cause_clears "a retained copy is reaped on the quiet retry once its cause clears"; }
 test_long_retained_reason_is_logged_once() { assert_scenario scn_long_reason_is_logged_once "a retained reason longer than the saved 300 characters is logged and woken once, not at every retry"; }
@@ -1143,6 +1287,11 @@ test_unsafe_mutations_are_caught() {
   expect_caught pane-exempts-any-process $lib '  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1' '  :' scn_pane_build_keeps_the_copy "shell-only pane exemption"
   expect_caught pane-exempts-busy-shell $lib '      if (child) exit 1' '      if (0) exit 1' scn_pane_busy_shell_keeps_the_copy "idle-shell-only pane exemption"
   expect_caught pane-exempts-any-shell $lib '        if (p == pane) exit 0' '        if (1) exit 0' scn_stray_shell_keeps_the_copy "pane-ancestry pane exemption"
+  expect_caught own-branch-stash-ignored $lib '    if [ -z "$branch" ] || [ -z "$name" ] || [ "$name" = "(no branch)" ] || [ "$name" = "$branch" ]; then' '    if false; then' scn_linked_slot_own_branch_stash_is_kept "own-branch stash proof"
+  expect_caught detached-copy-ignores-stashes $lib '    if [ -z "$branch" ] || [ -z "$name" ]' '    if [ -z "$name" ]' scn_linked_detached_slot_keeps_every_stash "detached-copy stash proof"
+  expect_caught linked-own-unpushed-ignored $lib '  if [ "$unpushed" != 0 ]; then' '  if false; then' scn_linked_slot_own_unpushed_commit_is_kept "own unpushed-commit proof in a linked slot"
+  expect_caught non-github-guard-removed $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_enterprise_pr_keeps_the_copy "github.com-only guard"
+  expect_caught non-github-guard-removed-forgejo $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_forgejo_pr_keeps_the_copy "github.com-only guard (Forgejo)"
   expect_caught fetch-back-in-the-lock $orch '  if ! prove_all "$real" "$pr_number" nofetch; then' '  if ! prove_all "$real" "$pr_number"; then' scn_hung_remote_never_holds_the_project_lock "no-fetch re-proof under the locks"
   expect_caught nested-fetch-back-in-the-lock $orch '      fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }' '      fm_mp_prove_git "$n" "" || { record_verdict "$real"; return 1; }' scn_hung_remote_never_holds_the_project_lock "no-fetch nested re-proof under the locks"
   expect_caught bare-pane-shell-exempt $lib '      if (child) exit 1
@@ -1169,6 +1318,8 @@ test_over_strict_mutations_are_caught() {
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
   expect_caught nofetch-forgets-pr-head $lib '    [ -z "$prn" ] || prsha=$FM_MP_PR_HEAD' '    :' scn_pr_head_proves_a_squash_merged_commit "reuse of the merged PR head"
+  expect_caught other-branches-count-again $lib 'rev-list --count HEAD --not --remotes' 'rev-list --count HEAD --branches --not --remotes' scn_linked_slot_ignores_other_tasks_work "own-work-only branch proof"
+  expect_caught other-branch-stash-counts $lib '    if [ -z "$branch" ] || [ -z "$name" ] || [ "$name" = "(no branch)" ] || [ "$name" = "$branch" ]; then' '    if true; then' scn_linked_slot_ignores_other_tasks_work "own-work-only stash proof"
   expect_caught pane-shell-never-signaled $lib '  kill -HUP "$pid" 2>/dev/null || return 1' '  :' scn_lingering_pane_shell_on_herdr "SIGHUP step"
   expect_caught exit-never-accepted $reap '  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1' '  return 1' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "stopped-worker acceptance"
   expect_caught empty-checksums-fail $lib '  [ ! -s "$dest/SHA256SUMS" ] || (cd "$dest"' '  (cd "$dest"' scn_empty_preserve_paths_do_not_keep_the_copy "empty-manifest rule"
@@ -1209,12 +1360,7 @@ case "${1:-}" in
   destroy)
     [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ "$4" = --yes ] || { echo "stub treehouse: unexpected arguments: $*" >&2; exit 9; }
     case "$2" in "$TREEHOUSE_ROOT"/*/*/*) ;; *) echo "stub treehouse: outside the fake pool" >&2; exit 3 ;; esac
-    inuse=$(command -p lsof -a -d cwd +D "$2" -t 2>/dev/null | sort -u | tr '\n' ' ')
-    if [ -n "${inuse// /}" ]; then
-      echo "Skipped 1 worktree: [in-use:${inuse%% *}] $2" >&2
-      echo "did not destroy 1 (in-use); re-run with --include-in-use" >&2
-      exit 1
-    fi
+    "$(dirname "$0")/th-gate" "$2" || exit 1
     rm -rf "$2"; exit 0 ;;
 esac
 exit 0
@@ -1224,8 +1370,9 @@ SH
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$STUB_LOG"
 # A case may make teardown refuse the way the 2026-10-18 closeout driver did, so
-# the fallback alone decides.
-if [ -e "$REFUSE_FLAG" ]; then
+# the fallback alone decides; it refuses only while the copy is there.
+copy=$(sed -n 's/^worktree=//p' "$FM_STATE_OVERRIDE/$1.meta" 2>/dev/null)
+if [ -e "$REFUSE_FLAG" ] && [ -e "$copy" ]; then
   echo "REFUSED: Vernant's closeout driver did not release foreign copy /pool/1/repo/.claude/worktrees/n1 (exit 1): exact tree not covered by the merged PR" >&2
   exit 1
 fi
@@ -1344,19 +1491,16 @@ test_e2e_transient_contention_retries_then_succeeds() {
   pass "end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps"
 }
 
-# Real teardown refuses a copy that went on after its PR merged (a stale PR
-# head), though that follow-up commit is pushed and nothing is lost. The
-# fallback proves the copy clean, pushed and unused, removes it, and teardown
-# then finishes the records.
-test_e2e_false_positive_refusal_is_reaped_by_the_fallback() {
+# Real teardown refuses a squash-merged copy with ignored scratch files (the
+# 2026-10-18 closeout driver's refusal). The fallback proves the copy clean,
+# pushed and unused, ends the pane's idle shell, `treehouse destroy` removes the
+# merged slot, and teardown then finishes the records.
+test_e2e_squash_merged_copy_with_ignored_files_is_reaped_by_the_fallback() {
   make_e2e_world
-  printf 'follow-up\n' > "$COPY/followup.txt"
-  git -C "$COPY" add followup.txt
-  git -C "$COPY" commit -q -m "follow-up after the merge"
-  git -C "$COPY" push -q origin fm/t1
   mkdir -p "$COPY/.claude/bug-evidence" "$COPY/node_modules/x"
   printf 'closeout\n' > "$COPY/.claude/bug-evidence/slot.json"
   printf x > "$COPY/node_modules/x/i.js"
+  : > "$W/refuse"
   prune_real arm t1
   start_inside "$COPY" "$W/worker.pid"
   start_pane "$COPY" bash "$W/bin/pane-idle" "$W/hold"
@@ -1373,7 +1517,32 @@ test_e2e_false_positive_refusal_is_reaped_by_the_fallback() {
   find "$DATA/t1/merge-prune-preserved" -name slot.json | grep -q . || fail "the bug-evidence record was not preserved before removal"
   [ "$(wake_count_real)" = 0 ] || fail "a reaped copy raised a wake"
   assert_nothing_forced "e2e fallback"
-  pass "end to end: a copy real teardown refuses for a pushed follow-up is removed by the fallback, preserved records first, and teardown then closes the task"
+  pass "end to end: a squash-merged copy with ignored files that teardown refuses is removed by the fallback, preserved records first, and teardown then closes the task"
+}
+
+# Real teardown refuses a copy that went on after its PR merged (a stale PR
+# head). The follow-up commit is pushed but not merged, so `treehouse destroy`
+# refuses the slot as unmerged and only --include-unlanded would override it,
+# which the fallback never uses: the copy stays with one wake.
+test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy() {
+  make_e2e_world
+  printf 'follow-up\n' > "$COPY/followup.txt"
+  git -C "$COPY" add followup.txt
+  git -C "$COPY" commit -q -m "follow-up after the merge"
+  git -C "$COPY" push -q origin fm/t1
+  prune_real arm t1
+  start_inside "$COPY" "$W/worker.pid"
+  start_pane "$COPY" bash "$W/bin/pane-idle" "$W/hold"
+  FM_MERGE_PRUNE_EXIT_WAIT=3 prune_real run t1 --now >/dev/null 2>&1
+  [ -e "$COPY" ] || fail "an unmerged copy was removed: $(cat "$DATA/t1/merge-prune.log")"
+  [ -e "$STATE/t1.meta" ] || fail "the task record was closed over a kept copy"
+  [ "$(cat "$W/th.log")" = "destroy $COPY --include-leased --yes" ] || fail "the fallback did not make exactly the reaper's destroy call: $(cat "$W/th.log")"
+  [ "$(wake_count_real)" = 1 ] || fail "want exactly one wake, got $(wake_count_real): $(cat "$STATE/.wake-queue" 2>/dev/null)"
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'unmerged' || fail "the wake does not name the copy and that it is unmerged: $(cat "$STATE/.wake-queue")"
+  assert_nothing_forced "e2e unmerged"
+  prune_real run t1 --now >/dev/null 2>&1; prune_real run t1 --now >/dev/null 2>&1
+  [ "$(wake_count_real)" = 1 ] || fail "repeat attempts raised more wakes"
+  pass "end to end: a copy with a pushed follow-up commit that is not merged is refused by destroy as unmerged, stays, forces nothing and raises exactly one wake"
 }
 
 test_e2e_unsafe_copies_are_never_removed() {
@@ -1444,6 +1613,13 @@ ALL_TESTS=(
   test_fallback_keeps_the_copy_when_process_ownership_is_not_proven
   test_fallback_keeps_the_copy_on_an_unknown_refusal
   test_fallback_keeps_the_copy_when_any_refusal_line_is_not_a_landing_refusal
+  test_fallback_keeps_a_pushed_but_unmerged_copy
+  test_fallback_ignores_other_tasks_work_in_a_linked_slot
+  test_fallback_keeps_a_linked_slot_with_its_own_unpushed_commit
+  test_fallback_keeps_a_linked_slot_with_a_stash_of_its_own_branch
+  test_fallback_keeps_a_detached_linked_slot_with_a_stash
+  test_fallback_keeps_the_copy_of_a_github_enterprise_pr
+  test_fallback_keeps_the_copy_of_a_forgejo_pr
   test_fallback_destroy_failure_keeps_the_copy
   test_retained_copy_is_reaped_quietly_when_the_cause_clears
   test_long_retained_reason_is_logged_once
@@ -1464,7 +1640,8 @@ ALL_TESTS=(
   test_fallback_removes_a_copy_whose_preserve_paths_are_empty
   test_e2e_merge_prunes_the_copy_with_the_real_teardown
   test_e2e_transient_contention_retries_then_succeeds
-  test_e2e_false_positive_refusal_is_reaped_by_the_fallback
+  test_e2e_squash_merged_copy_with_ignored_files_is_reaped_by_the_fallback
+  test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy
   test_e2e_unsafe_copies_are_never_removed
   test_unsafe_mutations_are_caught
   test_over_strict_mutations_are_caught
