@@ -1,0 +1,10 @@
+{"invocation":1,"exit_code":2,"wall_s":24,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":2,"exit_code":2,"wall_s":24,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":3,"exit_code":2,"wall_s":31,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":4,"exit_code":2,"wall_s":29,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":5,"exit_code":2,"wall_s":34,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":6,"exit_code":2,"wall_s":37,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":7,"exit_code":2,"wall_s":43,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":8,"exit_code":2,"wall_s":35,"fail_open_text_present":false,"blind_turn_banner":true}
+{"invocation":9,"exit_code":2,"wall_s":34,"fail_open_text_present":false,"blind_turn_banner":true}
+failure_notice_on_disk=no total_wall_s=291 sync_wait_ms=12000

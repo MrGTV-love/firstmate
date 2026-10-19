@@ -1,0 +1,3 @@
+fm-test-run: no tests selected for changes vs HEAD (map is conservative; use --all for the complete suite)
+fm-test-run: no tests selected for changes vs HEAD (map is conservative; use --all for the complete suite)
+ok - changed selection covers dependents, fails closed for live unmapped source, and accepts retired unconsumed source
