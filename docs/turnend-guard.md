@@ -350,7 +350,8 @@ The cost lands whenever no claim is open at the end of the wait, not only when t
 Each blocked Stop waits the full 12 seconds first, so the cost is per Stop, and it adds up over the Stops of one failure episode:
 
 - With a failure notice on disk, the budget of three re-blocks runs out on the fourth Stop, which also waits the full 12 seconds before the verified fail-open, so the episode costs about 48 seconds of wait.
-- With no failure notice on disk, the verified fail-open never fires, so the re-blocks continue to Claude Code's 8-block override, about 96 seconds of wait.
+- With no failure notice on disk, the verified fail-open never fires: nine measured consecutive guard invocations all blocked, costing 108 nominal seconds of wait and 233.560 measured elapsed seconds under load.
+  The ninth invocation still blocked, so this is neither an eight-block/96-second guard bound nor evidence of when Claude Code itself overrides the hook.
   The same holds in away mode with no live daemon, and for a Stop that pi-code delivers, because the auto-arm stands down there by design.
 
 These are nominal floors; wall time can stretch about 9 times under load.

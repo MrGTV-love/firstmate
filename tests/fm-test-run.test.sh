@@ -613,12 +613,14 @@ test_changed_dependency_selection_and_unmapped_failure() {
   mkdir -p "$repo/bin/ten-levels/extensions" "$repo/tests/assets"
   : >"$repo/bin/ten-levels/extensions/report.ts"
   printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-jev-guard.test.sh"
-  chmod +x "$repo/tests/fm-jev-guard.test.sh"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-jev-guard-audit.test.sh"
+  chmod +x "$repo/tests/fm-jev-guard.test.sh" "$repo/tests/fm-jev-guard-audit.test.sh"
   : >"$repo/tests/assets/retired-asset.mjs"
-  git -C "$repo" add tests/fm-jev-guard.test.sh tests/assets/retired-asset.mjs
+  git -C "$repo" add tests/fm-jev-guard.test.sh tests/fm-jev-guard-audit.test.sh tests/assets/retired-asset.mjs
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm guard-fixture
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/fm-jev-guard.test.sh" "vendored jev-guard files select the jev-guard suite"
+  assert_contains "$listed" "tests/fm-jev-guard-audit.test.sh" "a report.ts-only change selects the audit-row suite"
   git -C "$repo" add bin/ten-levels
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-guard-change
   git -C "$repo" rm -q tests/assets/retired-asset.mjs

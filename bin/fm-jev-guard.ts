@@ -196,7 +196,7 @@ function trustedRead(event: GuardResultEvent, c: JevGuardContext, remainingMs: (
 
 type Judge = (state: State, questions: Questions) => Promise<SystemOneResult>;
 type Gated = GateDecision & { risk: number };
-type Trail = Pick<GuardTerminal, "chunks" | "results">;
+type Trail = Pick<GuardTerminal, "chunks" | "results" | "failures">;
 /** One piece of a payload: its policy judgment, or why it could not be judged. Either way it keeps any answer it received. */
 type Part<D> = { result?: SystemOneResult } & ({ decision: D } | { failure: unknown });
 type Settled<D> = { result?: SystemOneResult; trail: Trail } & ({ decision: D; part: number; of: number } | { failure: unknown });
@@ -220,7 +220,12 @@ function screenParts<D>(pieces: string[], run: (piece: string, judge: Judge) => 
  */
 function settle<D>(parts: Part<D>[], stops: (decision: D) => boolean, risk: (decision: D) => number): Settled<D> {
   const results = parts.flatMap((part) => part.result ?? []);
-  const trail: Trail = parts.length > 1 ? { chunks: parts.length, results } : {};
+  const failures = parts.flatMap((part, index) => "failure" in part && !part.result ? [{
+    chunk: index + 1, error_type: failureType(part.failure),
+    request_started: part.failure instanceof GuardUnavailableError && part.failure.requestStarted,
+    ...failureTiming(part.failure),
+  }] : []);
+  const trail: Trail = { chunks: parts.filter((part) => part.result || "failure" in part).length, results, failures };
   const judged = parts.flatMap((part, index) => ("decision" in part ? [{ part: index, result: part.result, decision: part.decision }] : []));
   const stopped = judged.find((piece) => stops(piece.decision));
   if (stopped) return { ...stopped, of: parts.length, trail };
@@ -338,7 +343,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
     } catch (error) {
       return finishCall({ ...terminal, ...trail, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type: failureType(error),
-        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) });
+        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result });
     }
   }, "tool_call", service.host));
 
@@ -375,7 +380,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         branch: result ? "policy" : "empty", request_started: result !== undefined, result }, undefined, event);
     } catch (error) {
       return finishResult({ ...terminal, ...trail, decision: "review", enforcement, branch: "outage", error_type: failureType(error),
-        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) }, undefined, event);
+        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result }, undefined, event);
     }
   }, "tool_result", service.host));
 }
