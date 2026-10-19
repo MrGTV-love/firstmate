@@ -35,6 +35,10 @@
 #     independent clone every local branch is read too, because removing the
 #     clone destroys them. The task's own copy may also rely on the merged pull
 #     request's head: a commit that is an ancestor of refs/pull/<n>/head landed;
+#   - the task's own copy also holds nothing the merged pull request leaves out
+#     (fm_mp_prove_landed): its HEAD is in the pull request's head, or the
+#     default branch already carries its content. A commit that is only pushed,
+#     such as a follow-up after the merge, is not landed;
 #   - every ignored file is scratch (list below), a preserved record, or a
 #     symlink; anything else is unique and keeps the copy;
 #   - no process has its working directory or an open file inside it, except a
@@ -57,7 +61,8 @@
 # files) preserves other ignored files inside teardown's own nested-copy path;
 # this fallback is stricter by design and writes to its own preserve directory.
 #
-# Requires bin/fm-timeout-lib.sh and bin/fm-backend.sh to be sourced first.
+# Requires bin/fm-timeout-lib.sh, bin/fm-backend.sh and bin/fm-task-copy-lib.sh to be
+# sourced first.
 # Regression coverage: tests/fm-merge-prune.test.sh.
 
 FM_MP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -215,7 +220,35 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
     fm_mp_verdict keep "$copy has $unpushed commit(s) on no remote"
     return 1
   fi
+  [ -z "$prn" ] || fm_mp_prove_landed "$copy" "$prsha" || return 1
   return 0
+}
+
+# The task's own copy must also hold nothing the merged pull request leaves out.
+# Work that is only pushed, such as a follow-up commit after the merge, is not
+# landed. It must be proved here, before anything is stopped: the pane's idle
+# `treehouse get` subshell returns the slot to the pool when it ends, which
+# resets the slot and so hides that commit from `treehouse destroy`. The copy's
+# HEAD must be in the merged pull request's head, or the default branch, as
+# fetched (no network call is made here), must already carry its content, which
+# is what a squash merge leaves. A read that fails proves nothing and keeps the copy.
+fm_mp_prove_landed() {  # <real-copy> <merged-pr-head-or-empty>
+  local copy=$1 prsha=${2:-} head name tree merged
+  if ! head=$(git -C "$copy" rev-parse -q --verify 'HEAD^{commit}' 2>/dev/null); then
+    fm_mp_verdict keep "cannot read the HEAD of $copy"
+    return 1
+  fi
+  if [ -n "$prsha" ] && git -C "$copy" merge-base --is-ancestor "$head" "$prsha" 2>/dev/null; then
+    return 0
+  fi
+  if name=$(fm_task_copy_default_branch "$copy") \
+    && tree=$(git -C "$copy" rev-parse -q --verify "refs/remotes/origin/$name^{tree}" 2>/dev/null) \
+    && merged=$(git -C "$copy" merge-tree --write-tree "refs/remotes/origin/$name" "$head" 2>/dev/null) \
+    && [ "${merged%%$'\n'*}" = "$tree" ]; then
+    return 0
+  fi
+  fm_mp_verdict keep "$copy has commits that are not in the merged pull request: its HEAD ${head:0:12} is not in the pull request's head and the default branch does not carry its content"
+  return 1
 }
 
 # Classify every ignored entry of one copy. Fills FM_MP_PRESERVE with the

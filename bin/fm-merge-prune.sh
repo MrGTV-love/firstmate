@@ -38,9 +38,12 @@
 # text; it preserves such files itself, and it prints a second refusal with the
 # HEAD one). Every refusal line of the output must be one of the two classes
 # (fallback_allowed names each message). A copy whose work is
-# pushed but not merged (a follow-up commit after the merge) is refused by
-# `treehouse destroy` as unmerged, which only --include-unlanded would override
-# and which is never used, so it stays with one wake. The fallback also runs only
+# pushed but not merged (a follow-up commit after the merge) stays with one wake:
+# the fallback proves the copy's HEAD is in the merged PR's head or that the
+# default branch carries its content, before it stops anything, because ending
+# the pane's idle shell returns the slot to the pool (reset to the default
+# branch), after which `treehouse destroy` could no longer see it as unmerged.
+# The fallback also runs only
 # for a task whose PR URL is https://github.com/<owner>/<repo>/pull/<n>, the
 # form teardown can finish the records of once the copy is gone; a PR of any
 # other provider keeps the copy with one wake.
@@ -52,6 +55,8 @@
 # that it and every nested copy has no changed or untracked file, holds no stash
 # entry of its own work, has no commit reachable from its HEAD (its own
 # checked-out branch) missing from every remote (or from the merged PR's head),
+# for the task's own copy leaves out nothing the merged PR omits (its HEAD is in
+# the PR's head, or the default branch carries its content),
 # holds only scratch or preserved ignored files, and has no process inside. For a
 # linked worktree of the project the commit and stash proofs read only that
 # copy's work (never the project's other branches or other tasks' stashes); a
