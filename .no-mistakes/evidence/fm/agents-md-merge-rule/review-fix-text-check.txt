@@ -1,0 +1,19 @@
+review-1: ship-landing line 19:
+A captain instruction to merge is explicit authority; `yolo` and the standing merge rule in AGENTS.md section 7 are the standing routine merge authority.
+review-1: rollback sentence in AGENTS.md:
+242:To change the rule back, delete this block and edit the three pointers to it: hard rule 2, the `yolo` sentence above, and the standing-authority line in `.agents/skills/ship-landing/SKILL.md`.
+review-2: 'beyond what the captain ordered' count (want 0):
+0
+review-3: 'recorded' near merge rule / data-file authority (want none):
+captain's standing merge rule (section 7)
+0
+review-4: 'never retry; ask once' / 'actual diff' (want 0 / 0):
+0
+0
+review-5: yolo sentence:
+`yolo` governs merge authority only: with it off, the captain approves every PR merge except one the standing merge rule below covers, and every local-only landing; with it on, firstmate merges green, in-scope work itself.
+block:
+**Standing merge rule (captain-set 2026-10-19, revisable).** Merge a PR through `bin/fm-pr-merge.sh`, without asking, when an independent PASS from a different model family names the exact head and the required checks are green.
+Ask only when the PR loosens a deny or allow-list, widens what a guard permits, or touches customer data, billing or spend.
+This rule covers PR merges only; every local-only landing still needs the captain.
+To change the rule back, delete this block and edit the three pointers to it: hard rule 2, the `yolo` sentence above, and the standing-authority line in `.agents/skills/ship-landing/SKILL.md`.
