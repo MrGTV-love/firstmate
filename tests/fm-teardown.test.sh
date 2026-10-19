@@ -10866,7 +10866,7 @@ test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal() {
 }
 
 test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wait() {
-  local rc lock holder actor late i
+  local rc lock holder actor late i actor_rc
   make_own_locked_copy_case route-flip-wait enclosing
   printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
   seed_backlog_in_flight "$FOREIGN_CASE"
@@ -11075,7 +11075,7 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
     assert_grep "$reason" "$FOREIGN_CASE/stderr" "held-no-lease-$mode: the refusal did not say why the lease failed"
     assert_present "$FOREIGN_COPY" "held-no-lease-$mode: the task's own nested copy was removed"
     assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-no-lease-$mode: the task record was removed"
-    [ "$(backlog_row_state "$FOREIGN_CASE")" != done ] || fail "held-no-lease-$mode: the backlog item was closed by a refused close"
+    [ "$(backlog_row_state "$FOREIGN_CASE")" != "done" ] || fail "held-no-lease-$mode: the backlog item was closed by a refused close"
     assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-no-lease-$mode: a refused close wrote a held-copy record"
     jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
       || fail "held-no-lease-$mode: the slot's lease record changed"
@@ -11335,7 +11335,7 @@ SH
     assert_no_grep "is not proved landed" "$FOREIGN_CASE/stderr" "held-unchecked-$shape: the refusal calls an unchecked copy not landed"
     assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "held-unchecked-$shape: the refusal changed"
     assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-unchecked-$shape: the task record was removed"
-    [ "$(backlog_row_state "$FOREIGN_CASE")" != done ] || fail "held-unchecked-$shape: the backlog item was closed by a refused close"
+    [ "$(backlog_row_state "$FOREIGN_CASE")" != "done" ] || fail "held-unchecked-$shape: the backlog item was closed by a refused close"
     assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-unchecked-$shape: a refused close wrote a held-copy record"
     held_assert_untouched "held-unchecked-$shape" "$FOREIGN_CASE" "$FOREIGN_COPY"
     rm -f "$FOREIGN_CASE/fakebin/git"
