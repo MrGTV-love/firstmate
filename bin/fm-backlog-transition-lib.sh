@@ -648,6 +648,7 @@ fm_backlog_new_work_transition() {
     close $prior or die $!;
     $value =~ s/^([^\S\n]*)dropped([^\S\n]*)$/${1}Historical captain disposition: dropped${2}/mg;
     $value =~ s/^([^\S\n]*)Deliverable of the finished work:/${1}Historical deliverable of the finished work:/mg;
+    $value =~ s/^([^\S\n]*)(preserved in bundle \/[^\n]*, not landed)([^\S\n]*)$/${1}Historical $2$3/mg;
     utf8::encode($value) if utf8::is_utf8($value);
     open my $next, ">:raw", "$ARGV[0]/next" or die $!;
     print {$next} $value;
@@ -1386,6 +1387,7 @@ fm_backlog_ledger_closed() {  # <state-dir> <config-dir> <id> [<done-arg>...]
     --report:*) evidence=report ;;
     --pr:*) evidence=merged_pr; pr=$2 ;;
     --note:dropped) evidence=drop_file ;;
+    --note:"preserved in bundle /"*", not landed") evidence=none ;;
     --note:*) evidence=local_main ;;
     *) evidence=none ;;
   esac

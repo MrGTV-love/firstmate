@@ -10962,6 +10962,27 @@ test_bundle_kept_ship_closes_its_row_as_not_landed() {
   pass 'a ship kept only by a verified bundle closes its backlog row as preserved in that bundle, not landed'
 }
 
+test_bundle_kept_ship_records_no_landing_in_the_ledger() {
+  local shape case_dir rc
+  for shape in local-only open-pr; do
+    if [ "$shape" = local-only ]; then
+      make_bundle_copy_case "bundle-ledger-$shape" local-only
+    else
+      make_bundle_copy_case "bundle-ledger-$shape"
+    fi
+    case_dir=$NESTED_CASE
+    seed_backlog_in_flight "$case_dir"
+    [ "$shape" != open-pr ] || append_pr_meta_url "$case_dir"
+    : > "$case_dir/config/fleet-ledger"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "bundle-ledger-$shape: a verified bundle must allow ordinary teardown: $(cat "$case_dir/stderr")"
+    assert_equals '["task-x1","none",null,true]' "$(ledger_closed_rows "$case_dir")" \
+      "bundle-ledger-$shape: a bundle close must not be recorded as a landing"
+  done
+  pass 'ledger on: a ship kept only by a verified bundle records a close with no landing evidence'
+}
+
 test_bundle_hint_needs_unlanded_tips() {
   local case_dir rc
   make_bundle_copy_case bundle-pushed
@@ -14163,6 +14184,7 @@ test_bundle_restore_runs_once_per_unchanged_proof
 test_bundle_restore_memo_misses_a_changed_record_or_bundle
 test_bundle_restore_memo_is_keyed_by_object_format
 test_bundle_kept_ship_closes_its_row_as_not_landed
+test_bundle_kept_ship_records_no_landing_in_the_ledger
 test_bundle_hint_needs_unlanded_tips
 test_bundle_needs_the_copys_own_unlanded_tip
 test_bundle_hint_skips_a_moved_head_at_final_custody
