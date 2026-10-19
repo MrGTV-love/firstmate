@@ -1763,26 +1763,37 @@ test_process_budget_command_quotes_foreign_firstmate_path() {
 }
 
 # A first lane must never be told to create the nested worktree that leaked
-# under pool slots. The brief points at firstmate's spawn-time provisioning and
-# keeps the branch step only as the non-provisioned fallback.
+# under pool slots, and must never be left with no way forward. The ship brief is
+# the generated text a lane reads: it forbids the second tree, points the lane at
+# Vernant's own provisioner, and routes a refusal or scope growth to a blocked
+# stop instead of a retry tree.
 test_ship_brief_does_not_instruct_a_nested_worktree() {
-  local home id brief
+  local home id brief mode
   home="$TMP_ROOT/slot-provisioning-home"
   mkdir -p "$home/data"
-  id='brief-slot-provisioning'
-  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode no-mistakes >/dev/null 2>&1 \
-    || fail "fm-brief.sh failed to scaffold the slot-provisioning brief"
-  brief="$home/data/$id/brief.md"
-  assert_grep 'the slot is already provisioned' "$brief" \
-    "the ship brief does not tell the first lane the slot is already provisioned"
-  assert_grep 'Never run `scripts/git-stability/start_task_worktree.py` from inside this slot' "$brief" \
-    "the ship brief does not forbid the nested worktree"
-  [ "$(grep -c 'start_task_worktree.py' "$brief")" = 1 ] \
-    || fail "the ship brief mentions start_task_worktree.py more than once, which can reintroduce a positive instruction"
-  # shellcheck disable=SC2016  # literal backticks around the branch name must stay unexpanded
-  assert_grep "\`git checkout -b fm/$id --\`" "$brief" \
-    "the non-provisioned branch fallback disappeared"
-  pass "fm-brief.sh: a ship brief provisions the slot and never instructs a nested worktree"
+  for mode in no-mistakes direct-PR local-only; do
+    id="brief-slot-provisioning-$mode"
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh failed to scaffold the $mode slot-provisioning brief"
+    brief="$home/data/$id/brief.md"
+    assert_grep 'Do not create a second tree with' "$brief" \
+      "the $mode ship brief does not forbid the nested worktree"
+    assert_grep 'from inside this slot; that nested worktree has no owner.' "$brief" \
+      "the $mode ship brief does not say the nested worktree has no owner"
+    assert_grep 'scripts/git-stability/provision_existing_slot.py' "$brief" \
+      "the $mode ship brief does not name Vernant's slot provisioner"
+    assert_grep 'docs/agentic-operations/worktree-python-environments.md' "$brief" \
+      "the $mode ship brief does not name Vernant's provisioning doc"
+    assert_grep "If the provisioner refuses (for example manifest_exists), or the task needs a path outside the owned scope, or a fresh retry tree: stop, append a blocked line saying 'needs slot manifest or owned-path extension', and wait; Main routes it. Never run start_task_worktree.py from this slot." "$brief" \
+      "the $mode ship brief lost its stop-and-wait route for a refusal, scope growth, or a retry tree"
+    if grep -F 'start_task_worktree.py' "$brief" | grep -vF -e 'Do not create' -e 'Never run' >/dev/null; then
+      fail "the $mode ship brief mentions start_task_worktree.py outside a prohibition"
+    fi
+    # shellcheck disable=SC2016  # literal backticks around the branch name must stay unexpanded
+    assert_grep "\`git checkout -b fm/$id --\`" "$brief" \
+      "the $mode ship brief lost its branch step"
+  done
+  pass "fm-brief.sh: a ship brief forbids the nested worktree and gives the lane a blocked route"
 }
 
 test_script_parses
