@@ -94,11 +94,13 @@
 # deepest path first, each re-proved just before its own removal. An unlocked
 # copy goes by a plain `git worktree remove` run from the parent clone. A locked
 # one first gets the closeout driver's plan, run from that clone without
-# --execute-cleanup and before anything is copied or hashed: a plan that exits
-# non-zero or says allowed is false holds the copy as HELD-LOCKED with the
-# driver's own words (the first 600 characters, on one line), copies nothing, and
-# is not a failure. A copy whose plan allows it has its ignored entries preserved
-# and is then released and removed by the driver, exactly as bin/fm-teardown.sh
+# --execute-cleanup and before anything is copied or hashed. The plan must exit
+# 0 AND state allowed=true (a JSON boolean true, or the literal allowed=true);
+# a non-zero exit, an empty, malformed or verdictless answer, a timeout, or any
+# other value holds the copy as HELD-LOCKED with the driver's own words (the
+# first 600 characters, on one line), copies nothing, and is not a failure. A
+# copy whose plan allows it has its ignored entries preserved and is then
+# released and removed by the driver, exactly as bin/fm-teardown.sh
 # does it. The preserved entries land in data/copy-sweep/<run stamp>-<HEAD>/
 # nested-copy-preserved/<sha256 of the path>, so no later run or copy at the same
 # path replaces them. Never a force flag, never a recursive delete of a copy
@@ -908,18 +910,64 @@ gib_or_dash() {  # <KiB or ->
   case "$1" in ''|*[!0-9]*) printf -- '-' ;; *) kib_to_gib "$1" ;; esac
 }
 
+# True only when <driver output> carries a real positive verdict: JSON whose
+# "allowed" key is the boolean true, or the literal `allowed=true`. Everything
+# else - no verdict, an empty or malformed document, a false or non-boolean
+# value - is not permission.
+plan_verdict_allows() {  # <driver output>
+  local out=$1
+  if command -v python3 >/dev/null 2>&1; then
+    printf '%s' "$out" | python3 -c 'import json, sys
+try:
+    gate = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+sys.exit(0 if isinstance(gate, dict) and gate.get("allowed") is True else 1)' 2>/dev/null \
+      && return 0
+  fi
+  printf '%s' "$out" | grep -Eiq '(^|[^[:alnum:]_"])allowed[[:space:]]*=[[:space:]]*"?true"?([^[:alnum:]_]|$)'
+}
+
 # Asks Vernant's closeout driver, in plan mode, whether it would release <copy>,
-# before anything is copied or hashed. Fails with PLAN_WHY holding the driver's
-# own words on one line when it exits non-zero or says allowed is false.
+# before anything is copied or hashed. The copy stays unless the driver exits 0
+# AND states allowed=true; a non-zero exit, silence, an unparsable verdict, or
+# no answer within the plan timeout (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by
+# default) all keep it, with PLAN_WHY holding the driver's own words.
 PLAN_WHY=
 driver_plan_allows() {  # <clone> <copy>
-  local rc=0
-  teardown_run_closeout "$1" "$2" plan || rc=$?
+  local dir rc=0 limit waited=0 pid
+  limit=${FM_COPY_SWEEP_PLAN_TIMEOUT:-120}
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-sweep-plan.XXXXXX") || {
+    PLAN_WHY="its closeout driver could not be planned (no temporary directory)"
+    return 1
+  }
+  (
+    local r=0
+    teardown_run_closeout "$1" "$2" plan || r=$?
+    printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$dir/out"
+    printf '%s' "$r" > "$dir/rc"
+  ) &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$limit" ]; do
+    sleep 1
+    waited=$((waited + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null
+    TEARDOWN_CLOSEOUT_OUT=$(cat "$dir/out" 2>/dev/null) || TEARDOWN_CLOSEOUT_OUT=
+    rm -rf "$dir"
+    PLAN_WHY="its closeout driver did not answer within ${limit}s"
+    return 1
+  fi
+  wait "$pid" 2>/dev/null
+  rc=$(cat "$dir/rc" 2>/dev/null) || rc=1
+  TEARDOWN_CLOSEOUT_OUT=$(cat "$dir/out" 2>/dev/null) || TEARDOWN_CLOSEOUT_OUT=
+  rm -rf "$dir"
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
   PLAN_WHY=${PLAN_WHY:0:600}
-  if [ "$rc" != 0 ] || printf '%s' "$TEARDOWN_CLOSEOUT_OUT" \
-    | grep -Eiq '(^|[^[:alnum:]_])allowed"?[[:space:]]*[:=][[:space:]]*"?false([^[:alnum:]_]|$)'; then
-    PLAN_WHY="its closeout driver would not release it (exit $rc): ${PLAN_WHY:-no output}"
+  if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_OUT"; then
+    PLAN_WHY="its closeout driver would not release it (exit ${rc:-1}): ${PLAN_WHY:-no output}"
     return 1
   fi
 }

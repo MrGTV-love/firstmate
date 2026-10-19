@@ -467,6 +467,21 @@ if [ "\${3:-}" != --execute-cleanup ]; then
     echo '{"allowed": false, "reason": "pull_request_not_merged"}'
     exit 3
   fi
+  if [ -e "$log/plan-empty" ]; then
+    exit 0
+  fi
+  if [ -e "$log/plan-malformed" ]; then
+    printf '{"allowed": tr'
+    exit 0
+  fi
+  if [ -e "$log/plan-missing" ]; then
+    printf '{"reason": "no verdict"}'
+    exit 0
+  fi
+  if [ -e "$log/plan-hang" ]; then
+    sleep 30
+    exit 0
+  fi
   echo '{"allowed": true}'
   exit 0
 fi
@@ -649,6 +664,31 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text(
   assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)"$'\n'"$SLOT|--cleanup-worktree $(copy_path locked) --execute-cleanup" \
     "$(cat "$W/closeout.log")" "the driver did not run once to plan and once to release"
   pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code"
+}
+
+test_unproved_plan_verdicts_hold_the_copy() {
+  local mode admin
+  for mode in empty malformed missing hang; do
+    make_locked_copy_case "plan-$mode" dead
+    install_driver "$SLOT" "$W"
+    printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+    : > "$W/plan-$mode"
+    admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+    FM_COPY_SWEEP_PLAN_TIMEOUT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "an unproved plan ($mode) must not fail the run, got $RC: $OUT"
+    assert_class locked HELD-LOCKED
+    assert_contains "$OUT" "summary: HELD-LOCKED=1" "an unproved plan ($mode) is not counted as held"
+    assert_not_contains "$OUT" "FAILED" "an unproved plan ($mode) was reported as a failure"
+    assert_absent "$HOMED/data/copy-sweep" "an unproved plan ($mode) copied ignored entries"
+    [ -e "$(copy_path locked)" ] || fail "an unproved plan ($mode) removed the copy"
+    registered locked || fail "an unproved plan ($mode) left the copy unregistered"
+    [ -f "$admin/locked" ] || fail "an unproved plan ($mode) lost the lock"
+    [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "an unproved plan ($mode) logged a removal"
+    assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
+      "an unproved plan ($mode) asked the driver for more than its plan"
+  done
+  pass "an empty, malformed or missing plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, and exit 0"
 }
 
 test_two_sweeps_of_one_path_keep_both_preserved_directories() {
@@ -1559,6 +1599,7 @@ run_case test_recycled_launcher_lock_is_released_by_the_driver
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
+run_case test_unproved_plan_verdicts_hold_the_copy
 run_case test_two_sweeps_of_one_path_keep_both_preserved_directories
 run_case test_a_removal_with_no_measured_size_says_so
 run_case test_locked_copy_with_an_unpushed_equivalence_is_still_held
