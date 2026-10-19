@@ -1334,6 +1334,42 @@ test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop() {
   pass "fm-control relaunch: an adapter unverified for this task kind refuses before the agent is stopped"
 }
 
+test_secondmate_relaunch_onto_dsh_refuses_before_stop() {
+  local dir home out rc
+  dir=$(new_case smdsh sm8)
+  home="$dir/home"
+  mkdir -p "$home/config" "$home/data/sm8"
+  printf '# secondmate brief\n' > "$home/data/sm8/brief.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+  mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
+  printf 'sm8\n' > "$dir/smhome/.fm-secondmate-home"
+  printf '# agents\n' > "$dir/smhome/AGENTS.md"
+  {
+    echo "window=fmses:fm-sm8"
+    echo "endpoint_task_id=sm8"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "model=default"
+    echo "effort=default"
+    echo "home=$dir/smhome"
+  } > "$home/state/sm8.meta"
+  printf '%s\n' "fm-sm8" > "$dir/fake/windows"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  out=$(run_control "$dir" sm8 relaunch --harness dsh); rc=$?
+  expect_code 1 "$rc" "a dsh secondmate relaunch should refuse"$'\n'"$out"
+  assert_contains "$out" "not verified to run a secondmate task" \
+    "the dsh refusal should name the kind the adapter cannot run"
+  [ "$(cat "$dir/fake/command")" = claude ] \
+    || fail "the dsh refusal must land before the running agent is stopped"
+  [ "$(meta_field "$dir" sm8 harness)" = claude ] \
+    || fail "a refused dsh relaunch must leave the durable record on the recorded harness"
+  pass "fm-control relaunch: a dsh secondmate target refuses before the agent is stopped"
+}
+
 test_explicit_secondmate_harness_ignores_configured_profile_axes() {
   local dir home out rc
   dir=$(new_case smexplicit sm4)
@@ -2092,6 +2128,7 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin
 test_secondmate_claude_relaunch_keeps_local_settings
 test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop
 test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop
+test_secondmate_relaunch_onto_dsh_refuses_before_stop
 test_explicit_secondmate_harness_ignores_configured_profile_axes
 test_ship_relaunch_ignores_the_crew_harness_config
 test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
