@@ -44,7 +44,8 @@
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); it loses no commit, because
-# the work is landed, and no tracked change, because the clean proof refuses one.
+# the work is landed or held by a recorded bundle, and no tracked change,
+# because the clean proof refuses one.
 # Any other ignored entry is copied to the task's data directory before removal.
 # The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files

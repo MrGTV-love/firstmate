@@ -263,8 +263,9 @@
 # that is not teardown's own is never signalled and refuses at once, named by its
 # pid; it is a clean worktree root, and each ignored file it holds is either
 # regenerable machinery or copied with its SHA-256 into the task's data
-# directory before removal; and its work is landed by the existing landed-work
-# rule. A copy whose work is not proved landed stays, with the reason written.
+# directory before removal; and its work passes the existing landed-work rule,
+# which also accepts the recorded bundle alternative above. A copy whose work is
+# neither proved landed nor held by a recorded bundle stays, with the reason written.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -275,8 +276,8 @@
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); any other ignored entry is
 # preserved first in data/<task>/nested-copy-preserved with its SHA-256. It loses
-# no commit, because the work is landed, and no tracked change, because the clean
-# proof refuses one. The clean proof skips
+# no commit, because the work is landed or held by a recorded bundle, and no
+# tracked change, because the clean proof refuses one. The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
