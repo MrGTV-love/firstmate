@@ -58,7 +58,10 @@
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
 #                      bin/fm-teardown.sh uses), no process inside, no record.
-#   REAPABLE-DRIVER    the same proofs as REAPABLE-PROVEN, plus Vernant's exact
+#   REAPABLE-DRIVER    a clean worktree root, no active record, no process
+#                      inside, every local commit reachable from HEAD contained
+#                      in a remote branch (the content-in-default fallback does
+#                      not apply to a locked copy), plus Vernant's exact
 #                      creation lock whose launcher pid is gone or recycled.
 #                      The launcher test is bin/fm-teardown-nested-lib.sh's own
 #                      teardown_lock_launcher_may_be_live: a pid that started
@@ -689,14 +692,15 @@ classify() {  # <copy> <clone> <pool> <container>
       CLASS=REAPABLE-PROVEN
       REASON="clean, no process, no record, HEAD contained in a remote branch"
     fi
+  elif [ "$locked" = 1 ]; then
+    # A locked copy is released only when every local commit is on a remote.
+    # The content-in-default fallback stays an unlocked-copy rule: a bundle is
+    # the recovery for its commits, not a landed proof for a lock release.
+    CLASS=HELD-UNPUSHED
+    REASON="$count commit(s) are on no remote; a locked copy is released only when every local commit is on a remote"
   elif content_in_default "$copy" "$clone"; then
-    if [ "$locked" = 1 ]; then
-      CLASS=REAPABLE-DRIVER
-      REASON="clean, no process, no record, content already in the default branch, Vernant launcher $launcher is gone"
-    else
-      CLASS=REAPABLE-PROVEN
-      REASON="clean, no process, no record, content already in the default branch"
-    fi
+    CLASS=REAPABLE-PROVEN
+    REASON="clean, no process, no record, content already in the default branch"
   else
     CLASS=HELD-UNPUSHED
     REASON="$count commit(s) are on no remote and not in the default branch"

@@ -548,6 +548,25 @@ test_recycled_launcher_lock_is_released_by_the_driver() {
   pass "a locked copy whose launcher pid is recycled is preserved, released by the driver and removed, one run"
 }
 
+test_locked_copy_with_an_unpushed_equivalence_is_still_held() {
+  make_locked_copy_case locked-unpushed recycled
+  install_driver "$SLOT" "$W"
+  # An empty commit's content is trivially already in the default branch, so the
+  # unlocked landed-content fallback alone would call this copy reapable.
+  git -C "$(copy_path locked)" commit -q --allow-empty -m 'local only'
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_class locked HELD-UNPUSHED
+  assert_contains "$OUT" "a locked copy is released only when every local commit is on a remote" \
+    "the report did not say why the locked copy is held"
+  [ -e "$(copy_path locked)" ] || fail "a locked copy with an unpushed commit was removed"
+  assert_absent "$W/closeout.log" "the driver ran on a locked copy with an unpushed commit"
+  [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a held locked copy was logged as removed"
+  kill "$LIVE_PID" 2>/dev/null || true
+  wait "$LIVE_PID" 2>/dev/null || true
+  pass "a locked copy with an unpushed but content-equivalent commit is held, and the driver never runs"
+}
+
 test_unlocked_ignored_files_are_kept_unless_regenerable() {
   local exclude
   make_world ignoredproof
@@ -1416,6 +1435,7 @@ run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy
 run_case test_recycled_launcher_lock_is_released_by_the_driver
+run_case test_locked_copy_with_an_unpushed_equivalence_is_still_held
 run_case test_unlocked_ignored_files_are_kept_unless_regenerable
 run_case test_live_foreign_or_unreleasable_locks_are_kept
 run_case test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
