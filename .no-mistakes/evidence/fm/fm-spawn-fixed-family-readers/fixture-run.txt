@@ -1,0 +1,5 @@
+ok - default fallback overlay matches pre-change bytes
+ok - fixed-family empties native chains, survives relaunch, and is dropped on promotion
+ok - fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op
+FM_TEST_ONLY=test_spawn_fixed_family nice -n 20 bash   6.53s user 15.46s system 52% cpu 42.252 total
+exit=0

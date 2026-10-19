@@ -1,0 +1,2 @@
+base  main  (repository default)
+🌳 No worktrees in pool.

@@ -1,0 +1,11 @@
+--- new state/*.meta in real home (diff vs before; empty = none) ---
+(no difference)
+--- treehouse status ---
+(no difference)
+🌳 No worktrees in pool.
+--- processes with worktree path ---
+(count: 0)
+--- leftover temp dirs ---
+(eval):1: no matches found: /Users/charlesabrooker/tmp/fm-live-fixed-family.*
+--- worktree git status ---
+(end)

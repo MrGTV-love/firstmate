@@ -1,0 +1,70 @@
+
+===== S1 baseline: review-reader scout WITHOUT --fixed-family (the Vernant bug shape) =====
+exit=0
+chains: {"default":[],"openai-codex/gpt-6.1-sol":["deepseek/deepseek-v4-flash:high"],"openai-codex/gpt-6.1-sol:high":["deepseek/deepseek-v4-flash:high"],"deepseek/deepseek-v4-flash":[],"deepseek/deepseek-v4-flash:high":[]}
+meta fixed_family: 0
+
+===== S2 review-reader scout WITH --fixed-family: chains must be empty =====
+exit=0
+chains: {"default":[],"openai-codex/gpt-6.1-sol":[],"openai-codex/gpt-6.1-sol:high":[]}
+meta: fixed_family=on
+launch uses overlay: 1 line(s) reference omp-fallback.yml
+any 'deepseek' anywhere in the overlay: 0
+
+===== S3 relaunch of fixed-family scout (flag NOT repeated) keeps empty chains =====
+exit=0
+chains: {"default":[],"openai-codex/gpt-6.1-sol":[],"openai-codex/gpt-6.1-sol:high":[]}
+meta: fixed_family=on
+
+===== S4 promote fixed-family scout to ship, then relaunch (review-1 decision: drop key) =====
+promote exit=0
+meta kind: kind=ship ; fixed_family lines: 0
+relaunch exit=0
+notice: reader-fixed ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for reader-fixed: unavailable - no TypeSafe or OpenRouter key
+spawned reader-fixed harness=omp kind=ship mode=local-only yolo=off window=firstmate:fm-reader-fixed worktree=/Users/charlesabrooker/tmp/fm-live-fixed-family.kAmhVH/s2/wt
+chains after ship relaunch: {"default":[],"openai-codex/gpt-6.1-sol":["deepseek/deepseek-v4-flash:high"],"openai-codex/gpt-6.1-sol:high":["deepseek/deepseek-v4-flash:high"],"deepseek/deepseek-v4-flash":[],"deepseek/deepseek-v4-flash:high":[]}
+
+===== S5 adversarial: --fixed-family on a ship =====
+exit=1
+error: --fixed-family applies only to scout tasks, including review readers; ships and secondmates cannot use it
+meta exists: no; overlay exists: no; launched: no
+
+===== S6 adversarial: --fixed-family on a secondmate =====
+exit=1
+error: --fixed-family applies only to scout tasks, including review readers; ships and secondmates cannot use it
+meta exists: no; launched: no
+
+===== S7 adversarial: --fixed-family with a raw launch command =====
+exit=1
+error: --fixed-family requires a canonical omp launch; a raw launch command cannot receive the per-task overlay that empties its fallback chains
+meta exists: no; launched: no
+
+===== S8 non-omp harness (claude) scout with --fixed-family: no-op with notice =====
+exit=0
+note: --fixed-family has no effect on harness 'claude'; only canonical omp launches receive a per-task fallback overlay
+warning: task cl-ff: /Users/charlesabrooker/tmp/fm-live-fixed-family.kAmhVH/s8/home/data/cl-ff/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+spawned cl-ff harness=claude kind=scout window=firstmate:fm-cl-ff worktree=/Users/charlesabrooker/tmp/fm-live-fixed-family.kAmhVH/s8/wt
+omp overlay present: no; fixed_family in meta: 1
+
+===== S9 adversarial: relaunch of an existing SHIP with explicit --fixed-family =====
+ship spawn exit=0
+relaunch exit=1
+error: --fixed-family applies only to scout tasks, including review readers; ships and secondmates cannot use it
+
+===== S10 adversarial: tampered meta (fixed_family=junk) on a scout relaunch =====
+spawn exit=0
+relaunch exit=1
+error: invalid recorded fixed_family posture for junk
+
+===== S11 combo: --fixed-family + --omp-no-helpers on a scout =====
+exit=0
+skill selection for combo: unavailable - no TypeSafe or OpenRouter key
+spawned combo harness=omp kind=scout window=firstmate:fm-combo worktree=/Users/charlesabrooker/tmp/fm-live-fixed-family.kAmhVH/s11/wt
+chains: {"default":[],"openai-codex/gpt-6.1-sol":[],"openai-codex/gpt-6.1-sol:high":[]}
+meta: fixed_family=on omp_no_helpers=on 
+
+===== S12 bad promote guard: ordinary scout promote leaves meta sane (no fixed_family introduced) =====
+spawn exit=0
+promote exit=0
+kind: kind=ship; fixed_family lines: 0
