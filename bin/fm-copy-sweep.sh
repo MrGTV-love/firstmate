@@ -107,8 +107,12 @@
 # `check` bounds its whole run by that timeout minus five seconds. It scans each
 # clone as it finds it and stops looking for clones once that time is spent, so
 # on a host with many clones it covers the first clones it reaches and a later
-# poll starts from the same place: partial coverage, which the size cache widens
-# a little on every poll. A cut run writes no completed-scan mark, its wake names
+# poll starts from the same place: partial coverage. The size cache saves only
+# du time, so a poll that du holds up reaches a little further each time; once
+# sizes are cached the time goes to finding and listing clones, which the cache
+# does not skip, and a poll bound that way stops at the same clone every time.
+# Home project clones come after the pool clones, so such a check may never
+# reach them. A cut run writes no completed-scan mark, its wake names
 # only what it measured, every budget the record holds as over keeps its place in
 # it because a cut scan cannot prove any budget back under (only a complete run
 # clears one), and it keeps the still-fresh cached sizes of the copies it never
@@ -117,7 +121,8 @@
 # UNCLASSIFIED). Every git and lsof call of those classifications runs under the
 # time left too, so a copy whose classification cannot finish reads UNCLASSIFIED.
 # The bound holds to within the work of one clone. The hourly `--apply` run has
-# no time bound, covers every clone, and warms the cache for large copies.
+# no time bound, is the only run certain to cover every clone, and warms the
+# cache for large copies.
 #
 # Exit status: 0 done, 1 a removal or write failed, 2 bad call or bad config.
 # tests/fm-copy-sweep.test.sh is the regression entry point.

@@ -1753,13 +1753,15 @@ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
 `bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake.
 `check` scans at most once per `interval` and stays inside the watcher's per-check timeout, to within the work of one clone.
 It scans each clone as it finds it and stops looking for clones once its time is spent, so on a host with many clones it covers the first clones it reaches, and the next poll starts from the same place.
-That partial coverage widens a little on every poll, because the size cache lets a later poll reach further.
+The size cache saves only `du` time, so a poll that `du` holds up reaches a little further each time.
+Once sizes are cached, the time goes to finding and listing clones, which the cache does not skip, and a poll bound that way stops at the same clone every time.
+Home project clones come after the pool clones, so such a check may never reach them.
 A cut run records no completed scan, and its wake names only what it measured.
 Every budget the record holds as over keeps its place in it, because a cut scan cannot prove any budget back under, and only a complete run clears one.
 A cut run also keeps the still-fresh cached sizes of the copies it did not reach.
 `check` cuts a size measurement it cannot finish, and classifies only the copies its wake names.
 A classification it cannot finish in time leaves that copy `UNCLASSIFIED`.
-The hourly `--apply` run has no such bound, covers every clone, and warms the cache for large copies.
+The hourly `--apply` run has no such bound, is the only run certain to cover every clone, and warms the cache for large copies.
 `bin/fm-copy-sweep.sh disarm` removes the binding.
 
 ### Budgets
