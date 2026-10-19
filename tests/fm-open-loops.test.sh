@@ -3150,9 +3150,26 @@ assert call(loops, '--check-actions').returncode == 0
 (home / 'state/worker.meta').write_text(f'kind=ship\nspawn_gen=worker-generation\nproject={home}/projects/example\nbranch=fm/worker\n')
 (home / 'nm/state.sqlite').write_text('unreadable optional step store\n')
 assert call(loops, '--check-actions').returncode == 0
-# Rechecking sees a stopped or silent worker even without another collector publication.
+# An unexpired receipt is trusted without a new read, even though a fresh read would now disagree.
 (home / 'worker-state').write_text('state: paused · source: status-log · no progress\n')
-assert call(loops, '--check-actions').returncode == 1
+assert call(loops, '--check-actions').returncode == 0, 'an unexpired receipt stands without re-reading the worker'
+assert not ok(loops, '--present-overdue').stdout
+# At its recheck epoch a receipt is re-proven, not trusted: a stopped or silent worker needs a real check-in again
+# without waiting for another collector publication.
+env['FM_OPEN_LOOPS_NOW'] = str(now + 900)
+assert call(loops, '--check-actions').returncode == 1, 'an expired receipt is not trusted'
+assert row['id'] in ok(loops, '--present-overdue').stdout
+# A worker that still shows a live run is re-proven and its receipt renewed for another interval.
+(home / 'worker-state').write_text('state: working · source: run-step · run: live-validation; still running\n')
+assert call(loops, '--check-actions').returncode == 0
+renewed = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+assert renewed['kind'] == 'observed' and 'still running' in renewed['evidence'] and renewed['recheck_epoch'] == now + 1800, renewed
+# A receipt whose input changed no longer holds before its recheck epoch: the worker's new status line drops it,
+# the stopped worker is not re-proven, and the row demands an action again.
+(home / 'worker-state').write_text('state: paused · source: status-log · no progress\n')
+with (home / 'state/worker.status').open('a') as status_log:
+    status_log.write(f'working [at={now - 7100}]: still implementing\n')
+assert call(loops, '--check-actions').returncode == 1, 'a changed status file drops the stored receipt'
 assert row['id'] in ok(loops, '--present-overdue').stdout
 
 # Recent canonical status and pipeline events are independent satisfaction routes; their inclusive expiry reopens.
@@ -3365,8 +3382,42 @@ try:
     assert actions[fresh['id']]['kind'] == 'observed' and row['id'] not in actions, actions
 finally:
     (home / 'hang-reader').unlink(missing_ok=True)
+# Progress accumulates across presentations: with a budget that fits ten live reads, sixty overdue rows are proven
+# oldest first, every later presentation reuses the stored receipts without reading them again, and the last ten
+# rows are covered on the sixth presentation.
+module.write_text(deadline_source.replace('EVIDENCE_DEADLINE_SECONDS = 5\n', 'EVIDENCE_DEADLINE_SECONDS = 600\n'))
+reader.write_text('#!/usr/bin/env bash\n'
+    'n=$(cat "$FM_HOME/reads" 2>/dev/null || echo 0)\n'
+    'if [ "$n" -ge 10 ]; then echo "cut $1" >> "$FM_HOME/read-log"; kill -ALRM "$PPID"; sleep 30; exit 1; fi\n'
+    'echo $((n + 1)) > "$FM_HOME/reads"; echo "ok $1" >> "$FM_HOME/read-log"\n'
+    'cat "$FM_HOME/worker-state"\n')
+home, row, ledger, env, call, ok, drain, ack = case('converge')
+rows = []
+for n in range(1, 61):
+    task = f't{n:02d}'
+    (home / f'state/{task}.meta').write_text(f'kind=ship\nspawn_gen=generation-{n}\n')
+    (home / f'state/{task}.status').write_text(f'working [at={now-7200}]: implementing\n')
+    rows.append(dict(row, id=f'row-converge-{n:02d}', subject=task, age_seconds=7200 + n * 10))
+record = json.loads(ledger.read_text()); record['rows'] = rows; ledger.write_text(json.dumps(record))
+(home / 'worker-state').write_text('state: working · source: run-step · run: live-validation\n')
+reads, read_log = home / 'reads', home / 'read-log'
+proven = lambda: sorted(ident for ident, action in json.loads(ledger.read_text()).get('handling', {}).get('actions', {}).items()
+                        if action['kind'] == 'observed')
+for presentation in range(1, 7):
+    reads.write_text('0')
+    ok(loops, '--present-overdue')
+    oldest = sorted(f'row-converge-{n:02d}' for n in range(61 - 10 * presentation, 61))
+    assert proven() == oldest, (presentation, proven())
+reads.write_text('0')
+assert call(loops, '--check-actions').returncode == 0, 'every overdue row holds a receipt after six presentations'
+assert not ok(loops, '--present-overdue').stdout
+lines = read_log.read_text().splitlines()
+assert [line[3:] for line in lines if line.startswith('ok ')] == [f't{n:02d}' for n in range(60, 0, -1)], lines
+assert sum(line.startswith('cut ') for line in lines) == 5, 'a stored receipt was read again or a presentation ended early'
+module.write_text(deadline_source)
 print('PASS: a hung current-state reader ends at the evidence deadline; cheaper evidence still satisfies other rows and the unproven row demands its action', flush=True)
 print('PASS: automatic evidence reads leave the receipt lock available; concurrent row, metadata and status changes reject stale proofs', flush=True)
+print('PASS: stored automatic receipts are trusted until their recheck epoch or an input change, then re-proven; overdue rows are proven oldest first across presentations', flush=True)
 print('PASS: fresh live-run, status and run-step receipts; standing acknowledgement; named open ship waits reopen;'
       ' silent/stalled, blocked, captain and merge requirements and unevidenced second deferrals retained', flush=True)
 PY

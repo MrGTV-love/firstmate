@@ -1466,6 +1466,11 @@ class SatisfactionVerifier(WaitVerifier):
         super().__init__(report, state, now)
         self.proofs, self.steps, self.statuses = {}, {}, {}
         self.sealed = False
+        self.expired = False
+
+    def check_deadline(self):
+        if self.expired:
+            raise CollectionDeadline("automatic evidence exceeded its deadline")
 
     def run_steps(self, worktree):
         """The run store is read once per pass (once per worktree when NM_HOME is relative); unreadable means none."""
@@ -1550,7 +1555,7 @@ class SatisfactionVerifier(WaitVerifier):
     def file_guard(path):
         try:
             info = path.stat()
-            return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+            return [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns]
         except FileNotFoundError:
             return None
 
@@ -1593,6 +1598,26 @@ class SatisfactionVerifier(WaitVerifier):
             raise ValueError("automatic evidence sources must not be redirected")
         return [self.file_guard(path) for path in paths]
 
+    def stored_stands(self, action, row, now):
+        """A stored automatic receipt still holds: same row, unexpired, and every local input file unchanged."""
+        proof = action.get("proof")
+        kind = action.get("kind")
+        if not isinstance(proof, dict) or proof.get("identity") != self.identity(row) \
+                or proof.get("recheck_epoch", now + 1) <= now:
+            return False
+        if kind == "observed":
+            if row.get("category") != "silent_report":
+                return False
+        elif kind == "backlog_wait":
+            if not ship_wait_candidate(row):
+                return False
+        else:
+            return False
+        try:
+            return proof.get("guard") == self.input_guard(row)
+        except SOURCE_ERRORS:
+            return False
+
     def prepare(self, report):
         status_guards = {}
         overdue = overdue_rows(report, self.collector.now)
@@ -1602,11 +1627,14 @@ class SatisfactionVerifier(WaitVerifier):
                 self.backlog_records()  # standing-receipt checks under the receipt lock reuse this one read
             except SOURCE_ERRORS:
                 pass
-        rows = [row for row in overdue if row.get("category") in ("silent_report", "unanswered_question")]
-        # Every row's recent events and dependencies are tried before any slow current-state read,
-        # so one hung reader can only cost the rows that have no cheaper evidence.
+        rows = sorted((row for row in overdue if row.get("category") in ("silent_report", "unanswered_question")),
+                      key=lambda row: -(float("inf") if row.get("age_seconds") is None else row["age_seconds"]))
+        rows = [row for row in rows if not self.stored_stands(self.actions.get(row["id"], {}), row, self.collector.now)]
+        # Rows without a valid stored receipt are proven oldest first, each with its recent events and dependencies
+        # before any slow current-state read, so one hung reader can only cost the rows that have no cheaper evidence.
         for live in (False, True):
             for row in rows:
+                self.check_deadline()  # a failed stop of the killed reader can replace the deadline error
                 if live and (row["category"] != "silent_report" or row["id"] in self.proofs):
                     continue
                 try:
@@ -1620,12 +1648,13 @@ class SatisfactionVerifier(WaitVerifier):
                         continue
                     kind, proof = self.automatic(row, live)
                     if proof and guard == self.input_guard(row):
-                        self.proofs[row["id"]] = (self.identity(row), guard, kind, proof)
+                        identity = self.identity(row)
+                        self.proofs[row["id"]] = (identity, guard, kind, dict(proof, guard=guard, identity=identity))
                 except SOURCE_ERRORS:
                     continue  # incomplete or concurrently changed evidence never excuses follow-up
         return self
 
-    def prepared(self, row, now):
+    def prepared(self, row, now, action):
         entry = self.proofs.get(row["id"])
         if entry is not None:
             identity, guard, kind, proof = entry
@@ -1635,6 +1664,8 @@ class SatisfactionVerifier(WaitVerifier):
                     return kind, proof
             except SOURCE_ERRORS:
                 pass
+        if self.stored_stands(action, row, now):
+            return action["kind"], action["proof"]
         return None, None
 
 
@@ -1645,6 +1676,8 @@ def prepare_satisfaction(state, now):
     unproven (they keep demanding an action) instead of extending that hold.
     """
     def expired(_signum, _frame):
+        if verifier is not None:
+            verifier.expired = True
         raise CollectionDeadline("automatic evidence exceeded its deadline")
     verifier = None
     previous = signal.signal(signal.SIGALRM, expired)
@@ -1760,7 +1793,7 @@ def ledger_action(args, state, now, prepared=None):
         for row in rows:
             # Reloaded actions remain authoritative; only cheap row/file identity checks
             # happen here, never the preflight's machine or backlog subprocesses.
-            kind, proof = prepared.prepared(row, now)
+            kind, proof = prepared.prepared(row, now, actions.get(row["id"], {}))
             if not proof or receipt_stands(actions.get(row["id"], {}), row, now, waits):
                 continue
             ident = row["id"]
