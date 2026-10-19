@@ -15,20 +15,13 @@ ORIGINAL_PATH=$PATH
 SESSION=$("$HELPER" name dsh-live)
 export FM_HERDR_LAB_STATE_DIR="$TASK/herdr-safety"
 mkdir -p "$TASK"
+# shellcheck source=tests/fm-dsh-live-cleanup.sh
+. "$ROOT/tests/fm-dsh-live-cleanup.sh"
 cleanup() {
   local rc=$?
   trap - EXIT
-  if ! PATH="$ORIGINAL_PATH" "$HELPER" teardown "$SESSION"; then
-    if PATH="$ORIGINAL_PATH" herdr session list --json 2>/dev/null \
-      | jq -e --arg name "$SESSION" '.sessions[]? | select(.name == $name)' >/dev/null 2>&1; then
-      rc=1
-      echo "lab session $SESSION remains after teardown" >&2
-    else
-      echo "teardown reported failure but the lab session is gone" >&2
-    fi
-  fi
-  printf 'cleanup_exit=%s\n' "$rc"
-  exit "$rc"
+  fm_dsh_live_cleanup "$rc" "$SESSION" "$HELPER" "$ORIGINAL_PATH"
+  exit $?
 }
 trap cleanup EXIT
 unset HERDR_ENV HERDR_PANE_ID HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_SOCKET_PATH HERDR_SESSION

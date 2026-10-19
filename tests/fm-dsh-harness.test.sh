@@ -115,4 +115,13 @@ printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture\n'
 . "$ROOT/bin/fm-control-lib.sh"
 [ "$(fm_control_interrupt_key dsh)" = Escape ]
 [ "$(fm_control_exit_command dsh)" = /exit ]
-printf 'ok - dsh executable-slot attribution and lifecycle capability contract\n'
+# shellcheck source=tests/fm-dsh-live-cleanup.sh
+. "$ROOT/tests/fm-dsh-live-cleanup.sh"
+printf '#!/bin/sh\nexit 1\n' > "$TMP/teardown-fail"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/teardown-ok"
+chmod +x "$TMP/teardown-fail" "$TMP/teardown-ok"
+out=$(fm_dsh_live_cleanup 0 session "$TMP/teardown-fail" "$PATH") && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || { echo 'a failed teardown must stay fatal' >&2; exit 1; }
+case "$out" in *cleanup_exit=1*) ;; *) echo "failed teardown lost its report: $out" >&2; exit 1 ;; esac
+fm_dsh_live_cleanup 0 session "$TMP/teardown-ok" "$PATH" >/dev/null || { echo 'a clean teardown must pass' >&2; exit 1; }
+printf 'ok - dsh executable-slot attribution, lifecycle capability and fatal cleanup contract\n'
