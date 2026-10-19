@@ -367,7 +367,9 @@
 #   --fixed-family applies only to scout tasks, including independent review
 #   readers: it empties every per-task omp fallback chain so a provider error
 #   stops the reader instead of switching its model family. Other harnesses
-#   accept it as a no-op with a notice. The task records fixed_family=on and
+#   accept it as a no-op with a notice; a raw launch command is refused,
+#   because it carries no per-task overlay to empty. The task records
+#   fixed_family=on and
 #   relaunch inherits it. Dispatch-time selection and default chains do not
 #   change; this controls only the per-task omp runtime fallback overlay.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
@@ -3222,8 +3224,15 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
 fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 
-if [ "$FIXED_FAMILY" = 1 ] && { [ "$HARNESS" != omp ] || [ "$RAW_LAUNCH" != 0 ]; }; then
-  echo "note: --fixed-family has no effect on harness '$HARNESS'; only canonical omp launches receive a per-task fallback overlay" >&2
+if [ "$FIXED_FAMILY" = 1 ]; then
+  # A raw launch carries no per-task --config overlay, so the chains cannot be
+  # emptied and the family promise would be silently unenforced. Refuse rather
+  # than launch a reader whose fallbacks still reach another family.
+  [ "$RAW_LAUNCH" = 0 ] || {
+    echo "error: --fixed-family requires a canonical omp launch; a raw launch command cannot receive the per-task overlay that empties its fallback chains" >&2
+    exit 1
+  }
+  [ "$HARNESS" = omp ] || echo "note: --fixed-family has no effect on harness '$HARNESS'; only canonical omp launches receive a per-task fallback overlay" >&2
 fi
 
 if [ "$OMP_NO_HELPERS" = 1 ]; then

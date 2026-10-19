@@ -624,7 +624,17 @@ test_spawn_fixed_family_scope() {
   expect_code 0 $? "other harnesses must accept fixed-family as a no-op: $out"
   assert_contains "$out" '--fixed-family has no effect on harness' "other harnesses need a plain no-op note"
   assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "other harnesses must not receive an omp overlay"
-  pass "fixed-family refuses non-scouts before launch and notes non-omp no-op"
+  id=family-raw
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" 'omp --auto-approve' --fixed-family 2>&1)
+  expect_code 1 $? "a raw launch must not claim a fixed family: $out"
+  assert_contains "$out" '--fixed-family requires a canonical omp launch' "raw launches need a plain refusal reason"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused raw launch must publish no record"
+  assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "a refused raw launch must emit no overlay"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw fixed-family launch reached launch"
+  pass "fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op"
 }
 
 test_spawn_fixed_family() {
