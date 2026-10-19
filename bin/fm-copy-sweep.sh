@@ -82,7 +82,10 @@
 # read, no du runs: the listing, the classes and --apply still run, only fresh
 # cached sizes are used, and a report or --apply run prints one line, "scan
 # skipped: load N above limit M". --apply and `check` also record it, `check`
-# stays quiet, and either raises one wake once 6 runs in a row have skipped.
+# stays quiet, and either raises one wake once 6 runs in a row have skipped. A
+# `check` cut by its time bound counts at most once per `interval` toward that
+# count, measured from the last time the count advanced, so a check that is cut
+# and skipped on every poll still reaches the wake after 6 intervals.
 #
 # Budgets. config/copy-budget (docs/configuration.md owns the format) holds a
 # GiB budget per pool root and per container (a pool slot, or a Firstmate home).
@@ -106,8 +109,10 @@
 # on a host with many clones it covers the first clones it reaches and a later
 # poll starts from the same place: partial coverage, which the size cache widens
 # a little on every poll. A cut run writes no completed-scan mark, its wake names
-# only what it measured, and a budget it did not reach keeps its place in the
-# record. Each du runs under the time left and is cut when it cannot finish, and
+# only what it measured, every budget the record holds as over keeps its place in
+# it because a cut scan cannot prove any budget back under (only a complete run
+# clears one), and it keeps the still-fresh cached sizes of the copies it never
+# reached. Each du runs under the time left and is cut when it cannot finish, and
 # `check` classifies only the copies it names in a wake (the rest read
 # UNCLASSIFIED). Every git and lsof call of those classifications runs under the
 # time left too, so a copy whose classification cannot finish reads UNCLASSIFIED.
@@ -855,21 +860,32 @@ evaluate_budgets() {
 }
 
 # A run that skipped its sizing adds one to the count of skipped runs in a row.
-# Once the count reaches SKIP_WAKE_RUNS, "skip:load" stands over like a budget
-# does and raises its wake once; the first run that sizes again ends the streak.
-# The hourly --apply and the gated `check` each run about once per `interval`,
-# so 6 runs in a row are about 6 hours at the default.
+# A cut run writes no completed-scan mark, so nothing gates it to one per
+# `interval`; it counts only when a whole `interval` has passed since the time
+# the streak was last advanced, which the record keeps. Once the count reaches
+# SKIP_WAKE_RUNS, "skip:load" stands over like a budget does and raises its wake
+# once; the first run that sizes again ends the streak. The hourly --apply and
+# the gated `check` each count about once per `interval`, so 6 runs in a row are
+# about 6 intervals, 6 hours at the default.
 SKIP_WAKE_RUNS=6
 SKIP_RUNS_NOW=
+SKIP_COUNTED_NOW=
 
-evaluate_skip() {
-  local runs
+evaluate_skip() {  # <now>
+  local now=$1 runs at
   SKIP_RUNS_NOW=
+  SKIP_COUNTED_NOW=
   [ -n "$SKIP_LINE" ] || return 0
   runs=$REC_SKIP_RUNS
+  at=$REC_SKIP_AT
   case "$runs" in ''|*[!0-9]*) runs=0 ;; esac
+  case "$at" in ''|*[!0-9]*) at= ;; esac
   SKIP_RUNS_NOW=$runs
-  [ "$SCAN_CUT" = 1 ] || SKIP_RUNS_NOW=$((runs + 1))
+  SKIP_COUNTED_NOW=$at
+  if [ "$SCAN_CUT" != 1 ] || [ -z "$at" ] || [ $((now - at)) -ge "$SCAN_INTERVAL" ] || [ "$now" -lt "$at" ]; then
+    SKIP_RUNS_NOW=$((runs + 1))
+    SKIP_COUNTED_NOW=$now
+  fi
   [ "$SKIP_RUNS_NOW" -ge "$SKIP_WAKE_RUNS" ] || return 0
   OVER_NOW="${OVER_NOW}skip:load"$'\n'
   ! printf '%s' "$REC_OVER" | grep -qxF skip:load || return 0
@@ -882,6 +898,7 @@ REC_LAST_SCAN=
 REC_OVER=
 REC_ERROR=
 REC_SKIP_RUNS=
+REC_SKIP_AT=
 REC_SKIP_LINE=
 
 record_usable() {
@@ -896,13 +913,15 @@ read_record() {
   REC_OVER=
   REC_ERROR=
   REC_SKIP_RUNS=
+  REC_SKIP_AT=
   REC_SKIP_LINE=
   record_usable || return 0
   REC_LAST_SCAN=$(awk -F '\t' '$1 == "last_scan" { print $2; exit }' "$RECORD")
   REC_OVER=$(awk -F '\t' '$1 == "over" { print $2 }' "$RECORD")
   REC_ERROR=$(awk -F '\t' '$1 == "error" { print $2; exit }' "$RECORD")
   REC_SKIP_RUNS=$(awk -F '\t' '$1 == "skip" { print $2; exit }' "$RECORD")
-  REC_SKIP_LINE=$(awk -F '\t' '$1 == "skip" { print $3; exit }' "$RECORD")
+  REC_SKIP_AT=$(awk -F '\t' '$1 == "skip" { print $3; exit }' "$RECORD")
+  REC_SKIP_LINE=$(awk -F '\t' '$1 == "skip" { print $4; exit }' "$RECORD")
 }
 
 write_atomic() {  # <destination> <content>
@@ -915,11 +934,12 @@ write_atomic() {  # <destination> <content>
   fi
 }
 
-# Publishes the record: the budgets over now, plus the ones a cut scan could not
-# prove under or never reached, so a half-measured scan never forgets a standing
-# condition.
+# Publishes the record: the budgets over now, plus the recorded ones this run
+# could not prove back under. A budget with an unmeasured copy is one, and on a
+# cut run every recorded budget is, because a cut scan sees only part of any of
+# them. Only a complete run clears a standing budget.
 write_record() {  # <last-scan> <error>
-  local key content field
+  local key content
   content="$RECORD_SCHEMA_LINE"$'\n'
   [ -z "$1" ] || content="$content"$'last_scan\t'"$1"$'\n'
   while IFS= read -r key; do
@@ -927,23 +947,28 @@ write_record() {  # <last-scan> <error>
     content="$content"$'over\t'"$key"$'\n'
   done <<< "$OVER_NOW"
   while IFS= read -r key; do
-    [ -n "$key" ] || continue
-    printf '%s' "$REC_OVER" | grep -qxF "$key" && content="$content"$'over\t'"$key"$'\n'
-  done <<< "$UNKNOWN_NOW"
-  if [ "$SCAN_CUT" = 1 ]; then
-    while IFS= read -r key; do
-      case "$key" in pool:*) field=2 ;; container:*) field=1 ;; *) continue ;; esac
-      printf '%s\n' "$COPIES" | awk -F '\t' -v f="$field" -v k="${key#*:}" '$f == k { found = 1 } END { exit !found }' && continue
+    case "$key" in pool:*|container:*) ;; *) continue ;; esac
+    printf '%s' "$OVER_NOW" | grep -qxF "$key" && continue
+    if [ "$SCAN_CUT" = 1 ] || printf '%s' "$UNKNOWN_NOW" | grep -qxF "$key"; then
       content="$content"$'over\t'"$key"$'\n'
-    done <<< "$REC_OVER"
-  fi
-  [ -z "$SKIP_RUNS_NOW" ] || content="$content"$'skip\t'"$SKIP_RUNS_NOW"$'\t'"$SKIP_LINE"$'\n'
+    fi
+  done <<< "$REC_OVER"
+  [ -z "$SKIP_RUNS_NOW" ] || content="$content"$'skip\t'"$SKIP_RUNS_NOW"$'\t'"$SKIP_COUNTED_NOW"$'\t'"$SKIP_LINE"$'\n'
   [ -z "$2" ] || content="$content"$'error\t'"$2"$'\n'
   write_atomic "$RECORD" "$content"
 }
 
+# Rewrites the size cache from what this run measured. A cut run also keeps the
+# still-fresh lines of the copies it never reached.
 write_cache() {
-  write_atomic "$SIZE_CACHE" "$CACHE_NEW"
+  local keep='' nl=$'\n'
+  if [ "$SCAN_CUT" = 1 ] && [ -f "$SIZE_CACHE" ] && [ ! -L "$SIZE_CACHE" ]; then
+    keep=$(printf '%s' "$CACHE_NEW" | awk -F '\t' -v now="$CACHE_NOW" -v age="$CACHE_MAX_AGE" '
+      pass == 1 { seen[$1] = 1; next }
+      !($1 in seen) && $3 ~ /^[0-9]+$/ && $4 ~ /^[0-9]+$/ && now - $3 < age { print }' pass=1 - pass=2 "$SIZE_CACHE")
+  fi
+  [ -z "$keep" ] || keep=$keep$nl
+  write_atomic "$SIZE_CACHE" "$CACHE_NEW$keep"
 }
 
 # Raises the one wake. `check` prints the line for the watcher to turn into a
@@ -1100,6 +1125,7 @@ run_sweep() {  # report|apply|check
         OVER_NOW=$REC_OVER
         SKIP_LINE=$REC_SKIP_LINE
         SKIP_RUNS_NOW=$REC_SKIP_RUNS
+        SKIP_COUNTED_NOW=$REC_SKIP_AT
         write_record "$REC_LAST_SCAN" "$CONFIG_ERROR" || true
       fi
       return 0
@@ -1143,7 +1169,7 @@ run_sweep() {  # report|apply|check
     [ "$FAILED_COUNT" -eq 0 ] || rc=1
   fi
   evaluate_budgets
-  evaluate_skip
+  evaluate_skip "$now"
   if [ "$mode" != report ]; then
     write_cache || { echo "fm-copy-sweep: could not write $SIZE_CACHE" >&2; rc=1; }
     if ! raise_wake "$mode"; then

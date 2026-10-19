@@ -861,10 +861,105 @@ test_a_cut_check_keeps_the_standing_budgets_it_did_not_reach() {
   FAKE_LOAD=99 FAKE_GIT_SLEEP_ENUM=2 FM_CHECK_TIMEOUT=11 run_sweep check
   rows=$(grep -c "^skip"$'\t' "$HOMED/state/copy-sweep.record")
   [ "$rows" = 1 ] || fail "the record should hold one skip line: $(cat "$HOMED/state/copy-sweep.record")"
-  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "skip"$'\t'"0"$'\t'"scan skipped: load 99 above limit 40" "cut runs advanced the streak of skipped runs"
+  [ "$(skip_count)" = 2 ] || fail "with an interval of 0 every cut skipped run is an interval apart and counts: $(cat "$HOMED/state/copy-sweep.record")"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "scan skipped: load 99 above limit 40" "the record does not hold the skip line"
   FAKE_LOAD=99 FM_CHECK_TIMEOUT=90 run_sweep check
-  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "skip"$'\t'"1"$'\t' "a complete skipped run did not count"
-  pass "a cut check keeps the standing budgets it did not reach and does not count toward the streak of skipped runs"
+  [ "$(skip_count)" = 3 ] || fail "a complete skipped run did not count: $(cat "$HOMED/state/copy-sweep.record")"
+  pass "a cut check keeps the standing budgets it did not reach and counts toward the streak of skipped runs"
+}
+
+skip_count() { awk -F '\t' '$1 == "skip" { print $2 }' "$HOMED/state/copy-sweep.record"; }
+
+# Every poll is cut during enumeration (the second clone is never reached) and
+# skipped for load, and the clock is driven by FM_COPY_SWEEP_NOW.
+cut_skipped_poll() {  # <now>
+  FAKE_LOAD=99 FAKE_GIT_SLEEP_ENUM=4 FM_CHECK_TIMEOUT=8 FM_COPY_SWEEP_NOW=$1 run_sweep check
+  [ "$RC" = 0 ] || fail "check at $1 failed ($RC): $OUT"
+}
+
+test_a_check_cut_and_skipped_on_every_poll_still_reaches_the_wake() {
+  local t0=100000 step
+  make_world cutskip
+  add_pool_slot 2
+  printf 'load-limit 40\ninterval 3600\n' > "$HOMED/config/copy-budget"
+  cut_skipped_poll "$t0"
+  [ -z "$OUT" ] || fail "the first cut skipped poll woke: $OUT"
+  [ "$(skip_count)" = 1 ] || fail "the first cut skipped poll should count once: $(cat "$HOMED/state/copy-sweep.record")"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "skip"$'\t'"1"$'\t'"$t0"$'\t'"scan skipped: load 99 above limit 40" "the record does not keep the time the count last advanced"
+  cut_skipped_poll $((t0 + 10))
+  [ -z "$OUT" ] || fail "a poll inside one interval woke: $OUT"
+  [ "$(skip_count)" = 1 ] || fail "a cut skipped poll inside one interval must not add to the count: $(cat "$HOMED/state/copy-sweep.record")"
+  cut_skipped_poll $((t0 + 3599))
+  [ "$(skip_count)" = 1 ] || fail "a cut skipped poll one second short of an interval must not add to the count: $(cat "$HOMED/state/copy-sweep.record")"
+  for step in 2 3 4 5; do
+    cut_skipped_poll $((t0 + (step - 1) * 3600))
+    [ -z "$OUT" ] || fail "counted run $step woke early: $OUT"
+    [ "$(skip_count)" = "$step" ] || fail "counted run $step should make the count $step: $(cat "$HOMED/state/copy-sweep.record")"
+  done
+  cut_skipped_poll $((t0 + 5 * 3600))
+  [ "$(printf '%s\n' "$OUT" | grep -c '^copy-sweep:')" = 1 ] || fail "the 6th counted run should raise exactly one wake: $OUT"
+  assert_contains "$OUT" "scan skipped: load 99 above limit 40 on 6 runs in a row" "the wake did not name the skip and its length"
+  cut_skipped_poll $((t0 + 6 * 3600))
+  [ -z "$OUT" ] || fail "the same streak woke twice: $OUT"
+  assert_no_grep "last_scan" "$HOMED/state/copy-sweep.record" "a poll that was cut was recorded as a complete scan"
+  pass "a check that is cut and skipped on every poll counts once per interval and raises exactly one wake on the 6th counted run"
+}
+
+# Two slots of one pool: the second slot is never reached, so the pool's partial
+# total is under its budget although the pool stays over. The first run warms the
+# size cache, so the cut run still knows the first slot's size after the time
+# bound has passed and no copy is left unmeasured.
+test_a_cut_check_keeps_a_pool_budget_it_reached_only_in_part() {
+  local slot2
+  make_world poolcut
+  printf 'pool pool1 15\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  add_big_dirty_copy c1
+  slot2="$TH/pool1/2/repo"
+  mkdir -p "$TH/pool1/2"
+  fm_git_init_commit "$slot2"
+  fm_git_add_origin "$slot2" "$W/origin-slot2.git"
+  git -C "$slot2" fetch -q origin
+  printf '{"worktrees":[{"name":"1","path":"%s"},{"name":"2","path":"%s"}]}\n' "$SLOT" "$slot2" > "$TH/pool1/treehouse-state.json"
+  git -C "$slot2" worktree add -q -b fm/c2 "$slot2/.claude/worktrees/c2"
+  printf 'dirty\n' > "$slot2/.claude/worktrees/c2/untracked.txt"
+  printf '%s\t%s\n' "$slot2/.claude/worktrees/c2" $((10 * GIB)) >> "$W/du-table"
+  FM_COPY_SWEEP_NOW=1000 FM_CHECK_TIMEOUT=300 run_sweep check
+  assert_contains "$OUT" "pool $TH/pool1 is over its budget: 20.00 GiB against 15 GiB" "the complete run did not wake for the pool"
+  FM_COPY_SWEEP_NOW=1100 FAKE_GIT_SLEEP_ENUM=5 FM_CHECK_TIMEOUT=9 run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "a cut check woke for a standing pool budget: $RC $OUT"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "over"$'\t'"pool:$TH/pool1" "a cut check forgot a pool budget it reached only in part"
+  FM_COPY_SWEEP_NOW=1200 FM_CHECK_TIMEOUT=300 run_sweep check
+  [ -z "$OUT" ] || fail "the next complete run woke again for a pool that never stopped being over: $OUT"
+  printf '%s\t%s\n%s\t%s\n' "$(copy_path c1)" "$GIB" "$slot2/.claude/worktrees/c2" "$GIB" > "$W/du-table"
+  FM_COPY_SWEEP_NOW=100000 FM_CHECK_TIMEOUT=300 run_sweep check
+  [ -z "$OUT" ] || fail "dropping under the budget should not wake: $OUT"
+  assert_no_grep "pool:" "$HOMED/state/copy-sweep.record" "a complete run did not clear a pool that is back under"
+  printf '%s\t%s\n%s\t%s\n' "$(copy_path c1)" $((10 * GIB)) "$slot2/.claude/worktrees/c2" $((10 * GIB)) > "$W/du-table"
+  FM_COPY_SWEEP_NOW=200000 FM_CHECK_TIMEOUT=300 run_sweep check
+  assert_contains "$OUT" "pool $TH/pool1 is over its budget: 20.00 GiB against 15 GiB" "going over again after a complete run did not wake"
+  pass "a cut check keeps a pool budget it reached only in part, and only a complete run clears it"
+}
+
+cache_has() { grep -qF "$1"$'\t' "$HOMED/state/copy-sweep.sizes"; }
+
+test_a_cut_check_keeps_the_fresh_cached_sizes_it_did_not_reach() {
+  local n
+  make_world cachekeep
+  printf 'default-pool off\ndefault-container 5\ninterval 0\n' > "$HOMED/config/copy-budget"
+  add_big_dirty_copy c1
+  for n in 2 3 4 5; do add_pool_slot "$n"; done
+  FM_COPY_SWEEP_NOW=1000 FM_CHECK_TIMEOUT=300 run_sweep check
+  for n in 1 2 3 4 5; do cache_has "$(slot_of "$n")/.claude/worktrees/c$n" || fail "the complete run did not cache c$n"; done
+  FM_COPY_SWEEP_NOW=2000 FAKE_GIT_SLEEP_ENUM=2 FM_CHECK_TIMEOUT=9 run_sweep check
+  for n in 1 2 3 4 5; do cache_has "$(slot_of "$n")/.claude/worktrees/c$n" || fail "a cut run threw away the fresh cached size of c$n"; done
+  rm -rf "$(slot_of 5)/.claude/worktrees/c5"
+  git -C "$(slot_of 5)" worktree prune
+  FM_COPY_SWEEP_NOW=3000 FM_CHECK_TIMEOUT=300 run_sweep check
+  ! cache_has "$(slot_of 5)/.claude/worktrees/c5" || fail "a complete run kept the cached size of a copy it did not find"
+  for n in 1 2 3 4; do cache_has "$(slot_of "$n")/.claude/worktrees/c$n" || fail "the complete run lost the cached size of c$n"; done
+  FM_COPY_SWEEP_NOW=100000 FAKE_GIT_SLEEP_ENUM=2 FM_CHECK_TIMEOUT=9 run_sweep check
+  ! cache_has "$(slot_of 4)/.claude/worktrees/c4" || fail "a cut run kept a cached size older than cache-max-age"
+  pass "a cut check keeps the cached sizes of the copies it did not reach while they are fresh, and a complete run rewrites the cache"
 }
 
 test_check_classifies_only_the_copies_it_names() {
@@ -1004,6 +1099,9 @@ run_case test_ignored_files_that_exist_nowhere_else_hold_a_copy
 run_case test_a_slow_enumeration_still_prints_the_wake_for_the_clones_it_reached
 run_case test_a_slow_home_project_enumeration_is_cut_at_the_time_bound
 run_case test_a_cut_check_keeps_the_standing_budgets_it_did_not_reach
+run_case test_a_check_cut_and_skipped_on_every_poll_still_reaches_the_wake
+run_case test_a_cut_check_keeps_a_pool_budget_it_reached_only_in_part
+run_case test_a_cut_check_keeps_the_fresh_cached_sizes_it_did_not_reach
 run_case test_check_classifies_only_the_copies_it_names
 run_case test_check_respects_its_interval
 run_case test_check_never_removes

@@ -1754,7 +1754,9 @@ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
 `check` scans at most once per `interval` and stays inside the watcher's per-check timeout, to within the work of one clone.
 It scans each clone as it finds it and stops looking for clones once its time is spent, so on a host with many clones it covers the first clones it reaches, and the next poll starts from the same place.
 That partial coverage widens a little on every poll, because the size cache lets a later poll reach further.
-A cut run records no completed scan, its wake names only what it measured, and a budget it did not reach keeps its place in the record.
+A cut run records no completed scan, and its wake names only what it measured.
+Every budget the record holds as over keeps its place in it, because a cut scan cannot prove any budget back under, and only a complete run clears one.
+A cut run also keeps the still-fresh cached sizes of the copies it did not reach.
 `check` cuts a size measurement it cannot finish, and classifies only the copies its wake names.
 A classification it cannot finish in time leaves that copy `UNCLASSIFIED`.
 The hourly `--apply` run has no such bound, covers every clone, and warms the cache for large copies.
@@ -1789,6 +1791,8 @@ A report or `--apply` run prints one line, `scan skipped: load N above limit M`,
 `--apply` and `check` also record it, and `check` stays quiet.
 `--apply` and `check` raise one wake once 6 runs in a row have skipped.
 The hourly `--apply` and the `check` that `interval` gates each run about once per `interval`, so 6 runs are about 6 hours at the default.
+A `check` cut by its time bound is not gated, so it counts at most once per `interval`, measured from the last time the count advanced.
+A check that is cut and skipped on every poll therefore still reaches the wake after 6 intervals.
 When a budget goes over, the run raises exactly one wake, naming each budget that just went over, its total, and its five largest copies with their class.
 It raises no second wake while the same budget stays over, and a budget that drops under and goes over again wakes again.
 A scan that `check` had to cut short counts only what it measured, so an unmeasured copy can delay a wake and never cause one.
