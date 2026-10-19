@@ -282,6 +282,17 @@ function statusFileVersion(path: string): string | null {
   }
 }
 
+// bin/fm-status-cap-lib.sh's fm_status_read_limit_bytes: the cap plus the reserve, with the
+// same positive-integer fallback for FM_STATUS_CAP_BYTES and FM_STATUS_CAP_RESERVE_BYTES. A
+// status log past it is never read whole.
+function statusBound(value: string | undefined, fallback: number): number {
+  return /^[0-9]+$/.test(value ?? "") && Number(value) > 0 ? Number(value) : fallback;
+}
+
+function statusReadLimitBytes(): number {
+  return statusBound(process.env.FM_STATUS_CAP_BYTES, 33554432) + statusBound(process.env.FM_STATUS_CAP_RESERVE_BYTES, 1048576);
+}
+
 function openDecisions(
   lines: readonly string[],
   resolveVerb: string,
@@ -502,6 +513,7 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
             let contents: Buffer;
             let spanOffset = 0;
             try {
+              if (lstatSync(statusPath).size > statusReadLimitBytes()) return UNSAFE_SCOPE;
               contents = readFileSync(statusPath);
               if (cursor && cursor.offset <= contents.length) {
                 try {

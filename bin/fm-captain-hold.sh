@@ -2668,9 +2668,10 @@ open_task_ids() {
 
 # Every key token stated anywhere in a status log. A cheap candidate scan: it
 # over-includes tokens that are only prose, and status_key_closing_verb below is
-# what actually decides what the stream says about a key.
+# what actually decides what the stream says about a key. The log is read through the
+# byte read limit (bin/fm-status-cap-lib.sh), so a log past it yields no tokens.
 status_log_key_tokens() {  # <status-file>
-  grep -o '\[key=[A-Za-z0-9._-]*\]' "$1" 2>/dev/null |
+  fm_status_cat "$1" 0 2>/dev/null | grep -o '\[key=[A-Za-z0-9._-]*\]' |
     sed 's/^\[key=//; s/\]$//' | LC_ALL=C sort -u
 }
 
