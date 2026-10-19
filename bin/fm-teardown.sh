@@ -730,6 +730,7 @@ if [ "$FORCE" = --force ] && [ "$(fm_lease_actor)" = branch ]; then
   exit "$FM_LEASE_REFUSE_EXIT"
 fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
+teardown_friction_outcome retried
 
 # The pool slot of <project> that encloses a record's current copy without
 # being it: the slot that strictly contains the copy or, once the copy is gone,
@@ -6105,6 +6106,7 @@ if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ]; then
   fm_backlog_ledger_closed "$STATE" "$CONFIG" "$ID" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"
 fi
 rm -f "$STATE/$ID.teardown-return-pending"
+[ "$TEARDOWN_POOL_SLOT_LOST" != 0 ] || teardown_friction_outcome completed
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true

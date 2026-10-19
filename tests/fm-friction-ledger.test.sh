@@ -15,6 +15,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 from unittest.mock import patch
 
@@ -151,5 +152,78 @@ for env in [{k: v for k, v in os.environ.items() if k != 'FM_HOME'}, dict(os.env
     result = subprocess.run(['bash', '-c', shell, 'fixture', str(root / 'bin/fm-refuse-lib.sh'), command], env=env, text=True, capture_output=True)
     assert result.returncode == 7 and result.stderr.count('REFUSED:') == 1
 print('PASS typed machine/human exits, executable completing command, caller exit preserved on telemetry errors')
+
+# History that is complete but off-schema is diagnosed as history, never as a fault of the new event.
+bad_home = tmp / 'schema-home'
+(bad_home / 'state').mkdir(parents=True)
+bad_history = bad_home / 'state/friction.jsonl'
+for line in ('{"schema":"fm-friction.v1"}', '[]'):
+    bad_history.write_text(line + '\n')
+    before = bad_history.read_bytes()
+    result = run(arguments=args, env=dict(os.environ, FM_HOME=str(bad_home)))
+    assert 'invalid ledger history' in result.stderr and 'invalid schema or fields' not in result.stderr, result.stderr
+    assert bad_history.read_bytes() == before
+print('PASS schema-invalid history reports its own cause and is retained unchanged')
+
+# A supplied operation/episode replaces the event-id default, so an outcome shares the refusal's operation.
+corr_home = tmp / 'corr-home'
+corr_home.mkdir()
+corr_env = dict(os.environ, FM_HOME=str(corr_home))
+supplied = dict(corr_env, FM_FRICTION_OPERATION_ID='op-supplied', FM_FRICTION_EPISODE_ID='episode-supplied')
+
+def corr_rows():
+    return [json.loads(line) for line in (corr_home / 'state/friction.jsonl').read_text().splitlines()]
+
+run(arguments=args, env=supplied)
+run(arguments=args, env=corr_env)
+blocked, plain = corr_rows()
+assert blocked['operation_id'] == 'op-supplied' and blocked['episode_id'] == 'episode-supplied'
+assert blocked['attempt_id'] != 'op-supplied'
+assert plain['operation_id'] == plain['attempt_id'] == plain['event_id']
+outcome = ['outcome', 'retry-succeeded', 'fixture-guard', 'nested-copy', '/private/path-canary', 'task-canary']
+no_operation = {k: v for k, v in corr_env.items() if k != 'FM_FRICTION_OPERATION_ID'}
+for arguments, env in [(outcome, no_operation),
+                       (outcome, dict(corr_env, FM_FRICTION_OPERATION_ID='op-unknown')),
+                       ([*outcome[:4], '/other/path', 'task-canary'], supplied),
+                       ([*outcome[:5], 'other-task'], supplied),
+                       ([outcome[0], outcome[1], 'other-guard', *outcome[3:]], supplied)]:
+    result = run(arguments=arguments, env=env)
+    assert len(corr_rows()) == 2 and not result.stderr, 'an outcome without a matching blocked event must not be recorded'
+retried = ['outcome', 'retried', *outcome[2:]]
+operation_wide = ['outcome', 'completed', 'fixture-guard', 'nested-copy', '', 'task-canary']
+for arguments in (retried, retried, outcome, outcome, operation_wide, operation_wide):
+    run(arguments=arguments, env=supplied)
+rows_after = corr_rows()
+assert [row['outcome'] for row in rows_after] == ['blocked', 'blocked', 'retried', 'retried', 'retry-succeeded', 'completed'], 'a retry is recorded each time, a terminal outcome once'
+for row in rows_after[2:]:
+    assert row['operation_id'] == 'op-supplied' and row['episode_id'] == 'episode-supplied'
+    assert row['rule_id'] == 'missing-proof' and row['subject'] == blocked['subject'] and row['first_block_at'] == blocked['first_block_at']
+assert all(row['elapsed_ms'] is None for row in rows_after[:4])
+assert all(type(row['elapsed_ms']) is int and row['elapsed_ms'] >= 0 for row in rows_after[4:])
+assert len({row['event_id'] for row in rows_after}) == 6
+assert 'canary' not in (corr_home / 'state/friction.jsonl').read_text()
+print('PASS supplied operation shared by refusal and outcomes; uncorrelated outcomes never invented; terminal outcome once')
+
+# One shell process keeps one operation across refusals and prints it in each machine command.
+shell_two = '. "$1"; fm_refuse g r1 m1 machine "true" nested-copy s1 t; fm_refuse g r2 m2 machine "true" nested-copy s2 t'
+fresh_home = tmp / 'fresh-home'
+fresh_home.mkdir()
+fresh_env = dict(no_operation, FM_HOME=str(fresh_home))
+fresh_env.pop('FM_FRICTION_EPISODE_ID', None)
+result = subprocess.run(['bash', '-c', shell_two, 'fixture', str(root / 'bin/fm-refuse-lib.sh')], env=fresh_env, text=True, capture_output=True)
+printed = [re.fullmatch(r'completing-command: FM_FRICTION_OPERATION_ID=(\S+) FM_FRICTION_EPISODE_ID=(\S+) true', line)
+           for line in result.stderr.splitlines() if line.startswith('completing-command: ')]
+assert len(printed) == 2 and all(printed), result.stderr
+assert printed[0].groups() == printed[1].groups() and printed[0].group(1) == printed[0].group(2)
+fresh_rows = [json.loads(line) for line in (fresh_home / 'state/friction.jsonl').read_text().splitlines()]
+assert [row['rule_id'] for row in fresh_rows] == ['r1', 'r2']
+assert {row['operation_id'] for row in fresh_rows} == {row['episode_id'] for row in fresh_rows} == {printed[0].group(1)}
+assert fresh_rows[0]['attempt_id'] != fresh_rows[1]['attempt_id']
+supplied_shell = dict(fresh_env, FM_FRICTION_OPERATION_ID='op-from-route', FM_FRICTION_EPISODE_ID='episode-from-route')
+result = subprocess.run(['bash', '-c', shell_two + '; fm_friction_outcome retry-succeeded g nested-copy s1 t', 'fixture', str(root / 'bin/fm-refuse-lib.sh')], env=supplied_shell, text=True, capture_output=True)
+assert result.stderr.count('completing-command: FM_FRICTION_OPERATION_ID=op-from-route FM_FRICTION_EPISODE_ID=episode-from-route true') == 2, result.stderr
+last = [json.loads(line) for line in (fresh_home / 'state/friction.jsonl').read_text().splitlines()][-1]
+assert (last['outcome'], last['rule_id'], last['operation_id'], last['episode_id']) == ('retry-succeeded', 'r1', 'op-from-route', 'episode-from-route')
+print('PASS one operation per refusing process, carried in every printed machine command')
 PY
 pass "friction ledger and refusal envelope behavioral contracts"

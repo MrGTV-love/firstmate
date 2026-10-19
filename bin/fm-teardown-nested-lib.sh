@@ -77,6 +77,24 @@ TEARDOWN_SLOT_COPIES=()
 TEARDOWN_CLOSEOUT_OUT=
 TEARDOWN_FOREIGN_RULE=
 TEARDOWN_REFUSED_COPIES=()
+TEARDOWN_FRICTION_GUARD=FM-TEARDOWN-PRESERVATION
+
+# One operation per teardown process: the environment's when this run is a
+# printed completing command, else minted with its first refusal. The outcome
+# of a copy is recorded only for an operation a refusal already holds.
+teardown_friction_outcome() {  # <outcome> [<copy>]
+  FM_HOME="$FM_HOME" fm_friction_outcome "$1" "$TEARDOWN_FRICTION_GUARD" nested-copy "${2:-}" "$ID"
+}
+
+# The human-only question for a copy the proof refused; <rule> names the proof.
+teardown_copy_question() {  # <rule> <copy> <why>
+  case "$1" in
+    copy-worktree-root) printf 'What owner-approved repair, removal or retained ownership applies to %s (%s)? Keep it; no removal or forced cleanup is authorized.' "$2" "$3" ;;
+    copy-head-resolved) printf 'Which verified commit holds the work in %s (%s)? Keep the copy; no discard is authorized.' "$2" "$3" ;;
+    copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$3" ;;
+    *) printf 'What verified landing or retained ownership covers %s (%s)? Keep this copy until that evidence exists; no discard is authorized.' "$2" "$3" ;;
+  esac
+}
 
 # One event per refused copy/predicate, not another event for the registered-copy
 # wrapper that repeats it. The command re-enters the existing proof/preservation
@@ -94,7 +112,7 @@ teardown_refuse_copy() {  # <rule> <missing> <copy> [new-question]
   exit_text=$command
   if [ -n "${4:-}" ]; then kind=human-only; exit_text=$4; fi
   FM_HOME="$FM_HOME" FM_FRICTION_REVISION_FILE="$revision" \
-    fm_refuse FM-TEARDOWN-PRESERVATION "$1" "$2" "$kind" "$exit_text" nested-copy "$3" "$ID"
+    fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$2" "$kind" "$exit_text" nested-copy "$3" "$ID"
   TEARDOWN_REFUSED_COPIES+=("$3")
 }
 
@@ -379,7 +397,7 @@ teardown_foreign_copy_prove() {  # <copy>
   TEARDOWN_FOREIGN_RULE='copy-unowned'
   fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 || rc=$?
   if [ "$rc" = 1 ]; then
-    TEARDOWN_FOREIGN_RULE=inspection-unavailable
+    TEARDOWN_FOREIGN_RULE=${FM_TASK_COPY_STABLE:-inspection-unavailable}
     [ -z "$FM_TASK_COPY_DIRTY" ] || TEARDOWN_FOREIGN_RULE='copy-preserved'
     TEARDOWN_FOREIGN_WHY="it $FM_TASK_COPY_REASON"
     return 1
@@ -411,7 +429,7 @@ teardown_foreign_copies_prove() {  # <slot>
       TEARDOWN_FOREIGN_COPIES+=("$copy")
     else
       teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." "$copy" \
-        "What verified landing or retained ownership covers $copy ($TEARDOWN_FOREIGN_WHY)? Keep this copy until that evidence exists; no discard is authorized."
+        "$(teardown_copy_question "$TEARDOWN_FOREIGN_RULE" "$copy" "$TEARDOWN_FOREIGN_WHY")"
     fi
   done
 }
@@ -526,6 +544,7 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
     return 1
   fi
   echo "teardown: removed landed foreign copy $copy from pool slot $slot" >&2
+  teardown_friction_outcome retry-succeeded "$copy"
 }
 
 # Releases every proved foreign copy of TEARDOWN_RETURN_SLOT. Each copy is
@@ -541,7 +560,7 @@ teardown_foreign_copies_release() {
   for copy in "${TEARDOWN_FOREIGN_COPIES[@]}"; do
     if ! teardown_foreign_copy_prove "$copy"; then
       teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "foreign copy $copy in pool slot $slot is no longer provable: $TEARDOWN_FOREIGN_WHY; nothing was removed." "$copy" \
-        "What verified landing or retained ownership covers the changed copy $copy ($TEARDOWN_FOREIGN_WHY)? Keep it until that new evidence exists."
+        "$(teardown_copy_question "$TEARDOWN_FOREIGN_RULE" "$copy" "$TEARDOWN_FOREIGN_WHY")"
       return 1
     fi
   done
@@ -613,6 +632,7 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     return 1
   fi
   echo "teardown: removed landed own nested copy $copy from pool slot $slot" >&2
+  teardown_friction_outcome retry-succeeded "$copy"
 }
 
 # Releases every own nested copy of the task that Vernant's creation lock holds.

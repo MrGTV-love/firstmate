@@ -3,8 +3,13 @@
 
 Usage: FM_HOME=/absolute/home python3 bin/fm-friction-ledger.py < event.json
        ... fm-friction-ledger.py refusal GUARD RULE KIND SUBJECT EXIT_KIND TASK REVISION_FILE
+       ... fm-friction-ledger.py outcome OUTCOME GUARD KIND SUBJECT TASK
 The stdin interface validates a complete event; refusal constructs a blocked event
 with hashed subject/task identities and source-file revision, never raw payloads.
+FM_FRICTION_OPERATION_ID/EPISODE_ID, when supplied, are used instead of the event id.
+outcome appends a follow-up only for the supplied FM_FRICTION_OPERATION_ID, only when
+that operation already holds a blocked event for the same guard, task and subject
+(an empty SUBJECT means the whole operation), and a terminal outcome only once.
 Only explicit FM_HOME selects state/friction.jsonl; overrides and cwd cannot redirect it.
 One locked O_APPEND write publishes a bounded line. Duplicate event_id is a no-op.
 Lock contention is bounded. A corrupt/partial history is retained, never repaired or
@@ -31,6 +36,7 @@ LOCK_PAUSE = 0.02
 TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\Z")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 OUTCOMES = {"blocked", "worked-around", "bypassed", "retried", "retry-succeeded", "completed", "abandoned", "escalated"}
+TERMINAL = {"retry-succeeded", "completed", "abandoned"}
 FIELDS = {"schema", "event_id", "at", "guard_id", "rule_id", "guard_revision", "task_id", "actor", "execution_kind", "subject", "attempt_id", "operation_id", "episode_id", "outcome", "reason", "exit_printed", "exit_kind", "proof_digest", "theater", "new_information", "first_block_at", "elapsed_ms", "adjudication"}
 
 
@@ -86,11 +92,15 @@ def validate(event):
     return data
 
 
+def utc_stamp(moment):
+    return moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
 def refusal(args):
     if len(args) != 7:
         raise LedgerError("usage: refusal GUARD RULE KIND SUBJECT EXIT_KIND TASK REVISION_FILE")
     guard, rule, kind, subject, exit_kind, task, revision_file = args
-    now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    now = utc_stamp(dt.datetime.now(dt.timezone.utc))
     event_id = os.environ.get("FM_FRICTION_EVENT_ID") or str(uuid.uuid4())
     attempt = os.environ.get("FM_FRICTION_ATTEMPT_ID") or event_id
     operation = os.environ.get("FM_FRICTION_OPERATION_ID") or attempt
@@ -106,9 +116,52 @@ def refusal(args):
             "first_block_at": now, "elapsed_ms": None, "adjudication": "unknown"}
 
 
-def append_event(event):
-    """Validate and append once, or recognize an already published event id."""
-    data = validate(event)
+def outcome(args):
+    """Return a function building the follow-up event from history, or None when nothing correlates."""
+    if len(args) != 5:
+        raise LedgerError("usage: outcome OUTCOME GUARD KIND SUBJECT TASK")
+    name, guard, kind, subject, task = args
+    if name not in OUTCOMES - {"blocked"}:
+        raise LedgerError("invalid event category")
+    operation = os.environ.get("FM_FRICTION_OPERATION_ID")
+    if not operation:
+        return None
+    identity = digest(subject) if subject else None
+    task_id = digest(task) if task else "unknown"
+
+    def derive(rows):
+        same = [row for row in rows
+                if (row["operation_id"], row["guard_id"], row["task_id"], row["subject"]["kind"]) == (operation, guard, task_id, kind)
+                and identity in (None, row["subject"]["identity"])]
+        blocked = [row for row in same if row["outcome"] == "blocked"]
+        if not blocked or (name in TERMINAL and any(row["outcome"] == name for row in same)):
+            return None
+        first, last = blocked[0], blocked[-1]
+        moment = dt.datetime.now(dt.timezone.utc)
+        elapsed = None
+        if name in TERMINAL and first["first_block_at"] is not None:
+            began = dt.datetime.fromisoformat(first["first_block_at"][:-1] + "+00:00")
+            elapsed = max(0, int((moment - began).total_seconds() * 1000))
+        event_id = str(uuid.uuid4())
+        return {"schema": "fm-friction.v1", "event_id": event_id, "at": utc_stamp(moment),
+                "guard_id": guard, "rule_id": last["rule_id"], "guard_revision": last["guard_revision"],
+                "task_id": task_id, "actor": os.environ.get("FM_FRICTION_ACTOR", "unknown"),
+                "execution_kind": last["execution_kind"], "subject": last["subject"],
+                "attempt_id": event_id, "operation_id": operation, "episode_id": last["episode_id"],
+                "outcome": name, "reason": last["reason"], "exit_printed": last["exit_printed"],
+                "exit_kind": last["exit_kind"], "proof_digest": "unknown", "theater": "unknown",
+                "new_information": "unknown", "first_block_at": first["first_block_at"],
+                "elapsed_ms": elapsed, "adjudication": "unknown"}
+
+    return derive
+
+
+def append_event(event=None, derive=None):
+    """Validate and append once, or recognize an already published event id.
+
+    With derive, the event is built from the validated history under the same lock.
+    """
+    data = validate(event) if event is not None else None
     home = os.environ.get("FM_HOME", "")
     if not home or not Path(home).is_absolute():
         raise LedgerError("explicit absolute FM_HOME required; no event recorded")
@@ -130,9 +183,10 @@ def append_event(event):
                     raise LedgerError("ledger busy; preserve event identity and retry telemetry later") from None
                 time.sleep(LOCK_PAUSE)
         duplicate = False
-        with os.fdopen(os.dup(fd), "rb") as history:
+        rows = []
+        with os.fdopen(os.dup(fd), "rb") as ledger:
             while True:
-                line = history.readline(MAX_LINE_BYTES + 1)
+                line = ledger.readline(MAX_LINE_BYTES + 1)
                 if not line:
                     break
                 if len(line) > MAX_LINE_BYTES or not line.endswith(b"\n"):
@@ -140,10 +194,18 @@ def append_event(event):
                 try:
                     old = json.loads(line)
                     validate(old)
-                except (ValueError, TypeError, KeyError) as exc:
+                except (LedgerError, ValueError, TypeError, KeyError) as exc:
                     raise LedgerError("invalid ledger history; preserve it for reconciliation before retrying") from exc
-                duplicate |= old["event_id"] == event["event_id"]
-        if duplicate:
+                if derive is None:
+                    duplicate |= old["event_id"] == event["event_id"]
+                else:
+                    rows.append(old)
+        if derive is not None:
+            event = derive(rows)
+            if event is None:
+                return
+            data = validate(event)
+        elif duplicate:
             return
         # Do not retry a short/failed append: it may already have published bytes.
         if os.write(fd, data) != len(data):
@@ -153,7 +215,7 @@ def append_event(event):
 
 
 def main(argv=None):
-    event = None
+    event = derive = None
     try:
         args = sys.argv[1:] if argv is None else argv
         if args == ["--help"]:
@@ -161,14 +223,18 @@ def main(argv=None):
             return 0
         if args and args[0] == "refusal":
             event = refusal(args[1:])
+        elif args and args[0] == "outcome":
+            derive = outcome(args[1:])
+            if derive is None:
+                return 0
         elif not args:
             raw = sys.stdin.buffer.read(MAX_LINE_BYTES + 1)
             if len(raw) > MAX_LINE_BYTES:
                 raise LedgerError("event exceeds ledger bound")
             event = json.loads(raw)
         else:
-            raise LedgerError("usage: fm-friction-ledger.py [refusal ...]")
-        append_event(event)
+            raise LedgerError("usage: fm-friction-ledger.py [refusal ...|outcome ...]")
+        append_event(event, derive)
     except (LedgerError, OSError, ValueError, TypeError, KeyError) as exc:
         # Never echo exception text from the OS/JSON parser: it may contain input.
         message = str(exc) if isinstance(exc, LedgerError) else "telemetry unavailable; preserve event identity and retry telemetry later"

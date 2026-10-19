@@ -10835,8 +10835,21 @@ SH
   pass "a foreign copy whose ignored files cannot be listed is refused, not treated as having nothing to preserve"
 }
 
+# run_printed_route <route> <rc-var>: runs a printed completing command through
+# the real teardown with only this fixture's external-tool and home-layout
+# environment, leaving its streams in the case.
+run_printed_route() {
+  local route=$1 rc_var=$2 status=0
+  env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" \
+    FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+    FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
+    NM_HOME="$FOREIGN_CASE/nm" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
+    bash -c "$route" > "$FOREIGN_CASE/completed.stdout" 2> "$FOREIGN_CASE/completed.stderr" || status=$?
+  printf -v "$rc_var" '%s' "$status"
+}
+
 test_typed_preservation_exit_completes_cleanup() {
-  local rc exclude route line preserved ownership
+  local rc exclude route line preserved ownership operation
   for ownership in foreign own; do
   route=
   if [ "$ownership" = own ]; then
@@ -10860,23 +10873,88 @@ test_typed_preservation_exit_completes_cleanup() {
     case "$line" in 'completing-command: '*) route=${line#completing-command: } ;; esac
   done < "$FOREIGN_CASE/stderr"
   [ -n "$route" ] || fail 'preservation refusal omitted its executable completing command'
-  # Restore storage, then execute the printed route through the real teardown
-  # graph with only this fixture's external-tool and home-layout environment.
+  operation=$(jq -r '.operation_id' "$FOREIGN_CASE/home/state/friction.jsonl")
+  case "$route" in
+    "FM_FRICTION_OPERATION_ID=$operation FM_FRICTION_EPISODE_ID=$operation "*) ;;
+    *) fail "printed route does not carry the refusal's operation and episode: $route" ;;
+  esac
+  # While storage is still broken the route is refused again, as another
+  # attempt of the same operation that prints the same route.
+  run_printed_route "$route" rc
+  expect_code 1 "$rc" "printed route must keep refusing while storage is broken: $(cat "$FOREIGN_CASE/completed.stderr")"
+  assert_equals "$route" "$(sed -n 's/^completing-command: //p' "$FOREIGN_CASE/completed.stderr")" 'a repeated refusal printed a different route'
+  jq -es --arg op "$operation" 'map(.outcome) == ["blocked", "retried", "blocked"] and (map(.operation_id) | unique == [$op])' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'a refused retry was not one more attempt of the same operation'
+  # Restore storage, then execute the printed route through the real teardown graph.
   rm "$FOREIGN_CASE/fakebin/cp"
-  rc=0
-  env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" \
-    FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
-    FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
-    NM_HOME="$FOREIGN_CASE/nm" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
-    bash -c "$route" > "$FOREIGN_CASE/completed.stdout" 2> "$FOREIGN_CASE/completed.stderr" || rc=$?
+  run_printed_route "$route" rc
   expect_code 0 "$rc" "printed route failed after storage restored: $(cat "$FOREIGN_CASE/completed.stderr")"
   assert_absent "$FOREIGN_COPY" 'printed route did not retire copy'
   assert_absent "$FOREIGN_CASE/state/task-x1.meta" 'printed route did not close task'
   preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
   assert_equals 'unique retained bytes' "$(cat "$preserved")" 'completing route lost ignored bytes'
-  jq -es 'length == 1' "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'success fabricated another policy refusal'
+  jq -es --arg op "$operation" '
+      map(.outcome) == ["blocked", "retried", "blocked", "retried", "retry-succeeded", "completed"]
+      and (map(.operation_id) | unique == [$op]) and (map(.episode_id) | unique == [$op])
+      and (map(.rule_id) | unique == ["ignored-bytes-preserved"]) and (map(.subject.identity) | unique | length == 1)
+      and (map(.event_id) | unique | length == 6) and all(.execution_kind == "test")
+      and (.[:4] | all(.elapsed_ms == null)) and (.[4:] | all(.elapsed_ms | type == "number" and . >= 0))' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null \
+    || fail "a refusal and its successful retry must be one operation ending in retry-succeeded and completed: $(cat "$FOREIGN_CASE/home/state/friction.jsonl")"
   done
-  pass 'own and foreign typed preservation refusals retain unique bytes and their printed commands complete cleanup after storage repair'
+  pass 'own and foreign typed preservation refusals retain unique bytes, and their printed commands complete cleanup after storage repair as one operation'
+}
+
+# A proof failure that needs a human decision is a typed refusal with a
+# human-only question and one event; it is not a plain error and not a second
+# event from the registered-copy custody refusal that repeats it.
+assert_typed_copy_refusal() {  # <label> <rule>
+  local label=$1 rule=$2
+  assert_grep "REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=$rule " "$FOREIGN_CASE/stderr" "$label: the refusal is not typed"
+  assert_grep 'human-only-exit: ' "$FOREIGN_CASE/stderr" "$label: the refusal printed no question"
+  assert_no_grep "error: foreign copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "$label: a policy refusal was printed as a plain error"
+  assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "$label: the custody refusal changed"
+  jq -es --arg rule "$rule" 'length == 1 and .[0].rule_id == $rule and .[0].outcome == "blocked" and .[0].exit_kind == "human-only" and .[0].exit_printed' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail "$label: expected exactly one typed human-only event"
+  assert_present "$FOREIGN_COPY" "$label: the copy was removed"
+  assert_absent "$FOREIGN_CASE/closeout.log" "$label: the closeout driver ran"
+  assert_absent "$FOREIGN_CASE/treehouse.log" "$label: the pool slot was returned"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+}
+
+test_foreign_copy_that_is_not_a_worktree_root_is_a_typed_refusal() {
+  local rc
+  make_foreign_copy_case foreign-typed-not-root
+  rm -f "$FOREIGN_COPY/.git"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "not-root: a registered remnant without its .git must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_typed_copy_refusal not-root copy-worktree-root
+  pass 'a foreign copy that is not a Git worktree root is refused with its rule and a human-only question, once'
+}
+
+test_foreign_copy_with_an_unresolvable_head_is_a_typed_refusal() {
+  local rc
+  make_foreign_copy_case foreign-typed-unborn-head
+  git -C "$FOREIGN_COPY" symbolic-ref HEAD refs/heads/fm/unborn-typed
+  git -C "$FOREIGN_COPY" read-tree --empty
+  find "$FOREIGN_COPY" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "unborn-head: a copy whose HEAD cannot be resolved must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_typed_copy_refusal unborn-head copy-head-resolved
+  pass 'a foreign copy whose HEAD cannot be resolved is refused with its rule and a human-only question, once'
+}
+
+test_foreign_copy_whose_anchor_names_another_commit_is_a_typed_refusal() {
+  local rc short other
+  make_foreign_copy_case foreign-typed-anchor-commit
+  short=$(git -C "$FOREIGN_COPY" rev-parse --short HEAD)
+  other=$(git -C "$FOREIGN_CASE/project" commit-tree -m 'another commit' "$(git -C "$FOREIGN_CASE/project" rev-parse 'HEAD^{tree}')")
+  git -C "$FOREIGN_CASE/project" update-ref "refs/fm/anchor/task-x1-$short" "$other"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "anchor-commit: an anchor naming another commit must refuse the copy: $(cat "$FOREIGN_CASE/stderr")"
+  assert_typed_copy_refusal anchor-commit copy-anchor-commit
+  assert_equals "$other" "$(git -C "$FOREIGN_CASE/project" rev-parse "refs/fm/anchor/task-x1-$short")" 'anchor-commit: the existing anchor was overwritten'
+  pass 'a foreign copy whose preservation anchor names another commit is refused with its rule and a human-only question, once'
 }
 
 test_teardown_usage_and_inspection_errors_are_not_policy_events() {
@@ -13090,6 +13168,9 @@ test_foreign_copy_regenerable_ignored_files_need_no_preservation
 test_foreign_copy_preserves_durable_tac_state_before_removal
 test_foreign_copy_is_not_removed_when_its_ignored_files_cannot_be_listed
 test_typed_preservation_exit_completes_cleanup
+test_foreign_copy_that_is_not_a_worktree_root_is_a_typed_refusal
+test_foreign_copy_with_an_unresolvable_head_is_a_typed_refusal
+test_foreign_copy_whose_anchor_names_another_commit_is_a_typed_refusal
 test_teardown_usage_and_inspection_errors_are_not_policy_events
 test_earlier_preserved_copy_survives_until_its_replacement_is_verified
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused

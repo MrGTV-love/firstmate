@@ -1181,22 +1181,20 @@ test_claude_oversize() {
   pass "Claude hooks retain JSON/exit contracts, screen bounded writes, refuse uncoverable size with the typed completing route, and leave advisory-only results uncounted"
 }
 
-jev_test_cases=(
-  test_claude_effects test_outages_and_scope test_bounded_retry test_missing_runtime
-  test_launch_cutover test_crashing_runtime test_service_contract test_result_and_audit_policy
-  test_claude_result_advisory test_claude_channel_context test_channel_consistency
-  test_omp_permissions test_deadlines test_trusted_reads_and_independent_judgment
-  test_oversize_screening test_claude_oversize test_ledger_privacy
-)
-# Like the teardown suite, accept only registered case names for focused runs.
-for requested in "$@"; do
-  found=0
-  for test_case in "${jev_test_cases[@]}"; do [ "$requested" != "$test_case" ] || found=1; done
-  [ "$found" = 1 ] || { printf 'Unknown test case: %s\n' "$requested" >&2; exit 2; }
-done
-for test_case in "${jev_test_cases[@]}"; do
-  if [ "$#" = 0 ]; then "$test_case"; continue; fi
-  for requested in "$@"; do
-    if [ "$requested" = "$test_case" ]; then "$test_case"; break; fi
-  done
-done
+test_claude_effects
+test_outages_and_scope
+test_bounded_retry
+test_missing_runtime
+test_launch_cutover
+test_crashing_runtime
+test_service_contract
+test_result_and_audit_policy
+test_claude_result_advisory
+test_claude_channel_context
+test_channel_consistency
+test_omp_permissions
+test_deadlines
+test_trusted_reads_and_independent_judgment
+test_oversize_screening
+test_claude_oversize
+test_ledger_privacy

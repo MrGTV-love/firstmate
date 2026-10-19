@@ -117,10 +117,12 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev size refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
-Usage, queue contention and transient inspection failures alone are not policy events.
+Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
+A copy that is not a Git worktree root, has a HEAD that cannot be resolved, or meets a preservation anchor naming another commit stays that way until someone decides, so teardown refuses it as `copy-worktree-root`, `copy-head-resolved` or `copy-anchor-commit` with a human-only question.
 The shell [refusal envelope](../bin/fm-refuse-lib.sh) prints `REFUSED: guard=<stable-id> rule=<predicate-id> missing=<actual missing proof>`, followed by `completing-command: <supported command>` or a literal `human-only-exit: <new question>` line.
 The caller retains its existing exit code; a telemetry failure never adds a refusal, changes that code, or changes hook JSON or the Claude Stop exit-2 contract.
 The teardown completing command re-enters its existing proof and automatic ignored-byte preservation path without force after readable source and writable preservation storage are restored.
+It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, and one teardown process keeps one operation across all its refusals, so a refusal, a refusal on retry and the later success are one operation; a human-only exit prints no command and carries none.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
 Jev's size message names the existing request/overlap budget and same-write-tool report-splitting route without changing screening or admission.
 A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; on Claude a tool result is advisory only, so an oversized result there is neither printed as `REFUSED` nor counted.
@@ -141,7 +143,10 @@ The shell constructor hashes subject and task context and the enforcing source f
 `execution_kind` is `live` or `test`; `exit_kind` is `machine`, `human-only` or `none`, with boolean `exit_printed` true exactly when an exit is printed.
 `theater` is `yes`, `no` or `unknown`; `adjudication` is `legitimate-false-block`, `harm-caught`, `policy-changed` or `unknown`.
 The pilot leaves adjudication, theater and fact delta unknown rather than inventing evidence.
-A retry is a new attempt/event under the same operation/episode; a terminal event appends its measured elapsed time without rewriting the blocked event.
+A retry is a new attempt/event under the same operation/episode, so a retry that is refused again is another `blocked` event; a terminal event appends its measured elapsed time without rewriting the blocked event.
+The writer's `outcome` interface appends a follow-up only for the `FM_FRICTION_OPERATION_ID` it is given, only when that operation already holds a blocked event for the same guard, task and subject, and a terminal outcome (`retry-succeeded`, `completed`, `abandoned`) at most once; elapsed time runs from the first block.
+Teardown records `retried` when a run starts with such an operation, `retry-succeeded` when it removes a copy that was refused, and `completed` when the teardown finishes without a lost slot.
+No site observes `abandoned`, `worked-around`, `bypassed` or `escalated`, so none is recorded; Jev's size bridge sees only the refusal, because a split write is a different action, so it records no outcome.
 `FM_FRICTION_EVENT_ID`, `FM_FRICTION_ATTEMPT_ID`, `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` supply existing correlation identities when available; otherwise the constructor generates a fresh event/attempt identity, without guessing continuity across invocations.
 `FM_FRICTION_EXECUTION_KIND=test` separates fixtures, and `FM_FRICTION_ACTOR` supplies a known typed role; absent actor information remains unknown.
 Commands, completing questions, tool output, credentials, raw paths and customer content are never ledger fields.
@@ -150,6 +155,7 @@ Records are bounded to 8,192 encoded bytes and published with one append operati
 A repeated `event_id` is recognized without appending again, independently of notification deduplication.
 History is append-only and is never automatically rotated, truncated or deleted.
 A short/crashed append leaves its existing bytes intact; subsequent writes diagnose the incomplete history rather than appending to a corrupt tail or looping on it.
+A complete line that fails the schema is diagnosed the same way, as invalid history, never as a fault of the new event.
 Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
 An omitted event remains missing evidence, not a guarded-operation failure.
 The optional friction writer is separate from Jev's existing mandatory audit: that audit's `AuditUnavailableError` behavior is unchanged.
