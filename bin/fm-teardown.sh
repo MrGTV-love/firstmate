@@ -241,10 +241,10 @@
 # copy, refuses as before; --force never waives these proofs. The by-hand route
 # is in docs/agent-control.md.
 # Held copies. A foreign copy that is clean, owned by no record, process or live
-# launcher outside this teardown, and held back only by ignored files that exist
-# nowhere else or by a HEAD that is not proved landed does not stop the close of
-# a task whose own copy passed the landed-work proof (bin/fm-teardown-nested-lib.sh
-# owns the rule). The task closes: its backlog item goes to Done, its record and
+# launcher, and held back only by ignored files that exist nowhere else or by a
+# HEAD that is not proved landed does not stop the close of a task whose own copy
+# passed the landed-work proof (bin/fm-teardown-nested-lib.sh owns the rule).
+# The task closes: its backlog item goes to Done, its record and
 # runtime state go, and only its own nested copies the proof covers are removed.
 # The pool slot is reserved under a durable lease exactly as an ordinary return
 # reserves it, but it is not returned, and no foreign copy is touched; a slot
@@ -252,9 +252,10 @@
 # removed. Each held copy is named in the output and appended to
 # data/held-foreign-copies.log once the task record and the task's own nested
 # copies are gone, before the backlog close. --force never holds a
-# copy, a copy inside the task's own nested copy is never held, and a copy that
-# is dirty, owned, or has a process in it still refuses. docs/agent-control.md
-# owns the rule.
+# copy, nor does retiring a secondmate home, a copy inside the task's own nested
+# copy is never held, and a copy that is dirty, owned, or has a process in it
+# (this teardown's own included) still refuses. docs/agent-control.md owns the
+# rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.

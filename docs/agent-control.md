@@ -311,7 +311,7 @@ When such a copy cannot be released, or when one that can be released lies there
 A foreign copy that is also dirty, named by another record, running a process, or locked by anything other than a Vernant creation lock whose launcher is gone still refuses the whole close, and so does an own copy that is dirty or unlanded, or any other refusal of the ordinary close.
 The refusal names that blocker, such as the owning record or the running process, and not the unique ignored files the copy also holds.
 A copy whose landing could not be checked, as when fetching the default branch from origin fails, is never held either: the close refuses, names the failed fetch, and a rerun checks again.
-`--force` never holds a foreign copy.
+`--force` never holds a foreign copy, and neither does retiring a secondmate home.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
 The log test lists the commits of a squash-merged branch whose remote branch was deleted as unpushed, so judge those copies by their merged PR and the closeout driver's landing check, not by that list alone.
 A plain `git worktree remove` refuses a locked copy, and neither `--force` nor unlocking by hand is the supported route.
