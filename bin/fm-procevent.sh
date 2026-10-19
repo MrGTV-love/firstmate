@@ -59,7 +59,9 @@
 #            Consumers that need readiness call this explicitly after arming.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for that capture. It then
-#            drains its owned process group in EXIT cleanup, unless the source
+#            drains its owned process group in EXIT cleanup. Output-reader
+#            lifetime follows docs/configuration.md "Prove ownership before
+#            stopping a runner". Polling continues only if the source
 #            command is the tracked adapter script and `relisten` accepts
 #            polling again in this same runner.
 #            It blocks for the runner's lifetime and is meant to run supervised,
@@ -1435,9 +1437,18 @@ EOF
     perl -e '
       use strict;
       use warnings;
-      my $limit = shift;
+      my ($limit, $parent) = @ARGV;
       my ($written, $truncated) = (0, 0);
+      my $readers = "";
+      vec($readers, fileno(STDIN), 1) = 1;
       while (1) {
+        # SIGKILL cannot run shell cleanup, and the source may keep the FIFO
+        # open after its runner dies. Never block indefinitely awaiting EOF.
+        exit 2 if getppid() != $parent;
+        my $ready = $readers;
+        my $available = select($ready, undef, undef, 1);
+        exit 2 if $available < 0;
+        next unless $available;
         my $count = sysread(STDIN, my $buffer, 65536);
         exit 2 unless defined $count;
         last if $count == 0;
@@ -1455,7 +1466,7 @@ EOF
         $truncated = 1 if $take < $count;
       }
       exit($truncated ? 3 : 0);
-    ' "$MAX_OUTPUT_BYTES" <&4 > "$out" &
+    ' "$MAX_OUTPUT_BYTES" "$$" <&4 > "$out" &
     bound_pid=$!
     # A trapped signal interrupts wait immediately. A foreground drain would
     # defer the TERM trap for as long as the native poll keeps stdout open.

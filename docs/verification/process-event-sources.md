@@ -225,6 +225,22 @@ They fail for opposite reasons, which is the point of keeping them apart.
 The crashed-leader cases separately pin refusal and claim preservation when a leader dies outside the stop's own signal, so successful escalation cannot be mistaken for closing that limit.
 Refresh the regressions with `bash tests/fm-procevent.test.sh`; the dated measurements above are recorded observations, not fixed timing thresholds.
 
+### Output-reader lifetime after runner loss
+
+Verified on 2026-10-19 on macOS (Darwin 25.6.0) with Perl 5.34.1 through the public source-registration and launch interfaces in isolated temporary homes.
+In `tests/fm-procevent-runner-custody.test.sh`, SIGKILL on only the runner left no marked output reader while the source and descendant remained alive with the FIFO write end; reader inspection uses only the fixture's temporary-tree marker.
+The same regression covers runner-only TERM and HUP, existing identity-checked group cleanup and replacement capture, and delayed binary output at zero, partial, and complete bounds, including nonzero source exits with usable output.
+This is the shared built-in capture path, with no harness or session-provider selector; extension capture remains separate and unchanged.
+
+The command below ran inside the process-budget and duration wrappers:
+
+```text
+nice -n 20 bash bin/fm-test-run.sh tests/fm-procevent-runner-custody.test.sh
+ok - killed launcher leaves no marked bounding reader even while its source holds stdout open
+ok - normal delayed output preserves exact binary bytes, zero and partial bounds, and nonzero source exits
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=76013
+```
+
 ## Portability finding
 
 `setsid` is **not present on macOS**, so it cannot establish the runner's process group.
