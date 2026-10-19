@@ -114,6 +114,12 @@
 # disagrees, so an adjusted brief and the recorded task metadata cannot drift
 # apart.
 # Ship briefs begin with a worktree-isolation assertion before the branch step.
+# The branch step also forbids a second tree inside the pool slot: Vernant's
+# scripts/git-stability/start_task_worktree.py would nest a locked copy under
+# the slot that no one owns the release of (bin/fm-teardown-nested-lib.sh and
+# bin/fm-copy-sweep.sh only clean up after it). A Vernant rule or guard that
+# demands a manifest or a second worktree becomes a blocked status line that
+# quotes the demand, not a tree the lane creates.
 # Both crewmate scaffolds carry one shared rule against administering the
 # infrastructure every lane shares - the no-mistakes daemon and the worktree pool
 # their own slot came from - so ship and scout cannot drift apart. A secondmate
