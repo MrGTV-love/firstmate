@@ -47,6 +47,8 @@ Observed: three cards, each with `Task:`, `Decision:`, `Recommendation:`, `Evide
 `no-recommendation` rendered `Recommendation: none recorded` and `Evidence: none recorded` for its invalid evidence value.
 Exactly two `none recorded` occurrences appeared across the three cards.
 A fourth task with a 45,000-character body was cut to fit Slack's size limit; its card still ended with `Full decision remains in the local backlog.`, `Reply in this thread with your answer.`, and the main-window note.
+Answering that task closed it; its `Resolved:` post was cut with `Full text remains in the local backlog.`, the poll printed no transport failure, and the thread was retired.
+The replay double rejects any post over 40,000 characters, as Slack does; before the cut moved into the single post path, that resolution post failed with `slack: transport failure: api_error` and the thread was never retired.
 Result: pass.
 
 ## DOD-03 - typed reply through the existing intake
@@ -103,6 +105,7 @@ Observed: one `check: slack 900.000001 - conflicting signals: Abort vs Wait`, ze
 (c) Two different reactions produced one check line and one notice; later polls stayed silent; removing one reaction changed the reaction set and recorded the remaining option.
 (d) A reaction the intake refused (`refused: typed-call`, call still open) was not submitted again by the next poll, and no second acknowledgement was posted.
 The conflict notice in the thread named the remedy: `Remove the :two: reaction, or type 2.` for a reaction against a typed reply, `Please reply once.` for two typed replies, and `Remove all but one reaction.` for two reactions.
+Two conflicting typed replies of 45,000 characters each produced one conflict notice cut with `Full text remains in the local backlog.`, no transport failure, and an unanswered call.
 Result: pass.
 
 ## DOD-09 - duplicate and cross-channel answers record once

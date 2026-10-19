@@ -105,6 +105,8 @@ class Replay:
             channel = fields.get('channel')
             if channel != self.transcript.get('channel', 'D0123456789'):
                 raise SlackError('channel_not_found')
+            if len(fields.get('text', '')) > 40000:
+                raise SlackError('api_error')
             next_ts = int(self.state['next_ts']) + 1
             self.state['next_ts'] = next_ts
             ts = f'{next_ts}.000001'

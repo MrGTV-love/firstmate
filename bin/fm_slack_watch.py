@@ -33,6 +33,9 @@ REACTIONS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'ni
 USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
+CARD_TAIL = ('\nFull decision remains in the local backlog.'
+             '\nReply in this thread with your answer.'
+             '\nMessages typed in the main DM window are not read.')
 
 
 def run(script, *args, text=None):
@@ -348,7 +351,7 @@ class Watch:
         return self.api.call('conversations.history', channel=channel, limit=100,
                              include_all_metadata=True).get('messages', [])
 
-    def post(self, event, text, thread=None):
+    def post(self, event, text, thread=None, tail='\nFull text remains in the local backlog.'):
         channel = self.state.get('channel')
         if not channel:
             raise SlackError('dm_not_prepared')
@@ -356,6 +359,8 @@ class Watch:
         for message in self.recent(thread):
             if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                 return message['ts']
+        if len(text.encode()) > 39000:
+            text = text[:38000] + tail
         args = {'channel': channel, 'text': text,
                 'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
                 'metadata': {'event_type': STATE_KEY, 'event_payload': {'id': marker}},
@@ -478,16 +483,12 @@ class Watch:
             if text_only:
                 card = {}
             text, options, usable = self.card_payload(row, card, text_only)
-            if len(text.encode()) > 39000:
-                text = (text[:38000] + '\nFull decision remains in the local backlog.'
-                        '\nReply in this thread with your answer.'
-                        '\nMessages typed in the main DM window are not read.')
             self.scope_notice()
             # Re-check immediately before the network post.
             again, current = self.probe(key)
             if again == 1 or (current if again == 0 else 'uncertain') != identity:
                 continue
-            ts = self.post('card:' + occurrence, text)
+            ts = self.post('card:' + occurrence, text, tail=CARD_TAIL)
             record = {'key': key, 'identity': identity, 'ts': ts, 'options': options,
                       'mode': card.get('close') if card.get('close') in ('done', 'release') else 'done',
                       'reactions': usable, 'retired': False}

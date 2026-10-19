@@ -96,6 +96,13 @@ card=$(python3 "$HELPER" card-text "$(replay_file)" oversized-card)
 assert_contains "$card" 'Full decision remains in the local backlog.' "DOD-02 oversized card was not cut"
 assert_contains "$card" 'Reply in this thread with your answer.' "DOD-02 oversized card lost the reply instruction"
 assert_contains "$card" 'Messages typed in the main DM window are not read.' "DOD-02 oversized card lost the main-window note"
+ts=$(thread_field oversized-card ts)
+reply_to "$ts" 900.000099 go
+out=$(poll card-payload)
+assert_eq "$(closed_count "$out")" 1 "DOD-02 oversized call closed"
+assert_not_contains "$out" 'transport failure' "DOD-02 the resolution post of an oversized call failed"
+assert_contains "$(thread_texts "$ts")" 'Full text remains in the local backlog.' "DOD-02 oversized resolution was not cut"
+assert_eq "$(thread_field oversized-card retired)" True "DOD-02 oversized thread was not retired"
 printf 'ok - DOD-02\n'
 
 # DOD-03
@@ -207,6 +214,16 @@ reply_to 900.000001 900.000009 3
 out=$(poll contradiction-typed)
 assert_eq "$(closed_count "$out")" 1 "DOD-08 (a) a fresh typed reply answers"
 assert_eq "$(answer_line conflict-call)" "abort" "DOD-08 (a) fresh reply recorded"
+new_home contradiction-typed
+bind
+mirror contradiction-typed >/dev/null
+reply_to 900.000001 900.000011 "$(python3 -c 'print("a" * 45000)')"
+reply_to 900.000001 900.000012 "$(python3 -c 'print("b" * 45000)')"
+out=$(poll contradiction-typed)
+assert_not_contains "$out" 'transport failure' "DOD-08 a long conflict notice failed to post"
+assert_eq "$(check_count "$out")" 1 "DOD-08 long conflict surfaces once"
+assert_contains "$(thread_texts 900.000001)" 'Full text remains in the local backlog.' "DOD-08 long conflict notice was not cut"
+assert_open conflict-call 0 "DOD-08 long conflict records nothing"
 new_home reaction-answer
 bind
 mirror reaction-answer >/dev/null
