@@ -23,8 +23,9 @@
 #   placeholders, an empty Task, an incomplete pair of Task subsections, or a
 #   `## Captain's intent` line opening with a Captain label or address. A fresh
 #   spawn also refuses a leftover `## Definition Of Done (task)` placeholder,
-#   naming the section and the placeholder; a `DoD file: <absolute path>` line
-#   inside that section naming a finished criteria file is the only escape. A
+#   naming the section and the placeholder; an unfenced `DoD file: <absolute
+#   path>` line inside that section naming a finished criteria file is the only
+#   escape. A
 #   fresh spawn of a brief with no such section warns once on stderr and
 #   proceeds. A relaunch and a secondmate charter never reach the check
 #   (bin/fm-dod-lib.sh owns it).

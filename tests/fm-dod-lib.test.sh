@@ -21,6 +21,53 @@ write_merge_marker() {  # <state> <id> <provider> <host> <path> <number>
   chmod 600 "$1/$2.pr-poll-merge-notified"
 }
 
+test_dod_file_examples_are_not_directives() {
+  local brief="$TMP_ROOT/fenced-dod.md" fence out rc
+  mkdir -p "$TMP_ROOT"
+  for fence in '```' '~~~'; do
+    cat > "$brief" <<EOF
+## Definition Of Done (task)
+Capability in plain words: Deliver the specified behavior.
+### Mandatory items
+The help text includes this example:
+${fence}text
+DoD file: $TMP_ROOT/example-only.md
+## How You're Graded
+${fence}
+### Hard gates
+Preserve the real criteria.
+## How You're Graded
+EOF
+    out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+    [ "$rc" -eq 1 ] && [ -z "$out" ] \
+      || fail "a fenced DoD-file example refused actual criteria: $out"
+  done
+  pass "fenced DoD-file examples do not refuse actual criteria"
+}
+
+test_unfenced_dod_file_is_still_honored() {
+  local brief="$TMP_ROOT/real-dod.md" criteria="$TMP_ROOT/criteria.md" out rc
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+\`\`\`text
+DoD file: $TMP_ROOT/example-only.md
+\`\`\`
+DoD file: $criteria
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "an unreadable real DoD file must refuse"
+  assert_contains "$out" "DoD file $criteria is not a readable file" "the real directive after an example must be honored"
+  printf '{DOD_MANDATORY_ITEMS}\n' > "$criteria"
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a real DoD file with placeholders must refuse"
+  assert_contains "$out" "DoD file $criteria:" "the real criteria file must be checked"
+  printf 'Ship the specified behavior and retain the safety guard.\n' > "$criteria"
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a readable filled real DoD file must pass: $out"
+  pass "unfenced DoD-file directives after fenced examples remain authoritative"
+}
+
 test_scout_done_is_not_gated() {
   local repo wt
   repo="$TMP_ROOT/scout-repo"
@@ -481,6 +528,8 @@ EOF
   pass "promotion keeps a scout's recorded base branch and refuses local-only for it"
 }
 
+test_dod_file_examples_are_not_directives
+test_unfenced_dod_file_is_still_honored
 test_scout_done_is_not_gated
 test_unpushed_ship_done_is_refused
 test_no_mistakes_prevalidation_done_is_not_gated

@@ -110,7 +110,7 @@ init_changed_fixture_repo() {
   local repo=$1 script
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
-  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
+  cp "$ROOT/bin/fm-duration.py" "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   chmod +x "$repo/bin/fm-test-run.sh"
   for script in \
@@ -613,12 +613,14 @@ test_changed_dependency_selection_and_unmapped_failure() {
   mkdir -p "$repo/bin/ten-levels/extensions" "$repo/tests/assets"
   : >"$repo/bin/ten-levels/extensions/report.ts"
   printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-jev-guard.test.sh"
-  chmod +x "$repo/tests/fm-jev-guard.test.sh"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-jev-guard-audit.test.sh"
+  chmod +x "$repo/tests/fm-jev-guard.test.sh" "$repo/tests/fm-jev-guard-audit.test.sh"
   : >"$repo/tests/assets/retired-asset.mjs"
-  git -C "$repo" add tests/fm-jev-guard.test.sh tests/assets/retired-asset.mjs
+  git -C "$repo" add tests/fm-jev-guard.test.sh tests/fm-jev-guard-audit.test.sh tests/assets/retired-asset.mjs
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm guard-fixture
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/fm-jev-guard.test.sh" "vendored jev-guard files select the jev-guard suite"
+  assert_contains "$listed" "tests/fm-jev-guard-audit.test.sh" "a report.ts-only change selects the audit-row suite"
   git -C "$repo" add bin/ten-levels
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-guard-change
   git -C "$repo" rm -q tests/assets/retired-asset.mjs
@@ -954,17 +956,12 @@ PY
   timeout_script=tests/fm-calm-pi-extension.test.sh
   mkdir -p "$timeout_repo/bin" "$timeout_repo/tests"
   cp "$RUNNER" "$timeout_repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-duration.py" "$timeout_repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$timeout_repo/tests/"
-  cat >"$timeout_repo/bin/fm-timeout-lib.sh" <<'SH'
-fm_run_timed() {
-  [ "$1" -eq 1500 ] || return 99
-  return 124
-}
-SH
   cat >"$timeout_repo/$timeout_script" <<'SH'
 #!/usr/bin/env bash
-touch should-not-run
-echo "not ok - automatic timeout helper was bypassed"
+echo "not ok - automatic progress guard was bypassed"
+sleep 30
 SH
   chmod +x "$timeout_repo/bin/fm-test-run.sh" "$timeout_repo/$timeout_script"
   git -C "$timeout_repo" init -q
@@ -972,17 +969,110 @@ SH
   git -C "$timeout_repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$timeout_repo/$timeout_script"
   set +e
-  (cd "$timeout_repo" && bin/fm-test-run.sh --changed --base HEAD) \
+  (cd "$timeout_repo" && FM_DURATION_NO_PROGRESS_SECS=2 FM_DURATION_FILE="$tmp/timeout-durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) \
     >"$tmp/timeout.out" 2>"$tmp/timeout.err"
   rc=$?
   set -e
-  [ "$rc" -eq 1 ] || fail "single-script automatic timeout must fail the run, got $rc"
+  [ "$rc" -eq 1 ] || fail "a script that stops making progress must fail the run, got $rc: $(cat "$tmp/timeout.out" "$tmp/timeout.err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-calm-pi-extension\.test\.sh exit=124 ' "$tmp/timeout.out" \
-    || fail "single unproven changed script did not receive the automatic timeout: $(cat "$tmp/timeout.out")"
-  [ ! -e "$timeout_repo/should-not-run" ] || fail "automatic timeout helper did not own the single changed script"
+    || fail "single unproven changed script did not receive the automatic progress guard: $(cat "$tmp/timeout.out")"
+  assert_contains "$(cat "$tmp/timeout.err")" "no_progress" \
+    "the progress guard did not report why the changed script was stopped"
 
   rm -rf "$tmp"
   pass "changed defaults to bounded automatic scheduling with serial override"
+}
+
+# The progress guard wraps every automatic --changed script, and a parallel
+# worker captures that wrapper's stderr beside the script's. The guard's own
+# lines (calibration notes and heartbeats) must never reach the script's captured
+# output: gate-skip detection reads that output's first line, so a skip printed
+# after any of them, as a script slow to print on a loaded host does, would be a
+# silent green. A gate-skipped run also stays out of calibration, as it always
+# has. tests/fm-daemon.test.sh runs in the concurrent phase of this fixture.
+test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene() {
+  local tmp repo rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-guard-skip.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cat >"$repo/tests/fm-daemon.test.sh" <<'SH'
+#!/usr/bin/env bash
+sleep 3
+echo "skip: herdr not found"
+SH
+  git -C "$repo" add .
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
+  printf '\n' >>"$repo/bin/shared-probe-lib.sh"
+
+  set +e
+  (cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "a delayed gate skip must still pass the run, got $rc: $(cat "$tmp/out" "$tmp/err")"
+  grep -Eq '^FM_TEST_END .+ tests/fm-daemon\.test\.sh exit=0 .*gate_skip=true' "$tmp/out" \
+    || fail "a gate skip printed after the guard's own lines was counted as a plain pass: $(cat "$tmp/out")"
+  assert_contains "$(cat "$tmp/out")" "skipped_gate=1" "the delayed gate skip was not counted in the summary"
+  assert_contains "$(cat "$tmp/err")" "gate skip: tests/fm-daemon.test.sh: herdr not found" \
+    "the delayed gate skip's reason was lost"
+  if grep -Eq '^(progress|calibration|fallback):' "$tmp/out"; then
+    fail "the progress guard's own lines reached the replayed script output: $(cat "$tmp/out")"
+  fi
+  python3 - "$tmp/durations.jsonl" <<'PY' || fail "gate-skipped and ordinary guarded runs were not recorded as calibration hygiene requires: $(cat "$tmp/durations.jsonl" 2>&1)"
+import json, sys
+rows = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8") if line.strip()]
+by_key = {}
+for row in rows:
+    by_key.setdefault(row["key"], []).append(row)
+skip = by_key.get("test.tests/fm-daemon.test.sh", [])
+assert len(skip) == 1 and skip[0]["exit"] == 0 and skip[0]["calibration"] is False, skip
+ordinary = by_key.get("test.tests/fm-pi-watch-extension.test.sh", [])
+assert len(ordinary) == 1 and ordinary[0]["calibration"] is True, ordinary
+PY
+  rm -rf "$tmp"
+  pass "the changed progress guard keeps a delayed gate skip a gate skip and out of calibration"
+}
+
+# Output is progress as well as CPU time, in the concurrent path too. A script
+# that prints steadily while it waits on something slow spends almost no CPU, and
+# ps reports CPU time in whole seconds on Linux, so output is the only signal that
+# keeps it alive. tests/fm-daemon.test.sh runs in the concurrent phase of this
+# fixture beside other admissible scripts.
+test_changed_parallel_guard_counts_low_cpu_script_output_as_progress() {
+  local tmp repo rc shape
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-guard-talker.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cat >"$repo/tests/fm-daemon.test.sh" <<'SH'
+#!/usr/bin/env bash
+python3 -c 'import time
+for tick in range(40):
+    print("tick", tick, flush=True)
+    time.sleep(0.25)'
+echo "ok - patient low-CPU script"
+SH
+  git -C "$repo" add .
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
+  printf '\n' >>"$repo/bin/shared-probe-lib.sh"
+
+  set +e
+  (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=4 FM_DURATION_FILE="$tmp/durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
+  rc=$?
+  set -e
+  shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/out" | head -n 2 | awk '{print $1}' | paste -sd, -)
+  [ "$shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
+    || fail "the fixture did not take the concurrent path: $shape"
+  [ "$rc" -eq 0 ] || fail "a script whose output keeps coming must not be stopped, got $rc: $(cat "$tmp/err")"
+  grep -Eq '^FM_TEST_END .+ tests/fm-daemon\.test\.sh exit=0 ' "$tmp/out" \
+    || fail "the patient low-CPU script did not finish green: $(cat "$tmp/out")"
+  assert_contains "$(cat "$tmp/out")" "ok - patient low-CPU script" "the script's output was not replayed"
+  if grep -q 'no_progress' "$tmp/err"; then
+    fail "the progress guard stopped a script that was printing: $(cat "$tmp/err")"
+  fi
+  rm -rf "$tmp"
+  pass "the concurrent changed progress guard treats a low-CPU script's output as progress"
 }
 
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs() {
@@ -1027,6 +1117,77 @@ SH
     "Cygwin mode enforcement did not reject a non-0700 worker root"
   rm -rf "$tmp"
   pass "Windows emulation exempts only synthetic POSIX modes"
+}
+
+# Native Windows Python cannot start bin/fm-duration.py run (it has no POSIX
+# process groups), so plain --changed must run the selected scripts itself on a
+# Windows bash host instead of routing each one through that runner. The fixture
+# helper refuses `run` the way that Python does and hands every other subcommand
+# to the real helper, and a fake uname emulates the host. The same fixture on a
+# POSIX host still sends every script through the progress runner, so the guard
+# is gone only where the runner cannot exist.
+test_changed_runs_unguarded_on_native_windows_bash() {
+  local tmp repo fakebin script out rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-windows-guard.XXXXXX")
+  repo="$tmp/repo"
+  fakebin="$tmp/fakebin"
+  init_changed_fixture_repo "$repo"
+  mkdir -p "$fakebin"
+  cat >"$fakebin/uname" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${FAKE_UNAME:-MINGW64_NT-10.0}"
+SH
+  chmod +x "$fakebin/uname"
+  cat >"$repo/bin/fm-duration.py" <<'PY'
+import os, sys
+if sys.argv[1:2] == ['run']:
+    with open(os.environ['FM_TEST_RUN_LOG'], 'a') as log:
+        log.write(' '.join(sys.argv[1:3]) + '\n')
+    sys.exit('error: progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
+os.execv(sys.executable, [sys.executable, os.environ['FM_TEST_REAL_DURATION'], *sys.argv[1:]])
+PY
+  for script in fm-daemon.test.sh fm-pi-watch-extension.test.sh; do
+    printf '#!/usr/bin/env bash\n: >"%s/ran.%s"\necho "ok - windows guard fixture"\n' \
+      "$tmp" "$script" >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  git -C "$repo" add .
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
+  printf '\n' >>"$repo/bin/shared-probe-lib.sh"
+
+  : >"$tmp/run.log"
+  set +e
+  out=$(cd "$repo" && PATH="$fakebin:$PATH" FM_DURATION_FILE="$tmp/durations.jsonl" \
+    FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
+    bin/fm-test-run.sh --changed --base HEAD 2>&1)
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "plain --changed on an emulated native Windows bash: $out"
+  for script in fm-daemon.test.sh fm-pi-watch-extension.test.sh; do
+    [ -e "$tmp/ran.$script" ] || fail "$script was not run on the emulated Windows host: $out"
+    grep -Fq "tests/$script exit=0 " <<<"$out" \
+      || fail "$script did not finish green on the emulated Windows host: $out"
+  done
+  [ ! -s "$tmp/run.log" ] \
+    || fail "the Windows host still routed scripts through the progress runner: $(cat "$tmp/run.log")"
+  assert_contains "$out" "failed=0" "the emulated Windows run did not report every script green"
+
+  rm -f "$tmp"/ran.*
+  : >"$tmp/run.log"
+  set +e
+  out=$(cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
+    FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
+    bin/fm-test-run.sh --changed --base HEAD 2>&1)
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "plain --changed on a POSIX host keeps the progress runner: $out"
+  assert_contains "$(cat "$tmp/run.log")" "run test.tests/fm-daemon.test.sh" \
+    "a POSIX host did not send the changed script through the progress runner"
+  [ ! -e "$tmp/ran.fm-daemon.test.sh" ] \
+    || fail "the refusing progress runner still let a guarded script run: $out"
+
+  rm -rf "$tmp"
+  pass "plain --changed runs unguarded on native Windows bash and stays guarded on POSIX"
 }
 
 # A local verification round names the subjects it cares about. Exercise begin/end
@@ -1774,7 +1935,7 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   budget=$(printf '%s\n' "$out" | sed -n 's/.*serial_budget_ms=\([0-9][0-9]*\).*/\1/p')
   [ -n "$max" ] && [ -n "$budget" ] \
     || fail "coverage summary must carry serial packing and budget: $out"
-  [ "$budget" -eq 1200000 ] || fail "packing must leave ten minutes of the normal CI tier"
+  [ "$budget" -eq 1200000 ] || fail "serial packing target must stay at twenty minutes, got ${budget}ms"
   [ "$max" -gt 0 ] && [ "$max" -le "$budget" ] \
     || fail "largest serial shard packs ${max}ms above the ${budget}ms target"
   pass "coverage guard bounds the unmeasured share and serial packing within twenty minutes"
@@ -2449,30 +2610,26 @@ SH
 }
 
 # The duration regression this guard exists for: a suite whose scripts are all
-# green but whose wall clock outgrew its caller's invocation budget. The caller
-# gets killed mid-run and retries invisibly, so an over-budget run has to be a
-# failure, not a note in the log.
+# green but whose wall clock outgrew a fixed per-script bound. A healthy slow
+# suite keeps working and its output keeps it alive; only silence is stopped.
 # tests/fm-watch-triage.test.sh finishes in about 434s alone and about 698s
-# under CI load, so the automatic --changed bound must leave a slow but healthy
-# watcher-wake-lock script room while still bounding a genuinely hung one
-# (upstream issue #3869). The stub records the bound the runner hands it.
-test_changed_bound_gives_slow_watcher_suites_headroom() {
-  local tmp repo script bound rc
+# under CI load, so the automatic --changed guard must leave progress alone
+# while still stopping a genuinely hung script (upstream issue #3869).
+test_changed_progress_guard_gives_slow_watcher_suites_headroom() {
+  local tmp repo script rc
   tmp=$(mktemp -d)
   repo="$tmp/repo"
   script=tests/fm-watch-triage.test.sh
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-duration.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
-  cat >"$repo/bin/fm-timeout-lib.sh" <<'SH'
-fm_run_timed() {
-  printf '%s\n' "$1" >bound-secs
-  shift
-  "$@"
-}
-SH
   cat >"$repo/$script" <<'SH'
 #!/usr/bin/env bash
+for tick in 1 2 3 4; do
+  echo "tick $tick"
+  sleep 1
+done
 echo "ok - healthy but slow watcher suite"
 SH
   chmod +x "$repo/bin/fm-test-run.sh" "$repo/$script"
@@ -2481,16 +2638,15 @@ SH
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$repo/$script"
   set +e
-  (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
+  (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=5 FM_DURATION_FILE="$tmp/durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
   rc=$?
   set -e
-  [ "$rc" -eq 0 ] || fail "healthy changed watcher script must pass, got $rc: $(cat "$tmp/out" "$tmp/err")"
-  [ -s "$repo/bound-secs" ] || fail "changed watcher script did not run under the automatic bound: $(cat "$tmp/out")"
-  bound=$(cat "$repo/bound-secs")
-  [ "$bound" -ge 1500 ] \
-    || fail "automatic --changed bound for $script must be at least 1500s, got ${bound}s"
+  [ "$rc" -eq 0 ] || fail "healthy progressing changed script must pass, got $rc: $(cat "$tmp/out" "$tmp/err")"
+  grep -Eq '^FM_TEST_END .+ tests/fm-watch-triage\.test\.sh exit=0 ' "$tmp/out" \
+    || fail "the slow changed watcher script did not finish green: $(cat "$tmp/out")"
   rm -rf "$tmp"
-  pass "the automatic --changed bound gives the slow watcher suite at least 1500s"
+  pass "the automatic --changed progress guard lets a slow suite that keeps producing output finish"
 }
 
 test_max_wall_ms_is_a_result_not_advice() {
@@ -2690,7 +2846,7 @@ SH
 
 test_herdr_ci_family_run_has_a_step_timeout() {
   # The required Herdr lane's hang tripwire is the family-run *step* bound, not
-  # the 75-minute job cap. Parse the workflow as YAML so nested `with.name`
+  # the 120-minute job cap. Parse the workflow as YAML so nested `with.name`
   # artifact keys cannot masquerade as the step contract.
   command -v ruby >/dev/null 2>&1 \
     || fail "ruby is required to parse .github/workflows/ci.yml as YAML"
@@ -2713,13 +2869,13 @@ puts JSON.generate(
     || fail "could not read job timeout from parsed workflow"
   step_timeout=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["step_timeout"])' <<<"$json") \
     || fail "could not read step timeout from parsed workflow"
-  [ "$job_timeout" = 75 ] \
-    || fail "tests-herdr job backstop must stay 75 minutes, got $job_timeout"
-  [ "$step_timeout" = 20 ] \
-    || fail "family-run step timeout must be 20 minutes, got $step_timeout"
+  [ "$job_timeout" = 120 ] \
+    || fail "tests-herdr job backstop must stay 120 minutes, got $job_timeout"
+  [ "$step_timeout" = 60 ] \
+    || fail "family-run step timeout must be 60 minutes, got $step_timeout"
   [ "$step_timeout" -lt "$job_timeout" ] \
     || fail "family-run step timeout must be below the job backstop"
-  pass "Herdr CI family-run step times out at 20 min under a 75 min job backstop"
+  pass "Herdr CI family-run step times out at 60 min under a 120 min job backstop"
 }
 
 test_aggregate_json() {
@@ -2788,7 +2944,10 @@ test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency
+test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene
+test_changed_parallel_guard_counts_low_cpu_script_output_as_progress
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs
+test_changed_runs_unguarded_on_native_windows_bash
 test_script_list_uses_bounded_automatic_concurrency
 test_family_proofs_run_in_separate_concurrent_phases
 test_empty_selection_emits_summary
@@ -2822,7 +2981,7 @@ test_concurrent_runs_are_ordered_longest_first
 test_per_script_timeout_bounds_a_hang
 test_runner_reaps_stubs_a_killed_script_left_behind
 test_each_script_runs_under_a_process_budget
-test_changed_bound_gives_slow_watcher_suites_headroom
+test_changed_progress_guard_gives_slow_watcher_suites_headroom
 test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation
 test_herdr_ci_family_run_has_a_step_timeout

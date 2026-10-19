@@ -70,6 +70,14 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): an `add` that created a
+# new item also appends one task.filed record, and a `done`/`close` that passed
+# the proof check above and moved a row to Done appends one task.closed record
+# (bin/fm-backlog-transition-lib.sh, which writes a repeat of a close once). The
+# command's stdout, stderr, and exit status stay tasks-axi's own; an add that
+# found the id already present (tasks-axi reports `already`) writes nothing, and
+# a failed ledger write costs one stderr line. While config/fleet-ledger is
+# absent the command runs as before.
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 set -u
@@ -239,7 +247,7 @@ task_mutation_cleanup() {
 }
 
 guard_completion() {
-  local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop note=$TASK_NOTE
+  local id=$TASK_ID pr=$TASK_PR report=$TASK_REPORT drop note=$TASK_NOTE proof=()
   drop=$(absolute_from_caller "$TASK_DROP")
   case "$TASK_COMMAND" in done|close) ;; *) return 0 ;; esac
   [ "$TASK_CONTROL_LOCK_HELD" = 1 ] || return 0
@@ -260,21 +268,25 @@ guard_completion() {
       || fail "--drop-file must be a regular file holding the captain's own words (1..8192 bytes)"
     GUARD_ARGS=(--note dropped)
     GUARD_STRIP_DROP=1
+    proof=("${GUARD_ARGS[@]}")
   elif [ -n "$report" ]; then
     [ "$FM_BACKLOG_ROW_KIND" = scout ] \
       || fail "a report is not a ship's deliverable; land its pull request or record the captain's drop"
     case "$report" in /*) ;; *) report="$FM_BACKLOG_AXI_ROOT/$report" ;; esac
     [ -f "$report" ] && [ ! -L "$report" ] && [ -s "$report" ] \
       || fail "the report has not been written: $report"
+    proof=(--report "$report")
   elif [ -n "$pr" ]; then
     [ "$FM_BACKLOG_ROW_KIND" = ship ] || fail "a scout's deliverable is its written report"
     [[ "$pr" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
       || fail "only a GitHub pull request can be proved merged here; complete other deliveries with bin/fm-teardown.sh or record the captain's drop"
     gh-axi api "/repos/${BASH_REMATCH[1]}/pulls/${BASH_REMATCH[2]}" --jq '"merged=" + ((.merged_at != null)|tostring)' --full 2>/dev/null \
       | grep -Eq '^  body: "?merged=true"?$' || fail "the pull request has not merged: $pr"
+    proof=(--pr "$pr")
   else
     fail "completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words"
   fi
+  [ "${FM_BACKLOG_ROW_STATE%% *}" = "done" ] || LEDGER_CLOSE_ARGS=("${proof[@]}")
 }
 
 FM_BACKLOG_TRANSITION_ERROR=
@@ -296,6 +308,7 @@ fi
 
 GUARD_ARGS=()
 GUARD_STRIP_DROP=0
+LEDGER_CLOSE_ARGS=()
 parse_task_mutation "$@"
 if [ "$TASK_HELP" = 0 ] && [[ "$TASK_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
   # shellcheck source=bin/fm-wake-lib.sh
@@ -343,8 +356,50 @@ case "$TASK_COMMAND" in
     fi
     ;;
 esac
+# Append task.filed for the item an `add` just created, read from the add's own
+# output so a minted id and every defaulted field are the ones tasks-axi stored.
+ledger_task_filed() {  # <captured-stdout-file>
+  local out fields id='' repo='' kind='' priority='' key value ledger_state ledger_config
+  out=$(cat -- "$1") || return 0
+  if printf '%s' "$out" | jq -e . >/dev/null 2>&1; then
+    fields=$(printf '%s' "$out" | jq -r 'select(.ok == true and .action == "add" and (.already | not))
+      | .task | "id\t\(.id // "")", "repo\t\(.repo // "")", "kind\t\(.kind // "")", "priority\t\(.priority // "")"' 2>/dev/null) || return 0
+  else
+    fields=$(printf '%s\n' "$out" | awk '
+      /^ok: added / { added = 1; next }
+      added && /^  (id|kind|repo|priority): / {
+        key = $1; sub(/:$/, "", key); value = $0; sub(/^  [a-z]+: /, "", value)
+        gsub(/^"|"$/, "", value); if (value == "-") value = ""
+        printf "%s\t%s\n", key, value
+      }') || return 0
+  fi
+  while IFS=$'\t' read -r key value; do
+    case "$key" in id) id=$value ;; repo) repo=$value ;; kind) kind=$value ;; priority) priority=$value ;; esac
+  done <<< "$fields"
+  [ -n "$id" ] || return 0
+  ledger_state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
+  ledger_config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$ledger_state FM_CONFIG_OVERRIDE=$ledger_config \
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$id" "$repo" "$kind" "$priority" || true
+}
+
+case "$TASK_COMMAND" in
+  add|create)
+    if [ -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] && add_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-add.XXXXXX" 2>/dev/null); then
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$add_out"
+      add_status=$?
+      cat -- "$add_out"
+      [ "$add_status" -ne 0 ] || ledger_task_filed "$add_out" || true
+      rm -f -- "$add_out"
+      exit "$add_status"
+    fi
+    ;;
+esac
 if [ "$TASK_CONTROL_LOCK_HELD" = 1 ]; then
   tasks-axi ${ARGS[@]+"${ARGS[@]}"}
-  exit "$?"
+  task_status=$?
+  [ "$task_status" -ne 0 ] || [ "${#LEDGER_CLOSE_ARGS[@]}" -eq 0 ] \
+    || fm_backlog_ledger_closed "$task_state" "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$TASK_ID" "${LEDGER_CLOSE_ARGS[@]}"
+  exit "$task_status"
 fi
 exec tasks-axi ${ARGS[@]+"${ARGS[@]}"}

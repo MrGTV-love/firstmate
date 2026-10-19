@@ -277,6 +277,7 @@ SH
 if [ -f "$FM_FAKE_DIR/crew-state" ]; then cat "$FM_FAKE_DIR/crew-state"; else
   printf 'state: working · source: run-step · step: review\n'
 fi
+if [ -f "$FM_FAKE_DIR/crew-state-exit" ]; then exit "$(cat "$FM_FAKE_DIR/crew-state-exit")"; fi
 SH
   chmod +x "$fb/crew-state"
   printf '%s\n' "$fb"
@@ -1233,6 +1234,19 @@ EOF
   pass "fm-control exit: a task whose own state is not done keeps the picker refusal"
 }
 
+test_exit_refuses_completion_output_from_a_failed_state_command() {
+  local dir out rc
+  dir=$(picker_case failed-done-state 'state: done · source: run-step · run: r1')
+  printf '7\n' > "$dir/fake/crew-state-exit"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "completion output from a failed command is not proof of done"$'\n'"$out"
+  assert_contains "$out" "its current state could not be read" "the refusal should name the failed read"
+  [ "$(cat "$dir/fake/keys")" = Enter ] || fail "a failed read must not send the confirming Enter"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a failed read must leave the agent running"
+  [ "$(cat "$dir/fake/picker")" = open ] || fail "a failed read must leave the picker open"
+  pass "fm-control exit: completion output from a failed state command keeps the picker refusal"
+}
+
 test_exit_refuses_the_picker_when_the_state_cannot_be_read() {
   local dir out rc
   dir=$(picker_case unreadable-state '')
@@ -1885,6 +1899,7 @@ EOF
   pass "fm-control-lib: only a runtime's own recorded session has a relaunch resume form"
 }
 
+test_exit_refuses_completion_output_from_a_failed_state_command
 test_exit_types_each_harness_verified_command
 test_interrupt_sends_each_harness_verified_key
 test_devin_interrupt_invalidates_busy

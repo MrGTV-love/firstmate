@@ -462,13 +462,15 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
 # treehouse status and treehouse lease use), or empty when no entry records
 # <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, conflicting, recovered,
-# escaped, relative, missing-jq, or unknown; and on failure FM_TASK_COPY_SLOT_REASON to a clause
-# following the slot's path.
+# escaped, relative, missing-jq, or unknown; FM_TASK_COPY_SLOT_HOLDER to the lease
+# holder of the last leased entry that records <slot>, or empty; and on failure
+# FM_TASK_COPY_SLOT_REASON to a clause following the slot's path.
 # Returns 0 when held, 1 otherwise.
 # The last state file read and its entries are kept in
 # FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES, so a scan
 # reads each pool's state once; a scan clears both before it starts.
 FM_TASK_COPY_SLOT_NAME=
+FM_TASK_COPY_SLOT_HOLDER=
 FM_TASK_COPY_SLOT_STATE=
 FM_TASK_COPY_SLOT_REASON=
 FM_TASK_COPY_POOL_STATE_FILE=
@@ -480,6 +482,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   state="${slot%/*/*}/treehouse-state.json"
   leaf=${slot#"${slot%/*/*}"}
   FM_TASK_COPY_SLOT_NAME=
+  FM_TASK_COPY_SLOT_HOLDER=
   FM_TASK_COPY_SLOT_STATE=unknown
   FM_TASK_COPY_SLOT_REASON=
   if ! command -v jq >/dev/null 2>&1; then
@@ -535,6 +538,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     fi
     matched=$((matched + 1))
     FM_TASK_COPY_SLOT_NAME=${name#N}
+    [ "${leased#L}" != leased ] || FM_TASK_COPY_SLOT_HOLDER=${holder#H}
     if [ "${leased#L}" != leased ]; then
       has_unleased=1
     elif [ "${holder#H}" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ] && [ "$is_home" = 0 ]; then

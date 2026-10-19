@@ -80,7 +80,7 @@ Its selected row is "Exit and stop tasks", and its footer reads "Enter to confir
 A worker parked on it holds every later steering message behind it, so two supported answers exist.
 
 - **A finished task is stopped.**
-  `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done`, and whose busy record read `idle` before anything was sent.
+  `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read successfully through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done`, and whose busy record read `idle` before anything was sent.
   An `unknown` busy record is never promoted to idle, so it refuses like a busy one.
   A task whose steering inbox still holds an unhandled record also refuses, because a parked picker blocks the doorbell and stopping the task would leave that steering unread; release it with `stay` first, let it read and acknowledge the steering, then `exit`.
   A `failed` task is not finished: it is usually steered and retried, so its picker is released with `stay`.
@@ -280,27 +280,31 @@ When no active record owns it, such as a finished record's nested copy left afte
 - No other active task record names the copy, even through a symlink alias.
 - No process outside this teardown runs in the copy, and no live process outside this teardown is the launcher named in its lock. A process is this teardown's own when it, or an ancestor by parent chain, has a cwd exactly at the task's worktree, the slot, a nested copy of the task, or the task's scratch directory. A launcher pid that started after the lock file was written is a recycled pid and owns nothing.
 - Retire sends TERM, recording each signal like the others, to each launcher and each process in the copy that is this teardown's own, whatever its cwd, and waits briefly. One that is still alive keeps the copy, and the refusal names its pid. Retire sends no KILL. A process that is not this teardown's own is never signalled: it refuses the release, and the refusal names its pid.
-- It is a clean worktree root and holds no ignored file that exists nowhere else.
+- It is a clean worktree root, and each ignored file it holds is either regenerable machinery (the allow-list in `teardown_preservable_ignored`) or copied with its SHA-256 into the task's data directory at `data/<task-id>/nested-copy-preserved/` before removal.
 - Its work is landed by the ordinary landed-work test.
 
 A copy locked by Vernant's creation lock is released and removed by Vernant's own driver, `scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup`, run from the slot; an unlocked copy is removed with a plain non-forced `git worktree remove`.
 A copy whose work is not proved landed stays, and teardown writes the reason.
 The task's own nested copy that Vernant's creation lock holds takes the same driver route in place of a forced removal, once it also passes the record, process, launcher and ignored-file proofs above; an own copy that is not locked is removed as before.
-Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, and anything ignored under its `.claude` and `.opencode` trees); it loses no commit, because the work is landed, and no tracked change, because the clean proof refuses one.
+Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, regenerable build caches such as `.next`, `*.tsbuildinfo`, `graphify-out`, `.import_linter_cache`, `.tac/tmp` and `.tac/uv-cache`, and anything ignored under its `.claude` and `.opencode` trees).
+Every other ignored entry, including durable `.tac` state such as `.tac/loop-state`, is preserved as the proof above requires, just before the copy is removed.
+Removal therefore loses no unique content, because it is preserved; no commit, because the work is landed; and no tracked change, because the clean proof refuses one.
 The clean proof skips untracked files under `.claude` only; the ignored-file proof skips ignored files under `.claude` and `.opencode`; plain `git worktree remove` still refuses a copy that holds an untracked file.
 On the pool-slot route the release runs before the final project-lock wait, so the driver never runs while the lock is held, except when teardown keeps project custody through the return.
-A copy it cannot prove, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above unless the held-copy rule below applies, and `--force` waives none of it.
+A copy it cannot prove, an ignored entry it cannot copy and hash, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above unless the held-copy rule below applies, and `--force` waives none of it.
+A nested copy that no teardown ever reaches, because its slot is never returned, falls to the [nested task copy sweep](configuration.md#nested-task-copy-sweep-configcopy-budget), and the header of [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) owns which copies it removes and which it holds, locked copies included.
 
 **Held copies.**
 A foreign copy that cannot be released does not stop the task that is closing from closing.
-This holds when the task's own copy has passed the ordinary landed-work test, and every foreign copy that would stop the slot's return is clean, owned by no record, no process and no live launcher, and held back only by ignored files that exist nowhere else or by a HEAD that is not proved landed.
+This holds when the task's own copy has passed the ordinary landed-work test, and every foreign copy that would stop the slot's return is clean, owned by no record, no process and no live launcher, and held back only by a HEAD that is not proved landed.
 Teardown then closes the task: it moves the backlog item to Done with the merged evidence, removes the task's own record and runtime state, and removes only the task's own nested copies that the proof covers.
 It does not return the slot, and it does not touch the slot's claim or any foreign copy; it never deletes, moves, rewrites or changes the mode of anything inside one.
 Before it removes anything, it reserves the slot under a durable lease in Treehouse state, exactly as an ordinary return does, because a slot taken with a plain `treehouse get` holds only a process lease that lapses when the worker exits and a later `treehouse get` could then reset it over the held copies.
 A slot that is already durably leased is not changed.
 When the slot cannot be proved durably leased, or the reservation fails, the whole close refuses before it removes anything, and the output says why.
 The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot is reserved under a durable lease and stays claimed.
-Nothing returns the slot automatically, and nothing removes a held copy: a held copy goes only on the owner's word naming it, so ask the supervisor.
+Nothing returns the slot automatically, and nothing removes a held copy: a held copy goes only on the owner's word naming it, or once its HEAD is landed.
+For each held copy the output also prints the next step for that copy's owner: list the commits only it holds with `git -C <copy> log --oneline HEAD --not --remotes`, land them, then remove the copy and return the slot with the commands the output prints.
 Only once the task record and the task's own nested copies are gone, which no rerun can bring back, teardown prints these notices and appends each such copy to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
 It does this before the backlog close and the later steps, so a failure of the backlog close, of the fleet sync, or an idle-reaper timeout after that point still leaves the notices and the line.
 A close that a step before that point refuses writes no line, and teardown never edits or clears the file.
@@ -309,7 +313,7 @@ The notices are printed whichever completion line the close later prints, includ
 A foreign copy that lies inside one of the task's own nested copies is never held, because removing the own copy would take it along.
 When such a copy cannot be released, or when one that can be released lies there beside a copy that would be held, the whole close refuses as it does without this rule.
 A foreign copy that is also dirty, named by another record, running a process, or locked by anything other than a Vernant creation lock whose launcher is gone still refuses the whole close, and so does an own copy that is dirty or unlanded, or any other refusal of the ordinary close.
-The refusal names that blocker, such as the owning record or the running process, and not the unique ignored files the copy also holds.
+The refusal names that blocker, such as the owning record or the running process.
 A copy whose landing could not be checked, as when fetching the default branch from origin fails, is never held either: the close refuses, names the failed fetch, and a rerun checks again.
 `--force` never holds a foreign copy, and neither does retiring a secondmate home.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.

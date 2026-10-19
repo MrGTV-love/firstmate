@@ -18,6 +18,13 @@
 #   bin/fm-merge-outcome-lib.sh  merged ... pr (a recorded PR merge)
 #   bin/fm-merge-local.sh        merged ... local (a local-only landing)
 #   bin/fm-teardown.sh           cleaned_up
+#   bin/fm-backlog-transition-lib.sh  closed (a landed backlog close: teardown,
+#                                its replay, and a proven `done`)
+#   bin/fm-tasks-axi.sh          filed (an `add` that created a new item)
+#   bin/fm-send.sh               answered ... send (a --resolve-key close)
+#   bin/fm-captain-hold.sh       filed (a captain-hold item it created),
+#                                closed (a held item it moved to Done),
+#                                answered ... hold (an answer or a reconciliation)
 #
 # Usage:
 #   fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model>
@@ -25,6 +32,10 @@
 #   fm-fleet-ledger.sh merged <task> pr <url>
 #   fm-fleet-ledger.sh merged <task> local
 #   fm-fleet-ledger.sh cleaned_up <task>
+#   fm-fleet-ledger.sh filed <task> <repo> <kind> <priority>
+#   fm-fleet-ledger.sh closed <task> <evidence> <pr>
+#   fm-fleet-ledger.sh answered <task> send <key>
+#   fm-fleet-ledger.sh answered <task> hold <key> <source>
 #   fm-fleet-ledger.sh capture
 #   fm-fleet-ledger.sh appended <config> <state>/<task>.status
 #
@@ -44,6 +55,15 @@
 # records precede them. cleaned_up then deletes the task's offset, because teardown
 # retires that status log right after. dispatched deletes any leftover offset
 # so a reused task id starts at byte 0 of its fresh log.
+# filed, closed, and answered are the lifecycle records the fleet's own scripts
+# already know at the moment they happen; their callers pass what they hold and
+# an empty argument is recorded as null. They add an `at` member (the same
+# instant as `ts`, as ISO 8601 UTC) and capture nothing. `answered` derives its
+# answered_by value itself (bin/fm-answered-by-lib.sh) from this home's role
+# and, for a hold, the recorded <source> text; no caller types it. closed writes
+# nothing when the task's current incarnation (after its latest task.dispatched)
+# already holds a task.closed with the same evidence and pr, so a close that more
+# than one path reaches is recorded once and a reopened task records its next close.
 # Every write holds state/.fleet-ledger.lock.
 #
 # Environment: FM_HOME, FM_STATE_OVERRIDE, and FM_CONFIG_OVERRIDE resolve the
@@ -65,7 +85,7 @@ LOCK="$STATE/.fleet-ledger.lock"
 TEXT_MAX_CHARS=2000
 
 usage() {
-  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | capture | appended <config> <state>/<task>.status" >&2
+  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | filed <task> <repo> <kind> <priority> | closed <task> <evidence> <pr> | answered <task> send <key> | answered <task> hold <key> <source> | capture | appended <config> <state>/<task>.status" >&2
   exit 2
 }
 
@@ -82,6 +102,13 @@ case "$cmd" in
     case "$#:${3:-}" in 4:pr) [ -n "$4" ] || usage ;; 3:local) ;; *) usage ;; esac
     ;;
   cleaned_up) { [ "$#" -eq 2 ] && task_ok "$2"; } || usage ;;
+  filed) { [ "$#" -eq 5 ] && task_ok "$2"; } || usage ;;
+  closed) { [ "$#" -eq 4 ] && task_ok "$2" && [ -n "$3" ]; } || usage ;;
+  answered)
+    task_ok "${2:-}" || usage
+    case "$#:${3:-}" in 4:send) ;; 5:hold) ;; *) usage ;; esac
+    [ -n "$4" ] || usage
+    ;;
   capture) [ "$#" -eq 1 ] || usage ;;
   appended)
     [ "$#" -eq 3 ] && [ -n "$2" ] || usage
@@ -137,17 +164,40 @@ load_libs() {
   . "$SCRIPT_DIR/fm-wake-lib.sh" || return 1
   # shellcheck source=bin/fm-classify-lib.sh
   . "$SCRIPT_DIR/fm-classify-lib.sh" || return 1
+  # shellcheck source=bin/fm-answered-by-lib.sh
+  . "$SCRIPT_DIR/fm-answered-by-lib.sh" || return 1
   LIBS_LOADED=1
 }
 
 # append <event> <task> <jq-object-of-extra-members> [jq --arg pairs...]
 append() {
-  local event=$1 task=$2 extra=$3 line
+  local event=$1 task=$2 extra=$3 line head
+  # shellcheck disable=SC2016 # $event and $task here are jq variables.
+  head='{v: 1, ts: (now | floor), event: $event, task: $task}'
   shift 3
+  # LEDGER_AT=1 adds the same instant as ISO 8601 UTC, read once so ts and at agree.
+  # shellcheck disable=SC2016 # $event, $task, and $t here are jq variables.
+  [ "${LEDGER_AT:-0}" = 0 ] \
+    || head='(now | floor) as $t | {v: 1, ts: $t, at: ($t | todate), event: $event, task: $task}'
   line=$(jq -cn --arg event "$event" --arg task "$task" "$@" \
-    "def n: if . == \"\" then null else . end; {v: 1, ts: (now | floor), event: \$event, task: \$task} + ($extra)") \
+    "def n: if . == \"\" then null else . end; $head + ($extra)") \
     || return 1
-  printf '%s\n' "$line" >> "$LEDGER"
+  # The open error is silenced so an unwritable ledger costs one summary line below.
+  printf '%s\n' "$line" 2>/dev/null >> "$LEDGER"
+}
+
+# Whether the task's current incarnation already has this close: a task.closed
+# for the same evidence and pr that follows the task's latest task.dispatched.
+# The caller holds the lock.
+closed_recorded() { # <task> <evidence> <pr>
+  [ -f "$LEDGER" ] || return 1
+  # shellcheck disable=SC2016 # $task, $evidence, $pr, and $e here are jq variables.
+  jq -en --arg task "$1" --arg evidence "$2" --arg pr "$3" \
+    'reduce (inputs | select(.task == $task)) as $e (false;
+      if $e.event == "task.dispatched" then false
+      elif $e.event == "task.closed" and $e.evidence == $evidence
+        and $e.pr == (if $pr == "" then null else $pr end) then true
+      else . end)' "$LEDGER" >/dev/null 2>&1
 }
 
 # The status-line grammar belongs to bin/fm-status-decision-lib.sh; this only projects it.
@@ -223,6 +273,22 @@ case "$cmd" in
     else
       append task.merged "$2" '{via: "local"}' || rc=1
     fi
+    ;;
+  filed)
+    LEDGER_AT=1 append task.filed "$2" \
+      '{repo: ($repo | n), kind: ($kind | n), priority: ($priority | n | if . == null then null else (tonumber? // .) end)}' \
+      --arg repo "$3" --arg kind "$4" --arg priority "$5" || rc=1
+    ;;
+  closed)
+    closed_recorded "$2" "$3" "$4" \
+      || LEDGER_AT=1 append task.closed "$2" '{evidence: $evidence, pr: ($pr | n)}' \
+        --arg evidence "$3" --arg pr "$4" || rc=1
+    ;;
+  answered)
+    by=$(fm_answered_by "$FM_HOME" "$STATE" "$3" "${5:-}")
+    LEDGER_AT=1 append task.answered "$2" \
+      '{via: $via, key: $key, answered_by: $by}' \
+      --arg via "$3" --arg key "$4" --arg by "$by" || rc=1
     ;;
   cleaned_up)
     capture_task "$2" || rc=1

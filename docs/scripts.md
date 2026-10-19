@@ -59,6 +59,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
 | [`fm-proc-budget.sh`](../bin/fm-proc-budget.sh) | Bound a command tree's process growth; its header owns the budget contract |
+| [`fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) | Find, size and remove provably stale nested task copies, and wake once when their bytes pass a budget ([configuration](configuration.md#nested-task-copy-sweep-configcopy-budget)); its header owns the classes and proofs |
 | `fm-load-report.sh`      | Record host load and judge it with pipeline agent durations ([recipe](cpu-pass-pool.md#judging-the-pool)) |
 | `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
 | `fm-proc-guard.sh`       | Count the user's processes against the per-user limit and write one process census when a pile-up holds ([framework](host-guards.md)) |
@@ -168,6 +169,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |
 | `fm-merge-outcome-lib.sh` | Publish a confirmed merge's durable, role-routed supervision outcome                 |
 | `fm-merge-authority-lib.sh` | Resolve merge authority at the gate, persist it against the accepted canonical PR, and identity-check its later poll consumption |
+| `fm-answered-by-lib.sh` | Derive who answered a decision (home role or recorded source) for the ledger and a captain hold's record |
 | `fm-parent-channel-lib.sh` | Resolve a secondmate home's parent channel and append a captain-facing outcome line to it at most once |
 | `fm-promote.sh`          | Promote a scout task in place to a protected ship task with an explicit delivery mode, write the ship instructions carrying that mode's definition of done, and supersede the task's brief so a later relaunch cannot revive stale scout delivery text |
 | [`fm-teardown.sh`](../bin/fm-teardown.sh) | Fail-closed teardown: return landed ship worktrees, require completed scout deliverables, remove the task's own Docker stacks, reap its custody archive branches once the merged PR proves them carried, retire secondmate homes; its header owns task-private no-mistakes agent retirement |

@@ -212,10 +212,11 @@
 # each such process running in the copy, waits a bounded time, and sends no KILL,
 # and one still alive refuses the release, named by its pid, while a process
 # that is not teardown's own is never signalled and refuses at once, named by its
-# pid; it is a clean worktree root with no ignored file unique to it; and its
-# work is landed by the existing landed-work rule. A copy whose work is not
-# proved landed stays, with the reason written, and refuses the close unless the
-# held-copy rule below applies.
+# pid; it is a clean worktree root, and each ignored file it holds is either
+# regenerable machinery or copied with its SHA-256 into the task's data
+# directory before removal; and its work is landed by the existing landed-work
+# rule. A copy whose work is not proved landed stays, with the reason written,
+# and refuses the close unless the held-copy rule below applies.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -223,9 +224,11 @@
 # interpreter); an unlocked copy is removed with a plain non-forced git worktree
 # remove. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
-# .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
-# .opencode trees); it loses no commit, because the work is landed, and no
-# tracked change, because the clean proof refuses one. The clean proof skips
+# .DS_Store, Firstmate's hook files, regenerable build caches, and anything
+# ignored under its .claude and .opencode trees); any other ignored entry is
+# preserved first in data/<task>/nested-copy-preserved with its SHA-256. It loses
+# no commit, because the work is landed, and no tracked change, because the clean
+# proof refuses one. The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
@@ -241,8 +244,8 @@
 # copy, refuses as before; --force never waives these proofs. The by-hand route
 # is in docs/agent-control.md.
 # Held copies. A foreign copy that is clean, owned by no record, process or live
-# launcher, and held back only by ignored files that exist nowhere else or by a
-# HEAD that is not proved landed does not stop the close of a task whose own copy
+# launcher, and held back only by a HEAD that is not proved landed does not stop
+# the close of a task whose own copy
 # passed the landed-work proof (bin/fm-teardown-nested-lib.sh owns the rule).
 # The task closes: its backlog item goes to Done, its record and
 # runtime state go, and only its own nested copies the proof covers are removed.
@@ -4086,12 +4089,18 @@ teardown_reprove_same_route() {
 # printed. A record that cannot be written is a warning, never a refusal: the
 # close already happened.
 teardown_held_copies_report() {
-  local entry record="$DATA/held-foreign-copies.log"
-  echo "notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy."
+  local entry copy record="$DATA/held-foreign-copies.log" slot=$TEARDOWN_HELD_SLOT holder
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$slot" >/dev/null 2>&1 || true
+  holder=${FM_TASK_COPY_SLOT_HOLDER:-<the lease holder that treehouse status shows for the slot>}
+  echo "notice: the slot return is deferred: the foreign copies listed below hold commits that are not proved landed, and teardown never deletes, moves or rewrites a foreign copy."
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
-    echo "notice: held foreign copy ${entry%%$'\t'*} stays in pool slot $TEARDOWN_HELD_SLOT: ${entry#*$'\t'}."
+    copy=${entry%%$'\t'*}
+    echo "notice: held foreign copy $copy stays in pool slot $slot: ${entry#*$'\t'}."
+    echo "notice: next step for the owner of $copy: list the commits only it holds with git -C '$copy' log --oneline HEAD --not --remotes, land them, remove the copy with git -C '$slot' worktree remove '$copy' (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree '$copy' --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd '$PROJ' && treehouse return '$slot' --if-lease-holder '$holder' </dev/null)."
   done
-  echo "notice: pool slot $TEARDOWN_HELD_SLOT is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, so ask the supervisor."
+  echo "notice: pool slot $slot is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, or once its HEAD is landed."
   if teardown_held_copies_record; then
     echo "notice: each held copy is also listed in $record."
   else
@@ -6167,6 +6176,13 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): the item is now Done, so
+# record when it closed and on what evidence. A retained (captain-held) item
+# returned to Queued is not a completion and writes nothing. A close the next
+# session start replays is recorded there instead (bin/fm-backlog-transition-lib.sh).
+if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ]; then
+  fm_backlog_ledger_closed "$STATE" "$CONFIG" "$ID" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"
+fi
 rm -f "$STATE/$ID.teardown-return-pending"
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then

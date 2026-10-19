@@ -12,6 +12,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
+| Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
@@ -85,6 +86,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - The append-only held-copy record `held-foreign-copies.log`, written by `bin/fm-teardown.sh` once a task has closed beside foreign copies it leaves standing; it lists them and returns nothing, and [Agent control](agent-control.md)'s held-copy rule owns its fields.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
+- The nested-copy sweep's append-only removal log `data/copy-sweep.log`, produced by `bin/fm-copy-sweep.sh --apply`.
 - The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
 
 `state/` holds runtime records:
@@ -104,6 +106,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
+- The nested-copy sweep's size cache `state/copy-sweep.sizes` and budget record `state/copy-sweep.record`, owned by `bin/fm-copy-sweep.sh`.
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
@@ -635,7 +638,7 @@ The receipt prevents accidental publication through supported paths; it proves c
 The optional local, gitignored `config/wait-no-turns` presence flag opts this home into keeping a waiting worker from spending turns until it is answered.
 With it present, ship and scout briefs gain the `# Waiting` section and the foreground no-mistakes drive text, every brief's inbox section keeps the natural-checkpoint check and adds that a waiting worker does not poll or list its inbox because a waiting instruction rings, a pending-reply recovery waits while that mate has its own open decision or blocker, and a fire-and-forget steer whose doorbell did not land gets one later ring.
 With the file absent, generated briefs omit the waiting section and the no-poll inbox line, the drive text backgrounds the call, recovery sends during an open decision, and a fire-and-forget steer is not owed a retry ring.
-Long-command and pipeline-drive lifetimes remain progress-based in either posture; `bin/fm-duration.py --help` owns measured ceilings and calibration fallbacks.
+Long-command and pipeline-drive lifetimes remain progress-based in either posture; `bin/fm-duration.py --help` owns the no-progress and absolute stop limits, the measured slower-than-usual report, and calibration fallbacks.
 The flag is a home-local preference and is not inherited by secondmate homes.
 
 ## No-mistakes pipeline spend (config/pipeline-spend)
@@ -866,6 +869,7 @@ A live task record completes only through [`bin/fm-teardown.sh`](../bin/fm-teard
 Dropped work is never presented as recently landed.
 A retained captain-held row may record its finished deliverable as dropped while the unanswered question remains a separate open obligation.
 Explicit reopening or successful new-work start or dispatch retires the previous active dropped classification while preserving the exact captain words in `captain-drop.md`.
+The same transitions retire every earlier `Deliverable of the finished work:` line to `Historical deliverable of the finished work:`, keeping its text, so only the current cycle's deliverable stays active.
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
@@ -951,7 +955,7 @@ A longer interval needs `FM_POLL` set in the environment of every process that d
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
 The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many scripts run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
-`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a measured ceiling or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a run's stop or slower-than-usual clock, or a per-script bound: `gate --wait-file` reports the milliseconds it queued behind busy slots, and 0 when a slot was free at once, and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample).
 `--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
 A script that queued records its `test.<script>` sample with no start load, because the runner read the load before the queue, while `fm-duration.py run` reads it after taking its slot.
 The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the bounded wait, the nested-run rule and the exit codes.
@@ -1412,8 +1416,8 @@ A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
 A filled section may quote a placeholder inside a sentence.
-The one escape is a `DoD file: <absolute path>` line inside that section naming an existing, non-empty file with no placeholder left.
-A `DoD file:` line anywhere else in the brief is ignored.
+The one escape is an unfenced `DoD file: <absolute path>` line inside that section naming an existing, non-empty file with no placeholder left.
+A `DoD file:` line in a fenced example or anywhere else in the brief is ignored.
 A relaunch (`bin/fm-spawn.sh --relaunch`) never runs the check, so a criteria file that moves later cannot block it.
 Secondmate charters carry neither section and are never checked.
 A fresh spawn of a brief with no such section at all is not refused: it prints one warning line on stderr that names the missing section and the task id, and carries on.
@@ -1705,6 +1709,57 @@ The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
+
+## Nested task copy sweep (config/copy-budget)
+
+A task copy is nested when a clone registers it strictly inside its own directory, such as `<clone>/.claude/worktrees/<name>`.
+`treehouse prune` works on whole pool slots and does not see these copies, and a teardown only removes its own task's.
+Left alone, they pile up: each holds a full checkout, often 2 to 4 GiB, and nothing else bounds their total.
+[`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) is the one mechanism that finds them, sizes them, removes the provably stale ones, and raises a single wake when the bytes they hold pass a budget.
+The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
+It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, and how `check` stays inside the watcher's timeout.
+`bin/fm-copy-sweep.sh --help` prints that header.
+The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
+
+### Hourly command and watcher check
+
+Firstmate installs no scheduler for `--apply`; run this one line from the host's own hourly job:
+
+```sh
+bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
+```
+
+`bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake.
+`bin/fm-copy-sweep.sh disarm` removes the binding.
+The script header owns how much of the host one `check` covers per poll, what a cut run records, and why the hourly `--apply` is the only run certain to cover every clone.
+
+### Budgets
+
+The optional local, gitignored `config/copy-budget` holds one directive per line; `#` starts a comment:
+
+```text
+# GiB budgets; a decimal value is allowed and "off" turns a budget off
+default-pool 60
+default-container 20
+pool pool-name 80
+container /absolute/path/to/slot-or-home 10
+# 1-minute load average above which no du runs
+load-limit 90
+# whole seconds between scans by check
+interval 3600
+# whole seconds before a cached size is measured again
+cache-max-age 86400
+```
+
+A pool is a `<treehouse root>/<pool>` directory, named by its directory name or full path.
+A container is a pool slot's clone or a Firstmate home, named by its absolute path.
+The values above are the built-in defaults for the lines that carry one, and a missing file means exactly those defaults.
+A malformed file refuses the run and names its line.
+The script header owns how a budget is measured, when it is over, and when its wake fires.
+
+`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) is the only operator environment setting.
+`check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
+[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
@@ -2308,8 +2363,15 @@ The owning home's private `state/jev-guard.jsonl` receives minimized terminal re
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
-A payload screened in pieces records `chunks` (the piece count; 1 for a single request, 0 when none was sent), the usage and tries of every answered piece added together, and the longest elapsed time, with a failed piece's own tries added to the total.
-When several pieces answered, the cost is their sum and counts as reported only when every one of them reported its cost; otherwise it is unknown.
+A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer (a blank tool-result piece needs none and is not counted), separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
+Its usage totals every answered piece, its attempts include every answered piece and every unanswered piece whose request started, and `ms` is the longest elapsed time because pieces run concurrently.
+The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.
+A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning, an unsupported result shape) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
+When every planned piece answered, one answer carries its own reported or estimated charge, and several answers sum to a reported charge only when every one of them reported its cost, otherwise unknown.
+Once a request has started, a planned piece that did not answer, whether it failed or was never sent, makes the total unknown with `incomplete: true`.
+A payload for which no request was sent records `not_called` and is not incomplete, because nothing was billed.
+`reported_amount` retains the known reported subtotal, so a partial payload neither hides it nor presents it as the charge for the whole payload.
+`tests/fm-jev-guard-audit.test.sh` exercises settlement and these accounting boundaries offline, including multiple failures and unsent pieces.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
 Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
 Commands, state, questions, raw exchanges, provider extension fields and exception messages are excluded; paths are excluded except for the refused write/edit target in `refused_path`.
@@ -3591,6 +3653,7 @@ FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 pro
 FM_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git probe
 FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit FM_CHECK_TIMEOUT, and the cut is reported
 FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
+FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_PROCEVENT_MAX_OUTPUT_BYTES=1048576   # bound on one captured process-to-event result
 FM_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/firstmate/procevent-claims
 FM_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400
