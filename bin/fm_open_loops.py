@@ -1225,12 +1225,31 @@ def parkable(row):
     return row.get("category") in CAPTAIN_PARKABLE and row.get("owner") == "firstmate"
 
 
-def completing_routes(ident):
-    """What a refused action points at: the supported ways a row stops demanding a new action."""
-    return (f"; the row clears by the automatic evidence receipt at the next presentation (fresh machine evidence"
-            f" or a named open ship), by a real check-in (bin/fm-open-loops.sh --check-in <task>) or other steer"
-            f" recorded with bin/fm-open-loops.sh action {ident} steered --evidence <NNN.msg>, or by"
-            f" bin/fm-open-loops.sh action {ident} escalated --evidence <follow-up>")
+def ship_wait_candidate(row):
+    """A firstmate-owned, uncorrelated status question: the only row a named open ship can park automatically."""
+    source = row.get("source") or {}
+    return row.get("category") == "unanswered_question" and row.get("owner") == "firstmate" \
+        and source.get("kind") == "status" \
+        and not source.get("key", "").startswith(("pending-reply-", "remote-reply-continuity-"))
+
+
+def completing_routes(row):
+    """What a refused action points at: only the routes that can complete this row's category."""
+    ident, category = row["id"], row.get("category")
+    steer = f"bin/fm-open-loops.sh action {ident} steered --evidence <NNN.msg>"
+    escalate = f"bin/fm-open-loops.sh action {ident} escalated --evidence <follow-up>"
+    if category == "silent_report":
+        return (f"; the row clears by the automatic evidence receipt at the next presentation when the worker shows"
+                f" fresh machine evidence, or by a real check-in (bin/fm-open-loops.sh --check-in {row.get('subject', '')})"
+                f" recorded with {steer}, or by {escalate}")
+    if ship_wait_candidate(row):
+        return (f"; the row clears by the automatic evidence receipt at the next presentation when its backlog"
+                f" blocked-by names only open ships, or by answering the worker and recording {steer}, or by {escalate}")
+    if category == "stalled_worker":
+        return "; the row clears when the worker shows fresh activity or is restarted, and a second deferral is refused"
+    merge = (f" or bin/fm-open-loops.sh action {ident} merged --evidence {row.get('subject', '')}"
+             if category in ("open_pr", "review_pass_not_merged") else "")
+    return f"; complete {json.dumps(row.get('next_action', ''))}, then record it with {escalate}{merge}"
 
 
 class WaitVerifier:
@@ -1246,6 +1265,7 @@ class WaitVerifier:
         self.backlog = None
         self.backlog_error = None
         self.decisions = {}
+        self.working = {}
 
     def backlog_records(self):
         """This home's canonical backlog records, read once, or the first read's error when it is unavailable."""
@@ -1351,9 +1371,11 @@ class WaitVerifier:
             path = c.state / (task + ".status")
             if path.is_symlink() or not path.is_file():
                 raise ValueError("prerequisite status is unavailable")
-            status = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
-                            'if crew_is_provably_working "$3"; then last_status_line "$2"; fi',
-                            BIN, path, task).strip()
+            if task not in self.working:
+                self.working[task] = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
+                                            'if crew_is_provably_working "$3"; then last_status_line "$2"; fi',
+                                            BIN, path, task).strip()
+            status = self.working[task]
             if not status:
                 raise ValueError("routed prerequisite is no longer working; follow up on its result or wait")
             stat = path.stat()
@@ -1371,11 +1393,11 @@ class WaitVerifier:
             raise ValueError("waiting requires a current ledger; this one is held stale until the quota window resets")
         if row["category"] not in CAPTAIN_PARKABLE \
                 or row.get("stale") or row.get("owner") == "captain":
-            raise ValueError("this obligation cannot have a standing dependency wait" + completing_routes(row["id"]))
+            raise ValueError("this obligation cannot have a standing dependency wait" + completing_routes(row))
         source = row.get("source")
         self.verify_source(source)
         if source.get("key", "").startswith(("pending-reply-", "remote-reply-continuity-")):
-            raise ValueError("unanswered correlated replies cannot have a standing wait" + completing_routes(row["id"]))
+            raise ValueError("unanswered correlated replies cannot have a standing wait" + completing_routes(row))
         if prerequisite:
             dependency = self.rows.get(prerequisite)
             if dependency is None or prerequisite == row["id"] or dependency.get("stale") \
@@ -1443,6 +1465,7 @@ class SatisfactionVerifier(WaitVerifier):
     def __init__(self, report, state, now):
         super().__init__(report, state, now)
         self.proofs, self.steps, self.statuses = {}, {}, {}
+        self.sealed = False
 
     def run_steps(self, worktree):
         """The run store is read once per pass (once per worktree when NM_HOME is relative); unreadable means none."""
@@ -1493,11 +1516,9 @@ class SatisfactionVerifier(WaitVerifier):
     def named_ship_evidence(self, row):
         # Only the backlog's explicit blocked-by relationship may park a status question.
         # Captain holds, arbitrary blocked prose and delivery/merge obligations retain their own rules.
-        source = row.get("source") or {}
-        if row.get("category") != "unanswered_question" or row.get("owner") != "firstmate" \
-                or source.get("kind") != "status" \
-                or source.get("key", "").startswith(("pending-reply-", "remote-reply-continuity-")):
+        if not ship_wait_candidate(row):
             return None
+        source = row["source"]
         self.verify_source(source)
         records = {r["id"]: r for r in self.backlog_records() if r.get("structured")}
         record = records.get(source.get("key")) or records.get(source.get("task"))
@@ -1505,7 +1526,7 @@ class SatisfactionVerifier(WaitVerifier):
                 or (record.get("hold_kind") == "captain" and record.get("hold_bucket") != "blocked"):
             return None
         tasks = record.get("unresolved_blocker_ids", [])
-        if not tasks or record["id"] in tasks:
+        if not tasks or record["id"] in tasks or source.get("task") in tasks:
             return None
         if any(t not in records or records[t].get("state") not in ("queued", "in_flight")
                or records[t].get("kind") != "ship" for t in tasks):
@@ -1536,7 +1557,11 @@ class SatisfactionVerifier(WaitVerifier):
     def backlog_records(self):
         path = self.collector.data / "backlog.md"
         guard = self.file_guard(path)
-        if guard != getattr(self, "backlog_guard", object()):
+        cached = guard == getattr(self, "backlog_guard", object()) \
+            and (self.backlog is not None or self.backlog_error is not None)
+        if not cached:
+            if self.sealed:
+                raise ValueError("backlog was not read unchanged before the receipt lock")
             self.backlog, self.backlog_error, self.backlog_guard = None, None, guard
         records = super().backlog_records()
         if guard != self.file_guard(path):
@@ -1549,6 +1574,7 @@ class SatisfactionVerifier(WaitVerifier):
         self.actions = report.get("handling", {}).get("actions", {})
         self.stale = bool(report.get("stale"))
         self.decisions.clear()
+        self.working.clear()
         self.collector.now = now
         self.collector.env["FM_SNAPSHOT_NOW_EPOCH"] = str(now)
         self.collector.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1568,9 +1594,15 @@ class SatisfactionVerifier(WaitVerifier):
         return [self.file_guard(path) for path in paths]
 
     def prepare(self, report):
-        status_guards, backlog_guard = {}, object()
-        rows = [row for row in overdue_rows(report, self.collector.now)
-                if row.get("category") in ("silent_report", "unanswered_question")]
+        status_guards = {}
+        overdue = overdue_rows(report, self.collector.now)
+        if any(self.actions.get(row["id"], {}).get("kind") == "waiting" or self.actions.get(row["id"], {}).get("hold")
+               for row in overdue):
+            try:
+                self.backlog_records()  # standing-receipt checks under the receipt lock reuse this one read
+            except SOURCE_ERRORS:
+                pass
+        rows = [row for row in overdue if row.get("category") in ("silent_report", "unanswered_question")]
         # Every row's recent events and dependencies are tried before any slow current-state read,
         # so one hung reader can only cost the rows that have no cheaper evidence.
         for live in (False, True):
@@ -1584,8 +1616,6 @@ class SatisfactionVerifier(WaitVerifier):
                         if status_guards.get(task) != guard[:2]:
                             self.decisions.pop(task, None)
                             status_guards[task] = guard[:2]
-                        if backlog_guard != guard[-1]:
-                            self.backlog, self.backlog_error, backlog_guard = None, None, guard[-1]
                     if receipt_stands(self.actions.get(row["id"], {}), row, self.collector.now, self):
                         continue
                     kind, proof = self.automatic(row, live)
@@ -1616,10 +1646,9 @@ def prepare_satisfaction(state, now):
     """
     def expired(_signum, _frame):
         raise CollectionDeadline("automatic evidence exceeded its deadline")
-    override = os.environ.get("FM_OPEN_LOOPS_EVIDENCE_SECONDS", "")
     verifier = None
     previous = signal.signal(signal.SIGALRM, expired)
-    signal.alarm(int(override) if override.isdigit() and int(override) > 0 else EVIDENCE_DEADLINE_SECONDS)
+    signal.alarm(EVIDENCE_DEADLINE_SECONDS)
     try:
         report = read_ledger(state)
         if report and overdue_rows(report, now):
@@ -1630,6 +1659,8 @@ def prepare_satisfaction(state, now):
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)
+        if verifier is not None:
+            verifier.sealed = True
     return verifier
 
 
@@ -1729,10 +1760,8 @@ def ledger_action(args, state, now, prepared=None):
         for row in rows:
             # Reloaded actions remain authoritative; only cheap row/file identity checks
             # happen here, never the preflight's machine or backlog subprocesses.
-            if receipt_stands(actions.get(row["id"], {}), row, now, waits):
-                continue
             kind, proof = prepared.prepared(row, now)
-            if not proof:
+            if not proof or receipt_stands(actions.get(row["id"], {}), row, now, waits):
                 continue
             ident = row["id"]
             automatic.add(ident)
@@ -1774,11 +1803,12 @@ def ledger_action(args, state, now, prepared=None):
         return 0
     if args.check_actions:
         missing = [row for ident, row in by_id.items()
-                   if ident not in automatic and not receipt_stands(actions.get(ident, {}), row, now, waits)
+                   if ident not in automatic
                    and ((ident in pending and (actions.get(ident, {}).get("sequence", 0) <= pending[ident]
                          or (actions.get(ident, {}).get("kind") == "deferred"
                              and actions[ident].get("recheck_epoch", 0) <= now)))
-                        or actions.get(ident, {}).get("kind") in ("waiting", "observed", "backlog_wait"))]
+                        or actions.get(ident, {}).get("kind") in ("waiting", "observed", "backlog_wait"))
+                   and not receipt_stands(actions.get(ident, {}), row, now, waits)]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
@@ -1858,7 +1888,7 @@ def ledger_action(args, state, now, prepared=None):
                     marked[ident] = now
             write_ledger(state, report, receipt=True)
             raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it"
-                             + completing_routes(ident))
+                             + completing_routes(by_id[ident]))
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
     elif args.recheck and args.kind != "waiting":

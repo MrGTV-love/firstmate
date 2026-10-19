@@ -3017,6 +3017,7 @@ assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
 shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
 counting = code / 'bin/fm-fleet-snapshot.sh'
 counting.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$FM_HOME/snapshot-runs"\n'
+                    '[ ! -e "$FM_HOME/hang-snapshot" ] || exec sleep 3600\n'
                     'exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"\n')
 counting.chmod(0o755)
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('read-once')
@@ -3038,6 +3039,31 @@ backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 broken = ok(loops, '--present-overdue')
 assert all(each['id'] in broken.stdout for each in standing) and 'STANDING' not in broken.stdout, broken
 assert snapshot_runs() == 1, ('an unreadable backlog was read again for each standing row', snapshot_runs())
+# (h) The backlog is read once before the receipt lock, and a hung reader ends at the evidence deadline instead of
+# holding the receipt and queue locks: the unproven standing row fails closed and demands its action.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
+    'hung-backlog', category='unlanded_commit', subject='held-job', next_action='land or discard the unlanded commits',
+    evidence='1 commit not on main', source=dict(kind='commits', task='held-job'))
+runs = home / 'snapshot-runs'
+snapshot_runs = lambda: len(runs.read_text().splitlines()) if runs.exists() else 0
+_, boundary = drain()
+recorded = act('escalated', 'asked the captain')
+assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
+record = stored()
+record['handling']['presentations']['main'][row['id']] = record['handling']['actions'][row['id']]['sequence']
+ledger.write_text(json.dumps(record))
+runs.unlink(missing_ok=True)
+standing = call(loops, '--check-actions')
+assert standing.returncode == 0 and snapshot_runs() == 1, ('a live hold stands from one pre-lock backlog read', standing, snapshot_runs())
+(home / 'hang-snapshot').touch()
+started = time.monotonic()
+refused = call(loops, '--check-actions')
+assert time.monotonic() - started < 45, 'the acknowledgement waited on a hung backlog reader'
+assert refused.returncode == 1 and row['id'] in refused.stdout, refused
+started = time.monotonic()
+presented = ok(loops, '--present-overdue')
+assert time.monotonic() - started < 45, 'the presentation waited on a hung backlog reader'
+assert row['id'] in presented.stdout and 'STANDING' not in presented.stdout, presented
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
       ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
       ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
@@ -3105,9 +3131,10 @@ refused = ack(boundary)
 assert refused.returncode == 1 and row['id'] in refused.stdout and '--check-in "worker"' in refused.stdout, refused
 waiting = call(loops, 'action', row['id'], 'waiting', '--evidence', 'x', '--recheck', iso(now + 600), '--prerequisite-task', 'other')
 assert waiting.returncode == 1 and 'cannot have a standing dependency wait' in waiting.stdout, waiting
-for route in ('automatic evidence receipt', '--check-in <task>', f"action {row['id']} steered --evidence <NNN.msg>",
+for route in ('automatic evidence receipt', '--check-in worker', f"action {row['id']} steered --evidence <NNN.msg>",
               f"action {row['id']} escalated --evidence <follow-up>"):
     assert route in waiting.stdout, (route, waiting)
+assert 'merged' not in waiting.stdout and 'restarted' not in waiting.stdout, waiting
 (home / 'worker-state').write_text('state: working · source: run-step · run: live-validation; test running\n')
 mtime = ledger.stat().st_mtime_ns
 assert ack(boundary).returncode == 0
@@ -3198,22 +3225,61 @@ for ending in ('done', 'missing', 'captain', 'nonship', 'mixed', 'finished-plus-
     refused = ack(boundary)
     assert refused.returncode == 1 and row['id'] in refused.stdout and 'escalated --evidence' in refused.stdout, refused
 
-# Fresh machine state never excuses a genuinely stalled row, blocked question, captain hold or merge obligation.
-for category, fields in (
-    ('stalled_worker', {}), ('unanswered_question', {'subject': 'worker:blocker', 'evidence': 'blocked: external input'}),
-    ('unanswered_question', {'subject': 'worker:captain-hold', 'owner': 'captain'}),
-    ('review_pass_not_merged', {'subject': 'https://github.com/test/project/pull/9'})):
-    home, row, ledger, env, call, ok, drain, ack = case('negative-' + category + fields.get('owner', ''), category, **fields)
+# A question that waits on the very ship that asked it is a deadlock, never an open-ship wait.
+home, row, ledger, env, call, ok, drain, ack = case('dependency-asker')
+(home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n- [ ] worker - Implement fix (repo: firstmate) (kind: ship)\n'
+    '- [ ] question - Await fix blocked-by: worker (repo: firstmate) (kind: decision)\n\n## Done\n')
+(home / 'state/worker.status').write_text(f'needs-decision [at={now-7200}] [key=question]: await the named fix\n')
+report = json.loads(ok(loops, '--heartbeat', '--json').stdout)
+row = next(r for r in report['rows'] if r['subject'] == 'worker:question')
+_, boundary = drain()
+refused = ack(boundary)
+assert refused.returncode == 1 and row['id'] in refused.stdout, refused
+assert row['id'] not in json.loads(ledger.read_text())['handling']['actions'], 'the asking ship cannot be its own question\'s open-ship wait'
+
+# Fresh machine state never excuses a genuinely stalled row, blocked question, captain hold or merge obligation,
+# and a refusal names only routes that complete that category.
+URL = 'https://github.com/test/project/pull/9'
+def refusal(row, call, kind):
+    if kind == 'waiting':
+        return call(loops, 'action', row['id'], 'waiting', '--evidence', 'x', '--recheck', iso(now + 600), '--prerequisite-task', 'other')
+    first = call(loops, 'action', row['id'], 'deferred', '--evidence', 'first recheck', '--recheck', iso(now + 600))
+    assert first.returncode == 0, first
+    return call(loops, 'action', row['id'], 'deferred', '--evidence', 'still no proof', '--recheck', iso(now + 700))
+for category, fields, kind, present, absent in (
+    ('stalled_worker', {}, 'deferred', ('second deferral refused', 'fresh activity or is restarted'),
+     ('--check-in', 'automatic evidence receipt', 'steered --evidence', 'merged')),
+    ('stalled_worker', {}, 'waiting', ('standing dependency wait', 'fresh activity or is restarted'),
+     ('--check-in', 'automatic evidence receipt', 'steered --evidence', 'merged')),
+    ('unanswered_question', {'subject': 'worker:blocker', 'evidence': 'blocked: external input'}, None, (), ()),
+    ('unanswered_question', {'subject': 'worker:question', 'source': dict(kind='status', task='worker', key='question')},
+     'deferred', ('second deferral refused', 'automatic evidence receipt', 'blocked-by names only open ships',
+                  'answering the worker', 'steered --evidence <NNN.msg>', 'escalated --evidence <follow-up>'),
+     ('--check-in', 'merged', 'restarted')),
+    ('unanswered_question', {'subject': 'worker:captain-hold', 'owner': 'captain',
+                             'next_action': 'resolve the captain hold or record its next decision date'},
+     'waiting', ('standing dependency wait', 'resolve the captain hold', 'escalated --evidence <follow-up>'),
+     ('--check-in', 'automatic evidence receipt', 'steered --evidence', 'merged', 'restarted')),
+    ('review_pass_not_merged', {'subject': URL, 'next_action': 'merge with existing authority or escalate for approval'},
+     'waiting', ('standing dependency wait', 'merge with existing authority', 'escalated --evidence <follow-up>',
+                 'merged --evidence ' + URL),
+     ('--check-in', 'automatic evidence receipt', 'steered --evidence', 'restarted')),
+    ('open_pr', {'subject': URL, 'next_action': 'complete the requested PR review', 'owner': 'alice'},
+     'deferred', ('second deferral refused', 'complete the requested PR review', 'escalated --evidence <follow-up>',
+                  'merged --evidence ' + URL),
+     ('--check-in', 'automatic evidence receipt', 'steered --evidence', 'restarted'))):
+    home, row, ledger, env, call, ok, drain, ack = case(
+        'negative-' + category + fields.get('owner', '') + (kind or '') + str(len(fields)), category, **fields)
     (home / 'worker-state').write_text('state: working · source: run-step · run: live-validation\n')
     _, boundary = drain()
     assert ack(boundary).returncode == 1, category
-    if category == 'stalled_worker':
-        ok(loops, 'action', row['id'], 'deferred', '--evidence', 'first recheck', '--recheck', iso(now+600))
-        second = call(loops, 'action', row['id'], 'deferred', '--evidence', 'still no proof', '--recheck', iso(now+700))
-        assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
-        for route in ('automatic evidence receipt', '--check-in <task>', f"action {row['id']} steered --evidence <NNN.msg>",
-                      f"action {row['id']} escalated --evidence <follow-up>"):
-            assert route in second.stdout, (route, second)
+    if kind:
+        refused = refusal(row, call, kind)
+        assert refused.returncode == 1, (category, kind, refused)
+        for text in present:
+            assert text in refused.stdout, (category, kind, text, refused)
+        for text in absent:
+            assert text not in refused.stdout, (category, kind, text, refused)
         assert ack(boundary).returncode == 1
 # Automatic readers cannot hold the publication/receipt lock, and stale preflight identities cannot buy a receipt.
 reader.write_text('#!/usr/bin/env bash\n'
@@ -3225,9 +3291,12 @@ reader.write_text('#!/usr/bin/env bash\n'
     '  touch "$FM_HOME/reader-entered"\n'
     '  while [ ! -e "$FM_HOME/release-reader" ]; do sleep 0.1; done\n'
     'fi\ncat "$FM_HOME/worker-state"\n')
+module = code / 'bin/fm_open_loops.py'
+deadline_source = module.read_text()
+assert deadline_source.count('EVIDENCE_DEADLINE_SECONDS = 5\n') == 1
+module.write_text(deadline_source.replace('EVIDENCE_DEADLINE_SECONDS = 5\n', 'EVIDENCE_DEADLINE_SECONDS = 120\n'))
 for change in ('none', 'row', 'meta', 'status'):
     home, row, ledger, env, call, ok, drain, ack = case('lock-' + change)
-    env['FM_OPEN_LOOPS_EVIDENCE_SECONDS'] = '120'
     other = dict(row, id='unrelated-action', category='stalled_worker', subject='other-worker')
     record = json.loads(ledger.read_text()); record['rows'].append(other)
     ledger.write_text(json.dumps(record))
@@ -3264,6 +3333,7 @@ for change in ('none', 'row', 'meta', 'status'):
         (home / 'release-reader').touch()
         if pending.poll() is None:
             pending.communicate(timeout=120)
+module.write_text(deadline_source)
 # A hung current-state reader cannot extend the queue-lock hold: the pass ends at its deadline, rows with cheaper
 # evidence are still satisfied, and the row that only the hung reader could prove demands its action.
 home, row, ledger, env, call, ok, drain, ack = case('hung-reader')
