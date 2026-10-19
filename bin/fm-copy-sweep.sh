@@ -1016,7 +1016,7 @@ teardown_driver_release() {  # <clone> <copy> <release-id>
 # the driver's reason and nothing is copied. A failure after the plan was allowed
 # leaves the copy and is reported, never retried harder.
 apply_removals() {
-  local line container pool clone copy kib head branch err refusal freed gone= held= stamp
+  local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net
   stamp=$(date -u +%Y%m%dT%H%M%SZ).$$
   REMOVAL_REPORT=
