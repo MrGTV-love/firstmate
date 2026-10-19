@@ -10,7 +10,8 @@
 #
 # Producers:
 #   bin/fm-brief.sh              appended (in every worker's status command,
-#                                right after its unchanged plain append)
+#                                right after its capped append,
+#                                bin/fm-status-append.sh)
 #   bin/fm-spawn.sh              dispatched (fresh spawns only, never relaunch)
 #   bin/fm-watch.sh              capture, once per poll cycle
 #   bin/fm-pr-check.sh           pr_ready (a PR registered for review, not the
@@ -43,9 +44,13 @@
 # line added to a state/<task>.status log since that task's byte offset in
 # state/.<task>.fleet-ledger-offset. An absent offset reads from byte 0, and a
 # log shorter than its offset is re-read from byte 0. A partial last line waits
-# for a later capture. Records are appended before the offset is saved, so an
-# interrupted capture repeats records rather than losing them. Without any
-# grown log, capture returns after one size listing and sources nothing.
+# for a later capture. A log that grew by more than one tail window or more than
+# CAPTURE_MAX_LINES lines since the offset is captured from its last whole lines,
+# and a task.status.skipped record counts the bytes left out (docs/fleet-ledger.md;
+# docs/configuration.md "Status log size bounds" owns the bounds). Records are
+# appended before the offset is saved, so an interrupted capture repeats records
+# rather than losing them. Without any grown log, capture returns after one size
+# listing and sources nothing.
 # appended captures only that task, so a worker's status line is recorded as
 # soon as the worker writes it; the byte offset keeps the per-poll capture from
 # recording it again. Its arguments name the home, because a worker has no
