@@ -10639,7 +10639,8 @@ dead_launcher_pid() {
 
 # run_foreign_teardown <rc-var> [VAR=value...]: runs the case's teardown with
 # the stub interpreter and the given environment, which may replace it; stdout
-# and stderr land in the case.
+# and stderr land in the case. FOREIGN_TEARDOWN_ARGS holds any teardown flags.
+FOREIGN_TEARDOWN_ARGS=()
 run_foreign_teardown() {
   local rc_var=$1 case_dir=$FOREIGN_CASE status=0
   shift
@@ -10647,7 +10648,7 @@ run_foreign_teardown() {
     FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
     FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
     NM_HOME="$case_dir/nm" PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
-    "$TEARDOWN" task-x1 > "$case_dir/stdout" 2> "$case_dir/stderr" || status=$?
+    "$TEARDOWN" task-x1 ${FOREIGN_TEARDOWN_ARGS[@]+"${FOREIGN_TEARDOWN_ARGS[@]}"} > "$case_dir/stdout" 2> "$case_dir/stderr" || status=$?
   printf -v "$rc_var" '%s' "$status"
 }
 
@@ -10867,6 +10868,9 @@ test_typed_preservation_exit_completes_cleanup() {
   expect_code 1 "$rc" "failed preservation must keep refusing"
   assert_foreign_copy_untouched typed-preservation-route
   assert_equals 'unique retained bytes' "$(cat "$FOREIGN_COPY/unique.dat")" 'unproven ignored bytes changed'
+  assert_no_grep 'human-only-exit:' "$FOREIGN_CASE/stderr" 'an unforced run must keep its printed completing command'
+  assert_grep 'it was not removed. Restore readable source and writable preservation storage, then run the completing command.' "$FOREIGN_CASE/stderr" \
+    'an unforced run lost the guidance that names its completing command'
   jq -es 'length == 1 and .[0].schema == "fm-friction.v1" and .[0].rule_id == "ignored-bytes-preserved" and .[0].exit_kind == "machine" and .[0].execution_kind == "test"' \
     "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'preservation refusal was absent or counted twice'
   while IFS= read -r line; do
@@ -10903,6 +10907,74 @@ test_typed_preservation_exit_completes_cleanup() {
     || fail "a refusal and its successful retry must be one operation ending in retry-succeeded and completed: $(cat "$FOREIGN_CASE/home/state/friction.jsonl")"
   done
   pass 'own and foreign typed preservation refusals retain unique bytes, and their printed commands complete cleanup after storage repair as one operation'
+}
+
+# A forced or legacy-record original run cannot be completed by the printed
+# command, which carries neither flag, so its preservation refusal ends in a
+# human-only exit with no command and no flag anywhere in the envelope lines.
+assert_preservation_refusal_without_route() {  # <label>
+  local label=$1 envelope
+  assert_grep 'REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved ' "$FOREIGN_CASE/stderr" "$label: the refusal is not typed"
+  assert_no_grep 'completing-command:' "$FOREIGN_CASE/stderr" "$label: a command that cannot complete this run was printed"
+  assert_grep 'human-only-exit: This run was forced or used a legacy record' "$FOREIGN_CASE/stderr" "$label: the run was not named in the human-only exit"
+  envelope=$(grep -E '^(REFUSED: guard=FM-TEARDOWN-PRESERVATION|human-only-exit:)' "$FOREIGN_CASE/stderr")
+  case "$envelope" in
+    *--force*|*--drop-file*|*--legacy-record*) fail "$label: the refusal printed a force or legacy flag: $envelope" ;;
+  esac
+  jq -es 'length == 1 and .[0].rule_id == "ignored-bytes-preserved" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only" and .[0].exit_printed' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail "$label: expected exactly one human-only event: $(cat "$FOREIGN_CASE/home/state/friction.jsonl")"
+  assert_foreign_copy_untouched "$label"
+  assert_equals 'unique retained bytes' "$(cat "$FOREIGN_COPY/unique.dat")" "$label: unproven ignored bytes changed"
+}
+
+# run_preservation_refusal <ownership> <name> <record> [teardown-flag...]: a
+# teardown run with the given flags over a backlog-tracked task whose ignored-file
+# preservation fails; a legacy <record> predates spawn_gen.
+run_preservation_refusal() {
+  local ownership=$1 name=$2 record=$3 rc exclude
+  shift 3
+  if [ "$ownership" = own ]; then
+    dead_launcher_pid
+    make_own_locked_copy_case "$name-own" enclosing "$FOREIGN_DEAD_PID"
+  else
+    make_foreign_copy_case "$name-foreign"
+  fi
+  if [ "$record" = legacy ]; then
+    grep -v '^spawn_gen=' "$FOREIGN_CASE/state/task-x1.meta" > "$FOREIGN_CASE/state/task-x1.meta.new"
+    mv "$FOREIGN_CASE/state/task-x1.meta.new" "$FOREIGN_CASE/state/task-x1.meta"
+  fi
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'unique retained bytes\n' > "$FOREIGN_COPY/unique.dat"
+  cat > "$FOREIGN_CASE/fakebin/cp" <<SH
+#!/usr/bin/env bash
+case " \$* " in *nested-copy-preserved*) exit 1 ;; esac
+exec "$(command -v cp)" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/cp"
+  FOREIGN_TEARDOWN_ARGS=("$@")
+  run_foreign_teardown rc
+  FOREIGN_TEARDOWN_ARGS=()
+  expect_code 1 "$rc" "$name-$ownership: failed preservation must keep refusing with the same exit: $(cat "$FOREIGN_CASE/stderr")"
+}
+
+test_forced_preservation_refusal_prints_no_completing_command() {
+  local ownership
+  for ownership in foreign own; do
+    run_preservation_refusal "$ownership" typed-forced current --force --drop-file "$(fm_test_drop_file)"
+    assert_preservation_refusal_without_route "forced-$ownership"
+  done
+  pass 'a forced teardown whose ignored files cannot be preserved ends in a human-only exit with no command and no flag, for foreign and own copies'
+}
+
+test_legacy_preservation_refusal_prints_no_completing_command() {
+  local ownership
+  for ownership in foreign own; do
+    run_preservation_refusal "$ownership" typed-legacy legacy --legacy-record
+    assert_preservation_refusal_without_route "legacy-$ownership"
+  done
+  pass 'a legacy-record teardown whose ignored files cannot be preserved ends in a human-only exit with no command and no flag, for foreign and own copies'
 }
 
 # A proof failure that needs a human decision is a typed refusal with a
@@ -13168,6 +13240,8 @@ test_foreign_copy_regenerable_ignored_files_need_no_preservation
 test_foreign_copy_preserves_durable_tac_state_before_removal
 test_foreign_copy_is_not_removed_when_its_ignored_files_cannot_be_listed
 test_typed_preservation_exit_completes_cleanup
+test_forced_preservation_refusal_prints_no_completing_command
+test_legacy_preservation_refusal_prints_no_completing_command
 test_foreign_copy_that_is_not_a_worktree_root_is_a_typed_refusal
 test_foreign_copy_with_an_unresolvable_head_is_a_typed_refusal
 test_foreign_copy_whose_anchor_names_another_commit_is_a_typed_refusal

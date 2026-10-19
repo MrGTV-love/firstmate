@@ -123,6 +123,7 @@ The shell [refusal envelope](../bin/fm-refuse-lib.sh) prints `REFUSED: guard=<st
 The caller retains its existing exit code; a telemetry failure never adds a refusal, changes that code, or changes hook JSON or the Claude Stop exit-2 contract.
 The teardown completing command re-enters its existing proof and automatic ignored-byte preservation path without force after readable source and writable preservation storage are restored.
 It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, and one teardown process keeps one operation across all its refusals, so a refusal, a refusal on retry and the later success are one operation; a human-only exit prints no command and carries none.
+A forced or legacy-record teardown prints a human-only exit for that refusal instead, because the printed command carries no force or legacy flags and so could not complete that run; the owner re-runs it with the owner's own flags.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
 Jev's size message names the existing request/overlap budget and same-write-tool report-splitting route without changing screening or admission.
 A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; on Claude a tool result is advisory only, so an oversized result there is neither printed as `REFUSED` nor counted.

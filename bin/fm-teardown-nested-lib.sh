@@ -54,8 +54,8 @@
 #
 # Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh and bin/fm-refuse-lib.sh first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, DATA, META,
-# STATE, WT, TASK_TMP, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT,
-# TEARDOWN_PEER_SLOT) and functions
+# STATE, WT, TASK_TMP, FORCE, LEGACY_RECORD_GIVEN, TEARDOWN_NESTED_COPIES,
+# TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT) and functions
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
 
@@ -98,9 +98,11 @@ teardown_copy_question() {  # <rule> <copy> <why>
 
 # One event per refused copy/predicate, not another event for the registered-copy
 # wrapper that repeats it. The command re-enters the existing proof/preservation
-# owner without force. A new custody/disposition decision is asked explicitly.
+# owner without force, so a forced or legacy-record run, which it could not
+# complete, gets a human-only exit instead. A new custody/disposition decision is
+# asked explicitly.
 teardown_refuse_copy() {  # <rule> <missing> <copy> [new-question]
-  local command kind=machine exit_text revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh}
+  local command kind=machine exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh}
   # An unavailable inspection is not a policy judgment. The later custody
   # wrapper repeats this diagnostic without manufacturing a policy event.
   if [ "$1" = inspection-unavailable ]; then
@@ -108,11 +110,19 @@ teardown_refuse_copy() {  # <rule> <missing> <copy> [new-question]
     TEARDOWN_REFUSED_COPIES+=("$3")
     return 0
   fi
-  printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
-  exit_text=$command
-  if [ -n "${4:-}" ]; then kind=human-only; exit_text=$4; fi
+  if [ -n "${4:-}" ]; then
+    kind=human-only
+    exit_text=$4
+  elif [ "${FORCE:-}" = --force ] || [ "${LEGACY_RECORD_GIVEN:-0}" = 1 ]; then
+    kind=human-only
+    exit_text="This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?"
+  else
+    printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
+    exit_text=$command
+    missing="$missing Restore readable source and writable preservation storage, then run the completing command."
+  fi
   FM_HOME="$FM_HOME" FM_FRICTION_REVISION_FILE="$revision" \
-    fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$2" "$kind" "$exit_text" nested-copy "$3" "$ID"
+    fm_refuse "$TEARDOWN_FRICTION_GUARD" "$1" "$missing" "$kind" "$exit_text" nested-copy "$3" "$ID"
   TEARDOWN_REFUSED_COPIES+=("$3")
 }
 
@@ -508,7 +518,7 @@ teardown_foreign_copy_present() {  # <slot> <copy>
 teardown_foreign_copy_dispose() {  # <slot> <copy>
   local slot=$1 copy=$2 rc=0
   teardown_preserve_ignored "$copy" || {
-    teardown_refuse_copy ignored-bytes-preserved "the ignored files of foreign copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command." "$copy"
+    teardown_refuse_copy ignored-bytes-preserved "the ignored files of foreign copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
   }
   teardown_copy_lock_file "$copy" || rc=$?
@@ -618,7 +628,7 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     return 1
   fi
   teardown_preserve_ignored "$copy" || {
-    teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command." "$copy"
+    teardown_refuse_copy ignored-bytes-preserved "the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
   }
   rc=0
