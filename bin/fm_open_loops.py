@@ -1647,12 +1647,6 @@ class SatisfactionVerifier(WaitVerifier):
                                        -(float("inf") if row.get("age_seconds") is None else row["age_seconds"])))
         rows = [row for row in rows if not self.stored_stands(self.actions.get(row["id"], {}), row, now)]
         self.queued = {row["id"] for row in rows}
-        if any(self.actions.get(row["id"], {}).get("kind") == "waiting" or self.actions.get(row["id"], {}).get("hold")
-               for row in overdue):
-            try:
-                self.backlog_records()  # standing-receipt checks under the receipt lock reuse this one read
-            except SOURCE_ERRORS:
-                pass
         looked, live = [], False
         # Every row's recent events and dependencies are tried before any slow current-state read,
         # so one hung reader can only cost the rows that have no cheaper evidence.
@@ -1676,9 +1670,16 @@ class SatisfactionVerifier(WaitVerifier):
                         self.attempted.append(ident)
                     else:
                         looked.append(ident)
+            if any(self.actions.get(row["id"], {}).get("kind") == "waiting" or self.actions.get(row["id"], {}).get("hold")
+                   for row in overdue):
+                try:
+                    self.backlog_records()  # standing-receipt checks under the receipt lock reuse this one read
+                except SOURCE_ERRORS:
+                    pass
         except CollectionDeadline:
             for ident in [*([] if live else looked), self.inflight]:
-                if ident is not None and ident not in self.attempted:
+                if ident is not None and ident not in self.attempted and ident not in self.proofs \
+                        and ident not in self.standing:
                     self.attempted.append(ident)
                     if ident != self.inflight or type(ticks.get(ident)) is not int:
                         self.demoted.add(ident)
@@ -1688,8 +1689,8 @@ class SatisfactionVerifier(WaitVerifier):
     def unchecked(self, row):
         """The deadline, not the row, left this row unread: never reached, only given a cheap look, or cut off a first time."""
         ident = row["id"]
-        return self.expired and ident in self.queued and ident not in self.proofs \
-            and (ident not in self.attempted or ident in self.demoted)
+        return self.expired and bool(self.attempted or self.proofs or self.standing) and ident in self.queued \
+            and ident not in self.proofs and (ident not in self.attempted or ident in self.demoted)
 
     def prepared(self, row, now, action):
         entry = self.proofs.get(row["id"])

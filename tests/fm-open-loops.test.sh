@@ -3064,6 +3064,32 @@ started = time.monotonic()
 presented = ok(loops, '--present-overdue')
 assert time.monotonic() - started < 45, 'the presentation waited on a hung backlog reader'
 assert row['id'] in presented.stdout and 'STANDING' not in presented.stdout, presented
+# (i) A stalled backlog read after the rows' own evidence marks no row "not checked": the silent row with a fresh status
+# event still proves, and the held row is an ordinary obligation that names its completing command.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
+    'stalled-preread', category='unlanded_commit', subject='held-job', next_action='land or discard the unlanded commits',
+    evidence='1 commit not on main', source=dict(kind='commits', task='held-job'))
+(home / 'state/fresh-worker.meta').write_text('kind=ship\nspawn_gen=fresh-generation\n')
+(home / 'state/fresh-worker.status').write_text(f'working [at={now - 10}]: progress\n')
+silent = dict(id='row-stalled-preread-silent', category='silent_report', subject='fresh-worker', owner='firstmate',
+              next_action='check in: progress, blockers, cross-workstream dependencies', age_seconds=7200,
+              limit_seconds=900, overdue=True, evidence='old report')
+_, boundary = drain()
+assert act('escalated', 'asked the captain').returncode == 0
+record = stored(); record['rows'].append(silent); ledger.write_text(json.dumps(record))
+(home / 'hang-snapshot').touch()
+started = time.monotonic()
+presented = ok(loops, '--present-overdue')
+assert time.monotonic() - started < 45, 'the presentation waited on a stalled backlog read'
+assert 'NOT CHECKED THIS PASS' not in presented.stdout and 'retry:' not in presented.stdout, presented.stdout
+assert row['id'] in presented.stdout.split('STANDING')[0], 'the held row is an ordinary obligation when its backlog cannot be read'
+assert 'STANDING' in presented.stdout and silent['id'] in presented.stdout.split('STANDING')[1], 'a stalled backlog read must not stop the status-event proof'
+assert stored()['handling']['actions'][silent['id']]['kind'] == 'observed'
+refused = call(loops, '--check-actions')
+assert refused.returncode == 1 and row['id'] in refused.stdout and silent['id'] not in refused.stdout, refused
+assert 'were not checked' not in refused.stdout and 'retry:' not in refused.stdout, refused.stdout
+assert f'action "{row["id"]}" escalated --evidence' in refused.stdout, 'the refusal names its completing command'
+(home / 'hang-snapshot').unlink()
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
       ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
       ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
