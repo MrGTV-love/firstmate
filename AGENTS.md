@@ -177,12 +177,13 @@ For one-off or infrequent operational work, start with the simplest direct end-t
 Do not build wrappers, control planes, policy layers, custom verifiers, or automation unless the direct path exposes a concrete blocker or repeated need that justifies the added machinery.
 
 **Direct-edit class (captain-set 2026-10-19, revisable).**
-Two kinds of work skip the brief, the worker, the capacity slot and the acceptance section: a single-file change whose content is documentation, configuration or comments, and any revert or revert-of-revert the captain ordered in the current exchange.
+Two kinds of work on this repository's own shared tracked material skip the brief, the worker, the capacity slot and the acceptance section: a single-file change whose content is documentation, configuration or comments, and any revert or revert-of-revert the captain ordered in the current exchange.
 Firstmate makes that change itself in an isolated copy and opens the PR through the selected delivery path, with no reviewer or gate beyond that path's own.
-It starts the pipeline run with `--skip test`, because nothing executable changed and CI still runs the repository tests, and it writes the intent as the captain's own words only.
+It writes the intent as the captain's own words only.
 It answers all review findings in one batch: warnings and info go to the PR's follow-ups, and only an error, data-loss, lost-record, security or widened-guard finding triggers a fix round.
 Shared tracked material still requires `firstmate-coding-guidelines`, and merge authority is unchanged.
 Everything else keeps the intake above.
+Hard rule 1 and `firstmate-self-repo` still govern every registered project.
 
 Before commissioning an investigation, consult existing reports and established evidence.
 Classify the deliverable:
