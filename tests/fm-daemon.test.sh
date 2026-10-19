@@ -475,8 +475,9 @@ PYRESET
     loops --present-overdue > /dev/null || fail "presentation $pass failed"
     escalate || fail "rows nobody could check wedged the away escalation on pass $pass"
     [ ! -s "$buffer" ] || fail "rows the deadline cut off reached the escalation digest on pass $pass"
-    ! receipted row-away-a && ! receipted row-away-b && ! receipted row-away-c \
-      || fail "rows the deadline cut off were given receipts on pass $pass"
+    if receipted row-away-a || receipted row-away-b || receipted row-away-c; then
+      fail "rows the deadline cut off were given receipts on pass $pass"
+    fi
   done
   python3 -c 'import json, sys; t = json.load(open(sys.argv[1]))["handling"]["attempts"]; sys.exit(not all(t.get("row-away-" + n) for n in "abc"))' "$state/open-loops.json" \
     || fail "the cut rows were not rotated behind the rows the pass never reached"

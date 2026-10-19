@@ -39,6 +39,7 @@ GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
 # One hard budget for a whole automatic-evidence pass: the wake drain holds its queue lock across it.
+# measured: value=5 date=2026-10-19 host=Mac-Studio.local margin=1.9x (slowest of five 10-row passes with the real fm-crew-state.sh was 2.55s; 74 rows reach the cap)
 EVIDENCE_DEADLINE_SECONDS = 5
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
 STOP_STATES = {"done", "parked", "paused"}
