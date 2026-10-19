@@ -1,0 +1,46 @@
+### ARM A: operator shell, --run 01M5AM1K6GPQZFWZJREQZDSDG4
+run:
+  id: "01M5AM1K6GPQZFWZJREQZDSDG4"
+  branch: fm/fm-dsh-tui-adoption
+  status: running
+  head: c5204a73
+  head_sha: c5204a735a99415eeb7a27d404ff96851589419b
+  verification_plan: none
+  findings: "1 awaiting, 1 auto-fix"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,107
+    rebase,completed,0,3783
+    review,completed,2,5286920
+    test,running,0,0
+    document,pending,0,0
+    lint,pending,0,0
+    push,pending,0,0
+    pr,pending,0,0
+    ci,pending,0,0
+  active_steps[1]{step,status,active_for,round_active_for,last_activity,agent_pid,round}:
+    test,running,3m30s,3m30s,"1s ago: claude producing output","82691",starting
+
+### ARM B: swapped empty HOME + NM_HOME + GIT_CONFIG_GLOBAL carried, --run 01M5AM1K6GPQZFWZJREQZDSDG4
+run:
+  id: "01M5AM1K6GPQZFWZJREQZDSDG4"
+  branch: fm/fm-dsh-tui-adoption
+  status: running
+  head: c5204a73
+  head_sha: c5204a735a99415eeb7a27d404ff96851589419b
+  verification_plan: none
+  findings: "1 awaiting, 1 auto-fix"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,107
+    rebase,completed,0,3783
+    review,completed,2,5286920
+    test,running,0,0
+    document,pending,0,0
+    lint,pending,0,0
+    push,pending,0,0
+    pr,pending,0,0
+    ci,pending,0,0
+  active_steps[1]{step,status,active_for,round_active_for,last_activity,agent_pid,round}:
+    test,running,3m32s,3m32s,"3s ago: claude producing output","82691",starting
+
+### ARM C: swapped empty HOME, NM_HOME unset, --run 01M5AM1K6GPQZFWZJREQZDSDG4
+error: "run \"01M5AM1K6GPQZFWZJREQZDSDG4\" not found"

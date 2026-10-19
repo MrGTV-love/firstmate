@@ -1,0 +1,9 @@
+ok - fm-harness: dsh detects by anchored name or script argv; the marker is a precedence override that needs real dsh ancestry
+ok - session lock and process classification: dsh is anchored, decoys stay out
+ok - fm_backend_tmux_agent_state: dsh is alive by name and by script argv, an unrelated node is not
+ok - fm_busy_classify: dsh follows the launch's own durable session log
+ok - fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default
+ok - fm-spawn: an explicit dsh pin is honored and a dsh launch without a DeepSeek model is refused
+ok - fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME
+ok - fm-spawn: config/session-launch-policy=omp-or-tc refuses a dsh launch with the policy's own message
+bash tests/fm-dsh-spawn.test.sh  7.41s user 18.04s system 12% cpu 3:27.35 total

@@ -1,0 +1,17 @@
+### ARM A: operator shell
+HOME=/Users/charlesabrooker NM_HOME=/Users/charlesabrooker/.no-mistakes
+  ● daemon running (pid 26547)
+error: repo not initialized (run 'no-mistakes init' first)
+help[1]: Run `no-mistakes init` to set up the gate in this repository
+
+### ARM B: swapped empty HOME + NM_HOME + GIT_CONFIG_GLOBAL carried
+HOME=/Users/charlesabrooker/tmp/dsh-home.vKmn8e NM_HOME=/Users/charlesabrooker/.no-mistakes
+  ● daemon running (pid 26547)
+error: repo not initialized (run 'no-mistakes init' first)
+help[1]: Run `no-mistakes init` to set up the gate in this repository
+
+### ARM C: swapped empty HOME, NM_HOME unset
+HOME=/Users/charlesabrooker/tmp/dsh-home.vKmn8e NM_HOME=<unset>
+  ○ daemon not running
+error: repo not initialized (run 'no-mistakes init' first)
+help[1]: Run `no-mistakes init` to set up the gate in this repository

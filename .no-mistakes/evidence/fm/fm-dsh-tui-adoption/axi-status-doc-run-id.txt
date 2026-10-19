@@ -1,0 +1,30 @@
+### ARM A: operator shell, --run 01M59ACR7C1VSYG5SEZHB7K7SW (run id cited in the doc)
+run:
+  id: "01M59ACR7C1VSYG5SEZHB7K7SW"
+  branch: fm/fm-dsh-tui-adoption
+  status: cancelled
+  head: f09cf534
+  head_sha: f09cf5340d8445255fb20aa73067922435a82bf4
+  verification_plan: none
+  pr: "https://github.com/MrGTV-love/firstmate/pull/182"
+  findings: "6 awaiting, 5 auto-fix, 3 info"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,65
+    rebase,completed,0,1649
+
+### ARM B: swapped empty HOME + NM_HOME + GIT_CONFIG_GLOBAL carried
+run:
+  id: "01M59ACR7C1VSYG5SEZHB7K7SW"
+  branch: fm/fm-dsh-tui-adoption
+  status: cancelled
+  head: f09cf534
+  head_sha: f09cf5340d8445255fb20aa73067922435a82bf4
+  verification_plan: none
+  pr: "https://github.com/MrGTV-love/firstmate/pull/182"
+  findings: "6 awaiting, 5 auto-fix, 3 info"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,65
+    rebase,completed,0,1649
+
+### ARM C: swapped empty HOME, NM_HOME unset
+error: "run \"01M59ACR7C1VSYG5SEZHB7K7SW\" not found"
