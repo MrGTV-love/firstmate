@@ -45,10 +45,11 @@
 #                      holds all of its copies.
 #   HELD-DIRTY         git status shows any change or untracked file, an
 #                      operation (rebase, merge, cherry-pick, revert, bisect) is
-#                      in progress, it holds an ignored entry that removal would
-#                      lose or an ignored list that cannot be read (the teardown
-#                      library's allow-list rule), or another registered copy
-#                      with an existing directory is inside it:
+#                      in progress, it is not locked and holds an ignored file
+#                      that exists nowhere else (the teardown library's rule; a
+#                      locked copy's are preserved before its release), or
+#                      another registered copy with an existing directory is
+#                      inside it:
 #                      a plain `git worktree remove` of the outer copy would
 #                      delete that inner copy and whatever it holds, and git
 #                      status cannot see it when `.claude/worktrees/` is ignored.
@@ -92,10 +93,13 @@
 # one is preserved and then released and removed by Vernant's own closeout
 # driver, run from that clone, exactly as bin/fm-teardown.sh does it. The
 # sweep's preserved ignored entries land in data/copy-sweep/nested-copy-preserved.
-# Never a force flag, never a recursive delete, never a hand unlock, never a
-# Treehouse call. A removal that fails leaves the copy and is
-# reported, and the run exits 1; it is not retried. Each removal appends one line
-# to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
+# Never a force flag, never a recursive delete of a copy, never a hand unlock,
+# never a Treehouse call. A removal that fails leaves the copy and is
+# reported with the refusal text of git or of the closeout driver, and the run
+# exits 1; it is not retried in that run, and the next run proves the copy again.
+# A removed copy is reported with the GiB it freed, and the run totals them (a
+# size that was not measured counts as none and is said so). Each removal
+# appends one line to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
 # in the same run is removed by the next run; a second run otherwise finds
 # nothing left to remove. Report mode (no flag) reads the size cache and writes
 # nothing; `check` writes only the size cache and the record (budgets and live copies).
@@ -658,18 +662,16 @@ classify() {  # <copy> <clone> <pool> <container>
       return 0
     fi
   done
-  # Every ignored entry removal would lose, by the teardown library's own
-  # allow-list: regenerable caches are excluded, everything else counts. A copy
-  # this sweep removes must first preserve them, so a listing failure keeps the
-  # copy rather than reading as "nothing to lose".
+  # A locked copy's ignored entries are preserved by its driver release, so only
+  # an unlocked copy is held for them; an unreadable list holds either kind.
   if ! unique=$(teardown_preservable_ignored "$copy"); then
-    CLASS=HELD-DIRTY
-    REASON="its ignored files cannot be listed for preservation"
+    CLASS=ORPHAN-NO-RECORD
+    REASON="its ignored files cannot be listed, so none is ruled out"
     return 0
   fi
   if [ "$locked" != 1 ] && [ -n "$unique" ]; then
     CLASS=HELD-DIRTY
-    REASON="it holds ignored files that removal would lose: $(printf '%s' "$unique" | tr '\n' ' ')"
+    REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 0
   fi
   while IFS= read -r inner; do
@@ -863,6 +865,8 @@ scan() {  # <mode>
 REMOVAL_REPORT=
 REMOVED_COUNT=0
 FAILED_COUNT=0
+FREED_KIB=0
+FREED_UNMEASURED=0
 
 log_removal() {  # <copy> <clone> <head> <branch> <kib> <proof>
   mkdir -p "$DATA_DIR" 2>/dev/null || return 1
@@ -892,10 +896,12 @@ teardown_driver_release() {  # <clone> <copy>
 # Vernant's closeout driver. A refusal leaves the copy and is reported, never
 # retried harder.
 apply_removals() {
-  local line container pool clone copy kib head branch err gone=
+  local line container pool clone copy kib head branch err refusal freed gone=
   REMOVAL_REPORT=
   REMOVED_COUNT=0
   FAILED_COUNT=0
+  FREED_KIB=0
+  FREED_UNMEASURED=0
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"
@@ -917,7 +923,8 @@ apply_removals() {
       # teardown library preserved every ignored entry it holds.
       if ! err=$(teardown_driver_release "$clone" "$copy" 2>&1); then
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"Vernant's closeout driver did not release the copy and it was left: $(printf '%s' "$err" | tail -1)"$'\n'
+        refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"the copy was left: $(printf '%s' "${refusal:-$err}" | tr '\n\t' '  ')"$'\n'
         continue
       fi
     elif ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
@@ -932,7 +939,17 @@ apply_removals() {
     fi
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
     gone="$gone$copy"$'\n'
-    REMOVAL_REPORT="${REMOVAL_REPORT}REMOVED"$'\t'"$copy"$'\t'"branch $branch at ${head:0:12} (${REASON})"$'\n'
+    case "$kib" in
+      ''|*[!0-9]*)
+        FREED_UNMEASURED=$((FREED_UNMEASURED + 1))
+        freed='size not measured'
+        ;;
+      *)
+        FREED_KIB=$((FREED_KIB + kib))
+        freed="$(kib_to_gib "$kib") GiB freed"
+        ;;
+    esac
+    REMOVAL_REPORT="${REMOVAL_REPORT}REMOVED"$'\t'"$copy"$'\t'"branch $branch at ${head:0:12}, $freed (${REASON})"$'\n'
     log_removal "$copy" "$clone" "$head" "$branch" "$kib" "$REASON" \
       || { FAILED_COUNT=$((FAILED_COUNT + 1)); REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it was removed but $REMOVAL_LOG could not be appended"$'\n'; }
   done < <(printf '%s\n' "$COPIES" | awk -F '\t' '$5 == "REAPABLE-PROVEN" || $5 == "REAPABLE-DRIVER"' | LC_ALL=C sort -t "$(printf '\t')" -k4,4r)
@@ -1239,6 +1256,11 @@ print_report() {  # <mode>
     count=$(printf '%s\n' "$COPIES" | awk -F '\t' -v c="$class" '$5 == c { n++ } END { print n + 0 }')
     printf 'summary: %s=%s\n' "$class" "$count"
   done
+  if [ "$1" = apply ]; then
+    printf 'summary: removed=%s freed=%s GiB' "$REMOVED_COUNT" "$(kib_to_gib "$FREED_KIB")"
+    [ "$FREED_UNMEASURED" -eq 0 ] || printf ' (%s removed with no measured size)' "$FREED_UNMEASURED"
+    printf '\n'
+  fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     printf '%s\n' "$line"

@@ -1965,7 +1965,8 @@ The values above are the built-in defaults for the lines that carry one, and a m
 A malformed file refuses the run and names its line.
 The script header owns how a budget is measured, when it is over, and when its wake fires.
 
-`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) is the only operator environment setting.
+`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) names the Treehouse root.
+`FM_TEARDOWN_VERNANT_PYTHON` (default `<clone>/.venv/bin/python`) names the interpreter that runs Vernant's closeout driver when `--apply` releases a locked copy, exactly as it does for teardown.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
 [`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
