@@ -88,6 +88,14 @@ new_home card-payload
 bind
 mirror card-payload
 python3 "$HELPER" card-payload "$(replay_file)"
+python3 -c 'print("\n".join("x" * 100 for _ in range(450)))' > "$FM_HOME/oversized.body"
+(cd "$FM_HOME" && tasks-axi add oversized-card "Oversized decision" --kind captain --repo sample --body-file "$FM_HOME/oversized.body" >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold oversized-card --reason "Select the release approach" >/dev/null
+mirror card-payload >/dev/null
+card=$(python3 "$HELPER" card-text "$(replay_file)" oversized-card)
+assert_contains "$card" 'Full decision remains in the local backlog.' "DOD-02 oversized card was not cut"
+assert_contains "$card" 'Reply in this thread with your answer.' "DOD-02 oversized card lost the reply instruction"
+assert_contains "$card" 'Messages typed in the main DM window are not read.' "DOD-02 oversized card lost the main-window note"
 printf 'ok - DOD-02\n'
 
 # DOD-03
@@ -113,6 +121,7 @@ new_home single-char-answer
 bind
 mirror single-char-answer >/dev/null
 assert_contains "$(python3 "$HELPER" cards "$(replay_file)")" 'Affordance: single-character' "DOD-04 single-character affordance"
+assert_contains "$(python3 "$HELPER" cards "$(replay_file)")" 'Reply in this thread with the option number.' "DOD-04 single-character reply place"
 out=$(poll single-char-answer)
 assert_eq "$(closed_count "$out")" 1 "DOD-04 single-char close count"
 assert_eq "$(answer_line single-call)" "wait" "DOD-04 single-char option value"
@@ -290,6 +299,7 @@ out=$(mirror missing-scope)
 assert_contains "$out" 'missing reaction scope: reactions:read, users:read' "DOD-14 scope diagnostic"
 cards=$(python3 "$HELPER" cards "$(replay_file)")
 assert_contains "$cards" 'Affordance: single-character' "DOD-14 affordance"
+assert_contains "$cards" 'Reply in this thread with the option number.' "DOD-14 reply place"
 out=$(poll missing-scope)
 assert_not_contains "$out" 'missing reaction scope' "DOD-14 diagnostic is once per state change"
 assert_contains "$out" 'closed: scope-call' "DOD-14 still answerable"
@@ -537,6 +547,7 @@ text_only_case() {  # <generated>
   assert_not_contains "$card" 'Options:' "X4 [$1] text-only card offered options"
   assert_not_contains "$card" 'React with' "X4 [$1] text-only card advertised taps"
   assert_contains "$card" 'Affordance: text' "X4 [$1] text-only affordance"
+  assert_contains "$card" 'Reply in this thread with your answer.' "X4 [$1] text-only reply place"
   ts=$(thread_field with-options ts)
   assert_eq "$(python3 "$HELPER" reaction-count "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" "$ts")" 0 "X4 [$1] seeded reactions"
   reply_to "$ts" 900.000099 1

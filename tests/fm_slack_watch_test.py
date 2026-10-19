@@ -41,11 +41,14 @@ def card_payload(path):
     assert set(cards) == {'with-options', 'no-options', 'no-recommendation'}, cards.keys()
     for key, text in cards.items():
         for part in ('Task: ', 'Decision: ', 'Recommendation: ', 'Evidence: ',
-                     'If you both tap and type:'):
+                     'If you both tap and type:', 'in this thread',
+                     'Messages typed in the main DM window are not read.'):
             assert part in text, (key, part)
     assert 'Recommendation: ship' in cards['with-options']
     assert 'Evidence: /tmp/evidence-with-options.md' in cards['with-options']
     assert 'Options:' in cards['with-options'] and '1. Ship it (ship)' in cards['with-options']
+    assert 'or reply in this thread with the option number.' in cards['with-options']
+    assert 'Reply in this thread with your answer.' in cards['no-options']
     assert 'Options:' not in cards['no-options']
     assert 'Recommendation: none recorded' in cards['no-recommendation']
     assert 'Evidence: none recorded' in cards['no-recommendation']

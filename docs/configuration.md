@@ -2948,6 +2948,7 @@ Arming is an intentional live operation that can open a DM; building or testing 
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
 Each card includes the task's title, hold reason and body (including its evidence links), plus current board-authored options/recommendation when available.
+Every card tells the captain to reply inside the card's thread and says that a message typed in the main DM window is not read, because only a thread reply maps to one decision.
 The mirror also reads explicit `Option N:`, `Recommendation:`, and `Evidence:` lines from the task body; other numbered lines stay in the card as plain text and are never options, and it does not infer options from arbitrary prose.
 An option written without a `(value)` records its label, never its hint, as the keyed answer.
 A board card (options, recommendation, evidence, close mode) is used only when the board was regenerated after the hold's recorded set time.

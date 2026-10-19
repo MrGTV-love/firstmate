@@ -41,11 +41,12 @@ Result: pass.
 
 Command: `fm-slack-mirror.sh --replay tests/fixtures/slack/card-payload/transcript.json`.
 
-Observed: three cards, each with `Task:`, `Decision:`, `Recommendation:`, `Evidence:`, and `If you both tap and type:`.
+Observed: three cards, each with `Task:`, `Decision:`, `Recommendation:`, `Evidence:`, a line telling the captain to reply in the thread, a line saying `Messages typed in the main DM window are not read.`, and `If you both tap and type:`.
 `with-options` carried `Recommendation: ship`, `Evidence: /tmp/evidence-with-options.md`, and a numbered option block.
 `no-options` carried no option block.
 `no-recommendation` rendered `Recommendation: none recorded` and `Evidence: none recorded` for its invalid evidence value.
 Exactly two `none recorded` occurrences appeared across the three cards.
+A fourth task with a 45,000-character body was cut to fit Slack's size limit; its card still ended with `Full decision remains in the local backlog.`, `Reply in this thread with your answer.`, and the main-window note.
 Result: pass.
 
 ## DOD-03 - typed reply through the existing intake

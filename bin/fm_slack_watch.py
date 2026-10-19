@@ -320,7 +320,13 @@ class Watch:
                 text.append(f"{i}. {option['label']} ({option['value']}){hint}")
         text.append('Affordance: ' + ('text' if not options else 'reaction' if usable else 'single-character'))
         if usable and options:
-            text.append('React with ' + '/'.join(REACTIONS[:len(options)]) + ' or type the option number.')
+            text.append('React with ' + '/'.join(REACTIONS[:len(options)])
+                        + ' or reply in this thread with the option number.')
+        elif options:
+            text.append('Reply in this thread with the option number.')
+        else:
+            text.append('Reply in this thread with your answer.')
+        text.append('Messages typed in the main DM window are not read.')
         text.append('If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.')
         if not usable:
             text.append('Missing reaction scope: ' + ', '.join(sorted(missing)) + '.')
@@ -473,7 +479,9 @@ class Watch:
                 card = {}
             text, options, usable = self.card_payload(row, card, text_only)
             if len(text.encode()) > 39000:
-                text = text[:38000] + '\nFull decision remains in the local backlog.'
+                text = (text[:38000] + '\nFull decision remains in the local backlog.'
+                        '\nReply in this thread with your answer.'
+                        '\nMessages typed in the main DM window are not read.')
             self.scope_notice()
             # Re-check immediately before the network post.
             again, current = self.probe(key)
