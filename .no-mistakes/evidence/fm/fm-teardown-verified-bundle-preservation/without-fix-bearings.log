@@ -1,0 +1,814 @@
+ok - a restarted bundle-preserved row is not a drop and is listed once it is really delivered
+not ok - a restarted bundle-preserved row closed with a plain done was marked as a drop: {
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-07-11T18:00:00Z",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/fixture-root",
+    "state": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state",
+    "data": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data",
+    "config": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/config",
+    "projects": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/projects"
+  },
+  "backlog": {
+    "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "reported": null,
+        "raw": "- [ ] ship-task - Ship the thing (repo: firstmate) (kind: ship) (since 2026-07-11)",
+        "body_excerpt": null,
+        "repo": "firstmate",
+        "blocked_reason": null,
+        "done": null,
+        "blocked_by_ids": [],
+        "captain_actionable": false,
+        "captain_drop": false,
+        "title": "Ship the thing",
+        "hold_set": null,
+        "state": "in_flight",
+        "report_path": null,
+        "current_role": "worker",
+        "kind": "ship",
+        "body_lines": [],
+        "blocked_by": null,
+        "order": 1,
+        "pr_url": null,
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "links": [],
+        "since": "2026-07-11",
+        "checked": false,
+        "structured": true,
+        "hold_reason": null,
+        "hold_age_days": 0,
+        "priority": null,
+        "hold_until": null,
+        "merged": null,
+        "hold_bucket": null,
+        "requires_child_metadata": true,
+        "hold_kind": null,
+        "unresolved_blocker_ids": [],
+        "local_note": null,
+        "id": "ship-task"
+      },
+      {
+        "body_lines": [],
+        "blocked_by": null,
+        "order": 2,
+        "report_path": "data/scout-x/report.md",
+        "kind": "scout",
+        "current_role": "worker",
+        "hold_set": null,
+        "state": "in_flight",
+        "blocked_by_ids": [],
+        "captain_actionable": false,
+        "captain_drop": false,
+        "title": "Investigate the thing",
+        "blocked_reason": null,
+        "done": null,
+        "repo": "firstmate",
+        "body_excerpt": null,
+        "reported": null,
+        "raw": "- [ ] scout-x - Investigate the thing data/scout-x/report.md (repo: firstmate) (kind: scout) (since 2026-07-11)",
+        "local_note": null,
+        "id": "scout-x",
+        "hold_kind": null,
+        "unresolved_blocker_ids": [],
+        "merged": null,
+        "hold_bucket": null,
+        "requires_child_metadata": true,
+        "priority": null,
+        "hold_until": null,
+        "structured": true,
+        "hold_reason": null,
+        "hold_age_days": 0,
+        "links": [],
+        "since": "2026-07-11",
+        "checked": false,
+        "pr_url": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        }
+      },
+      {
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "pr_url": null,
+        "since": null,
+        "links": [],
+        "checked": false,
+        "structured": true,
+        "hold_age_days": null,
+        "hold_reason": null,
+        "priority": null,
+        "hold_until": null,
+        "merged": null,
+        "hold_bucket": null,
+        "requires_child_metadata": false,
+        "hold_kind": null,
+        "unresolved_blocker_ids": [
+          "ship-task"
+        ],
+        "id": "live-gate",
+        "local_note": null,
+        "raw": "- [ ] live-gate - Real queued work blocked-by: ship-task (repo: firstmate) (kind: ship)",
+        "reported": null,
+        "repo": "firstmate",
+        "body_excerpt": null,
+        "done": null,
+        "blocked_reason": null,
+        "blocked_by_ids": [
+          "ship-task"
+        ],
+        "title": "Real queued work",
+        "captain_actionable": false,
+        "captain_drop": false,
+        "state": "queued",
+        "hold_set": null,
+        "report_path": null,
+        "kind": "ship",
+        "current_role": "queued",
+        "blocked_by": "ship-task",
+        "body_lines": [],
+        "order": 3
+      },
+      {
+        "repo": "firstmate",
+        "body_excerpt": "NOT REQUIRED - superseded 2026-07-11; kept as reference only.",
+        "blocked_reason": null,
+        "done": null,
+        "reported": null,
+        "raw": "- [ ] dead-gate - Old conditional work (repo: firstmate) (kind: scout)",
+        "kind": "scout",
+        "current_role": "queued",
+        "report_path": null,
+        "order": 4,
+        "blocked_by": null,
+        "body_lines": [
+          "NOT REQUIRED - superseded 2026-07-11; kept as reference only."
+        ],
+        "captain_actionable": false,
+        "title": "Old conditional work",
+        "captain_drop": false,
+        "blocked_by_ids": [],
+        "hold_set": null,
+        "state": "queued",
+        "hold_reason": null,
+        "hold_age_days": null,
+        "structured": true,
+        "hold_until": null,
+        "priority": null,
+        "pr_url": null,
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "checked": false,
+        "links": [],
+        "since": null,
+        "local_note": null,
+        "id": "dead-gate",
+        "hold_bucket": null,
+        "requires_child_metadata": false,
+        "merged": null,
+        "unresolved_blocker_ids": [],
+        "hold_kind": null
+      },
+      {
+        "repo": "firstmate",
+        "body_excerpt": "preserved in bundle /Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/bundles/kept.bundle, not landed",
+        "blocked_reason": null,
+        "done": "2026-10-19",
+        "reported": null,
+        "raw": "- [x] bundle-plain - Work a bundle held, then delivered (repo: firstmate) (kind: ship) (done 2026-10-19)",
+        "kind": "ship",
+        "current_role": "done",
+        "report_path": null,
+        "order": 5,
+        "body_lines": [
+          "preserved in bundle /Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/bundles/kept.bundle, not landed"
+        ],
+        "blocked_by": null,
+        "title": "Work a bundle held, then delivered",
+        "captain_actionable": false,
+        "captain_drop": true,
+        "blocked_by_ids": [],
+        "state": "done",
+        "hold_set": null,
+        "hold_reason": null,
+        "hold_age_days": null,
+        "structured": true,
+        "priority": null,
+        "hold_until": null,
+        "pr_url": null,
+        "completion": {
+          "date": "2026-10-19",
+          "verb": "done"
+        },
+        "checked": true,
+        "links": [],
+        "since": null,
+        "local_note": null,
+        "id": "bundle-plain",
+        "hold_bucket": null,
+        "requires_child_metadata": false,
+        "merged": null,
+        "unresolved_blocker_ids": [],
+        "hold_kind": null
+      },
+      {
+        "links": [
+          "https://github.com/kunchenguid/firstmate/pull/7"
+        ],
+        "since": null,
+        "checked": true,
+        "pr_url": "https://github.com/kunchenguid/firstmate/pull/7",
+        "completion": {
+          "date": "2026-07-10",
+          "verb": "merged"
+        },
+        "priority": null,
+        "hold_until": null,
+        "structured": true,
+        "hold_reason": null,
+        "hold_age_days": null,
+        "hold_kind": null,
+        "unresolved_blocker_ids": [],
+        "merged": "2026-07-10",
+        "requires_child_metadata": false,
+        "hold_bucket": null,
+        "local_note": null,
+        "id": "done-a",
+        "reported": null,
+        "raw": "- [x] done-a - Landed thing https://github.com/kunchenguid/firstmate/pull/7 (repo: firstmate) (kind: ship) (merged 2026-07-10)",
+        "blocked_reason": null,
+        "done": null,
+        "body_excerpt": null,
+        "repo": "firstmate",
+        "hold_set": null,
+        "state": "done",
+        "blocked_by_ids": [],
+        "captain_actionable": false,
+        "title": "Landed thing",
+        "captain_drop": false,
+        "body_lines": [],
+        "blocked_by": null,
+        "order": 6,
+        "report_path": null,
+        "kind": "ship",
+        "current_role": "done"
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "external-wait",
+      "kind": "ship",
+      "harness": "claude",
+      "mode": "no-mistakes",
+      "yolo": "",
+      "branch": null,
+      "project": "firstmate",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/external-wait.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/external-wait.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "paused",
+            "note": "declared external-wait for upstream release",
+            "raw": "paused: declared external-wait for upstream release",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/projects/ship-wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data/external-wait/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "paused",
+        "source": "status-log",
+        "detail": "declared external-wait for upstream release",
+        "raw": "state: paused · source: status-log · declared external-wait for upstream release",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-external-wait",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "paused: declared external-wait for upstream release"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-external-wait",
+        "steer": "bin/fm-send.sh fm-external-wait '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "mate",
+      "kind": "secondmate",
+      "harness": "codex",
+      "mode": "secondmate",
+      "yolo": "",
+      "branch": null,
+      "project": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close-secondmate-home",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/mate.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/mate.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "an unrelated subtask finished",
+            "raw": "done: an unrelated subtask finished",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close-secondmate-home",
+          "present": true
+        },
+        "home": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close-secondmate-home",
+          "present": true
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data/mate/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [
+        "firstmate"
+      ],
+      "current_state": {
+        "state": "parked",
+        "source": "status-log",
+        "detail": "pick subscribe order",
+        "raw": "state: parked · source: status-log · pick subscribe order",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-mate",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": true,
+        "blocked_event": false,
+        "open_decisions": [
+          {
+            "key": "race",
+            "verb": "needs-decision",
+            "summary": "pick subscribe order"
+          }
+        ],
+        "scout_report_present": false,
+        "last_event_text": "done: an unrelated subtask finished"
+      },
+      "actions": {
+        "send": "bin/fm-send.sh fm-mate '<request>'",
+        "watch": "read status/doc return channel; do not routinely fm-peek a secondmate for answers",
+        "return_channel_note": "Secondmate answers come back through status/doc paths after a marked fm-send request."
+      },
+      "backlog": null
+    },
+    {
+      "id": "scout-x",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "scout",
+      "yolo": "",
+      "branch": null,
+      "project": "firstmate",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/scout-x.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/scout-x.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "report ready",
+            "raw": "done: report ready",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/projects/ship-wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data/scout-x/report.md",
+          "present": true
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "done",
+        "source": "status-log",
+        "detail": "report ready",
+        "raw": "state: done · source: status-log · report ready",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-scout-x",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": true,
+        "last_event_text": "done: report ready"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-scout-x",
+        "steer": "bin/fm-send.sh fm-scout-x '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": {
+        "body_lines": [],
+        "blocked_by": null,
+        "order": 2,
+        "report_path": "data/scout-x/report.md",
+        "kind": "scout",
+        "current_role": "worker",
+        "hold_set": null,
+        "state": "in_flight",
+        "blocked_by_ids": [],
+        "captain_actionable": false,
+        "captain_drop": false,
+        "title": "Investigate the thing",
+        "blocked_reason": null,
+        "done": null,
+        "repo": "firstmate",
+        "body_excerpt": null,
+        "reported": null,
+        "raw": "- [ ] scout-x - Investigate the thing data/scout-x/report.md (repo: firstmate) (kind: scout) (since 2026-07-11)",
+        "local_note": null,
+        "id": "scout-x",
+        "hold_kind": null,
+        "unresolved_blocker_ids": [],
+        "merged": null,
+        "hold_bucket": null,
+        "requires_child_metadata": true,
+        "priority": null,
+        "hold_until": null,
+        "structured": true,
+        "hold_reason": null,
+        "hold_age_days": 0,
+        "links": [],
+        "since": "2026-07-11",
+        "checked": false,
+        "pr_url": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        }
+      }
+    },
+    {
+      "id": "ship-task",
+      "kind": "ship",
+      "harness": "claude",
+      "mode": "no-mistakes",
+      "yolo": "",
+      "branch": null,
+      "project": "firstmate",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/ship-task.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/state/ship-task.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "building the thing",
+            "raw": "working: building the thing",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/projects/ship-wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data/ship-task/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "working",
+        "source": "pane",
+        "detail": "harness busy (claude-hook)",
+        "raw": "state: working · source: pane · harness busy (claude-hook)",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-ship-task",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-07-11T18:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": "https://github.com/kunchenguid/firstmate/pull/9",
+        "source": "meta",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working: building the thing"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-ship-task",
+        "steer": "bin/fm-send.sh fm-ship-task '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": {
+        "reported": null,
+        "raw": "- [ ] ship-task - Ship the thing (repo: firstmate) (kind: ship) (since 2026-07-11)",
+        "body_excerpt": null,
+        "repo": "firstmate",
+        "blocked_reason": null,
+        "done": null,
+        "blocked_by_ids": [],
+        "captain_actionable": false,
+        "captain_drop": false,
+        "title": "Ship the thing",
+        "hold_set": null,
+        "state": "in_flight",
+        "report_path": null,
+        "current_role": "worker",
+        "kind": "ship",
+        "body_lines": [],
+        "blocked_by": null,
+        "order": 1,
+        "pr_url": null,
+        "completion": {
+          "date": null,
+          "verb": null
+        },
+        "links": [],
+        "since": "2026-07-11",
+        "checked": false,
+        "structured": true,
+        "hold_reason": null,
+        "hold_age_days": 0,
+        "priority": null,
+        "hold_until": null,
+        "merged": null,
+        "hold_bucket": null,
+        "requires_child_metadata": true,
+        "hold_kind": null,
+        "unresolved_blocker_ids": [],
+        "local_note": null,
+        "id": "ship-task"
+      }
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 2,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 2,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": false,
+    "proven_clear": false,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [
+    {
+      "id": "scout-x",
+      "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data/scout-x/report.md",
+      "kind": "scout"
+    }
+  ],
+  "secondmate_current": {
+    "registry": {
+      "present": true,
+      "available": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-07-11T18:00:00Z"
+      },
+      "records": [
+        {
+          "id": "mate",
+          "home": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close-secondmate-home",
+          "host": null,
+          "root": null,
+          "remote": false,
+          "registered": true,
+          "registry_error": null
+        }
+      ],
+      "input_truncated": false,
+      "records_truncated": false,
+      "complete": true,
+      "reasons": [],
+      "lines_in_window": 1,
+      "records_in_window": 1
+    },
+    "records": [
+      {
+        "id": "mate",
+        "home": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close-secondmate-home",
+        "host": null,
+        "remote": false,
+        "registered": true,
+        "spawn_gen": null,
+        "current": {
+          "state": "unknown",
+          "reason": "structured home ledger is missing, unreadable, or invalid"
+        },
+        "invalidity": null,
+        "reconcile_inventory": null,
+        "provenance": {
+          "selected": "parent-event-fallback",
+          "structured_home": "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close-secondmate-home",
+          "parent_event_role": "fallback-only-not-current"
+        },
+        "freshness": {
+          "status": "historical-event",
+          "observed_at": "2026-07-11T18:00:00Z",
+          "age_seconds": 0
+        },
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [],
+        "landed": [],
+        "endpoints": [],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 0,
+          "landed": 0,
+          "endpoints": 0
+        },
+        "omitted": [],
+        "parent_event": {
+          "raw": "done: an unrelated subtask finished",
+          "note": "an unrelated subtask finished",
+          "age_seconds": null,
+          "open_activities": [],
+          "open_decisions": [
+            {
+              "key": "race",
+              "verb": "needs-decision",
+              "summary": "pick subscribe order"
+            }
+          ],
+          "activity_scan": {
+            "records": [],
+            "available": true,
+            "input_truncated": false,
+            "retained_truncated": false,
+            "reasons": [],
+            "lines_in_window": 2,
+            "records_in_window": 0
+          }
+        },
+        "terminal_evidence": {
+          "provenance": "parent-direct-report-terminal",
+          "trust": "untrusted-supplement",
+          "captured": true,
+          "observed_at": "2026-07-11T18:00:00Z",
+          "freshness": "fresh",
+          "reason": null,
+          "lines": 2,
+          "bytes": 12,
+          "event_note_seen": false,
+          "contradiction": false
+        },
+        "contradiction": false
+      }
+    ],
+    "total_registered": 1,
+    "total": 1,
+    "shown": 1,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [
+      "/Users/charlesabrooker/tmp/fm-bearings.nUyi1B/bundle-preserved-plain-close-secondmate-home"
+    ],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

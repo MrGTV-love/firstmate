@@ -1,0 +1,13 @@
+=== S1: bundle close -> restart -> plain done
+after bundle close: state=done body="preserved in bundle /Users/charlesabrooker/tmp/fm-lab.uEFPkA/bundles/kept.bundle, not landed"
+snapshot: {"id":"live-a","state":"done","captain_drop":true,"pr_url":null,"report_path":null}
+after restart:      state=in_flight body="Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.uEFPkA/bundles/kept.bundle, not landed"
+after plain done:   state=done body="Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.uEFPkA/bundles/kept.bundle, not landed"
+snapshot: {"id":"live-a","state":"done","captain_drop":false,"pr_url":null,"report_path":null}
+=== S2: bundle close only (no restart) stays a drop
+snapshot: {"id":"live-b","state":"done","captain_drop":true,"pr_url":null,"report_path":null}
+=== S4: two bundle cycles
+after 2nd bundle close: body="Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.uEFPkA/bundles/kept.bundle, not landed\npreserved in bundle /Users/charlesabrooker/tmp/fm-lab.uEFPkA/bundles/second.bundle, not landed"
+snapshot: {"id":"live-c","state":"done","captain_drop":true,"pr_url":null,"report_path":null}
+after 2nd restart:      body="Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.uEFPkA/bundles/kept.bundle, not landed\nHistorical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.uEFPkA/bundles/second.bundle, not landed"
+snapshot after plain done: {"id":"live-c","state":"done","captain_drop":false,"pr_url":null,"report_path":null}

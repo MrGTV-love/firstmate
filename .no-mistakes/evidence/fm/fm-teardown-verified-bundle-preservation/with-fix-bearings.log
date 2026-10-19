@@ -1,0 +1,4 @@
+ok - a restarted bundle-preserved row is not a drop and is listed once it is really delivered
+ok - a restarted bundle-preserved row closed with a plain done is not a drop and is listed as landed
+ok - landed excludes rows closed on a bundle alone while real deliveries stay
+nice -n 20 bash tests/.tmp-run-bearings.sh  8.46s user 15.63s system 64% cpu 37.295 total

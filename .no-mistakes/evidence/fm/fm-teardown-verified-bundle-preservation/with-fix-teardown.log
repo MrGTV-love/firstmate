@@ -1,0 +1,6 @@
+ok - a ship kept only by a verified bundle closes its backlog row as preserved in that bundle, not landed
+ok - ledger on: a ship kept only by a verified bundle records a close with no landing evidence
+ok - a pushed copy whose only local-only commits sit on a side branch still needs its delivery proof
+ok - a bundle changed after admission is rejected before copy removal
+ok - a verified bundle never excuses uncommitted changes
+nice -n 20 bash tests/fm-teardown.test.sh       15.30s user 24.22s system 76% cpu 51.394 total

@@ -1,0 +1,2 @@
+=== bearings --json --all-landed (live lab home, with fix)
+{"landed":[{"id":"live-c","artifact":"-"},{"id":"live-a","artifact":"-"}]}

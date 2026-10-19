@@ -1,0 +1,18 @@
+=== E1 indented + trailing spaces
+before start [e1]: "  preserved in bundle /x/y.bundle, not landed   "
+after  start [e1]: "  Historical preserved in bundle /x/y.bundle, not landed   "
+=== E2 mid-line mention is untouched
+before start [e2]: "see preserved in bundle /x/y.bundle, not landed for details"
+after  start [e2]: "see preserved in bundle /x/y.bundle, not landed for details"
+=== E3 relative path is untouched (snapshot rule requires a leading slash)
+before start [e3]: "preserved in bundle rel/y.bundle, not landed"
+after  start [e3]: "preserved in bundle rel/y.bundle, not landed"
+=== E4 comma-containing path
+before start [e4]: "preserved in bundle /x/a, not landed.bundle, not landed"
+after  start [e4]: "Historical preserved in bundle /x/a, not landed.bundle, not landed"
+=== E5 note with another line around it
+before start [e5]: "First line\npreserved in bundle /x/y.bundle, not landed\nLast line"
+after  start [e5]: "First line\nHistorical preserved in bundle /x/y.bundle, not landed\nLast line"
+=== E6 reopen path (done row -> reopen) retires too
+before reopen [e6]: "preserved in bundle /x/y.bundle, not landed"
+after  reopen [e6]: state=queued "Historical preserved in bundle /x/y.bundle, not landed"
