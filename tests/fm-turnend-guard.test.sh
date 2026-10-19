@@ -1057,6 +1057,7 @@ function invoke(registration, home, context, payload) {
     XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
     FM_HOME: home, FM_CONFIG_OVERRIDE: path.join(home, 'config'), FM_STATE_OVERRIDE: path.join(home, 'state'),
     CLAUDE_PROJECT_DIR: home, CLAUDECODE: '1', FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
+    FM_CD_GUARD_MODE: 'deny', // This consumer matrix exercises blocking authorizations.
     FM_CLAUDE_AUTOARM_SYNC_WAIT_MS: '100', FM_CLAUDE_AUTOARM_ATTEMPTS: '1',
   };
   if (home === task || context === 'task-marker') env.FM_TASK_ID = 'config-consumer-task';
