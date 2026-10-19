@@ -594,9 +594,20 @@ test_spawn_fixed_family_contract() {
       assert_equals '{"default":[],"openai-codex/gpt-6.1-sol":[],"openai-codex/gpt-6.1-sol:high":[]}' \
         "$(jq -c .retry.fallbackChains "$overlay")" "relaunch must retain empty model and effort chains"
       assert_grep 'fixed_family=on' "$HOME_DIR/state/$id.meta" "relaunch must retain fixed-family posture"
+      out=$(FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" \
+        FM_DATA_OVERRIDE="$HOME_DIR/data" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
+        "$ROOT/bin/fm-promote.sh" "$id" --mode local-only --yolo off 2>&1)
+      expect_code 0 $? "promoting a fixed-family scout should succeed: $out"
+      assert_grep 'kind=ship' "$HOME_DIR/state/$id.meta" "promotion must make the task a ship"
+      assert_no_grep 'fixed_family=' "$HOME_DIR/state/$id.meta" "a ship must not keep the scout-only fixed-family posture"
+      out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" \
+        --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1)
+      expect_code 0 $? "a promoted fixed-family scout must stay relaunchable: $out"
+      assert_equals '["deepseek/deepseek-v4-flash:high"]' \
+        "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6.1-sol:high"]' "$overlay")" "a promoted ship relaunches with ordinary chains"
     fi
   done
-  pass "fixed-family empties native chains and survives relaunch"
+  pass "fixed-family empties native chains, survives relaunch, and is dropped on promotion"
 }
 
 test_spawn_fixed_family_scope() {

@@ -370,8 +370,10 @@
 #   accept it as a no-op with a notice; a raw launch command is refused,
 #   because it carries no per-task overlay to empty. The task records
 #   fixed_family=on and
-#   relaunch inherits it. Dispatch-time selection and default chains do not
-#   change; this controls only the per-task omp runtime fallback overlay.
+#   relaunch inherits it; bin/fm-promote.sh drops it when the scout becomes a
+#   ship, so the ship relaunches with ordinary chains. Dispatch-time selection
+#   and default chains do not change; this controls only the per-task omp
+#   runtime fallback overlay.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
 #   to high (ultra is refused for omp before launch), disables
