@@ -64,14 +64,15 @@ If a genuinely ambiguous command shape is found that risks a false block, the gu
 
 ## Stable reason code
 
-Every warning and deny carries the same stable code in square brackets before its unchanged prose reason.
-The legacy reason still says "is blocked" so `deny` mode preserves the original response byte for byte; the permission decision and exit status distinguish a warning from a block.
+Every warning and deny carries the same stable code in square brackets before its prose reason.
+`deny` mode keeps the original reason, which says the directory change "is blocked", so its response is unchanged byte for byte.
+`warn` mode uses its own reason, because the command has already run: it says the directory change already ran and the shell is now outside the firstmate home, then names `git -C <dir>`, an absolute path on the command itself, `(cd <dir> && ...)`, and `cd` back to the firstmate home.
 
 | Code | Meaning |
 | --- | --- |
 | `persistent-cd` | A top-level `cd`/`pushd`/`popd` would persistently change the primary shell's own working directory. |
 
-The reason directs the caller to reach the target without moving the shell by using `git -C <dir>`, placing an absolute path on the intended command itself, or scoping the `cd` to a subshell.
+Both reasons direct the caller to reach the target without moving the shell by using `git -C <dir>`, placing an absolute path on the intended command itself, or scoping the `cd` to a subshell.
 An absolute-path `cd /home/project` remains a persistent directory change, so it receives the correction rather than a silent allow.
 
 ## Transport and fail-open behavior
@@ -95,14 +96,20 @@ A broken hook must never deny every shell tool call.
 ## Output contract
 
 - Silent allow (and inert-outside-primary) returns exit 0 with both streams empty.
-- Warn returns exit 0, keeps stdout empty, and writes `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"},"systemMessage":"[persistent-cd] reason"}` to stderr.
-- With `--cursor`, warn instead writes `{"permission":"allow","user_message":"[persistent-cd] reason"}` to stdout and keeps stderr empty.
+- Warn returns exit 0, keeps stderr empty, and writes `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] warn reason"},"systemMessage":"[persistent-cd] warn reason"}` to stdout.
+- The warn object carries no `permissionDecision`.
+- With `--cursor`, warn instead writes `{"permission":"allow","user_message":"[persistent-cd] warn reason"}` to stdout and keeps stderr empty.
 - In `deny` mode, the original output is unchanged: exit 2 and `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] reason"}` on stderr, plus `{"decision":"deny","reason":"[persistent-cd] reason"}` on stdout for Grok unless `--claude` suppresses stdout.
 - With `--cursor`, deny instead returns exit 0 with `{"permission":"deny","user_message":"[persistent-cd] reason"}` on stdout and stderr empty, because Cursor reads the permission object rather than the exit status.
-- Claude's stdout stays empty in both modes.
+- Claude's stdout stays empty in `deny` mode.
 - Codex blocks on exit 2 and displays stderr.
 - OpenCode throws only when the checker exits 2.
 - Pi, pi-signed, and omp return `{block: true}` only when the checker exits 2.
+
+The warn shape departs from the original work order, which specified an `allow` object on stderr with stdout empty.
+A successful exit does not deliver stderr, and a `permissionDecision` of `allow` would auto-approve the `cd`, so warn prints `systemMessage` and `additionalContext` on stdout with no permission decision.
+Delivery of the warning to the model or the user is not proven live in any harness.
+The OpenCode, Pi, pi-signed, and omp adapters act only on exit 2 and never read the checker's stdout on exit 0, so they do not forward the warning.
 
 ## Shared classifier ownership
 
@@ -131,7 +138,7 @@ Every shell variable reference in the Grok hook command carries an inline defaul
 ## Automated validation
 
 `tests/fm-cd-pretool-check.test.sh` owns the acceptance matrix.
-Every classified and silent-allow case runs through Codex-shaped stdin, Claude-shaped stdin, Grok-shaped stdin, OpenCode-shaped CLI, Pi-shaped CLI, and Cursor-shaped stdin entry forms with the mode unset, `warn`, and `deny`.
+Every classified and silent-allow case runs through Codex-shaped stdin, Claude-shaped stdin, Grok-shaped stdin, OpenCode-shaped CLI, Pi-shaped CLI, and Cursor-shaped stdin entry forms with the mode unset and with `deny`; an explicit `warn` is spot-checked on `cd projects/foo` for each entry form, because it takes the same path as the unset default.
 The suite also proves the end-to-end cwd-leak regression in `deny` mode (a firstmate-owned backlog write leaking into a project clone, then denied at the exact command), the checkout scoping (fires in a git-cloned secondmate fixture, inert in a crewmate/scout linked worktree, inert outside a firstmate checkout, inert outside a git repo), the fail-open transport behavior, the prefilter fast path, the policy CLI output contract, and the per-harness wiring.
 
 Run:

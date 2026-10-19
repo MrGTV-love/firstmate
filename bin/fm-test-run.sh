@@ -605,7 +605,7 @@ tests/fm-captain-hold-keyed-answers.test.sh 257148
 tests/fm-captain-hold-lifecycle.test.sh 264427
 tests/fm-captain-hold-reconcile.test.sh 247202
 tests/fm-captain-hold-sweep.test.sh 199013
-tests/fm-cd-pretool-check.test.sh 19264
+tests/fm-cd-pretool-check.test.sh 47335
 tests/fm-composer-ghost.test.sh 2912
 tests/fm-composer-lib.test.sh 218757
 tests/fm-crew-state.test.sh 80671

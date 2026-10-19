@@ -5,9 +5,10 @@
 // A stray persistent top-level `cd projects/<clone>` silently relocates the
 // primary shell, so the next firstmate-owned command (a backlog write, an
 // fm-* lifecycle call, tasks-axi) runs inside a project clone instead of the
-// home. This policy blocks exactly that class of command; the environmental
-// scoping to the real primary checkout lives in the bin/fm-cd-pretool-check.sh
-// transport, not here. See docs/cd-guard.md for the full contract.
+// home. This policy warns about exactly that class of command, or denies it
+// when FM_CD_GUARD_MODE=deny; the environmental scoping to the real primary
+// checkout lives in the bin/fm-cd-pretool-check.sh transport, not here. See
+// docs/cd-guard.md for the full contract.
 //
 // The shell tokenizer and command-position analysis are imported from
 // bin/fm-arm-command-policy.mjs, the sole owner of firstmate's shell
@@ -22,6 +23,12 @@ import { fileURLToPath } from "node:url";
 const REASONS = {
   "persistent-cd":
     "a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).",
+};
+
+// The warn decision lets the command run, so its text must not claim a block.
+const WARN_REASONS = {
+  "persistent-cd":
+    "a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).",
 };
 
 // Directory-changing builtins that mutate the calling shell's own cwd.
@@ -51,7 +58,7 @@ function deny(code) {
 }
 
 function warn(code) {
-  return { decision: "warn", code, reason: REASONS[code] };
+  return { decision: "warn", code, reason: WARN_REASONS[code] };
 }
 
 function hasPathQualifiedCommandPrefix(position) {
@@ -72,7 +79,7 @@ function hasCommandQueryPrefix(position) {
   return false;
 }
 
-function decision(command) {
+function decision(command, mode = "warn") {
   const lexed = new Lexer(command).tokenize();
   // Fail open on syntax this classifier cannot tokenize. The cd-guard's threat
   // model is agent mistakes - an accidental bare `cd projects/foo` always
@@ -98,7 +105,7 @@ function decision(command) {
     if (!command) continue;
     if (!CD_BUILTINS.has(command.value)) continue;
     if (position.wrappers.some((wrapper) => FORKING_WRAPPERS.has(wrapper))) continue;
-    return warn("persistent-cd");
+    return mode === "deny" ? deny("persistent-cd") : warn("persistent-cd");
   }
   return { decision: "allow" };
 }
@@ -141,7 +148,7 @@ if (invokedDirectly()) {
     if (!args.commandSet || !args.command) {
       process.stdout.write("allow\n");
     } else {
-      const result = decision(args.command);
+      const result = decision(args.command, process.env.FM_CD_GUARD_MODE === "deny" ? "deny" : "warn");
       if (result.decision === "allow") {
         process.stdout.write("allow\n");
       } else {

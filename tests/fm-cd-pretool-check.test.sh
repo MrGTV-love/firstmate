@@ -2,10 +2,10 @@
 # shellcheck disable=SC1091,SC2016
 # Behavior tests for the cd-guard PreToolUse seatbelt (docs/cd-guard.md).
 #
-# bin/fm-cd-command-policy.mjs is the single owner of the block/allow decision;
+# bin/fm-cd-command-policy.mjs is the single owner of the warn/deny/allow decision;
 # it reuses the shell classifier owned by bin/fm-arm-command-policy.mjs.
 # bin/fm-cd-pretool-check.sh is the stable transport: it scopes the guard to the
-# real primary checkout, then drives all five harness entry forms. This suite
+# real primary checkout, then drives all six harness entry forms. This suite
 # proves the decision matrix, the harness-output shaping, the primary-checkout
 # scoping (including the deliberate secondmate-home difference from the turn-end
 # guard), the fail-open transport behavior, the prefilter fast path, the
@@ -191,34 +191,50 @@ run_matrix_entry() {
     return
   fi
 
-  local permission=allow expected_rc=0 message_file=$err_file
-  if [ "$mode" = deny ]; then
-    permission=deny
-    [ "$entry" = cursor ] || expected_rc=2
+  local expected_rc=0 message_file=$out_file
+  if [ "$mode" = deny ] && [ "$entry" != cursor ]; then
+    expected_rc=2
+    message_file=$err_file
   fi
-  expect_code "$expected_rc" "$rc" "$id via $entry in $mode mode"
-  if [ "$entry" = cursor ]; then
-    [ ! -s "$err_file" ] || fail "$id via cursor must leave stderr empty"
-    message_file=$out_file
-    jq -e --arg permission "$permission" '
-      .permission == $permission and
-      (.user_message | contains("[persistent-cd]") and contains("git -C")) and
-      (keys == ["permission", "user_message"])
-    ' "$out_file" >/dev/null 2>&1 || fail "$id via cursor lacks its $permission correction object"
-  else
-    jq -e --arg permission "$permission" '
-      .hookSpecificOutput == {hookEventName:"PreToolUse",permissionDecision:$permission} and
-      (.systemMessage | contains("[persistent-cd]") and contains("git -C")) and
-      (keys == ["hookSpecificOutput", "systemMessage"])
-    ' "$err_file" >/dev/null 2>&1 || fail "$id via $entry lacks its $permission correction object"
-    if [ "$entry" = claude ] || [ "$mode" != deny ]; then
-      [ ! -s "$out_file" ] || fail "$id via $entry in $mode mode must leave stdout empty"
+  if [ "$mode" = deny ]; then
+    if [ "$entry" = cursor ]; then
+      [ ! -s "$err_file" ] || fail "$id via cursor must leave stderr empty"
+      jq -e '
+        .permission == "deny" and
+        (.user_message | contains("[persistent-cd]") and contains("git -C") and contains("is blocked")) and
+        (keys == ["permission", "user_message"])
+      ' "$out_file" >/dev/null 2>&1 || fail "$id via cursor lacks its deny correction object"
     else
-      jq -e --arg reason "$(jq -r .systemMessage "$err_file")" \
-        '. == {decision:"deny",reason:$reason}' "$out_file" >/dev/null 2>&1 \
-        || fail "$id via $entry deny must preserve the Grok object"
+      jq -e '
+        .hookSpecificOutput == {hookEventName:"PreToolUse",permissionDecision:"deny"} and
+        (.systemMessage | contains("[persistent-cd]") and contains("git -C") and contains("is blocked")) and
+        (keys == ["hookSpecificOutput", "systemMessage"])
+      ' "$err_file" >/dev/null 2>&1 || fail "$id via $entry lacks its deny correction object"
+      if [ "$entry" = claude ]; then
+        [ ! -s "$out_file" ] || fail "$id via claude deny must leave stdout empty"
+      else
+        jq -e --arg reason "$(jq -r .systemMessage "$err_file")" \
+          '. == {decision:"deny",reason:$reason}' "$out_file" >/dev/null 2>&1 \
+          || fail "$id via $entry deny must preserve the Grok object"
+      fi
+    fi
+  else
+    [ ! -s "$err_file" ] || fail "$id via $entry in $mode mode must leave stderr empty: $(cat "$err_file")"
+    if [ "$entry" = cursor ]; then
+      jq -e '
+        .permission == "allow" and
+        (.user_message | contains("[persistent-cd]") and contains("git -C") and contains("already ran") and contains("cd back") and (contains("is blocked") | not)) and
+        (keys == ["permission", "user_message"])
+      ' "$out_file" >/dev/null 2>&1 || fail "$id via cursor lacks its warn correction object: $(cat "$out_file")"
+    else
+      jq -e '
+        (.systemMessage | contains("[persistent-cd]") and contains("git -C") and contains("absolute path") and contains("(cd <dir> && ...)") and contains("already ran") and contains("cd back") and (contains("is blocked") | not)) and
+        .hookSpecificOutput == {hookEventName:"PreToolUse",additionalContext:.systemMessage} and
+        (keys == ["hookSpecificOutput", "systemMessage"])
+      ' "$out_file" >/dev/null 2>&1 || fail "$id via $entry lacks its warn correction object: $(cat "$out_file")"
     fi
   fi
+  expect_code "$expected_rc" "$rc" "$id via $entry in $mode mode"
   if [ "$id" = B01 ] && { [ "$entry" = claude ] || [ "$entry" = cursor ]; }; then
     pass "cd-guard: $entry $mode mode exit=$rc correction=$(cat "$message_file")"
   fi
@@ -226,7 +242,7 @@ run_matrix_entry() {
 
 test_full_acceptance_matrix() {
   local i entry mode
-  for mode in default warn deny; do
+  for mode in default deny; do
     if [ "$mode" = default ]; then
       unset FM_CD_GUARD_MODE
     else
@@ -238,8 +254,12 @@ test_full_acceptance_matrix() {
       done
     done
   done
+  export FM_CD_GUARD_MODE=warn
+  for entry in codex claude grok opencode pi cursor; do
+    run_matrix_entry B01 deny "$entry" 'cd projects/foo' warn
+  done
   unset FM_CD_GUARD_MODE
-  pass "cd-guard acceptance matrix: ${#MATRIX_IDS[@]} cases x 6 harness entry forms x 3 modes, warning/deny/silent allow all correct"
+  pass "cd-guard acceptance matrix: ${#MATRIX_IDS[@]} cases x 6 harness entry forms in default and deny modes, explicit warn spot-checked, warning/deny/silent allow all correct"
 }
 
 # --- primary-checkout scoping ----------------------------------------------
@@ -250,8 +270,8 @@ test_fires_in_secondmate_home() {
   out=$("$dir/bin/fm-cd-pretool-check.sh" --claude --command 'cd projects/foo' 2>&1); rc=$?
   expect_code 0 "$rc" "cd-guard must warn in a secondmate's own primary session (unlike the turn-end guard)"
   assert_contains "$out" '[persistent-cd]' "secondmate-home warning must carry the reason code"
-  printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "allow"' >/dev/null \
-    || fail "secondmate-home warning must allow the command"
+  printf '%s' "$out" | jq -e '.hookSpecificOutput | has("permissionDecision") | not' >/dev/null \
+    || fail "secondmate-home warning must not carry a permission decision"
   pass "cd-guard: fires in a secondmate home (its own primary session is a primary)"
 }
 
@@ -402,13 +422,19 @@ test_policy_cli_direct() {
   policy="$ROOT/bin/fm-cd-command-policy.mjs"
   [ "$(node "$policy" --command 'cd projects/foo' | cut -f1)" = warn ] \
     || fail "policy CLI must warn for a bare top-level cd"
+  [ "$(node "$policy" --command 'cd projects/foo' | cut -f3 | grep -c 'already ran')" -eq 1 ] \
+    || fail "policy CLI warn reason must say the directory change already ran"
+  [ "$(FM_CD_GUARD_MODE=deny node "$policy" --command 'cd projects/foo' | cut -f1)" = deny ] \
+    || fail "policy CLI must deny a bare top-level cd in deny mode"
+  [ "$(FM_CD_GUARD_MODE=deny node "$policy" --command 'cd projects/foo' | cut -f3 | grep -c 'is blocked')" -eq 1 ] \
+    || fail "policy CLI deny reason must say the directory change is blocked"
   [ "$(node "$policy" --command 'git -C projects/foo status')" = allow ] \
     || fail "policy CLI must allow git -C"
   [ "$(node "$policy" --command '(cd projects/foo && pwd)')" = allow ] \
     || fail "policy CLI must allow a subshell-local cd"
   [ "$(node "$policy")" = allow ] \
     || fail "policy CLI must allow when no command is supplied"
-  pass "cd-guard: fm-cd-command-policy.mjs CLI honors the warn/allow output contract"
+  pass "cd-guard: fm-cd-command-policy.mjs CLI honors the warn/deny/allow output contract"
 }
 
 # --- per-harness wiring -----------------------------------------------------

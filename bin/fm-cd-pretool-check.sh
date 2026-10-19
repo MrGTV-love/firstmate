@@ -24,9 +24,10 @@
 #
 # Exit/output contract (FM_CD_GUARD_MODE=warn by default; deny restores blocks):
 #   ALLOW - exit 0 and no output.
-#   WARN - exit 0, a Claude-shaped allow object with systemMessage on stderr,
-#          and stdout empty; --cursor uses permission=allow and user_message
-#          on stdout instead.
+#   WARN - exit 0, stderr empty, and a systemMessage plus
+#          hookSpecificOutput.additionalContext object on stdout with no
+#          permissionDecision, because an allow would auto-approve the command;
+#          --cursor uses permission=allow and user_message on stdout instead.
 #   DENY - exit 2, a Claude-shaped deny object on stderr, and a Grok-shaped
 #          deny object on stdout unless --claude was supplied.
 #   DENY, --cursor - exit 0 and Cursor's own decision object on stdout. Cursor
@@ -57,9 +58,10 @@ toolInput.command, or Claude/Codex tool_input.command).
 Fires only in the real primary firstmate checkout; it is a silent no-op in a
 crewmate/scout task worktree or any non-firstmate repo.
 FM_CD_GUARD_MODE=warn (default) allows persistent top-level cwd changes with a
-correction message on stderr and stdout empty. Set FM_CD_GUARD_MODE=deny to
-restore exit 2 and the original deny response on stderr, with a Grok decision
-object on stdout unless --claude is supplied.
+correction message on stdout (systemMessage and additionalContext, no
+permissionDecision) and exit 0. Set FM_CD_GUARD_MODE=deny to restore exit 2 and
+the original deny response on stderr, with a Grok decision object on stdout
+unless --claude is supplied.
 With --cursor, warnings use permission=allow and user_message on stdout.
 With --cursor, a deny is Cursor's own decision object on stdout and exit 0,
 because Cursor reads the returned object rather than the exit status.
@@ -189,11 +191,11 @@ json_escape() {
 
 DETAIL="[$CODE] $REASON"
 ESCAPED=$(json_escape "$DETAIL")
-if [ "$DECISION" = warn ] && [ "${FM_CD_GUARD_MODE:-warn}" != deny ]; then
+if [ "$DECISION" = warn ]; then
   if [ "$CURSOR_MODE" -eq 1 ]; then
     printf '{"permission":"allow","user_message":"%s"}\n' "$ESCAPED"
   else
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"},"systemMessage":"%s"}\n' "$ESCAPED" >&2
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"%s"},"systemMessage":"%s"}\n' "$ESCAPED" "$ESCAPED"
   fi
   exit 0
 fi
