@@ -11307,6 +11307,83 @@ SH
   pass "a copy not held because a process of the closing task runs in it, or launched its lock, is refused naming that process, and nothing is signalled or removed"
 }
 
+# A landing check that could not run is not a copy that is not landed: when
+# fetching the default branch fails, the copy is refused, never held, so a
+# rerun can check again and release a copy that did land.
+test_a_foreign_copy_whose_landing_could_not_be_checked_is_not_held() {
+  local rc shape real_git
+  real_git=$(command -v git)
+  for shape in landed unlanded; do
+    make_held_case "held-unchecked-$shape"
+    if [ "$shape" = unlanded ]; then
+      held_foreign_unlanded "$FOREIGN_COPY"
+    fi
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -C ] && [ "\${2:-}" = "$FOREIGN_COPY" ] && [ "\${3:-}" = fetch ]; then
+  echo "fatal: unable to access 'origin': simulated outage" >&2
+  exit 128
+fi
+exec "$real_git" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git"
+    held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "held-unchecked-$shape: a copy whose landing could not be checked must refuse the close: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "REFUSED: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: its landing could not be checked because fetching the default branch from origin failed" \
+      "$FOREIGN_CASE/stderr" "held-unchecked-$shape: the refusal did not say the landing could not be checked: $(cat "$FOREIGN_CASE/stderr")"
+    assert_no_grep "is not proved landed" "$FOREIGN_CASE/stderr" "held-unchecked-$shape: the refusal calls an unchecked copy not landed"
+    assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "held-unchecked-$shape: the refusal changed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-unchecked-$shape: the task record was removed"
+    [ "$(backlog_row_state "$FOREIGN_CASE")" != done ] || fail "held-unchecked-$shape: the backlog item was closed by a refused close"
+    assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-unchecked-$shape: a refused close wrote a held-copy record"
+    held_assert_untouched "held-unchecked-$shape" "$FOREIGN_CASE" "$FOREIGN_COPY"
+    rm -f "$FOREIGN_CASE/fakebin/git"
+    run_foreign_teardown rc
+    if [ "$shape" = landed ]; then
+      expect_code 0 "$rc" "held-unchecked-$shape: the rerun must release a copy that did land: $(cat "$FOREIGN_CASE/stderr")"
+      assert_absent "$FOREIGN_COPY" "held-unchecked-$shape: the rerun did not release the landed copy"
+      assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "held-unchecked-$shape: the rerun did not return the slot"
+    else
+      expect_code 0 "$rc" "held-unchecked-$shape: the rerun must hold a copy that really is unlanded: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "held-unchecked-$shape"
+      assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-unchecked-$shape: the rerun did not write one record line"
+    fi
+  done
+  pass "a foreign copy whose landing could not be checked is refused with nothing removed and no record line, and a rerun releases a landed copy and holds an unlanded one"
+}
+
+# The held notices and the record are written once the task record and the own
+# nested copies are gone, so a later failure, here the backlog close, still
+# leaves them.
+test_a_failure_after_the_point_of_no_return_still_leaves_the_held_notice_and_record() {
+  local rc real_axi
+  real_axi=$(command -v tasks-axi)
+  make_held_case held-after-no-return
+  held_foreign_ignored "$FOREIGN_COPY"
+  cat > "$FOREIGN_CASE/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = done ]; then
+  echo "error: simulated backlog failure" >&2
+  exit 1
+fi
+exec "$real_axi" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/tasks-axi"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "held-after-no-return: a failing backlog close must fail the run: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "its backlog item could not be closed atomically" "$FOREIGN_CASE/stderr" \
+    "held-after-no-return: the run did not fail at the backlog close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" "held-after-no-return: the task record survived, so the point of no return was not passed"
+  assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: it holds ignored files that exist nowhere else: unique.dat." \
+    "$FOREIGN_CASE/stdout" "held-after-no-return: the held notice was lost with the later failure"
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" \
+    "held-after-no-return: the record does not hold exactly one line"
+  held_assert_untouched "held-after-no-return" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  pass "a failure after the task record and own copies are gone still leaves the held notice and one record line, and the foreign copy untouched"
+}
+
 test_a_forced_close_never_holds_a_foreign_copy() {
   local rc
   make_held_case held-forced
@@ -13474,6 +13551,8 @@ test_a_legacy_record_held_close_still_names_the_held_copies
 test_a_foreign_copy_does_not_excuse_an_own_copy_that_is_not_landed
 test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close
 test_a_foreign_copy_not_held_for_a_process_of_this_teardown_names_that_process
+test_a_foreign_copy_whose_landing_could_not_be_checked_is_not_held
+test_a_failure_after_the_point_of_no_return_still_leaves_the_held_notice_and_record
 test_a_forced_close_never_holds_a_foreign_copy
 test_a_slot_with_no_foreign_copy_closes_and_returns_as_before
 test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal

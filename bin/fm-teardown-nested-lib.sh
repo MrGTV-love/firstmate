@@ -327,8 +327,10 @@ teardown_foreign_copy_holdable() {  # <copy>
 # Proves foreign copy <copy>, or returns 1 with TEARDOWN_FOREIGN_WHY naming what
 # could not be proved and TEARDOWN_FOREIGN_HOLDABLE set to 1 when the copy may
 # stay held (teardown_foreign_copy_holdable). Writes nothing. A half-removed or
-# unreadable copy fails the first check. The landed-work rule gets an empty branch
-# name so it never adopts this copy's PR as the task's recorded one.
+# unreadable copy fails the first check. A landing check that could not run, as
+# when the default branch cannot be fetched, never leaves the copy holdable. The
+# landed-work rule gets an empty branch name so it never adopts this copy's PR as
+# the task's recorded one.
 TEARDOWN_FOREIGN_HOLDABLE=0
 TEARDOWN_FOREIGN_PROCS_BASE=0
 TEARDOWN_FOREIGN_DIAG=
@@ -354,9 +356,14 @@ teardown_foreign_copy_prove() {  # <copy>
   # caller to print with the refusal, so a copy that stays held does not leave a
   # REFUSED line in the output of a close that succeeds.
   diag=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-landed.XXXXXX") || diag=
+  FM_TASK_COPY_FETCH_FAILED=0
   if ! teardown_landed "$copy" HEAD "" 2> "${diag:-/dev/null}"; then
     [ -z "$diag" ] || TEARDOWN_FOREIGN_DIAG=$(cat "$diag")
     [ -z "$diag" ] || rm -f "$diag"
+    if [ "$FM_TASK_COPY_FETCH_FAILED" = 1 ]; then
+      TEARDOWN_FOREIGN_WHY="its landing could not be checked because fetching the default branch from origin failed"
+      return 1
+    fi
     TEARDOWN_FOREIGN_WHY="its HEAD ${FM_TASK_COPY_HEAD:0:12} is not proved landed"
     ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=1
     return 1

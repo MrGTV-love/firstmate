@@ -4077,9 +4077,12 @@ teardown_reprove_same_route() {
   fi
 }
 
-# Names the held foreign copies once the close is final, whatever completion line
-# was printed, and appends them to the held-copy record. A record that cannot be
-# written is a warning, never a refusal: the close already happened.
+# Names the held foreign copies and appends them to the held-copy record, once
+# the task record and the task's own nested copies are gone, which no rerun can
+# bring back, and before the backlog close and the later steps that can still
+# fail. Whatever completion line is printed later, these lines were already
+# printed. A record that cannot be written is a warning, never a refusal: the
+# close already happened.
 teardown_held_copies_report() {
   local entry record="$DATA/held-foreign-copies.log"
   echo "notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy."
@@ -6127,6 +6130,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   TEARDOWN_META_REMOVED=1
   teardown_release_project_lock || exit 1
 fi
+[ -z "$TEARDOWN_HELD_SLOT" ] || ! teardown_owns_worktree || teardown_held_copies_report
 # The record is gone, so the backlog must not still show this task in flight
 # when teardown reports success. Still under this task's meta lock, so a steer
 # racing the same id stays serialized exactly as it was before. A captain-held
@@ -6192,7 +6196,6 @@ elif teardown_owns_worktree; then
 else
   echo "teardown $ID complete (window ${T:-none}; pool slot $WT left to task $TEARDOWN_SLOT_REASSIGNED_TO${TEARDOWN_SLOT_REASSIGNED_HOME:+ (home $TEARDOWN_SLOT_REASSIGNED_HOME)}, which it was reassigned to)"
 fi
-[ -z "$TEARDOWN_HELD_SLOT" ] || ! teardown_owns_worktree || teardown_held_copies_report
 for teardown_prior_copy in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
   echo "notice: $ID's prior copy $teardown_prior_copy (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted"
 done

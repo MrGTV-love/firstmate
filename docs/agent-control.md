@@ -301,14 +301,16 @@ A slot that is already durably leased is not changed.
 When the slot cannot be proved durably leased, or the reservation fails, the whole close refuses before it removes anything, and the output says why.
 The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot is reserved under a durable lease and stays claimed.
 Nothing returns the slot automatically, and nothing removes a held copy: a held copy goes only on the owner's word naming it, so ask the supervisor.
-Only once the close is final, with the task record gone, teardown appends each such copy to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
-A close that a later step refuses writes no line, and teardown never edits or clears the file.
+Only once the task record and the task's own nested copies are gone, which no rerun can bring back, teardown prints these notices and appends each such copy to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
+It does this before the backlog close and the later steps, so a failure of the backlog close, of the fleet sync, or an idle-reaper timeout after that point still leaves the notices and the line.
+A close that a step before that point refuses writes no line, and teardown never edits or clears the file.
 A record that cannot be written prints a warning on stdout and does not refuse the close; the output then lists the held copies as their only trace.
-These notices follow whichever completion line the close prints, including the line of a `--legacy-record` close.
+The notices are printed whichever completion line the close later prints, including the line of a `--legacy-record` close.
 A foreign copy that lies inside one of the task's own nested copies is never held, because removing the own copy would take it along.
 When such a copy cannot be released, or when one that can be released lies there beside a copy that would be held, the whole close refuses as it does without this rule.
 A foreign copy that is also dirty, named by another record, running a process, or locked by anything other than a Vernant creation lock whose launcher is gone still refuses the whole close, and so does an own copy that is dirty or unlanded, or any other refusal of the ordinary close.
 The refusal names that blocker, such as the owning record or the running process, and not the unique ignored files the copy also holds.
+A copy whose landing could not be checked, as when fetching the default branch from origin fails, is never held either: the close refuses, names the failed fetch, and a rerun checks again.
 `--force` never holds a foreign copy.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
 The log test lists the commits of a squash-merged branch whose remote branch was deleted as unpushed, so judge those copies by their merged PR and the closeout driver's landing check, not by that list alone.

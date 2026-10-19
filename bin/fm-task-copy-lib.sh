@@ -62,12 +62,19 @@ fm_task_copy_default_branch() {
   return 1
 }
 
+# Set to 1 when fm_task_copy_content_in_default could not fetch the default
+# branch, so a caller can tell a check that could not run from a copy whose
+# content is not in the default branch. Callers clear it before the check.
+FM_TASK_COPY_FETCH_FAILED=0
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>]
   local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} ref default_tree merged_tree
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
   if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
-    git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
+    if ! git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1; then
+      FM_TASK_COPY_FETCH_FAILED=1
+      return 1
+    fi
     ref="refs/remotes/origin/$name"
   elif git -C "$worktree" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
     ref="refs/heads/$name"
