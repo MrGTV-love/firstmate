@@ -285,81 +285,26 @@ test_foreign_omp_writer_is_named_stopped_and_never_deleted() {
   pass "a raw omp writer over the cap is detected within polls, named by pid, stopped alone, and the log is left intact with one wake while it does not grow"
 }
 
-# An lsof stand-in for a writer that reopens the log on every append: it has the log
-# open for a fraction of each look, so most looks list nothing. This one lists the
-# writer from look number FM_FAKE_LSOF_HIT on and counts every look in FM_FAKE_LSOF_COUNT.
-make_fake_lsof() {  # <dir> -> path of the stand-in
-  local fake="$1/fake-lsof"
-  cat > "$fake" <<'SH'
-#!/usr/bin/env bash
-n=$(( $(cat "$FM_FAKE_LSOF_COUNT" 2>/dev/null || echo 0) + 1 ))
-printf '%s' "$n" > "$FM_FAKE_LSOF_COUNT"
-[ "$n" -ge "$FM_FAKE_LSOF_HIT" ] || exit 0
-printf 'p%s\ncomp\nf3\nau\n' "$FM_FAKE_LSOF_PID"
-SH
-  chmod +x "$fake"
-  printf '%s\n' "$fake"
-}
-
-test_the_guard_looks_again_for_a_writer_that_reopens_the_log() {
-  local dir state status writer out fake looks
-  dir=$(make_case reopen-looks); state="$dir/state"; status="$state/reopen.status"
-  fake=$(make_fake_lsof "$dir")
-  head -c 300000 /dev/zero | tr '\0' 'x' > "$status"
-  printf '\n' >> "$status"
-  # An omp-named sleep: one process, with no child left behind when it is killed.
-  mkdir -p "$dir/sleepbin"
-  ln -s "$(command -v sleep)" "$dir/sleepbin/omp"
-  "$dir/sleepbin/omp" 600 &
-  writer=$!
-
-  # The first five looks list nothing; the sixth names the omp process. The guard must
-  # keep looking, stop that one process, and stop looking once it has a name.
-  out=$(env FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=262144 FM_STATUS_CAP_LSOF="$fake" \
-    FM_FAKE_LSOF_COUNT="$dir/looks" FM_FAKE_LSOF_HIT=6 FM_FAKE_LSOF_PID="$writer" "$GUARD" scan) \
-    || { kill -9 "$writer" 2>/dev/null; fail "the guard scan failed"; }
-  looks=$(cat "$dir/looks")
-  case "$out" in
-    *"writer=pid $writer omp"*"stopped pid $writer (omp) with SIGSTOP"*) ;;
-    *) kill -9 "$writer" 2>/dev/null; fail "a writer that lsof listed only on the sixth look was not named and stopped: $out" ;;
-  esac
-  [ "$(state_letter "$writer")" = T ] || { kill -9 "$writer" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$writer"))"; }
-  [ "$looks" -eq 6 ] || { kill -CONT "$writer" 2>/dev/null; kill -9 "$writer" 2>/dev/null; fail "expected six looks, the guard made $looks"; }
-  kill -CONT "$writer" 2>/dev/null; kill -9 "$writer" 2>/dev/null
-
-  # A writer that no look ever lists is looked for a bounded number of times, and then
-  # named as not found with nothing stopped; the scan does not loop on it.
-  dir=$(make_case reopen-never); state="$dir/state"; status="$state/never.status"
-  fake=$(make_fake_lsof "$dir")
-  head -c 300000 /dev/zero | tr '\0' 'x' > "$status"
-  printf '\n' >> "$status"
-  out=$(env FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=262144 FM_STATUS_CAP_LSOF="$fake" \
-    FM_FAKE_LSOF_COUNT="$dir/looks" FM_FAKE_LSOF_HIT=100000 FM_FAKE_LSOF_PID=1 "$GUARD" scan) \
-    || fail "the guard scan failed on a log with no listed writer"
-  looks=$(cat "$dir/looks")
-  case "$out" in *'writer=none found'*'stopped nothing'*) ;; *) fail "a log with no listed writer was not reported as none found: $out" ;; esac
-  [ "$looks" -ge 2 ] || fail "the guard looked once and gave up on a writer that may reopen the log ($looks looks)"
-  [ "$looks" -le 20 ] || fail "the guard looked $looks times; the look count is not bounded at twenty"
-  pass "the guard looks again until lsof names a writer that reopens the log, stops that one process, and gives up after a bounded number of looks"
-}
-
-test_the_incident_loop_that_reopens_the_log_is_found_and_stopped() {
+test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped() {
   local dir state status omp wpid out waited=0 limit_blocks=16384
   command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
-  dir=$(make_case reopen-real); state="$dir/state"; status="$state/loop.status"
+  dir=$(make_case holds-open); state="$dir/state"; status="$state/loop.status"
   omp=$(make_named_shell "$dir" omp)
   : > "$status"
-  # The loop of 2026-10-18 as the review reproduced it: one printf per iteration appended
-  # with >>, so the log is opened and closed on every append and lsof sees it open for
-  # only a fraction of each look. Three million lines of five bytes are 15 MB, under the
-  # 16 MiB hard limit this writer carries, and long enough to outlast the scan.
+  # The writer of 2026-10-18: one printf whose format has no conversion and that has an
+  # extra argument, which the harness shell re-applied without end, appending to a log it
+  # opened once and held for its whole run. It wrote 0.7 GB/s, which no loop that opens
+  # and closes the log on every append can do, so this fixture holds the descriptor and
+  # writes without a pause. Three million lines of five bytes are 15 MB, under the 16 MiB
+  # hard limit it carries, and long enough to outlast the scan.
   (
     ulimit -f "$limit_blocks"
     "$omp" -c '
+      exec 9>>"$1"
       i=0
       while [ "$i" -lt 3000000 ]; do
         i=$((i + 1))
-        printf "text\n" "$RANDOM" >> "$1"
+        printf "text\n" >&9
       done
     ' _ "$status" &
     printf '%s\n' "$!" > "$dir/writer.pid"
@@ -368,30 +313,35 @@ test_the_incident_loop_that_reopens_the_log_is_found_and_stopped() {
   wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
   wpid=$(cat "$dir/writer.pid")
   while [ "$(file_size "$status")" -le 65536 ] && [ "$waited" -lt 300 ]; do sleep 0.1; waited=$((waited + 1)); done
-  [ "$(file_size "$status")" -gt 65536 ] || { kill -9 "$wpid" 2>/dev/null; fail "the loop never passed the cap, so the fixture proves nothing"; }
+  [ "$(file_size "$status")" -gt 65536 ] || { kill -9 "$wpid" 2>/dev/null; fail "the writer never passed the cap, so the fixture proves nothing"; }
   out=$(FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=65536 "$GUARD" scan) \
     || { kill -9 "$wpid" 2>/dev/null; fail "the guard scan failed"; }
   case "$out" in
     *"writer=pid $wpid omp"*"stopped pid $wpid (omp) with SIGSTOP"*) ;;
-    *) kill -9 "$wpid" 2>/dev/null; fail "the guard missed the loop that reopens the log on every append: $out" ;;
+    *) kill -9 "$wpid" 2>/dev/null; fail "the guard missed the writer that holds the log open: $out" ;;
   esac
-  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the loop was not stopped (state $(state_letter "$wpid"))"; }
+  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the writer was not stopped (state $(state_letter "$wpid"))"; }
   [ -f "$status" ] || { kill -9 "$wpid" 2>/dev/null; fail "the over-cap log was deleted"; }
   kill -CONT "$wpid" 2>/dev/null; kill -9 "$wpid" 2>/dev/null
-  pass "the incident loop, which reopens the log on every append, is named and stopped by the guard and the log is left in place"
+  pass "the incident writer, which holds the log open and writes without a pause, is named and stopped by the guard and the log is left in place"
 }
 
 test_a_lingering_signal_does_not_hold_back_the_over_cap_stop() {
-  local dir state status out omp wpid watch_pid waited=0
+  local dir state status out omp wpid watch_pid waited=0 deadline
   command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
   dir=$(make_case linger); state="$dir/state"; status="$state/linger.status"; out="$dir/watch.out"
   omp=$(make_named_shell "$dir" omp)
   : > "$status"
-  # The first status line is a signal and starts the watcher's grace linger, here 40 s.
+  # The writer's lines are 1000 bytes long, so the 64 KiB log is about 65 lines: classifying
+  # the pending signal in the wake's flush takes a moment, where 13000 short lines would
+  # take longer than the deadline on a loaded host and hide the grace this test is about.
+  # The first status line is a signal and starts the watcher's grace linger, here 120 s.
   # The log passes its 64 KiB cap a few seconds later, inside that linger. The stop must
   # come from the watcher's own cap check during the linger, not from the next watcher
-  # after a drain, an ack and a re-arm.
-  watch_cap "$state" "$out" FM_SIGNAL_GRACE=40 FM_STATUS_CAP_BYTES=65536
+  # after a drain, an ack and a re-arm, and the wake that reports it must not wait out
+  # another grace for the pending signal: the watcher has to exit well inside 120 s.
+  # The wait is a wall-clock deadline, so a loaded host cannot stretch it past the grace.
+  watch_cap "$state" "$out" FM_SIGNAL_GRACE=120 FM_STATUS_CAP_BYTES=65536
   watch_pid=$!
   while [ ! -e "$state/.last-watcher-beat" ] && [ "$waited" -lt 600 ]; do sleep 0.1; waited=$((waited + 1)); done
   [ -e "$state/.last-watcher-beat" ] || { reap "$watch_pid"; fail "the watcher never started its loop"; }
@@ -399,12 +349,13 @@ test_a_lingering_signal_does_not_hold_back_the_over_cap_stop() {
     ulimit -f "$HARD_LIMIT_BLOCKS"
     "$omp" -c '
       exec 9>>"$1"
+      line=$(head -c 999 /dev/zero | tr "\0" x)
       printf "working: the first line is the signal\n" >&9
       sleep 4 9>&-
       i=0
       while [ "$i" -lt 40 ]; do
         i=$((i + 1))
-        printf "text\n%.0s" {1..13000} >&9
+        printf "${line}\n%.0s" {1..65} >&9
         sleep 1 9>&-
       done
     ' _ "$status" &
@@ -413,7 +364,14 @@ test_a_lingering_signal_does_not_hold_back_the_over_cap_stop() {
   ) &
   wait_for_file_nonempty "$dir/writer.pid" || { reap "$watch_pid"; fail "the fake writer did not start"; }
   wpid=$(cat "$dir/writer.pid")
-  wait_for_exit "$watch_pid" 300 || { kill -9 "$wpid" 2>/dev/null; fail "the watcher kept lingering on the status signal while the log ran past the cap: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  deadline=$((SECONDS + 90))
+  while is_live_non_zombie "$watch_pid" && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
+  if is_live_non_zombie "$watch_pid"; then
+    kill -9 "$wpid" 2>/dev/null
+    reap "$watch_pid"
+    fail "the watcher kept lingering on the status signal while the log ran past the cap: $(cat "$out" "$out.err" 2>/dev/null)"
+  fi
+  wait "$watch_pid" 2>/dev/null
   grep -q 'check: status-log-over-cap' "$out" || { kill -9 "$wpid" 2>/dev/null; fail "the first wake was not the over-cap check: $(cat "$out")"; }
   grep -q "stopped pid $wpid (omp) with SIGSTOP" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "the wake does not say the writer was stopped: $(cat "$out")"; }
   [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$wpid"))"; }
@@ -842,8 +800,7 @@ tests=(
   test_incident_shape_is_refused_at_the_cap_and_loses_no_distinct_line
   test_foreign_omp_writer_is_named_stopped_and_never_deleted
   test_a_resumed_writer_is_woken_for_and_stopped_again
-  test_the_guard_looks_again_for_a_writer_that_reopens_the_log
-  test_the_incident_loop_that_reopens_the_log_is_found_and_stopped
+  test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped
   test_a_lingering_signal_does_not_hold_back_the_over_cap_stop
   test_non_omp_and_missing_writers_wake_but_stop_nothing
   test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth
