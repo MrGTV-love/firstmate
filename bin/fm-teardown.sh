@@ -72,8 +72,10 @@
 # The record and bundle must be regular nonsymlink files. The bundle's physical
 # parent must be outside every registered copy (symlink aliases included), every
 # enclosing Treehouse pool (non-copy directories in it included) and every
-# scratch root this teardown removes: the task's tasktmp, its launch-home temp
-# root, and $STATE/<task-id>.inbox and .git-hooks.
+# removal root this teardown removes: the task's own copy, its tasktmp, its
+# launch-home temp root, the whole state directory (every state-side removal
+# target, including .nm-read-cache-<task-id>), and $STATE/<task-id>.inbox and
+# .git-hooks.
 # The recorded bundle must pass git bundle verify in the copy, match its recorded
 # SHA-256, advertise and record every maximal tip of git rev-list --children
 # <ref> <branches> --not --remotes, and restore on its own: fetching every

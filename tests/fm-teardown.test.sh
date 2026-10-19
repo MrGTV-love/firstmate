@@ -10735,7 +10735,7 @@ test_invalid_preservation_bundle_refuses() {
       state-inbox)
         BUNDLE_PATH="$case_dir/state/task-x1.inbox/work.bundle"
         record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create inbox bundle'
-        reason='bundle is inside task scratch'
+        reason='bundle is inside task state'
         ;;
     esac
     rc=0
@@ -10750,6 +10750,57 @@ test_invalid_preservation_bundle_refuses() {
     assert_absent "$case_dir/treehouse.log" "bundle-$shape: pool slot was returned"
   done
   pass 'incomplete, unverifiable, changed, unrecorded, unsafe-path and malformed bundle records retain the original refusal'
+}
+
+# The state directory is a teardown removal root: state/.nm-read-cache-<id> is
+# deleted whole, so a bundle recorded there would be deleted with the copy it
+# preserves. The proof must reject the whole state root (not one hard-coded
+# cache path), and must reject a symlink alias that resolves into it.
+test_bundle_under_state_cache_refuses() {
+  local shape case_dir rc reason record digest
+  for shape in state-cache state-cache-alias state-cache-symlink; do
+    make_bundle_copy_case "bundle-state-$shape" local-only
+    case_dir=$NESTED_CASE
+    record="$case_dir/data/task-x1/preservation-bundles.tsv"
+    case "$shape" in
+      state-cache)
+        BUNDLE_PATH="$case_dir/state/.nm-read-cache-task-x1/work.bundle"
+        record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all \
+          || fail 'cannot create state-cache bundle fixture'
+        reason='bundle is inside task state'
+        ;;
+      state-cache-alias)
+        mkdir -p "$case_dir/state/.nm-read-cache-task-x1"
+        ln -s "$case_dir/state/.nm-read-cache-task-x1" "$case_dir/state-cache-alias"
+        BUNDLE_PATH="$case_dir/state-cache-alias/work.bundle"
+        record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all \
+          || fail 'cannot create state-cache alias fixture'
+        reason='bundle is inside task state'
+        ;;
+      state-cache-symlink)
+        BUNDLE_PATH="$case_dir/state/.nm-read-cache-task-x1/work.bundle"
+        record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all \
+          || fail 'cannot create state-cache symlink fixture'
+        ln -s "$BUNDLE_PATH" "$case_dir/state-cache-bundle-link"
+        digest=$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')
+        printf '%s\t%s\t%s\n' "$case_dir/state-cache-bundle-link" "$digest" \
+          "$(git -C "$NESTED_COPY" rev-parse HEAD)" > "$record"
+        reason='bundle is not a regular nonsymlink file'
+        ;;
+    esac
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "bundle-state-$shape: a bundle under the state removal root must refuse"
+    assert_present "$NESTED_COPY/.git" "bundle-state-$shape: copy was removed"
+    assert_present "$BUNDLE_PATH" "bundle-state-$shape: the preservation bundle was deleted"
+    assert_present "$record" "bundle-state-$shape: the preservation record was deleted"
+    assert_present "$case_dir/state/task-x1.meta" "bundle-state-$shape: task record was removed"
+    assert_absent "$case_dir/treehouse.log" "bundle-state-$shape: pool slot was returned"
+    assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" "bundle-state-$shape: original refusal changed"
+    assert_grep "$reason" "$case_dir/stderr" "bundle-state-$shape: missing predicate not named"
+    assert_grep 'Create a self-contained external bundle' "$case_dir/stderr" "bundle-state-$shape: supported completing step missing"
+  done
+  pass 'a bundle under the state removal root, or a symlink into it, never counts as preservation'
 }
 
 make_sibling_unpushed_work() {  # <case-dir>
@@ -14177,6 +14228,7 @@ test_reverse_nested_prior_outside_claude_tears_down
 test_locked_own_copy_is_released_by_the_closeout_driver
 test_verified_bundle_preserves_unlanded_copy
 test_invalid_preservation_bundle_refuses
+test_bundle_under_state_cache_refuses
 test_bundle_ignores_branches_other_worktrees_hold
 test_bundle_covers_a_removed_copys_branch_without_other_worktrees
 test_bundle_survives_a_stale_registered_worktree

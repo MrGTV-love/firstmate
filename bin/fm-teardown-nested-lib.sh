@@ -356,13 +356,29 @@ teardown_bundle_external() {  # <copy> <bundle>
   done < "$inventory"
   rm -f "$inventory"
   [ -z "$incomplete" ] || return 1
-  for root in ${TASK_TMP:+"${TASK_TMP:-}"} ${LAUNCH_HOME_TOKEN:+"/tmp/fm-$ID+${LAUNCH_HOME_TOKEN:-}"} \
-      "$STATE/$ID.inbox" "$STATE/$ID.git-hooks"; do
-    root=${root%/}
+  # The removal roots are the existing teardown globals: $STATE is the parent
+  # of every state-side removal target (including the .nm-read-cache-<id>
+  # directory teardown removes whole, and any future state target), and $WT is
+  # the task's own copy. Rejecting the roots keeps this proof true as the
+  # teardown's removal set changes; do not replace them with one path name.
+  local roots=() labels=() label i
+  roots+=("$STATE"); labels+=(state)
+  [ -z "${WT:-}" ] || { roots+=("$WT"); labels+=(copy); }
+  [ -z "${TASK_TMP:-}" ] || { roots+=("$TASK_TMP"); labels+=(scratch); }
+  [ -z "${LAUNCH_HOME_TOKEN:-}" ] || { roots+=("/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"); labels+=(scratch); }
+  roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks"); labels+=(scratch scratch)
+  for i in "${!roots[@]}"; do
+    root=${roots[$i]%/}
+    label=${labels[$i]}
     [ -e "$root" ] || continue
     field=$(fm_task_copy_canonical_dir "$root") || field=$root
     case "$path" in "$root"/*|"$field"/*)
-      TEARDOWN_BUNDLE_REASON="bundle is inside task scratch $root"; return 1 ;;
+      case "$label" in
+        state) TEARDOWN_BUNDLE_REASON="bundle is inside task state $root" ;;
+        copy) TEARDOWN_BUNDLE_REASON="bundle is inside task copy $root" ;;
+        *) TEARDOWN_BUNDLE_REASON="bundle is inside task scratch $root" ;;
+      esac
+      return 1 ;;
     esac
   done
   cursor=$parent
