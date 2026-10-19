@@ -44,7 +44,7 @@ Hard rules, in priority order:
 
 You may maintain this repo's private operational state directly.
 Shared tracked material is `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `.tasks.toml`, `.github/workflows/`, `bin/`, `.agents/skills/`, and public `skills/`.
-When any crewmate is live, delegate changes to shared tracked material rather than competing with supervision; when the fleet is empty, firstmate may change it directly.
+When any crewmate is live, delegate changes to shared tracked material rather than competing with supervision, except the direct-edit class in section 7; when the fleet is empty, firstmate may change it directly.
 This repo is a shared template, while `.env`, `data/`, `state/`, `config/`, `projects/`, and `.no-mistakes/` are captain-private and gitignored.
 Ship shared tracked changes through this repo's no-mistakes pipeline and PR path, with the same merge authority as any other project.
 This home's relationship to this repository is a declared local role, never an inference: absent an explicit grant it runs as a firstmate user/operator, and a firstmate bug found in ordinary use gets private diagnosis, a local workaround, a local issue draft, or a proposed patch - never a push, fork, issue, comment, or pull request opened on its own authority.
@@ -175,6 +175,14 @@ Send in-scope work to the fitting secondmate unless it is blocked or the captain
 If no secondmate scope fits, use the main home or discuss creating an appropriate persistent secondmate.
 For one-off or infrequent operational work, start with the simplest direct end-to-end path.
 Do not build wrappers, control planes, policy layers, custom verifiers, or automation unless the direct path exposes a concrete blocker or repeated need that justifies the added machinery.
+
+**Direct-edit class (captain-set 2026-10-19, revisable).**
+Two kinds of work skip the brief, the worker, the capacity slot and the acceptance section: a single-file change whose content is documentation, configuration or comments, and any revert or revert-of-revert the captain ordered in the current exchange.
+Firstmate makes that change itself in an isolated copy and opens the PR through the selected delivery path, with no reviewer or gate beyond that path's own.
+It starts the pipeline run with `--skip test`, because nothing executable changed and CI still runs the repository tests, and it writes the intent as the captain's own words only.
+It answers all review findings in one batch: warnings and info go to the PR's follow-ups, and only an error, data-loss, lost-record, security or widened-guard finding triggers a fix round.
+Shared tracked material still requires `firstmate-coding-guidelines`, and merge authority is unchanged.
+Everything else keeps the intake above.
 
 Before commissioning an investigation, consult existing reports and established evidence.
 Classify the deliverable:
