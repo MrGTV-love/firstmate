@@ -1,0 +1,33 @@
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline
+ok - task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible
+not ok - oversize screening: fm-friction: telemetry unavailable; preserve event identity and retry telemetry later; event_id=285b8736-1fbe-4143-8204-95c3192561e0; guarded result unchanged
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: row time 23281
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M58P7KRCEP87GRQFCCM7XG70/[eval1]:199:8
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v26.4.0
+nice -n 20 bash tests/fm-jev-guard.test.sh  11.22s user 14.48s system 4% cpu 8:34.75 total

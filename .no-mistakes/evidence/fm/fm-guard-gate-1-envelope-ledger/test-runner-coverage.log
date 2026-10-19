@@ -1,0 +1,4 @@
+FM_TEST_COVERAGE ok total=331 parallel=29 parallel_max_ms=1628090 parallel_imbalance_ms=52 parallel_unhinted=0 serial=284 serial_shards=15 serial_unhinted=4 serial_max_ms=1160472 serial_budget_ms=1200000 herdr=18
+check-coverage rc=0
+head: illegal line count -- 0
+head: illegal line count -- 0

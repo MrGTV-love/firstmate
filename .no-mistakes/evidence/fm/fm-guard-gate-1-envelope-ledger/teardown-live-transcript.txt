@@ -1,0 +1,112 @@
+=== test_unlanded_foreign_copy_is_refused :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-unlanded/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-unlanded/pool/1/project: its HEAD dda7fa212427 is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-unlanded/pool/1/project/.claude/worktrees/fc-one (its HEAD dda7fa212427 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-unlanded/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-unlanded/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-unlanded/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-unlanded/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"copy-landed","outcome":"blocked","exit_kind":"human-only","operation_id":"60e4fd12-e873-4980-8dd7-8ddf6d487518"}
+
+=== test_typed_preservation_exit_completes_cleanup :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-preservation-route/pool/1/project/.claude/worktrees/fc-one could not be preserved in /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-preservation-route/data/task-x1/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command.
+completing-command: FM_FRICTION_OPERATION_ID=d706a673-68a6-4571-99c8-d63422ea1c43 FM_FRICTION_EPISODE_ID=d706a673-68a6-4571-99c8-d63422ea1c43 FM_HOME=/Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-preservation-route/home bash /Users/charlesabrooker/tmp/fm-jevcmp.JDJmSC/head/bin/fm-teardown.sh task-x1
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"blocked","exit_kind":"machine","operation_id":"d706a673-68a6-4571-99c8-d63422ea1c43"}
+
+=== test_typed_preservation_exit_completes_cleanup :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-own-preservation-route/pool/1/project/.claude/worktrees/fc-one could not be preserved in /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-own-preservation-route/data/task-x1/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command.
+completing-command: FM_FRICTION_OPERATION_ID=419d771c-85b3-4bed-9559-0dd808b7d133 FM_FRICTION_EPISODE_ID=419d771c-85b3-4bed-9559-0dd808b7d133 FM_HOME=/Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-own-preservation-route/home bash /Users/charlesabrooker/tmp/fm-jevcmp.JDJmSC/head/bin/fm-teardown.sh task-x1
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"blocked","exit_kind":"machine","operation_id":"419d771c-85b3-4bed-9559-0dd808b7d133"}
+
+=== run_preservation_refusal :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-forced-foreign/pool/1/project/.claude/worktrees/fc-one could not be preserved in /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-forced-foreign/data/task-x1/nested-copy-preserved; it was not removed.
+human-only-exit: This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"blocked","exit_kind":"human-only","operation_id":"8ae47613-215d-4173-bddc-4b039c25899a"}
+
+=== run_preservation_refusal :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-forced-own/pool/1/project/.claude/worktrees/fc-one could not be preserved in /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/typed-forced-own/data/task-x1/nested-copy-preserved; it was not removed.
+human-only-exit: This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"blocked","exit_kind":"human-only","operation_id":"39ba3a5f-42bb-4b9a-a327-f50a22b5c272"}
+
+=== test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal missing=git worktree remove would not remove foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-git-protects/pool/1/project/.claude/worktrees/fc-one without force; it was not removed.
+human-only-exit: What retained disposition covers the contents Git still protects in /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-git-protects/pool/1/project/.claude/worktrees/fc-one? Preserve this copy; no forced removal is authorized.
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"nonforced-removal","outcome":"blocked","exit_kind":"human-only","operation_id":"8bb12d0f-16b8-4dfe-a71f-fd83b3adb00d"}
+
+=== test_foreign_copy_removal_that_fails_for_another_reason_is_a_plain_error :: teardown exit=1
+--- stderr:
+error: git worktree remove failed for foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-1/pool/1/project/.claude/worktrees/fc-one (exit 255): error: failed to delete '/Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-1/pool/1/project/.claude/worktrees/fc-one': Permission denied; it was not removed.
+--- friction ledger rows:
+(no ledger file)
+
+=== test_foreign_copy_removal_that_fails_for_another_reason_is_a_plain_error :: teardown exit=1
+--- stderr:
+error: git worktree remove failed for foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-2/pool/1/project/.claude/worktrees/fc-one (exit 255): error: failed to delete '/Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-2/pool/1/project/.claude/worktrees/fc-one': Device or resource busy; it was not removed.
+--- friction ledger rows:
+(no ledger file)
+
+=== test_foreign_copy_removal_that_fails_for_another_reason_is_a_plain_error :: teardown exit=1
+--- stderr:
+error: git worktree remove failed for foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-3/pool/1/project/.claude/worktrees/fc-one (exit 255): error: failed to delete '/Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-3/pool/1/project/.claude/worktrees/fc-one': Input/output error; it was not removed.
+--- friction ledger rows:
+(no ledger file)
+
+=== test_foreign_copy_removal_that_fails_for_another_reason_is_a_plain_error :: teardown exit=1
+--- stderr:
+error: git worktree remove failed for foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-4/pool/1/project/.claude/worktrees/fc-one (exit 255): error: failed to delete '/Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-removal-fails-4/pool/1/project/.claude/worktrees/fc-one': denied?completing-command: touch forged; it was not removed.
+--- friction ledger rows:
+(no ledger file)
+
+=== test_landing_check_that_could_not_ask_the_forge_is_a_plain_error :: teardown exit=1
+--- stderr:
+error: foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-forge-down/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-forge-down/pool/1/project: its landing could not be checked (gh pr view https://github.com/example/repo/pull/7 failed (exit 1)).
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-forge-down/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-forge-down/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-forge-down/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-forge-down/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- friction ledger rows:
+(no ledger file)
+
+=== test_landing_check_that_the_forge_answered_not_merged_stays_a_copy_landed_refusal :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-open/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-open/pool/1/project: its HEAD 549d326ce09f is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-open/pool/1/project/.claude/worktrees/fc-one (its HEAD 549d326ce09f is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-open/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-open/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-open/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-landing-open/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"copy-landed","outcome":"blocked","exit_kind":"human-only","operation_id":"988b5103-bbd4-4d70-8e23-b2ee6069f697"}
+
+=== test_foreign_copy_that_is_not_a_worktree_root_is_a_typed_refusal :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-worktree-root missing=foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-not-root/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-not-root/pool/1/project: it is not a Git worktree root, so its contents cannot be proved preserved.
+human-only-exit: What owner-approved repair, removal or retained ownership applies to /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-not-root/pool/1/project/.claude/worktrees/fc-one (it is not a Git worktree root, so its contents cannot be proved preserved)? Keep it; no removal or forced cleanup is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-not-root/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-not-root/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-not-root/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-not-root/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"copy-worktree-root","outcome":"blocked","exit_kind":"human-only","operation_id":"92953313-abd6-48af-8eac-6efbd8b88c32"}
+
+=== test_foreign_copy_with_an_unresolvable_head_is_a_typed_refusal :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-head-resolved missing=foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-unborn-head/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-unborn-head/pool/1/project: it has a HEAD that cannot be resolved.
+human-only-exit: Which verified commit holds the work in /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-unborn-head/pool/1/project/.claude/worktrees/fc-one (it has a HEAD that cannot be resolved)? Keep the copy; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-unborn-head/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-unborn-head/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-unborn-head/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-unborn-head/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"copy-head-resolved","outcome":"blocked","exit_kind":"human-only","operation_id":"0a820e50-1f1f-46db-b449-137209df920f"}
+
+=== test_foreign_copy_whose_anchor_names_another_commit_is_a_typed_refusal :: teardown exit=1
+--- stderr:
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-anchor-commit missing=foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-anchor-commit/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-anchor-commit/pool/1/project: it cannot be anchored: preservation anchor refs/fm/anchor/task-x1-6326c9e already names a different commit.
+human-only-exit: Which commit does the existing preservation anchor protect, and does it cover /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-anchor-commit/pool/1/project/.claude/worktrees/fc-one (it cannot be anchored: preservation anchor refs/fm/anchor/task-x1-6326c9e already names a different commit)? Keep the copy and the anchor; no overwrite is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-anchor-commit/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-anchor-commit/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-anchor-commit/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.4wWXRw/foreign-typed-anchor-commit/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+--- friction ledger rows:
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"copy-anchor-commit","outcome":"blocked","exit_kind":"human-only","operation_id":"95506495-241c-410a-b6c7-e6deac4c5439"}
+

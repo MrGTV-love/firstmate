@@ -1,0 +1,10 @@
+ok - an unlanded foreign copy is refused with a written reason and nothing changes
+ok - own and foreign typed preservation refusals retain unique bytes, and their printed commands complete cleanup after storage repair as one operation
+ok - a forced teardown whose ignored files cannot be preserved ends in a human-only exit with no command and no flag, for foreign and own copies
+ok - a foreign copy whose contents Git protects is refused as a typed nonforced-removal with its question
+ok - a foreign copy whose removal fails with EACCES, EBUSY or an I/O error is a plain error naming Git and records no event
+ok - a landing check whose gh pr view fails is a plain error naming the forge failure, not a copy-landed refusal
+ok - a landing check the forge answered with not merged is still refused as a typed copy-landed
+ok - a foreign copy that is not a Git worktree root is refused with its rule and a human-only question, once
+ok - a foreign copy whose HEAD cannot be resolved is refused with its rule and a human-only question, once
+ok - a foreign copy whose preservation anchor names another commit is refused with its rule and a human-only question, once

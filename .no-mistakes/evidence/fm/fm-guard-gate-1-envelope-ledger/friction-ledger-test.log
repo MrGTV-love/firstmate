@@ -1,0 +1,11 @@
+PASS shared-barrier publication: 11 writers, 8 unique complete lines; concurrent/replayed IDs counted once; hashed context
+PASS schema validation, no payload diagnostics, append-only correlated outcomes
+PASS authoritative home without cwd or state-override fallback
+PASS bounded contention, full disk, permissions and partial append preserve guarded result/history
+PASS typed machine/human exits, executable completing command, caller exit preserved on telemetry errors
+PASS schema-invalid history reports its own cause and is retained unchanged
+PASS supplied operation shared by refusal and outcomes; uncorrelated outcomes never invented; terminal outcome once
+PASS one operation per refusing process, carried in every printed machine command
+PASS control characters in envelope text cannot forge a completing-command or human-only-exit line
+ok - friction ledger and refusal envelope behavioral contracts
+nice -n 20 bash tests/fm-friction-ledger.test.sh  3.19s user 5.75s system 35% cpu 25.112 total

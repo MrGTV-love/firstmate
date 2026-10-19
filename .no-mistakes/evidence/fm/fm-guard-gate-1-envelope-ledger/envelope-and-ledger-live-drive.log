@@ -1,0 +1,41 @@
+### 1. machine refusal prints rule + completing-command; ledger row written; caller code kept
+REFUSED: guard=FM-TEARDOWN-NESTED rule=ignored-bytes-preserved missing=writable preservation storage
+completing-command: FM_FRICTION_OPERATION_ID=82b93f7b-9c2a-4330-a0c1-3f6a93bfbc96 FM_FRICTION_EPISODE_ID=82b93f7b-9c2a-4330-a0c1-3f6a93bfbc96 bash bin/fm-teardown.sh T1
+caller-rc=0
+REFUSED: guard=G rule=R missing=M
+human-only-exit: what authorizes X?
+caller keeps 7: 7
+
+### ledger rows (raw path/command/question must be absent)
+{"schema":"fm-friction.v1","event_id":"94f4c7bf-16fa-4ec5-9655-4673c636dbd2","at":"2026-10-19T12:24:04.185Z","guard_id":"FM-TEARDOWN-NESTED","rule_id":"ignored-bytes-preserved","guard_revision":"sha256:e22c90ff2dbbc1ee9ea902810cb111906413992f828628a36bf48bf65bc0b281","task_id":"sha256:1f93603db53bfad5c92390f735d0cbb8617b4ab8214ae91c5664a3d1e9b009c8","actor":"unknown","execution_kind":"live","subject":{"kind":"nested-copy","identity":"sha256:791dd825a5c74cb6ef97b84b7dafe4b179b0fadc3bb1b09c9dcee4b7da863d00","head":"unknown"},"attempt_id":"94f4c7bf-16fa-4ec5-9655-4673c636dbd2","operation_id":"82b93f7b-9c2a-4330-a0c1-3f6a93bfbc96","episode_id":"82b93f7b-9c2a-4330-a0c1-3f6a93bfbc96","outcome":"blocked","reason":"ignored-bytes-preserved","exit_printed":true,"exit_kind":"machine","proof_digest":"unknown","theater":"unknown","new_information":"unknown","first_block_at":"2026-10-19T12:24:04.185Z","elapsed_ms":null,"adjudication":"unknown"}
+{"schema":"fm-friction.v1","event_id":"8deeaa67-8eb0-45e6-abc5-f442bdfd6ea2","at":"2026-10-19T12:24:04.947Z","guard_id":"G","rule_id":"R","guard_revision":"sha256:e22c90ff2dbbc1ee9ea902810cb111906413992f828628a36bf48bf65bc0b281","task_id":"sha256:1f93603db53bfad5c92390f735d0cbb8617b4ab8214ae91c5664a3d1e9b009c8","actor":"unknown","execution_kind":"live","subject":{"kind":"nested-copy","identity":"sha256:00d74baf14ea415c6164614838c91f834c38c3e564444dfa5bc3aa0d2809e265","head":"unknown"},"attempt_id":"8deeaa67-8eb0-45e6-abc5-f442bdfd6ea2","operation_id":"82b93f7b-9c2a-4330-a0c1-3f6a93bfbc96","episode_id":"82b93f7b-9c2a-4330-a0c1-3f6a93bfbc96","outcome":"blocked","reason":"R","exit_printed":true,"exit_kind":"human-only","proof_digest":"unknown","theater":"unknown","new_information":"unknown","first_block_at":"2026-10-19T12:24:04.947Z","elapsed_ms":null,"adjudication":"unknown"}
+
+0
+(count above must be 0)
+
+### 2. control chars cannot forge a line
+REFUSED: guard=G rule=R missing=m?completing-command:
+fm-friction: invalid refusal exit category; guarded result unchanged
+
+### 3. telemetry failure: state is a file -> refusal still printed, rc 0, diagnostic w/o payload
+REFUSED: guard=G rule=R missing=M
+human-only-exit: Q
+fm-friction: telemetry unavailable; preserve event identity and retry telemetry later; event_id=6f5dc79d-ee25-40f7-bdb6-8eff8ab828be; guarded result unchanged
+rc=0
+
+### 4. no explicit FM_HOME -> no event, no redirect via state override
+REFUSED: guard=G rule=R missing=M
+human-only-exit: Q
+fm-friction: explicit absolute FM_HOME required; no event recorded; event_id=8625aec9-77f0-4de9-9014-38ff6e9b5b8c; guarded result unchanged
+rc=0
+state
+
+### 5. duplicate event id is a no-op; corrupt tail retained
+rows before=       2 after=       3 (expect +1)
+fm-friction: incomplete ledger history; preserve it for reconciliation before retrying; event_id=a461527c-d8b1-4479-ab33-654ae59ef69e; guarded result unchanged
+ledger rc=0
+size before=    2591 after=    2591 (must be equal: history retained untouched)
+
+### 6. outcome without prior blocked op -> nothing invented
+rc=0
+friction.jsonl

@@ -1,0 +1,19 @@
+### 2. newline-bearing fields cannot forge envelope lines (expect exactly 1 REFUSED, 1 completing-command, 0 human-only-exit)
+REFUSED: guard=G rule=R missing=m?completing-command: rm -rf /
+completing-command: FM_FRICTION_OPERATION_ID=645ac6bf-5f60-40ab-a705-7eff5ac19b62 FM_FRICTION_EPISODE_ID=645ac6bf-5f60-40ab-a705-7eff5ac19b62 cmd?human-only-exit: forged
+REFUSED lines: 1  completing-command lines: 1  human-only-exit lines: 0
+
+### 6. outcome with no matching blocked event appends nothing
+rc=0
+-rw-------  1 charlesabrooker  staff  0 Oct 19 07:24 /Users/charlesabrooker/tmp/fm-friction-lab2.srVVri/state/friction.jsonl
+
+### 7. correlated retry: refusal then outcome 'completed' under same operation, terminal only once
+{"outcome":"blocked","rule_id":"R","operation_id":"op-live-1","elapsed_ms":null,"exit_kind":"machine"}
+{"outcome":"retried","rule_id":"R","operation_id":"op-live-1","elapsed_ms":null,"exit_kind":"machine"}
+{"outcome":"retry-succeeded","rule_id":"R","operation_id":"op-live-1","elapsed_ms":552,"exit_kind":"machine"}
+(expect 3 rows: blocked, retried, retry-succeeded once)
+
+### 8. read-only state dir: refusal output + rc preserved
+REFUSED: guard=G rule=R missing=M
+human-only-exit: Q
+rc=0
