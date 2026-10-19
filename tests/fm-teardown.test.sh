@@ -11197,14 +11197,53 @@ SH
   assert_no_grep 'rule=nonforced-removal' "$FOREIGN_CASE/stderr" 'english-clean: Git words alone were typed as a protection refusal'
   assert_absent "$FOREIGN_CASE/home/state/friction.jsonl" 'english-clean: Git words alone recorded a policy event'
   assert_foreign_copy_untouched english-clean
-  pass 'nonforced-removal follows the copy Git protects, not the language or words of Git'"'"'s message'
+
+  make_foreign_copy_case foreign-removal-protected-but-failed
+  mkdir -p "$FOREIGN_COPY/.claude"
+  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" worktree remove "*) echo "fatal: '$FOREIGN_COPY' contains modified or untracked files, use --force to delete it" >&2; exit 255 ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "protected-but-failed: a failed removal must keep the exit: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "error: git worktree remove failed for foreign copy $FOREIGN_COPY (exit 255)" "$FOREIGN_CASE/stderr" 'protected-but-failed: a status other than Git'"'"'s fatal refusal was reported as protection'
+  assert_no_grep 'rule=nonforced-removal' "$FOREIGN_CASE/stderr" 'protected-but-failed: a non-refusal status was typed as a protection refusal'
+  assert_absent "$FOREIGN_CASE/home/state/friction.jsonl" 'protected-but-failed: a non-refusal status recorded a policy event'
+  assert_foreign_copy_untouched protected-but-failed
+  pass 'nonforced-removal needs both a protected copy and Git'"'"'s fatal refusal status, and ignores the language or words of Git'"'"'s message'
+}
+
+# Git also refuses a worktree whose git directory keeps a modules directory, even
+# when its working tree is clean (what a submodule deinit leaves). Real Git
+# refuses with its fatal status and teardown counts it as the typed refusal.
+test_foreign_copy_with_a_modules_directory_is_a_typed_nonforced_removal() {
+  local rc gitdir
+  make_foreign_copy_case foreign-modules-dir
+  gitdir=$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)
+  mkdir "$gitdir/modules"
+  [ -z "$(git -C "$FOREIGN_COPY" status --porcelain --ignore-submodules=none)" ] || fail 'modules-dir: the fixture copy is not clean'
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "modules-dir: a copy Git refuses to remove must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal ' "$FOREIGN_CASE/stderr" 'modules-dir: the refusal is not typed'
+  assert_no_grep 'error: git worktree remove failed' "$FOREIGN_CASE/stderr" 'modules-dir: a Git protection refusal was reported as a plain failure'
+  jq -es 'length == 1 and .[0].rule_id == "nonforced-removal" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only"' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'modules-dir: expected exactly one typed human-only event'
+  assert_foreign_copy_untouched modules-dir
+  assert_present "$gitdir/modules" 'modules-dir: the modules directory was removed'
+  pass 'a foreign copy whose git directory keeps a modules directory is refused as a typed nonforced-removal'
 }
 
 # teardown_copy_git_protects, run from the library against real Git copies:
 # clean and uninitialized-submodule copies are removable, so a failure to remove
-# them is not Git's protection; untracked files and an initialized submodule are.
+# them is not Git's protection; untracked files, an initialized submodule and the
+# modules directory a submodule deinit leaves behind are.
 test_git_protection_is_read_from_the_copy_state() {
-  local base=$TMP_ROOT/git-protects out
+  local base=$TMP_ROOT/git-protects out name rc
   mkdir -p "$base"
   (
     export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always
@@ -11218,13 +11257,16 @@ test_git_protection_is_read_from_the_copy_state() {
     git -C "$base/repo" worktree add -q "$base/uninitialized" -b uninitialized
     git -C "$base/repo" worktree add -q "$base/untracked" -b untracked
     git -C "$base/repo" worktree add -q "$base/initialized" -b initialized
+    git -C "$base/repo" worktree add -q "$base/deinitialized" -b deinitialized
     printf 'x\n' > "$base/untracked/new.txt"
     git -C "$base/initialized" submodule -q update --init
+    git -C "$base/deinitialized" submodule -q update --init
+    git -C "$base/deinitialized" submodule -q deinit -f sub
   ) > "$base/setup.out" 2>&1 || fail "git-protects: fixture setup failed: $(cat "$base/setup.out")"
   cat > "$base/harness.sh" <<'SH'
 set -u
 . "$FM_HARNESS_LIB"
-for name in clean uninitialized untracked initialized missing; do
+for name in clean uninitialized untracked initialized deinitialized missing; do
   if teardown_copy_git_protects "$FM_HARNESS_BASE/$name"; then echo "$name=protected"; else echo "$name=removable"; fi
 done
 SH
@@ -11234,12 +11276,16 @@ SH
 uninitialized=removable
 untracked=protected
 initialized=protected
+deinitialized=protected
 missing=removable' "$out" 'git-protects: protection was not read from the copy state'
   git -C "$base/repo" worktree remove "$base/uninitialized" || fail 'git-protects: Git refused an uninitialized-submodule copy the check called removable'
   git -C "$base/repo" worktree remove "$base/clean" || fail 'git-protects: Git refused a clean copy the check called removable'
-  ! git -C "$base/repo" worktree remove "$base/untracked" 2>/dev/null || fail 'git-protects: Git removed an untracked-file copy the check called protected'
-  ! git -C "$base/repo" worktree remove "$base/initialized" 2>/dev/null || fail 'git-protects: Git removed an initialized-submodule copy the check called protected'
-  pass "Git's protection is read from the copy: untracked files and an initialized submodule protect it, a clean or uninitialized copy does not, and Git agrees"
+  for name in untracked initialized deinitialized; do
+    rc=0
+    git -C "$base/repo" worktree remove "$base/$name" > /dev/null 2>&1 || rc=$?
+    assert_equals 128 "$rc" "git-protects: Git did not refuse the $name copy the check called protected with its fatal status"
+  done
+  pass "Git's protection is read from the copy: untracked files, an initialized submodule and a deinitialized submodule's modules directory protect it, a clean or uninitialized copy does not, and Git refuses exactly those with status 128"
 }
 
 # One rule asks one question wherever it is refused. The proof refuses a lock
@@ -13565,6 +13611,7 @@ test_landing_check_that_the_forge_answered_not_merged_stays_a_copy_landed_refusa
 test_landing_proof_that_head_changed_after_its_proof_is_unasked
 test_git_protection_is_read_from_the_copy_state
 test_nonforced_removal_is_decided_from_the_copy_not_from_gits_message
+test_foreign_copy_with_a_modules_directory_is_a_typed_nonforced_removal
 test_creation_lock_owner_asks_the_same_question_at_proof_and_release_time
 test_copy_path_with_newlines_cannot_forge_envelope_lines
 test_foreign_copy_that_is_not_a_worktree_root_is_a_typed_refusal

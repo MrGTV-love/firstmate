@@ -525,14 +525,17 @@ teardown_foreign_copy_present() {  # <slot> <copy>
   return 1
 }
 
-# Would a plain git worktree remove refuse <copy>? Git's documented conditions,
-# read from the copy itself and taken before the attempt, since a failed removal
-# can leave files missing: modified or untracked files, or an initialized
+# Would a plain git worktree remove refuse <copy>? Git's own conditions, read
+# from the copy itself and taken before the attempt, since a failed removal can
+# leave files missing: modified or untracked files, a modules directory in the
+# copy's git directory (even after a submodule deinit), or an initialized
 # submodule. A copy that cannot be read is not proved protected.
 teardown_copy_git_protects() {  # <copy>
-  local status entry
+  local status entry gitdir
   status=$(git -C "$1" status --porcelain --ignore-submodules=none 2>/dev/null) || return 1
   [ -z "$status" ] || return 0
+  gitdir=$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+  [ ! -d "$gitdir/modules" ] || return 0
   while IFS= read -r -d '' entry; do
     case "$entry" in
       '160000 '*) [ ! -e "$1/${entry#*$'\t'}/.git" ] || return 0 ;;
@@ -568,7 +571,7 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
       teardown_copy_git_protects "$copy" && protected=1 || protected=0
       remove_err=$(git -C "$slot" worktree remove "$copy" 2>&1 >/dev/null) || remove_rc=$?
       if [ "$remove_rc" != 0 ]; then
-        if [ "$protected" = 1 ]; then
+        if [ "$protected" = 1 ] && [ "$remove_rc" = 128 ]; then
           teardown_refuse_copy nonforced-removal "git worktree remove would not remove foreign copy $copy without force; it was not removed." "$copy"
         else
           teardown_refuse_copy inspection-unavailable "git worktree remove failed for foreign copy $copy (exit $remove_rc): $remove_err; it was not removed." "$copy"
