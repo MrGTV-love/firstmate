@@ -92,6 +92,9 @@ case " $* " in
   *" rev-parse --show-toplevel "*)
     [ -z "${FAKE_GIT_SLEEP_HOME:-}" ] || sleep "$FAKE_GIT_SLEEP_HOME"
     ;;
+  *" rev-parse --absolute-git-dir "*)
+    [ -z "${FAKE_GIT_SLEEP_ABSDIR:-}" ] || sleep "$FAKE_GIT_SLEEP_ABSDIR"
+    ;;
   *" ls-files "*)
     if [ -n "${FAKE_GIT_FAIL_LSFILES:-}" ]; then
       echo "fatal: injected ls-files failure" >&2
@@ -208,11 +211,13 @@ assert_untouched() {  # <names...>: before and after snapshots match
 HELD_NAMES=(dirty unpushed unpushed2 live orphan locked proc)
 
 test_report_lists_every_copy_and_changes_nothing() {
+  local first second
   make_matrix report
   take_snapshots before reap "${HELD_NAMES[@]}"
   git -C "$SLOT" worktree list --porcelain > "$W/list-before"
   FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep
   [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  first=$OUT
   assert_class reap REAPABLE-PROVEN
   assert_class dirty HELD-DIRTY
   assert_class unpushed HELD-UNPUSHED
@@ -234,11 +239,14 @@ test_report_lists_every_copy_and_changes_nothing() {
   assert_absent "$HOMED/state/copy-sweep.record" "report wrote a budget record"
   assert_absent "$HOMED/state/copy-sweep.sizes" "report wrote a size cache"
   assert_absent "$HOMED/state/.wake-queue" "report raised a wake"
-  pass "report mode lists every copy with class and reason and changes nothing"
+  FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep
+  second=$OUT
+  [ "$first" = "$second" ] || fail "a second report differs from the first: $(diff <(printf '%s\n' "$first") <(printf '%s\n' "$second") | head -5)"
+  pass "report mode lists every copy with class and reason, changes nothing, and repeats exactly"
 }
 
 test_live_nested_copies_are_named_once_with_age_and_left_untouched() {
-  local lock before_lock before_list report_line
+  local lock before_lock before_list report_line first
   make_world live-nested
   add_copy locked-live
   add_copy unlocked-live
@@ -258,10 +266,15 @@ test_live_nested_copies_are_named_once_with_age_and_left_untouched() {
   assert_contains "$report_line" "$(copy_path locked-live) (task=outer-task age=3600s source=lock)" 'lock age or absolute path missing'
   assert_contains "$report_line" "$(copy_path unlocked-live) (task=outer-task age=86400s source=directory)" 'directory age or absolute path missing'
   assert_absent "$HOMED/state/.wake-queue" 'report raised a wake'
+  first=$OUT
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep
+  assert_equals "$first" "$OUT" 'a second report with the clock pinned differs from the first'
   FM_COPY_SWEEP_NOW=1893456000 run_sweep check
   [ "$RC" = 0 ] || fail "live nested check failed: $OUT"
   [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] || fail "check emitted more than one notification: $OUT"
-  assert_equals "$report_line" "$OUT" 'check must name both live copies even with budgets off'
+  assert_contains "$OUT" 'nested copies=2, oldest 2:' 'check must count both live copies even with budgets off'
+  assert_contains "$OUT" "$(copy_path locked-live) (task=outer-task age=3600s source=lock)" 'check did not name the locked live copy'
+  assert_contains "$OUT" "$(copy_path unlocked-live) (task=outer-task age=86400s source=directory)" 'check did not name the unlocked live copy'
   assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path locked-live)" 'record did not keep the notified live copy'
   FM_COPY_SWEEP_NOW=1893456001 run_sweep check
   [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "the same live set woke again: $OUT"
@@ -271,7 +284,7 @@ test_live_nested_copies_are_named_once_with_age_and_left_untouched() {
   FM_COPY_SWEEP_NOW=1893456002 run_sweep check
   [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] || fail "budget and live facts emitted separate notifications: $OUT"
   assert_contains "$OUT" 'over its budget' 'budget facts were lost'
-  assert_contains "$OUT" 'nested copies=3:' 'the new live copy did not raise one aggregated fact'
+  assert_contains "$OUT" 'nested copies=3, oldest 3:' 'the new live copy did not raise one aggregated fact'
   assert_contains "$OUT" "$(copy_path added-live)" 'the new live copy was not named'
   take_snapshots after locked-live unlocked-live
   assert_untouched locked-live unlocked-live
@@ -279,6 +292,79 @@ test_live_nested_copies_are_named_once_with_age_and_left_untouched() {
   assert_equals "$before_list" "$(git -C "$SLOT" worktree list --porcelain)" 'check changed registrations'
   assert_absent "$HOMED/data/copy-sweep.log" 'live check wrote a removal log'
   pass 'live nested copies are named once with lock/directory ages, below budget, without changing copies or locks'
+}
+
+test_a_lock_probe_cut_by_the_time_bound_reads_unknown_never_directory() {
+  make_world live-probe-cut
+  add_copy locked-live
+  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
+  git -C "$SLOT" worktree lock --reason 'vernant-session-active owner=launcher:999999' "$(copy_path locked-live)"
+  printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  FAKE_GIT_SLEEP_ABSDIR=6 FM_CHECK_TIMEOUT=7 run_sweep check
+  [ "$RC" = 0 ] || fail "check with a cut lock probe failed: $OUT"
+  assert_contains "$OUT" "$(copy_path locked-live) (task=outer-task age=unknown source=unknown)" 'a copy whose lock probe was cut was not named with an unknown source'
+  assert_not_contains "$OUT" 'source=directory' 'a copy whose lock probe was cut was labeled by its directory'
+  pass 'a lock probe cut by the time bound names the copy with an unknown source and age, never its directory age'
+}
+
+test_a_registered_copy_whose_directory_is_gone_is_not_named_live() {
+  make_world live-gone
+  add_copy present
+  add_copy vanished
+  rm -rf "$(copy_path vanished)"
+  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
+  printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  run_sweep check
+  assert_contains "$OUT" 'nested copies=1, oldest 1:' 'the count included a copy that is not on disk'
+  assert_contains "$OUT" "$(copy_path present) (task=outer-task" 'the copy on disk was not named'
+  assert_not_contains "$OUT" "$(copy_path vanished)" 'a copy that is not on disk was named as live'
+  assert_not_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path vanished)" 'the record kept a copy that is not on disk'
+  pass 'a registered copy whose directory is gone is not named as a live nested copy'
+}
+
+test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report() {
+  local i report_line wake_line
+  make_world live-bound
+  for i in 1 2 3 4 5 6 7; do
+    add_copy "n$i"
+    TZ=UTC touch -t "$(printf '20291231%02d00' $((i - 1)))" "$(copy_path "n$i")"
+  done
+  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
+  printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep
+  report_line=$(printf '%s\n' "$OUT" | grep '^copy-sweep: HELD-LIVE-TASK nested copies=')
+  assert_contains "$report_line" 'nested copies=7:' 'the report did not count every live copy'
+  for i in 1 2 3 4 5 6 7; do
+    assert_contains "$report_line" "$(copy_path "n$i") (task=outer-task" "the report left out copy n$i"
+  done
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep check
+  [ "$RC" = 0 ] || fail "check failed: $OUT"
+  wake_line=$OUT
+  [ "$(printf '%s\n' "$wake_line" | wc -l | tr -d ' ')" = 1 ] || fail "the live copies were not one aggregated line: $wake_line"
+  assert_contains "$wake_line" 'nested copies=7, oldest 5:' 'the wake did not carry the count and the bound'
+  for i in 1 2 3 4 5; do
+    assert_contains "$wake_line" "$(copy_path "n$i") (task=outer-task age=" "the wake left out oldest copy n$i"
+  done
+  assert_not_contains "$wake_line" "$(copy_path n6)" 'the wake named a copy beyond the oldest five'
+  assert_not_contains "$wake_line" "$(copy_path n7)" 'the wake named a copy beyond the oldest five'
+  assert_contains "$wake_line" 'the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh' 'the wake did not point at the report line'
+  pass 'the wake carries the count, the oldest five live copies and a pointer to the report, as one line'
+}
+
+test_an_unreadable_clone_keeps_the_record_so_recovery_does_not_wake_again() {
+  make_budget_world unread-record 4 4 4
+  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  run_sweep check
+  assert_contains "$OUT" "container $SLOT is over its budget: 12.00 GiB against 5 GiB" 'the first run did not wake on the budget'
+  assert_contains "$OUT" 'nested copies=3, oldest 3:' 'the first run did not name the live copies'
+  FAKE_GIT_FAIL_LIST=1 run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "a run that could not read the clone woke: $OUT"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "container:$SLOT" 'an unreadable clone dropped the standing budget from the record'
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path c1)" 'an unreadable clone dropped a live copy from the record'
+  run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "recovery from an unreadable clone woke again for an unchanged world: $OUT"
+  pass 'a clone that cannot be read keeps the recorded budgets and live copies, so recovery stays quiet'
 }
 
 test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact() {
@@ -1150,6 +1236,10 @@ run_case() {
 
 run_case test_report_lists_every_copy_and_changes_nothing
 run_case test_live_nested_copies_are_named_once_with_age_and_left_untouched
+run_case test_a_lock_probe_cut_by_the_time_bound_reads_unknown_never_directory
+run_case test_a_registered_copy_whose_directory_is_gone_is_not_named_live
+run_case test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report
+run_case test_an_unreadable_clone_keeps_the_record_so_recovery_does_not_wake_again
 run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy

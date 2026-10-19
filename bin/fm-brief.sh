@@ -663,9 +663,7 @@ TASK_SECTION=${TASK_SECTION%$'\n'}
 # The secondmate charter deliberately omits this rule because a secondmate
 # legitimately allocates and returns slots for crewmates in its own home.
 IFS= read -r -d '' SHARED_INFRA_RULE <<'EOF' || true
-7. Never administer infrastructure that every lane shares.
-   The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.
-   Two things are shared:
+7. Never administer infrastructure that every lane shares. Two things are shared:
    - The `no-mistakes` daemon - one instance serving every lane/home, so stopping, restarting, or
      updating it kills other lanes' in-flight pipeline runs; only firstmate manages the daemon.
      Before you append `blocked:` about the pipeline, run `no-mistakes daemon status` and
@@ -685,6 +683,7 @@ IFS= read -r -d '' SHARED_INFRA_RULE <<'EOF' || true
      get/return/remove/prune, the equivalent operations on any other worktree provider or runtime
      backend, and `git worktree add|remove|move|prune`. A slot that looks unused is not evidence
      that it is free, and returning your own worktree is firstmate's job at cleanup, not yours.
+   The task copy is the isolation: do not create a second worktree inside it.
    If you genuinely need a second checkout, another slot, or the daemon touched, append
    `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
 EOF

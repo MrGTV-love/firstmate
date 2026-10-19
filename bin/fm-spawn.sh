@@ -4422,6 +4422,25 @@ validate_spawn_worktree() { # <source> <inspect-target>
   fi
 }
 
+# The task copy is the isolation, so a slot that already has a worktree
+# registered strictly inside it carries a stale inner layer and is not handed out
+# for new work. The refusal names the slot and every registration, and removes,
+# locks, unlocks, and returns nothing; a registration list that cannot be read
+# refuses too, because an unreadable list proves nothing empty.
+validate_spawn_slot_has_no_inner_worktree() { # <inspect-target>
+  local inspect_target=$1 slot nested line
+  if ! slot=$(fm_task_copy_canonical_dir "$WT") || ! nested=$(fm_task_copy_registered_nested "$slot"); then
+    echo "error: treehouse get yielded '$WT', but the worktrees registered inside it cannot be listed; refusing to launch onto a slot that may carry a second isolation layer. Inspect target $inspect_target" >&2
+    exit 1
+  fi
+  [ -n "$nested" ] || return 0
+  echo "error: treehouse get yielded slot '$slot', which already has a worktree registered inside it; the task copy is the isolation, so a slot carrying an inner layer is not handed out for new work. Nothing was removed, locked, unlocked, or returned; bin/fm-copy-sweep.sh reports these copies. Inspect target $inspect_target" >&2
+  while IFS= read -r line; do
+    echo "  registered inside the slot: $line" >&2
+  done < <(printf '%s\n' "$nested")
+  exit 1
+}
+
 # A pooled slot whose only deviation is a submodule gitlink is stale, not dirty:
 # an earlier refresh moved the superproject and left the submodule checkout on
 # the pin the previous base recorded. The refusal still stands and this gate
@@ -5655,6 +5674,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   fi
 
   validate_spawn_worktree "treehouse get" "$T"
+  validate_spawn_slot_has_no_inner_worktree "$T"
 
   # Claim the pool slot for this task. The interactive `treehouse get` sent to
   # the pane above records only a process lease (Treehouse's durable
