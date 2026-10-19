@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # Detect the agent harness this process tree runs on.
 # Usage: fm-harness.sh                  print own harness: claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|dsh|agy|devin|unknown
-#        fm-harness.sh model-family <model> [provider]
-#                                        print the harness a model family routes to
-#                                        (deepseek -> dsh, claude* -> claude, else omp)
 #        fm-harness.sh crew             print the effective CREWMATE harness
 #                                        (config/crew-harness; "default" resolves to own)
 #        fm-harness.sh secondmate       print the harness the PRIMARY uses to launch
@@ -555,7 +552,6 @@ validate_native_effort() {
 }
 
 case "${1:-}" in
-  model-family) shift; exec python3 "$SCRIPT_DIR/fm-dsh.py" route "$@" ;;
   validate-native-effort) shift; validate_native_effort "$@" ;;
   ancestry)
     case "${2:-}" in

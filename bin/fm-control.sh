@@ -2296,6 +2296,9 @@ resolve_relaunch_profile() {
   if [ "$TARGET_HARNESS" = omp ]; then
     fm_omp_api_billing_route_check "$TARGET_MODEL" || return 1
   fi
+  local dsh_route_model=$TARGET_MODEL
+  [ "$dsh_route_model" != default ] || dsh_route_model=
+  python3 "$SCRIPT_DIR/fm-dsh.py" check "$TARGET_HARNESS" "$dsh_route_model" || return 1
   case "$(fm_meta_get "$META" omp_no_helpers)" in
     '') ;;
     on)

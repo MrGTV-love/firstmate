@@ -5600,14 +5600,22 @@ agy_wait_for_working() {
   return 1
 }
 
+agy_spawn_fail() {  # <detail>
+  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  echo "error: $1; inspect window $T" >&2
+  rovo_endpoint_cleanup
+}
+
 # dsh-tui submits the brief as its opening prompt, so its own durable session
 # log is the start proof: a turn opening (busy) or already finishing (idle)
-# both mean the brief reached the agent. No pane-scrape fallback exists because
-# the log is the same source the busy classifier trusts.
+# both mean the brief reached the agent. A resumed launch already holds the
+# earlier conversation, so only a turn that started beyond DSH_START_POSITION,
+# the log position taken before launch, counts. No pane-scrape fallback exists
+# because the log is the same source the busy classifier trusts.
 dsh_wait_for_start() {
   local state i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
   while [ "$i" -lt "$max" ]; do
-    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" 2>/dev/null) || state=unknown
+    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
     case "$state" in
       busy | idle) return 0 ;;
     esac
@@ -6970,6 +6978,7 @@ dsh)
   if [ -z "$DSH_RUNTIME" ]; then
     DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT") || exit 1
   fi
+  DSH_START_POSITION=$(python3 "$SCRIPT_DIR/fm-dsh.py" position "$STATE_REAL" "$ID") || exit 1
   LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}
   LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
   LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}

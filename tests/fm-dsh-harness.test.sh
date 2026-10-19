@@ -52,6 +52,17 @@ assert call('state', state, 'task') == 'busy', 'torn append must not create idle
 put([start,end])
 assert call('state', state, 'task') == 'idle'
 assert call('session-file',state,'task') == str(log)
+# A resumed launch already holds the earlier conversation, so the start proof
+# is a turn that began beyond the position taken before launch.
+where = call('position',state,'task')
+assert json.loads(where) == [str(log), 2]
+assert call('state',state,'task','--since',where) == 'unknown', 'history alone is not a started turn'
+put([start,end,{'type':'turn/start','seq':3}])
+assert call('state',state,'task','--since',where) == 'busy'
+put([start,end,{'type':'turn/start','seq':3},{'type':'turn/end','seq':4}])
+assert call('state',state,'task','--since',where) == 'idle', 'a turn that already finished still proves the brief ran'
+assert call('state',state,'task','--since','{') == 'unknown', 'an unreadable position must not pass'
+put([start,end])
 # The launch overlay replaces the stock profile patch's sessionId field, so
 # resume must write it explicitly into the bound launch patch.
 (runtime / 'launch.yml').write_text('[]\n')
@@ -71,15 +82,47 @@ child = runtime / 'dsh/sessions/workspace/child'
 child.mkdir()
 (child / 'session.v4.jsonl').write_text(json.dumps({**header,'delegationDepth':1,'id':'22222222-2222-4222-8222-222222222222'})+'\n')
 assert call('state',state,'task') == 'idle', 'subagents do not own top-level activity'
-# A relaunch opens a NEW depth-zero session in the same launch store, so the
-# newest depth-zero log is the live one and the older one is history.
+# The newest depth-zero log in a launch store is the live one; an older one is
+# history, and a position taken on another log does not gate the newer one.
 (child / 'session.v4.jsonl').write_text(json.dumps({**header,'id':'33333333-3333-4333-8333-333333333333'})+'\n'+json.dumps({**start,'seq':7})+'\n')
-assert call('state',state,'task') == 'busy', 'a relaunched session owns activity'
+assert call('state',state,'task') == 'busy', 'the newest depth-zero session owns activity'
+assert call('state',state,'task','--since',where) == 'busy', 'a position on another log is history'
 assert call('session-file',state,'task') == str(child / 'session.v4.jsonl')
 (child / 'session.v4.jsonl').unlink()
 (store / 'session.v5.jsonl').write_text(json.dumps({**header,'version':5})+'\n')
 assert call('state',state,'task') == 'unknown', 'new unsupported generation must not fall back'
-print('ok - dsh route boundaries, contradiction refusal, provider normalization, durable transitions, torn append, relaunch-session selection and ambiguity')
+call('position',state,'task',ok=False)
+# A launch with no log yet has no position, so its first turn is the proof.
+no_log = tmp / 'no-log-state'
+no_log.mkdir()
+(no_log / 'task.dsh-session').write_text(json.dumps({**binding,'root':str(tmp / 'no-launch-yet')}))
+assert call('position',no_log,'task') == ''
+# prepare retires the generation its new binding replaces, so a changed route
+# does not strand the old credentials copy and session logs, but it never
+# removes a directory that is not one of this task's own generations.
+source = tmp / 'installed-dsh'
+installed = source / 'profiles/dsh-tui'
+package = installed / 'node_modules/@deepseek-harness-tui/dsh-tui'
+package.mkdir(parents=True)
+(installed / 'package.json').write_text('{}')
+(package / 'package.json').write_text(json.dumps({'version':'0.16.1'}))
+(source / '.credentials.yaml').write_text('secret\n')
+launches = tmp / 'launches'
+launches.mkdir()
+def prepare(generation):
+    return Path(call('prepare',launches,'task',generation,source,'deepseek/v4','high',cwd))
+first = prepare('g1')
+assert (first / 'dsh/.credentials.yaml').read_text() == 'secret\n'
+second = prepare('g2')
+assert not first.exists(), 'a replaced launch generation must be retired'
+assert json.loads((launches / 'task.dsh-session').read_text())['root'] == str(second)
+outside = tmp / 'outside'
+outside.mkdir()
+(outside / 'keep').write_text('x')
+(launches / 'task.dsh-session').write_text(json.dumps({'root':str(outside),'cwd':str(cwd)}))
+prepare('g3')
+assert (outside / 'keep').exists(), 'prepare must not remove a root outside the task generations'
+print('ok - dsh route boundaries, contradiction refusal, provider normalization, durable transitions, torn append, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement')
 PY
 # shellcheck source=bin/fm-dsh-lib.sh
 . "$ROOT/bin/fm-dsh-lib.sh"

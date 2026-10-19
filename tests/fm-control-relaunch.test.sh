@@ -76,6 +76,47 @@ SH
   pass "fm-control relaunch: unsupported omp preserves the running agent and task"
 }
 
+test_relaunch_refuses_contradictory_dsh_route_before_stopping() {
+  local dir out rc case_name expected
+  local -a args
+  for case_name in dsh-without-model omp-with-deepseek-model; do
+    dir=$(new_case "dsh-route-$case_name" dsh-route)
+    add_ship_task "$dir" dsh-route claude
+    cat > "$dir/fakebin/dsh-tui" <<'SH'
+#!/bin/sh
+if [ "${1:-}" = version ]; then
+  printf '@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)\nprofile: 0.16.1  fake\n'
+  exit 0
+fi
+exit 1
+SH
+    cat > "$dir/fakebin/dsh" <<'SH'
+#!/bin/sh
+printf '0.2.0-rc.2\n'
+SH
+    chmod +x "$dir/fakebin/dsh-tui" "$dir/fakebin/dsh"
+    cp "$dir/home/state/dsh-route.meta" "$dir/prior.meta"
+    case "$case_name" in
+      dsh-without-model)
+        args=(--harness dsh)
+        expected="dsh requires an explicit DeepSeek model id"
+        ;;
+      *)
+        args=(--harness omp --model deepseek/deepseek-v4-flash)
+        expected="routes to dsh, not to 'omp'"
+        ;;
+    esac
+    out=$(run_control "$dir" dsh-route relaunch "${args[@]}" --note "preserve current agent"); rc=$?
+    expect_code 1 "$rc" "$case_name must refuse before stopping: $out"
+    assert_contains "$out" "$expected" "$case_name refusal must name the contradiction"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "$case_name refusal stopped the original agent"
+    [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "$case_name refusal sent lifecycle or launch input"
+    cmp -s "$dir/prior.meta" "$dir/home/state/dsh-route.meta" || fail "$case_name refusal changed task metadata"
+    assert_absent "$dir/home/state/dsh-route.control-relaunch" "$case_name refusal must precede the relaunch transaction"
+  done
+  pass "fm-control relaunch: a contradictory dsh route preserves the running agent and task"
+}
+
 test_relaunch_omp_billing_admission_preserves_running_agents() {
   local provider path dir id model meta out rc expected
   local -a args
@@ -2011,6 +2052,7 @@ fi
 control_relaunch_test_cases=(
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_unsupported_omp_before_stopping
+test_relaunch_refuses_contradictory_dsh_route_before_stopping
 test_relaunch_omp_billing_admission_preserves_running_agents
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

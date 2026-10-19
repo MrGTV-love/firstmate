@@ -4,21 +4,26 @@
 `resume` rewrites the bound launch patch with the newest session id in the
 row config's sessionId field: the launch overlay replaces the stock profile
 patch field that reads DSH_TUI_RESUME_SESSION, so the env alone cannot resume.
-The durable fold follows the newest depth-zero log.
+A resumed session appends to its own log. The durable fold follows the newest
+depth-zero log.
 
 prepare STATE ID GENERATION SOURCE_HOME MODEL EFFORT CWD stages a per-launch
 HOME and DSH_HOME at STATE/ID.dsh/GENERATION, then atomically publishes
-STATE/ID.dsh-session. Installed packages are read-only links; configuration,
-credentials, preferences, and session logs belong exclusively to this launch.
+STATE/ID.dsh-session and retires the generation that binding replaced.
+Installed packages are read-only links; configuration, credentials,
+preferences, and session logs belong exclusively to this launch.
 resume STATE ID MODEL EFFORT CWD rewrites the bound launch patch to resume the
 newest depth-zero session, or prints nothing when the binding changed.
 session-file STATE ID prints the live depth-zero session log.
-state STATE ID folds only the unique depth-zero session in that launch's
-plain JSONL store. Missing, ambiguous, corrupt, or unsupported data is unknown.
+position STATE ID prints the live session log and its last durable seq as JSON,
+or nothing before the launch has a log.
+state STATE ID [--since POSITION] folds only the newest depth-zero session in
+that launch's plain JSONL store. Missing, corrupt, or unsupported data is
+unknown. With --since, anything recorded at or before POSITION is history: a
+turn must have started beyond it, or the state is unknown.
 route MODEL [PROVIDER] prints the default model-family adapter.
 check HARNESS MODEL [PROVIDER] refuses DeepSeek/runtime contradictions while
-preserving explicit non-DeepSeek adapters. profiles FILE checks every declared
-profile (including fallbacks) without rewriting configuration.
+preserving explicit non-DeepSeek adapters.
 """
 import argparse
 import json
@@ -57,18 +62,6 @@ def normalize(value):
                 value["model"] = "deepseek/" + value["model"]
         return value
     return value
-
-
-def profiles(value):
-    if isinstance(value, list):
-        for item in value:
-            profiles(item)
-    elif isinstance(value, dict):
-        if isinstance(value.get("harness"), str):
-            check(value["harness"], value.get("model", ""), value.get("provider", ""))
-        for key in ("rules", "use", "default", "fallback", "default_fallback"):
-            if key in value:
-                profiles(value[key])
 
 
 def atomic_json(path, value):
@@ -153,7 +146,14 @@ def prepare(args):
     if effort not in ("", "default"):
         atomic_json(prefs / "effort.json", {"effort": effort})
     atomic_json(root / "launch.yml", launch_patch(model, effort, cwd, dsh, ""))
-    atomic_json(Path(state) / f"{task}.dsh-session", {"root": str(root), "cwd": str(Path(cwd).resolve()), "generation": generation, "model": model, "effort": effort})
+    binding = Path(state) / f"{task}.dsh-session"
+    try:
+        previous = Path(json.loads(binding.read_text())["root"])
+    except (OSError, ValueError, KeyError, TypeError):
+        previous = None
+    atomic_json(binding, {"root": str(root), "cwd": str(Path(cwd).resolve()), "generation": generation, "model": model, "effort": effort})
+    if previous is not None and previous != root and previous.parent == root.parent:
+        shutil.rmtree(previous, ignore_errors=True)
     print(root)
 
 
@@ -178,18 +178,17 @@ def session_path(binding):
         candidates.append(path)
     if not candidates:
         return None
-    # dsh-tui --resume replays the conversation into a NEW session id in the
-    # same launch store, so a resumed task legitimately owns more than one
-    # depth-zero log. The newest is the live one; older logs are its history.
+    # A launch store can hold more than one depth-zero log. The newest is the
+    # live one; older logs are history.
     candidates.sort(key=lambda path: (path.stat().st_mtime_ns, path.parent.name))
     return candidates[-1]
 
 
-def turn_state(state, task):
-    binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
-    path = session_path(binding)
-    if not isinstance(path, Path):
-        return "unknown"
+def live_log(state, task):
+    return session_path(json.loads((Path(state) / f"{task}.dsh-session").read_text()))
+
+
+def fold(path):
     with path.open("rb") as stream:
         stream.seek(0, os.SEEK_END)
         start = max(0, stream.tell() - 1024 * 1024)
@@ -197,7 +196,7 @@ def turn_state(state, task):
         if start:
             stream.readline()
         result = "unknown"
-        last_seq = -1
+        last_seq = started = -1
         for line in stream:
             if not line.endswith(b"\n"):
                 break  # An incomplete append is not a committed event.
@@ -206,13 +205,33 @@ def turn_state(state, task):
                 continue
             seq = event.get("seq")
             if not isinstance(seq, int) or seq <= last_seq:
-                return "unknown"
+                raise ValueError("dsh session log has a non-monotonic sequence")
             last_seq = seq
             if event.get("type") == "turn/start":
                 result = "busy"
+                started = seq
             elif event.get("type") == "turn/end":
                 result = "idle"
-        return result
+        return result, last_seq, started
+
+
+def turn_state(state, task, since=None):
+    path = live_log(state, task)
+    if not isinstance(path, Path):
+        return "unknown"
+    result, _, started = fold(path)
+    if since is not None and started <= (since[1] if since[0] == str(path) else -1):
+        return "unknown"
+    return result
+
+
+def position(state, task):
+    path = live_log(state, task)
+    if path is None:
+        return None
+    if not isinstance(path, Path):
+        raise ValueError("dsh session log is unreadable")
+    return [str(path), fold(path)[1]]
 
 
 def resume(args):
@@ -237,8 +256,7 @@ def resume(args):
 
 def session_file(args):
     state, task = args
-    binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
-    path = session_path(binding)
+    path = live_log(state, task)
     if isinstance(path, Path):
         print(path)
 
@@ -252,9 +270,13 @@ def main():
     p.add_argument("values", nargs=5)
     p = sub.add_parser("session-file")
     p.add_argument("values", nargs=2)
+    p = sub.add_parser("position")
+    p.add_argument("state")
+    p.add_argument("task")
     p = sub.add_parser("state")
     p.add_argument("state")
     p.add_argument("task")
+    p.add_argument("--since", default="")
     p = sub.add_parser("route")
     p.add_argument("model")
     p.add_argument("provider", nargs="?", default="")
@@ -262,8 +284,6 @@ def main():
     p.add_argument("harness")
     p.add_argument("model")
     p.add_argument("provider", nargs="?", default="")
-    p = sub.add_parser("profiles")
-    p.add_argument("file")
     p = sub.add_parser("normalize")
     p.add_argument("file")
     p.add_argument("output")
@@ -279,13 +299,15 @@ def main():
             print(route(args.model, args.provider))
         elif args.command == "check":
             check(args.harness, args.model, args.provider)
-        elif args.command == "profiles":
-            profiles(json.loads(Path(args.file).read_text()))
         elif args.command == "normalize":
             atomic_json(Path(args.output), normalize(json.loads(Path(args.file).read_text())))
+        elif args.command == "position":
+            where = position(args.state, args.task)
+            if where is not None:
+                print(json.dumps(where))
         elif args.command == "state":
             try:
-                print(turn_state(args.state, args.task))
+                print(turn_state(args.state, args.task, json.loads(args.since) if args.since else None))
             except (OSError, ValueError, KeyError, TypeError):
                 print("unknown")
     except (OSError, ValueError, KeyError, TypeError) as error:
