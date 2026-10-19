@@ -353,6 +353,7 @@ start_pane() {  # <dir> <command...>
   pid=$!
   WORKER_PIDS+=("$pid")
   printf '%s\n' "$pid" > "$W/pane.pid"
+  # shellcheck disable=SC2016 # The single-quoted sh -c body expands in the child shell.
   fm_test_wait_until 10 sh -c '[ -n "$(pgrep -P "$1")" ]' _ "$pid" || true
   PANE_CHILD=$(pgrep -P "$pid" | sed -n 1p)
   wait_inside "$dir"
@@ -368,6 +369,7 @@ start_stray_shell() {  # <dir>
 }
 
 wait_inside() {  # <dir>: until some process works inside it
+  # shellcheck disable=SC2016 # The single-quoted sh -c body expands in the child shell.
   fm_test_wait_until 10 sh -c '[ -n "$(lsof -t +D "$1" 2>/dev/null)" ]' _ "$1" || true
 }
 
@@ -429,7 +431,8 @@ scn_scratch_copy_is_removed() {
   cmp -s "$W/status.before" "$STATE/t1.status" || why "the prune wrote to the task's status file: $(cat "$STATE/t1.status")" || return 1
   [ ! -e "$(project_lock_path)" ] || why "the project lock outlived the attempt" || return 1
   [ "$(wake_count)" = 0 ] || why "a reaped copy raised a wake" || return 1
-  [ -s "$W/control.log" ] && [ -z "$(grep -vx 't1 exit' "$W/control.log")" ] || why "the finished worker was not stopped by 't1 exit': $(cat "$W/control.log")" || return 1
+  [ -s "$W/control.log" ] || why "the finished worker was not stopped by 't1 exit': $(cat "$W/control.log")" || return 1
+  ! grep -qvx 't1 exit' "$W/control.log" || why "the finished worker was not stopped by 't1 exit': $(cat "$W/control.log")" || return 1
   f=$(find "$DATA/t1/merge-prune-preserved" -path '*/root/.claude/bug-evidence/ev1.json' 2>/dev/null | sed -n 1p)
   [ -n "$f" ] && [ "$(cat "$f")" = evidence-one ] || why "the bug-evidence record was not preserved" || return 1
   f=$(find "$DATA/t1/merge-prune-preserved" -path '*/root/.claude/channel-outbox/rate.json' 2>/dev/null | sed -n 1p)
@@ -688,6 +691,7 @@ scn_other_process_in_the_pane_keeps_the_copy() {  # <build|busy-shell|stray-shel
       ;;
     holder)
       start_pane "$W" bash "$W/bin/pane-holder" "$COPY/README.md" "$W" "$W/hold"
+      # shellcheck disable=SC2016 # The single-quoted sh -c body expands in the child shell.
       fm_test_wait_until 10 sh -c '[ -n "$(lsof -t "$1" 2>/dev/null)" ]' _ "$COPY/README.md" || true
       ;;
   esac
@@ -1384,6 +1388,7 @@ expect_caught() {  # <name> <file> <old> <new> <scenario> <what the mutation bre
   BIN_DIR="$ROOT/bin"
 }
 
+# shellcheck disable=SC2016 # Every mutation old/new text is literal shell source, never expanded here.
 test_unsafe_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
   expect_caught no-dirty-check $lib '  if [ -n "$dirty" ]; then' '  if false; then' scn_changed_file_is_kept "changed-file proof"
@@ -1445,6 +1450,7 @@ test_unsafe_mutations_are_caught() {
   pass "mutation proof (unsafe direction): breaking any safety proof makes its keep case fail"
 }
 
+# shellcheck disable=SC2016 # Every mutation old/new text is literal shell source, never expanded here.
 test_over_strict_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
   expect_caught no-scratch-names $lib '  if fm_mp_scratch_name "$name"; then' '  if false; then' scn_scratch_copy_is_removed "scratch patterns"
@@ -1575,7 +1581,7 @@ wake_count_real() {
 # (Teardown's own `treehouse return --force` is the landed-work-guarded return
 # of the slot it has just proved safe; it is not a forced teardown.)
 assert_nothing_forced() {  # <label>
-  if [ -s "$W/stub.log" ] && [ -n "$(grep -vx 't1' "$W/stub.log")" ]; then
+  if [ -s "$W/stub.log" ] && grep -qvx 't1' "$W/stub.log"; then
     fail "$1: teardown was asked with extra arguments: $(cat "$W/stub.log")"
   fi
   if grep -Eq -- '--include-unlanded|--include-in-use|^destroy .*--force' "$W/th.log"; then
@@ -1635,7 +1641,8 @@ test_e2e_transient_contention_retries_then_succeeds() {
   prune_real run t1 >/dev/null 2>&1
   [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.merge-prune" ] || fail "the retry after the contention cleared did not reap: $(cat "$DATA/t1/merge-prune.log")"
   assert_slot_returned
-  grep -q 'retry in' "$DATA/t1/merge-prune.log" && grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
+  grep -q 'retry in' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
+  grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
   pass "end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps"
 }
 

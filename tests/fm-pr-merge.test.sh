@@ -853,6 +853,7 @@ test_verified_merge_arms_the_pool_copy_prune() {
   add_gh_mocks "$case_dir" 1212121212121212121212121212121212121212
   : > "$case_dir/gh-axi.log"
   stub="$case_dir/teardown-stub"
+  # shellcheck disable=SC2016 # The stub's own text is single-quoted on purpose: it expands when the stub runs.
   printf '#!/usr/bin/env bash\nprintf "%%s|admission=%%s\\n" "$*" "${FM_IDLE_REAP_ADMISSION:-}" >> "%s"\nexit 0\n' "$case_dir/teardown-calls" > "$stub"
   chmod +x "$stub"
 
