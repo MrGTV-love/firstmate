@@ -3366,7 +3366,8 @@ try:
     result, boundary = drain()
     elapsed = time.monotonic() - started
     assert elapsed < 45, ('the drain waited on a hung reader', elapsed)
-    assert result.stdout.startswith('OVERDUE:') and row['id'] in result.stdout.split('STANDING')[0], result
+    assert result.stdout.startswith('NOT CHECKED THIS PASS') and row['id'] in result.stdout.split('STANDING')[0], result
+    assert 'OVERDUE:' not in result.stdout and '--check-in' not in result.stdout, 'a first cut-off read is retried, not steered'
     assert fresh['id'] in result.stdout.split('STANDING')[1], 'a row with a recent status event is satisfied despite the hung reader'
     hung = int((home / 'hung-pid').read_text())
     try:
@@ -3378,13 +3379,14 @@ try:
     refused = ack(boundary)
     assert time.monotonic() - started < 45, 'the acknowledgement waited on a hung reader'
     assert refused.returncode == 1 and row['id'] in refused.stdout and fresh['id'] not in refused.stdout, refused
+    assert f'--check-in "worker"' in refused.stdout, 'a reader cut off a second time is an obligation again'
     actions = json.loads(ledger.read_text())['handling']['actions']
     assert actions[fresh['id']]['kind'] == 'observed' and row['id'] not in actions, actions
 finally:
     (home / 'hang-reader').unlink(missing_ok=True)
-# Progress accumulates across presentations: with a budget that fits ten live reads, sixty overdue rows are proven
-# oldest first, every later presentation reuses the stored receipts without reading them again, and the last ten
-# rows are covered on the sixth presentation.
+# Progress accumulates across presentations: with a budget that fits ten live reads, sixty overdue rows are tried
+# least recently attempted first, the read the deadline cuts off goes to the back of the line, every later
+# presentation reuses the stored receipts without reading them again, and nothing in the output asks for a steer.
 module.write_text(deadline_source.replace('EVIDENCE_DEADLINE_SECONDS = 5\n', 'EVIDENCE_DEADLINE_SECONDS = 600\n'))
 reader.write_text('#!/usr/bin/env bash\n'
     'n=$(cat "$FM_HOME/reads" 2>/dev/null || echo 0)\n'
@@ -3403,17 +3405,80 @@ record = json.loads(ledger.read_text()); record['rows'] = rows; ledger.write_tex
 reads, read_log = home / 'reads', home / 'read-log'
 proven = lambda: sorted(ident for ident, action in json.loads(ledger.read_text()).get('handling', {}).get('actions', {}).items()
                         if action['kind'] == 'observed')
-for presentation in range(1, 7):
+expected, start = [], 60
+for _ in range(5):
+    expected.append([f'ok t{n:02d}' for n in range(start, start - 10, -1)] + [f'cut t{start - 10:02d}'])
+    start -= 11
+expected.append([f'ok t{n:02d}' for n in range(5, 0, -1)] + [f'ok t{n:02d}' for n in (50, 39, 28, 17, 6)])
+seen = 0
+for presentation, reads_this_pass in enumerate(expected, 1):
     reads.write_text('0')
-    ok(loops, '--present-overdue')
-    oldest = sorted(f'row-converge-{n:02d}' for n in range(61 - 10 * presentation, 61))
-    assert proven() == oldest, (presentation, proven())
+    shown = ok(loops, '--present-overdue').stdout
+    lines = read_log.read_text().splitlines()
+    assert lines[seen:] == reads_this_pass, (presentation, lines[seen:])
+    seen = len(lines)
+    assert len(proven()) == sum(line.startswith('ok ') for line in lines), (presentation, proven())
+    assert 'OVERDUE:' not in shown and 'help:' not in shown and '--check-in' not in shown, (presentation, shown[:600])
+    if presentation < 6:
+        assert 'NOT CHECKED THIS PASS' in shown and 'retry:' in shown, (presentation, shown[:600])
+        assert f'"row-converge-{61 - 11 * presentation:02d}"' in shown, 'the read the deadline cut off is not checked, not an obligation'
 reads.write_text('0')
 assert call(loops, '--check-actions').returncode == 0, 'every overdue row holds a receipt after six presentations'
 assert not ok(loops, '--present-overdue').stdout
 lines = read_log.read_text().splitlines()
-assert [line[3:] for line in lines if line.startswith('ok ')] == [f't{n:02d}' for n in range(60, 0, -1)], lines
-assert sum(line.startswith('cut ') for line in lines) == 5, 'a stored receipt was read again or a presentation ended early'
+assert sum(line.startswith('ok ') for line in lines) == 60 and len(proven()) == 60, 'a stored receipt was read again'
+assert not list((home / 'state').glob('*.inbox')), 'no worker was steered'
+
+# Stopped rows at the head never starve the working rows behind them: a row tried without proof goes to the back,
+# so with a budget of two probes per pass both working rows hold a receipt after the second presentation.
+reader.write_text('#!/usr/bin/env bash\n'
+    'n=$(cat "$FM_HOME/reads" 2>/dev/null || echo 0)\n'
+    'if [ "$n" -ge "$(cat "$FM_HOME/budget" 2>/dev/null || echo 2)" ]; then echo "cut $1" >> "$FM_HOME/read-log"; kill -ALRM "$PPID"; sleep 30; exit 1; fi\n'
+    'echo $((n + 1)) > "$FM_HOME/reads"; echo "ok $1" >> "$FM_HOME/read-log"\n'
+    'case "$1" in stopped*) echo "state: paused · source: status-log · stopped" ;;\n'
+    '  *) echo "state: working · source: run-step · run: live-validation" ;; esac\n')
+home, row, ledger, env, call, ok, drain, ack = case('rotation')
+rows = []
+for name, age in (('stopped1', 8000), ('stopped2', 7900), ('stopped3', 7800), ('working1', 7300), ('working2', 7200)):
+    (home / f'state/{name}.meta').write_text(f'kind=ship\nspawn_gen=generation-{name}\n')
+    (home / f'state/{name}.status').write_text(f'working [at={now-7200}]: implementing\n')
+    rows.append(dict(row, id='row-rotation-' + name, subject=name, age_seconds=age))
+record = json.loads(ledger.read_text()); record['rows'] = rows; ledger.write_text(json.dumps(record))
+reads, read_log = home / 'reads', home / 'read-log'
+reads.write_text('0')
+first = ok(loops, '--present-overdue').stdout
+assert read_log.read_text().splitlines() == ['ok stopped1', 'ok stopped2', 'cut stopped3'], read_log.read_text()
+overdue, unchecked = first.split('NOT CHECKED THIS PASS')[0], first.split('NOT CHECKED THIS PASS')[1]
+assert 'stopped1' in overdue and 'stopped2' in overdue and 'stopped3' not in overdue, first
+assert all(name in unchecked for name in ('stopped3', 'working1', 'working2')), first
+reads.write_text('0')
+ok(loops, '--present-overdue')
+assert read_log.read_text().splitlines()[3:] == ['ok working1', 'ok working2', 'cut stopped1'], read_log.read_text()
+assert proven() == ['row-rotation-working1', 'row-rotation-working2'], proven()
+assert not list((home / 'state').glob('*.inbox')), 'no worker was steered'
+
+# A row the deadline left unread is retried, never steered: the refusal names no check-in or receipt command for it.
+home, row, ledger, env, call, ok, drain, ack = case('unchecked')
+rows = []
+for name, age in (('stoppedA', 8000), ('stoppedB', 7900), ('stoppedC', 7800)):
+    (home / f'state/{name}.meta').write_text(f'kind=ship\nspawn_gen=generation-{name}\n')
+    (home / f'state/{name}.status').write_text(f'working [at={now-7200}]: implementing\n')
+    rows.append(dict(row, id='row-unchecked-' + name, subject=name, age_seconds=age))
+record = json.loads(ledger.read_text()); record['rows'] = rows; ledger.write_text(json.dumps(record))
+reads, read_log = home / 'reads', home / 'read-log'
+(home / 'budget').write_text('0'); reads.write_text('0')
+assert 'NOT CHECKED THIS PASS' in ok(loops, '--present-overdue').stdout
+refused = call(loops, '--check-actions')
+assert refused.returncode == 1 and 'acknowledgement refused' in refused.stdout and 'were not checked' in refused.stdout, refused
+assert 'retry:' in refused.stdout and '--check-in' not in refused.stdout and 'help:' not in refused.stdout, refused.stdout
+(home / 'budget').write_text('1'); reads.write_text('0')
+mixed = call(loops, '--check-actions')
+assert mixed.returncode == 1, mixed
+for name in ('stoppedC', 'stoppedA'):
+    assert f'--check-in "{name}"' in mixed.stdout, (name, mixed.stdout)
+assert '--check-in "stoppedB"' not in mixed.stdout and 'NOT CHECKED THIS PASS' in mixed.stdout, mixed.stdout
+assert '"row-unchecked-stoppedB"' in mixed.stdout.split('NOT CHECKED THIS PASS')[1], mixed.stdout
+assert not list((home / 'state').glob('*.inbox')), 'no worker was steered'
 module.write_text(deadline_source)
 print('PASS: a hung current-state reader ends at the evidence deadline; cheaper evidence still satisfies other rows and the unproven row demands its action', flush=True)
 print('PASS: automatic evidence reads leave the receipt lock available; concurrent row, metadata and status changes reject stale proofs', flush=True)

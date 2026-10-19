@@ -1132,6 +1132,8 @@ class Collector:
                                          for actor, pending in handling["presentations"].items()}
             handling["presented_at"] = {actor: {ident: stamp for ident, stamp in stamps.items() if ident in published}
                                         for actor, stamps in handling.get("presented_at", {}).items()}
+            if "attempts" in handling:
+                handling["attempts"] = {ident: tick for ident, tick in handling["attempts"].items() if ident in published}
             for row in report["rows"]:
                 if handling["actions"].get(row["id"], {}).get("captain_visible"):
                     row["captain_visible"] = True
@@ -1172,6 +1174,7 @@ def read_ledger(state):
                 type(handling.get("sequence")) is not int
                 or not isinstance(handling.get("actions"), dict) or not isinstance(handling.get("presentations"), dict)
                 or not isinstance(handling.get("presented_at", {}), dict)
+                or not isinstance(handling.get("attempts", {}), dict)
                 or any(not isinstance(v, dict) for v in handling.get("presented_at", {}).values())
                 or any(not isinstance(v, dict) for v in [*handling["actions"].values(),
                                                          *handling["presentations"].values()])):
@@ -1465,6 +1468,7 @@ class SatisfactionVerifier(WaitVerifier):
     def __init__(self, report, state, now):
         super().__init__(report, state, now)
         self.proofs, self.steps, self.statuses = {}, {}, {}
+        self.queued, self.attempted, self.demoted, self.standing, self.inflight = set(), [], set(), set(), None
         self.sealed = False
         self.expired = False
 
@@ -1618,41 +1622,74 @@ class SatisfactionVerifier(WaitVerifier):
         except SOURCE_ERRORS:
             return False
 
+    def probe(self, row, live, status_guards):
+        guard = self.input_guard(row)
+        if row.get("category") == "unanswered_question":
+            task = row["source"]["task"]
+            if status_guards.get(task) != guard[:2]:
+                self.decisions.pop(task, None)
+                status_guards[task] = guard[:2]
+        if receipt_stands(self.actions.get(row["id"], {}), row, self.collector.now, self):
+            self.standing.add(row["id"])
+            return
+        kind, proof = self.automatic(row, live)
+        if proof and guard == self.input_guard(row):
+            identity = self.identity(row)
+            self.proofs[row["id"]] = (identity, guard, kind, dict(proof, guard=guard, identity=identity))
+
     def prepare(self, report):
         status_guards = {}
-        overdue = overdue_rows(report, self.collector.now)
+        now = self.collector.now
+        overdue = overdue_rows(report, now)
+        ticks = report.get("handling", {}).get("attempts", {})
+        rows = sorted((row for row in overdue if row.get("category") in ("silent_report", "unanswered_question")),
+                      key=lambda row: (ticks[row["id"]] if type(ticks.get(row["id"])) is int else 0,
+                                       -(float("inf") if row.get("age_seconds") is None else row["age_seconds"])))
+        rows = [row for row in rows if not self.stored_stands(self.actions.get(row["id"], {}), row, now)]
+        self.queued = {row["id"] for row in rows}
         if any(self.actions.get(row["id"], {}).get("kind") == "waiting" or self.actions.get(row["id"], {}).get("hold")
                for row in overdue):
             try:
                 self.backlog_records()  # standing-receipt checks under the receipt lock reuse this one read
             except SOURCE_ERRORS:
                 pass
-        rows = sorted((row for row in overdue if row.get("category") in ("silent_report", "unanswered_question")),
-                      key=lambda row: -(float("inf") if row.get("age_seconds") is None else row["age_seconds"]))
-        rows = [row for row in rows if not self.stored_stands(self.actions.get(row["id"], {}), row, self.collector.now)]
-        # Rows without a valid stored receipt are proven oldest first, each with its recent events and dependencies
-        # before any slow current-state read, so one hung reader can only cost the rows that have no cheaper evidence.
-        for live in (False, True):
-            for row in rows:
-                self.check_deadline()  # a failed stop of the killed reader can replace the deadline error
-                if live and (row["category"] != "silent_report" or row["id"] in self.proofs):
-                    continue
-                try:
-                    guard = self.input_guard(row)
-                    if row.get("category") == "unanswered_question":
-                        task = row["source"]["task"]
-                        if status_guards.get(task) != guard[:2]:
-                            self.decisions.pop(task, None)
-                            status_guards[task] = guard[:2]
-                    if receipt_stands(self.actions.get(row["id"], {}), row, self.collector.now, self):
+        looked, live = [], False
+        # Every row's recent events and dependencies are tried before any slow current-state read,
+        # so one hung reader can only cost the rows that have no cheaper evidence.
+        try:
+            for live in (False, True):
+                for row in rows:
+                    self.check_deadline()
+                    ident = row["id"]
+                    if live and (row["category"] != "silent_report" or ident in self.proofs):
                         continue
-                    kind, proof = self.automatic(row, live)
-                    if proof and guard == self.input_guard(row):
-                        identity = self.identity(row)
-                        self.proofs[row["id"]] = (identity, guard, kind, dict(proof, guard=guard, identity=identity))
-                except SOURCE_ERRORS:
-                    continue  # incomplete or concurrently changed evidence never excuses follow-up
+                    self.inflight = ident
+                    try:
+                        self.probe(row, live, status_guards)
+                    except SOURCE_ERRORS:
+                        pass  # incomplete or concurrently changed evidence never excuses follow-up
+                    self.check_deadline()  # a failed stop of the killed reader can replace the deadline error
+                    self.inflight = None
+                    if ident in self.proofs or ident in self.standing:
+                        continue
+                    if live or row["category"] != "silent_report":
+                        self.attempted.append(ident)
+                    else:
+                        looked.append(ident)
+        except CollectionDeadline:
+            for ident in [*([] if live else looked), self.inflight]:
+                if ident is not None and ident not in self.attempted:
+                    self.attempted.append(ident)
+                    if ident != self.inflight or type(ticks.get(ident)) is not int:
+                        self.demoted.add(ident)
+            raise
         return self
+
+    def unchecked(self, row):
+        """The deadline, not the row, left this row unread: never reached, only given a cheap look, or cut off a first time."""
+        ident = row["id"]
+        return self.expired and ident in self.queued and ident not in self.proofs \
+            and (ident not in self.attempted or ident in self.demoted)
 
     def prepared(self, row, now, action):
         entry = self.proofs.get(row["id"])
@@ -1749,6 +1786,18 @@ def render_overdue(rows):
     return "\n".join(lines)
 
 
+def render_unchecked(rows):
+    fields = ["id", "owner", "subject", "age_seconds"]
+    lines = ["NOT CHECKED THIS PASS (the evidence deadline ended first; tried first next pass; no action needed now):",
+             f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
+    lines += ["  - " + ",".join(json.dumps(r.get(f), ensure_ascii=False) for f in fields) for r in rows]
+    return "\n".join(lines)
+
+
+UNCHECKED_RETRY = ("retry: run this command again; the next pass tries the rows not checked first."
+                   " Send no check-in and record no action for them now.")
+
+
 def ledger_action(args, state, now, prepared=None):
     """Receipts and per-actor presentations share the ledger's short publication lock range."""
     try:
@@ -1807,32 +1856,49 @@ def ledger_action(args, state, now, prepared=None):
             if "recheck_epoch" in proof:
                 actions[ident]["recheck_epoch"] = proof["recheck_epoch"]
             changed = True
+        attempts = controls.get("attempts", {})
+        for ident in automatic:
+            changed = attempts.pop(ident, None) is not None or changed
+        tried = [ident for ident in prepared.attempted if ident in by_id and ident not in automatic]
+        if tried:
+            attempts = controls.setdefault("attempts", {})
+            tick = max((value for value in attempts.values() if type(value) is int), default=0)
+            for ident in tried:
+                tick += 1
+                attempts[ident] = tick
+            changed = True
     if changed:
         write_ledger(state, report, receipt=True)
     for row in rows:
         row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
     pending = controls["presentations"].setdefault(actor, {})
     if args.present_overdue:
-        needing, standing = [], []
+        needing, standing, unchecked = [], [], []
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
             if ident in automatic or receipt_stands(action, row, now, waits):
                 standing.append(row)
                 continue
-            needing.append(row)
+            (unchecked if prepared is not None and prepared.unchecked(row) else needing).append(row)
             if ident not in pending or action.get("sequence", 0) > pending[ident]:
                 pending[ident] = controls["sequence"]
                 stamps.setdefault(actor, {})[ident] = now
         write_ledger(state, report, receipt=True)
-        if needing:
-            print(render_overdue(needing))
+        if needing or unchecked:
+            if needing:
+                print(render_overdue(needing))
+            if unchecked:
+                print(render_unchecked(unchecked))
             if standing:
                 print(render_overdue(standing).replace("OVERDUE:", "STANDING (a receipt stands; no action needed):", 1))
-            print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
-                  " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]"
-                  " [--prerequisite <row-id> | --prerequisite-task <task-id>]"
-                  " [--hold <captain-held-task-id>]")
+            if needing:
+                print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
+                      " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]"
+                      " [--prerequisite <row-id> | --prerequisite-task <task-id>]"
+                      " [--hold <captain-held-task-id>]")
+            if unchecked:
+                print(UNCHECKED_RETRY)
         return 0
     if args.check_actions:
         missing = [row for ident, row in by_id.items()
@@ -1843,8 +1909,19 @@ def ledger_action(args, state, now, prepared=None):
                         or actions.get(ident, {}).get("kind") in ("waiting", "observed", "backlog_wait"))
                    and not receipt_stands(actions.get(ident, {}), row, now, waits)]
         if missing:
+            unchecked = [row for row in missing if prepared is not None and prepared.unchecked(row)]
+            missing = [row for row in missing if not any(row["id"] == other["id"] for other in unchecked)]
+            if not missing:
+                print(f"error: {len(unchecked)} overdue rows were not checked before the evidence deadline;"
+                      " acknowledgement refused until a retry checks them")
+                print(render_unchecked(unchecked))
+                print(UNCHECKED_RETRY)
+                return 1
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
+            if unchecked:
+                print(render_unchecked(unchecked))
+                print(UNCHECKED_RETRY)
             for row in missing:
                 ident = json.dumps(row["id"])
                 if row.get("category") == "silent_report":

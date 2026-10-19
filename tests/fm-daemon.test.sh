@@ -403,6 +403,71 @@ EOF
   pass "away mode escalates each overdue row once per digest, records the receipt, and acknowledges"
 }
 
+test_unchecked_overdue_rows_are_retried_not_escalated_by_away_daemon() {
+  local dir state fakebin buffer reader report id kind
+  dir=$(make_supercase overdue-unchecked); state="$dir/state"; fakebin="$dir/daemon-bin"
+  buffer="$state/.subsuper-escalations"; reader="$dir/reader.sh"
+  mkdir -p "$dir/data" "$dir/config" "$dir/projects" "$fakebin"
+  python3 - "$dir" "$state" "$(date +%s)" <<'PYROWS'
+import json, sys
+from pathlib import Path
+home, state, now = Path(sys.argv[1]).resolve(), Path(sys.argv[2]), int(sys.argv[3])
+rows = []
+for name, age in (('away-a', 7400), ('away-b', 7300), ('away-c', 7200)):
+    (state / f'{name}.meta').write_text(f'kind=ship\nspawn_gen=generation-{name}\n')
+    (state / f'{name}.status').write_text(f'working [at={now - 7200}]: implementing\n')
+    rows.append(dict(id='row-' + name, category='silent_report', subject=name, owner='firstmate',
+                     next_action='check in: progress, blockers, cross-workstream dependencies',
+                     age_seconds=age, limit_seconds=900, overdue=True, evidence='old report'))
+json.dump(dict(schema='fm-open-loops.v1', generated_epoch=now, home=str(home), complete=True, rows=rows),
+          open(state / 'open-loops.json', 'w'))
+PYROWS
+  printf '#!/usr/bin/env bash\nexec "%s/bin/fm-open-loops.sh" "$@"\n' "$ROOT" > "$fakebin/fm-open-loops.sh"
+  chmod +x "$fakebin/fm-open-loops.sh"
+  cat > "$reader" <<'SH'
+#!/usr/bin/env bash
+n=$(cat "$FM_HOME/reads" 2>/dev/null || echo 0)
+if [ "$n" -ge "$(cat "$FM_HOME/budget" 2>/dev/null || echo 1)" ]; then kill -ALRM "$PPID"; sleep 30; exit 1; fi
+echo $((n + 1)) > "$FM_HOME/reads"
+echo 'state: paused · source: status-log · stopped'
+SH
+  chmod +x "$reader"
+  loops() { env FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$reader" "$ROOT/bin/fm-open-loops.sh" "$@"; }
+  escalate() {
+    ( export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$reader" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999
+      escalate_overdue_rows "$state" )
+  }
+  printf '1\n' > "$dir/budget"; printf '0\n' > "$dir/reads"
+  loops --present-overdue > "$dir/present.out" || fail "the first presentation failed"
+  assert_contains "$(cat "$dir/present.out")" 'NOT CHECKED THIS PASS' "the cut rows were not shown as not checked"
+  printf '0\n' > "$dir/reads"
+  escalate || fail "an unchecked row wedged the away escalation"
+  for id in row-away-a row-away-c; do
+    assert_contains "$(cat "$buffer" 2>/dev/null)" "overdue open work: \"$id\"," "a row the pass tried and could not prove did not reach the digest"
+    kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"][sys.argv[2]]["kind"])' "$state/open-loops.json" "$id")
+    [ "$kind" = escalated ] || fail "$id was not receipted by the away escalation: $kind"
+  done
+  case "$(cat "$buffer" 2>/dev/null)" in *'"row-away-b"'*) fail "a row the deadline left unread was escalated" ;; esac
+  python3 -c 'import json, sys; sys.exit("row-away-b" in json.load(open(sys.argv[1])).get("handling", {}).get("actions", {}))' \
+    "$state/open-loops.json" || fail "a row the deadline left unread was given a receipt"
+  [ ! -e "$state/away-b.inbox" ] || fail "a row the deadline left unread was steered"
+
+  rm -f "$buffer"; printf '0\n' > "$dir/budget"; printf '0\n' > "$dir/reads"
+  python3 - "$state/open-loops.json" <<'PYRESET'
+import json, sys
+record = json.load(open(sys.argv[1]))
+record['handling'] = dict(sequence=0, presentations={}, presented_at={}, actions={})
+json.dump(record, open(sys.argv[1], 'w'))
+PYRESET
+  loops --present-overdue > /dev/null || fail "the second presentation failed"
+  escalate || fail "rows nobody could check wedged the away escalation"
+  [ ! -s "$buffer" ] || fail "rows the deadline left unread reached the escalation digest"
+  python3 -c 'import json, sys; sys.exit(bool(json.load(open(sys.argv[1]))["handling"]["actions"]))' "$state/open-loops.json" \
+    || fail "rows the deadline left unread were given receipts"
+  unset -f loops escalate
+  pass "away mode retries rows the evidence deadline left unread and escalates only rows it tried and could not prove"
+}
+
 test_busy_inbox_escalation_reaches_supervision() {
   local variant=$1 mode=$2 dir state task=busy-inbox win gen pane reason detail buffer sent drain
   dir=$(make_supercase "busy-inbox-$variant-$mode"); state="$dir/state"
@@ -3433,6 +3498,7 @@ test_status_read_failure_surfaces_without_advancing_seen
 test_catchall_advances_routine_then_surfaces_append
 test_escalation_buffer_failure_retains_wake_and_position
 test_overdue_rows_escalate_before_away_acknowledgement
+test_unchecked_overdue_rows_are_retried_not_escalated_by_away_daemon
 test_busy_inbox_escalation_reaches_supervision stuck away
 test_busy_inbox_escalation_reaches_supervision stuck quiet
 test_busy_inbox_escalation_reaches_supervision write away

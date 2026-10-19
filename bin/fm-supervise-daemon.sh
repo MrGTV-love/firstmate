@@ -1692,7 +1692,10 @@ handle_wake() {  # <reason> <state>
 # Away mode owns no follow-up of its own: every overdue open-loops row the drain
 # presented without a recorded action joins the escalation digest, and that
 # escalation is recorded as the row's receipt, so the acknowledgement gate
-# neither wedges these wakes nor lets them be consumed silently.
+# neither wedges these wakes nor lets them be consumed silently. A row the
+# evidence deadline ended before checking is listed apart (not as a quoted
+# row line) and is retried, never escalated: running out of time says nothing
+# about the row.
 escalate_overdue_rows() {  # <state>
   local state=$1 report line id
   [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
