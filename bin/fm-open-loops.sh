@@ -19,9 +19,8 @@
 # requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
 # --present-overdue and --check-actions automatically receipt fresh check-in evidence and named open-ship blockers
-# within one five-second evidence deadline, least recently attempted rows first; an unexpired receipt is reused without a
-# new read, and a row it tried without proof moves behind the rows it never reached. Rows the deadline did not reach print as
-# NOT CHECKED THIS PASS with a retry line: no steer, and no away-mode escalation, is owed for them.
+# within one evidence deadline. Rows the deadline did not reach print as NOT CHECKED THIS PASS with a retry line:
+# no steer, and no away-mode escalation, is owed for them.
 # --check-actions honors standing receipts and exits 1 with per-row completing commands for unmet requirements; it first
 # records the presentation of a listed row that no actor presented, so every command it prints is accepted.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
@@ -33,9 +32,9 @@
 # waiting selects either --prerequisite QUESTION_ROW_ID (a distinct same-task question) or
 # --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence names its new
 # inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`.
-# docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, source
-# verification, standing waits, captain-hold bindings, acknowledgement, and invalidation; a receipt never
-# resolves the obligation.
+# docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, the evidence
+# deadline and its row order, source verification, standing waits, captain-hold bindings, acknowledgement,
+# and invalidation; a receipt never resolves the obligation.
 # Examples: fm-open-loops.sh action ROW_ID steered --evidence 001.msg
 #           fm-open-loops.sh action ROW_ID deferred --evidence 'lint still producing output' --recheck '<future-UTC-time>'
 # --heartbeat also atomically publishes state/open-loops.json. The watcher runs it as a
