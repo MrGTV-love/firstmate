@@ -317,8 +317,9 @@ teardown_bundle_refuse() {  # <predicate> [hint]
 }
 
 # A physical file path outside every registered copy of this copy's ref store,
-# outside the pool, and outside the task scratch roots teardown removes. Parent
-# canonicalization catches symlink aliases;
+# outside the pool, and outside the removal roots teardown removes (the task's
+# copy, its scratch and the state directory). Parent canonicalization catches
+# symlink aliases;
 # rejecting a leaf symlink avoids making its target part of a removal proof.
 teardown_bundle_external() {  # <copy> <bundle>
   local copy=$1 bundle=$2 parent path inventory field root cursor incomplete=
@@ -362,11 +363,11 @@ teardown_bundle_external() {  # <copy> <bundle>
   # the task's own copy. Rejecting the roots keeps this proof true as the
   # teardown's removal set changes; do not replace them with one path name.
   local roots=() labels=() label i
-  roots+=("$STATE"); labels+=(state)
-  [ -z "${WT:-}" ] || { roots+=("$WT"); labels+=(copy); }
   [ -z "${TASK_TMP:-}" ] || { roots+=("$TASK_TMP"); labels+=(scratch); }
   [ -z "${LAUNCH_HOME_TOKEN:-}" ] || { roots+=("/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"); labels+=(scratch); }
   roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks"); labels+=(scratch scratch)
+  [ -z "${WT:-}" ] || { roots+=("$WT"); labels+=(copy); }
+  roots+=("$STATE"); labels+=(state)
   for i in "${!roots[@]}"; do
     root=${roots[$i]%/}
     label=${labels[$i]}
@@ -409,7 +410,7 @@ teardown_bundle_restorable() {  # <copy> <bundle> <bundle-sha256> <tips>
   done
   git init --quiet --bare --object-format="$format" "$scratch" >/dev/null 2>&1 \
     && git -C "$scratch" fetch --quiet "$bundle" "${specs[@]}" >/dev/null 2>&1 \
-    && git -C "$scratch" fsck --connectivity-only --no-dangling >/dev/null 2>&1 \
+    && git -C "$scratch" fsck --strict --no-dangling >/dev/null 2>&1 \
     || rc=1
   rm -rf "$scratch"
   [ "$rc" != 0 ] || TEARDOWN_BUNDLE_RESTORED+="$key"$'\n'

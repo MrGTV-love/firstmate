@@ -10735,7 +10735,7 @@ test_invalid_preservation_bundle_refuses() {
       state-inbox)
         BUNDLE_PATH="$case_dir/state/task-x1.inbox/work.bundle"
         record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create inbox bundle'
-        reason='bundle is inside task state'
+        reason='bundle is inside task scratch'
         ;;
     esac
     rc=0
@@ -10756,6 +10756,9 @@ test_invalid_preservation_bundle_refuses() {
 # deleted whole, so a bundle recorded there would be deleted with the copy it
 # preserves. The proof must reject the whole state root (not one hard-coded
 # cache path), and must reject a symlink alias that resolves into it.
+# state-cache and state-cache-alias are the guards that fail before the state
+# root was rejected. state-cache-symlink is a negative control for the existing
+# leaf-symlink check, which already refused before that change.
 test_bundle_under_state_cache_refuses() {
   local shape case_dir rc reason record digest
   for shape in state-cache state-cache-alias state-cache-symlink; do
@@ -10801,6 +10804,34 @@ test_bundle_under_state_cache_refuses() {
     assert_grep 'Create a self-contained external bundle' "$case_dir/stderr" "bundle-state-$shape: supported completing step missing"
   done
   pass 'a bundle under the state removal root, or a symlink into it, never counts as preservation'
+}
+
+# A bundle whose pack passes bundle verify and a connectivity-only fsck can still
+# hold a commit that no strict reader accepts (here: author and committer are not
+# valid idents). Such a bundle does not preserve the work, so the isolated
+# restore must run fsck --strict and refuse, keeping the copy, bundle and record.
+test_bundle_with_malformed_commit_refuses() {
+  local case_dir rc record tree parent bad
+  make_bundle_copy_case bundle-malformed-commit
+  case_dir=$NESTED_CASE
+  record="$case_dir/data/task-x1/preservation-bundles.tsv"
+  tree=$(git -C "$NESTED_COPY" rev-parse 'HEAD^{tree}')
+  parent=$(git -C "$NESTED_COPY" rev-parse origin/main)
+  bad=$(printf 'tree %s\nparent %s\nauthor not an ident\ncommitter not an ident\n\nmalformed commit\n' "$tree" "$parent" \
+    | git -C "$NESTED_COPY" hash-object -t commit -w --literally --stdin) || fail 'cannot create malformed commit fixture'
+  git -C "$NESTED_COPY" update-ref HEAD "$bad" || fail 'cannot point the copy at the malformed commit'
+  record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot bundle the malformed commit'
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'bundle-malformed-commit: a bundle holding a malformed commit must refuse'
+  assert_present "$NESTED_COPY/.git" 'bundle-malformed-commit: copy was removed'
+  assert_present "$BUNDLE_PATH" 'bundle-malformed-commit: the preservation bundle was deleted'
+  assert_present "$record" 'bundle-malformed-commit: the preservation record was deleted'
+  assert_present "$case_dir/state/task-x1.meta" 'bundle-malformed-commit: task record was removed'
+  assert_absent "$case_dir/treehouse.log" 'bundle-malformed-commit: pool slot was returned'
+  assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" 'bundle-malformed-commit: original refusal changed'
+  assert_grep 'bundle cannot be restored in an isolated repository' "$case_dir/stderr" 'bundle-malformed-commit: restore refusal not named'
+  pass 'a bundle that holds a structurally invalid commit never counts as preservation'
 }
 
 make_sibling_unpushed_work() {  # <case-dir>
@@ -14229,6 +14260,7 @@ test_locked_own_copy_is_released_by_the_closeout_driver
 test_verified_bundle_preserves_unlanded_copy
 test_invalid_preservation_bundle_refuses
 test_bundle_under_state_cache_refuses
+test_bundle_with_malformed_commit_refuses
 test_bundle_ignores_branches_other_worktrees_hold
 test_bundle_covers_a_removed_copys_branch_without_other_worktrees
 test_bundle_survives_a_stale_registered_worktree

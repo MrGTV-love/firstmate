@@ -80,7 +80,7 @@
 # SHA-256, advertise and record every maximal tip of git rev-list --children
 # <ref> <branches> --not --remotes, and restore on its own: fetching every
 # recorded tip from it into a fresh empty repository outside the copy and pool
-# must succeed and pass git fsck --connectivity-only.
+# must succeed and pass git fsck --strict.
 # <ref> is the copy's HEAD (detached included) or a removed copy's branch tip,
 # and it must carry a locally-only commit of its own: <branches> only widen
 # what the bundle must cover, they never make a pushed <ref> eligible, so a
@@ -102,7 +102,7 @@
 # bin/fm-landed-lib.sh keeps such a row out of Recently Landed.
 # A Vernant-locked copy still needs its driver's independent landing verdict.
 # To create a self-contained bundle and its record (no creator is run by teardown),
-# choose an absolute durable bundle path OUTSIDE every copy, pool and scratch root,
+# choose an absolute durable bundle path OUTSIDE every copy, pool, state directory and scratch root,
 # set copy, task and FM_HOME explicitly, then run under bash:
 #   bundle=/durable/preservation/task.bundle
 #   mkdir -p "${bundle%/*}" "$FM_HOME/data/$task"
