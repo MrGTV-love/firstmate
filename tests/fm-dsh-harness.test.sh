@@ -23,10 +23,18 @@ for model, provider, expected in [
     ('my-deepseek/model', '', 'omp'),
     ('deepseekish/model', '', 'omp')]:
     assert call('route', model, provider) == expected
-for harness, model, provider in [('omp','deepseek/v4',''), ('claude','v4','deepseek'), ('dsh','openai/gpt','')]:
-    call('check', harness, model, provider, ok=False)
+# dsh must run a DeepSeek model; explicit non-dsh harnesses may name a
+# DeepSeek stand-in, because routing is only a default.
+for model, provider in [('', ''), ('openai/gpt', '')]:
+    call('check', 'dsh', model, provider, ok=False)
+call('check', 'dsh', 'deepseek/deepseek-v4-flash')
 for harness in ('codex', 'pi', 'pi-signed', 'omp', 'claude'):
     call('check', harness, 'unchanged/model')
+    call('check', harness, 'deepseek/deepseek-v4-flash')
+fallback_profiles = tmp / 'fallback-profiles.json'
+fallback_profiles.write_text(json.dumps({'rules':[{'fallback':[{'harness':'omp','model':'deepseek/deepseek-v4-flash','effort':'high'}]}]}))
+call('normalize', fallback_profiles, fallback_profiles)
+assert json.loads(fallback_profiles.read_text())['rules'][0]['fallback'][0]['model'] == 'deepseek/deepseek-v4-flash'
 profiles = tmp / 'profiles.json'
 profiles.write_text(json.dumps({'rules':[{'use':[{'harness':'dsh','provider':'deepseek','model':'v4','effort':'high'}]}]}))
 call('normalize', profiles, profiles)

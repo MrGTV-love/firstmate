@@ -22,8 +22,9 @@ that launch's plain JSONL store. Missing, corrupt, or unsupported data is
 unknown. With --since, anything recorded at or before POSITION is history: a
 turn must have started beyond it, or the state is unknown.
 route MODEL [PROVIDER] prints the default model-family adapter.
-check HARNESS MODEL [PROVIDER] refuses DeepSeek/runtime contradictions while
-preserving explicit non-DeepSeek adapters.
+check HARNESS MODEL [PROVIDER] refuses a dsh launch without a DeepSeek model;
+an explicit non-dsh harness may name a DeepSeek stand-in, because DeepSeek work
+routes to dsh only by default.
 """
 import argparse
 import json
@@ -47,8 +48,6 @@ def check(harness, model, provider=""):
         if not model:
             raise ValueError("dsh requires an explicit DeepSeek model id")
         raise ValueError(f"dsh runs only DeepSeek models, not '{model}'")
-    if deepseek and harness != "dsh":
-        raise ValueError(f"DeepSeek model '{model}' routes to dsh, not to '{harness}'")
 
 
 def normalize(value):
