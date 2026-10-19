@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # fm-copy-sweep.sh - find, size and remove provably stale nested task copies, and
-# wake once when the bytes they hold pass a budget.
+# wake once when the bytes they hold pass a budget or when a nested copy sits
+# inside a live task's copy.
 #
 # Usage:
 #   fm-copy-sweep.sh                report every nested copy; change nothing
 #   fm-copy-sweep.sh --apply        also remove the REAPABLE-PROVEN copies
 #   fm-copy-sweep.sh check          the watcher's periodic entry (report only)
 #   fm-copy-sweep.sh arm            bind `check` to the existing watcher cadence
-#   fm-copy-sweep.sh disarm         remove that binding and the budget record
+#   fm-copy-sweep.sh disarm         remove that binding and the record (budgets and live copies)
 #   fm-copy-sweep.sh --help
 #
 # Hourly hygiene job, one line (bounded by the process budget, never forced):
@@ -81,7 +82,7 @@
 # to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
 # in the same run is removed by the next run; a second run otherwise finds
 # nothing left to remove. Report mode (no flag) reads the size cache and writes
-# nothing; `check` writes only the size cache and the budget record.
+# nothing; `check` writes only the size cache and the record (budgets and live copies).
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
 # only hold a copy back, never release one.

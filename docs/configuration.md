@@ -106,7 +106,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
-- The nested-copy sweep's size cache `state/copy-sweep.sizes` and budget record `state/copy-sweep.record`, owned by `bin/fm-copy-sweep.sh`.
+- The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
