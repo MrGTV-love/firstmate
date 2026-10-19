@@ -306,6 +306,11 @@
 #   operator's trust.json. Ordinary Pi worker launches never receive --approve.
 #   A missing selected executable refuses before endpoint creation, and pi-signed
 #   never falls back to pi.
+#   A crewmate/scout spawn with no harness arg and a deepseek/ model launches on
+#   dsh instead of the resolved crew harness; an explicit harness, a raw launch,
+#   and a secondmate are never re-routed. The dsh adapter reference
+#   (.agents/skills/harness-adapters/references/harness/dsh.md) owns the route,
+#   and launch_template's dsh case documents the private HOME it launches under.
 #   config/session-launch-policy can restrict even explicit launches; its schema
 #   and tc-run prerequisite are owned by docs/configuration.md "Session launch policy".
 #   Devin is worker-only: --permission-mode dangerous and

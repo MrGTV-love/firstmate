@@ -3886,13 +3886,13 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 
 Verified on 2026-10-18 on macOS arm64 (Darwin 27.0.0) through `bin/fm-herdr-lab.sh` in a named non-default lab session.
 Runtime: `dsh-tui` 0.16.1 (launcher and installed profile) with the `dsh` CLI 0.2.0-rc.2.
-Fixture: the disposable scratch project `/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-project` and its isolated linked copy `/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-copy`, registered only in the guard's private home with local-only delivery and no push.
+Fixture: a disposable scratch project and its isolated linked copy, registered only in the guard's private home with local-only delivery and no push.
 
 ```sh
 FM_DSH_LIVE=1 \
 FM_DSH_EVIDENCE_DIR=<fresh evidence directory> \
-FM_DSH_LAB_PROJECT=/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-project \
-FM_DSH_LAB_COPY=/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-copy \
+FM_DSH_LAB_PROJECT=<disposable scratch project> \
+FM_DSH_LAB_COPY=<its separate linked copy> \
 bin/fm-test-run.sh tests/fm-dsh-live-e2e.test.sh
 bin/fm-test-run.sh tests/fm-dsh-harness.test.sh
 bin/fm-test-run.sh tests/fm-dsh-spawn.test.sh
@@ -3928,11 +3928,11 @@ ok - fm-spawn: config/session-launch-policy=omp-or-tc refuses a dsh launch with 
 
 The two `live` lines and `cleanup_exit=0` were recorded by the live guard before the start-position proof landed; the eleven portable lines come from the final head. Rerun the live guard to refresh the first three.
 
-The 93 MB installed profile tree is reproduced inside each launch root rather than linked: Node resolves real paths before DSH's profile interception, so a linked `node_modules` escaped the isolated profile and loaded the launcher's own incompatible packages.
+The 93 MB installed profile tree is reproduced file by file inside each launch root and never linked as a directory: Node resolves real paths before DSH's profile interception, so a linked `node_modules` directory escaped the isolated profile and loaded the launcher's own incompatible packages.
 The launcher needs the `dsh` CLI on `PATH`; a pane without the installing nvm bin directory exits with `dsh CLI not found`, so the launch prepends the launcher's own directory.
 The launch swaps `HOME` for the task's private one, so `~/.gitconfig` and the no-mistakes home are carried as `GIT_CONFIG_GLOBAL` and `NM_HOME` environment paths resolved by the pane shell; nothing is copied or linked, and the other HOME-relative tool state is absent on purpose.
-On 2026-10-19, against the operator's live no-mistakes daemon, `no-mistakes daemon status` printed `daemon running (pid 26547)` from the operator's shell and from a swapped empty `HOME` with `NM_HOME` carried, and `daemon not running` from the swapped `HOME` with `NM_HOME` unset.
-`no-mistakes axi status` from the review worktree gave the identical `repo not initialized` answer under both homes, because that worktree is not a gated repository; a live ship worker running `axi status` against a gated repository is not yet recorded.
+On 2026-10-19, against the operator's live no-mistakes daemon, `no-mistakes daemon status` reported the same running daemon from the operator's shell and from a swapped empty `HOME` with `NM_HOME` carried, and `daemon not running` from the swapped `HOME` with `NM_HOME` unset.
+`no-mistakes axi status` from an ungated worktree gave the identical `repo not initialized` answer under both homes; a live ship worker running `axi status` against a gated repository is not yet recorded.
 DSH's default `workspace-write` posture parked a real worker on an `Awaiting approval` panel when it moved a steering record outside the session workspace; the launch therefore selects DSH's own `danger-full-access` preset, whose approval policy is `never`.
 
 ## Busy inbox escalation

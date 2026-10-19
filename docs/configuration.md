@@ -1276,9 +1276,10 @@ rovo is likewise verified for crewmate and scout launches ONLY, refused for a se
 
 agy is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no hook surface and no primary supervision protocol; [`docs/verification/agy.md`](verification/agy.md) owns that evidence, including the spawn-time worktree trust pre-registration through `bin/fm-agy-trust.sh` and Herdr's native agy pane recognition.
 devin is verified for crewmate and scout launches only; a secondmate is refused because Devin has no verified primary supervision protocol.
-dsh (DeepSeek Harness through `dsh-tui`) is verified for crewmate and scout launches only, and `fm-spawn.sh` refuses it for a secondmate because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns the launch, model, busy-state, and composer contracts, and [runtime verification](verification/runtime-backends.md#deepseek-harness-dsh-tui) owns the live evidence.
 
 Its private worker config disables Claude Code imports (including the captain's hooks) and, unless the home sets `config/keep-ai-trailers` (see "Commit attribution"), Devin commit attribution without editing user or project config; [`fm-devin-config.sh`](../bin/fm-devin-config.sh) owns these enforced settings and [Devin verification](verification/devin.md) owns the live evidence and observed model availability.
+
+dsh (DeepSeek Harness through `dsh-tui`) is verified for crewmate and scout launches only, and `fm-spawn.sh` refuses it for a secondmate because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns the launch, model, busy-state, and composer contracts, and [runtime verification](verification/runtime-backends.md#deepseek-harness-dsh-tui) owns the live evidence.
 
 ### Verification and primary supervision
 
@@ -1305,6 +1306,9 @@ When pi-signed is selected, Firstmate preserves `FM_PI_HARNESS=pi-signed` and re
 
 Plain Pi launches set `FM_PI_HARNESS=pi`, so a signed primary's environment cannot relabel a plain Pi worker.
 When it is absent or contains `default`, crewmates mirror the firstmate's own harness.
+
+A crewmate or scout launch that names no harness and selects a `deepseek/` model runs on `dsh` instead of the `config/crew-harness` value, because `dsh` is the default DeepSeek runtime.
+An explicit harness, a raw launch command, and a secondmate are never re-routed, so an explicit non-`dsh` DeepSeek stand-in stays legal; [the dsh adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md#routing) owns the route and the `dsh` model admission.
 
 ### Choose the secondmate harness
 

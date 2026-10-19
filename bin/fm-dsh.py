@@ -10,8 +10,10 @@ depth-zero log.
 prepare STATE ID GENERATION SOURCE_HOME MODEL EFFORT CWD stages a per-launch
 HOME and DSH_HOME at STATE/ID.dsh/GENERATION, then atomically publishes
 STATE/ID.dsh-session and retires the generation that binding replaced.
-Installed packages are read-only links; configuration, credentials,
-preferences, and session logs belong exclusively to this launch.
+The installed package tree is reproduced inside the launch root, hard-linked
+file by file where the filesystem allows and copied otherwise, never linked as
+a directory; configuration, credentials, preferences, and session logs belong
+exclusively to this launch.
 resume STATE ID MODEL EFFORT CWD rewrites the bound launch patch to resume the
 newest depth-zero session, or prints nothing when the binding changed.
 session-file STATE ID prints the live depth-zero session log.
