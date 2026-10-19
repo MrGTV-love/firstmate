@@ -227,7 +227,7 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 until the owner confirms it rides this PR.
 
-## X1..X21 - review-round regressions
+## X1..X22 - review-round regressions
 
 Each runs against replay transcripts and the real intake; none opens a socket.
 
@@ -253,6 +253,7 @@ Each runs against replay transcripts and the real intake; none opens a socket.
 - X19: two conflicts of 450-character wake lines on two threads, plus a later unmatched reply on a third, ran through the armed `check`. The first poll emitted the first conflict's line ending `; +2 queued` within 480 characters; the second conflict's replies and the unmatched reply were not marked seen, their rows stayed pending, and the second conflict's notice was not yet posted. The second poll emitted the second conflict ending `; +1 queued` and posted its notice. The third poll emitted the unmatched reply's line with no marker, and a fourth poll printed nothing. No conflict recorded an answer.
 - X20: an owner reply carrying only `subtype: thread_broadcast` closed the call with the typed words as the answer, while replies from the owner's id carrying `bot_id`, `app_id`, or `bot_profile` answered nothing and closed nothing.
 - X21: with stdout and stderr captured apart, an explicit `arm` named its failure on stderr, wrote nothing to stdout, and exited nonzero on every run: after `FM_SLACK_DM_USER` changed (`dm_user_changed`, run twice with the failure already recorded by the standing check in between), with a state file of the wrong schema (`invalid_state_schema`), with a symlinked state directory (`unsafe_state_path`), and with a missing transcript (`replay_transcript_unreadable`). The standing `check` was silent on both streams with exit 0 while healthy, reported `dm_user_changed` once on stdout when it changed, and was silent on the repeat.
+- X22: with `FM_SLACK_POLL_MAX_ANSWERS=1`, a live thread with an owner reply and a thread whose call was closed in the terminal after the owner replied late: the first poll answered the live thread and did not retire the closed one (no `Resolved:` post, `retired` false); the second poll emitted `unmatched reply` for the late reply; the third poll posted `Resolved:` and retired the thread.
 
 ## ACT-1 - live answer
 

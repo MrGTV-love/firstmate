@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X21.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X22.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -989,5 +989,30 @@ rm -f "$FM_STATE_OVERRIDE/slack-watch"
 new_home typed-reply
 ARM_TRANSCRIPT="$TMP/no-such-transcript.json" arm_fails "missing transcript" replay_transcript_unreadable
 printf 'ok - X21\n'
+
+# X22: a spent answer cap never retires a thread whose replies were not read
+new_home mirror
+bind
+mirror mirror >/dev/null
+ts_a=$(thread_field open-a ts)
+ts_b=$(thread_field open-b ts)
+reply_to "$ts_a" 900.000101 go
+close_terminal open-b
+reply_to "$ts_b" 900.000201 late
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$FIX/mirror/transcript.json")
+assert_eq "$(closed_count "$out")" 1 "X22 the live thread was answered"
+assert_closed open-a 1 "X22 the live call closed"
+assert_eq "$(thread_field open-a retired)" True "X22 the answered thread was retired"
+assert_eq "$(thread_field open-b retired)" False "X22 an unread thread was retired"
+assert_not_contains "$(thread_texts "$ts_b")" 'Resolved:' "X22 an unread thread was resolved"
+assert_not_contains "$out" 'unmatched reply' "X22 the unread reply surfaced early"
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$FIX/mirror/transcript.json")
+assert_contains "$out" "unmatched reply 900.000201" "X22 the late reply on the closed call was never surfaced"
+assert_eq "$(thread_field open-b retired)" False "X22 the thread was retired with its notice"
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$FIX/mirror/transcript.json")
+assert_eq "$(thread_field open-b retired)" True "X22 the read thread was not retired"
+assert_contains "$(thread_texts "$ts_b")" 'Resolved: open-b' "X22 the retired thread was not resolved"
+assert_not_contains "$out" 'unmatched reply' "X22 the late reply surfaced twice"
+printf 'ok - X22\n'
 
 printf 'ok - all Slack watch checks\n'

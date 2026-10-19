@@ -211,6 +211,7 @@ class Watch:
         self.output = []
         self.detail = ''
         self.noticed_threads = set()
+        self.read_threads = set()
         self.notices_held = False
 
     def dm_user(self):
@@ -533,7 +534,7 @@ class Watch:
     def resolve(self):
         rows = None
         for occurrence, record in self.tracked():
-            if record['ts'] in self.noticed_threads:
+            if record['ts'] in self.noticed_threads or record['ts'] not in self.read_threads:
                 continue
             standing = self.hold(record)
             if standing in ('live', 'unknown'):
@@ -621,7 +622,6 @@ class Watch:
         if remaining is None:
             remaining = 0
         if remaining <= 0:
-            self.resolve()
             return
         if self.state['threads'] and not self.state.get('channel'):
             self.prepare()
@@ -634,6 +634,7 @@ class Watch:
                 break
             key = record['key']
             new_replies = [r for r in self.typed_candidates(record) if r['event'] not in self.state['seen']]
+            self.read_threads.add(record['ts'])
             taps = self.reaction_choices(record) if record.get('reactions') and record.get('options') else []
             signature = ','.join(tap['name'] for tap in taps)
             if record.get('blocked') is not None:
