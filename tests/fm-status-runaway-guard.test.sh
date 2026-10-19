@@ -676,6 +676,38 @@ test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain() {
   pass "one lane's log past the read limits is named on stderr and the drain still presents every other lane's open decisions"
 }
 
+# The watcher queues a plain signal row for any status log that changes, and the drain
+# annotates a signal row with the log's unread lines. That annotation step must obey
+# the same read limits as every other history reader: a log past them is refused and
+# named, never read whole into the output.
+drain_annotations_in() {  # <case-dir> <cap> <reserve> -> the drain's stdout; its stderr is <case-dir>/drain.err
+  local dir=$1 state=$1/state
+  printf 'working: a healthy lane\n' > "$state/a.status"
+  perl -e 'print "text\n" x 5000' > "$state/b.status"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1/fm-wake-lib.sh"; fm_wake_append signal a.status "signal: a.status" && fm_wake_append signal b.status "signal: b.status"' \
+    _ "$ROOT/bin" || return 1
+  FM_STATUS_CAP_BYTES=$2 FM_STATUS_CAP_RESERVE_BYTES=$3 FM_STATE_OVERRIDE="$state" "$DRAIN" 2>"$dir/drain.err"
+}
+
+test_the_drain_annotation_never_reads_a_log_past_the_limit() {
+  local out dir lines
+  # b.status is 25000 bytes in 5000 lines; with this cap plus reserve the read limit is 5000 bytes.
+  dir=$(make_case annotate-refused)
+  out=$(drain_annotations_in "$dir" 4000 1000) || fail "the drain failed on a signal row for a log past the read limit: $(head -c 400 "$dir/drain.err")"
+  lines=$(printf '%s\n' "$out" | grep -c 'wake annotation:.*b\.status' || true)
+  [ "$lines" -eq 0 ] || fail "the drain printed $lines annotation lines from a log past the read limit"
+  case "$out" in *'wake annotation:'*'a.status: working: a healthy lane'*) ;; *) fail "the healthy lane lost its annotation beside a refused one: $out" ;; esac
+  grep -q 'refused to read b.status' "$dir/drain.err" || fail "the drain did not name the refused log: $(head -c 400 "$dir/drain.err")"
+
+  # Mutation check: the same fixture with the limit raised past the log is annotated
+  # in full, so the refusal above is the read limit and not a missing annotation.
+  dir=$(make_case annotate-allowed)
+  out=$(drain_annotations_in "$dir" 100000 1000) || fail "mutation check: the drain failed with the limit raised: $(head -c 400 "$dir/drain.err")"
+  lines=$(printf '%s\n' "$out" | grep -c 'wake annotation:.*b\.status: text' || true)
+  [ "$lines" -eq 5000 ] || fail "mutation check: with the limit raised the drain annotated $lines of 5000 lines, so the refusal test above proves nothing"
+  pass "a signal row for a log past the read limit annotates nothing and names the log; a log within the limit is annotated whole"
+}
+
 test_latest_event_endpoint_is_a_position_in_the_whole_log() {
   local dir state status size out
   dir=$(make_case endpoint-position); state="$dir/state"; status="$state/e.status"
@@ -809,6 +841,7 @@ tests=(
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
   test_a_refused_read_is_unknown_never_an_empty_open_set
   test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain
+  test_the_drain_annotation_never_reads_a_log_past_the_limit
   test_latest_event_endpoint_is_a_position_in_the_whole_log
   test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log
   test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log
