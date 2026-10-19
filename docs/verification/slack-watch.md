@@ -10,8 +10,7 @@ Fixture homes were created with `tests/fixtures/slack/make-home.sh <scenario> <t
 
 The canonical suite is `tests/fm-slack-watch.test.sh`, run as a single process under `nice -n 20`.
 It invokes the real `fm-captain-hold.sh` intake and `tasks-axi` against each disposable home.
-The first suite run completed DOD-01 through DOD-15 and failed DOD-16 before the scan fix; after that fix, DOD-16, DOD-17, S1, S2 and S3 were each run and recorded below.
-A clean full-suite rerun was attempted but did not complete within 1200 seconds while the shared host was at load average 70-79; no result from that rerun is claimed.
+No clean full-suite result is claimed here; each section below records the targeted command and observed result for one guarantee.
 The targeted commands below are the DoD's Verify commands with the fixture home exported as `FM_HOME`, `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, and `FM_CONFIG_OVERRIDE`.
 
 ## Live read-only probe
@@ -48,7 +47,7 @@ Observed: three cards, each with `Task:`, `Decision:`, `Recommendation:`, `Evide
 Exactly two `none recorded` occurrences appeared across the three cards.
 A fourth task with a 45,000-character body was cut to fit Slack's size limit; its card still ended with `Full decision remains in the local backlog.`, `Reply in this thread with your answer.`, and the main-window note.
 Answering that task closed it; its `Resolved:` post was cut with `Full text remains in the local backlog.`, the poll printed no transport failure, and the thread was retired.
-The replay double rejects any post over 40,000 characters, as Slack does; before the cut moved into the single post path, that resolution post failed with `slack: transport failure: api_error` and the thread was never retired.
+The replay double rejects any post over 40,000 characters, as Slack does, so an uncut resolution post would fail with `slack: transport failure: api_error` and leave the thread unretired.
 Result: pass.
 
 ## DOD-03 - typed reply through the existing intake
@@ -82,7 +81,7 @@ Result: pass.
 
 Command: `tests/fm-slack-intake-unchanged.test.sh`.
 
-One-time proof that the intake is unmodified: `git diff 0185e74c46f6c5cf38f3ed61a5c84247eeca8264 -- bin/fm-captain-hold.sh` printed nothing and exited 0 (base commit against the working tree).
+One-time proof that the intake is unmodified: `git diff df6448846813245550010ba6c593a7a7b07389d7 -- bin/fm-captain-hold.sh` printed nothing and exited 0 (base commit against the working tree).
 That diff is a landing-time check, not a permanent test, so a later branch may legitimately edit the intake.
 The permanent test asserts behavior only: the reserved `reconcile` value, a task not held for the captain, and an unknown key are each refused or skipped, and the reserved value stays refused when `slack-dm` is bound.
 Result: pass.

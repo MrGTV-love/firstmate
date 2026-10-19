@@ -2954,7 +2954,7 @@ Every message the plane posts (card, notice, acknowledgement, and resolution) is
 The mirror also reads explicit `Option N:`, `Recommendation:`, and `Evidence:` lines from the task body; other numbered lines stay in the card as plain text and are never options, and it does not infer options from arbitrary prose.
 An option written without a `(value)` records its label, never its hint, as the keyed answer.
 A board card (options, recommendation, evidence, close mode) is used only when the board was regenerated after the hold's recorded set time.
-When that cannot be proven, the thread carries the question and reason as text only, with no numbered options and no seed reactions, and a reply is recorded verbatim.
+When a board card exists but that cannot be proven, the thread carries the question and reason as text only, with no numbered options and no seed reactions, and a reply is recorded verbatim.
 A typed reply and a reaction seen in the same poll are compared: agreement records one answer, disagreement surfaces to the captain once and records neither.
 Two contradictory typed replies, or two different reactions, likewise record nothing and surface once.
 A conflicted thread stays blocked until a fresh typed reply arrives or the reaction set changes; every typed reply in the conflict is consumed and is never recorded later.
@@ -2967,7 +2967,7 @@ When the call's state cannot be read, the poll leaves the reply unread and tries
 Each tap is attributed to the member who made it, and a staged answer is dropped if that member has left the allowlist before delivery.
 Typing an option number, or tapping its reaction, records the option's value as the keyed answer and its label as the label, the same record the board leaves; all other typed words are passed through within the intake's existing field constraints, after Slack's own message escaping is undone (`&amp;`, `&lt;`, `&gt;` become `&`, `<`, `>`, and a link Slack wrapped as `<url>` or `<url|text>` becomes the url or the text), so the record holds what the owner typed.
 The reserved `reconcile` value never answers a call.
-A long or multiline reply is flattened to one line for the intake, which keeps its existing truncation; the full text stays in the Slack thread, and no copy of it is kept in this home.
+A long or multiline reply is flattened to one line for the intake, which keeps its existing truncation; the full text stays in the Slack thread, and the only copy kept in this home is the journal row that stages it, which is removed when its publication completes.
 An authorized reply that the intake refuses is acknowledged in its thread and surfaced for firstmate rather than silently dropped; a reply the intake fails to process at all is neither acknowledged nor consumed, stays staged, and is retried on the next poll, with one wake line per failure episode that carries the intake's own error text.
 Anything the intake writes to its error stream, such as a parent-channel delivery problem after a successful close, is passed on in the wake line.
 A repeat sighting of an already-recorded reply produces no extra line: the intake's replay detection keeps one record, and the poll reports only what it did.
@@ -2980,7 +2980,7 @@ The test-only `after-delivery` fault fires after the intake has applied the row 
 A crash after notification publication may duplicate a notification but cannot discard the staged answer.
 Ordinary Slack outages, revoked tokens, and rate limits are reported once per failure episode; the other answer surfaces keep working.
 A missing reaction scope is reported once per change in the missing set, not on every poll.
-The standing check runs inside the watcher's per-check bound, and individual API socket waits are capped at 10 seconds.
+The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
 
 `tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and scans for it.
 Re-notification, a periodic digest, quiet hours, and old-thread cleanup are intentionally not part of this first step.

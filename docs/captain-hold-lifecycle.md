@@ -228,7 +228,7 @@ An unbound source feeds nothing, so the path is opt-in per source.
 
 ### Channels that feed the intake
 
-Two channels feed that one intake today, and both are ordinary callers rather than special cases.
+Three channels feed that one intake today, and all are ordinary callers rather than special cases.
 
 `bin/fm-send.sh --resolve-key` is the chat channel:
 
@@ -246,6 +246,12 @@ Two channels feed that one intake today, and both are ordinary callers rather th
 `bin/fm-procevent-lavish.sh answers` is one such built-in adapter command.
 It reads only rows tagged `choice` and relays a card's declared close mode.
 It can never let freeform captain prose forge a task id or a mode.
+
+`bin/fm_slack_watch.py` is the Slack channel:
+
+- It feeds the intake only while `slack-dm` is bound with `bin/fm-captain-hold.sh bind`.
+- It passes one allowlisted owner reply or reaction from a mirrored DM thread as one keyed line and carries no decision rule.
+- [`configuration.md`](configuration.md#slack-decision-plane-env) owns its configuration and mechanics.
 
 Trusted external process-event adapters intentionally expose no answer operation and cannot feed this authority-bearing intake; [`extension-bindings.md`](extension-bindings.md#trust-boundary) owns that boundary.
 
