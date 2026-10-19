@@ -64,7 +64,9 @@ path=${*: -1}
 mkdir -p "$FAKE_DU_ACTIVE"
 : > "$FAKE_DU_ACTIVE/$$"
 find "$FAKE_DU_ACTIVE" -type f | wc -l | tr -d ' ' >> "$FAKE_DU_LOG.conc"
-sleep "${FAKE_DU_SLEEP:-0.05}"
+# FAKE_DU_HANG_AFTER=<n>: every du after the n-th never finishes on its own.
+[ "$(wc -l < "$FAKE_DU_LOG.conc" | tr -d ' ')" -le "${FAKE_DU_HANG_AFTER:-999999}" ] || exec sleep 600
+sleep 0.05
 rm -f "$FAKE_DU_ACTIVE/$$"
 printf '%s\n' "$path" >> "$FAKE_DU_LOG"
 kib=$(awk -F '\t' -v p="$path" '$1 == p { print $2 }' "$FAKE_DU_TABLE")
@@ -557,7 +559,9 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   make_budget_world cut 10 10 10
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   # The first du finishes inside the bound; the second is cut by it; the third never starts.
-  FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check
+  # The second hangs until the bound kills it, so no whole-second rounding of
+  # the bound can let it finish.
+  FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=8 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
   assert_contains "$OUT" "is over its budget: 10.00 GiB against 5 GiB" "a lower bound already over the budget should wake"
   assert_contains "$OUT" "2 copies unmeasured" "the wake did not disclose the unmeasured copies"
@@ -565,7 +569,7 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   [ "$(du_calls)" = 1 ] || fail "a du that could not finish inside the bound was counted, or one ran past it: $(du_calls) completed"
   make_budget_world cutquiet 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check
+  FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=8 run_sweep check
   [ -z "$OUT" ] || fail "a cut scan that proved nothing over still woke: $OUT"
   pass "a scan cut at its time bound wakes only on bytes it measured and records no completed scan"
 }
