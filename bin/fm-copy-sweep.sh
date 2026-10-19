@@ -30,11 +30,13 @@
 #                      the owner are the repair.
 #   HELD-LOCKED        a worktree lock holds it and this sweep may not remove it.
 #                      A lock that is not Vernant's exact creation-lock format,
-#                      or whose launcher may still be alive, stays here: the
-#                      closeout driver is the only supported release and this
-#                      sweep never unlocks by hand. A REAPABLE-DRIVER copy whose
-#                      driver plan refuses it in --apply joins this class, with
-#                      the driver's own reason as its reason.
+#                      or whose launcher may still be alive, stays here, as does
+#                      a Vernant-locked copy whose clone has no closeout driver
+#                      or no usable interpreter for it: the closeout driver is
+#                      the only supported release and this sweep never unlocks
+#                      by hand. A REAPABLE-DRIVER copy whose driver plan refuses
+#                      it in --apply joins this class, with the driver's own
+#                      reason as its reason.
 #   HELD-LIVE-TASK     an active task record in any local home names it (or a
 #                      path inside or around it, except a registered secondmate's
 #                      own home chain), a process has its working directory
@@ -56,7 +58,8 @@
 #                      delete that inner copy and whatever it holds, and git
 #                      status cannot see it when `.claude/worktrees/` is ignored.
 #   HELD-UNPUSHED      its HEAD holds a commit that is on no remote and whose
-#                      content is not already in the default branch.
+#                      content is not already in the default branch (a locked
+#                      copy has no such fallback; see REAPABLE-DRIVER).
 #   REAPABLE-PROVEN    clean, HEAD contained in a remote branch (the whole-slot
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one

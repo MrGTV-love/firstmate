@@ -1967,7 +1967,7 @@ The script header owns how a budget is measured, when it is over, and when its w
 
 `FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) names the Treehouse root.
 `FM_TEARDOWN_VERNANT_PYTHON` (default `<clone>/.venv/bin/python`) names the interpreter that runs Vernant's closeout driver when `--apply` releases a locked copy, exactly as it does for teardown.
-`FM_COPY_SWEEP_PLAN_TIMEOUT` (default `120`, in seconds) bounds the closeout driver's plan for a locked copy; a plan that does not answer in time holds the copy, and the sweep kills the plan's whole process group.
+`FM_COPY_SWEEP_PLAN_TIMEOUT` (default `120`, in seconds) bounds the closeout driver's plan for a locked copy; a plan that does not answer in time holds the copy, and the script header owns how the plan is stopped.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
 [`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 

@@ -70,6 +70,9 @@
 # TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT, TEARDOWN_HELD_SLOT) and functions
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
+# bin/fm-copy-sweep.sh also calls teardown_run_closeout and
+# teardown_foreign_copy_dispose for a locked copy it proved on its own, with DATA
+# set to its data directory and ID to a per-release id.
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
