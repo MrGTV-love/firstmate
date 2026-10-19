@@ -1,0 +1,57 @@
+{
+  "schema": "fm-slack-replay.v1",
+  "team": "T0123456789",
+  "channel": "D0123456789",
+  "bot_user": "UBOT0123456",
+  "bot_id": "BBOT0123456",
+  "next_ts": 899,
+  "scopes": [
+    "chat:write",
+    "im:write",
+    "im:history",
+    "reactions:read",
+    "reactions:write",
+    "users:read"
+  ],
+  "users": {
+    "U0TESTOWNER": {
+      "is_bot": false
+    },
+    "U0123456789": {
+      "is_bot": false
+    },
+    "U0DISPLAYNAME": {
+      "is_bot": false
+    }
+  },
+  "messages": [
+    {
+      "ts": "900.000001",
+      "text": "Seeded decision card",
+      "user": "UBOT0123456",
+      "bot_id": "BBOT0123456"
+    },
+    {
+      "ts": "900.000002",
+      "thread_ts": "900.000001",
+      "user": "U0TESTOWNER",
+      "text": "yes"
+    }
+  ],
+  "reactions": {},
+  "skip_mirror": true,
+  "seed_state": {
+    "threads": {
+      "crash-a-call:2026-10-01T00:00:00Z#0": {
+        "key": "crash-a-call",
+        "identity": "2026-10-01T00:00:00Z#0",
+        "ts": "900.000001",
+        "options": [],
+        "mode": "done",
+        "reactions": true,
+        "retired": false
+      }
+    },
+    "seen": {}
+  }
+}
