@@ -274,9 +274,11 @@ status_open_decisions_cursor_offset() {  # <status-file>
 # Print every non-blank status line whose bytes begin at or after the persisted
 # presentation offset. Does not write the cursor. A missing manifest row or
 # changed status identity reads the current file from offset 0; malformed or
-# unreadable cursor state fails the scan. Symlinks and unreadable status files
-# print nothing. With <out-var>, the lines are assigned to it instead of
-# printed, so a per-task scan takes them without forking a substitution.
+# unreadable cursor state fails the scan with status 1. A span the read limits
+# refuse (bin/fm-status-cap-lib.sh) fails it with status 2 instead, so a caller can
+# leave that one task's cursor where it was and go on with the others. Symlinks and
+# unreadable status files print nothing. With <out-var>, the lines are assigned to it
+# instead of printed, so a per-task scan takes them without forking a substitution.
 status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>] [<out-var>]
   local f=$1 captured_end=${2:-} __fm_nl_out=${3-} __fm_nl_acc='' offset size actual_size chunk line rc=0
   [ -z "$__fm_nl_out" ] || printf -v "$__fm_nl_out" '%s' ''
@@ -297,8 +299,10 @@ status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>] [<out
   # The span is held in memory, not in a scratch file beside the cursor: a drain
   # killed mid-read (SIGKILL cannot be trapped) must leave nothing behind, and the
   # read limit (bin/fm-status-cap-lib.sh) bounds what it holds. A span past the limit
-  # fails the read, so the caller leaves its cursor where it was; it is never clipped.
-  chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null) || return 1
+  # fails the read with status 2, so the caller leaves its cursor where it was; it is
+  # never clipped.
+  chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null) \
+    || { [ "$?" -ne 2 ] || return 2; return 1; }
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       *[![:space:]]*)

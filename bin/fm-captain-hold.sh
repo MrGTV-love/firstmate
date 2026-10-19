@@ -2409,7 +2409,8 @@ reconcile_close_key() {
       *) fail "cannot establish whether key $key belongs to captain-held task $id; nothing was closed" ;;
     esac
   done
-  open=$(status_open_decisions "$file")
+  open=$(status_open_decisions "$file") \
+    || fail "cannot read $owner's status log, which is past the status read limits, so its open decisions are unknown; nothing was closed"
   if status_event_recorded "$file" "$line"; then
     ! _fm_open_set_has "$open" "$key" \
       || fail "key $key was reopened; old evidence cannot resolve a new call"
@@ -2424,7 +2425,8 @@ reconcile_close_key() {
   record_key_evidence "$owner" "$key" "$opening"
   fm_wake_status_append_self_announced "$STATE" "$file" "$line" || append_rc=$?
   [ "$append_rc" -ne 2 ] || fail "could not append the reconciliation for $owner key $key; retry with the same evidence"
-  open=$(status_open_decisions "$file")
+  open=$(status_open_decisions "$file") \
+    || fail "the close of key $key was appended, but $owner's status log is past the status read limits, so whether it closed cannot be verified"
   ! _fm_open_set_has "$open" "$key" \
     || fail "key $key remains open in $owner; it may have reopened concurrently"
   printf 'reconciled-key: %s %s\nevidence: %s\n' "$owner" "$key" "$KEY_EVIDENCE_PATH"
@@ -2541,7 +2543,8 @@ EOF
   fi
 
   status_file="$STATE/$origin.status"
-  open=$(status_open_decisions "$status_file")
+  open=$(status_open_decisions "$status_file") \
+    || fail "cannot read origin $origin's status stream, which is past the status read limits, so its open captain decisions are unknown"
   if [ -n "$open" ] && [ -z "$keys" ]; then
     fail "origin $origin still has open captain decisions in its status stream; hold a captain task for what remains, or answer them, before attesting --none"
   fi
@@ -2597,7 +2600,8 @@ command_verify() {
 $(printf '%s\n' "$keys" | tr ',' '\n')
 EOF
   fi
-  open=$(status_open_decisions "$STATE/$origin.status")
+  open=$(status_open_decisions "$STATE/$origin.status") \
+    || fail "cannot read origin $origin's status stream, which is past the status read limits, so its open captain decisions are unknown"
   while IFS=$'\t' read -r key _verb _summary; do
     [ -n "$key" ] || continue
     fail "open captain decision $origin/$key is not transferred to the captain-held inventory; re-run complete"

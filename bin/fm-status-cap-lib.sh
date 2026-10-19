@@ -39,13 +39,15 @@
 # because a shell loop costs about 2.7 ms per line in the watcher's span classifier
 # (measured 2026-10-18): a flood of tiny lines under the byte limit would otherwise
 # hold the watcher for hours, and the watcher is what raises the over-cap wake.
-# Each can be overridden by the environment for a test or a deliberate site choice;
-# a value that is not a positive integer falls back to the default.
+# The cap and the reserve can be overridden by the environment (FM_STATUS_CAP_BYTES,
+# FM_STATUS_CAP_RESERVE_BYTES) for a test or a deliberate site choice, and a value
+# that is not a positive integer falls back to the default. The window and the line
+# limit are constants.
 
 FM_STATUS_CAP_BYTES_DEFAULT=33554432
 FM_STATUS_CAP_RESERVE_BYTES_DEFAULT=1048576
-FM_STATUS_READ_WINDOW_BYTES_DEFAULT=4194304
-FM_STATUS_READ_LIMIT_LINES_DEFAULT=32768
+_FM_STATUS_READ_WINDOW_BYTES=4194304
+_FM_STATUS_READ_LIMIT_LINES=32768
 
 # Printed, or assigned to <out-var> when one is given, so a reader takes the bound
 # without forking a command substitution. Locals carry the __fm_cb_ prefix because
@@ -69,11 +71,11 @@ fm_status_cap_reserve_bytes() {  # [<out-var>]
 }
 
 fm_status_window_bytes() {  # [<out-var>]
-  _fm_status_bound_value "${FM_STATUS_READ_WINDOW_BYTES:-}" "$FM_STATUS_READ_WINDOW_BYTES_DEFAULT" "${1-}"
+  if [ -n "${1-}" ]; then printf -v "$1" '%s' "$_FM_STATUS_READ_WINDOW_BYTES"; else printf '%s' "$_FM_STATUS_READ_WINDOW_BYTES"; fi
 }
 
 fm_status_read_limit_lines() {  # [<out-var>]
-  _fm_status_bound_value "${FM_STATUS_READ_LIMIT_LINES:-}" "$FM_STATUS_READ_LIMIT_LINES_DEFAULT" "${1-}"
+  if [ -n "${1-}" ]; then printf -v "$1" '%s' "$_FM_STATUS_READ_LIMIT_LINES"; else printf '%s' "$_FM_STATUS_READ_LIMIT_LINES"; fi
 }
 
 # cap plus reserve. The locals carry the __fm_rl_ prefix for the same reason as above.
@@ -88,27 +90,30 @@ fm_status_read_limit_bytes() {  # [<out-var>]
   fi
 }
 
-# 0 when a reader may take <bytes> bytes of <status-file> in one pass, 1 when that is
-# past the read limit: one line on stderr then names the file and both numbers, and the
-# reader must take nothing. Every reader that needs a log's history asks here, so a log
-# past the limit is refused the same way, and named, wherever it is read.
+# 0 when a reader may take <bytes> bytes of <status-file> in one pass, 2 when that is
+# past the read limit: one line on stderr then names the file, the span and the
+# supported route, and the reader must take nothing. Every reader that needs a log's
+# history asks here, so a log past the limit is refused the same way, and named,
+# wherever it is read. Status 2 is the refusal and no other failure uses it, so a
+# caller can tell "this log cannot be read" from "this log is empty".
 fm_status_read_allowed() {  # <status-file> <bytes>
   local __fm_ra_limit
   fm_status_read_limit_bytes __fm_ra_limit
   [ "$2" -le "$__fm_ra_limit" ] && return 0
-  echo "fm-status: refused to read ${1##*/}: $2 bytes is past the read limit of $__fm_ra_limit bytes (cap plus reserve); nothing was read" >&2
-  return 1
+  echo "fm-status: refused to read ${1##*/}: a span of $2 bytes is past the read limit of $__fm_ra_limit bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log" >&2
+  return 2
 }
 
 # Print exactly <byte-length> bytes of <status-file> from <start-offset>, or nothing.
 # Past the byte limit, and past the line limit unless <max-lines> is 0 (byte limit
-# alone), the read is refused: one line on stderr names the file and the limit, nothing
-# is printed, and the status is 1. A span is never clipped, so a caller that turns the
-# bytes into a position measures it against the span it asked for. Any other failure
-# (a file that cannot be opened or is shorter than asked) is status 1 with no message.
+# alone), the read is refused: one line on stderr names the file, the span and the
+# supported route, nothing is printed, and the status is 2. A span is never clipped, so
+# a caller that turns the bytes into a position measures it against the span it asked
+# for. Any other failure (a file that cannot be opened or is shorter than asked) is
+# status 1 with no message.
 fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lines>]
   local f=$1 start=$2 length=$3 lines rc=0
-  fm_status_read_allowed "$f" "$length" || return 1
+  fm_status_read_allowed "$f" "$length" || return 2
   case "${4-}" in
     0) lines=0 ;;
     ''|*[!0-9]*) fm_status_read_limit_lines lines ;;
@@ -132,8 +137,8 @@ fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lin
     }
   ' "$f" "$start" "$length" "$lines" || rc=$?
   if [ "$rc" -eq 3 ]; then
-    echo "fm-status: refused to read ${f##*/}: more than $lines lines in the span, the line-by-line read limit; nothing was read" >&2
-    return 1
+    echo "fm-status: refused to read ${f##*/}: a span of more than $lines lines is past the line-by-line read limit; nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log" >&2
+    return 2
   fi
   return "$rc"
 }
@@ -159,6 +164,7 @@ use warnings;
 use Fcntl qw(:DEFAULT :flock);
 
 my ($path, $cap, $reserve, @lines) = @ARGV;
+if (!@lines) { @lines = map { chomp; $_ } <STDIN>; }
 
 sub ends_with_newline {
     my ($handle, $size) = @_;
@@ -206,6 +212,16 @@ fm_status_append_lines() {  # <status-file> <line>...
 
 fm_status_append_line() {  # <status-file> <line>
   fm_status_append_lines "$1" "$2"
+}
+
+# The same append for every line of <lines-file>, one event per line, read by the
+# writer itself rather than passed on its command line, for a batch too large for one
+# command line. Returns as fm_status_append_lines does; an empty file appends nothing.
+fm_status_append_file() {  # <status-file> <lines-file>
+  local file=$1 cap reserve
+  fm_status_cap_bytes cap
+  fm_status_cap_reserve_bytes reserve
+  perl -e "$_FM_STATUS_APPEND_PERL" -- "$file" "$cap" "$reserve" < "$2"
 }
 
 # --- over-cap detection ------------------------------------------------------

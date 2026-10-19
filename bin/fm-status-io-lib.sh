@@ -254,7 +254,7 @@ _fm_status_sidecar_fits() {  # <file>
 fm_status_tail_lines() {  # <status-file> <lines>
   local window
   fm_status_window_bytes window
-  tail -c "$window" "$1" 2>/dev/null | tail -n "$2"
+  tail -c "$window" "$1" 2>/dev/null | head -c "$window" | tail -n "$2"
 }
 
 FM_STATUS_SNAPSHOT_EVENT_LINE=

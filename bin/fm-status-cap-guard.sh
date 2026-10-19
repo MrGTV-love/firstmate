@@ -20,7 +20,7 @@
 # which a later `kill -CONT <pid>` undoes. Exactly the pids lsof reported as holding
 # the file open for writing and recognized as omp are signalled; any other writer,
 # or none found, is named and left alone. It never deletes, truncates or rewrites a
-# file. `FM_STATUS_CAP_STOP=0` makes it observe only.
+# file.
 #
 # bin/fm-control.sh is the control plane for a task's agent, addressed by task id
 # and driving its endpoint; it has no verb for one process id, and the writer is a
@@ -37,8 +37,8 @@
 # rate times the poll interval, which docs/configuration.md "Status log size bounds"
 # states with measured numbers.
 # Environment: FM_STATE_OVERRIDE (state dir), FM_STATUS_CAP_SAMPLE_SECS (growth
-# sample, default 1), FM_STATUS_CAP_STOP (0 observes only), FM_STATUS_CAP_LSOF (the
-# lsof command, for tests). The cap itself is FM_STATUS_CAP_BYTES.
+# sample, default 1), FM_STATUS_CAP_LSOF (the lsof command, for tests). The cap itself
+# is FM_STATUS_CAP_BYTES.
 #
 # tests/fm-status-runaway-guard.test.sh is the regression entry point.
 set -u
@@ -199,10 +199,6 @@ investigate() {  # <size> <ident> <path>
         continue
       fi
       omp_found=1
-      if [ "${FM_STATUS_CAP_STOP:-1}" = 0 ]; then
-        action_text="${action_text:+$action_text; }stopped nothing: FM_STATUS_CAP_STOP=0"
-        continue
-      fi
       start=$(process_start "$pid")
       line=$(stop_writer "$pid" "$name" "$start") || :
       action_text="${action_text:+$action_text; }$line"

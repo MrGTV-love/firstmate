@@ -165,11 +165,11 @@ make_named_shell() {  # <dir> <name>
 }
 
 # A bounded writer that holds a descriptor open and appends short lines the way the
-# harness did, 13000 lines (65000 bytes) every second for up to 60 rounds. It is paced
-# so that it is still writing when the watcher, which takes several seconds to start,
-# finds it, and a stopped and then resumed one still has most of its work left. It runs
-# under a hard file-size limit and a hard round count: 60 rounds are 3.9 MB, under the
-# 4 MiB limit.
+# harness did, 13000 lines (65000 bytes) every three seconds for up to 60 rounds. It is
+# paced so that it is still writing when the watcher, which takes several seconds to
+# start and far longer on a loaded host, finds it, and a stopped and then resumed one
+# still has most of its work left. It runs under a hard file-size limit and a hard round
+# count: 60 rounds are 3.9 MB, under the 4 MiB limit.
 start_paced_writer() {  # <shell> <status-file> <pid-file>
   (
     ulimit -f "$HARD_LIMIT_BLOCKS"
@@ -179,7 +179,7 @@ start_paced_writer() {  # <shell> <status-file> <pid-file>
       while [ "$i" -lt 60 ]; do
         i=$((i + 1))
         printf "text\n%.0s" {1..13000} >&9
-        sleep 1 9>&-
+        sleep 3 9>&-
       done
     ' _ "$2" &
     printf '%s\n' "$!" > "$3"
@@ -421,7 +421,7 @@ test_readers_stay_bounded_on_a_two_gib_log() {
   [ "$(file_size "$status")" -eq 2147483648 ] || fail "the fixture is not 2 GiB"
   size_after=$(file_size "$status")
 
-  secs=$(timed open-decisions fm_run_timed "$READER_BOUND_SECS" bash -c '. "$1"; status_open_decisions "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \
+  secs=$(timed open-decisions fm_run_timed "$READER_BOUND_SECS" bash -c '. "$1"; status_open_decisions "$2"; true' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \
     || fail "status_open_decisions did not finish in ${READER_BOUND_SECS}s on a 2 GiB log"
   record_timing "open-decisions fold" "$secs"
   secs=$(timed last-line fm_run_timed "$READER_BOUND_SECS" bash -c '. "$1"; last_status_line "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \
@@ -456,7 +456,7 @@ test_history_readers_refuse_a_log_past_the_limit_and_name_it() {
   make_two_gib_log "$status" || fail "could not build the sparse 2 GiB fixture"
 
   out=$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2"' _ "$ROOT/bin" "$status" 2>"$dir/cat.err") || rc=$?
-  [ "$rc" -ne 0 ] || fail "a whole-file read of a 2 GiB log succeeded"
+  [ "$rc" -eq 2 ] || fail "a whole-file read of a 2 GiB log was not refused with exit status 2 (rc=$rc)"
   [ -z "$out" ] || fail "a whole-file read of a 2 GiB log printed ${#out} bytes"
   grep -q 'refused to read huge.status' "$dir/cat.err" || fail "the refusal does not name the file: $(cat "$dir/cat.err")"
 
@@ -485,7 +485,8 @@ test_history_readers_refuse_a_log_past_the_limit_and_name_it() {
   rc=0
   out=$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2"' _ "$ROOT/bin" "$status" 2>"$dir/lines.err") || rc=$?
   [ "$rc" -ne 0 ] && [ -z "$out" ] || fail "a 40000 line log was read by a line-by-line reader (rc=$rc, ${#out} bytes)"
-  grep -q 'refused to read dense.status: more than 32768 lines' "$dir/lines.err" || fail "the line refusal does not name the file and limit: $(cat "$dir/lines.err")"
+  [ "$rc" -eq 2 ] || fail "a line-limit refusal is not exit status 2 (rc=$rc)"
+  grep -q 'refused to read dense.status: a span of more than 32768 lines' "$dir/lines.err" || fail "the line refusal does not name the file and limit: $(cat "$dir/lines.err")"
   [ "$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" 0 | wc -c' _ "$ROOT/bin" "$status" | tr -d ' ')" -eq 80000 ] \
     || fail "the byte-limit-alone read of the 40000 line log did not return all of it"
   perl -e 'print "working: step $_\n" for 1 .. 5338' > "$status"
@@ -524,6 +525,61 @@ test_a_saved_cursor_never_advances_past_bytes_that_were_not_read() {
   case "$out" in *early-q*) ;; *) fail "a refused span dropped the decision the cursor held: $out" ;; esac
   grep -q "^offset=$size\$" "$cursor" || fail "a refused span moved the cursor: $(cat "$cursor")"
   pass "a fold that cannot read its span leaves the saved cursor and its open decision where they were"
+}
+
+run_classify() {  # <function> <args...>: one status-library function in a fresh shell
+  bash -c '. "$1/fm-classify-lib.sh"; shift; "$@"' _ "$ROOT/bin" "$@"
+}
+
+test_a_refused_read_is_unknown_never_an_empty_open_set() {
+  local dir state status out rc err
+  dir=$(make_case refused-open-set); state="$dir/state"; status="$state/r.status"; err="$dir/refused.err"
+  # A log with an open decision and then 40000 routine lines: past the 32768 line limit
+  # at 200 KB, far below the cap, so no over-cap wake explains the refusal.
+  { printf 'needs-decision [key=q1]: an early question that is still open\n'; perl -e 'print "text\n" x 40000'; } > "$status"
+
+  # No checkpoint: every pure reader refuses with status 2 and says so, and prints no set.
+  for reader in "status_open_decisions $status" "status_open_decisions_dated $status" "status_own_open_decisions $status" "status_current_line $status ship"; do
+    rc=0
+    # shellcheck disable=SC2086
+    out=$(run_classify $reader 2>"$err") || rc=$?
+    [ "$rc" -eq 2 ] || fail "${reader%% *} did not refuse with exit status 2 on a log past the line limit (rc=$rc, output '$out')"
+    [ -z "$out" ] || fail "${reader%% *} printed '$out' for a log it refused"
+    grep -q 'refused to read r.status' "$err" || fail "${reader%% *} did not name the refused log: $(cat "$err")"
+  done
+  rc=0
+  run_classify status_has_open_needs_decision "$status" 2>/dev/null || rc=$?
+  [ "$rc" -eq 1 ] || fail "a refused log answered the needs-decision question with $rc, not the safe no"
+
+  # With a trusted checkpoint the open set survives a refused tail, as the incremental fold does.
+  status="$state/seeded.status"
+  printf 'needs-decision [key=q1]: an early question that is still open\n' > "$status"
+  out=$(run_classify status_open_decisions_incremental "$status")
+  case "$out" in *q1*) ;; *) fail "the checkpoint fixture did not fold q1: $out" ;; esac
+  perl -e 'print "text\n" x 40000' >> "$status"
+  out=$(run_classify status_open_decisions "$status" 2>/dev/null) || fail "the seeded pure fold failed after 40000 lines"
+  case "$out" in *q1*) ;; *) fail "the seeded pure fold lost the checkpoint's open decision: '$out'" ;; esac
+  out=$(run_classify status_open_decisions_incremental "$status" 2>/dev/null) || fail "the incremental fold failed after 40000 lines"
+  case "$out" in *q1*) ;; *) fail "the incremental fold lost the checkpoint's open decision: '$out'" ;; esac
+  pass "a log the read limits refuse reads as unknown (status 2), never as no open decision, while a checkpointed fold keeps its open set"
+}
+
+test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain() {
+  local dir state out err
+  dir=$(make_case refused-lane); state="$dir/state"; err="$dir/drain.err"
+  printf 'needs-decision [key=q1]: a healthy lane still has its decision\n' > "$state/a.status"
+  perl -e 'print "text\n" x 5000' > "$state/b.status"
+  : > "$state/a.meta"
+  : > "$state/b.meta"
+  fm_write_meta "$state/a.meta" "window=firstmate:fm-a" "worktree=$dir" "project=alpha" "harness=claude" "kind=ship" 2>/dev/null || true
+  fm_write_meta "$state/b.meta" "window=firstmate:fm-b" "worktree=$dir" "project=alpha" "harness=claude" "kind=ship" 2>/dev/null || true
+  # b.status is 25000 bytes; with this cap plus reserve the read limit is 5000 bytes.
+  out=$(FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 FM_STATE_OVERRIDE="$state" "$DRAIN" 2>"$err") \
+    || fail "the drain failed because one lane's log is past the read limit: $(head -c 400 "$err")"
+  case "$out" in *'[key=q1]'*) ;; *) fail "the healthy lane's open decision vanished from the drain: $out" ;; esac
+  grep -q 'b.status' "$err" || fail "the drain did not name the refused log: $(head -c 400 "$err")"
+  grep -q 'refused\|past the read limits' "$err" || fail "the drain did not say why: $(head -c 400 "$err")"
+  pass "one lane's log past the read limits is named on stderr and the drain still presents every other lane's open decisions"
 }
 
 test_latest_event_endpoint_is_a_position_in_the_whole_log() {
@@ -655,6 +711,8 @@ tests=(
   test_readers_stay_bounded_on_a_two_gib_log
   test_history_readers_refuse_a_log_past_the_limit_and_name_it
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
+  test_a_refused_read_is_unknown_never_an_empty_open_set
+  test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain
   test_latest_event_endpoint_is_a_position_in_the_whole_log
   test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log
   test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log

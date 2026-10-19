@@ -318,7 +318,8 @@ class Collector:
         out = self.bash('. "$1/fm-classify-lib.sh"; last=$(last_status_line "$2"); '
                         'printf "%s\\n" "$(status_line_at_epoch "$last" || :)" '
                         '"$(status_line_verb "$last")"; '
-                        'status_own_open_decisions "$2" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
+                        'own=$(status_own_open_decisions "$2") || exit 1; '
+                        'printf "%s\\n" "$own" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
                         '{ n = 1 } END { print n + 0 }\'; '
                         'wait=$(status_declared_wait_line "$2"); '
                         'if status_is_paused_or_captain_held "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
@@ -801,9 +802,10 @@ class Collector:
                 continue
             if path.is_symlink():
                 raise ValueError("review lane status must not be a symbolic link")
-            events = self.bash('. "$1"; while IFS= read -r line || [ -n "$line" ]; do '
+            events = self.bash('. "$1"; text=$(fm_status_cat "$2") || exit 1; '
+                               'while IFS= read -r line || [ -n "$line" ]; do '
                                'if _fm_status_line_is_event "$line" "$FM_CLASSIFY_CAPTAIN_RE_DEFAULT"; '
-                               'then printf "%s\\n" "$line"; fi; done < <(fm_status_cat "$2")',
+                               'then printf "%s\\n" "$line"; fi; done <<< "$text"',
                                BIN / "fm-status-event-lib.sh", path)
             # Exact URL tokens, not prefix matches on PR numbers.
             lines = [line for line in events.splitlines()

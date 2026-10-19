@@ -726,14 +726,18 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
 
 # Copy a task's status log into the snapshot. A log past the read limit
 # (bin/fm-status-cap-lib.sh) is refused, named on stderr, and not copied: the task is
-# then observed without a status log, and one runaway log neither fills the disk a
-# second time nor fails the whole snapshot. Any other log is copied whole with its
-# mtime, exactly as before.
+# then observed without a status log, its <destination>.refused marker says why so the
+# task record reports its open decisions as unreadable rather than as none, and one
+# runaway log neither fills the disk a second time nor fails the whole snapshot. Any
+# other log is copied whole with its mtime, exactly as before.
 snapshot_capture_status() {  # <source> <destination>
   local source=$1 size
   if size=$(_fm_status_file_size "$source" 2>/dev/null); then
     size=${size//[[:space:]]/}
-    case "$size" in ''|*[!0-9]*) ;; *) fm_status_read_allowed "$source" "$size" || return 0 ;; esac
+    case "$size" in
+      ''|*[!0-9]*) ;;
+      *) fm_status_read_allowed "$source" "$size" || { : > "$2.refused"; return 0; } ;;
+    esac
   fi
   snapshot_capture_optional "$@"
 }
@@ -861,7 +865,7 @@ task_json_one() {  # <captured-meta> - prints one task record
   local remote_host remote_root current_file endpoint_file observation_line
   local pr pr_source pr_head current_json endpoint_exists agent_alive last_event_raw last_event_verb last_event_note
   local last_event_epoch last_event_age status_present report_present report_marker_present pr_from_status
-  local open_decisions_tsv worktree_present home_present observed_meta_present
+  local open_decisions_tsv open_decisions_unreadable worktree_present home_present observed_meta_present
 
   # Each task is one jq program fed by in-shell reads: a metadata key, a status
   # line, or a path test costs no subprocess, so the per-task cost stays flat as
@@ -942,7 +946,10 @@ task_json_one() {  # <captured-meta> - prints one task record
   # never clear another concern's keyed decision. A parked/blocked state, or a
   # non-authoritative status-log/none read on a still-live task, keeps the fold's
   # open decision surfacing.
-  open_decisions_tsv=$(status_open_decisions "$status_log" "$kind")
+  open_decisions_unreadable=false
+  [ ! -e "$status_log.refused" ] || open_decisions_unreadable=true
+  open_decisions_tsv=$(status_open_decisions "$status_log" "$kind") \
+    || { open_decisions_tsv=''; open_decisions_unreadable=true; }
 
   endpoint_exists=null
   agent_alive=not_checked
@@ -997,6 +1004,7 @@ task_json_one() {  # <captured-meta> - prints one task record
     --arg last_event_verb "$last_event_verb" \
     --arg last_event_note "$last_event_note" \
     --arg open_decisions_tsv "$open_decisions_tsv" \
+    --argjson open_decisions_unreadable "$open_decisions_unreadable" \
     --argjson last_event_age "$last_event_age" \
     --argjson status_present "$status_present" \
     --argjson current_state "$current_json" \
@@ -1047,6 +1055,7 @@ task_json_one() {  # <captured-meta> - prints one task record
         pending_decision:any($open_decisions[]; .verb == "needs-decision"),
         blocked_event:any($open_decisions[]; .verb == "blocked"),
         open_decisions:$open_decisions,
+        open_decisions_unreadable:$open_decisions_unreadable,
         scout_report_present:$report_marker_present,
         last_event_text:$last_event_raw
       },

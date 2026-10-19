@@ -652,8 +652,22 @@ EOF
   stage_mirror_lines "$normalized_payload" "$mirrored" "$source_record" "$status_file" \
     "$status_additions" "$source_additions" \
     || { fm_lock_release "$lock"; die "cannot stage remote reply mirror identity"; }
-  cat "$status_additions" >> "$status_file" \
-    || { fm_lock_release "$lock"; die "cannot append remote reply"; }
+  # The mirror writes through the capped append like every other writer of this log
+  # (bin/fm-status-cap-lib.sh). A refusal stops the ingest before anything else is
+  # committed: the cursor and the mirrored-source record stay where they were, so the
+  # delta is re-read whole and the lines that did land are recognised as present, and one
+  # keyed escalation names the log. Nothing is dropped and the log never grows unbounded.
+  append_rc=0
+  fm_status_append_file "$status_file" "$status_additions" || append_rc=$?
+  if [ "$append_rc" -eq 75 ]; then
+    line="blocked [key=remote-reply-continuity-$id-capped]: remote reply mirror stopped for $id: the parent status log is past its size limit, so the remote delta at offset ${CURSOR_OFFSET} stays unread and nothing was dropped; free the log or retire the lane and the next ingest resumes"
+    if ! status_event_recorded "$status_file" "$line"; then
+      append_status_once "$status_file" "$(status_stamp_line "$line")" || :
+    fi
+    fm_lock_release "$lock"
+    die "cannot append remote reply: $status_file is at its size limit; the cursor was not advanced and the delta stays re-readable"
+  fi
+  [ "$append_rc" -eq 0 ] || { fm_lock_release "$lock"; die "cannot append remote reply"; }
   appended=$(LC_ALL=C awk 'END { print NR + 0 }' "$status_additions") \
     || { fm_lock_release "$lock"; die "cannot count appended remote replies"; }
   cat "$source_additions" >> "$source_record" \
