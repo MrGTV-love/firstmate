@@ -3895,6 +3895,7 @@ FM_DSH_LAB_PROJECT=/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab
 FM_DSH_LAB_COPY=/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-copy \
 bin/fm-test-run.sh tests/fm-dsh-live-e2e.test.sh
 bin/fm-test-run.sh tests/fm-dsh-harness.test.sh
+bin/fm-test-run.sh tests/fm-dsh-spawn.test.sh
 ```
 
 ```text
@@ -3904,6 +3905,14 @@ cleanup_exit=0
 ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement
 ok - dsh frame proves empty, typed draft, and busy-hint furniture
 ok - dsh executable-slot attribution, lifecycle capability and fatal cleanup contract
+ok - fm-harness: dsh detects by anchored name or script argv; the marker is a precedence override that needs real dsh ancestry
+ok - session lock and process classification: dsh is anchored, decoys stay out
+ok - fm_backend_tmux_agent_state: dsh is alive by name and by script argv, an unrelated node is not
+ok - fm_busy_classify: dsh follows the launch's own durable session log
+ok - fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default
+ok - fm-spawn: an explicit dsh pin is honored and a dsh launch without a DeepSeek model is refused
+ok - fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME
+ok - fm-spawn: config/session-launch-policy=omp-or-tc refuses a dsh launch with the policy's own message
 ```
 
 | Fact | Observed |
@@ -3917,10 +3926,13 @@ ok - dsh executable-slot attribution, lifecycle capability and fatal cleanup con
 | Relaunch | `bin/fm-control.sh <id> relaunch` replaced the worker in the same endpoint; the replacement read its relaunch instructions and the guard observed the bound session log grow in place |
 | Resume | Available through the launch overlay's `sessionId` field. The stock profile patch reads `DSH_TUI_RESUME_SESSION`, but the launch patch replaces that row config, so `--resume` or the env alone opened a fresh session; `bin/fm-dsh.py resume` now writes the task's newest session id explicitly and DSH continues the conversation in the same session log. Verified by a secret-word probe in which the resumed session recalled a word from the earlier turn, and by the live guard's same-log growth and earlier-conversation assertions. |
 
-The two `live` lines and `cleanup_exit=0` were recorded by the live guard before the start-position proof landed; the three portable lines come from the final head. Rerun the live guard to refresh the first three.
+The two `live` lines and `cleanup_exit=0` were recorded by the live guard before the start-position proof landed; the eleven portable lines come from the final head. Rerun the live guard to refresh the first three.
 
 The 93 MB installed profile tree is reproduced inside each launch root rather than linked: Node resolves real paths before DSH's profile interception, so a linked `node_modules` escaped the isolated profile and loaded the launcher's own incompatible packages.
 The launcher needs the `dsh` CLI on `PATH`; a pane without the installing nvm bin directory exits with `dsh CLI not found`, so the launch prepends the launcher's own directory.
+The launch swaps `HOME` for the task's private one, so `~/.gitconfig` and the no-mistakes home are carried as `GIT_CONFIG_GLOBAL` and `NM_HOME` environment paths resolved by the pane shell; nothing is copied or linked, and the other HOME-relative tool state is absent on purpose.
+On 2026-10-19, against the operator's live no-mistakes daemon, `no-mistakes daemon status` printed `daemon running (pid 26547)` from the operator's shell and from a swapped empty `HOME` with `NM_HOME` carried, and `daemon not running` from the swapped `HOME` with `NM_HOME` unset.
+`no-mistakes axi status` from the review worktree gave the identical `repo not initialized` answer under both homes, because that worktree is not a gated repository; a live ship worker running `axi status` against a gated repository is not yet recorded.
 DSH's default `workspace-write` posture parked a real worker on an `Awaiting approval` panel when it moved a steering record outside the session workspace; the launch therefore selects DSH's own `danger-full-access` preset, whose approval policy is `never`.
 
 ## Busy inbox escalation

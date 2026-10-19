@@ -2953,6 +2953,14 @@ launch_template() {
       printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __PIEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
     ;;
+  # dsh-tui has no model, effort, or preference flags, so the launch swaps HOME
+  # for the task's private one. GIT_CONFIG_GLOBAL and NM_HOME name the operator's
+  # real git identity file and no-mistakes home, resolved by the pane shell before
+  # HOME changes, so a commit keeps its author and the worker still reaches the
+  # shared daemon; every other HOME-relative tool state is absent on purpose.
+  dsh)
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__:"$PATH" __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+    ;;
   # omp (Oh My Pi), a Pi fork. Same one-positional-brief, --model, --thinking,
   # and -e shape as Pi, verified on omp 18.1.11. The differences are all at
   # the launch boundary and documented in the header above: foreign markers
@@ -2962,9 +2970,6 @@ launch_template() {
   # prompt can park an unattended worker, the tracked posture overlay so a
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
   # pinned to the worktree because omp's extension discovery is cwd-only.
-  dsh)
-    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__:"$PATH" __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
-    ;;
   omp)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then

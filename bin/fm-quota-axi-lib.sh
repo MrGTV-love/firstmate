@@ -176,7 +176,6 @@ fm_quota_provider_for_harness() {
         *)               return 1 ;;
       esac
       ;;
-    dsh)          printf 'deepseek\n' ;;
     claude)       printf 'claude\n' ;;
     codex)        printf 'codex\n' ;;
     opencode)     printf 'codex\n' ;;
