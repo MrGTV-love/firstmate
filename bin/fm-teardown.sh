@@ -70,10 +70,15 @@
 # The record and bundle must be regular nonsymlink files. The bundle's physical
 # parent must be outside every registered copy (symlink aliases included) and
 # every enclosing Treehouse pool, including non-copy directories in it.
-# One recorded bundle must pass git bundle verify in the copy, match its recorded
-# SHA-256, and advertise and record every maximal tip from the copy's own
-# git rev-list --all <ref> --not --remotes --children. Thus local side branches
-# and detached HEADs count too, and ancestors need not be separate bundle heads.
+# One recorded bundle must match its recorded SHA-256, advertise and record every
+# maximal tip of git rev-list --children <ref> <branches> --not --remotes, and
+# restore on its own: fetching every recorded tip from it into a fresh empty
+# repository outside the copy and pool must succeed and pass git fsck
+# --connectivity-only. <ref> is the copy's HEAD (detached included) or a removed
+# copy's branch tip; <branches> are the local branches no worktree has checked
+# out, so side branches count and a branch another worktree holds is that task's
+# own. A thin bundle, a truncated pack or a missing tip refuses. Ancestors need
+# not be separate bundle heads.
 # No unlanded tip means this alternative proves nothing: pushed-but-undelivered
 # ships still require the existing delivery proof. Bundle proofs are not cached:
 # final safety rechecks read the file and record and verify coverage again.
@@ -86,7 +91,6 @@
 #   bundle=/durable/preservation/task.bundle
 #   mkdir -p "${bundle%/*}" "$FM_HOME/data/$task"
 #   git -C "$copy" bundle create "$bundle" --all &&
-#   git -C "$copy" bundle verify "$bundle" &&
 #   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
 #   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
 #   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" >> "$FM_HOME/data/$task/preservation-bundles.tsv"

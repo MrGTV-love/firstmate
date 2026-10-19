@@ -10589,7 +10589,6 @@ record_preservation_bundle() {  # <case> <copy> <bundle> [revision...]
   shift 3
   mkdir -p "${bundle%/*}" "$case_dir/data/task-x1"
   git -C "$copy" bundle create "$bundle" "$@" 2>/dev/null || return 1
-  git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1 || return 1
   digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$case_dir/data/task-x1/preservation-bundles.tsv"
@@ -10636,8 +10635,8 @@ test_verified_bundle_preserves_unlanded_copy() {
 }
 
 test_invalid_preservation_bundle_refuses() {
-  local shape case_dir rc reason record second digest
-  for shape in missing-tip recorded-tip verify hash no-record inside-copy inside-pool other-copy alias-copy symlink malformed empty-field; do
+  local shape case_dir rc reason record second digest first size
+  for shape in missing-tip recorded-tip not-a-bundle thin truncated hash no-record inside-copy inside-pool other-copy alias-copy symlink malformed empty-field blank-tips; do
     make_bundle_copy_case "bundle-invalid-$shape"
     case_dir=$NESTED_CASE
     record="$case_dir/data/task-x1/preservation-bundles.tsv"
@@ -10652,11 +10651,30 @@ test_invalid_preservation_bundle_refuses() {
         printf '%s\t%s\t%s\n' "$BUNDLE_PATH" "$digest" "$(git -C "$NESTED_COPY" rev-parse origin/main)" > "$record"
         reason='record does not list unlanded tip'
         ;;
-      verify)
+      not-a-bundle)
         printf 'not a bundle\n' > "$BUNDLE_PATH"
         digest=$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')
         printf '%s\t%s\t%s\n' "$BUNDLE_PATH" "$digest" "$(git -C "$NESTED_COPY" rev-parse HEAD)" > "$record"
-        reason='git bundle verify failed'
+        reason='bundle advertised tips cannot be read'
+        ;;
+      thin)
+        first=$(git -C "$NESTED_COPY" rev-parse HEAD)
+        printf 'later work\n' > "$NESTED_COPY/later.txt"
+        git -C "$NESTED_COPY" add later.txt
+        git -C "$NESTED_COPY" -c user.email=t@t -c user.name=t commit -qm 'later unpublished work'
+        record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH.thin" "$first..fm/task-x1-v2" \
+          || fail 'cannot create thin bundle fixture'
+        git -C "$NESTED_COPY" bundle verify "$BUNDLE_PATH.thin" >/dev/null 2>&1 \
+          || fail 'thin bundle fixture must pass verify inside its own copy'
+        reason='bundle cannot be restored in an isolated repository'
+        ;;
+      truncated)
+        size=$(wc -c < "$BUNDLE_PATH")
+        head -c $((size - 16)) "$BUNDLE_PATH" > "$BUNDLE_PATH.cut"
+        mv "$BUNDLE_PATH.cut" "$BUNDLE_PATH"
+        digest=$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')
+        printf '%s\t%s\t%s\n' "$BUNDLE_PATH" "$digest" "$(git bundle list-heads "$BUNDLE_PATH" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)" > "$record"
+        reason='bundle cannot be restored in an isolated repository'
         ;;
       hash)
         printf 'changed\n' >> "$BUNDLE_PATH"
@@ -10685,6 +10703,10 @@ test_invalid_preservation_bundle_refuses() {
         printf '%s\t\t%s\n' "$BUNDLE_PATH" "$(git -C "$NESTED_COPY" rev-parse HEAD)" > "$record"
         reason='malformed preservation record line 1'
         ;;
+      blank-tips)
+        printf '%s\t%s\t \n' "$BUNDLE_PATH" "$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')" > "$record"
+        reason='malformed preservation record line 1 in'
+        ;;
       symlink)
         ln -s "$BUNDLE_PATH" "$case_dir/bundle-link"
         digest=$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')
@@ -10707,6 +10729,48 @@ test_invalid_preservation_bundle_refuses() {
     assert_absent "$case_dir/treehouse.log" "bundle-$shape: pool slot was returned"
   done
   pass 'incomplete, unverifiable, changed, unrecorded, unsafe-path and malformed bundle records retain the original refusal'
+}
+
+make_sibling_unpushed_work() {  # <case-dir>
+  local case_dir=$1
+  git -C "$case_dir/project" worktree add -q -b fm/sibling "$case_dir/sibling" main
+  printf 'sibling in flight\n' > "$case_dir/sibling/sibling.txt"
+  git -C "$case_dir/sibling" add sibling.txt
+  git -C "$case_dir/sibling" -c user.email=t@t -c user.name=t commit -qm 'sibling unpublished work'
+  SIBLING_HEAD=$(git -C "$case_dir/sibling" rev-parse HEAD)
+}
+
+test_bundle_ignores_branches_other_worktrees_hold() {
+  local case_dir rc
+  make_bundle_copy_case bundle-sibling
+  case_dir=$NESTED_CASE
+  make_sibling_unpushed_work "$case_dir"
+  git -C "$case_dir/project" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'project clone local commit'
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-sibling: another worktree's unpushed branch must not block this copy: $(cat "$case_dir/stderr")"
+  assert_absent "$NESTED_COPY" 'bundle-sibling: preserved copy was not removed'
+  assert_absent "$case_dir/state/task-x1.meta" 'bundle-sibling: task was not retired'
+  assert_equals "$SIBLING_HEAD" "$(git -C "$case_dir/sibling" rev-parse HEAD)" 'bundle-sibling: sibling worktree lost its commit'
+  assert_present "$case_dir/sibling/sibling.txt" 'bundle-sibling: sibling worktree was disturbed'
+  pass 'a branch another worktree has checked out never has to be in this copy'"'"'s bundle'
+}
+
+test_bundle_covers_a_removed_copys_branch_without_other_worktrees() {
+  local case_dir rc
+  make_bundle_copy_case bundle-gone
+  case_dir=$NESTED_CASE
+  make_sibling_unpushed_work "$case_dir"
+  git -C "$case_dir/project" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'project clone local commit'
+  git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
+  assert_absent "$NESTED_COPY" 'bundle-gone: setup did not remove the nested copy'
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-gone: a removed copy's branch held by its bundle must finish: $(cat "$case_dir/stderr")"
+  assert_grep "$BUNDLE_PATH" "$case_dir/stderr" 'bundle-gone: bundle path not reported'
+  assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" 'bundle-gone: the slot was not returned'
+  assert_absent "$case_dir/state/task-x1.meta" 'bundle-gone: task was not retired'
+  pass 'a removed copy'"'"'s branch is judged by its own bundle, not by the project clone or sibling worktrees'
 }
 
 test_bundle_is_reverified_before_copy_removal() {
@@ -13818,6 +13882,8 @@ test_reverse_nested_prior_outside_claude_tears_down
 test_locked_own_copy_is_released_by_the_closeout_driver
 test_verified_bundle_preserves_unlanded_copy
 test_invalid_preservation_bundle_refuses
+test_bundle_ignores_branches_other_worktrees_hold
+test_bundle_covers_a_removed_copys_branch_without_other_worktrees
 test_bundle_is_reverified_before_copy_removal
 test_bundle_does_not_excuse_dirty_copy
 test_foreign_bundle_preservation_keeps_other_proofs
