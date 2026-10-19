@@ -835,6 +835,11 @@ The path check is authoritative: \`git rev-parse --git-dir\` and \`git rev-parse
 If the top-level path is the primary checkout or not the worktree you were launched in, STOP - do not branch or commit here - append \`blocked [at=<epoch>]: launched in primary checkout, not an isolated worktree\` to the status file and stop.
 
 1. First action: create your branch: \`git checkout -b $BRANCH_Q --\`$SETUP2
+   A fresh ship whose slot ships \`scripts/git-stability/provision_existing_slot.py\` is provisioned by firstmate at spawn, and spawn checks out your branch before the worker starts.
+   When this slot ships that script and \`git branch --show-current\` already prints $BRANCH_Q, the slot is already provisioned and the lifecycle manifest names this slot itself; skip the branch command above.
+   Never run \`scripts/git-stability/start_task_worktree.py\` from inside this slot; that creates a nested worktree nothing owns.
+   If publication reports a missing or mismatched lifecycle manifest, stop and report it instead of creating a second worktree.
+   Retries and scope growth keep the driver until an owned-path extension verb exists; that follow-up is separate.
 
 # Rules
 $RULE1

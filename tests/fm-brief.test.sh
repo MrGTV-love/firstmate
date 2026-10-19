@@ -1762,6 +1762,31 @@ test_process_budget_command_quotes_foreign_firstmate_path() {
   pass "fm-brief.sh: emitted process-budget commands execute from foreign paths"
 }
 
+# A first lane must never be told to create the nested worktree that leaked
+# under pool slots. The brief points at firstmate's spawn-time provisioning and
+# keeps the branch step only as the non-provisioned fallback.
+test_ship_brief_does_not_instruct_a_nested_worktree() {
+  local home id brief
+  home="$TMP_ROOT/slot-provisioning-home"
+  mkdir -p "$home/data"
+  id='brief-slot-provisioning'
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode no-mistakes >/dev/null 2>&1 \
+    || fail "fm-brief.sh failed to scaffold the slot-provisioning brief"
+  brief="$home/data/$id/brief.md"
+  assert_grep 'the slot is already provisioned' "$brief" \
+    "the ship brief does not tell the first lane the slot is already provisioned"
+  assert_grep 'Never run `scripts/git-stability/start_task_worktree.py` from inside this slot' "$brief" \
+    "the ship brief does not forbid the nested worktree"
+  assert_grep 'Retries and scope growth keep the driver' "$brief" \
+    "the ship brief dropped the retry and scope-growth driver guidance"
+  [ "$(grep -c 'start_task_worktree.py' "$brief")" = 1 ] \
+    || fail "the ship brief mentions start_task_worktree.py more than once, which can reintroduce a positive instruction"
+  # shellcheck disable=SC2016  # literal backticks around the branch name must stay unexpanded
+  assert_grep "\`git checkout -b fm/$id --\`" "$brief" \
+    "the non-provisioned branch fallback disappeared"
+  pass "fm-brief.sh: a ship brief provisions the slot and never instructs a nested worktree"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
@@ -1770,6 +1795,7 @@ test_forge_selection_renders_correct_cli
 test_ship_mode_is_required_and_closed_set
 test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget
 test_process_budget_command_quotes_foreign_firstmate_path
+test_ship_brief_does_not_instruct_a_nested_worktree
 test_ship_mode_is_explicit_not_registry
 test_delivery_flags_are_refused_where_they_do_not_apply
 test_faster_paths_use_configured_authority_without_stacked_review

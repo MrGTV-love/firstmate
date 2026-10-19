@@ -14,7 +14,7 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-spawn-pool-base-freshen)
 
 make_case() {
-  local name=$1 id=$2 default=${3:-main} case_dir home project origin pool publisher fakebin initial
+  local name=$1 id=$2 default=${3:-main} with_provisioner=${4:-0} case_dir home project origin pool publisher fakebin initial
   case_dir="$TMP_ROOT/$name"
   home="$case_dir/home"
   project="$case_dir/project"
@@ -30,7 +30,25 @@ make_case() {
 
   git init --quiet -b "$default" "$project"
   printf 'base\n' > "$project/README.md"
+  if [ "$with_provisioner" = 1 ]; then
+    mkdir -p "$project/scripts/git-stability"
+    printf '.venv/\n' > "$project/.gitignore"
+    cat > "$project/scripts/git-stability/provision_existing_slot.py" <<'SH'
+#!/usr/bin/env bash
+printf '%s|%s\n' "$PWD" "$*" >> "${FM_FAKE_PROVISION_LOG:?}"
+if [ "${FM_FAKE_PROVISION_RC:-0}" != 0 ]; then
+  printf 'FAKE_PROVISION_REFUSAL: %s\n' "${FM_FAKE_PROVISION_REASON:-refused}"
+  exit "${FM_FAKE_PROVISION_RC}"
+fi
+printf '{"state":"PASS"}\n'
+exit 0
+SH
+    chmod +x "$project/scripts/git-stability/provision_existing_slot.py"
+  fi
   git -C "$project" add README.md
+  if [ "$with_provisioner" = 1 ]; then
+    git -C "$project" add .gitignore scripts/git-stability/provision_existing_slot.py
+  fi
   git -C "$project" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
   git clone --quiet --bare "$project" "$origin"
   git -C "$project" remote add origin "file://$origin"
@@ -887,8 +905,136 @@ test_scout_base_branch_refused_on_gerrit_forge() {
   pass "a based scout on a forge=gerrit project is refused at spawn"
 }
 
+make_slot_python() { # <slot>
+  mkdir -p "$1/.venv/bin"
+  printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$1/.venv/bin/python"
+  chmod +x "$1/.venv/bin/python"
+}
+
+# A fresh ship whose slot ships the repository's slot provisioner is attested
+# before the worker starts: one invocation, the repository's real argument
+# contract, the task branch checked out, and no nested worktree.
+test_slot_provisioning_runs_once_with_contract_argv() {
+  local rec id out status argv base_sha
+  id='pool-provisioning-r1'
+  rec=$(make_case provisioning "$id" main 1)
+  read_case_record "$rec"
+  make_slot_python "$POOL_DIR"
+  : > "$CASE_DIR/provision.log"
+
+  out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
+    run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a ship spawn whose slot ships the provisioner should provision and launch"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "the provisioned slot did not launch"
+  [ "$(wc -l < "$CASE_DIR/provision.log" | tr -d ' ')" = 1 ] \
+    || fail "spawn did not run the provisioner exactly once: $(cat "$CASE_DIR/provision.log")"
+  argv=$(cat "$CASE_DIR/provision.log")
+  base_sha=$(git -C "$CASE_DIR/origin.git" rev-parse main)
+  assert_contains "$argv" "$POOL_DIR|--repo-root $POOL_DIR" \
+    "the provisioner did not run from the slot with the slot as repo root"
+  assert_contains "$argv" "--worktree-path $POOL_DIR" \
+    "the provisioner was not told the exact slot"
+  assert_contains "$argv" "--owner-id $id" "the provisioner did not receive the task identity"
+  assert_contains "$argv" "--branch fm/$id" "the provisioner did not receive the ship branch"
+  assert_contains "$argv" "--base-sha $base_sha" \
+    "the provisioner did not receive the slot's merge-base commit"
+  assert_contains "$argv" "--owned-path README.md" \
+    "the provisioner did not receive a tracked top-level owned path"
+  assert_contains "$argv" "--owned-path scripts" \
+    "the provisioner did not receive the tracked scripts directory"
+  assert_equals "fm/$id" "$(git -C "$POOL_DIR" branch --show-current)" \
+    "spawn did not check out the ship branch before provisioning"
+  [ ! -e "$POOL_DIR/.claude/worktrees" ] \
+    || fail "the spawn flow registered a nested worktree under the slot"
+  assert_grep "worktree=$POOL_DIR" "$HOME_DIR/state/$id.meta" \
+    "the provisioned spawn did not publish its slot as the task worktree"
+  pass "a ship spawn provisions its slot once with the repository's contract and creates no nested worktree"
+}
+
+# A slot that has not created its virtual environment still runs an executable
+# provisioner directly, so the contract does not depend on one interpreter path.
+test_slot_provisioning_runs_an_executable_provisioner() {
+  local rec id out status
+  id='pool-provisioning-executable-r1'
+  rec=$(make_case provisioning-executable "$id" main 1)
+  read_case_record "$rec"
+  : > "$CASE_DIR/provision.log"
+
+  out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
+    run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "an executable provisioner should run without a virtual environment"$'\n'"$out"
+  [ "$(wc -l < "$CASE_DIR/provision.log" | tr -d ' ')" = 1 ] \
+    || fail "the executable provisioner did not run exactly once"
+  assert_equals "fm/$id" "$(git -C "$POOL_DIR" branch --show-current)" \
+    "the executable provisioner path did not check out the ship branch"
+  pass "an executable slot provisioner runs without a virtual environment and creates no nested worktree"
+}
+
+# Projects without the provisioner keep their existing spawn behavior.
+test_slot_without_provisioner_launches_as_before() {
+  local rec id out status
+  id='pool-no-provisioner-r1'
+  rec=$(make_case no-provisioner "$id")
+  read_case_record "$rec"
+
+  out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
+    run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a project without the provisioner should launch as before"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "the project without the provisioner did not launch"
+  [ ! -e "$CASE_DIR/provision.log" ] \
+    || fail "spawn ran a provisioner for a project that does not ship one"
+  [ -z "$(git -C "$POOL_DIR" branch --show-current)" ] \
+    || fail "spawn created a ship branch for a project without the provisioner"
+  pass "a project without the provisioner spawns unchanged"
+}
+
+# A provisioner refusal stops the spawn with its own words, restores the slot,
+# and leaves no task record or nested worktree behind.
+test_slot_provisioning_refusal_stops_spawn_without_changes() {
+  local rec id out status expected
+  id='pool-provisioning-refused-r1'
+  rec=$(make_case provisioning-refused "$id" main 1)
+  read_case_record "$rec"
+  make_slot_python "$POOL_DIR"
+  : > "$CASE_DIR/provision.log"
+  expected=$(git -C "$CASE_DIR/origin.git" rev-parse main)
+
+  out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
+    FM_FAKE_PROVISION_RC=2 FM_FAKE_PROVISION_REASON='slot is dirty' \
+    run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn launched despite a provisioner refusal"
+  assert_contains "$out" "FAKE_PROVISION_REFUSAL: slot is dirty" \
+    "the provisioner's own refusal text was not shown"
+  assert_contains "$out" "slot provisioning refused for $id" \
+    "spawn did not explain that it stopped on the refusal"
+  assert_not_contains "$out" "spawned $id" "a refused spawn reported success"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "a refused spawn published task metadata"
+  [ "$(wc -l < "$CASE_DIR/provision.log" | tr -d ' ')" = 1 ] \
+    || fail "spawn retried the refused provisioner: $(cat "$CASE_DIR/provision.log")"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$expected" ] \
+    || fail "a refused spawn left the slot somewhere other than its detached base"
+  [ -z "$(git -C "$POOL_DIR" branch --show-current)" ] \
+    || fail "a refused spawn left its ship branch checked out"
+  if git -C "$POOL_DIR" show-ref --verify --quiet "refs/heads/fm/$id"; then
+    fail "a refused spawn left the branch it created behind"
+  fi
+  [ -z "$(git -C "$POOL_DIR" status --porcelain)" ] \
+    || fail "a refused spawn left the slot dirty"
+  [ ! -e "$POOL_DIR/.claude/worktrees" ] \
+    || fail "a refused spawn left a nested worktree under the slot"
+  pass "a provisioner refusal stops the spawn with its words, without retrying or changing the slot"
+}
+
 test_remote_seeded_home_spawns_from_treehouse_pool
 test_pool_slot_claim_follows_the_spawn_outcome
+test_slot_provisioning_runs_once_with_contract_argv
+test_slot_provisioning_runs_an_executable_provisioner
+test_slot_without_provisioner_launches_as_before
+test_slot_provisioning_refusal_stops_spawn_without_changes
 test_linked_spawning_home_rejects_primary_before_refresh
 test_stale_pool_base_refreshes_before_branching
 test_named_base_branch_starts_from_that_branch
