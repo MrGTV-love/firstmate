@@ -723,11 +723,14 @@ An ignored file that is neither scratch nor preserved is unique work, so the cop
 The finished worker's own session is stopped first with `bin/fm-control.sh <id> exit`.
 That verb keeps the task's terminal pane open, and the pane keeps the idle shell it entered the copy with, so that shell is inside the copy.
 That one shell does not keep the copy, but `treehouse destroy` refuses a copy that has a process working inside it, so the fallback ends it with SIGHUP just before the destroy.
-It must be a recognized shell whose working directory is inside the copy, with no child process, that is the pane's own shell or descends from it, found by the pane's process id on the tmux and herdr backends, and the exit verb must have confirmed that the agent stopped.
+It must be a recognized shell whose working directory is inside the copy, with no child process, that is a strict descendant of the pane's own shell, found by the pane's process id on the tmux and herdr backends, and the exit verb must have confirmed that the agent stopped.
+The pane's own shell is never ended, so a bare pane shell inside the copy keeps the copy.
 On any other backend nothing is ignored.
 The fallback never sends SIGKILL, never closes the pane (it stays open on its outer shell), and waits up to `FM_MERGE_PRUNE_EXIT_WAIT` seconds for the shell to go; a shell that does not go keeps the copy.
 Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included.
-The task's Treehouse project lock is held from the worker stop to the destroy, and the slot's owner claim is read again right before the signal: a slot that another task has claimed, or whose claim cannot be read, stays untouched.
+The task's Treehouse project lock is held from the worker stop to the destroy.
+The proof that is repeated while that lock and the task control lock are held makes no fetch and reuses the remote refs fetched before them, so a hung remote never holds either lock.
+The slot's owner claim is read again right before the signal: a slot that another task has claimed, or whose claim cannot be read, stays untouched.
 When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
 That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` is present, and its last status event is `done`.
 The ordinary finished-session sweep keeps its classification unchanged.

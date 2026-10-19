@@ -51,6 +51,8 @@ FM_MP_VERDICT=
 FM_MP_REASON=
 # shellcheck disable=SC2034 # Output global, read by bin/fm-merge-prune.sh.
 FM_MP_PANE_SHELL=
+# shellcheck disable=SC2034 # State between passes of fm_mp_prove_git, set by its fetching mode.
+FM_MP_PR_HEAD=
 FM_MP_PRESERVE=()
 FM_MP_NESTED=()
 
@@ -120,9 +122,13 @@ fm_mp_verdict() {  # <ok|keep|transient> <reason>
 
 # Status, stash and unpushed-commit proofs for one copy.
 # <pr-number> is empty for a nested copy; the task's own copy passes it so a
-# squash-merged pull request's head counts as the remote proof.
-fm_mp_prove_git() {  # <real-copy> [<pr-number>]
-  local copy=$1 prn=${2:-} top dirty stashes unpushed prsha='' extra=()
+# squash-merged pull request's head counts as the remote proof. The default mode
+# fetches the remotes (and the pull request's head) first and leaves that head in
+# FM_MP_PR_HEAD. The nofetch mode makes no network call: it reuses the remote
+# refs and the pull request head that an earlier fetching pass left, so a pass
+# made while the project lock is held can never wait on a hung remote.
+fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
+  local copy=$1 prn=${2:-} mode=${3:-fetch} top dirty stashes unpushed prsha='' extra=()
   if ! top=$(git -C "$copy" rev-parse --show-toplevel 2>/dev/null) || [ "$(fm_mp_real "$top")" != "$copy" ]; then
     fm_mp_verdict keep "$copy is not a git work tree root"
     return 1
@@ -140,10 +146,16 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>]
     fm_mp_verdict keep "$copy holds $stashes stash entries"
     return 1
   fi
-  fm_run_timed "$(fm_mp_limit merge-prune.fetch 120)" git -C "$copy" fetch -q --all </dev/null >/dev/null 2>&1 || true
-  if [ -n "$prn" ]; then
-    if fm_run_timed "$(fm_mp_limit merge-prune.fetch 120)" git -C "$copy" fetch -q origin "refs/pull/$prn/head" </dev/null >/dev/null 2>&1; then
-      prsha=$(git -C "$copy" rev-parse -q --verify FETCH_HEAD 2>/dev/null) || prsha=
+  if [ "$mode" = nofetch ]; then
+    [ -z "$prn" ] || prsha=$FM_MP_PR_HEAD
+  else
+    fm_run_timed "$(fm_mp_limit merge-prune.fetch 120)" git -C "$copy" fetch -q --all </dev/null >/dev/null 2>&1 || true
+    if [ -n "$prn" ]; then
+      FM_MP_PR_HEAD=
+      if fm_run_timed "$(fm_mp_limit merge-prune.fetch 120)" git -C "$copy" fetch -q origin "refs/pull/$prn/head" </dev/null >/dev/null 2>&1; then
+        prsha=$(git -C "$copy" rev-parse -q --verify FETCH_HEAD 2>/dev/null) || prsha=
+        FM_MP_PR_HEAD=$prsha
+      fi
     fi
   fi
   [ -z "$prsha" ] || extra=("$prsha")
@@ -300,9 +312,10 @@ fm_mp_pane_pid() {  # <meta-file>
 # Whether <pid> is the task's own pane shell: the idle shell that the pane keeps
 # in the copy after its agent exits (the pane entered the copy with a
 # `treehouse get` subshell). Only a recognized shell whose working directory is
-# inside <real-copy>, with no child process, that is the pane's shell
-# (<pane-pid>) or descends from it qualifies. A build, an editor, a test, or a
-# shell running one is not it.
+# inside <real-copy>, with no child process, that is a strict descendant of the
+# pane's shell (<pane-pid>) qualifies. The pane's own shell never does, because
+# ending it would close the pane. A build, an editor, a test, or a shell running
+# one is not it.
 fm_mp_pane_shell() {  # <pid> <pane-pid> <real-copy>
   local pid=$1 pane=${2:-} copy=$3 comm cwd
   [ -n "$pane" ] || return 1
@@ -315,6 +328,7 @@ fm_mp_pane_shell() {  # <pid> <pane-pid> <real-copy>
     { parent[$1] = $2; if ($2 == p) child = 1 }
     END {
       if (child) exit 1
+      p = parent[p]
       for (n = 0; p > 1 && n < 64; n++) {
         if (p == pane) exit 0
         p = parent[p]
