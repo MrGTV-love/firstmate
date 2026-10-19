@@ -33,8 +33,9 @@
 # Automatic sweep calls additionally require reap eligibility before cleanup;
 # bin/fm-idle-session-reap.sh's header owns that admission contract.
 # The captain-call retention path below applies to ordinary teardown admission.
-# REFUSES if a ship's deliverable has not LANDED, because cleanup
-# hard-resets/removes the worktree and kills its processes.
+# REFUSES if a ship's deliverable has not LANDED and its locally-only tips
+# lack recorded bundle preservation below, because cleanup hard-resets/removes
+# the worktree and kills its processes.
 # A pushed branch is recoverable work, not a delivered result.
 # A ship has landed only when its PR is merged and
 # GitHub reports a PR head that contains the current local work, or its content is
@@ -60,6 +61,38 @@
 # HEAD is that run's input head (submitted_head_sha). A copy at any other commit,
 # a run that pushed another head, or a missing record
 # (state database, run row, pushed head, input head) refuses and names the record.
+# Recorded bundle preservation is a cleanup alternative, not proof of delivery.
+# Its record is $DATA/$ID/preservation-bundles.tsv (normally
+# $FM_HOME/data/<task-id>/preservation-bundles.tsv): one bundle per line, exactly
+# three TAB-separated fields: absolute bundle path, lowercase SHA-256 (64 hex),
+# and space-separated full commit tips advertised by git bundle list-heads.
+# Paths cannot contain TAB, CR or newline; blank or malformed lines refuse.
+# The record and bundle must be regular nonsymlink files. The bundle's physical
+# parent must be outside every registered copy (symlink aliases included) and
+# every enclosing Treehouse pool, including non-copy directories in it.
+# One recorded bundle must pass git bundle verify in the copy, match its recorded
+# SHA-256, and advertise and record every maximal tip from the copy's own
+# git rev-list --all <ref> --not --remotes --children. Thus local side branches
+# and detached HEADs count too, and ancestors need not be separate bundle heads.
+# No unlanded tip means this alternative proves nothing: pushed-but-undelivered
+# ships still require the existing delivery proof. Bundle proofs are not cached:
+# final safety rechecks read the file and record and verify coverage again.
+# Success prints the bundle path, hash and preserved tips, and never waives dirt,
+# ignored-file preservation, process, ownership or closeout-driver proofs.
+# A Vernant-locked copy still needs its driver's independent landing verdict.
+# To create a self-contained bundle and its record (no creator is run by teardown),
+# choose an absolute durable bundle path OUTSIDE every copy and pool, set copy,
+# task and FM_HOME explicitly, then run under bash:
+#   bundle=/durable/preservation/task.bundle
+#   mkdir -p "${bundle%/*}" "$FM_HOME/data/$task"
+#   git -C "$copy" bundle create "$bundle" --all &&
+#   git -C "$copy" bundle verify "$bundle" &&
+#   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
+#   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
+#   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" >> "$FM_HOME/data/$task/preservation-bundles.tsv"
+# Keep the bundle and record until the preserved commits are no longer needed;
+# data/<task> survives cleanup. Restore into a new repository with
+# git -C <restore-repo> fetch <bundle-path> <tip-sha>:refs/heads/recovered.
 # Anything else refuses.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
@@ -2365,14 +2398,19 @@ work_is_landed() {
     fi
   done
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] && [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
+    # Bundle proofs are local, so re-read them even under final project custody.
+    teardown_bundle_preserved "$dir" "$head" && return 0
     echo "REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof" >&2
     TEARDOWN_LANDED_UNASKED="HEAD changed to ${head:0:12} after its landing proof; retry for a fresh proof"
     return 1
   fi
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
-  work_is_landed_proof "$branch" || return 1
-  TEARDOWN_LANDED_DIRS+=("$dir")
-  TEARDOWN_LANDED_HEADS+=("$head")
+  if work_is_landed_proof "$branch"; then
+    TEARDOWN_LANDED_DIRS+=("$dir")
+    TEARDOWN_LANDED_HEADS+=("$head")
+    return 0
+  fi
+  teardown_bundle_preserved "$dir" "$head"
 }
 
 # A pushed branch proves recoverability, not delivery: require the landing
@@ -2494,7 +2532,8 @@ $refs
 EOF
 }
 
-# The one landed-work rule, applied to <ref> in <dir>: the task copy's own HEAD,
+# The one cleanup commit rule (landing or recorded bundle), applied to <ref>
+# in <dir>: the task copy's own HEAD,
 # the enclosing slot's HEAD, or a removed copy's branch ref read from the
 # project. <branch> names the PR lookup, as for work_is_landed.
 teardown_landed() {  # <dir> <ref> <branch>
