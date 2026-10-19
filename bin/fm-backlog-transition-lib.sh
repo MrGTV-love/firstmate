@@ -1376,9 +1376,11 @@ fm_backlog_close_marker_clear() {  # <state-dir> <id>
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): record a close that just
 # landed. <done-arg>... are the arguments the close handed to `tasks-axi done`,
 # which name the evidence: a report, a merged PR, the captain's drop, a local
-# main landing, or none. The ledger writes a repeat of the same close once, so
-# the direct teardown, its replay, and a proven `done` can each call this. A
-# failed write never changes the caller's result.
+# main landing, or none. A close on a preserved bundle is none: it is not a
+# landing, so it must not fall into the local main arm. The ledger writes a
+# repeat of the same close once, so the direct teardown, its replay, and a
+# proven `done` can each call this. A failed write never changes the caller's
+# result.
 fm_backlog_ledger_closed() {  # <state-dir> <config-dir> <id> [<done-arg>...]
   local state=$1 config=$2 id=$3 evidence pr=''
   shift 3
