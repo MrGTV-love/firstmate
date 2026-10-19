@@ -1,0 +1,45 @@
+ok - a shared-root local-only ship without a PR retires using its own landed branch, not the parked root
+ok - a non-GitHub recorded PR cannot reassociate even with a contained recorded head
+ok - a recovered-state shared slot retains custody and reports the lack of a non-forcing remedy on Treehouse 2.3.1-fm
+ok - an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes
+ok - the unleased shared-slot remedy names the sole remaining root record and lists every candidate with its status among several
+ok - a nested shared ship keeps its own dirty and landed proof under a merged PR, and no outcome touches its copy
+ok - recorded PR reassociation accepts equal/descendant tips and refuses missing, unrelated, advanced or malformed head proof
+ok - two and three shared records retire finished ship/scout records and reassociate parked work without changing any copy
+ok - an unfinished shared record keeps its record and slot claim
+ok - reassociate re-points worktree, branch, and brief, records the old copy and note, and touches nothing else
+ok - fm-crew-state reads the replacement copy's real run after reassociation
+ok - moving a task back to a prior copy undoes that hop
+ok - a replacement pool slot with no owner claim is claimed for the task
+ok - own enclosing-to-nested and nested-to-enclosing reassociation keep the slot claimed and exempt only the replacement's own path
+ok - a disjoint pool slot the task leaves is released, recorded as history, and reclaimable
+ok - reassociation leaves a historical separate log untouched and records its note only in the brief
+ok - a scout reassociates without gaining delivery-branch fields
+ok - both copies reject enclosing and nested cross-task custody through physical aliases
+ok - both copies reject foreign enclosing and nested managed pool slot claims
+ok - every reassociation refusal leaves the record, instructions, copy, and endpoint untouched
+ok - a finished relaunch journal does not block reassociation, and an unfinished one refuses without changes
+ok - failed publication retains the original brief until restoration succeeds
+ok - unchanged-branch reassociation validates the brief and preserves matching branch declarations
+ok - ships and scouts refuse staged, unstaged, and unignored untracked bytes by name
+ok - spawned copy commits survive provider reset through the anchor, and the slot the task left is reusable
+ok - a slot holding a reassociated task's nested copy refuses a new allocation
+ok - a nested reassociated ship lands, tears down under the landed and anchored proofs, and frees its slot for the next spawn
+ok - a hop out of the pool refuses an enclosing slot with uncommitted work and anchors its committed work before releasing it
+ok - a vanished pool copy is recorded as released history and its claim is dropped
+ok - a record staging write failure refuses and publishes nothing
+ok - the old copy's dirty check exempts exactly the hook artifacts teardown exempts
+ok - anchor write and verification failures leave the copy, record, brief, and endpoint untouched
+ok - non-pool reassociation serializes ownership scans through publication for physical aliases
+ok - nested S5 reassociation admits validated owning ancestors through aliases but preserves every ancestor prior
+ok - same-origin copies in another ref store are refused in both roles without changing records, briefs, anchors, claims, or copies
+ok - one call re-points two live records that share a slot root, each at its own nested copy, and neither order alone could
+ok - a joint reassociation refuses on a missing proof, a foreign copy or claim, or an overlap, names the task, and changes nothing
+ok - malformed --also arguments refuse before any record is read or changed
+ok - a failed write in a joint reassociation leaves both records, both instructions files, and the slot claim exactly as they were
+ok - a joint reassociation holds every named record's lock while it proves and anchors the copies, and releases each one
+ok - after a joint reassociation each task's teardown removes only its own proven copy, the claim passes on, and the last task out returns the root
+ok - a joint-reassociated task's teardown still refuses unlanded work, dirt, a third live holder of the root and a foreign copy, and a refusal changes no record, lease, claim or copy
+ok - a joint-reassociated task's Vernant-locked copy is released through the closeout driver, and a driver refusal keeps both records, copies, the lease and the claim
+ok - a rerun finishes a teardown whose copy is already removed, refuses an unlanded one, and a slot reassigned to a stranger keeps its copies
+exit=0

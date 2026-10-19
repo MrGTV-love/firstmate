@@ -1,0 +1,15 @@
+ok - an ordinary close whose slot gains a copy holding unlanded commits during the project-lock wait refuses with nothing removed
+ok - a stale-lock cleanup refuses when the slot gained a copy holding unlanded commits, instead of turning the close into a held close
+ok - a held close reserves a plain-get slot under a durable lease before it removes anything and leaves the held copy byte-identical
+ok - a held close refuses before it removes anything when the slot cannot be durably leased, and says why
+ok - a held close lists every held copy, says the slot is reserved under a durable lease and stays claimed, and promises no cleanup that does not exist
+ok - a held close refused by a later step writes no record line, and the close that completes writes one
+ok - a held-copy record that cannot be written prints a warning on stdout and the close still completes with the foreign copy untouched
+ok - a --legacy-record close beside a held foreign copy still lists the held copy and says the slot return is deferred
+ok - a dirty or unlanded own copy still refuses exactly as before when a foreign copy would be held, and nothing changes
+ok - a foreign copy that is also dirty, named by another record, or running a process still refuses the whole close
+ok - a copy not held because a process of the closing task runs in it, or launched its lock, is refused naming that process, and nothing is signalled or removed
+ok - a foreign copy whose landing could not be checked is refused with nothing removed and no record line, and a rerun releases a landed copy and holds an unlanded one
+ok - a failure after the task record and own copies are gone still leaves the held notice and one record line, and the foreign copy untouched
+ok - --force waives nothing: it never holds a foreign copy and still refuses
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record

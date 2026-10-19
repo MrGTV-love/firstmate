@@ -1,0 +1,44 @@
+
+=== S15 (unlanded-only) ADVERSARIAL: after a held close, the nested-copy sweep (--apply, pointed only at this lab's pool) must not remove the held copy ===
+  PASS  held close completed (exit 0)
+
+----- fm-copy-sweep.sh --apply on the lab (exit 0) -----
+copy-sweep: mode=apply containers=1 copies=1
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.WVhy4e/pool/.treehouse/repo-b3bdbe/1/repo/.claude/worktrees/x	1 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.WVhy4e/pool/.treehouse/repo-b3bdbe: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.WVhy4e/pool/.treehouse/repo-b3bdbe/1/repo: 0.00 GiB of 20 GiB, ok
+  PASS  sweep exit code is 0
+  PASS  sweep lists the held copy under a HELD-* class
+  PASS  sweep does not list the held copy as REAPABLE-PROVEN
+  PASS  held copy byte-identical after the sweep
+  PASS  held copy still registered after the sweep
+  PASS  sweep removal log has no line for the held copy
+
+=== S15 (unlanded-and-ignored) ADVERSARIAL: after a held close, the nested-copy sweep (--apply, pointed only at this lab's pool) must not remove the held copy ===
+  PASS  held close completed (exit 0)
+
+----- fm-copy-sweep.sh --apply on the lab (exit 0) -----
+copy-sweep: mode=apply containers=1 copies=1
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.igsoh2/pool/.treehouse/repo-203f92/1/repo/.claude/worktrees/x	it holds ignored files that exist nowhere else: unique.dat
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.igsoh2/pool/.treehouse/repo-203f92: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.igsoh2/pool/.treehouse/repo-203f92/1/repo: 0.00 GiB of 20 GiB, ok
+  PASS  sweep exit code is 0
+  PASS  sweep lists the held copy under a HELD-* class
+  PASS  sweep does not list the held copy as REAPABLE-PROVEN
+  PASS  held copy byte-identical after the sweep
+  PASS  held copy still registered after the sweep
+  PASS  sweep removal log has no line for the held copy
+
+TOTAL FAILS: 0

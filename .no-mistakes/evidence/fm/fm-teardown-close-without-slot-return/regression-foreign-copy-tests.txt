@@ -1,0 +1,36 @@
+ok - a landed copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned
+ok - a task whose own copy landed closes beside a foreign copy with commits on no remote, which stays byte-identical, with the slot still reserved
+ok - a foreign copy inside the own nested copy is never held or swept away: the close refuses and every copy, the slot, its lease and claim stay as they were
+ok - a dirty or unlanded own copy still refuses exactly as before when a foreign copy would be held, and nothing changes
+ok - --force waives nothing: it never holds a foreign copy and still refuses
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record
+ok - the reaper's first refusal line for a foreign copy that stays is the copy's own written reason
+ok - uncommitted files make a foreign copy refuse the close
+ok - a foreign copy's unique ignored file is preserved with its SHA-256 and the copy is retired
+ok - regenerable ignored caches are allow-listed and need no preservation or refusal
+ok - durable .tac state is preserved with the copy retired, while .tac/tmp stays regenerable
+ok - a foreign copy whose ignored files cannot be listed is refused, not treated as having nothing to preserve
+ok - a foreign copy that another active record names through a symlink alias is refused
+ok - a half-removed registered foreign copy refuses with the same custody refusal and nothing changes
+ok - a live pid that started after the creation lock was written is a recycled pid and does not own the copy
+ok - a live launcher that started before its creation lock keeps its foreign copy
+ok - a lock launcher that is the task's own session, or a descendant the cwd sweep cannot reach, is ended by retire and released with the slot
+ok - a live lock launcher outside the task's session, or one that outlives retire's signal, keeps its foreign copy and is named by pid
+ok - a foreign copy with a process outside the task running in it is refused and the process is left alone
+ok - a task-own process running inside a foreign copy is ended by retire and the copy is released, and one that outlives the signal keeps the copy by pid
+ok - a foreign copy nested in another foreign copy is removed before the copy that holds it
+ok - the closeout driver runs before the shared project lock is taken, and the slot return still runs under it
+ok - without FM_TEARDOWN_VERNANT_PYTHON the driver runs under the slot's own .venv interpreter
+ok - a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing
+ok - a driver refusal or a lock that is not Vernant's leaves the foreign copy, the slot and the record in place
+ok - a landed, clean own nested copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an own copy whose lock names a pid that started after the lock was written is released by the same driver path
+ok - a live lock launcher outside the task keeps a locked own copy and is named by pid
+ok - a locked own copy with unlanded commits, unsaved files, or a lock that is not Vernant's is refused and nothing changes
+ok - a locked own copy's unique ignored file is preserved with its SHA-256 and the copy is released
+ok - a foreign copy that is still refused keeps the locked own copy, the slot and the record in place
+ok - the closeout driver releases a locked own copy before the shared project lock is taken, and the slot return still runs under it
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place
+ok - shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work
+exit=0
