@@ -1516,7 +1516,7 @@ test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
 #!/usr/bin/env bash
 if [ "$#" -eq 1 ] && [ "$1" = "$FM_STATE_OVERRIDE/.last-watcher-beat" ]; then
   IFS= read -r holder < "$FM_STATE_OVERRIDE/.watch.lock/pid" || exit 1
-  if [ "$PPID" = "$holder" ]; then
+  if [ "$PPID" = "$holder" ] && [ ! -e "$FM_STATE_OVERRIDE/beacon-writer-stopped" ]; then
     "$FM_TEST_REAL_TOUCH" "$@" || exit "$?"
     kill -STOP "$PPID" || exit 1
     printf '%s\n' "$PPID" > "$FM_STATE_OVERRIDE/beacon-writer-stopped"
