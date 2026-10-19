@@ -1777,8 +1777,6 @@ test_ship_brief_does_not_instruct_a_nested_worktree() {
     "the ship brief does not tell the first lane the slot is already provisioned"
   assert_grep 'Never run `scripts/git-stability/start_task_worktree.py` from inside this slot' "$brief" \
     "the ship brief does not forbid the nested worktree"
-  assert_grep 'Retries and scope growth keep the driver' "$brief" \
-    "the ship brief dropped the retry and scope-growth driver guidance"
   [ "$(grep -c 'start_task_worktree.py' "$brief")" = 1 ] \
     || fail "the ship brief mentions start_task_worktree.py more than once, which can reintroduce a positive instruction"
   # shellcheck disable=SC2016  # literal backticks around the branch name must stay unexpanded

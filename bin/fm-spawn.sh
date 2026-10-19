@@ -498,14 +498,16 @@
 #   A fresh ship whose worktree ships
 #   scripts/git-stability/provision_existing_slot.py is provisioned at spawn,
 #   after that isolation and clean check: spawn checks out the task branch and
-#   runs that repository's provisioner for the slot itself, so the lifecycle
-#   manifest exists before the worker starts and no nested task worktree is
-#   needed. The provisioner's own refusal stops the spawn with its words and
-#   restores the slot's detached HEAD and branch; it leaves the slot and its
-#   lease in place, never retries, and never falls back to a nested tree.
-#   Projects without that script are unchanged. FM_SPAWN_VERNANT_PYTHON
-#   overrides the default <slot>/.venv/bin/python interpreter; without that
-#   environment an executable provisioner runs directly, then python3.
+#   runs that repository's provisioner with <slot>/.venv/bin/python for the slot
+#   itself, so the lifecycle manifest exists before the worker starts and no
+#   nested task worktree is needed. A slot without that interpreter, or the
+#   provisioner's own refusal, stops the spawn with its words; spawn never
+#   retries and never falls back to a nested tree. Every spawn that ends before
+#   its task record is published puts the slot back on its detached base and
+#   deletes the branch it created, so the same task id can spawn again; the
+#   lease and the slot claim are then released by the normal abort path. The
+#   lifecycle manifest is create-only and owned by the repository, so spawn
+#   never removes it. Projects without that script are unchanged.
 #   A slot whose only deviation is a stale submodule gitlink is refused by that
 #   same clean check, but is reported as a stale checkout naming each submodule
 #   and both pins; nothing is converged or removed, and no remedy is suggested.
@@ -1739,6 +1741,9 @@ SPAWN_BASE_ERROR=
 SPAWN_BASE_DISCOVERED=0
 SPAWN_BASE_DISCOVERED_AT=
 SPAWN_SLOT_CLAIMED=0
+SPAWN_PROVISION_WT=
+SPAWN_PROVISION_BRANCH=
+SPAWN_PROVISION_BASE=
 RELAUNCH_REPLACEMENT_PENDING=0
 RELAUNCH_REPLACEMENT_BUSY_GEN=
 RELAUNCH_REPLACEMENT_HARNESS=
@@ -1762,6 +1767,16 @@ spawn_fresh_commit_rollback() {
   fi
   echo "error: $FM_BACKLOG_TRANSITION_ERROR" >&2
   return 1
+}
+
+spawn_provision_rollback() {
+  local worktree=$SPAWN_PROVISION_WT
+  SPAWN_PROVISION_WT=
+  [ -d "$worktree" ] || return 0
+  git -C "$worktree" checkout --detach "$SPAWN_PROVISION_BASE" >/dev/null 2>&1 ||
+    echo "warning: could not restore detached HEAD $SPAWN_PROVISION_BASE in $worktree after aborting the spawn of $ID" >&2
+  git -C "$worktree" branch -D "$SPAWN_PROVISION_BRANCH" >/dev/null 2>&1 ||
+    echo "warning: could not remove branch $SPAWN_PROVISION_BRANCH from $worktree after aborting the spawn of $ID" >&2
 }
 
 parse_orca_worktree_result() {
@@ -1928,6 +1943,15 @@ spawn_abort_cleanup() {
   if [ "$SPAWN_META_LOCK_HELD" = 1 ]; then
     SPAWN_META_LOCK_HELD=0
     fm_lock_release "$SPAWN_META_LOCK" || true
+  fi
+  # The branch this attempt created in its slot belongs to the attempt, not to a
+  # task: with no record published and no worker possibly still running in the
+  # slot, put the slot back on its detached base and remove the branch so the
+  # same task id can spawn again. The Treehouse project lock is still held.
+  if [ -n "$SPAWN_PROVISION_WT" ] && [ "$status" -ne 0 ] &&
+    { [ "$SPAWN_LAUNCH_SENT" = 0 ] || [ "$SPAWN_ENDPOINT_CLOSED" = 1 ]; } &&
+    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
+    spawn_provision_rollback
   fi
   # A spawn that aborts after claiming its slot but before its record survives
   # must not leave a claim naming a task no record describes. The release is a
@@ -4582,62 +4606,46 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
 # validates the slot, branch, base, and scope, and writes the manifest
 # create-only. Spawn supplies exactly its required arguments: the slot as both
 # repo root and worktree path (the operation canonicalizes the repository
-# identity), the task's branch and owner id, the slot's merge-base with
-# origin/main, and every top-level tracked path as owned scope so a first lane
-# is not refused for working anywhere the repository allows. A refusal is
-# final: the branch this attempt created is removed and the prior detached HEAD
-# restored, then the spawn stops with the provisioner's own output.
+# identity), the task's branch and owner id, the slot's freshened HEAD as the
+# base (the tip of the spawn's base branch or origin's default branch), and
+# every top-level path tracked at that base as owned scope so a first lane is
+# not refused for working anywhere the repository allows. A refusal is final and
+# stops the spawn with the provisioner's own output. From the moment the branch
+# exists, spawn_abort_cleanup removes it and restores the detached base on every
+# exit that publishes no task record.
 spawn_provision_existing_slot() { # <worktree> <branch> <task-id>
   local worktree=$1 branch=$2 task=$3 driver py base_sha path out rc
   local -a args
   driver=$worktree/scripts/git-stability/provision_existing_slot.py
   [ -f "$driver" ] || return 0
-  py=${FM_SPAWN_VERNANT_PYTHON:-}
-  if [ -n "$py" ]; then
-    if [ ! -x "$py" ]; then
-      echo "error: cannot provision the slot at $worktree for $task: interpreter $py is not executable; refusing to launch without a lifecycle manifest" >&2
-      return 1
-    fi
-  elif [ -x "$worktree/.venv/bin/python" ]; then
-    py=$worktree/.venv/bin/python
-  elif [ -x "$driver" ]; then
-    # An executable provisioner carries its own interpreter; a test fixture or
-    # a slot without its virtual environment still runs the contract.
-    py=
-  elif command -v python3 >/dev/null 2>&1; then
-    py=python3
-  else
-    echo "error: cannot provision the slot at $worktree for $task: neither $worktree/.venv/bin/python nor an executable provisioner nor python3 is available; refusing to launch without a lifecycle manifest" >&2
+  py=$worktree/.venv/bin/python
+  if [ ! -x "$py" ]; then
+    echo "error: cannot provision the slot at $worktree for $task: $py is not executable; refusing to launch without a lifecycle manifest" >&2
     return 1
   fi
   if git -C "$worktree" show-ref --verify --quiet "refs/heads/$branch"; then
     echo "error: cannot provision the slot at $worktree for $task: branch $branch already exists; refusing to reuse or replace it" >&2
     return 1
   fi
-  base_sha=$(git -C "$worktree" merge-base origin/main HEAD 2>/dev/null) || {
-    echo "error: cannot provision the slot at $worktree for $task: could not resolve its merge-base with origin/main" >&2
+  base_sha=$(git -C "$worktree" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || {
+    echo "error: cannot provision the slot at $worktree for $task: could not resolve its HEAD commit" >&2
     return 1
   }
   if ! git -C "$worktree" checkout -b "$branch" -- >/dev/null 2>&1; then
     echo "error: cannot provision the slot at $worktree for $task: could not check out $branch" >&2
     return 1
   fi
+  SPAWN_PROVISION_WT=$worktree
+  SPAWN_PROVISION_BRANCH=$branch
+  SPAWN_PROVISION_BASE=$base_sha
   args=(--repo-root "$worktree" --worktree-path "$worktree" --owner-id "$task" \
     --branch "$branch" --base-sha "$base_sha")
   while IFS= read -r -d '' path; do
     args+=(--owned-path "$path")
   done < <(git -C "$worktree" ls-tree --name-only -z "$base_sha")
   rc=0
-  if [ -n "$py" ]; then
-    out=$(cd "$worktree" && "$py" "$driver" "${args[@]}" 2>&1) || rc=$?
-  else
-    out=$(cd "$worktree" && "$driver" "${args[@]}" 2>&1) || rc=$?
-  fi
+  out=$(cd "$worktree" && "$py" "$driver" "${args[@]}" 2>&1) || rc=$?
   if [ "$rc" -ne 0 ]; then
-    git -C "$worktree" checkout --detach "$base_sha" >/dev/null 2>&1 ||
-      echo "warning: could not restore detached HEAD $base_sha in $worktree after a provisioning refusal" >&2
-    git -C "$worktree" branch -D "$branch" >/dev/null 2>&1 ||
-      echo "warning: could not remove branch $branch from $worktree after a provisioning refusal" >&2
     [ -z "$out" ] || printf '%s\n' "$out" >&2
     echo "error: slot provisioning refused for $task; refusing to launch without retrying or creating a nested worktree" >&2
     return 1

@@ -952,24 +952,107 @@ test_slot_provisioning_runs_once_with_contract_argv() {
   pass "a ship spawn provisions its slot once with the repository's contract and creates no nested worktree"
 }
 
-# A slot that has not created its virtual environment still runs an executable
-# provisioner directly, so the contract does not depend on one interpreter path.
-test_slot_provisioning_runs_an_executable_provisioner() {
-  local rec id out status
-  id='pool-provisioning-executable-r1'
-  rec=$(make_case provisioning-executable "$id" main 1)
+# The provisioner runs only under the slot's own interpreter. A slot without it
+# is refused before any branch is created, even when the provisioner is itself
+# executable, so no other interpreter ever stands in for the slot's environment.
+test_slot_provisioning_without_slot_python_refuses() {
+  local rec id out status expected
+  id='pool-provisioning-no-python-r1'
+  rec=$(make_case provisioning-no-python "$id" main 1)
   read_case_record "$rec"
-  : > "$CASE_DIR/provision.log"
+  expected=$(git -C "$CASE_DIR/origin.git" rev-parse main)
 
   out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
     run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  expect_code 0 "$status" "an executable provisioner should run without a virtual environment"$'\n'"$out"
-  [ "$(wc -l < "$CASE_DIR/provision.log" | tr -d ' ')" = 1 ] \
-    || fail "the executable provisioner did not run exactly once"
+  [ "$status" -ne 0 ] || fail "spawn launched a Vernant ship in a slot without its interpreter"
+  assert_contains "$out" "$POOL_DIR/.venv/bin/python is not executable" \
+    "the refusal did not name the missing slot interpreter"
+  assert_not_contains "$out" "spawned $id" "a refused spawn reported success"
+  [ ! -e "$CASE_DIR/provision.log" ] \
+    || fail "spawn ran the provisioner without the slot's interpreter"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "a refused spawn published task metadata"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$expected" ] \
+    || fail "a refused spawn moved the slot off its detached base"
+  [ -z "$(git -C "$POOL_DIR" branch --show-current)" ] \
+    || fail "a refused spawn created a ship branch"
+  pass "a slot without its own interpreter is refused before any branch exists"
+}
+
+# The recorded base is the slot's freshened HEAD, not a merge-base with a fixed
+# branch: a ship based on another branch is provisioned from that branch's tip
+# and its owned scope is built from that tree.
+test_slot_provisioning_uses_the_freshened_base_branch() {
+  local rec id out status argv feature_sha main_sha
+  id='pool-provisioning-based-r1'
+  rec=$(make_case provisioning-based "$id" main 1)
+  read_case_record "$rec"
+  make_slot_python "$POOL_DIR"
+  publish_feature_branch feature/hub
+  brief_with_base "$id" feature/hub
+  : > "$CASE_DIR/provision.log"
+
+  out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
+    run_spawn "$id" --mode direct-PR --yolo off --base-branch feature/hub)
+  status=$?
+  expect_code 0 "$status" "a based Vernant ship should be provisioned and launched"$'\n'"$out"
+  argv=$(cat "$CASE_DIR/provision.log")
+  feature_sha=$(git -C "$CASE_DIR/origin.git" rev-parse feature/hub)
+  main_sha=$(git -C "$CASE_DIR/origin.git" rev-parse main)
+  [ "$feature_sha" != "$main_sha" ] || fail "the fixture's base branch did not diverge from main"
+  assert_contains "$argv" "--base-sha $feature_sha" \
+    "the provisioner was not given the based branch's tip as the slot's base"
+  assert_not_contains "$argv" "--base-sha $main_sha" \
+    "the provisioner was given main's commit for a ship based on another branch"
+  assert_contains "$argv" "--owned-path feature-only.txt" \
+    "the owned scope was not built from the based branch's tree"
   assert_equals "fm/$id" "$(git -C "$POOL_DIR" branch --show-current)" \
-    "the executable provisioner path did not check out the ship branch"
-  pass "an executable slot provisioner runs without a virtual environment and creates no nested worktree"
+    "spawn did not check out the ship branch for the based ship"
+  pass "a based Vernant ship is provisioned from its freshened base branch"
+}
+
+# A spawn that ends after provisioning but before its record is published must
+# leave the slot as it found it, so the same task id can spawn again.
+test_slot_provisioning_is_undone_when_a_later_step_fails() {
+  local rec id out status expected task_tmp
+  id="pool-provisioning-abort-$$"
+  rec=$(make_case provisioning-abort "$id" main 1)
+  read_case_record "$rec"
+  make_slot_python "$POOL_DIR"
+  : > "$CASE_DIR/provision.log"
+  expected=$(git -C "$CASE_DIR/origin.git" rev-parse main)
+  task_tmp="/tmp/fm-$id"
+  rm -rf "$task_tmp"
+  mkdir "$task_tmp"
+  chmod 777 "$task_tmp"
+
+  out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
+    run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn launched despite an unsafe task temp root"
+  assert_contains "$out" "is not a private directory owned by this user" \
+    "the later step did not refuse for the reason the test planted"
+  [ "$(wc -l < "$CASE_DIR/provision.log" | tr -d ' ')" = 1 ] \
+    || fail "the failing attempt did not reach the provisioner exactly once"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "the failed attempt published task metadata"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$expected" ] \
+    || fail "the failed attempt left the slot somewhere other than its detached base"
+  [ -z "$(git -C "$POOL_DIR" branch --show-current)" ] \
+    || fail "the failed attempt left its ship branch checked out"
+  if git -C "$POOL_DIR" show-ref --verify --quiet "refs/heads/fm/$id"; then
+    fail "the failed attempt left its ship branch behind"
+  fi
+
+  rm -rf "$task_tmp"
+  out=$(FM_FAKE_PROVISION_LOG="$CASE_DIR/provision.log" \
+    run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  rm -rf "$task_tmp"
+  expect_code 0 "$status" "the same task id should spawn again after the aborted attempt"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "the retried spawn did not launch"
+  assert_equals "fm/$id" "$(git -C "$POOL_DIR" branch --show-current)" \
+    "the retried spawn did not check out the ship branch"
+  pass "a spawn that fails after provisioning restores the slot, so the same task id spawns again"
 }
 
 # Projects without the provisioner keep their existing spawn behavior.
@@ -1032,7 +1115,9 @@ test_slot_provisioning_refusal_stops_spawn_without_changes() {
 test_remote_seeded_home_spawns_from_treehouse_pool
 test_pool_slot_claim_follows_the_spawn_outcome
 test_slot_provisioning_runs_once_with_contract_argv
-test_slot_provisioning_runs_an_executable_provisioner
+test_slot_provisioning_without_slot_python_refuses
+test_slot_provisioning_uses_the_freshened_base_branch
+test_slot_provisioning_is_undone_when_a_later_step_fails
 test_slot_without_provisioner_launches_as_before
 test_slot_provisioning_refusal_stops_spawn_without_changes
 test_linked_spawning_home_rejects_primary_before_refresh

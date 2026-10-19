@@ -3725,7 +3725,6 @@ FM_CREW_STATE_RUNS_LIMIT=200  # plain runs-ledger rows scanned for fallback attr
 FM_CREW_STATE_NM_CACHE=on   # off makes every no-mistakes read inside fm-crew-state.sh fresh; on keeps only a finished run's reads until its run id changes and reads everything else fresh every time (contract owner: bin/fm-nm-read-cache-lib.sh)
 FM_TEARDOWN_NM_RUNS_LIMIT=200  # recent no-mistakes run rows scanned to prove an unresolved-head parked run belongs to teardown's task
 FM_TEARDOWN_VERNANT_PYTHON=     # interpreter for Vernant's closeout driver; default <slot>/.venv/bin/python, and the driver step is skipped (and its copy refuses) when it is absent
-FM_SPAWN_VERNANT_PYTHON=       # interpreter for Vernant's slot provisioner at spawn; default <slot>/.venv/bin/python, then the executable provisioner itself, then python3, and a fresh ship whose slot ships the provisioner refuses when none is available (contract owner: bin/fm-spawn.sh header)
 FM_CREW_STATE_BIN=bin/fm-crew-state.sh   # test override for the current-state reader used by watcher triage: the working/paused classification, and the wedge timer's parked-gate wait evidence; `fm-control exit` reads it too for the finished-task check on Claude's exit picker
 FM_MAIL_USER=      # mail-plane IMAP/SMTP login, from .env or environment (docs/configuration.md "Mail plane")
 FM_MAIL_PASS=      # mail-plane IMAP/SMTP password
