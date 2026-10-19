@@ -1394,7 +1394,7 @@ if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
   elif [ -z "$policy_harness" ]; then
     if [ "$KIND" = secondmate ]; then
       case "${POS[1]:-}" in
-      '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
+      '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | dsh | agy | devin)
         policy_harness=${POS[1]:-} ;;
       *' '*)
         if [ "${#POS[@]}" -gt 2 ] || [ -d "${POS[1]}" ]; then
@@ -2549,7 +2549,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   }
 elif [ "$KIND" = secondmate ]; then
   case "${POS[1]:-}" in
-  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
+  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | dsh | agy | devin)
     ARG3=${POS[1]:-}
     ;;
   *' '*)
@@ -3268,7 +3268,7 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
     fi
   fi
 fi
-if [ "$RAW_LAUNCH" = 0 ]; then
+if [ "$RAW_LAUNCH" = 0 ] && fm_control_harness_supports_kind dsh "$KIND"; then
   if [ -z "$ARG3" ] && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
     HARNESS=dsh
     LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1

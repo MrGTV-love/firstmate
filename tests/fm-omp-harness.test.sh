@@ -239,7 +239,7 @@ test_spawn_launch_line_and_worker_wiring() {
   assert_present "$state/$id.omp-ext.ts" "omp spawn did not write the per-task extension"
   assert_absent "$state/$id.live-model" "a launch must not keep a previous session's live-model record"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
+  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
     "omp launch did not clear foreign markers and establish its own at the launch boundary"
   assert_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$WT_DIR' --config '$ROOT/.omp/fm-worker-overlay.yml'" \
     "omp scout launch did not carry shared posture and worker-only memory overlays"
@@ -1497,6 +1497,57 @@ test_secondmate_config_pinned_model_is_validated() {
   assert_absent "$world/home/state/sm.meta" "a refused secondmate spawn must publish no sm.meta"
   [ ! -s "$launchlog" ] || fail "a refused secondmate spawn must record no launch: $(cat "$launchlog")"
   pass "fm-spawn: the config/secondmate-harness model pin is validated against the omp catalog before launch"
+}
+
+test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh() {
+  # DeepSeek work routes to dsh only by default for a crewmate or scout. A
+  # secondmate has no dsh adapter, so a configured or requested omp stand-in on
+  # a DeepSeek model must launch on omp, and only an explicit dsh pin refuses.
+  local world home fakebin launchlog out status launch via
+  local -a extra
+  for via in config model dsh; do
+    extra=()
+    [ "$via" != model ] || extra=(--model deepseek/deepseek-v4-flash)
+    world="$TMP_ROOT/secondmate-deepseek-$via"
+    home="$world/sm"
+    mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data" "$world/user-home"
+    printf '# Firstmate\n' > "$home/AGENTS.md"
+    printf 'sm\n' > "$home/.fm-secondmate-home"
+    printf 'charter\n' > "$home/data/charter.md"
+    printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
+    git -C "$home" init -q -b main
+    fakebin=$(make_spawn_fakebin "$world/fake" claude)
+    make_fake_omp "$fakebin"
+    launchlog="$world/launch.log"
+    : > "$launchlog"
+    case "$via" in
+      config) printf 'omp deepseek/deepseek-v4-flash\n' > "$world/home/config/secondmate-harness" ;;
+      model) printf 'omp\n' > "$world/home/config/secondmate-harness" ;;
+      dsh) printf 'dsh deepseek/deepseek-v4-flash\n' > "$world/home/config/secondmate-harness" ;;
+    esac
+    out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
+      FM_ROOT_OVERRIDE='' FM_HOME="$world/home" HOME="$world/user-home" \
+      FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
+      FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
+      FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
+      "$ROOT/bin/fm-spawn.sh" sm "$home" --secondmate ${extra[@]+"${extra[@]}"} 2>&1)
+    status=$?
+    if [ "$via" = dsh ]; then
+      expect_code 1 "$status" "an explicit dsh secondmate pin must be refused: $out"
+      assert_contains "$out" "dsh is a verified crewmate/scout adapter only and cannot run a secondmate" \
+        "the dsh secondmate refusal must name its reason: $out"
+      assert_absent "$world/home/state/sm.meta" "a refused dsh secondmate must publish no sm.meta"
+      [ ! -s "$launchlog" ] || fail "a refused dsh secondmate must record no launch: $(cat "$launchlog")"
+      continue
+    fi
+    expect_code 0 "$status" "a $via-selected omp DeepSeek secondmate must not be rerouted to dsh: $out"
+    assert_grep "harness=omp" "$world/home/state/sm.meta" "the $via-selected DeepSeek secondmate must stay on omp"
+    assert_grep "model=deepseek/deepseek-v4-flash" "$world/home/state/sm.meta" "the $via-selected DeepSeek model must be recorded"
+    launch=$(cat "$launchlog")
+    assert_contains "$launch" "FM_OMP_HARNESS=omp" "the $via-selected DeepSeek secondmate must launch on omp: $launch"
+    assert_not_contains "$launch" "FM_DSH_HARNESS=dsh" "a secondmate must never launch on dsh: $launch"
+  done
+  pass "fm-spawn: a DeepSeek model never reroutes a secondmate to dsh, and only an explicit dsh pin refuses"
 }
 
 # --- 3. Busy state -------------------------------------------------------------
@@ -4236,6 +4287,7 @@ test_spawn_raw_omp_expansions_pass_through_unchanged
 test_spawn_raw_omp_literal_evidence_still_refuses
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
+test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh
 test_busy_extension_lifecycle
 test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed

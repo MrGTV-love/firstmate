@@ -237,7 +237,7 @@ jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not 
 RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES") \
   || die "profiles in $RULES_PATH do not resolve against $CONFIG/model-index.json; fix the harness, model, role, or effort field named above, then rerun bin/fm-dispatch-resolve.sh <brief>"
 printf '%s\n' "$RESOLVED_RULES" > "$RULES" || die "could not write resolved rules snapshot"
-python3 "$SCRIPT_DIR/fm-dsh.py" normalize "$RULES" "$RULES" || die "profile harness contradicts its model/provider"
+python3 "$SCRIPT_DIR/fm-dsh.py" normalize "$RULES" "$RULES" || die "a dsh profile needs a concrete DeepSeek model"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
 

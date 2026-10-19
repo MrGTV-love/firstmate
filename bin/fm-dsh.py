@@ -18,13 +18,17 @@ session-file STATE ID prints the live depth-zero session log.
 position STATE ID prints the live session log and its last durable seq as JSON,
 or nothing before the launch has a log.
 state STATE ID [--since POSITION] folds only the newest depth-zero session in
-that launch's plain JSONL store. Missing, corrupt, or unsupported data is
-unknown. With --since, anything recorded at or before POSITION is history: a
-turn must have started beyond it, or the state is unknown.
+that launch's plain JSONL store, from its newest turn/start (or the last MiB,
+whichever reaches further back), however large that turn is. Missing, corrupt,
+or unsupported data is unknown. With --since, anything recorded at or before
+POSITION is history: a turn must have started beyond it, or the state is
+unknown.
 route MODEL [PROVIDER] prints the default model-family adapter.
-check HARNESS MODEL [PROVIDER] refuses a dsh launch without a DeepSeek model;
-an explicit non-dsh harness may name a DeepSeek stand-in, because DeepSeek work
-routes to dsh only by default.
+check HARNESS MODEL [PROVIDER] refuses a dsh launch unless the model is a
+concrete DeepSeek id: the optional deepseek/ prefix, then a non-empty id with no
+slash or whitespace, which is exactly what prepare accepts. An explicit non-dsh
+harness may name a DeepSeek stand-in, because DeepSeek work routes to dsh only
+by default.
 """
 import argparse
 import json
@@ -32,6 +36,8 @@ import os
 from pathlib import Path
 import shutil
 import sys
+
+CHUNK = 1024 * 1024
 
 
 def route(model, provider=""):
@@ -43,11 +49,15 @@ def route(model, provider=""):
 
 
 def check(harness, model, provider=""):
-    deepseek = route(model, provider) == "dsh"
-    if harness == "dsh" and not deepseek:
-        if not model:
-            raise ValueError("dsh requires an explicit DeepSeek model id")
+    if harness != "dsh":
+        return
+    bare = model.removeprefix("deepseek/")
+    if not bare:
+        raise ValueError("dsh requires an explicit DeepSeek model id")
+    if route(model, provider) != "dsh":
         raise ValueError(f"dsh runs only DeepSeek models, not '{model}'")
+    if "/" in bare or any(c.isspace() for c in bare):
+        raise ValueError("dsh requires a concrete DeepSeek model id")
 
 
 def normalize(value):
@@ -55,10 +65,11 @@ def normalize(value):
         return [normalize(item) for item in value]
     if isinstance(value, dict):
         value = {key: normalize(item) for key, item in value.items()}
-        if "harness" in value:
-            check(value["harness"], value.get("model", ""), value.get("provider", ""))
-            if value.get("provider") == "deepseek" and value.get("model") and not value["model"].startswith("deepseek/"):
-                value["model"] = "deepseek/" + value["model"]
+        model, provider = value.get("model", ""), value.get("provider", "")
+        if "harness" in value and isinstance(model, str) and isinstance(provider, str):
+            check(value["harness"], model, provider)
+            if provider == "deepseek" and model and not model.startswith("deepseek/"):
+                value["model"] = "deepseek/" + model
         return value
     return value
 
@@ -104,11 +115,9 @@ def prepare(args):
     state, task, generation, source_home, model, effort, cwd = args
     check("dsh", model)
     model = model.removeprefix("deepseek/")
-    if not model or "/" in model or any(c.isspace() for c in model):
-        raise ValueError("dsh requires a concrete DeepSeek model id")
     if effort in ("", "default"):
         effort = ""
-    elif effort not in ("off", "low", "medium", "high", "xhigh", "max"):
+    elif effort not in ("low", "medium", "high", "xhigh", "max"):
         raise ValueError(f"unsupported dsh effort: {effort}")
     source = Path(source_home)
     original = source / "profiles" / "dsh-tui"
@@ -187,12 +196,49 @@ def live_log(state, task):
     return session_path(json.loads((Path(state) / f"{task}.dsh-session").read_text()))
 
 
+def committed_size(stream, size):
+    end = size
+    while end > 0:
+        begin = max(0, end - CHUNK)
+        stream.seek(begin)
+        found = stream.read(end - begin).rfind(b"\n")
+        if found >= 0:
+            return begin + found + 1
+        end = begin
+    return 0
+
+
+def last_turn_start(stream, committed):
+    # Scan committed lines newest first in bounded chunks, so a turn larger than
+    # one chunk still reaches its opening turn/start. 0 when the log has none.
+    end = committed
+    carry = b""
+    while end > 0:
+        begin = max(0, end - CHUNK)
+        stream.seek(begin)
+        lines = []
+        offset = begin
+        for line in (stream.read(end - begin) + carry).split(b"\n")[:-1]:
+            lines.append((offset, line))
+            offset += len(line) + 1
+        carry = b""
+        if begin:
+            carry = lines.pop(0)[1] + b"\n"
+        for offset, line in reversed(lines):
+            if b"turn/start" in line and json.loads(line).get("type") == "turn/start":
+                return offset
+        end = begin
+    return 0
+
+
 def fold(path):
     with path.open("rb") as stream:
         stream.seek(0, os.SEEK_END)
-        start = max(0, stream.tell() - 1024 * 1024)
+        size = stream.tell()
+        turn = last_turn_start(stream, committed_size(stream, size))
+        start = min(turn, max(0, size - CHUNK))
         stream.seek(start)
-        if start:
+        if start and start != turn:
             stream.readline()
         result = "unknown"
         last_seq = started = -1

@@ -28,6 +28,11 @@ for model, provider, expected in [
 for model, provider in [('', ''), ('openai/gpt', '')]:
     call('check', 'dsh', model, provider, ok=False)
 call('check', 'dsh', 'deepseek/deepseek-v4-flash')
+call('check', 'dsh', 'v4', 'deepseek')
+# check admits exactly the models prepare accepts, so a relaunch is refused
+# before the running agent stops rather than after.
+for model, provider in [('deepseek/a/b', ''), ('deepseek/ ', ''), ('deepseek/', ''), ('', 'deepseek'), ('a b', 'deepseek'), ('x/y', 'deepseek')]:
+    call('check', 'dsh', model, provider, ok=False)
 for harness in ('codex', 'pi', 'pi-signed', 'omp', 'claude'):
     call('check', harness, 'unchanged/model')
     call('check', harness, 'deepseek/deepseek-v4-flash')
@@ -35,6 +40,16 @@ fallback_profiles = tmp / 'fallback-profiles.json'
 fallback_profiles.write_text(json.dumps({'rules':[{'fallback':[{'harness':'omp','model':'deepseek/deepseek-v4-flash','effort':'high'}]}]}))
 call('normalize', fallback_profiles, fallback_profiles)
 assert json.loads(fallback_profiles.read_text())['rules'][0]['fallback'][0]['model'] == 'deepseek/deepseek-v4-flash'
+# A malformed model or provider is left for the rules validator to report, and
+# a model-less dsh profile is refused rather than normalized.
+malformed = tmp / 'malformed-profiles.json'
+raw = {'rules':[{'use':{'harness':'dsh','model':None},'fallback':[{'harness':'omp','model':7,'provider':['deepseek']}]}]}
+malformed.write_text(json.dumps(raw))
+call('normalize', malformed, malformed)
+assert json.loads(malformed.read_text()) == raw
+modelless = tmp / 'modelless-profiles.json'
+modelless.write_text(json.dumps({'rules':[{'use':{'harness':'dsh','provider':'deepseek','model':''}}]}))
+call('normalize', modelless, modelless, ok=False)
 profiles = tmp / 'profiles.json'
 profiles.write_text(json.dumps({'rules':[{'use':[{'harness':'dsh','provider':'deepseek','model':'v4','effort':'high'}]}]}))
 call('normalize', profiles, profiles)
@@ -85,6 +100,23 @@ missing_state.mkdir()
 assert call('resume',missing_state,'task','deepseek/v4','high',cwd) == '', 'no binding must fall back quietly'
 put([start, end, start])
 assert call('state',state,'task') == 'unknown', 'nonmonotonic durable sequence is corrupt'
+# A turn that wrote more than the read window still reads busy: the fold starts
+# at its opening turn/start, found by a bounded backward scan, and an incomplete
+# append larger than one chunk does not hide the committed events before it.
+big = 'x' * 700000
+second = {'type':'turn/start','seq':3}
+body = [{'type':'tool','seq':4 + n,'payload':big} for n in range(4)]
+put([start,end,second,*body])
+assert call('state',state,'task') == 'busy', 'an oversized turn is still busy'
+assert json.loads(call('position',state,'task')) == [str(log), 7]
+assert call('state',state,'task','--since',where) == 'busy', 'an oversized new turn passes the start proof'
+put([start,end,second,*body], '{"type":"tool","seq":8,"payload":"' + big * 2)
+assert call('state',state,'task') == 'busy', 'an oversized incomplete append is not committed'
+assert json.loads(call('position',state,'task')) == [str(log), 7]
+put([start,end,second,*body,{'type':'turn/end','seq':8}])
+assert call('state',state,'task') == 'idle'
+assert call('state',state,'task','--since',where) == 'idle'
+assert call('state',state,'task','--since',json.dumps([str(log), 3])) == 'unknown', 'the oversized turn started at or before the position'
 put([start,end])
 child = runtime / 'dsh/sessions/workspace/child'
 child.mkdir()
@@ -119,6 +151,9 @@ launches = tmp / 'launches'
 launches.mkdir()
 def prepare(generation):
     return Path(call('prepare',launches,'task',generation,source,'deepseek/v4','high',cwd))
+for model, effort in [('deepseek/a/b', 'high'), ('deepseek/ ', 'high'), ('deepseek/', 'high'), ('deepseek/v4', 'off'), ('deepseek/v4', 'ultra')]:
+    call('prepare',launches,'refused','g0',source,model,effort,cwd,ok=False)
+    assert not (launches / 'refused.dsh').exists() and not (launches / 'refused.dsh-session').exists(), 'a refused prepare must stage nothing'
 first = prepare('g1')
 assert (first / 'dsh/.credentials.yaml').read_text() == 'secret\n'
 second = prepare('g2')
@@ -130,7 +165,7 @@ outside.mkdir()
 (launches / 'task.dsh-session').write_text(json.dumps({'root':str(outside),'cwd':str(cwd)}))
 prepare('g3')
 assert (outside / 'keep').exists(), 'prepare must not remove a root outside the task generations'
-print('ok - dsh route boundaries, contradiction refusal, provider normalization, durable transitions, torn append, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement')
+print('ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement')
 PY
 # shellcheck source=bin/fm-dsh-lib.sh
 . "$ROOT/bin/fm-dsh-lib.sh"

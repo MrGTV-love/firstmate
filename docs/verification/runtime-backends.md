@@ -3901,7 +3901,7 @@ bin/fm-test-run.sh tests/fm-dsh-harness.test.sh
 ok - live dsh-tui 0.16.1 ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
 ok - live dsh-tui 0.16.1 scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
 cleanup_exit=0
-ok - dsh route boundaries, contradiction refusal, provider normalization, durable transitions, torn append, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement
+ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement
 ok - dsh frame proves empty, typed draft, and busy-hint furniture
 ok - dsh executable-slot attribution, lifecycle capability and fatal cleanup contract
 ```
