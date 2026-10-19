@@ -1,0 +1,15 @@
+report bytes: 396924
+whole write decision: deny
+part 0 chars=149999 decision=allowed judge_requests=11
+part 1 chars=149999 decision=allowed judge_requests=11
+part 2 chars=96926 decision=allowed judge_requests=7
+parts allowed: 3 of 3
+REASSEMBLY_IDENTICAL=yes
+total 784
+drwxr-xr-x  5 charlesabrooker  staff     160 Oct 19 17:33 .
+drwxr-xr-x  3 charlesabrooker  staff      96 Oct 19 17:29 ..
+-rw-r--r--  1 charlesabrooker  staff  149999 Oct 19 17:33 report-part-0.txt
+-rw-r--r--  1 charlesabrooker  staff  149999 Oct 19 17:33 report-part-1.txt
+-rw-r--r--  1 charlesabrooker  staff   96926 Oct 19 17:33 report-part-2.txt
+--- friction/audit state ---
+   3 {"guard_id":"FM-JEV-SIZE","rule_id":"complete-screening-budget","outcome":"blocked"}

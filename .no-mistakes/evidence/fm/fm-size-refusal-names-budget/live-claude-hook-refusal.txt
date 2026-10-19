@@ -1,0 +1,9 @@
+report bytes: 396924
+=== attempt 1: whole report, one write ===
+exit=0
+deny
+[jev-guard] Review required: RequestTooLargeError. Refused path: "/Users/charlesabrooker/tmp/fm-size-lab.KEcb9V/home/data/t1/report.txt". REVIEW_ON_UNAVAILABLE_V1. REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within 16 requests of 16384 UTF-8 bytes each, including model, questions and JSON framing, with 1024 JSON-escaped bytes of overlap. The 262144-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. Supported completing route for report writes: use the same write tool to split the report across separate files in the task's own data directory, each below 150,000 characters per write, and smaller again if encoded bytes still exceed the screening budget. Every write must fit and is screened completely. This is size-budget compliance only, not permission to split or reroute a prohibited action. For a shell call or unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?
+=== attempt 2: identical retry ===
+exit=0
+RETRY_IDENTICAL_REFUSAL=yes
+requests sent to judge during refusals: 0

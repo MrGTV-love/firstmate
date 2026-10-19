@@ -1,0 +1,11 @@
+char='x' count=149999 -> allowed
+char='x' count=150000 -> allowed
+char='x' count=200000 -> allowed
+char='x' count=230000 -> allowed
+char='x' count=262144 -> refused (RequestTooLargeError guard=FM-JEV-SIZE )
+char='x' count=262145 -> refused (RequestTooLargeError guard=FM-JEV-SIZE )
+--- non-ASCII (informational; review-1 declined by author) ---
+char='é' count=70000 -> allowed
+char='é' count=100000 -> allowed
+char='é' count=130072 -> refused (RequestTooLargeError guard=FM-JEV-SIZE )
+char='é' count=149999 -> refused (RequestTooLargeError guard=FM-JEV-SIZE )
