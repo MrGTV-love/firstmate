@@ -79,7 +79,7 @@ SH
 test_relaunch_refuses_contradictory_dsh_route_before_stopping() {
   local dir out rc case_name expected
   local -a args
-  for case_name in dsh-without-model omp-with-deepseek-model; do
+  for case_name in dsh-without-model; do
     dir=$(new_case "dsh-route-$case_name" dsh-route)
     add_ship_task "$dir" dsh-route claude
     cat > "$dir/fakebin/dsh-tui" <<'SH'
@@ -96,16 +96,8 @@ printf '0.2.0-rc.2\n'
 SH
     chmod +x "$dir/fakebin/dsh-tui" "$dir/fakebin/dsh"
     cp "$dir/home/state/dsh-route.meta" "$dir/prior.meta"
-    case "$case_name" in
-      dsh-without-model)
-        args=(--harness dsh)
-        expected="dsh requires an explicit DeepSeek model id"
-        ;;
-      *)
-        args=(--harness omp --model deepseek/deepseek-v4-flash)
-        expected="routes to dsh, not to 'omp'"
-        ;;
-    esac
+    args=(--harness dsh)
+    expected="dsh requires an explicit DeepSeek model id"
     out=$(run_control "$dir" dsh-route relaunch "${args[@]}" --note "preserve current agent"); rc=$?
     expect_code 1 "$rc" "$case_name must refuse before stopping: $out"
     assert_contains "$out" "$expected" "$case_name refusal must name the contradiction"
@@ -114,7 +106,14 @@ SH
     cmp -s "$dir/prior.meta" "$dir/home/state/dsh-route.meta" || fail "$case_name refusal changed task metadata"
     assert_absent "$dir/home/state/dsh-route.control-relaunch" "$case_name refusal must precede the relaunch transaction"
   done
-  pass "fm-control relaunch: a contradictory dsh route preserves the running agent and task"
+  # An explicit omp/pi stand-in on a DeepSeek model is legal: DeepSeek routes to
+  # dsh only by default, so the removed contradiction refusal must not reappear.
+  dir=$(new_case dsh-route-stand-in dsh-route)
+  add_ship_task "$dir" dsh-route claude
+  out=$(run_control "$dir" dsh-route relaunch --harness omp --model deepseek/deepseek-v4-flash --note "preserve current agent"); rc=$?
+  assert_not_contains "$out" "routes to dsh, not to 'omp'" \
+    "an explicit DeepSeek stand-in must not be refused as a contradiction"
+  pass "fm-control relaunch: dsh-without-model refuses pre-stop and explicit DeepSeek stand-ins stay legal"
 }
 
 test_relaunch_omp_billing_admission_preserves_running_agents() {
