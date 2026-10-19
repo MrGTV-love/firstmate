@@ -539,6 +539,7 @@ main() {
   expect_mutant_caught finished-needs-no-database case_finished_run_needs_the_database 'fm_nmc_fin_valid() { return 0; }'
   expect_mutant_caught live-run-kept case_live_run_is_read_fresh_every_time 'fm_nmc_classify() { FM_NMC_FIN=01RUN; return 0; }'
   expect_mutant_caught failure-kept case_failure_is_read_fresh_every_time 'fm_nmc_classify() { FM_NMC_FIN=01RUN; return 0; }'
+  # shellcheck disable=SC2016 # A literal mutant function body; "$1" expands in the mutant, not here.
   expect_mutant_caught live-ci-log-kept case_ci_logs_follow_live_and_terminal_state 'fm_nmc_classify() { [ "$1" = logs ] || return 1; FM_NMC_FIN=01CI; return 0; }'
   expect_mutant_caught terminal-ci-log-not-kept case_ci_logs_follow_live_and_terminal_state 'fm_nmc_classify() { return 1; }'
 }
