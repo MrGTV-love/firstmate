@@ -1,0 +1,7 @@
+# test block: tests/fm-open-loops.test.sh lines 3113-3597 (machine evidence, standing receipts, named-ship blockers, exclusions, deadline, lock, converge)
+# run: nice -n 20 python3 -I block-satisfaction.py <worktree> <fresh tmp world>; serial; host load avg ~50-80
+# exit code: 0; wall seconds: 1108
+PASS: a hung current-state reader ends at the evidence deadline; cheaper evidence still satisfies other rows and the unproven row demands its action
+PASS: automatic evidence reads leave the receipt lock available; concurrent row, metadata and status changes reject stale proofs
+PASS: stored automatic receipts are trusted until their recheck epoch or an input change, then re-proven; overdue rows are proven oldest first across presentations
+PASS: fresh live-run, status and run-step receipts; standing acknowledgement; named open ship waits reopen; silent/stalled, blocked, captain and merge requirements and unevidenced second deferrals retained

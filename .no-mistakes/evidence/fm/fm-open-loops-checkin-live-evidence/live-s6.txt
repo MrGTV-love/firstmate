@@ -1,0 +1,120 @@
+(fixture) published ledger with rows: row-stalled_worker=stalled_worker/firstmate
+$ [after] fm-wake-drain.sh   -> rc=0 (2.1s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-stalled_worker","firstmate","worker","restart or steer the stalled worker",7200,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402671	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 13932.1792402671.gAYfRv
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 13932.1792402671.gAYfRv   -> rc=1 (0.2s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-stalled_worker","firstmate","worker","restart or steer the stalled worker",7203,"old report",false
+help: "row-stalled_worker": complete "restart or steer the stalled worker"; record the follow-up with bin/fm-open-loops.sh action "row-stalled_worker" escalated --evidence <concrete-follow-up>
+(fixture) published ledger with rows: row-review_pass_not_merged=review_pass_not_merged/firstmate
+$ [after] fm-wake-drain.sh   -> rc=0 (2.4s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-review_pass_not_merged","firstmate","https://github.com/test/project/pull/9","merge the reviewed PR",7201,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402674	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 20949.1792402674.M1LWAk
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 20949.1792402674.M1LWAk   -> rc=1 (0.4s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-review_pass_not_merged","firstmate","https://github.com/test/project/pull/9","merge the reviewed PR",7203,"old report",false
+help: "row-review_pass_not_merged": complete "merge the reviewed PR"; record the follow-up with bin/fm-open-loops.sh action "row-review_pass_not_merged" escalated --evidence <concrete-follow-up> or bin/fm-open-loops.sh action "row-review_pass_not_merged" merged --evidence "https://github.com/test/project/pull/9"
+(fixture) published ledger with rows: row-open_pr=open_pr/firstmate
+$ [after] fm-wake-drain.sh   -> rc=0 (3.6s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-open_pr","firstmate","https://github.com/test/project/pull/8","get the PR merged",7201,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402678	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 29403.1792402678.FRINrm
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 29403.1792402678.FRINrm   -> rc=1 (0.4s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-open_pr","firstmate","https://github.com/test/project/pull/8","get the PR merged",7205,"old report",false
+help: "row-open_pr": complete "get the PR merged"; record the follow-up with bin/fm-open-loops.sh action "row-open_pr" escalated --evidence <concrete-follow-up> or bin/fm-open-loops.sh action "row-open_pr" merged --evidence "https://github.com/test/project/pull/8"
+(fixture) published ledger with rows: row-blocked=silent_report/firstmate
+$ [after] fm-wake-drain.sh   -> rc=0 (2.6s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-blocked","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402682	1	check	report	check: live
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+worker blocked: need the owner
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 38969.1792402682.ZqfN0s
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 38969.1792402682.ZqfN0s   -> rc=1 (0.3s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-blocked","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7203,"old report",false
+help: "row-blocked": send a real check-in with bin/fm-open-loops.sh --check-in "worker"; record its delivery with bin/fm-open-loops.sh action "row-blocked" steered --evidence <NNN.msg>
+$ [after] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; ready_not_started:fix-ship:overdue=False; unanswered_question:question:captain-hold:overdue=True; unanswered_question:worker:question:overdue=True
+$ [after] fm-wake-drain.sh   -> rc=0 (2.4s)
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "91958381c4f921492c1005d0","captain","question:captain-hold","resolve the captain hold or record its next decision date",null,"choose next step",false
+  "a5a7f0696470969a17384cff","firstmate","worker:question","answer or close this question, or record why it no longer applies",7201,"needs-decision: await the named fix",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402686	1	check	report	check: live
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+worker [key=question] needs-decision: await the named fix
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 49536.1792402686.vZn3rO
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 49536.1792402686.vZn3rO   -> rc=1 (0.5s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "91958381c4f921492c1005d0","captain","question:captain-hold","resolve the captain hold or record its next decision date",null,"choose next step",false
+  "a5a7f0696470969a17384cff","firstmate","worker:question","answer or close this question, or record why it no longer applies",7203,"needs-decision: await the named fix",false
+help: "91958381c4f921492c1005d0": complete "resolve the captain hold or record its next decision date"; record the follow-up with bin/fm-open-loops.sh action "91958381c4f921492c1005d0" escalated --evidence <concrete-follow-up>
+help: "a5a7f0696470969a17384cff": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "a5a7f0696470969a17384cff" escalated --evidence <concrete-follow-up>
+PASS: exclusions: stalled_worker, review_pass_not_merged (merge), open_pr, blocked status, captain-held question stay obligations even with a working reader -- all five stay refused with category-specific routes and no automatic receipt

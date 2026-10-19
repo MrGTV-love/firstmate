@@ -1,0 +1,62 @@
+[
+ {
+  "transcript": "live-s1.txt",
+  "result": "pass",
+  "note": "Headline: overdue check-in row on a validating worker. Base: ack refused, waiting refused, 2nd deferral refused. Changed: ack accepted, observed receipt, no inbox write, re-present silent."
+ },
+ {
+  "transcript": "live-s2.txt",
+  "result": "pass",
+  "note": "Run-step event younger than interval proves the row; at recheck epoch the row demands a real action again."
+ },
+ {
+  "transcript": "live-s3.txt",
+  "result": "pass",
+  "note": "Stalled worker (paused reading) and status-event-only worker: refused with check-in + steer route; accepted only after steer receipt."
+ },
+ {
+  "transcript": "live-s3c.txt",
+  "result": "pass",
+  "note": "Real --check-in on a lab-private tmux server: inbox record + doorbell in the pane; steer receipt completes the row."
+ },
+ {
+  "transcript": "live-s4.txt",
+  "result": "pass",
+  "note": "Named OPEN ship: base refused, changed accepted (backlog_wait receipt); done / missing / non-ship / captain-hold / unnamed blocker / asker-deadlock all re-demand."
+ },
+ {
+  "transcript": "live-s5.txt",
+  "result": "pass",
+  "note": "Standing deferral with older presentation outstanding: base ack rc=1, changed ack rc=0."
+ },
+ {
+  "transcript": "live-s6.txt",
+  "result": "pass",
+  "note": "Exclusions: stalled_worker, review_pass_not_merged, open_pr, blocked status verb, captain-held question stay refused with category routes and no automatic receipt."
+ },
+ {
+  "transcript": "live-s7.txt",
+  "result": "pass",
+  "note": "Second unevidenced deferral and waiting refused with actionable text; escalation completes."
+ },
+ {
+  "transcript": "live-s8.txt",
+  "result": "pass",
+  "note": "Hung reader: pass ended at ~5s deadline, concurrent receipt write completed at 1.8s while it ran, unread row still gated ack, no orphan reader left."
+ },
+ {
+  "transcript": "live-s9.txt",
+  "result": "pass",
+  "note": "60 overdue check-in rows: base ack refused; changed code acked after 1 presentation pass, no steer sent."
+ },
+ {
+  "transcript": "live-s10.txt",
+  "result": "pass",
+  "note": "Upgrade: ledger/presentation written by base commit satisfied and later re-demanded by changed code."
+ },
+ {
+  "transcript": "live-s11.txt",
+  "result": "pass",
+  "note": "Busy pane and unknown remote readings are not evidence; run-step reading clears the row."
+ }
+]

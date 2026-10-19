@@ -1,0 +1,27 @@
+$ [after] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; silent_report:worker:overdue=True
+$ [after] fm-wake-drain.sh   -> rc=0 (2.3s)
+1792402188	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 11044.1792402188.z4nJpL
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 11044.1792402188.z4nJpL   -> rc=0 (0.5s)
+receipt: {"kind": "observed", "evidence": "run-step event at 1792402177; project=/Users/charlesabrooker/tmp/fm-lab.9jmr4tnl/projects/example; branch=fm/worker", "recheck_epoch": 1792403077}
+--- time travel to the receipt's recheck epoch (FM_OPEN_LOOPS_NOW): the event has now aged to the interval
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (0.3s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "1c011601b1b4cd51db1c7b3c","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",8090,"last heard: status=1792394987; inbox acknowledgement=None; resolved reply=None",false
+help: "1c011601b1b4cd51db1c7b3c": send a real check-in with bin/fm-open-loops.sh --check-in "worker"; record its delivery with bin/fm-open-loops.sh action "1c011601b1b4cd51db1c7b3c" steered --evidence <NNN.msg>
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.2s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "1c011601b1b4cd51db1c7b3c","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",8090,"last heard: status=1792394987; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+PASS: fresh run-step event proves a check-in row; at its expiry the row demands a real action again -- ack rc 0 with observed receipt; --check-actions rc 1 at the recheck epoch

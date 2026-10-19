@@ -1,0 +1,42 @@
+private tmux socket dir: /tmp/fml.eX4UTz
+$ [after] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; silent_report:worker:overdue=True
+$ [after] fm-wake-drain.sh   -> rc=0 (5.7s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "514fec137fd7cfc4792bd419","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7203,"last heard: status=1792395720; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402921	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 28584.1792402921.HujkDv
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 28584.1792402921.HujkDv   -> rc=1 (0.5s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "514fec137fd7cfc4792bd419","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7207,"last heard: status=1792395720; inbox acknowledgement=None; resolved reply=None",false
+help: "514fec137fd7cfc4792bd419": send a real check-in with bin/fm-open-loops.sh --check-in "worker"; record its delivery with bin/fm-open-loops.sh action "514fec137fd7cfc4792bd419" steered --evidence <NNN.msg>
+$ [after] fm-open-loops.sh --check-in worker   -> rc=0 (4.7s)
+check_in: "sent"
+subject: "worker"
+inbox records after the REAL --check-in: ['001.msg']
+inbox body:
+schema=fm-task-inbox.v1
+at=2026-10-19T09:42:10Z
+--
+Check in: report progress, blockers, and cross-workstream dependencies that need resolution. Reply through your supervised status/report channel before acknowledging this inbox message; secondmates must preserve the request correlation in their parent-channel reply. Handle this at your next safe checkpoint; do not interrupt a running step.
+worker pane after the doorbell:
+: Firstmate instruction waiting: 'worker.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+- act, mv handled/.
+: Firstmate instruction waiting: 'worker.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw
+- act, mv handled/.
+$ [after] fm-open-loops.sh action 514fec137fd7cfc4792bd419 steered --evidence 001.msg   -> rc=0 (0.1s)
+action: "514fec137fd7cfc4792bd419"
+kind: steered
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 28584.1792402921.HujkDv   -> rc=0 (0.7s)
+PASS: stalled worker gets a REAL check-in (inbox record + doorbell on a private tmux pane); the steer receipt then completes the row -- real --check-in delivered; ack accepted only after the steer receipt

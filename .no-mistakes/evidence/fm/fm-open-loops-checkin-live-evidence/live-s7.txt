@@ -1,0 +1,28 @@
+$ [after] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; silent_report:worker:overdue=True
+$ [after] fm-wake-drain.sh   -> rc=0 (1.7s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c4287df4a5d8c81270e128e7","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7201,"last heard: status=1792395190; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402390	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 51304.1792402390.cRJGle
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-open-loops.sh action c4287df4a5d8c81270e128e7 deferred --evidence first recheck --recheck 2026-10-19T09:43:12Z   -> rc=0 (0.1s)
+action: "c4287df4a5d8c81270e128e7"
+kind: deferred
+$ [after] fm-open-loops.sh action c4287df4a5d8c81270e128e7 deferred --evidence still no proof --recheck 2026-10-19T09:44:52Z   -> rc=1 (0.1s)
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it; the row clears by the automatic evidence receipt at the next presentation when the worker shows fresh machine evidence, or by a real check-in (bin/fm-open-loops.sh --check-in worker) recorded with bin/fm-open-loops.sh action c4287df4a5d8c81270e128e7 steered --evidence <NNN.msg>, or by bin/fm-open-loops.sh action c4287df4a5d8c81270e128e7 escalated --evidence <follow-up>"
+$ [after] fm-open-loops.sh action c4287df4a5d8c81270e128e7 waiting --evidence x --recheck 2026-10-19T09:43:12Z --prerequisite-task other   -> rc=1 (0.1s)
+error: "this obligation cannot have a standing dependency wait; the row clears by the automatic evidence receipt at the next presentation when the worker shows fresh machine evidence, or by a real check-in (bin/fm-open-loops.sh --check-in worker) recorded with bin/fm-open-loops.sh action c4287df4a5d8c81270e128e7 steered --evidence <NNN.msg>, or by bin/fm-open-loops.sh action c4287df4a5d8c81270e128e7 escalated --evidence <follow-up>"
+$ [after] fm-open-loops.sh action c4287df4a5d8c81270e128e7 escalated --evidence told the owner the worker is stalled   -> rc=0 (0.1s)
+action: "c4287df4a5d8c81270e128e7"
+kind: escalated
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 51304.1792402390.cRJGle   -> rc=0 (0.9s)
+PASS: second unevidenced deferral and unqualified waiting are refused with actionable, category-specific routes; escalation completes -- refusal text names the automatic evidence receipt, real check-in, steer receipt and escalated receipt

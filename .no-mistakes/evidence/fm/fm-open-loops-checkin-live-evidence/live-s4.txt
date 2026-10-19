@@ -1,0 +1,143 @@
+===== before: question row blocked only by the named OPEN ship fix-ship =====
+$ [before] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; ready_not_started:fix-ship:overdue=False; unanswered_question:worker:question:overdue=True
+row 9575156ff1094a249e233961 category=unanswered_question owner=firstmate next_action='answer or close this question, or record why it no longer applies'
+$ [before] fm-wake-drain.sh   -> rc=0 (5.0s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9575156ff1094a249e233961","firstmate","worker:question","answer or close this question, or record why it no longer applies",7201,"needs-decision: await the named fix",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402641	1	check	report	check: live
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+worker [key=question] needs-decision: await the named fix
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 21834.1792402641.M2ZidE
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [before] fm-wake-drain.sh --ack-through 1 --recovery-generation 21834.1792402641.M2ZidE   -> rc=1 (1.7s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9575156ff1094a249e233961","firstmate","worker:question","answer or close this question, or record why it no longer applies",7207,"needs-decision: await the named fix",false
+===== after: question row blocked only by the named OPEN ship fix-ship =====
+$ [after] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; ready_not_started:fix-ship:overdue=False; unanswered_question:worker:question:overdue=True
+row d9283718b2ae7f049105aafc category=unanswered_question owner=firstmate next_action='answer or close this question, or record why it no longer applies'
+$ [after] fm-wake-drain.sh   -> rc=0 (2.3s)
+1792402651	1	check	report	check: live
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+worker [key=question] needs-decision: await the named fix
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 47970.1792402651.8h1w0n
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 47970.1792402651.8h1w0n   -> rc=0 (0.5s)
+receipt: {"kind": "backlog_wait", "evidence": "waiting on named open ship: fix-ship"} prerequisites=['fix-ship']
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.1s)
+--- transition: done
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (0.4s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7206,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.5s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7207,"needs-decision: await the named fix",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 47970.1792402651.8h1w0n   -> rc=1 (1.1s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7208,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+--- transition: missing
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (1.2s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7210,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.5s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7211,"needs-decision: await the named fix",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 47970.1792402651.8h1w0n   -> rc=1 (3.2s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7214,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+--- transition: nonship
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (0.6s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7215,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (1.1s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7216,"needs-decision: await the named fix",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 47970.1792402651.8h1w0n   -> rc=1 (0.7s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7217,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+--- transition: captain-hold
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (0.4s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7218,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.4s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7218,"needs-decision: await the named fix",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 47970.1792402651.8h1w0n   -> rc=1 (1.6s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7220,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+--- transition: unnamed-blocker-added
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (0.4s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7221,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.4s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7221,"needs-decision: await the named fix",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 47970.1792402651.8h1w0n   -> rc=1 (0.6s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7221,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (0.4s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d9283718b2ae7f049105aafc","firstmate","worker:question","answer or close this question, or record why it no longer applies",7222,"needs-decision: await the named fix",false
+help: "d9283718b2ae7f049105aafc": complete "answer or close this question, or record why it no longer applies"; record the follow-up with bin/fm-open-loops.sh action "d9283718b2ae7f049105aafc" escalated --evidence <concrete-follow-up>
+PASS: row blocked only by a named OPEN ship stops demanding actions; closing / missing / non-ship / captain-hold / unnamed blocker / asker-deadlock re-demand -- ack rc before=1 after=0; 5 transitions + deadlock re-demanded

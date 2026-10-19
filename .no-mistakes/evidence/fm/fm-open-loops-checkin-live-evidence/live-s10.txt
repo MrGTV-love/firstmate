@@ -1,0 +1,33 @@
+--- BASE code publishes the ledger and presents the overdue row (the handling object has no "attempts" key)
+$ [before] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; silent_report:worker:overdue=True
+$ [before] fm-wake-drain.sh   -> rc=0 (1.8s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d85ddda274addf2abf0885e5","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7201,"last heard: status=1792396519; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792403720	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 78544.1792403720.qhcR93
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [before] fm-wake-drain.sh --ack-through 1 --recovery-generation 78544.1792403720.qhcR93   -> rc=1 (0.2s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d85ddda274addf2abf0885e5","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7203,"last heard: status=1792396519; inbox acknowledgement=None; resolved reply=None",false
+--- the SAME home is now read by the CHANGED code (rolling upgrade, same published ledger and presentation record)
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 78544.1792403720.qhcR93   -> rc=0 (0.7s)
+receipt: {"kind": "observed", "evidence": "fm-crew-state: state: working \u00b7 source: run-step \u00b7 run: live-validation; test running", "recheck_epoch": 1792404622}
+--- the worker then stops: the reader says paused; advance to the recheck epoch
+$ [after] fm-open-loops.sh --check-actions   -> rc=1 (0.1s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d85ddda274addf2abf0885e5","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",8103,"last heard: status=1792396519; inbox acknowledgement=None; resolved reply=None",false
+help: "d85ddda274addf2abf0885e5": send a real check-in with bin/fm-open-loops.sh --check-in "worker"; record its delivery with bin/fm-open-loops.sh action "d85ddda274addf2abf0885e5" steered --evidence <NNN.msg>
+PASS: upgrade: a ledger and presentation written by the base commit are satisfied and later re-demanded by the changed code -- ack rc 1 on base, rc 0 on changed code from the same home; re-demand after expiry

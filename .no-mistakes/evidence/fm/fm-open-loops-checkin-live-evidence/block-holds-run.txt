@@ -1,0 +1,4 @@
+# test block: tests/fm-open-loops.test.sh lines 2679-3110 (holds, standing escalation, backlog read once, stalled backlog, deadline)
+# run: nice -n 20 python3 -I block-holds.py <worktree> <fresh tmp world>; serial
+# exit code: 0; wall seconds: 631
+PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger; a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not

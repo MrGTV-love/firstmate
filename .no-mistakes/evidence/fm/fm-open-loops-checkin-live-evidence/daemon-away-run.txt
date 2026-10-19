@@ -1,0 +1,4 @@
+# tests/fm-daemon.test.sh: test_overdue_rows_escalate_before_away_acknowledgement + test_unchecked_overdue_rows_are_retried_not_escalated_by_away_daemon (only those two selected; function bodies from the file; run serially, nice -n 20)
+# exit code: 0; wall seconds: 150
+ok - away mode escalates each overdue row once per digest, records the receipt, and acknowledges
+ok - away mode retries rows the evidence deadline cut off or never reached, escalates only rows it fully tried, and accepts the escalation of a lapsed receipt

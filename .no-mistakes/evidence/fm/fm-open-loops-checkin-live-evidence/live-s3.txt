@@ -1,0 +1,53 @@
+$ [after] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; silent_report:worker:overdue=True
+$ [after] fm-wake-drain.sh   -> rc=0 (1.6s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c55289129cbe4cd4f49ca220","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7201,"last heard: status=1792395130; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402331	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 89258.1792402331.iA931C
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 89258.1792402331.iA931C   -> rc=1 (0.2s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c55289129cbe4cd4f49ca220","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7202,"last heard: status=1792395130; inbox acknowledgement=None; resolved reply=None",false
+help: "c55289129cbe4cd4f49ca220": send a real check-in with bin/fm-open-loops.sh --check-in "worker"; record its delivery with bin/fm-open-loops.sh action "c55289129cbe4cd4f49ca220" steered --evidence <NNN.msg>
+$ [after] fm-open-loops.sh --check-in worker   -> rc=1 (0.7s)
+error: "WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.\nWARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.\nerror: no backend target recorded in /Users/charlesabrooker/tmp/fm-lab.k1adu077/state/"
+inbox records after --check-in: []
+--check-in could not deliver in this lab (no live pane); writing the inbox record the way the test fixture does
+$ [after] fm-open-loops.sh action c55289129cbe4cd4f49ca220 steered --evidence 001.msg   -> rc=0 (0.1s)
+action: "c55289129cbe4cd4f49ca220"
+kind: steered
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 89258.1792402331.iA931C   -> rc=0 (0.6s)
+(fixture) published ledger with rows: row-status-only=silent_report/firstmate
+$ [after] fm-wake-drain.sh   -> rc=0 (5.2s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-status-only","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7202,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402336	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 608.1792402336.uK3SS3
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 608.1792402336.uK3SS3   -> rc=1 (0.3s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-status-only","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7206,"old report",false
+help: "row-status-only": send a real check-in with bin/fm-open-loops.sh --check-in "worker"; record its delivery with bin/fm-open-loops.sh action "row-status-only" steered --evidence <NNN.msg>
+PASS: stalled / silent worker still needs a real steer; recent status event alone proves nothing -- ack refused with check-in+steer route, accepted only after the steer receipt

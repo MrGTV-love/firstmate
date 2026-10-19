@@ -1,0 +1,50 @@
+===== before: overdue "check in: progress, blockers, cross-workstream dependencies" row, worker shows a live run-step (fm-crew-state: working · run-step) =====
+$ [before] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; silent_report:worker:overdue=True
+row db6eae9326baede3c57c9ffb age=7200s limit=900s next_action='check in: progress, blockers, cross-workstream dependencies'
+$ [before] fm-wake-drain.sh   -> rc=0 (5.3s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "db6eae9326baede3c57c9ffb","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7204,"last heard: status=1792394975; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402176	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 79737.1792402176.TqYnQD
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [before] fm-wake-drain.sh --ack-through 1 --recovery-generation 79737.1792402176.TqYnQD   -> rc=1 (0.3s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "db6eae9326baede3c57c9ffb","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7207,"last heard: status=1792394975; inbox acknowledgement=None; resolved reply=None",false
+$ [before] fm-open-loops.sh action db6eae9326baede3c57c9ffb waiting --evidence x --recheck 2026-10-19T09:39:42Z --prerequisite-task other   -> rc=1 (0.1s)
+error: "this obligation cannot have a standing dependency wait"
+$ [before] fm-open-loops.sh action db6eae9326baede3c57c9ffb deferred --evidence validation running --recheck 2026-10-19T09:39:42Z   -> rc=0 (0.1s)
+action: "db6eae9326baede3c57c9ffb"
+kind: deferred
+$ [before] fm-open-loops.sh action db6eae9326baede3c57c9ffb deferred --evidence validation still running --recheck 2026-10-19T09:41:23Z   -> rc=1 (0.1s)
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+base: waiting rc=1, first deferral rc=0, second deferral rc=1
+===== after: overdue "check in: progress, blockers, cross-workstream dependencies" row, worker shows a live run-step (fm-crew-state: working · run-step) =====
+$ [after] fm-open-loops.sh --heartbeat --json   -> complete=True rows=coverage:no forge coverage: example:overdue=False; silent_report:worker:overdue=True
+row fc1e4a438cab71417873cc4e age=7200s limit=900s next_action='check in: progress, blockers, cross-workstream dependencies'
+$ [after] fm-wake-drain.sh   -> rc=0 (2.0s)
+1792402184	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 258.1792402184.EnAViC
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 258.1792402184.EnAViC   -> rc=0 (0.6s)
+stored receipt: {"kind": "observed", "evidence": "fm-crew-state: state: working \u00b7 source: run-step \u00b7 run: live-validation; test running", "recheck_epoch": 1792403084, "at_epoch": 1792402184}
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.1s)
+$ [after] fm-open-loops.sh --check-actions   -> rc=0 (0.1s)
+PASS: headline: overdue check-in row on a validating worker no longer blocks the acknowledgement (base refused it) -- ack rc before=1 after=0

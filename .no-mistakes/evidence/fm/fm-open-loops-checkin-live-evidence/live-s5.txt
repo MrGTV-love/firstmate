@@ -1,0 +1,61 @@
+===== before: stalled_worker row deferred once, then the ledger re-presents it (older presentation outstanding) =====
+(fixture) published ledger with rows: row-standing=stalled_worker/firstmate
+$ [before] fm-wake-drain.sh   -> rc=0 (8.8s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-standing","firstmate","worker","restart or steer the stalled worker",7203,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402356	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 53594.1792402356.ozFlLC
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [before] fm-open-loops.sh action row-standing deferred --evidence first check scheduled --recheck 2026-10-19T09:42:45Z   -> rc=0 (0.1s)
+action: "row-standing"
+kind: deferred
+$ [before] fm-open-loops.sh --present-overdue   -> rc=0 (0.3s)
+$ [before] fm-wake-drain.sh   -> rc=0 (4.1s)
+1792402366	2	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 53594.1792402356.ozFlLC
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [before] fm-wake-drain.sh --ack-through 2 --recovery-generation 53594.1792402356.ozFlLC   -> rc=1 (0.9s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-standing","firstmate","worker","restart or steer the stalled worker",7216,"old report",false
+before: re-presentation silent=True, ack rc=1
+===== after: stalled_worker row deferred once, then the ledger re-presents it (older presentation outstanding) =====
+(fixture) published ledger with rows: row-standing=stalled_worker/firstmate
+$ [after] fm-wake-drain.sh   -> rc=0 (2.0s)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-standing","firstmate","worker","restart or steer the stalled worker",7201,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792402371	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 99719.1792402371.tp4ZZL
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-open-loops.sh action row-standing deferred --evidence first check scheduled --recheck 2026-10-19T09:42:54Z   -> rc=0 (0.1s)
+action: "row-standing"
+kind: deferred
+$ [after] fm-open-loops.sh --present-overdue   -> rc=0 (0.1s)
+$ [after] fm-wake-drain.sh   -> rc=0 (1.2s)
+1792402374	2	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 99719.1792402371.tp4ZZL
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [after] fm-wake-drain.sh --ack-through 2 --recovery-generation 99719.1792402371.tp4ZZL   -> rc=0 (0.6s)
+after: re-presentation silent=True, ack rc=0
+PASS: standing receipt: a row under a standing deferral is not re-presented and does not gate the acknowledgement -- before(silent,rc)=(True, 1) after(silent,rc)=(True, 0)

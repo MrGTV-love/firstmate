@@ -1,0 +1,97 @@
+===== before: 60 overdue check-in rows, every worker has a fresh run-step event =====
+(fixture) published ledger with rows: row-w00=silent_report/firstmate; row-w01=silent_report/firstmate; row-w02=silent_report/firstmate; row-w03=silent_report/firstmate; row-w04=silent_report/firstmate; row-w05=silent_report/firstmate; row-w06=silent_report/firstmate; row-w07=silent_report/firstmate ... (60 rows)
+$ [before] fm-wake-drain.sh   -> rc=0 (10.1s)
+OVERDUE:
+rows[60]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-w00","firstmate","w00","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w01","firstmate","w01","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w02","firstmate","w02","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w03","firstmate","w03","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w04","firstmate","w04","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w05","firstmate","w05","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w06","firstmate","w06","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w07","firstmate","w07","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w08","firstmate","w08","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w09","firstmate","w09","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w10","firstmate","w10","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w11","firstmate","w11","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w12","firstmate","w12","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w13","firstmate","w13","check in: progress, blockers, cross-workstream dependencies",7201,"old report",false
+  "row-w14","firstmate","w14","check in: progress, blockers, cross-workstream dependencies
+...[5533 more chars]
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 80952.1792403326.z1pGjt
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  60 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [before] fm-wake-drain.sh --ack-through 1 --recovery-generation 80952.1792403326.z1pGjt   -> rc=1 (0.5s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[60]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-w00","firstmate","w00","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w01","firstmate","w01","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w02","firstmate","w02","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w03","firstmate","w03","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w04","firstmate","w04","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w05","firstmate","w05","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w06","firstmate","w06","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w07","firstmate","w07","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w08","firstmate","w08","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w09","firstmate","w09","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w10","firstmate","w10","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w11","firstmate","w11","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w12","firstmate","w12","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  "row-w13","firstmate","w13","check in: progress, blockers, cross-workstream dependencies",7211,"old report",false
+  
+...[5333 more chars]
+before: acknowledgement rc=1 after 0 presentation pass(es)
+===== after: 60 overdue check-in rows, every worker has a fresh run-step event =====
+(fixture) published ledger with rows: row-w00=silent_report/firstmate; row-w01=silent_report/firstmate; row-w02=silent_report/firstmate; row-w03=silent_report/firstmate; row-w04=silent_report/firstmate; row-w05=silent_report/firstmate; row-w06=silent_report/firstmate; row-w07=silent_report/firstmate ... (60 rows)
+$ [after] fm-wake-drain.sh   -> rc=0 (31.5s)
+NOT CHECKED THIS PASS (the evidence deadline ended first; tried first next pass; no action needed now):
+rows[16]{id,owner,subject,age_seconds}:
+  - "row-w44","firstmate","w44",7207
+  - "row-w45","firstmate","w45",7207
+  - "row-w46","firstmate","w46",7207
+  - "row-w47","firstmate","w47",7207
+  - "row-w48","firstmate","w48",7207
+  - "row-w49","firstmate","w49",7207
+  - "row-w50","firstmate","w50",7207
+  - "row-w51","firstmate","w51",7207
+  - "row-w52","firstmate","w52",7207
+  - "row-w53","firstmate","w53",7207
+  - "row-w54","firstmate","w54",7207
+  - "row-w55","firstmate","w55",7207
+  - "row-w56","firstmate","w56",7207
+  - "row-w57","firstmate","w57",7207
+  - "row-w58","firstmate","w58",7207
+  - "row-w59","firstmate","w59",7207
+STANDING (a receipt stands; no action needed):
+rows[44]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-w00","firstmate","w00","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w01","firstmate","w01","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w02","firstmate","w02","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w03","firstmate","w03","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w04","firstmate","w04","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w05","firstmate","w05","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w06","firstmate","w06","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w07","firstmate","w07","check in: progress, blockers, cross-workstream dependencies",7207,"old report",false
+  "row-w08",
+...[4332 more chars]
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 97532.1792403337.Yt5owi
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  60 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+pass 1: 2.5s; receipts stored=60; rows printed as needing an action=0; rows NOT CHECKED=0
+$ [after] fm-wake-drain.sh --ack-through 1 --recovery-generation 97532.1792403337.Yt5owi   -> rc=0 (1.9s)
+after: acknowledgement rc=0 after 1 presentation pass(es)
+PASS: 60 overdue check-in rows with fresh machine evidence no longer block the acknowledgement; presentations converge without any steer -- before ack rc=1; after ack rc=0 after 1 passes

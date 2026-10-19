@@ -1,0 +1,30 @@
+(fixture) published ledger with rows: row-silent=silent_report/firstmate; row-stalled=stalled_worker/firstmate
+$ [after] fm-wake-drain.sh   -> rc=0 (4.0s)
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-silent","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7202,"old report",false
+  "row-stalled","firstmate","other","restart or steer the stalled worker",7202,"old report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792403125	1	check	report	check: live
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 99329.1792403125.FKDVyH
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+--- the current-state reader now hangs (sleep 3600); start --check-actions in the background
+$ [after] fm-open-loops.sh action row-stalled escalated --evidence told the owner   -> rc=0 (0.1s)
+action: "row-stalled"
+kind: escalated
+receipt write finished 1.8s after the pass started; background pass still running: True; action rc=0 (0.1s)
+background --check-actions rc=1 after 6.2s
+error: 1 overdue rows were not checked before the evidence deadline; acknowledgement refused until a retry checks them
+NOT CHECKED THIS PASS (the evidence deadline ended first; tried first next pass; no action needed now):
+rows[1]{id,owner,subject,age_seconds}:
+  - "row-silent","firstmate","worker",7211
+retry: run this command again; the next pass tries the rows not checked first. Send no check-in and record no action for them now.
+"sleep 3600" processes that appeared during this run and are still alive: [] (other sessions' sleeps are excluded by pid)
+PASS: hung current-state reader ends at the 5s evidence deadline; a concurrent receipt write is not blocked; unread row still gates the acknowledgement -- receipt write completed while the pass was still running
