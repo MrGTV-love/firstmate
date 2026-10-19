@@ -3341,6 +3341,9 @@ Ownership is machine-wide per canonical source, because separate homes can share
   Uncertain group inspection is retried for a bounded 10 seconds; the runner then exits and keeps its claim for reconciliation rather than releasing it on a guess.
   TERM-resistant descendants use that same proved KILL escalation; the killed runner leaves its claim for reconciliation after the whole generation is gone.
   Adapter-terminal self-retirement can release the claim earlier, under the same lock that removes the registration; the subsequent EXIT cleanup still drains descendants, so the retained-claim ordering is not a universal terminal-path guarantee.
+- The built-in output-bounding reader exits when its runner parent disappears, including after SIGKILL, without waiting for EOF from a surviving source.
+  This does not stop surviving source processes or relax orphaned-claim recovery below; extension capture remains separate.
+  See [output-reader verification](verification/process-event-sources.md#output-reader-lifetime-after-runner-loss) for regression evidence.
 
 **Recover orphaned claims**
 

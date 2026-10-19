@@ -228,7 +228,7 @@ Refresh the regressions with `bash tests/fm-procevent.test.sh`; the dated measur
 ### Output-reader lifetime after runner loss
 
 Verified on 2026-10-19 on macOS (Darwin 25.6.0) with Perl 5.34.1 through the public source-registration and launch interfaces in isolated temporary homes.
-The output reader exits after its runner parent disappears even while the source and descendant retain the FIFO write end; the regression identifies readers only by its own temporary-tree marker.
+In `tests/fm-procevent-runner-custody.test.sh`, SIGKILL on only the runner left no marked output reader while the source and descendant remained alive with the FIFO write end; reader inspection uses only the fixture's temporary-tree marker.
 The same regression covers runner-only TERM and HUP, existing identity-checked group cleanup and replacement capture, and delayed binary output at zero, partial, and complete bounds, including nonzero source exits with usable output.
 This is the shared built-in capture path, with no harness or session-provider selector; extension capture remains separate and unchanged.
 

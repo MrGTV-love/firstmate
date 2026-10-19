@@ -59,9 +59,9 @@
 #            Consumers that need readiness call this explicitly after arming.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for that capture. It then
-#            drains its owned process group in EXIT cleanup. Its output reader
-#            also exits on runner parent loss, even if a surviving source keeps
-#            stdout open after SIGKILL. Polling continues only if the source
+#            drains its owned process group in EXIT cleanup. Output-reader
+#            lifetime follows docs/configuration.md "Prove ownership before
+#            stopping a runner". Polling continues only if the source
 #            command is the tracked adapter script and `relisten` accepts
 #            polling again in this same runner.
 #            It blocks for the runner's lifetime and is meant to run supervised,
