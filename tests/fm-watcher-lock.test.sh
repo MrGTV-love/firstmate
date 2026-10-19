@@ -1503,23 +1503,48 @@ SH
 }
 
 test_stopped_watcher_is_live_but_stale_then_exit_is_classified() {
-  local dir state fakebin armout armpid watcher_pid i status
+  local dir state fakebin armout armpid watcher_pid i status real_touch
   dir=$(make_case stopped-watcher)
   state="$dir/state"
   fakebin="$dir/fakebin"
   armout="$dir/arm.out"
-  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
+  real_touch=$(command -v touch)
+  # SIGSTOP of the watcher alone cannot stop an already-forked touch child.
+  # Stop from that child after its write, before the parent can fork another,
+  # so no in-flight beacon write can undo the test's subsequent backdate.
+  cat > "$fakebin/touch" <<'SH'
+#!/usr/bin/env bash
+if [ "$#" -eq 1 ] && [ "$1" = "$FM_STATE_OVERRIDE/.last-watcher-beat" ]; then
+  IFS= read -r holder < "$FM_STATE_OVERRIDE/.watch.lock/pid" || exit 1
+  if [ "$PPID" = "$holder" ] && [ ! -e "$FM_STATE_OVERRIDE/beacon-writer-stopped" ]; then
+    "$FM_TEST_REAL_TOUCH" "$@" || exit "$?"
+    kill -STOP "$PPID" || exit 1
+    printf '%s\n' "$PPID" > "$FM_STATE_OVERRIDE/beacon-writer-stopped"
+    exit 0
+  fi
+fi
+exec "$FM_TEST_REAL_TOUCH" "$@"
+SH
+  chmod +x "$fakebin/touch"
+  PATH="$fakebin:$PATH" FM_TEST_REAL_TOUCH="$real_touch" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout" &
   armpid=$!
   i=0
   while [ "$i" -lt 80 ]; do
-    grep -qF 'watcher: started pid=' "$armout" 2>/dev/null && break
+    if grep -qF 'watcher: started pid=' "$armout" 2>/dev/null \
+      && [ -s "$state/beacon-writer-stopped" ]; then
+      break
+    fi
     sleep 0.1
     i=$((i + 1))
   done
   watcher_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
   grep -qF "watcher: started pid=$watcher_pid" "$armout" || fail "load counterfactual watcher did not start"
+  [ "$(cat "$state/beacon-writer-stopped" 2>/dev/null || true)" = "$watcher_pid" ] \
+    || fail "watcher was not stopped after its beacon write completed"
 
   kill -STOP "$watcher_pid" 2>/dev/null || fail "could not SIGSTOP watcher"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_watcher_healthy "$2" "$3" 300 "$4"' _ "$LIB" "$state" "$WATCH" "$dir" \
+    || fail "stopped watcher with a fresh beacon was not classified healthy"
   touch -t 200001010000 "$state/.last-watcher-beat"
   FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_alive "$2"' _ "$LIB" "$watcher_pid" \
     || fail "SIGSTOP watcher was not classified as a live pid"
