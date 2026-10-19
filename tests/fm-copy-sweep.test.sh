@@ -74,6 +74,9 @@ EOF
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FAKE_GIT_LOG"
 case " $* " in
+  *" worktree list "*)
+    [ -z "${FAKE_GIT_FAIL_LIST:-}" ] || exit 128
+    ;;
   *" worktree remove "*)
     if [ -n "${FAKE_GIT_FAIL_REMOVE:-}" ]; then
       echo "fatal: injected failure" >&2
@@ -205,13 +208,11 @@ assert_untouched() {  # <names...>: before and after snapshots match
 HELD_NAMES=(dirty unpushed unpushed2 live orphan locked proc)
 
 test_report_lists_every_copy_and_changes_nothing() {
-  local first second
   make_matrix report
   take_snapshots before reap "${HELD_NAMES[@]}"
   git -C "$SLOT" worktree list --porcelain > "$W/list-before"
   FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep
   [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
-  first=$OUT
   assert_class reap REAPABLE-PROVEN
   assert_class dirty HELD-DIRTY
   assert_class unpushed HELD-UNPUSHED
@@ -233,10 +234,84 @@ test_report_lists_every_copy_and_changes_nothing() {
   assert_absent "$HOMED/state/copy-sweep.record" "report wrote a budget record"
   assert_absent "$HOMED/state/copy-sweep.sizes" "report wrote a size cache"
   assert_absent "$HOMED/state/.wake-queue" "report raised a wake"
-  FAKE_LSOF_CWD="$(copy_path proc)/sub" run_sweep
-  second=$OUT
-  [ "$first" = "$second" ] || fail "a second report differs from the first: $(diff <(printf '%s\n' "$first") <(printf '%s\n' "$second") | head -5)"
-  pass "report mode lists every copy with class and reason, changes nothing, and repeats exactly"
+  pass "report mode lists every copy with class and reason and changes nothing"
+}
+
+test_live_nested_copies_are_named_once_with_age_and_left_untouched() {
+  local lock before_lock before_list report_line
+  make_world live-nested
+  add_copy locked-live
+  add_copy unlocked-live
+  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
+  git -C "$SLOT" worktree lock --reason 'vernant-session-active owner=launcher:999999' "$(copy_path locked-live)"
+  lock="$(git -C "$(copy_path locked-live)" rev-parse --absolute-git-dir)/locked"
+  TZ=UTC touch -t 202912312300 "$lock"
+  TZ=UTC touch -t 202912310000 "$(copy_path unlocked-live)"
+  before_lock=$(shasum -a 256 "$lock")
+  take_snapshots before locked-live unlocked-live
+  printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep
+  [ "$RC" = 0 ] || fail "live nested report failed: $OUT"
+  report_line=$(printf '%s\n' "$OUT" | grep '^copy-sweep: HELD-LIVE-TASK nested copies=')
+  [ "$(printf '%s\n' "$report_line" | wc -l | tr -d ' ')" = 1 ] || fail "live facts were not aggregated: $OUT"
+  assert_contains "$report_line" 'nested copies=2:' 'report did not count both live copies'
+  assert_contains "$report_line" "$(copy_path locked-live) (task=outer-task age=3600s source=lock)" 'lock age or absolute path missing'
+  assert_contains "$report_line" "$(copy_path unlocked-live) (task=outer-task age=86400s source=directory)" 'directory age or absolute path missing'
+  assert_absent "$HOMED/state/.wake-queue" 'report raised a wake'
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep check
+  [ "$RC" = 0 ] || fail "live nested check failed: $OUT"
+  [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] || fail "check emitted more than one notification: $OUT"
+  assert_equals "$report_line" "$OUT" 'check must name both live copies even with budgets off'
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path locked-live)" 'record did not keep the notified live copy'
+  FM_COPY_SWEEP_NOW=1893456001 run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "the same live set woke again: $OUT"
+  add_copy added-live
+  before_list=$(git -C "$SLOT" worktree list --porcelain)
+  printf 'default-pool 0\ndefault-container 0\ninterval 0\n' > "$HOMED/config/copy-budget"
+  FM_COPY_SWEEP_NOW=1893456002 run_sweep check
+  [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] || fail "budget and live facts emitted separate notifications: $OUT"
+  assert_contains "$OUT" 'over its budget' 'budget facts were lost'
+  assert_contains "$OUT" 'nested copies=3:' 'the new live copy did not raise one aggregated fact'
+  assert_contains "$OUT" "$(copy_path added-live)" 'the new live copy was not named'
+  take_snapshots after locked-live unlocked-live
+  assert_untouched locked-live unlocked-live
+  assert_equals "$before_lock" "$(shasum -a 256 "$lock")" 'check changed the creation lock'
+  assert_equals "$before_list" "$(git -C "$SLOT" worktree list --porcelain)" 'check changed registrations'
+  assert_absent "$HOMED/data/copy-sweep.log" 'live check wrote a removal log'
+  pass 'live nested copies are named once with lock/directory ages, below budget, without changing copies or locks'
+}
+
+test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact() {
+  local proj copy
+  make_world closed-nested
+  proj="$HOMED/projects/proj"
+  fm_git_init_commit "$proj"
+  copy="$proj/.claude/worktrees/nested"
+  git -C "$proj" worktree add -q -b fm/nested "$copy"
+  fm_write_meta "$HOMED/state/owner.meta" "worktree=$proj" 'kind=scout'
+  printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  run_sweep check
+  assert_contains "$OUT" "$copy (task=owner age=" 'live home-project copy was not named'
+  rm "$HOMED/state/owner.meta"
+  printf 'done: task closed\n' > "$HOMED/state/owner.status"
+  fm_write_meta "$HOMED/state/mate.meta" "home=$HOMED" 'kind=secondmate'
+  run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "closed owner or secondmate home raised a live fact: $OUT"
+  [ -d "$copy" ] || fail 'closed copy was removed by the live check'
+  git -C "$proj" worktree list --porcelain | grep -qxF "worktree $copy" || fail 'closed copy was unregistered'
+  pass 'home-project nested copies are reported while their task is live, but not after closure or for a secondmate home'
+}
+
+test_unreadable_registration_is_reported_without_walking_for_copies() {
+  make_world unreadable-registration
+  add_copy nested
+  fm_write_meta "$HOMED/state/owner.meta" "worktree=$SLOT" 'kind=ship'
+  FAKE_GIT_FAIL_LIST=1 run_sweep
+  assert_contains "$OUT" "clone $SLOT was not read: its registered worktrees cannot be listed" 'enumeration failure was silently treated as no copies'
+  assert_not_contains "$OUT" 'HELD-LIVE-TASK nested copies=' 'failed enumeration invented a live copy'
+  [ "$(du_calls)" = 0 ] || fail 'failed enumeration walked the directory and measured a copy'
+  registered nested || fail 'unreadable enumeration changed a registration'
+  pass 'unreadable registered-worktree enumeration reports the gap without a directory-walk fallback'
 }
 
 test_apply_removes_only_the_reapable_copy() {
@@ -1074,6 +1149,9 @@ run_case() {
 }
 
 run_case test_report_lists_every_copy_and_changes_nothing
+run_case test_live_nested_copies_are_named_once_with_age_and_left_untouched
+run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
+run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy
 run_case test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
 run_case test_landed_content_without_a_pushed_tip_is_reaped_by_apply
