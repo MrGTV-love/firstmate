@@ -28,12 +28,11 @@
 #                      is no worktree root of that clone, or its git or lock state
 #                      cannot be read. Never touched; `git worktree prune` and
 #                      the owner are the repair.
-#   HELD-LOCKED        a worktree lock holds it. Vernant's creation lock is never
-#                      released by anything but Vernant's closeout driver, so
-#                      --apply never removes such a copy and never unlocks. The
-#                      sweep only names its bytes in a wake; the teardown path
-#                      (bin/fm-teardown-nested-lib.sh) is what releases a locked
-#                      copy, through Vernant's closeout driver.
+#   HELD-LOCKED        a worktree lock holds it and this sweep may not remove it.
+#                      A lock that is not Vernant's exact creation-lock format,
+#                      or whose launcher may still be alive, stays here: the
+#                      closeout driver is the only supported release and this
+#                      sweep never unlocks by hand.
 #   HELD-LIVE-TASK     an active task record in any local home names it (or a
 #                      path inside or around it, except a registered secondmate's
 #                      own home chain), a process has its working directory
@@ -58,6 +57,14 @@
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
 #                      bin/fm-teardown.sh uses), no process inside, no record.
+#   REAPABLE-DRIVER    the same proofs as REAPABLE-PROVEN, plus Vernant's exact
+#                      creation lock whose launcher pid is gone or recycled.
+#                      The launcher test is bin/fm-teardown-nested-lib.sh's own
+#                      teardown_lock_launcher_may_be_live: a pid that started
+#                      after the lock file was written is recycled and owns
+#                      nothing, and a pid that started before it, still alive, is
+#                      the lock's launcher and keeps the copy locked. Only
+#                      Vernant's closeout driver releases it.
 # HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
 # `git worktree remove`, so calling it live or orphaned would mislead.
 # Independently of class and byte budgets, one HELD-LIVE-TASK report line names
@@ -75,10 +82,14 @@
 # copies in all (new copies first, then the oldest), and a pointer to the no-flag
 # run. A copy with no live owning record is left to the existing reap path.
 #
-# --apply removes only REAPABLE-PROVEN copies, one at a time, deepest path first,
-# each re-proved just before its own removal, by a plain `git worktree remove`
-# run from the parent clone. Never a force flag, never a recursive delete, never
-# an unlock, never a Treehouse call. A removal that fails leaves the copy and is
+# --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
+# deepest path first, each re-proved just before its own removal. An unlocked
+# copy goes by a plain `git worktree remove` run from the parent clone; a locked
+# one is preserved and then released and removed by Vernant's own closeout
+# driver, run from that clone, exactly as bin/fm-teardown.sh does it. The
+# sweep's preserved ignored entries land in data/copy-sweep/nested-copy-preserved.
+# Never a force flag, never a recursive delete, never a hand unlock, never a
+# Treehouse call. A removal that fails leaves the copy and is
 # reported, and the run exits 1; it is not retried. Each removal appends one line
 # to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
 # in the same run is removed by the next run; a second run otherwise finds
@@ -528,7 +539,7 @@ content_in_default() {  # <copy> <clone>
 # that home would judge it.
 classify() {  # <copy> <clone> <pool> <container>
   local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending inner
-  local home=$FM_HOME state=$STATE
+  local home=$FM_HOME state=$STATE locked=0 launcher=
   CLASS=
   REASON=
   if [ "$pool" = - ] && ! [ "$container/state" -ef "$STATE" ]; then
@@ -562,11 +573,24 @@ classify() {  # <copy> <clone> <pool> <container>
     0)
       CLASS=HELD-LOCKED
       REASON="worktree lock: ${TEARDOWN_FOREIGN_LOCK:-no reason given}"
-      if pid=$(teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK") \
-        && ! teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
-        REASON="$REASON (launcher $pid is gone; only Vernant's closeout driver releases it)"
+      if ! pid=$(teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK"); then
+        REASON="$REASON (not the supported Vernant creation-lock format)"
+        return 0
       fi
-      return 0
+      if teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
+        REASON="$REASON (launcher $pid is alive or its start cannot be proved)"
+        return 0
+      fi
+      REASON="$REASON (launcher $pid is gone or recycled; only Vernant's closeout driver releases it)"
+      if [ ! -f "$clone/scripts/git-stability/closeout_pr.py" ] \
+        || [ ! -x "${FM_TEARDOWN_VERNANT_PYTHON:-$clone/.venv/bin/python}" ]; then
+        REASON="$REASON; closeout driver or interpreter unavailable"
+        return 0
+      fi
+      launcher=$pid
+      locked=1
+      CLASS=
+      REASON=
       ;;
     1) ;;
     *)
@@ -631,11 +655,11 @@ classify() {  # <copy> <clone> <pool> <container>
     fi
   done
   if ! unique=$(teardown_preservable_ignored "$copy"); then
-    CLASS=ORPHAN-NO-RECORD
-    REASON="its ignored files cannot be listed, so none is ruled out"
+    CLASS=HELD-DIRTY
+    REASON="its ignored files cannot be listed for preservation"
     return 0
   fi
-  if [ -n "$unique" ]; then
+  if [ "$locked" != 1 ] && [ -n "$unique" ]; then
     CLASS=HELD-DIRTY
     REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 0
@@ -653,11 +677,21 @@ classify() {  # <copy> <clone> <pool> <container>
     return 0
   fi
   if [ "$count" = 0 ]; then
-    CLASS=REAPABLE-PROVEN
-    REASON="clean, no process, no record, HEAD contained in a remote branch"
+    if [ "$locked" = 1 ]; then
+      CLASS=REAPABLE-DRIVER
+      REASON="clean, no process, no record, HEAD contained in a remote branch, Vernant launcher $launcher is gone"
+    else
+      CLASS=REAPABLE-PROVEN
+      REASON="clean, no process, no record, HEAD contained in a remote branch"
+    fi
   elif content_in_default "$copy" "$clone"; then
-    CLASS=REAPABLE-PROVEN
-    REASON="clean, no process, no record, content already in the default branch"
+    if [ "$locked" = 1 ]; then
+      CLASS=REAPABLE-DRIVER
+      REASON="clean, no process, no record, content already in the default branch, Vernant launcher $launcher is gone"
+    else
+      CLASS=REAPABLE-PROVEN
+      REASON="clean, no process, no record, content already in the default branch"
+    fi
   else
     CLASS=HELD-UNPUSHED
     REASON="$count commit(s) are on no remote and not in the default branch"
@@ -827,10 +861,27 @@ log_removal() {  # <copy> <clone> <head> <branch> <kib> <proof>
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$3" "$4" "$5" "$6" >> "$REMOVAL_LOG"
 }
 
-# Removes the REAPABLE-PROVEN copies, one at a time, deepest path first, each
-# proved again just before its own removal. Plain `git worktree remove` run from
-# the registering clone: it refuses a dirty or locked copy by itself, and a
-# refusal leaves the copy and is reported, never retried harder.
+# Preserves the ignored entries of a REAPABLE-DRIVER copy, then releases and
+# removes it through Vernant's own closeout driver, which is the only supported
+# release for its creation lock. The preservation lands under this sweep's data
+# directory, because a swept copy no task record owns has no task id to file it
+# under. The teardown library owns both the preservation and the driver run.
+teardown_driver_release() {  # <clone> <copy>
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} owner_id=copy-sweep
+  DATA=$DATA_DIR
+  ID=$owner_id
+  teardown_foreign_copy_dispose "$clone" "$copy" || rc=$?
+  DATA=$saved_data
+  ID=$saved_id
+  return "$rc"
+}
+
+# Removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time, deepest
+# path first, each proved again just before its own removal. An unlocked copy
+# goes by plain `git worktree remove` run from the registering clone: it refuses
+# a dirty or locked copy by itself. A driver-releasable copy goes through
+# Vernant's closeout driver. A refusal leaves the copy and is reported, never
+# retried harder.
 apply_removals() {
   local line container pool clone copy kib head branch err gone=
   REMOVAL_REPORT=
@@ -841,20 +892,33 @@ apply_removals() {
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"
     scan_processes
     classify "$copy" "$clone" "$pool" "$container"
-    if [ "$CLASS" != REAPABLE-PROVEN ]; then
-      REMOVAL_REPORT="${REMOVAL_REPORT}SKIPPED"$'\t'"$copy"$'\t'"no longer proven: $CLASS, $REASON"$'\n'
-      continue
-    fi
+    case "$CLASS" in
+      REAPABLE-PROVEN) ;;
+      REAPABLE-DRIVER) ;;
+      *)
+        REMOVAL_REPORT="${REMOVAL_REPORT}SKIPPED"$'\t'"$copy"$'\t'"no longer proven: $CLASS, $REASON"$'\n'
+        continue
+        ;;
+    esac
     head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || head=unknown
     branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=detached
-    if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
+    if [ "$CLASS" = REAPABLE-DRIVER ]; then
+      # The copy is Vernant-locked with a dead or recycled launcher. Its own
+      # driver is the only supported release: it unlocks and removes, after the
+      # teardown library preserved every ignored entry it holds.
+      if ! err=$(teardown_driver_release "$clone" "$copy" 2>&1); then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"Vernant's closeout driver did not release the copy and it was left: $(printf '%s' "$err" | tail -1)"$'\n'
+        continue
+      fi
+    elif ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
       FAILED_COUNT=$((FAILED_COUNT + 1))
       REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'
       continue
     fi
     if [ -e "$copy" ] || [ -L "$copy" ] || list_nested "$clone" | grep -qxF "$copy"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after git worktree remove"$'\n'
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after its removal"$'\n'
       continue
     fi
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
@@ -862,7 +926,7 @@ apply_removals() {
     REMOVAL_REPORT="${REMOVAL_REPORT}REMOVED"$'\t'"$copy"$'\t'"branch $branch at ${head:0:12} (${REASON})"$'\n'
     log_removal "$copy" "$clone" "$head" "$branch" "$kib" "$REASON" \
       || { FAILED_COUNT=$((FAILED_COUNT + 1)); REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it was removed but $REMOVAL_LOG could not be appended"$'\n'; }
-  done < <(printf '%s\n' "$COPIES" | awk -F '\t' '$5 == "REAPABLE-PROVEN"' | LC_ALL=C sort -t "$(printf '\t')" -k4,4r)
+  done < <(printf '%s\n' "$COPIES" | awk -F '\t' '$5 == "REAPABLE-PROVEN" || $5 == "REAPABLE-DRIVER"' | LC_ALL=C sort -t "$(printf '\t')" -k4,4r)
   if [ -n "$gone" ]; then
     COPIES=$(printf '%s\n' "$COPIES" | GONE=$gone awk -F '\t' 'BEGIN { n = split(ENVIRON["GONE"], g, "\n"); for (i = 1; i <= n; i++) if (g[i] != "") drop[g[i]] = 1 } !($4 in drop)')
   fi
@@ -1162,7 +1226,7 @@ print_report() {  # <mode>
     printf 'note: %s\n' "$line"
   done <<< "$NOTES"
   [ "$SCAN_CUT" != 1 ] || printf 'note: the scan stopped at its time bound; unmeasured copies show ? GiB\n'
-  for class in REAPABLE-PROVEN HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
+  for class in REAPABLE-PROVEN REAPABLE-DRIVER HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
     count=$(printf '%s\n' "$COPIES" | awk -F '\t' -v c="$class" '$5 == c { n++ } END { print n + 0 }')
     printf 'summary: %s=%s\n' "$class" "$count"
   done

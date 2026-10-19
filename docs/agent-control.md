@@ -294,7 +294,7 @@ Removal therefore loses no unique content, because it is preserved; no commit, b
 The clean proof skips untracked files under `.claude` only; the ignored-file proof skips ignored files under `.claude` and `.opencode`; plain `git worktree remove` still refuses a copy that holds an untracked file.
 On the pool-slot route the release runs before the final project-lock wait, so the driver never runs while the lock is held, except when teardown keeps project custody through the return.
 A copy it cannot prove, an ignored entry it cannot copy and hash, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above unless the held-copy rule below applies, and `--force` waives none of it.
-A nested copy that no teardown ever reaches, because its slot is never returned, falls to the [nested task copy sweep](configuration.md#nested-task-copy-sweep-configcopy-budget), and the header of [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) owns which copies it removes and which it holds, locked copies included.
+A nested copy that no teardown ever reaches, because its slot is never returned, falls to the [nested task copy sweep](configuration.md#nested-task-copy-sweep-configcopy-budget), and the header of [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) owns which copies it removes and which it holds, including the locked copies it may release through Vernant's closeout driver once that copy's launcher is proved gone.
 [Friction ledger](configuration.md#friction-ledger) owns the typed `REFUSED:` envelope a policy refusal of a copy prints, with its completing command or human-only question, and the plain `error:` a failure to read state prints instead.
 
 **Held copies.**
