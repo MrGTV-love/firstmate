@@ -628,7 +628,8 @@ backlog_json() (  # [<backlog-path>] - defaults to this home's $BACKLOG
     | .records |= map(
         if .structured then
           .captain_drop = (any(.body_lines[]?; . == "dropped" or . == "Deliverable of the finished work: dropped")
-            or (any(.body_lines[]?; startswith("preserved in bundle /") and endswith(", not landed"))
+            or (.state == "done"
+                and ((.body_lines[-1]? // "") | startswith("preserved in bundle /") and endswith(", not landed"))
                 and (.pr_url // null) == null and (.report_path // null) == null))
         else . end)
     | .records as $records
