@@ -554,7 +554,7 @@ test_locked_copy_with_an_unpushed_equivalence_is_still_held() {
   # An empty commit's content is trivially already in the default branch, so the
   # unlocked landed-content fallback alone would call this copy reapable.
   git -C "$(copy_path locked)" commit -q --allow-empty -m 'local only'
-  run_sweep --apply
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
   assert_class locked HELD-UNPUSHED
   assert_contains "$OUT" "a locked copy is released only when every local commit is on a remote" \
