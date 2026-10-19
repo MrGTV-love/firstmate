@@ -38,6 +38,8 @@ CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
+# One hard budget for a whole automatic-evidence pass: the wake drain holds its queue lock across it.
+EVIDENCE_DEADLINE_SECONDS = 5
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
 STOP_STATES = {"done", "parked", "paused"}
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
@@ -414,12 +416,6 @@ class Collector:
         if not row["overdue"]:
             return dict(check_in="not_sent", subject=task_id,
                         reason="report is fresh, excluded, or already has a pending request")
-        try:
-            proof = SatisfactionVerifier(self.result(), self.state, self.now).check_in_evidence(row)
-        except SOURCE_ERRORS:
-            proof = None
-        if proof:
-            return dict(check_in="not_sent", subject=task_id, reason="fresh machine evidence: " + proof["evidence"])
         task = next(t for t in self.direct_reports if t["id"] == task_id)
         env = dict(self.env)
         if task.get("spawn_gen"):
@@ -1229,6 +1225,14 @@ def parkable(row):
     return row.get("category") in CAPTAIN_PARKABLE and row.get("owner") == "firstmate"
 
 
+def completing_routes(ident):
+    """What a refused action points at: the supported ways a row stops demanding a new action."""
+    return (f"; the row clears by the automatic evidence receipt at the next presentation (fresh machine evidence"
+            f" or a named open ship), by a real check-in (bin/fm-open-loops.sh --check-in <task>) or other steer"
+            f" recorded with bin/fm-open-loops.sh action {ident} steered --evidence <NNN.msg>, or by"
+            f" bin/fm-open-loops.sh action {ident} escalated --evidence <follow-up>")
+
+
 class WaitVerifier:
     """Verify explicit per-obligation dependencies against this home's existing source owners."""
     def __init__(self, report, state, now):
@@ -1367,11 +1371,11 @@ class WaitVerifier:
             raise ValueError("waiting requires a current ledger; this one is held stale until the quota window resets")
         if row["category"] not in CAPTAIN_PARKABLE \
                 or row.get("stale") or row.get("owner") == "captain":
-            raise ValueError("this obligation cannot have a standing dependency wait")
+            raise ValueError("this obligation cannot have a standing dependency wait" + completing_routes(row["id"]))
         source = row.get("source")
         self.verify_source(source)
         if source.get("key", "").startswith(("pending-reply-", "remote-reply-continuity-")):
-            raise ValueError("unanswered correlated replies cannot have a standing wait")
+            raise ValueError("unanswered correlated replies cannot have a standing wait" + completing_routes(row["id"]))
         if prerequisite:
             dependency = self.rows.get(prerequisite)
             if dependency is None or prerequisite == row["id"] or dependency.get("stale") \
@@ -1436,7 +1440,23 @@ class WaitVerifier:
 
 class SatisfactionVerifier(WaitVerifier):
     """Automatic receipts use current local evidence, never a free-text claim or another row's ownership."""
-    def check_in_evidence(self, row):
+    def __init__(self, report, state, now):
+        super().__init__(report, state, now)
+        self.proofs, self.steps, self.statuses = {}, {}, {}
+
+    def run_steps(self, worktree):
+        """The run store is read once per pass (once per worktree when NM_HOME is relative); unreadable means none."""
+        root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
+        key = None if root.is_absolute() else worktree
+        if key not in self.steps:
+            try:
+                self.steps[key] = self.collector.pipeline_progress(worktree, steps_only=True)
+            except SOURCE_ERRORS:
+                self.steps[key] = {}  # the authoritative current-state reader can still prove a live run
+        return self.steps[key]
+
+    def check_in_evidence(self, row, live=False):
+        """Recent events prove cheaply; only live=True may run the slow current-state reader."""
         c = self.collector
         task = row.get("subject", "")
         interval = row.get("limit_seconds", 0)
@@ -1446,7 +1466,9 @@ class SatisfactionVerifier(WaitVerifier):
         source = c.task_source(task)
         if not source.get("generation"):
             return None
-        status_at, verb, decision, _, _, _ = c.report_status(task)
+        if task not in self.statuses:
+            self.statuses[task] = c.report_status(task)
+        status_at, verb, decision, _, _, _ = self.statuses[task]
         if decision or verb in ("done", "failed", "blocked", "needs-decision"):
             return None
         if status_at is not None and 0 <= c.now - status_at < interval:
@@ -1455,14 +1477,12 @@ class SatisfactionVerifier(WaitVerifier):
         meta = c.read_fields(c.state / (task + ".meta"))
         project, branch = meta.get("project"), meta.get("branch")
         if project and branch:
-            try:
-                progress = c.pipeline_progress(meta.get("worktree"), steps_only=True)
-            except SOURCE_ERRORS:
-                progress = {}  # the authoritative current-state reader can still prove a live run
-            stamp = progress.get((str(Path(project).resolve()), branch))
+            stamp = self.run_steps(meta.get("worktree")).get((str(Path(project).resolve()), branch))
             if stamp is not None and 0 <= c.now - stamp < interval:
                 return dict(source=source, evidence=f"run-step event at {stamp}; project={project}; branch={branch}",
                             recheck_epoch=stamp + interval)
+        if not live:
+            return None
         reader = os.environ.get("FM_CREW_STATE_BIN") or BIN / "fm-crew-state.sh"
         current = c.run([reader, task], env=dict(c.env, FM_CREW_STATE_NO_FORGE="1")).strip()
         if re.match(r"state: working · source: run-step(?: · |$)", current):
@@ -1484,7 +1504,7 @@ class SatisfactionVerifier(WaitVerifier):
         if not record or record.get("state") not in ("queued", "in_flight") \
                 or (record.get("hold_kind") == "captain" and record.get("hold_bucket") != "blocked"):
             return None
-        tasks = record.get("blocked_by_ids", [])
+        tasks = record.get("unresolved_blocker_ids", [])
         if not tasks or record["id"] in tasks:
             return None
         if any(t not in records or records[t].get("state") not in ("queued", "in_flight")
@@ -1493,9 +1513,9 @@ class SatisfactionVerifier(WaitVerifier):
         return dict(source=source, task=record["id"], prerequisite_tasks=tasks,
                     evidence="waiting on named open ship: " + ", ".join(tasks))
 
-    def automatic(self, row):
+    def automatic(self, row, live=False):
         if row.get("category") == "silent_report":
-            proof = self.check_in_evidence(row)
+            proof = self.check_in_evidence(row, live)
             return ("observed", proof) if proof else (None, None)
         proof = self.named_ship_evidence(row)
         return ("backlog_wait", proof) if proof else (None, None)
@@ -1507,8 +1527,6 @@ class SatisfactionVerifier(WaitVerifier):
 
     @staticmethod
     def file_guard(path):
-        if path.is_symlink():
-            raise ValueError("automatic evidence sources must not be redirected")
         try:
             info = path.stat()
             return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
@@ -1545,30 +1563,36 @@ class SatisfactionVerifier(WaitVerifier):
         paths = [c.state / (task + ".meta"), c.state / (task + ".status")]
         if row.get("category") == "unanswered_question":
             paths.append(c.data / "backlog.md")
+        if any(path.is_symlink() for path in paths):
+            raise ValueError("automatic evidence sources must not be redirected")
         return [self.file_guard(path) for path in paths]
 
     def prepare(self, report):
-        self.proofs = {}
         status_guards, backlog_guard = {}, object()
-        for row in overdue_rows(report, self.collector.now):
-            if row.get("category") not in ("silent_report", "unanswered_question"):
-                continue
-            try:
-                guard = self.input_guard(row)
-                if row.get("category") == "unanswered_question":
-                    task = row["source"]["task"]
-                    if status_guards.get(task) != guard[:2]:
-                        self.decisions.pop(task, None)
-                        status_guards[task] = guard[:2]
-                    if backlog_guard != guard[-1]:
-                        self.backlog, self.backlog_error, backlog_guard = None, None, guard[-1]
-                if receipt_stands(self.actions.get(row["id"], {}), row, self.collector.now, self):
+        rows = [row for row in overdue_rows(report, self.collector.now)
+                if row.get("category") in ("silent_report", "unanswered_question")]
+        # Every row's recent events and dependencies are tried before any slow current-state read,
+        # so one hung reader can only cost the rows that have no cheaper evidence.
+        for live in (False, True):
+            for row in rows:
+                if live and (row["category"] != "silent_report" or row["id"] in self.proofs):
                     continue
-                kind, proof = self.automatic(row)
-                if proof and guard == self.input_guard(row):
-                    self.proofs[row["id"]] = (self.identity(row), guard, kind, proof)
-            except SOURCE_ERRORS:
-                continue  # incomplete or concurrently changed evidence never excuses follow-up
+                try:
+                    guard = self.input_guard(row)
+                    if row.get("category") == "unanswered_question":
+                        task = row["source"]["task"]
+                        if status_guards.get(task) != guard[:2]:
+                            self.decisions.pop(task, None)
+                            status_guards[task] = guard[:2]
+                        if backlog_guard != guard[-1]:
+                            self.backlog, self.backlog_error, backlog_guard = None, None, guard[-1]
+                    if receipt_stands(self.actions.get(row["id"], {}), row, self.collector.now, self):
+                        continue
+                    kind, proof = self.automatic(row, live)
+                    if proof and guard == self.input_guard(row):
+                        self.proofs[row["id"]] = (self.identity(row), guard, kind, proof)
+                except SOURCE_ERRORS:
+                    continue  # incomplete or concurrently changed evidence never excuses follow-up
         return self
 
     def prepared(self, row, now):
@@ -1585,14 +1609,28 @@ class SatisfactionVerifier(WaitVerifier):
 
 
 def prepare_satisfaction(state, now):
-    """Perform slow machine/backlog reads without the publication/receipt lock."""
+    """Perform machine/backlog reads outside the receipt lock, within one hard deadline.
+
+    The wake drain holds its queue lock around the whole call, so a slow or hung reader leaves its rows
+    unproven (they keep demanding an action) instead of extending that hold.
+    """
+    def expired(_signum, _frame):
+        raise CollectionDeadline("automatic evidence exceeded its deadline")
+    override = os.environ.get("FM_OPEN_LOOPS_EVIDENCE_SECONDS", "")
+    verifier = None
+    previous = signal.signal(signal.SIGALRM, expired)
+    signal.alarm(int(override) if override.isdigit() and int(override) > 0 else EVIDENCE_DEADLINE_SECONDS)
     try:
         report = read_ledger(state)
         if report and overdue_rows(report, now):
-            return SatisfactionVerifier(report, state, now).prepare(report)
-    except SOURCE_ERRORS:
+            verifier = SatisfactionVerifier(report, state, now)
+            verifier.prepare(report)
+    except (CollectionDeadline, *SOURCE_ERRORS):
         pass  # ledger_action owns unreadable-ledger diagnostics and the acknowledgement boundary
-    return None
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+    return verifier
 
 
 def receipt_stands(action, row, now, waits=None):
@@ -1819,7 +1857,8 @@ def ledger_action(args, state, now, prepared=None):
                 if ident in marked:
                     marked[ident] = now
             write_ledger(state, report, receipt=True)
-            raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it")
+            raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it"
+                             + completing_routes(ident))
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
     elif args.recheck and args.kind != "waiting":

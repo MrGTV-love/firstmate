@@ -1720,12 +1720,8 @@ os.utime(meta_file, (now, now))
 (home / 'state/worker.status.hold').rename(status_file)
 status('worker', f'done [at={now - 2000}]: ready in branch\n', now - 2000)
 r = rows()['worker']; assert not r['overdue'] and r['informational'] and 'done/ready' in r['evidence'], r
-# Fresh run evidence also prevents an explicitly requested filler check-in.
-status('worker', f'working [at={now - 901}]: building\n', now - 901)
-fresh_run = json.loads(call('--check-in', 'worker', '--json', extra={'FM_SILENCE_TEST_CREW_SOURCE': 'run-step'}))
-assert fresh_run['check_in'] == 'not_sent' and 'fresh machine evidence' in fresh_run['reason'], fresh_run
-assert not list(inbox.glob('*.msg')), 'a validating worker needs no filler steer'
 # Ordinary check-in uses the real inbox, requests a report before ack, never types payload or interrupts.
+status('worker', f'working [at={now - 901}]: building\n', now - 901)
 call('--check-in', 'worker')
 messages = list(inbox.glob('*.msg')); assert len(messages) == 1, messages
 body = messages[0].read_text(); assert 'report progress, blockers, and cross-workstream dependencies' in body
@@ -3041,9 +3037,10 @@ runs.unlink()
 backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 broken = ok(loops, '--present-overdue')
 assert all(each['id'] in broken.stdout for each in standing) and 'STANDING' not in broken.stdout, broken
+assert snapshot_runs() == 1, ('an unreadable backlog was read again for each standing row', snapshot_runs())
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
       ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
-      ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog at most once')
+      ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 # Machine evidence, standing receipts and canonical named-ship blockers through the real wake acknowledgement.
@@ -3106,6 +3103,11 @@ home, row, ledger, env, call, ok, drain, ack = case('live-run')
 result, boundary = drain()
 refused = ack(boundary)
 assert refused.returncode == 1 and row['id'] in refused.stdout and '--check-in "worker"' in refused.stdout, refused
+waiting = call(loops, 'action', row['id'], 'waiting', '--evidence', 'x', '--recheck', iso(now + 600), '--prerequisite-task', 'other')
+assert waiting.returncode == 1 and 'cannot have a standing dependency wait' in waiting.stdout, waiting
+for route in ('automatic evidence receipt', '--check-in <task>', f"action {row['id']} steered --evidence <NNN.msg>",
+              f"action {row['id']} escalated --evidence <follow-up>"):
+    assert route in waiting.stdout, (route, waiting)
 (home / 'worker-state').write_text('state: working · source: run-step · run: live-validation; test running\n')
 mtime = ledger.stat().st_mtime_ns
 assert ack(boundary).returncode == 0
@@ -3160,13 +3162,16 @@ assert not ok(loops, '--present-overdue').stdout
 assert ack(boundary).returncode == 0, 'a row declared standing cannot still demand a new action'
 
 # Canonical blocked-by relationship, collected status provenance, and named open ship - no text guessing.
-for ending in ('done', 'missing', 'captain', 'nonship', 'mixed'):
+for ending in ('done', 'missing', 'captain', 'nonship', 'mixed', 'finished-plus-open'):
     home, row, ledger, env, call, ok, drain, ack = case('dependency-' + ending)
     backlog = home / 'data/backlog.md'
     original = ('## In flight\n\n## Queued\n- [ ] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n'
                 '- [ ] question - Await fix blocked-by: fix-ship (repo: firstmate) (kind: decision)\n\n## Done\n')
     if ending == 'captain':
         original = original.replace('(kind: decision)', '(kind: decision) (hold: choose next step) (hold-kind: captain)')
+    if ending == 'finished-plus-open':
+        original = original.replace('blocked-by: fix-ship', 'blocked-by: old-ship blocked-by: fix-ship').replace(
+            '## Done\n', '## Done\n- [x] old-ship - Earlier fix (repo: firstmate) (kind: ship)\n')
     backlog.write_text(original)
     (home / 'state/worker.status').write_text(f'needs-decision [at={now-7200}] [key=question]: await the named fix\n')
     report = json.loads(ok(loops, '--heartbeat', '--json').stdout)
@@ -3176,7 +3181,7 @@ for ending in ('done', 'missing', 'captain', 'nonship', 'mixed'):
     action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
     assert action['kind'] == 'backlog_wait' and action['proof']['prerequisite_tasks'] == ['fix-ship'], action
     assert not ok(loops, '--present-overdue').stdout
-    if ending == 'done':
+    if ending in ('done', 'finished-plus-open'):
         backlog.write_text(original.replace('- [ ] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n', '')
                            + '- [x] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n')
     elif ending == 'missing':
@@ -3206,15 +3211,23 @@ for category, fields in (
         ok(loops, 'action', row['id'], 'deferred', '--evidence', 'first recheck', '--recheck', iso(now+600))
         second = call(loops, 'action', row['id'], 'deferred', '--evidence', 'still no proof', '--recheck', iso(now+700))
         assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
+        for route in ('automatic evidence receipt', '--check-in <task>', f"action {row['id']} steered --evidence <NNN.msg>",
+                      f"action {row['id']} escalated --evidence <follow-up>"):
+            assert route in second.stdout, (route, second)
         assert ack(boundary).returncode == 1
 # Automatic readers cannot hold the publication/receipt lock, and stale preflight identities cannot buy a receipt.
 reader.write_text('#!/usr/bin/env bash\n'
+    'if [ -e "$FM_HOME/hang-reader" ] && [ "$1" = worker ]; then\n'
+    '  echo $$ > "$FM_HOME/hung-pid"\n'
+    '  exec sleep 3600\n'
+    'fi\n'
     'if [ -e "$FM_HOME/block-reader" ]; then\n'
     '  touch "$FM_HOME/reader-entered"\n'
     '  while [ ! -e "$FM_HOME/release-reader" ]; do sleep 0.1; done\n'
     'fi\ncat "$FM_HOME/worker-state"\n')
 for change in ('none', 'row', 'meta', 'status'):
     home, row, ledger, env, call, ok, drain, ack = case('lock-' + change)
+    env['FM_OPEN_LOOPS_EVIDENCE_SECONDS'] = '120'
     other = dict(row, id='unrelated-action', category='stalled_worker', subject='other-worker')
     record = json.loads(ledger.read_text()); record['rows'].append(other)
     ledger.write_text(json.dumps(record))
@@ -3251,6 +3264,38 @@ for change in ('none', 'row', 'meta', 'status'):
         (home / 'release-reader').touch()
         if pending.poll() is None:
             pending.communicate(timeout=120)
+# A hung current-state reader cannot extend the queue-lock hold: the pass ends at its deadline, rows with cheaper
+# evidence are still satisfied, and the row that only the hung reader could prove demands its action.
+home, row, ledger, env, call, ok, drain, ack = case('hung-reader')
+(home / 'state/other.meta').write_text('kind=ship\nspawn_gen=other-generation\n')
+(home / 'state/other.status').write_text(f'working [at={now-10}]: progress\n')
+fresh = dict(row, id='row-hung-reader-other', subject='other')
+record = json.loads(ledger.read_text()); record['rows'].append(fresh)
+ledger.write_text(json.dumps(record))
+(home / 'worker-state').write_text('state: working · source: run-step · run: live-validation\n')
+(home / 'hang-reader').touch()
+try:
+    started = time.monotonic()
+    result, boundary = drain()
+    elapsed = time.monotonic() - started
+    assert elapsed < 45, ('the drain waited on a hung reader', elapsed)
+    assert result.stdout.startswith('OVERDUE:') and row['id'] in result.stdout.split('STANDING')[0], result
+    assert fresh['id'] in result.stdout.split('STANDING')[1], 'a row with a recent status event is satisfied despite the hung reader'
+    hung = int((home / 'hung-pid').read_text())
+    try:
+        os.kill(hung, 0)
+        raise AssertionError('the deadline left the hung reader running')
+    except ProcessLookupError:
+        pass
+    started = time.monotonic()
+    refused = ack(boundary)
+    assert time.monotonic() - started < 45, 'the acknowledgement waited on a hung reader'
+    assert refused.returncode == 1 and row['id'] in refused.stdout and fresh['id'] not in refused.stdout, refused
+    actions = json.loads(ledger.read_text())['handling']['actions']
+    assert actions[fresh['id']]['kind'] == 'observed' and row['id'] not in actions, actions
+finally:
+    (home / 'hang-reader').unlink(missing_ok=True)
+print('PASS: a hung current-state reader ends at the evidence deadline; cheaper evidence still satisfies other rows and the unproven row demands its action', flush=True)
 print('PASS: automatic evidence reads leave the receipt lock available; concurrent row, metadata and status changes reject stale proofs', flush=True)
 print('PASS: fresh live-run, status and run-step receipts; standing acknowledgement; named open ship waits reopen;'
       ' silent/stalled, blocked, captain and merge requirements and unevidenced second deferrals retained', flush=True)

@@ -18,7 +18,8 @@
 # --present-overdue presents every overdue row that still needs an action first and records this actor's action
 # requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
-# --present-overdue and --check-actions automatically receipt fresh check-in evidence and named open-ship blockers.
+# --present-overdue and --check-actions automatically receipt fresh check-in evidence and named open-ship blockers
+# within one five-second evidence deadline; rows it leaves unproven keep demanding an action.
 # --check-actions honors standing receipts and exits 1 with per-row completing commands for unmet requirements.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
