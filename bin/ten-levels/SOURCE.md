@@ -56,6 +56,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
   It judges every planned piece with the unchanged level 6 policies; calls pass only when every planned piece passes, while result handling applies the explicit advisory and trusted-read rules below.
+  Its local credential-URL matcher uses scheme-character-run boundaries so long hyphenated report lines do not repeatedly rescan overlapping suffixes.
   Its host response handling preserves answered middle-band results with an advisory and audit row.
   Native reads of task-owned data/state and tracked own-worktree files, including modified tracked files, pass immediately without a judge; cross-task roots are not trusted.
   Native source metadata normalizes numeric and database selectors before bounded path admission.

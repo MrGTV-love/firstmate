@@ -1203,6 +1203,28 @@ async function call(host, content, tool = 'write', target = path) {
     }) });
   return result === '' ? undefined : JSON.parse(result).hookSpecificOutput;
 }
+// A handler timer cannot interrupt synchronous regex work: isolate this case behind a process watchdog.
+const hyphenated = 'ordinary-word-'.repeat(100000).slice(0, 1048576);
+const boundedScan = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', '--input-type=module', '-e', `
+  import assert from 'node:assert/strict';
+  import { readFileSync } from 'node:fs';
+  import { pathToFileURL } from 'node:url';
+  const { context, content } = JSON.parse(readFileSync(0, 'utf8'));
+  const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+  const handlers = {};
+  installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
+  const ctx = { cwd: context.worktree };
+  const call = content => handlers.tool_call({ toolName: 'write', input: { path: 'hyphenated.md', content } }, ctx);
+  const start = performance.now();
+  assert.equal(await call(content), undefined, 'a long hyphenated line must be admitted');
+  const denied = await call(content + 'postgres://fixture:FAKE_PASSWORD@localhost/db');
+  assert.equal(denied?.block, true, 'a credential URL after a long scheme-character run still blocks');
+  const row = JSON.parse(readFileSync(context.state + '/jev-guard.jsonl', 'utf8').trim().split('\\n').at(-1));
+  assert.equal(row.branch, 'deterministic');
+  assert.equal(row.request_started, false);
+  console.log('hyphenated-scan-ok bytes=' + Buffer.byteLength(content) + ' offline_loopback_ms=' + Math.round(performance.now() - start));
+`], { input: JSON.stringify({ context, content: hyphenated }), encoding: 'utf8', timeout: 30000, killSignal: 'SIGKILL' });
+console.log(boundedScan.trim());
 for (const host of ['omp', 'claude']) {
   const before = sent().length;
   const start = performance.now();
