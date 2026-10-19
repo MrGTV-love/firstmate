@@ -91,6 +91,16 @@ for (const tool of ['result', 'write']) {
   assert.equal(r.cost.reported_amount, 0.001);
 
   });
+  await test(`${tool}: a planned payload with no request sent is not-called and not incomplete`, async () => {
+  const r = await run([new report.GuardUnavailableError('CredentialUnavailableError')], tool);
+  assert.equal(r.request_started, false);
+  assert.equal(r.planned_chunks, 1);
+  assert.equal(r.chunks, 0);
+  assert.equal(r.cost.source, 'not_called', 'nothing was sent, so nothing was billed');
+  assert.equal(r.cost.amount, null);
+  assert.equal(r.cost.incomplete, false);
+  assert.equal(r.cost.reported_amount, 0);
+  });
   await test(`${tool}: complete runs retain full reported cost without failures`, async () => {
   const r = await run([answer(), answer()], tool);
   assert.equal(r.attempts, 2);
