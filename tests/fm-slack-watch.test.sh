@@ -335,7 +335,7 @@ printf 'ok - DOD-16\n'
 # DOD-17
 new_home arming
 set +e
-out=$("$ROOT/bin/fm-slack-check.sh" --replay "$FIX/arming/arm.json" 2>&1); rc=$?
+out=$("$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/arming/arm.json" 2>&1); rc=$?
 set -e
 [ "$rc" -ne 0 ] || fail "DOD-17 arm before binding succeeded"
 assert_contains "$out" 'source_not_bound' "DOD-17 named refusal"
@@ -354,15 +354,19 @@ out=$(FM_SLACK_ALLOWED_AUTHORS='' "$FM_STATE_OVERRIDE/slack.check.sh" 2>&1); rc=
 set -e
 assert_eq "$rc" 0 "DOD-17 the armed shim exits cleanly with an empty allowlist"
 assert_eq "$out" "" "DOD-17 the armed shim is silent with an empty allowlist"
+python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); d["action"] = "disarm"; json.dump(d, open(sys.argv[2], "w"))' \
+  "$FIX/arming/arm.json" "$TMP/action-key.json"
+"$ROOT/bin/fm-slack-check.sh" --replay "$TMP/action-key.json" >/dev/null
+[ -f "$FM_STATE_OVERRIDE/slack.check.sh" ] || fail "DOD-17 a transcript action key disarmed the check"
 out=$("$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/arming/check.json")
 assert_eq "$(printf '%s\n' "$out" | grep -c .)" 1 "DOD-17 one check line"
-"$ROOT/bin/fm-slack-check.sh" disarm --replay "$FIX/arming/disarm.json" >/dev/null
+"$ROOT/bin/fm-slack-check.sh" disarm >/dev/null
 out=$("$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/arming/check.json")
 assert_eq "$out" "" "DOD-17 disarmed check silent"
 new_home arming
 bind
 set +e
-out=$("$ROOT/bin/fm-slack-check.sh" --replay "$FIX/arming/unreachable-dm.json" 2>&1); rc=$?
+out=$("$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/arming/unreachable-dm.json" 2>&1); rc=$?
 set -e
 [ "$rc" -ne 0 ] || fail "DOD-17 unreachable DM arm succeeded"
 assert_contains "$out" 'unreachable' "DOD-17 DM refusal named"
@@ -416,6 +420,22 @@ assert_contains "$(run_with FM_SLACK_POLL_MAX_ANSWERS=0 fm-slack-poll.sh --repla
 assert_contains "$(run_unset FM_SLACK_DM_USER fm-slack-check.sh arm --replay "$ARM_REPLAY")" 'slack: refused: missing_or_invalid_FM_SLACK_DM_USER' "S2 arm names an unusable DM user"
 assert_contains "$(run_with FM_SLACK_ALLOWED_AUTHORS=oops fm-slack-check.sh arm --replay "$ARM_REPLAY")" 'slack: refused: allowlist_unparseable' "S2 arm names an unusable allowlist"
 [ ! -e "$FM_STATE_OVERRIDE/slack.check.sh" ] || fail "S2 a refused arm left a check"
+arm_without() {  # <variable>; arm with that variable left out of the environment
+  local var=$1 item
+  local -a args=()
+  for item in "${base_env[@]}"; do
+    [ "${item%%=*}" = "$var" ] || args+=("$item")
+  done
+  env "${args[@]}" "$ROOT/bin/fm-slack-check.sh" arm --replay "$ARM_REPLAY" 2>&1
+}
+for var in SLACK_BOT_TOKEN FM_SLACK_ALLOWED_AUTHORS; do
+  set +e
+  out=$(arm_without "$var"); rc=$?
+  set -e
+  assert_contains "$out" 'slack: refused: unconfigured' "S2 arm names an unconfigured home without $var"
+  [ "$rc" -ne 0 ] || fail "S2 arm without $var exited zero"
+  [ ! -e "$FM_STATE_OVERRIDE/slack.check.sh" ] || fail "S2 arm without $var left a check"
+done
 printf 'ok - S2\n'
 
 # S3

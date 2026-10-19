@@ -39,7 +39,6 @@
     }
   ],
   "reactions": {},
-  "action": "check",
   "skip_mirror": true,
   "seed_state": {
     "threads": {

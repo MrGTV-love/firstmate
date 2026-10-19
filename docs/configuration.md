@@ -2927,6 +2927,7 @@ FM_SLACK_POLL_MAX_ANSWERS=20 # optional whole number, 1..200; default 20
 ```
 
 A missing token or an empty allowlist means the plane is off: a silent no-op, before network calls, state creation, task reads, or notifications.
+The one exception is an explicit `fm-slack-check.sh arm`: it prints `slack: refused: unconfigured`, exits non-zero, and registers nothing, so an arm that did nothing never looks like success.
 An unparseable allowlist, an invalid `FM_SLACK_DM_USER`, or an out-of-range `FM_SLACK_POLL_MAX_ANSWERS` refuses everything.
 Run by hand (`fm-slack-poll.sh`, `fm-slack-mirror.sh`) or through `fm-slack-check.sh arm`, a refusal prints a named reason; the armed standing check stays silent on the same refusal, so a typo in `.env` never wakes firstmate every cycle.
 Every allowlist token must match `[UW][A-Z0-9]{8,}`; names, email addresses, partially valid lists, and handles are refused rather than interpreted as authority.

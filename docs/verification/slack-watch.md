@@ -178,12 +178,13 @@ Result: pass.
 
 ## DOD-17 - arming is ordered and reversible
 
-Command: `fm-slack-check.sh --replay tests/fixtures/slack/arming/arm.json` in an unbound `arming` home.
+Command: `fm-slack-check.sh arm --replay tests/fixtures/slack/arming/arm.json` in an unbound `arming` home.
 
 Observed: `slack: refused: source_not_bound`, nonzero exit, and no `state/slack.check.sh`.
 After `fm-captain-hold.sh bind slack-dm`, `fm-slack-check.sh arm` printed `armed: state/slack.check.sh` and created both the shim and its trust file.
 The generated shim was then executed itself: with Slack off it exited 0 and printed nothing, and with an empty allowlist it reached the allowlist gate and never printed `unexpected_arguments`.
 `fm-slack-check.sh check --replay check.json` printed exactly one line (`closed: resolve-call`).
+A transcript that carried an `action` key did not change which action ran: only the word given to `fm-slack-check.sh` selects `arm`, `check`, or `disarm`.
 `fm-slack-check.sh disarm` removed both files, and the next `check` printed nothing.
 A bound home with `unreachable-dm.json` printed `slack: refused: unreachable`, exited nonzero, and left no shim.
 Result: pass.
@@ -201,7 +202,8 @@ Result: pass.
 
 Command: unset or corrupt each configuration variable in turn and run `fm-slack-check.sh check`, `fm-slack-poll.sh`, and `fm-slack-check.sh arm` against `tests/fixtures/slack/config/unset.json` and `tests/fixtures/slack/arming/arm.json`.
 
-Observed: token unset and allowlist unset were silent and off from all three entry points.
+Observed: token unset and allowlist unset were silent and off from `fm-slack-check.sh check` and `fm-slack-poll.sh`.
+The same two cases through `fm-slack-check.sh arm` printed `slack: refused: unconfigured`, exited nonzero, and left no check registered.
 Poll cap unset took the default and completed.
 The standing check printed nothing for `oops` as the allowlist, a malformed `FM_SLACK_DM_USER`, and a poll cap of `0`, `201`, or `many`.
 By hand, the same values printed `slack: refused: allowlist_unparseable`, `slack: refused: missing_or_invalid_FM_SLACK_DM_USER`, and `slack: refused: invalid_FM_SLACK_POLL_MAX_ANSWERS_1_to_200`.

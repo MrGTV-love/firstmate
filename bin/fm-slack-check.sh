@@ -8,12 +8,13 @@
 set -euo pipefail
 # shellcheck source=bin/fm-slack-lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-slack-lib.sh"
+export FM_SLACK_CHECK_ACTION=check
 case "${1:-}" in
   -h|--help)
     printf '%s\n' \
       'Usage: fm-slack-check.sh [arm|check|disarm] [--replay transcript.json]' \
       'Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.' \
-      'Disarm is the hard off switch. Unconfigured is silent/off.' \
+      'Disarm is the hard off switch. Unconfigured is silent/off; an explicit arm names the refusal.' \
       'See docs/configuration.md "Slack decision plane".'
     exit 0
     ;;

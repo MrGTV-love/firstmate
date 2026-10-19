@@ -26,7 +26,6 @@
   },
   "messages": [],
   "reactions": {},
-  "action": "arm",
   "failures": {
     "conversations.open": {
       "status": 503,

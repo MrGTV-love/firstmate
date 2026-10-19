@@ -713,22 +713,12 @@ def help_text(command):
     return {
         'mirror': 'Usage: fm-slack-mirror.sh [--replay transcript.json]\nMirror open captain calls into owner DM threads.',
         'poll': 'Usage: fm-slack-poll.sh [--replay transcript.json]\nDeliver authorized Slack signals through the keyed-answer intake.',
-        'check': 'Usage: fm-slack-check.sh [arm|check|disarm] [--replay transcript.json]\nWithout a word, the transcript action selects arm, check, or disarm.',
+        'check': 'Usage: fm-slack-check.sh [arm|check|disarm] [--replay transcript.json]',
     }.get(command, 'Usage: fm-slack-{mirror,poll,check}.sh [--replay transcript.json]')
 
 
 def state_home():
     return Path(os.environ.get('FM_STATE_OVERRIDE', Path(os.environ['FM_HOME']) / 'state'))
-
-
-def check_action(replay_path):
-    action = env_value('FM_SLACK_CHECK_ACTION')
-    if not action and replay_path:
-        try:
-            action = json.loads(Path(replay_path).read_text()).get('action') or ''
-        except (OSError, ValueError, AttributeError):
-            action = ''
-    return action
 
 
 def emit(watch, command):
@@ -753,17 +743,15 @@ def main(argv):
     if command not in ('mirror', 'poll', 'check'):
         print('error: unknown command; use --help')
         return 2
-    action = check_action(replay_path) if command == 'check' else ''
+    action = env_value('FM_SLACK_CHECK_ACTION') if command == 'check' else ''
     if action == 'disarm':
         return disarm()
     state, reason = mode()
-    if state == 'off':
+    if state != 'on':
+        if action == 'arm' or (state == 'refused' and command != 'check'):
+            print('slack: refused: ' + reason)
+            return 1 if command == 'check' else 0
         return 0
-    if state == 'refused':
-        if command == 'check' and action != 'arm':
-            return 0
-        print('slack: refused: ' + reason)
-        return 1 if command == 'check' else 0
     watch = None
     code = 0
     try:
