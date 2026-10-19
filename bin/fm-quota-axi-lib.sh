@@ -151,7 +151,8 @@ fm_quota_single_provider_table() {
     'kimi kimi' \
     'cursor cursor' \
     'agy agy' \
-    'muse meta'
+    'muse meta' \
+    'dsh deepseek'
 }
 
 # Reads the whole table before answering: leaving the loop early closes the
@@ -175,6 +176,7 @@ fm_quota_provider_for_harness() {
         *)               return 1 ;;
       esac
       ;;
+    dsh)          printf 'deepseek\n' ;;
     claude)       printf 'claude\n' ;;
     codex)        printf 'codex\n' ;;
     opencode)     printf 'codex\n' ;;

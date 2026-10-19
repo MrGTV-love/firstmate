@@ -290,6 +290,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-dsh-lib.sh
+. "$SCRIPT_DIR/fm-dsh-lib.sh"
 # shellcheck source=bin/fm-claude-launcher-lib.sh
 . "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh
@@ -2221,6 +2223,9 @@ resolve_relaunch_profile() {
     || die "'$TARGET_HARNESS' is not verified to run a $KIND task, so relaunching $ID onto it would stop the running agent for a launch that must be refused; choose an adapter verified for this kind"
   if [ "$TARGET_HARNESS" = omp ]; then
     fm_control_omp_launch_check || return 1
+  fi
+  if [ "$TARGET_HARNESS" = dsh ]; then
+    fm_dsh_launch_check || return 1
   fi
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the

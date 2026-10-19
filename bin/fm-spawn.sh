@@ -291,7 +291,7 @@
 #   profile consultation. A --secondmate spawn is exempt and resolves the SECONDMATE
 #   harness (config/secondmate-harness -> config/crew-harness -> own), so the
 #   secondmate-vs-crewmate split is DURABLE across every respawn (recovery,
-#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin)
+#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|dsh|agy|devin)
 #   overrides it for this spawn (either kind). A non-flag string containing
 #   whitespace is treated as a RAW launch command - the escape hatch for verifying
 #   new adapters. For pi and pi-signed, fm-spawn resolves the selected executable
@@ -968,6 +968,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-dsh-lib.sh
+. "$SCRIPT_DIR/fm-dsh-lib.sh"
 # shellcheck source=bin/fm-control-worktree-lib.sh
 . "$SCRIPT_DIR/fm-control-worktree-lib.sh"
 # shellcheck source=bin/fm-gate-refuse-lib.sh
@@ -2960,8 +2962,11 @@ launch_template() {
   # prompt can park an unattended worker, the tracked posture overlay so a
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
   # pinned to the worktree because omp's extension discovery is cwd-only.
+  dsh)
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__:"$PATH" __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+    ;;
   omp)
-    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
       printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
@@ -3263,6 +3268,13 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
     fi
   fi
 fi
+if [ "$RAW_LAUNCH" = 0 ]; then
+  if [ -z "$ARG3" ] && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
+    HARNESS=dsh
+    LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
+  fi
+  python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || exit 1
+fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 
 if [ "$FIXED_FAMILY" = 1 ]; then
@@ -3315,6 +3327,10 @@ fi
 # docs/supervision-protocols/ carries no agy wake protocol (agy 1.2.0).
 # devin has none either: only its worker lifecycle hooks are verified, and
 # docs/supervision-protocols/ carries no devin wake protocol (devin 3000.11.1).
+if [ "$KIND" = secondmate ] && [ "$HARNESS" = dsh ]; then
+  echo "error: dsh is a verified crewmate/scout adapter only and cannot run a secondmate yet; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
+  exit 1
+fi
 if [ "$KIND" = secondmate ] && { [ "$HARNESS" = muse ] || [ "$HARNESS" = gemini ] || [ "$HARNESS" = agy ] || [ "$HARNESS" = devin ]; }; then
   echo "error: $HARNESS is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
   exit 1
@@ -3337,6 +3353,10 @@ if [ "$KIND" != secondmate ]; then
 fi
 
 case "$HARNESS" in
+dsh)
+  DSH_BIN=$(fm_dsh_executable) || exit 1
+  fm_dsh_launch_check "$DSH_BIN" || exit 1
+  ;;
 devin)
   DEVIN_BIN=$(command -v devin) || {
     echo "error: devin executable not found on PATH" >&2
@@ -5580,7 +5600,24 @@ agy_wait_for_working() {
   return 1
 }
 
-agy_spawn_fail() {  # <detail>
+# dsh-tui submits the brief as its opening prompt, so its own durable session
+# log is the start proof: a turn opening (busy) or already finishing (idle)
+# both mean the brief reached the agent. No pane-scrape fallback exists because
+# the log is the same source the busy classifier trusts.
+dsh_wait_for_start() {
+  local state i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  while [ "$i" -lt "$max" ]; do
+    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" 2>/dev/null) || state=unknown
+    case "$state" in
+      busy | idle) return 0 ;;
+    esac
+    i=$((i + 1))
+    [ "$i" -ge "$max" ] || sleep "$interval"
+  done
+  return 1
+}
+
+dsh_spawn_fail() {  # <detail>
   printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
@@ -6921,6 +6958,18 @@ LAUNCH=${LAUNCH//__OMPWORKERCFG__/$sq_ompcfg}
 LAUNCH=${LAUNCH//__OMPSESSIONCFG__/$sq_ompsessioncfg}
 LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
 case "$HARNESS" in
+dsh)
+  # A relaunch starts a fresh session: dsh-tui 0.16.1 opens a requested
+  # session without its prior conversation (verified), so firstmate never
+  # claims resumed context. The task's instructions and worktree are what
+  # carry work forward.
+  DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT") || exit 1
+  LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}
+  LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
+  LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}
+  LAUNCH=${LAUNCH//__DSHPATH__/"$(shell_quote "$(dirname "$DSH_BIN")")"}
+  LAUNCH=${LAUNCH//__DSHBIN__/"$(shell_quote "$DSH_BIN")"}
+  ;;
 pi | pi-signed) LAUNCH=${LAUNCH//__PIBIN__/"$(shell_quote "$PI_BIN")"} ;;
 cursor) LAUNCH=${LAUNCH//__CURSORBIN__/"$(shell_quote "$CURSOR_BIN")"} ;;
 gemini) LAUNCH=${LAUNCH//__GEMINISETTINGS__/"$(shell_quote "$STATE_REAL/$ID.gemini-settings.json")"} ;;
@@ -7313,6 +7362,12 @@ if [ "$HARNESS" = agy ]; then
     else
       agy_spawn_fail "agy never showed its folder-trust dialog on an unregistered worktree in window $T, so the brief could not be confirmed to run there"
     fi
+    exit 1
+  fi
+fi
+if [ "$HARNESS" = dsh ]; then
+  if ! dsh_wait_for_start; then
+    dsh_spawn_fail "dsh-tui never recorded a turn for the launch brief in window $T"
     exit 1
   fi
 fi

@@ -3882,6 +3882,45 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 
 `FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh` refreshes the primary evidence; the worker path above is refreshed by repeating the scout dispatch after any omp upgrade.
 
+## DeepSeek Harness (dsh-tui)
+
+Verified on 2026-10-18 on macOS arm64 (Darwin 27.0.0) through `bin/fm-herdr-lab.sh` in a named non-default lab session.
+Runtime: `dsh-tui` 0.16.1 (launcher and installed profile) with the `dsh` CLI 0.2.0-rc.2.
+Fixture: the disposable scratch project `/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-project` and its isolated linked copy `/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-copy`, registered only in the guard's private home with local-only delivery and no push.
+
+```sh
+FM_DSH_LIVE=1 \
+FM_DSH_EVIDENCE_DIR=<fresh evidence directory> \
+FM_DSH_LAB_PROJECT=/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-project \
+FM_DSH_LAB_COPY=/Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/lab/scratch-copy \
+bin/fm-test-run.sh tests/fm-dsh-live-e2e.test.sh
+bin/fm-test-run.sh tests/fm-dsh-harness.test.sh
+```
+
+```text
+ok - live dsh-tui 0.16.1 ship brief, busy composer, mid-task steer, interrupt, exit, fresh relaunch with instructions, final exit
+ok - live dsh-tui 0.16.1 scout brief, busy composer, mid-task steer, interrupt, exit, fresh relaunch with instructions, final exit
+cleanup_exit=0
+ok - dsh route boundaries, contradiction refusal, provider normalization, durable transitions, torn append, relaunch-session selection and ambiguity
+ok - dsh frame proves empty, typed draft, and busy-hint furniture
+ok - dsh executable-slot attribution and lifecycle capability contract
+```
+
+| Fact | Observed |
+| --- | --- |
+| Launch | `dsh-tui --patch <launch patch> -- <brief>` started the interactive TUI and submitted the brief as its opening prompt; no folder-trust or approval dialog appeared under `DSH_PERMISSION_MODE=danger-full-access` |
+| Model and effort | no launch flags exist, so the launch patch and the launch-local `~/.dsh-tui/model.json` and `effort.json` selected `deepseek-v4-flash` at `high`; `/status` and the footer both reported that route |
+| Busy state | `bin/fm-dsh.py state` folded the launch's own `session.v4.jsonl`: the brief turn read `busy`, the completed steer read `idle`, and the pre-turn launch read `unknown`; no screen scrape was consulted |
+| Composer | the rounded `⌸ … ⛶` frame holding `❯` classified `empty` on an idle busy pane and `pending` with typed text, with its two status rows and `esc to interrupt` treated as furniture |
+| Steer | `bin/fm-send.sh` delivered an inbox record mid-task and the worker replied with the requested token before the next interruption |
+| Interrupt and exit | `bin/fm-control.sh <id> interrupt` reported `interrupt-delivered ... verified=agent-alive`, and `exit` reported `stopped` with Herdr then reporting the pane dead |
+| Relaunch | `bin/fm-control.sh <id> relaunch` replaced the worker in the same endpoint; the new session read its relaunch instructions and the guard observed a new depth-zero session log |
+| Resume | NOT available: a launch naming an earlier session with `--resume=<id>` or `DSH_TUI_RESUME_SESSION=<id>` opened a new session without the earlier conversation. A probe asked the resumed session for a secret word it had memorized moments earlier, and the model answered that its context held no prior turn. Firstmate therefore never claims resumed context; a relaunch starts a fresh session that re-reads the task's instructions and worktree. |
+
+The 93 MB installed profile tree is reproduced inside each launch root rather than linked: Node resolves real paths before DSH's profile interception, so a linked `node_modules` escaped the isolated profile and loaded the launcher's own incompatible packages.
+The launcher needs the `dsh` CLI on `PATH`; a pane without the installing nvm bin directory exits with `dsh CLI not found`, so the launch prepends the launcher's own directory.
+DSH's default `workspace-write` posture parked a real worker on an `Awaiting approval` panel when it moved a steering record outside the session workspace; the launch therefore selects DSH's own `danger-full-access` preset, whose approval policy is `never`.
+
 ## Busy inbox escalation
 
 Verified at `2026-10-03T19:20:07Z` on commit `23b0232908a5adc7fbf7339ef48c34a091a7a799` with Claude Code `2.1.288 (Claude Code)` on Herdr `0.9.1`, protocol `22`, in a named isolated lab session through `bin/fm-herdr-lab.sh`.

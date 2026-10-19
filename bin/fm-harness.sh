@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Detect the agent harness this process tree runs on.
-# Usage: fm-harness.sh                  print own harness: claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin|unknown
+# Usage: fm-harness.sh                  print own harness: claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|dsh|agy|devin|unknown
+#        fm-harness.sh model-family <model> [provider]
+#                                        print the harness a model family routes to
+#                                        (deepseek -> dsh, claude* -> claude, else omp)
 #        fm-harness.sh crew             print the effective CREWMATE harness
 #                                        (config/crew-harness; "default" resolves to own)
 #        fm-harness.sh secondmate       print the harness the PRIMARY uses to launch
@@ -76,6 +79,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
 # shellcheck source=bin/fm-gemini-lib.sh
 . "$SCRIPT_DIR/fm-gemini-lib.sh"
+# shellcheck source=bin/fm-dsh-lib.sh
+. "$SCRIPT_DIR/fm-dsh-lib.sh"
 
 # Print the harness named by a verified environment marker, or nothing when no
 # marker is present. Markers only report what the environment CLAIMS; detect_own
@@ -128,6 +133,10 @@ harness_marker() {
     echo omp
     return
   fi
+  if [ "${FM_DSH_HARNESS:-}" = dsh ] && ancestry_names_dsh; then
+    echo dsh
+    return
+  fi
   [ "${CLAUDECODE:-}" = "1" ] && { echo claude; return; }
   if [ "${PI_CODING_AGENT:-}" = "true" ]; then
     if [ "${FM_PI_HARNESS:-}" = pi-signed ]; then echo pi-signed; else echo pi; fi
@@ -169,6 +178,18 @@ ancestry_names_omp() {
   return 1
 }
 
+ancestry_names_dsh() {
+  local pid=$$ comm
+  for _ in 1 2 3 4 5 6 7 8; do
+    comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
+    case "${comm##*/}" in dsh|dsh-tui) return 0 ;; esac
+    fm_dsh_pid_is_dsh "$pid" && return 0
+    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+    [ -n "$pid" ] && [ "$pid" -gt 1 ] || return 1
+  done
+  return 1
+}
+
 # Print "<strength> <harness>" when one process identifies a harness, or nothing.
 # Strength records how the match was made:
 #   comm - the ancestor's own executable name identifies the harness. This is a
@@ -180,6 +201,10 @@ ancestry_names_omp() {
 harness_process_verdict() {  # <pid>
   local pid=$1 comm args argv0
   comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 0
+  if fm_dsh_pid_is_dsh "$pid"; then
+    echo 'comm dsh'
+    return
+  fi
   argv0=$(fm_cursor_argv0_for_pid "$pid" "$comm" 2>/dev/null || true)
   if fm_cursor_process_matches "$comm" '' "$argv0"; then
     echo "comm cursor"
@@ -229,6 +254,7 @@ harness_process_verdict() {  # <pid>
     # named `claude` with its own node child, and that fallback's *claude*
     # args glob would otherwise claim it if that subtree were ever walked.
     omp) echo "comm omp"; return ;;
+    dsh|dsh-tui) echo 'comm dsh'; return ;;
     # agy (Antigravity CLI) is a Go-compiled single binary whose process name
     # is exactly `agy` (verified, agy 1.2.0: `ps -o comm=` reports agy and
     # Herdr's process-info reports name agy with argv[0] agy). Anchored, never
@@ -397,7 +423,7 @@ supervision_primary_pin() {
   local pin=${FM_SUPERVISION_PRIMARY_HARNESS:-}
   [ "${FM_SUPERVISION_ACTOR:-}" = branch ] && [ -n "$pin" ] || return 0
   case "$pin" in
-    claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin)
+    claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|dsh|agy|devin)
       printf '%s\n' "$pin"
       ;;
     *)
@@ -529,6 +555,7 @@ validate_native_effort() {
 }
 
 case "${1:-}" in
+  model-family) shift; exec python3 "$SCRIPT_DIR/fm-dsh.py" route "$@" ;;
   validate-native-effort) shift; validate_native_effort "$@" ;;
   ancestry)
     case "${2:-}" in

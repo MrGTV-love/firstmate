@@ -16,10 +16,10 @@ fm_session_launch_policy_check() {  # <config-dir> <harness> [raw=0|1]
   local enabled harness=$2 raw=${3:-0}
   enabled=$(fm_session_launch_policy_enabled "$1") || return 1
   [ "$enabled" = 1 ] || return 0
-  if [ "$raw" = 0 ] && [ "$harness" = omp ]; then
+  if [ "$raw" = 0 ] && { [ "$harness" = omp ] || [ "$harness" = dsh ]; }; then
     return 0
   fi
-  printf "error: config/session-launch-policy=omp-or-tc refuses launch '%s'; only the canonical omp adapter is currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\n" "$harness" >&2
+  printf "error: config/session-launch-policy=omp-or-tc refuses launch '%s'; only the canonical omp and dsh adapters are currently supported under this policy; tc run requires a verified native launcher, not plain claude or a proxy wrapper\n" "$harness" >&2
   printf 'help: select an explicit allowed dispatch profile; for recovery use bin/fm-control.sh <id> relaunch --harness omp --model <omp-model-id> --effort <level> --note "<progress>"; no previous agent or work needs to be discarded\n' >&2
   return 1
 }
