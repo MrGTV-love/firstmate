@@ -4,9 +4,10 @@
 # A merged task's pool copy must be pruned right after its PR merges, with no
 # human step, and an unsafe copy must never be removed. This suite drives the
 # real scripts against a fake pool in a temp directory: a throwaway
-# TREEHOUSE_ROOT, bare origins, real git clones as pool copies, and a stub
-# `treehouse` first on PATH that records its arguments and removes the fake
-# directory. The real treehouse binary and the real ~/.treehouse are never
+# TREEHOUSE_ROOT, bare origins, pool copies that are linked git worktrees of a
+# project clone with the pool's treehouse-state.json beside them (the way
+# treehouse lays them out), and a stub `treehouse` first on PATH that records its
+# arguments and removes the fake directory. The real treehouse binary and the real ~/.treehouse are never
 # touched; the stub proves only the CALL SHAPE the fallback makes
 # (`treehouse destroy <copy> --include-leased --yes`), not how the real tool
 # behaves.
@@ -53,8 +54,9 @@ trap cleanup_workers EXIT
 # --- the fake pool ------------------------------------------------------------
 
 # make_world builds one isolated world and sets W, HOME_DIR, STATE, DATA, POOL,
-# ORIGIN and COPY (the task's pool copy: <pool root>/pool1/1/repo). The task's
-# project is the clone $W/project.
+# ORIGIN and COPY (the task's pool copy: <pool root>/pool1/1/repo, a linked
+# worktree of the task's project, the clone $W/project, with the pool's
+# treehouse-state.json at <pool root>/pool1).
 make_world() {
   local seed
   WN=$((WN + 1))
@@ -78,14 +80,14 @@ make_world() {
   git -C "$seed" commit -q -m base
   git -C "$seed" push -q origin main
   rm -rf "$seed"
-  git clone -q "$ORIGIN" "$COPY" 2>/dev/null
-  git -C "$COPY" checkout -q -b fm/t1
+  git clone -q "$ORIGIN" "$W/project" 2>/dev/null
+  git -C "$W/project" worktree add -q -b fm/t1 "$COPY" origin/main
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"t1"}]}\n' "$COPY" > "$POOL/pool1/treehouse-state.json"
   printf 'work\n' > "$COPY/work.txt"
   git -C "$COPY" add work.txt
   git -C "$COPY" commit -q -m "task work"
   git -C "$COPY" push -q origin fm/t1
   squash_merge_into_main "$COPY"
-  git clone -q "$ORIGIN" "$W/project" 2>/dev/null
   install_stubs
   mk_task t1 "$COPY"
 }
@@ -114,11 +116,20 @@ if [ "${1:-}" = destroy ] && [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ 
   esac
   [ ! -s "$TH_FAIL" ] || { echo "stub treehouse: destroy refused" >&2; exit 4; }
   "$(dirname "$0")/th-gate" "$2" || exit 1
-  rm -rf "$2"
+  "$(dirname "$0")/th-remove" "$2"
   exit 0
 fi
 echo "stub treehouse: unexpected arguments: $*" >&2
 exit 9
+SH
+  cat > "$W/bin/th-remove" <<'SH'
+#!/usr/bin/env bash
+# Removes a destroyed slot the way `treehouse destroy` does: the directory and
+# the project's registration of that linked worktree.
+common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common=
+rm -rf "$1"
+[ -z "$common" ] || git --git-dir="$common" worktree prune 2>/dev/null || true
+exit 0
 SH
   cat > "$W/bin/th-gate" <<'SH'
 #!/usr/bin/env bash
@@ -268,7 +279,7 @@ SH
 (cd / && exec sleep 300) &
 wait
 SH
-  chmod +x "$W/bin/treehouse" "$W/bin/th-gate" "$W/bin/teardown-stub" "$W/bin/control-stub" "$W/bin/tmux" "$W/bin/herdr" \
+  chmod +x "$W/bin/treehouse" "$W/bin/th-gate" "$W/bin/th-remove" "$W/bin/teardown-stub" "$W/bin/control-stub" "$W/bin/tmux" "$W/bin/herdr" \
     "$W/bin/pane-idle" "$W/bin/pane-busy" "$W/bin/pane-stubborn" "$W/bin/pane-holder"
   mkfifo "$W/hold"
   : > "$W/th.log"; : > "$W/stub.log"; : > "$W/control.log"; : > "$W/th.fail"
@@ -296,7 +307,6 @@ prune() {
     STUB_COUNT="$W/stub.count" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" \
     PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" \
     STOP_FAIL_FILE="$W/stop-fail" BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" \
-    PROJECT_LOCK_PATH="${PROJECT_LOCK_PATH:-}" FETCH_UNDER_LOCK_LOG="$W/fetch-under-lock.log" REAL_GIT="${REAL_GIT:-}" \
     FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-stub" FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" \
     FM_MERGE_PRUNE_EXIT_WAIT="${EXIT_WAIT:-0}" \
     "$BIN_DIR/fm-merge-prune.sh" "$@"
@@ -740,31 +750,64 @@ scn_bare_pane_shell_keeps_the_copy() {
   return 0
 }
 
-# A remote that never answers must not hold the project lock or the control
-# lock: the proof repeated under them reuses the refs fetched before them. The
-# stand-in git logs and hangs on any fetch made while the project lock exists,
-# and runs everything else as the real git does; the attempt, with a nested copy,
-# must finish within its bound with no fetch logged.
-scn_hung_remote_never_holds_the_project_lock() {
-  local PROJECT_LOCK_PATH REAL_GIT pid waited=0
-  make_world
-  make_nested .claude/worktrees/n1
-  PROJECT_LOCK_PATH=$(project_lock_path)
-  REAL_GIT=$(command -v git)
-  cat > "$W/bin/git" <<'SH'
-#!/usr/bin/env bash
+# A stand-in git first on PATH. It runs everything as the real git does, except:
+#   fetch     with the project lock held, it logs the call and hangs (a remote
+#             that never answers); once, after the first fetch, it steers or
+#             busies the worker when after-first-fetch says steer or busy (the
+#             worker changes between the first verdict and the lock);
+#   ls-files  -o -i (the ignored listing), ls-files -s (the tracked listing) and
+#   stash list   fail with a git error when fail-ls-files, fail-ls-files-s or
+#             fail-stash-list exists in the world.
+install_git_standin() {
+  {
+    printf '#!/usr/bin/env bash\nREAL_GIT=%q\nSTANDIN_DIR=%q\nLOCK=%q\n' "$(command -v git)" "$W" "$(project_lock_path)"
+    cat <<'SH'
 case " $* " in
   *" fetch "*)
-    if [ -e "$PROJECT_LOCK_PATH" ]; then
-      printf '%s\n' "$*" >> "$FETCH_UNDER_LOCK_LOG"
+    if [ -s "$STANDIN_DIR/after-first-fetch" ]; then
+      case "$(cat "$STANDIN_DIR/after-first-fetch")" in
+        steer)
+          mkdir -p "$FM_STATE_OVERRIDE/t1.inbox"
+          printf 'one more thing\n' > "$FM_STATE_OVERRIDE/t1.inbox/1.msg"
+          ;;
+        busy)
+          printf 'v1 gen=g1.1.1 seq=2 state=busy source=claude-hook event=UserPromptSubmit ts=%s\n' "$(date +%s)" > "$FM_STATE_OVERRIDE/t1.busy-state"
+          ;;
+      esac
+      : > "$STANDIN_DIR/after-first-fetch"
+    fi
+    if [ -e "$LOCK" ]; then
+      printf '%s\n' "$*" >> "$STANDIN_DIR/fetch-under-lock.log"
       exec sleep 300
     fi
+    ;;
+  *" ls-files -o -i "*)
+    [ ! -e "$STANDIN_DIR/fail-ls-files" ] || { echo "fatal: simulated ls-files failure" >&2; exit 128; }
+    ;;
+  *" ls-files -s "*)
+    [ ! -e "$STANDIN_DIR/fail-ls-files-s" ] || { echo "fatal: simulated ls-files failure" >&2; exit 128; }
+    ;;
+  *" stash list "*)
+    [ ! -e "$STANDIN_DIR/fail-stash-list" ] || { echo "fatal: simulated stash failure" >&2; exit 128; }
     ;;
 esac
 exec "$REAL_GIT" "$@"
 SH
+  } > "$W/bin/git"
   chmod +x "$W/bin/git"
   : > "$W/fetch-under-lock.log"
+}
+
+# A remote that never answers must not hold the project lock or the control
+# lock: the proof repeated under them reuses the refs fetched before them. The
+# stand-in git logs and hangs on any fetch made while the project lock exists;
+# the attempt, with a nested copy, must finish within its bound with no fetch
+# logged.
+scn_hung_remote_never_holds_the_project_lock() {
+  local pid waited=0
+  make_world
+  make_nested .claude/worktrees/n1
+  install_git_standin
   prune arm t1 >/dev/null 2>&1
   prune run t1 --now >/dev/null 2>&1 &
   pid=$!
@@ -779,7 +822,7 @@ SH
   wait "$pid" 2>/dev/null || true
   [ ! -s "$W/fetch-under-lock.log" ] || why "a fetch ran while the project lock was held: $(cat "$W/fetch-under-lock.log")" || return 1
   [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the copy was not removed: $(rec_field t1 reason)" || return 1
-  [ ! -e "$PROJECT_LOCK_PATH" ] || why "the project lock outlived the attempt" || return 1
+  [ ! -e "$(project_lock_path)" ] || why "the project lock outlived the attempt" || return 1
   return 0
 }
 
@@ -900,11 +943,6 @@ scn_pushed_but_unmerged_copy_is_kept() {
 
 # A pool slot is a linked worktree of the project: it shares the project's
 # branches and stash list. The git proofs read only this copy's work.
-make_linked_world() {
-  make_world
-  rm -rf "$COPY"
-  git -C "$W/project" worktree add -q -b fm/t1 "$COPY" origin/fm/t1
-}
 
 # Another task's work in the project: its own branch with a local-only commit,
 # and a stash made on that branch.
@@ -918,7 +956,7 @@ add_other_task_work() {
 }
 
 scn_linked_slot_ignores_other_tasks_work() {
-  make_linked_world
+  make_world
   add_other_task_work
   [ "$(git -C "$COPY" stash list | wc -l | tr -d ' ')" = 1 ] || why "the fixture's stash is not shared with the slot" || return 1
   go
@@ -928,7 +966,7 @@ scn_linked_slot_ignores_other_tasks_work() {
 }
 
 scn_linked_slot_own_unpushed_commit_is_kept() {
-  make_linked_world
+  make_world
   add_other_task_work
   printf 'later\n' > "$COPY/later.txt"
   git -C "$COPY" add later.txt
@@ -941,7 +979,7 @@ scn_linked_slot_own_unpushed_commit_is_kept() {
 }
 
 scn_linked_slot_own_branch_stash_is_kept() {
-  make_linked_world
+  make_world
   add_other_task_work
   printf 'wip\n' >> "$COPY/README.md"
   git -C "$COPY" stash -q
@@ -953,7 +991,7 @@ scn_linked_slot_own_branch_stash_is_kept() {
 }
 
 scn_linked_detached_slot_keeps_every_stash() {
-  make_linked_world
+  make_world
   add_other_task_work
   git -C "$COPY" checkout -q --detach
   go
@@ -979,6 +1017,83 @@ scn_non_github_pr_keeps_the_copy() {  # <pr url>
 }
 scn_enterprise_pr_keeps_the_copy() { scn_non_github_pr_keeps_the_copy https://github.example.com/acme/widget/pull/7; }
 scn_forgejo_pr_keeps_the_copy() { scn_non_github_pr_keeps_the_copy https://codeberg.org/acme/widget/pulls/7; }
+
+# A git tree that merely sits at <root>/a/b/c is not a pool copy: Treehouse owns
+# a slot only when the pool's treehouse-state.json is beside it and it shares the
+# project's git directory. Every other proof passes for this clean, pushed,
+# merged tree, so only the pool test keeps it.
+scn_plain_git_tree_is_not_a_pool_copy() {
+  make_world
+  git clone -q "$ORIGIN" "$POOL/a/b/c" 2>/dev/null
+  git -C "$POOL/a/b/c" checkout -q -b fm/t1 origin/fm/t1
+  mk_task t1 "$POOL/a/b/c"
+  go
+  [ -e "$POOL/a/b/c" ] && [ "$(destroy_calls)" = 0 ] || why "a plain git tree at <root>/a/b/c was destroyed as a pool copy" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped for a copy that is not a pool slot" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$POOL/a/b/c" "$STATE/.wake-queue" | grep -q 'not a Treehouse pool slot' || why "the wake does not name the copy and that it is not a pool slot" || return 1
+  return 0
+}
+
+# The worker is judged reapable first. Fetches and the lock wait follow, then
+# the worker is stopped. A worker that is steered, or turns busy, in between
+# stops nothing: no stop, no signal, no destroy, no wake, a backed-off record.
+scn_worker_changed_after_the_first_verdict_is_not_stopped() {  # <steer|busy>
+  make_world
+  install_git_standin
+  start_inside "$COPY" "$W/worker.pid"
+  printf '%s\n' "$1" > "$W/after-first-fetch"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy of a worker that went '$1' after the first verdict was removed" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although it went '$1' after the first verdict: $(cat "$W/control.log")" || return 1
+  kill -0 "$(cat "$W/worker.pid")" 2>/dev/null || why "the worker session was ended" || return 1
+  [ "$(rec_field t1 state)" = pending ] && [ "$(rec_field t1 attempts)" = 1 ] || why "not a backed-off first attempt: $(cat "$STATE/t1.merge-prune")" || return 1
+  [ "$(wake_count)" = 0 ] || why "a worker that changed raised a wake" || return 1
+  [ ! -e "$(project_lock_path)" ] || why "the project lock outlived the attempt" || return 1
+  return 0
+}
+scn_worker_steered_after_the_first_verdict() { scn_worker_changed_after_the_first_verdict_is_not_stopped steer; }
+scn_worker_busy_after_the_first_verdict() { scn_worker_changed_after_the_first_verdict_is_not_stopped busy; }
+
+# A proof read that fails must never count as finding nothing. Each stand-in
+# failure happens in the first proof pass, before anything is stopped.
+scn_failed_read_keeps_the_copy() {  # <fail flag> <state> <text the record must name>
+  make_world
+  install_git_standin
+  : > "$W/$1"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy was removed although the read '$1' failed" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although the read '$1' failed" || return 1
+  [ "$(rec_field t1 state)" = "$2" ] || why "the record is '$(rec_field t1 state)', want '$2': $(cat "$STATE/t1.merge-prune")" || return 1
+  rec_field t1 reason | grep -q -- "$3" || why "the record does not name '$3': $(rec_field t1 reason)" || return 1
+  if [ "$2" = retained ]; then
+    [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  else
+    [ "$(wake_count)" = 0 ] || why "a retried read raised a wake" || return 1
+  fi
+  return 0
+}
+scn_failing_ignored_listing_keeps_the_copy() { scn_failed_read_keeps_the_copy fail-ls-files retained 'cannot list ignored files'; }
+scn_failing_tracked_listing_keeps_the_copy() { scn_failed_read_keeps_the_copy fail-ls-files-s retained 'cannot list the tracked files'; }
+scn_failing_stash_listing_is_retried() { scn_failed_read_keeps_the_copy fail-stash-list pending 'git stash list failed'; }
+
+# A subtree that cannot be read cannot be searched for nested copies (find fails
+# in a scratch directory the search enters), and a .claude directory that cannot
+# be listed cannot be classified. Neither counts as finding nothing.
+scn_unreadable_subtree_keeps_the_copy() {  # <relative directory> <text the record must name>
+  make_world
+  mkdir -p "$COPY/$1"
+  chmod 000 "$COPY/$1"
+  go
+  chmod 755 "$COPY/$1" 2>/dev/null || true
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy was removed although $1 cannot be read" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although $1 cannot be read" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  rec_field t1 reason | grep -q -- "$2" || why "the record does not name '$2': $(rec_field t1 reason)" || return 1
+  return 0
+}
+scn_unreadable_scratch_subtree_keeps_the_copy() { scn_unreadable_subtree_keeps_the_copy .mypy_cache/sub 'cannot search'; }
+scn_unreadable_claude_directory_keeps_the_copy() { scn_unreadable_subtree_keeps_the_copy .claude 'cannot list .claude'; }
 
 run_scenario() {  # <name>
   SCN_WHY=
@@ -1185,6 +1300,14 @@ test_fallback_nested_unpushed_commit_keeps_the_slot() { assert_scenario scn_nest
 test_fallback_removes_a_clean_nested_copy_with_the_slot() { assert_scenario scn_clean_nested_copy_goes_with_the_slot "a clean pushed orphan nested copy goes with its slot, its preserve-list records preserved"; }
 test_fallback_keeps_unique_ignored_files() { assert_scenario scn_unique_ignored_file_is_kept "a unique ignored file outside the preserve list and the scratch patterns keeps the copy"; }
 test_fallback_keeps_a_non_pool_copy() { assert_scenario scn_non_pool_copy_is_kept "a copy outside the pool is never destroyed"; }
+test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot() { assert_scenario scn_plain_git_tree_is_not_a_pool_copy "a plain git tree at <root>/a/b/c is not a pool copy: it is kept with one wake and nothing is stopped or destroyed"; }
+test_fallback_does_not_stop_a_worker_steered_after_the_first_verdict() { assert_scenario scn_worker_steered_after_the_first_verdict "a worker steered between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off"; }
+test_fallback_does_not_stop_a_worker_busy_after_the_first_verdict() { assert_scenario scn_worker_busy_after_the_first_verdict "a worker that turns busy between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off"; }
+test_fallback_keeps_the_copy_when_the_ignored_listing_fails() { assert_scenario scn_failing_ignored_listing_keeps_the_copy "a failing git ls-files for ignored files keeps the copy and is never read as no ignored files"; }
+test_fallback_keeps_the_copy_when_the_tracked_listing_fails() { assert_scenario scn_failing_tracked_listing_keeps_the_copy "a failing git ls-files for tracked files keeps the copy and is never read as no submodules"; }
+test_fallback_retries_when_the_stash_listing_fails() { assert_scenario scn_failing_stash_listing_is_retried "a failing git stash list keeps the copy and retries later and is never read as no stash"; }
+test_fallback_keeps_the_copy_when_a_subtree_cannot_be_searched() { assert_scenario scn_unreadable_scratch_subtree_keeps_the_copy "a subtree the nested-copy search cannot read keeps the copy and is never read as no nested copy"; }
+test_fallback_keeps_the_copy_when_the_claude_directory_cannot_be_listed() { assert_scenario scn_unreadable_claude_directory_keeps_the_copy "a .claude directory that cannot be listed keeps the copy and is never read as empty"; }
 test_fallback_accepts_the_merged_pr_head() { assert_scenario scn_pr_head_proves_a_squash_merged_commit "a commit proved landed by the merged PR head does not keep the copy"; }
 test_fallback_ignores_a_search_indexer() { assert_scenario scn_search_indexer_does_not_keep_the_copy "a system search indexer (Spotlight) reading the copy does not keep it; any other process does"; }
 test_fallback_never_overrides_a_live_pipeline_refusal() { assert_scenario scn_pipeline_refusal_never_falls_back "a refusal about a live pipeline is retained, never overridden"; }
@@ -1271,7 +1394,19 @@ test_unsafe_mutations_are_caught() {
 
   expect_caught no-nested-check $lib '    FM_MP_NESTED+=("$dir")' '    :' scn_nested_unpushed_commit_keeps_the_slot "nested-copy proof"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
-  expect_caught no-pool-check $lib '    "$root"/*/*/*) return 0 ;;' '    *) return 0 ;;' scn_non_pool_copy_is_kept "pool-copy proof"
+  expect_caught no-pool-slot-check $orch '  if ! real=$(fm_mp_real "$wt") || ! fm_treehouse_pool_slot "$project" "$real"; then' '  if ! real=$(fm_mp_real "$wt"); then' scn_plain_git_tree_is_not_a_pool_copy "pool-slot proof"
+  expect_caught no-pool-slot-check-outside-the-pool $orch '  if ! real=$(fm_mp_real "$wt") || ! fm_treehouse_pool_slot "$project" "$real"; then' '  if ! real=$(fm_mp_real "$wt"); then' scn_non_pool_copy_is_kept "pool-slot proof (outside the pool)"
+  expect_caught no-second-classification $orch '  if ! reapable; then
+    fm_project_lock_release "$plock" || true' '  if false; then
+    fm_project_lock_release "$plock" || true' scn_worker_steered_after_the_first_verdict "second idle classification under the project lock"
+  expect_caught no-second-classification-busy $orch '  if ! reapable; then
+    fm_project_lock_release "$plock" || true' '  if false; then
+    fm_project_lock_release "$plock" || true' scn_worker_busy_after_the_first_verdict "second idle classification under the project lock (busy)"
+  expect_caught ignored-listing-status-is-tr $lib 'listing=$(set -o pipefail; git -C "$copy" ls-files -o -i' 'listing=$(git -C "$copy" ls-files -o -i' scn_failing_ignored_listing_keeps_the_copy "checked ignored-file listing"
+  expect_caught tracked-listing-status-is-sed $lib 'gitlinks=$(set -o pipefail; git -C' 'gitlinks=$(git -C' scn_failing_tracked_listing_keeps_the_copy "checked tracked-file listing"
+  expect_caught stash-listing-failure-is-nothing $lib 'listing=$(git -C "$copy" stash list --format=%gs 2>/dev/null) || return 1' 'listing=$(git -C "$copy" stash list --format=%gs 2>/dev/null) || true' scn_failing_stash_listing_is_retried "checked stash listing"
+  expect_caught find-status-is-tr $lib 'found=$(set -o pipefail; find "$copy"' 'found=$(find "$copy"' scn_unreadable_scratch_subtree_keeps_the_copy "checked nested-copy search"
+  expect_caught claude-listing-failure-is-empty $lib 'if ! children=$(ls -A "$copy/$rel" 2>/dev/null); then' 'children=$(ls -A "$copy/$rel" 2>/dev/null); if false; then' scn_unreadable_claude_directory_keeps_the_copy "checked .claude listing"
   expect_caught allow-leaked-worktree $orch '      *) return 1 ;;' '      *"leaked worktree processes"*) seen=1 ;;
       *) return 1 ;;' scn_leaked_worktree_keeps_the_copy "leaked-worktree refusal"
   expect_caught allow-leaked-tasktmp $orch '      *) return 1 ;;' '      *"leaked tasktmp processes"*) seen=1 ;;
@@ -1353,15 +1488,20 @@ make_e2e_world() {
   ln -s "$ROOT/bin" "$W/code-root/bin"
   cat > "$W/bin/treehouse" <<'SH'
 #!/usr/bin/env bash
-# Fake pool: `return` and the reaper's `destroy` both remove the fake copy.
+# Fake pool: `return` resets the slot in place, as the real tool does (detached
+# at origin/main, clean, still in the pool), and the reaper's `destroy` removes
+# the slot.
 printf '%s\n' "$*" >> "$TH_LOG"
 case "${1:-}" in
-  return) for a in "$@"; do wt=$a; done; rm -rf "$wt"; exit 0 ;;
+  return)
+    for a in "$@"; do wt=$a; done
+    git -C "$wt" checkout -q --detach origin/main && git -C "$wt" reset -q --hard && git -C "$wt" clean -ffdxq
+    exit $? ;;
   destroy)
     [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ "$4" = --yes ] || { echo "stub treehouse: unexpected arguments: $*" >&2; exit 9; }
     case "$2" in "$TREEHOUSE_ROOT"/*/*/*) ;; *) echo "stub treehouse: outside the fake pool" >&2; exit 3 ;; esac
     "$(dirname "$0")/th-gate" "$2" || exit 1
-    rm -rf "$2"; exit 0 ;;
+    "$(dirname "$0")/th-remove" "$2"; exit 0 ;;
 esac
 exit 0
 SH
@@ -1406,7 +1546,6 @@ exit 1
 SH
   chmod +x "$W/bin/treehouse" "$W/bin/no-mistakes" "$W/bin/gh-axi" "$W/bin/gh"
   fm_fake_docker "$W/bin"
-  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"t1"}]}\n' "$COPY" > "$POOL/pool1/treehouse-state.json"
   fm_write_meta "$STATE/t1.meta" "window=firstmate:fm-t1" "endpoint_task_id=t1" "worktree=$COPY" \
     "project=$W/project" "kind=ship" "mode=no-mistakes" "spawn_gen=e2e-t1" "harness=claude" "backend=tmux" \
     "pr=$PR" "pr_head=$head"
@@ -1450,11 +1589,19 @@ assert_not_destroyed() {  # <label>
   fi
 }
 
+# A pool slot that teardown returned stays in the pool, reset: clean, and no
+# longer on the task's branch.
+assert_slot_returned() {
+  [ -e "$COPY" ] || fail "the returned slot vanished from the pool"
+  [ -z "$(git -C "$COPY" status --porcelain --untracked-files=all)" ] || fail "the returned slot is not clean: $(git -C "$COPY" status --porcelain --untracked-files=all)"
+  ! git -C "$COPY" symbolic-ref -q HEAD >/dev/null || fail "the returned slot is still on a branch"
+}
+
 test_e2e_merge_prunes_the_copy_with_the_real_teardown() {
   make_e2e_world
   prune_real arm t1 --run || fail "arm --run failed"
   fm_test_wait_until 60 grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the detached attempt did not finish: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
-  [ ! -e "$COPY" ] || fail "the pool copy is still there after the merge"
+  assert_slot_returned
   [ ! -e "$STATE/t1.meta" ] || fail "the task record is still there: real teardown did not complete"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped: $(cat "$DATA/t1/merge-prune.log")"
   [ "$(wake_count_real)" = 0 ] || fail "a clean prune raised a wake"
@@ -1486,7 +1633,8 @@ test_e2e_transient_contention_retries_then_succeeds() {
   rm -rf "$STATE/.control-t1.lock"
   set_rec t1 next_at 0
   prune_real run t1 >/dev/null 2>&1
-  [ ! -e "$COPY" ] && [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.merge-prune" ] || fail "the retry after the contention cleared did not reap: $(cat "$DATA/t1/merge-prune.log")"
+  [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.merge-prune" ] || fail "the retry after the contention cleared did not reap: $(cat "$DATA/t1/merge-prune.log")"
+  assert_slot_returned
   grep -q 'retry in' "$DATA/t1/merge-prune.log" && grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
   pass "end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps"
 }
@@ -1599,6 +1747,14 @@ ALL_TESTS=(
   test_fallback_removes_a_clean_nested_copy_with_the_slot
   test_fallback_keeps_unique_ignored_files
   test_fallback_keeps_a_non_pool_copy
+  test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot
+  test_fallback_does_not_stop_a_worker_steered_after_the_first_verdict
+  test_fallback_does_not_stop_a_worker_busy_after_the_first_verdict
+  test_fallback_keeps_the_copy_when_the_ignored_listing_fails
+  test_fallback_keeps_the_copy_when_the_tracked_listing_fails
+  test_fallback_retries_when_the_stash_listing_fails
+  test_fallback_keeps_the_copy_when_a_subtree_cannot_be_searched
+  test_fallback_keeps_the_copy_when_the_claude_directory_cannot_be_listed
   test_fallback_accepts_the_merged_pr_head
   test_fallback_ignores_a_search_indexer
   test_fallback_never_overrides_a_live_pipeline_refusal
