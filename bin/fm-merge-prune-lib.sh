@@ -15,8 +15,8 @@
 #
 # A copy passes only when ALL of these hold, for the task's own copy AND for
 # every nested copy found inside it, each checked one by one:
-#   - the path is a Treehouse pool slot of the task's project, by the repo's one
-#     test (fm_treehouse_pool_slot in bin/fm-wake-lib.sh, which
+#   - the task's own copy is a Treehouse pool slot of the task's project, by the
+#     repo's one test (fm_treehouse_pool_slot in bin/fm-wake-lib.sh, which
 #     bin/fm-merge-prune.sh runs before it calls these proofs): the pool's
 #     treehouse-state.json sits beside the slot and the slot shares the
 #     project's git directory;
