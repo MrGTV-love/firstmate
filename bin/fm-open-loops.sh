@@ -22,7 +22,8 @@
 # within one five-second evidence deadline, least recently attempted rows first; an unexpired receipt is reused without a
 # new read, and a row it tried without proof moves behind the rows it never reached. Rows the deadline did not reach print as
 # NOT CHECKED THIS PASS with a retry line: no steer, and no away-mode escalation, is owed for them.
-# --check-actions honors standing receipts and exits 1 with per-row completing commands for unmet requirements.
+# --check-actions honors standing receipts and exits 1 with per-row completing commands for unmet requirements; it first
+# records the presentation of a listed row that no actor presented, so every command it prints is accepted.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
 # the row's PR URL for merged, or free text for escalated/deferred.

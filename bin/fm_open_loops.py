@@ -1468,7 +1468,7 @@ class SatisfactionVerifier(WaitVerifier):
     def __init__(self, report, state, now):
         super().__init__(report, state, now)
         self.proofs, self.steps, self.statuses = {}, {}, {}
-        self.queued, self.attempted, self.demoted, self.standing, self.inflight = set(), [], set(), set(), None
+        self.queued, self.attempted, self.cut, self.standing, self.inflight = set(), [], set(), set(), None
         self.sealed = False
         self.expired = False
 
@@ -1500,12 +1500,9 @@ class SatisfactionVerifier(WaitVerifier):
             return None
         if task not in self.statuses:
             self.statuses[task] = c.report_status(task)
-        status_at, verb, decision, _, _, _ = self.statuses[task]
+        _, verb, decision, _, _, _ = self.statuses[task]
         if decision or verb in ("done", "failed", "blocked", "needs-decision"):
             return None
-        if status_at is not None and 0 <= c.now - status_at < interval:
-            return dict(source=source, evidence=f"status event at {status_at}",
-                        recheck_epoch=status_at + interval)
         meta = c.read_fields(c.state / (task + ".meta"))
         project, branch = meta.get("project"), meta.get("branch")
         if project and branch:
@@ -1647,15 +1644,15 @@ class SatisfactionVerifier(WaitVerifier):
                                        -(float("inf") if row.get("age_seconds") is None else row["age_seconds"])))
         rows = [row for row in rows if not self.stored_stands(self.actions.get(row["id"], {}), row, now)]
         self.queued = {row["id"] for row in rows}
-        looked, live = [], False
-        # Every row's recent events and dependencies are tried before any slow current-state read,
-        # so one hung reader can only cost the rows that have no cheaper evidence.
+        silent = [row for row in rows if row["category"] == "silent_report"]
+        asked = [row for row in rows if row["category"] != "silent_report"]
+        looked, stage = [], 0
         try:
-            for live in (False, True):
-                for row in rows:
+            for stage, (live, group) in enumerate(((False, silent), (True, silent), (False, asked))):
+                for row in group:
                     self.check_deadline()
                     ident = row["id"]
-                    if live and (row["category"] != "silent_report" or ident in self.proofs):
+                    if ident in self.proofs or ident in self.standing:
                         continue
                     self.inflight = ident
                     try:
@@ -1677,20 +1674,19 @@ class SatisfactionVerifier(WaitVerifier):
                 except SOURCE_ERRORS:
                     pass
         except CollectionDeadline:
-            for ident in [*([] if live else looked), self.inflight]:
-                if ident is not None and ident not in self.attempted and ident not in self.proofs \
-                        and ident not in self.standing:
-                    self.attempted.append(ident)
-                    if ident != self.inflight or type(ticks.get(ident)) is not int:
-                        self.demoted.add(ident)
+            for ident in [*(looked if stage == 0 else []), self.inflight]:
+                if ident is not None and ident not in self.proofs and ident not in self.standing:
+                    self.cut.add(ident)
+                    if ident not in self.attempted:
+                        self.attempted.append(ident)
             raise
         return self
 
     def unchecked(self, row):
-        """The deadline, not the row, left this row unread: never reached, only given a cheap look, or cut off a first time."""
+        """The deadline, not the row, left this row unread: never reached, only given a cheap look, or cut off."""
         ident = row["id"]
         return self.expired and bool(self.attempted or self.proofs or self.standing) and ident in self.queued \
-            and ident not in self.proofs and (ident not in self.attempted or ident in self.demoted)
+            and ident not in self.proofs and (ident not in self.attempted or ident in self.cut)
 
     def prepared(self, row, now, action):
         entry = self.proofs.get(row["id"])
@@ -1918,6 +1914,13 @@ def ledger_action(args, state, now, prepared=None):
                 print(render_unchecked(unchecked))
                 print(UNCHECKED_RETRY)
                 return 1
+            unpresented = [row["id"] for row in missing
+                           if not any(row["id"] in presented for presented in controls["presentations"].values())]
+            if unpresented:
+                for ident in unpresented:
+                    pending[ident] = controls["sequence"]
+                    stamps.setdefault(actor, {})[ident] = now
+                write_ledger(state, report, receipt=True)
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
             if unchecked:

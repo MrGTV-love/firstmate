@@ -2677,11 +2677,15 @@ print('PASS: bound PR/status and Main-owned routed waits survive unchanged prese
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 # A firstmate-owned row parked behind a live captain hold takes a standing escalation, like a captain-owned row.
-import datetime as dt, json, os, re, shutil, subprocess, sys, time
+import datetime as dt, json, os, re, shutil, sqlite3, subprocess, sys, time
 from pathlib import Path
 root, world = map(Path, sys.argv[1:])
 code = world / 'park-code'
 shutil.copytree(root / 'bin', code / 'bin')
+module = code / 'bin/fm_open_loops.py'
+real_deadline = module.read_text()
+assert real_deadline.count('EVIDENCE_DEADLINE_SECONDS = 5\n') == 1
+module.write_text(real_deadline.replace('EVIDENCE_DEADLINE_SECONDS = 5\n', 'EVIDENCE_DEADLINE_SECONDS = 120\n'))
 now = int(time.time())
 iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 loops = code / 'bin/fm-open-loops.sh'
@@ -2702,7 +2706,7 @@ def park(name, **fields):
     backlog.write_text(HELD)
     clock = dict(now=now)
     env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_SUPERVISION_ACTOR='main',
-               FM_TEST_SEAM='1', FM_TEST_HARNESS='codex')
+               NM_HOME=str(home / 'nm'), FM_TEST_SEAM='1', FM_TEST_HARNESS='codex')
     for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
         env.pop(key, None)
     row = dict(id='row-' + name, category='unanswered_question', subject='held-job:ci-control', owner='firstmate',
@@ -3039,6 +3043,7 @@ backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 broken = ok(loops, '--present-overdue')
 assert all(each['id'] in broken.stdout for each in standing) and 'STANDING' not in broken.stdout, broken
 assert snapshot_runs() == 1, ('an unreadable backlog was read again for each standing row', snapshot_runs())
+module.write_text(real_deadline)
 # (h) The backlog is read once before the receipt lock, and a hung reader ends at the evidence deadline instead of
 # holding the receipt and queue locks: the unproven standing row fails closed and demands its action.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
@@ -3069,8 +3074,18 @@ assert row['id'] in presented.stdout and 'STANDING' not in presented.stdout, pre
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
     'stalled-preread', category='unlanded_commit', subject='held-job', next_action='land or discard the unlanded commits',
     evidence='1 commit not on main', source=dict(kind='commits', task='held-job'))
-(home / 'state/fresh-worker.meta').write_text('kind=ship\nspawn_gen=fresh-generation\n')
-(home / 'state/fresh-worker.status').write_text(f'working [at={now - 10}]: progress\n')
+(home / 'nm').mkdir()
+(home / 'projects/fresh').mkdir()
+(home / 'state/fresh-worker.meta').write_text(
+    f'kind=ship\nspawn_gen=fresh-generation\nproject={home}/projects/fresh\nbranch=fm/fresh-worker\n')
+(home / 'state/fresh-worker.status').write_text(f'working [at={now - 7200}]: implementing\n')
+with sqlite3.connect(home / 'nm/state.sqlite') as db:
+    db.executescript('CREATE TABLE repos(id INTEGER, working_path TEXT);'
+        'CREATE TABLE runs(id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT, status TEXT);'
+        'CREATE TABLE step_results(run_id INTEGER, step TEXT, started_at TEXT, completed_at TEXT);')
+    db.execute('INSERT INTO repos VALUES(1,?)', (f'{home}/projects/fresh',))
+    db.execute('INSERT INTO runs VALUES(1,1,?,?,?)', ('fm/fresh-worker', iso(now - 7200), 'running'))
+    db.execute('INSERT INTO step_results VALUES(1,?,?,NULL)', ('test', iso(now - 10)))
 silent = dict(id='row-stalled-preread-silent', category='silent_report', subject='fresh-worker', owner='firstmate',
               next_action='check in: progress, blockers, cross-workstream dependencies', age_seconds=7200,
               limit_seconds=900, overdue=True, evidence='old report')
@@ -3083,7 +3098,7 @@ presented = ok(loops, '--present-overdue')
 assert time.monotonic() - started < 45, 'the presentation waited on a stalled backlog read'
 assert 'NOT CHECKED THIS PASS' not in presented.stdout and 'retry:' not in presented.stdout, presented.stdout
 assert row['id'] in presented.stdout.split('STANDING')[0], 'the held row is an ordinary obligation when its backlog cannot be read'
-assert 'STANDING' in presented.stdout and silent['id'] in presented.stdout.split('STANDING')[1], 'a stalled backlog read must not stop the status-event proof'
+assert 'STANDING' in presented.stdout and silent['id'] in presented.stdout.split('STANDING')[1], 'a stalled backlog read must not stop the run-step proof'
 assert stored()['handling']['actions'][silent['id']]['kind'] == 'observed'
 refused = call(loops, '--check-actions')
 assert refused.returncode == 1 and row['id'] in refused.stdout and silent['id'] not in refused.stdout, refused
@@ -3111,9 +3126,21 @@ snapshot = code / 'bin/fm-fleet-snapshot.sh'
 snapshot.write_text('#!/usr/bin/env bash\nset -eo pipefail\n'
     'if [ "$1" = --home-input ]; then\n'
     '  "$(dirname "$0")/real-fleet-snapshot.sh" --contribution-input | jq \' .schema="fm-fleet-home-input.v1" | .tasks=[] \'\n'
-    'else exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"; fi\n')
+    'else [ ! -e "$FM_HOME/hang-snapshot" ] || exec sleep 3600; exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"; fi\n')
 snapshot.chmod(0o755)
 loops = code / 'bin/fm-open-loops.sh'
+
+def run_step(home, task, age):
+    project = home / 'projects' / task; project.mkdir(parents=True, exist_ok=True)
+    (home / f'state/{task}.meta').write_text(f'kind=ship\nspawn_gen=generation-{task}\nproject={project}\nbranch=fm/{task}\n')
+    with sqlite3.connect(home / 'nm/state.sqlite') as db:
+        db.executescript('CREATE TABLE IF NOT EXISTS repos(id INTEGER, working_path TEXT);'
+            'CREATE TABLE IF NOT EXISTS runs(id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT, status TEXT);'
+            'CREATE TABLE IF NOT EXISTS step_results(run_id INTEGER, step TEXT, started_at TEXT, completed_at TEXT);')
+        n = db.execute('SELECT COALESCE(MAX(id), 0) + 1 FROM runs').fetchone()[0]
+        db.execute('INSERT INTO repos VALUES(?,?)', (n, str(project)))
+        db.execute('INSERT INTO runs VALUES(?,?,?,?,?)', (n, n, f'fm/{task}', iso(now - 7200), 'running'))
+        db.execute('INSERT INTO step_results VALUES(?,?,?,NULL)', (n, 'test', iso(now - age)))
 
 def case(name, category='silent_report', **fields):
     home = world / ('satisfaction-' + name)
@@ -3198,28 +3225,54 @@ with (home / 'state/worker.status').open('a') as status_log:
 assert call(loops, '--check-actions').returncode == 1, 'a changed status file drops the stored receipt'
 assert row['id'] in ok(loops, '--present-overdue').stdout
 
-# Recent canonical status and pipeline events are independent satisfaction routes; their inclusive expiry reopens.
-for source in ('status', 'run-step'):
-    home, row, ledger, env, call, ok, drain, ack = case('fresh-' + source)
-    (home / 'worker-state').write_text('state: unknown · source: none · current reader unavailable\n')
-    if source == 'status':
-        (home / 'state/worker.status').write_text(f'working [at={now-10}]: progress\n')
-    else:
-        project = home / 'projects/example'; project.mkdir()
-        (home / 'state/worker.meta').write_text(f'kind=ship\nspawn_gen=worker-generation\nproject={project}\nbranch=fm/worker\n')
-        with sqlite3.connect(home / 'nm/state.sqlite') as db:
-            db.executescript('CREATE TABLE repos(id INTEGER, working_path TEXT);'
-                'CREATE TABLE runs(id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT, status TEXT);'
-                'CREATE TABLE step_results(run_id INTEGER, step TEXT, started_at TEXT, completed_at TEXT);')
-            db.execute('INSERT INTO repos VALUES(1,?)', (str(project),))
-            db.execute('INSERT INTO runs VALUES(1,1,?,?,?)', ('fm/worker', iso(now-7200), 'running'))
-            db.execute('INSERT INTO step_results VALUES(1,?,?,NULL)', ('test', iso(now-10)))
+# A receipt that lapsed since the last presentation leaves a row no actor presented: the refusal records its
+# presentation, so the commands it prints are accepted without another drain.
+for route in ('escalated', 'steered'):
+    home, row, ledger, env, call, ok, drain, ack = case('lapsed-' + route)
+    (home / 'worker-state').write_text('state: working · source: run-step · run: live-validation\n')
     _, boundary = drain()
     assert ack(boundary).returncode == 0
-    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
-    assert source + ' event' in action['evidence'] and action['recheck_epoch'] == now + 890, action
-    env['FM_OPEN_LOOPS_NOW'] = str(now + 890)
-    assert call(loops, '--check-actions').returncode == 1, source
+    assert row['id'] not in json.loads(ledger.read_text())['handling']['presentations'].get('main', {}), 'an automatic row is never presented'
+    (home / 'worker-state').write_text('state: paused · source: status-log · stopped\n')
+    env['FM_OPEN_LOOPS_NOW'] = str(now + 900)
+    refused = ack(boundary)
+    assert refused.returncode == 1 and row['id'] in refused.stdout and '--check-in "worker"' in refused.stdout, refused
+    assert row['id'] in json.loads(ledger.read_text())['handling']['presentations']['main'], 'the refusal records the presentation'
+    if route == 'escalated':
+        recorded = call(loops, 'action', row['id'], 'escalated', '--evidence', 'asked the owner about the stopped worker')
+    else:
+        inbox = home / 'state/worker.inbox'; inbox.mkdir()
+        (inbox / '001.msg').write_text(f'at={iso(now + 901)}\n--\nCheck in: report progress, blockers, and cross-workstream dependencies\n')
+        recorded = call(loops, 'action', row['id'], 'steered', '--evidence', '001.msg')
+    assert recorded.returncode == 0, (route, recorded)
+    assert ack(boundary).returncode == 0, route
+
+# A recent no-mistakes run-step event satisfies a check-in row, and its inclusive expiry reopens. A recent status
+# event alone proves nothing: the live reader decides.
+home, row, ledger, env, call, ok, drain, ack = case('fresh-run-step')
+(home / 'worker-state').write_text('state: unknown · source: none · current reader unavailable\n')
+project = home / 'projects/example'; project.mkdir()
+(home / 'state/worker.meta').write_text(f'kind=ship\nspawn_gen=worker-generation\nproject={project}\nbranch=fm/worker\n')
+with sqlite3.connect(home / 'nm/state.sqlite') as db:
+    db.executescript('CREATE TABLE repos(id INTEGER, working_path TEXT);'
+        'CREATE TABLE runs(id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT, status TEXT);'
+        'CREATE TABLE step_results(run_id INTEGER, step TEXT, started_at TEXT, completed_at TEXT);')
+    db.execute('INSERT INTO repos VALUES(1,?)', (str(project),))
+    db.execute('INSERT INTO runs VALUES(1,1,?,?,?)', ('fm/worker', iso(now-7200), 'running'))
+    db.execute('INSERT INTO step_results VALUES(1,?,?,NULL)', ('test', iso(now-10)))
+_, boundary = drain()
+assert ack(boundary).returncode == 0
+action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+assert 'run-step event' in action['evidence'] and action['recheck_epoch'] == now + 890, action
+env['FM_OPEN_LOOPS_NOW'] = str(now + 890)
+assert call(loops, '--check-actions').returncode == 1, 'run-step event'
+home, row, ledger, env, call, ok, drain, ack = case('fresh-status-only')
+(home / 'worker-state').write_text('state: unknown · source: none · current reader unavailable\n')
+(home / 'state/worker.status').write_text(f'working [at={now-10}]: progress\n')
+_, boundary = drain()
+refused = ack(boundary)
+assert refused.returncode == 1 and row['id'] in refused.stdout, 'a fresh status event alone is not machine evidence'
+assert row['id'] not in json.loads(ledger.read_text()).get('handling', {}).get('actions', {})
 
 # A standing deferral with an older outstanding presentation must not gate acknowledgement.
 home, row, ledger, env, call, ok, drain, ack = case('standing', category='stalled_worker')
@@ -3380,8 +3433,8 @@ module.write_text(deadline_source)
 # A hung current-state reader cannot extend the queue-lock hold: the pass ends at its deadline, rows with cheaper
 # evidence are still satisfied, and the row that only the hung reader could prove demands its action.
 home, row, ledger, env, call, ok, drain, ack = case('hung-reader')
-(home / 'state/other.meta').write_text('kind=ship\nspawn_gen=other-generation\n')
-(home / 'state/other.status').write_text(f'working [at={now-10}]: progress\n')
+(home / 'state/other.status').write_text(f'working [at={now-7200}]: implementing\n')
+run_step(home, 'other', 10)
 fresh = dict(row, id='row-hung-reader-other', subject='other')
 record = json.loads(ledger.read_text()); record['rows'].append(fresh)
 ledger.write_text(json.dumps(record))
@@ -3394,7 +3447,7 @@ try:
     assert elapsed < 45, ('the drain waited on a hung reader', elapsed)
     assert result.stdout.startswith('NOT CHECKED THIS PASS') and row['id'] in result.stdout.split('STANDING')[0], result
     assert 'OVERDUE:' not in result.stdout and '--check-in' not in result.stdout, 'a first cut-off read is retried, not steered'
-    assert fresh['id'] in result.stdout.split('STANDING')[1], 'a row with a recent status event is satisfied despite the hung reader'
+    assert fresh['id'] in result.stdout.split('STANDING')[1], 'a row with a recent run-step event is satisfied despite the hung reader'
     hung = int((home / 'hung-pid').read_text())
     try:
         os.kill(hung, 0)
@@ -3405,7 +3458,8 @@ try:
     refused = ack(boundary)
     assert time.monotonic() - started < 45, 'the acknowledgement waited on a hung reader'
     assert refused.returncode == 1 and row['id'] in refused.stdout and fresh['id'] not in refused.stdout, refused
-    assert f'--check-in "worker"' in refused.stdout, 'a reader cut off a second time is an obligation again'
+    assert 'were not checked' in refused.stdout and 'retry:' in refused.stdout and '--check-in' not in refused.stdout, \
+        ('a reader cut off a second time is still not checked, never a steer', refused.stdout)
     actions = json.loads(ledger.read_text())['handling']['actions']
     assert actions[fresh['id']]['kind'] == 'observed' and row['id'] not in actions, actions
 finally:
@@ -3500,12 +3554,42 @@ assert 'retry:' in refused.stdout and '--check-in' not in refused.stdout and 'he
 (home / 'budget').write_text('1'); reads.write_text('0')
 mixed = call(loops, '--check-actions')
 assert mixed.returncode == 1, mixed
-for name in ('stoppedC', 'stoppedA'):
-    assert f'--check-in "{name}"' in mixed.stdout, (name, mixed.stdout)
-assert '--check-in "stoppedB"' not in mixed.stdout and 'NOT CHECKED THIS PASS' in mixed.stdout, mixed.stdout
-assert '"row-unchecked-stoppedB"' in mixed.stdout.split('NOT CHECKED THIS PASS')[1], mixed.stdout
+assert '--check-in "stoppedC"' in mixed.stdout, mixed.stdout
+unread = mixed.stdout.split('NOT CHECKED THIS PASS')[1]
+for name in ('stoppedA', 'stoppedB'):
+    assert f'--check-in "{name}"' not in mixed.stdout, (name, 'a cut-off read, first or repeated, is never a steer', mixed.stdout)
+    assert f'"row-unchecked-{name}"' in unread, (name, mixed.stdout)
 assert not list((home / 'state').glob('*.inbox')), 'no worker was steered'
 module.write_text(deadline_source)
+
+# A stalled backlog read inside a status-question probe leaves only that question unchecked: the silent report a
+# run-step event proves is satisfied first, and a retry once the backlog answers proves the question too.
+home, row, ledger, env, call, ok, drain, ack = case('stalled-question')
+(home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n- [ ] fix-ship - Implement fix (repo: firstmate) (kind: ship)\n'
+    '- [ ] question - Await fix blocked-by: fix-ship (repo: firstmate) (kind: decision)\n\n## Done\n')
+(home / 'state/worker.status').write_text(f'needs-decision [at={now-7200}] [key=question]: await the named fix\n')
+question = next(r for r in json.loads(ok(loops, '--heartbeat', '--json').stdout)['rows'] if r['subject'] == 'worker:question')
+(home / 'state/runner.status').write_text(f'working [at={now-7200}]: implementing\n')
+run_step(home, 'runner', 10)
+silent = dict(row, id='row-stalled-question-runner', subject='runner', age_seconds=7000)
+record = json.loads(ledger.read_text()); record['rows'].append(silent); ledger.write_text(json.dumps(record))
+(home / 'hang-snapshot').touch()
+started = time.monotonic()
+presented = ok(loops, '--present-overdue')
+assert time.monotonic() - started < 45, 'the presentation waited on a stalled backlog read'
+unread, standing = presented.stdout.split('NOT CHECKED THIS PASS')[1].split('STANDING')
+assert question['id'] in unread and silent['id'] not in unread, presented.stdout
+assert silent['id'] in standing, 'a silent report a run-step event proves is satisfied before the stalled question'
+assert 'OVERDUE:' not in presented.stdout and '--check-in' not in presented.stdout, presented.stdout
+refused = call(loops, '--check-actions')
+assert refused.returncode == 1 and 'were not checked' in refused.stdout and question['id'] in refused.stdout, refused
+assert silent['id'] not in refused.stdout and 'help:' not in refused.stdout, refused.stdout
+actions = json.loads(ledger.read_text())['handling']['actions']
+assert actions[silent['id']]['kind'] == 'observed' and question['id'] not in actions, actions
+(home / 'hang-snapshot').unlink()
+assert call(loops, '--check-actions').returncode == 0, 'a retry once the backlog answers proves the question too'
+assert json.loads(ledger.read_text())['handling']['actions'][question['id']]['kind'] == 'backlog_wait'
+assert not list((home / 'state').glob('*.inbox')), 'no worker was steered'
 print('PASS: a hung current-state reader ends at the evidence deadline; cheaper evidence still satisfies other rows and the unproven row demands its action', flush=True)
 print('PASS: automatic evidence reads leave the receipt lock available; concurrent row, metadata and status changes reject stale proofs', flush=True)
 print('PASS: stored automatic receipts are trusted until their recheck epoch or an input change, then re-proven; overdue rows are proven oldest first across presentations', flush=True)

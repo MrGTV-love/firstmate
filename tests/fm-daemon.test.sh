@@ -404,7 +404,7 @@ EOF
 }
 
 test_unchecked_overdue_rows_are_retried_not_escalated_by_away_daemon() {
-  local dir state fakebin buffer reader report id kind
+  local dir state fakebin buffer reader id kind pass
   dir=$(make_supercase overdue-unchecked); state="$dir/state"; fakebin="$dir/daemon-bin"
   buffer="$state/.subsuper-escalations"; reader="$dir/reader.sh"
   mkdir -p "$dir/data" "$dir/config" "$dir/projects" "$fakebin"
@@ -413,7 +413,7 @@ import json, sys
 from pathlib import Path
 home, state, now = Path(sys.argv[1]).resolve(), Path(sys.argv[2]), int(sys.argv[3])
 rows = []
-for name, age in (('away-a', 7400), ('away-b', 7300), ('away-c', 7200)):
+for name, age in (('away-a', 7400), ('away-b', 7300), ('away-c', 7200), ('away-lapsed', 7100)):
     (state / f'{name}.meta').write_text(f'kind=ship\nspawn_gen=generation-{name}\n')
     (state / f'{name}.status').write_text(f'working [at={now - 7200}]: implementing\n')
     rows.append(dict(id='row-' + name, category='silent_report', subject=name, owner='firstmate',
@@ -437,35 +437,73 @@ SH
     ( export FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$reader" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999
       escalate_overdue_rows "$state" )
   }
+  receipted() { python3 -c 'import json, sys; sys.exit(sys.argv[2] not in json.load(open(sys.argv[1])).get("handling", {}).get("actions", {}))' "$state/open-loops.json" "$1"; }
+  python3 - "$state/open-loops.json" <<'PYTRIM'
+import json, sys
+record = json.load(open(sys.argv[1]))
+record['rows'] = [r for r in record['rows'] if r['id'] != 'row-away-lapsed']
+json.dump(record, open(sys.argv[1], 'w'))
+PYTRIM
+
+  # Two rows the pass could not finish reading are retried, and only the row it fully tried and could not prove is
+  # escalated: the one-read budget lets the first pass finish a, cut b off and never reach c; the second pass then
+  # finishes c, cuts a off a second time and never reaches b.
   printf '1\n' > "$dir/budget"; printf '0\n' > "$dir/reads"
   loops --present-overdue > "$dir/present.out" || fail "the first presentation failed"
   assert_contains "$(cat "$dir/present.out")" 'NOT CHECKED THIS PASS' "the cut rows were not shown as not checked"
   printf '0\n' > "$dir/reads"
   escalate || fail "an unchecked row wedged the away escalation"
-  for id in row-away-a row-away-c; do
-    assert_contains "$(cat "$buffer" 2>/dev/null)" "overdue open work: \"$id\"," "a row the pass tried and could not prove did not reach the digest"
-    kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"][sys.argv[2]]["kind"])' "$state/open-loops.json" "$id")
-    [ "$kind" = escalated ] || fail "$id was not receipted by the away escalation: $kind"
+  assert_contains "$(cat "$buffer" 2>/dev/null)" 'overdue open work: "row-away-c",' "a row the pass fully tried and could not prove did not reach the digest"
+  kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["row-away-c"]["kind"])' "$state/open-loops.json")
+  [ "$kind" = escalated ] || fail "row-away-c was not receipted by the away escalation: $kind"
+  for id in row-away-a row-away-b; do
+    case "$(cat "$buffer" 2>/dev/null)" in *"\"$id\""*) fail "$id, a row the deadline left unread, was escalated" ;; esac
+    ! receipted "$id" || fail "$id, a row the deadline left unread, was given a receipt"
   done
-  case "$(cat "$buffer" 2>/dev/null)" in *'"row-away-b"'*) fail "a row the deadline left unread was escalated" ;; esac
-  python3 -c 'import json, sys; sys.exit("row-away-b" in json.load(open(sys.argv[1])).get("handling", {}).get("actions", {}))' \
-    "$state/open-loops.json" || fail "a row the deadline left unread was given a receipt"
-  [ ! -e "$state/away-b.inbox" ] || fail "a row the deadline left unread was steered"
+  [ ! -e "$state/away-a.inbox" ] && [ ! -e "$state/away-b.inbox" ] || fail "a row the deadline left unread was steered"
 
-  rm -f "$buffer"; printf '0\n' > "$dir/budget"; printf '0\n' > "$dir/reads"
+  # Every probe the deadline cuts off stays unchecked, however many passes cut the same row again.
+  rm -f "$buffer"; printf '0\n' > "$dir/budget"
   python3 - "$state/open-loops.json" <<'PYRESET'
 import json, sys
 record = json.load(open(sys.argv[1]))
 record['handling'] = dict(sequence=0, presentations={}, presented_at={}, actions={})
 json.dump(record, open(sys.argv[1], 'w'))
 PYRESET
-  loops --present-overdue > /dev/null || fail "the second presentation failed"
-  escalate || fail "rows nobody could check wedged the away escalation"
-  [ ! -s "$buffer" ] || fail "rows the deadline left unread reached the escalation digest"
-  python3 -c 'import json, sys; sys.exit(bool(json.load(open(sys.argv[1]))["handling"]["actions"]))' "$state/open-loops.json" \
-    || fail "rows the deadline left unread were given receipts"
-  unset -f loops escalate
-  pass "away mode retries rows the evidence deadline left unread and escalates only rows it tried and could not prove"
+  for pass in 1 2 3 4; do
+    printf '0\n' > "$dir/reads"
+    loops --present-overdue > /dev/null || fail "presentation $pass failed"
+    escalate || fail "rows nobody could check wedged the away escalation on pass $pass"
+    [ ! -s "$buffer" ] || fail "rows the deadline cut off reached the escalation digest on pass $pass"
+    ! receipted row-away-a && ! receipted row-away-b && ! receipted row-away-c \
+      || fail "rows the deadline cut off were given receipts on pass $pass"
+  done
+  python3 -c 'import json, sys; t = json.load(open(sys.argv[1]))["handling"]["attempts"]; sys.exit(not all(t.get("row-away-" + n) for n in "abc"))' "$state/open-loops.json" \
+    || fail "the cut rows were not rotated behind the rows the pass never reached"
+  [ ! -e "$state/away-a.inbox" ] && [ ! -e "$state/away-b.inbox" ] && [ ! -e "$state/away-c.inbox" ] \
+    || fail "a row the deadline cut off was steered"
+
+  # A receipt that lapsed since the last presentation leaves a row no actor presented: the refusal records its
+  # presentation, so the escalation the daemon runs for it is accepted.
+  rm -f "$buffer"; printf '99\n' > "$dir/budget"; printf '0\n' > "$dir/reads"
+  python3 - "$state/open-loops.json" "$(date +%s)" <<'PYLAPSED'
+import json, sys
+record = json.load(open(sys.argv[1]))
+now = int(sys.argv[2])
+record['rows'] = [dict(id='row-away-lapsed', category='silent_report', subject='away-lapsed', owner='firstmate',
+                       next_action='check in: progress, blockers, cross-workstream dependencies',
+                       age_seconds=7100, limit_seconds=900, overdue=True, evidence='old report')]
+record['handling'] = dict(sequence=1, presentations={}, presented_at={},
+                          actions={'row-away-lapsed': dict(kind='observed', evidence='old live run', at_epoch=now - 2000,
+                                                           sequence=1, digest='lapsed', recheck_epoch=now - 1000)})
+json.dump(record, open(sys.argv[1], 'w'))
+PYLAPSED
+  escalate || fail "a lapsed automatic receipt wedged the away escalation"
+  assert_contains "$(cat "$buffer" 2>/dev/null)" 'overdue open work: "row-away-lapsed",' "the lapsed row did not reach the digest"
+  kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["row-away-lapsed"]["kind"])' "$state/open-loops.json")
+  [ "$kind" = escalated ] || fail "the lapsed row was not receipted by the away escalation: $kind"
+  unset -f loops escalate receipted
+  pass "away mode retries rows the evidence deadline cut off or never reached, escalates only rows it fully tried, and accepts the escalation of a lapsed receipt"
 }
 
 test_busy_inbox_escalation_reaches_supervision() {
