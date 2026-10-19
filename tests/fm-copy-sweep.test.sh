@@ -690,6 +690,37 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text(
   pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code"
 }
 
+test_a_failed_preservation_prints_no_completing_command_and_leaves_the_copy() {
+  local admin line
+  make_locked_copy_case preservefailed dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FAKEBIN/cp"
+  chmod +x "$FAKEBIN/cp"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a failed preservation should exit 1, got $RC: $OUT"
+  line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
+    || fail "the failed preservation was not reported as FAILED: $OUT"
+  assert_contains "$line" "rule=ignored-bytes-preserved" "the FAILED line lost the typed refusal"
+  assert_contains "$line" "human-only-exit: " "the failed preservation did not end in a human-only exit"
+  assert_not_contains "$OUT" "completing-command:" "a sweep refusal printed a command that cannot run"
+  assert_not_contains "$OUT" "fm-teardown.sh" "a sweep refusal named the teardown command"
+  assert_not_contains "$OUT" "REMOVED" "a copy whose preservation failed was reported removed"
+  [ -e "$(copy_path locked)" ] || fail "a copy whose preservation failed was removed"
+  registered locked || fail "a copy whose preservation failed is no longer registered"
+  [ -f "$admin/locked" ] || fail "a copy whose preservation failed lost its lock"
+  assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "the ignored file changed"
+  [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a copy whose preservation failed was logged as removed"
+  assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
+    "the driver was asked for more than its plan"
+  jq -es 'length == 1 and .[0].rule_id == "ignored-bytes-preserved" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only"' \
+    "$HOMED/state/friction.jsonl" >/dev/null \
+    || fail "the refusal was not one human-only friction event: $(cat "$HOMED/state/friction.jsonl" 2>/dev/null)"
+  pass "a copy whose ignored files cannot be preserved stays locked and registered, the FAILED line ends in a human-only exit with no completing command, and the run exits 1"
+}
+
 driver_pid_count() { [ -f "$W/driver.pids" ] && wc -l < "$W/driver.pids" | tr -d ' ' || printf '0\n'; }
 
 # Fails when any pid the fake driver recorded is still running.
@@ -1700,6 +1731,7 @@ run_case test_recycled_launcher_lock_is_released_by_the_driver
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
+run_case test_a_failed_preservation_prints_no_completing_command_and_leaves_the_copy
 run_case test_unproved_plan_verdicts_hold_the_copy
 run_case test_a_bare_allowed_literal_plan_releases_the_copy
 run_case test_a_zero_padded_plan_timeout_is_read_as_decimal

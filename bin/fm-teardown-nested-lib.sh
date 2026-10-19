@@ -64,7 +64,8 @@
 # the final project-lock wait, so the driver never runs while the lock is held,
 # except when teardown keeps project custody through the return.
 #
-# Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh and bin/fm-refuse-lib.sh first,
+# Requires bin/fm-task-copy-lib.sh, bin/fm-lock-lib.sh, bin/fm-pr-lib.sh and
+# bin/fm-refuse-lib.sh first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, DATA, META,
 # STATE, WT, TASK_TMP, FORCE, KIND, LEGACY_RECORD_GIVEN, TEARDOWN_NESTED_COPIES,
 # TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT, TEARDOWN_HELD_SLOT) and functions
@@ -129,7 +130,13 @@ teardown_copy_question() {  # <rule> <copy>
     creation-lock-owner) printf 'Who owns the creation lock on %s, and may it be released?' "$2" ;;
     nonforced-removal) printf 'What retained disposition covers the contents Git still protects in %s? Preserve this copy; no forced removal is authorized.' "$2" ;;
     registered-copy-proven) printf 'Which task and home retain the work in %s, or what verified landing covers it? No discard or forced removal is authorized.' "$2" ;;
-    ignored-bytes-preserved) printf "This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?" ;;
+    ignored-bytes-preserved)
+      if fm_task_id_path_safe "$ID"; then
+        printf "This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?"
+      else
+        printf 'This release has no teardown task id, so no completing command is printed. Which owner-approved storage or disposition preserves the ignored files of %s? Keep the copy; no removal is authorized.' "$2"
+      fi
+      ;;
     *) printf 'What verified landing or retained ownership covers %s (%s)? Keep this copy until that evidence exists; no discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
   esac
 }
@@ -137,8 +144,9 @@ teardown_copy_question() {  # <rule> <copy>
 # One event per refused copy/predicate, not another event for the registered-copy
 # wrapper that repeats it. The command re-enters the existing proof/preservation
 # owner without force, so a forced or legacy-record run, which it could not
-# complete, gets a human-only exit instead. A new custody/disposition decision is
-# asked explicitly.
+# complete, and a release whose id is not a teardown task id, which
+# bin/fm-teardown.sh would reject, get a human-only exit instead. A new
+# custody/disposition decision is asked explicitly.
 teardown_refuse_copy() {  # <rule> <missing> <copy>
   local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh}
   # An unavailable inspection is not a policy judgment. The later custody
@@ -149,7 +157,7 @@ teardown_refuse_copy() {  # <rule> <missing> <copy>
     return 0
   fi
   exit_text=$(teardown_copy_question "$1" "$3")
-  if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ]; then
+  if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ] && fm_task_id_path_safe "$ID"; then
     kind=machine
     printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
     exit_text=$command
