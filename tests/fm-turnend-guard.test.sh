@@ -413,6 +413,7 @@ install_guard_scripts() {
   # Launch probe sibling of fm-cursor-lib.sh; keep it next to the copy so a
   # fixture that ever verifies an executable does not source a missing file.
   cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/fm-timeout-lib.sh"
+  cp "$ROOT/bin/fm-dsh-lib.sh" "$dir/bin/fm-dsh-lib.sh"
   mkdir -p "$dir/docs"
   cp -R "$ROOT/docs/supervision-protocols" "$dir/docs/supervision-protocols"
   chmod +x "$dir/bin/fm-turnend-guard.sh" "$dir/bin/fm-turnend-guard-grok.sh" "$dir/bin/fm-operational-input.sh" "$dir/bin/fm-supervision-instructions.sh" "$dir/bin/fm-harness.sh"
@@ -1816,6 +1817,7 @@ install_integrated_autoarm() {
   # Launch probe sibling of fm-cursor-lib.sh; keep it next to the copy so a
   # fixture that ever verifies an executable does not source a missing file.
   cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/fm-timeout-lib.sh"
+  cp "$ROOT/bin/fm-dsh-lib.sh" "$dir/bin/fm-dsh-lib.sh"
   cp "$ROOT/bin/fm-lock.sh" "$dir/bin/fm-lock.sh"
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-lock.sh"
