@@ -107,13 +107,31 @@ SH
     assert_absent "$dir/home/state/dsh-route.control-relaunch" "$case_name refusal must precede the relaunch transaction"
   done
   # An explicit omp/pi stand-in on a DeepSeek model is legal: DeepSeek routes to
-  # dsh only by default, so the removed contradiction refusal must not reappear.
+  # dsh only by default, so the relaunch must be admitted and record the route.
   dir=$(new_case dsh-route-stand-in dsh-route)
   add_ship_task "$dir" dsh-route claude
+  cat > "$dir/fakebin/omp" <<'SH'
+#!/bin/sh
+if [ "${1:-}" = --version ]; then
+  printf 'omp/18.1.20\n'
+  exit 0
+fi
+if [ "${1:-}" = models ]; then
+  printf '{"models":[]}\n'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$dir/fakebin/omp"
   out=$(run_control "$dir" dsh-route relaunch --harness omp --model deepseek/deepseek-v4-flash --note "preserve current agent"); rc=$?
-  assert_not_contains "$out" "routes to dsh, not to 'omp'" \
-    "an explicit DeepSeek stand-in must not be refused as a contradiction"
-  pass "fm-control relaunch: dsh-without-model refuses pre-stop and explicit DeepSeek stand-ins stay legal"
+  expect_code 0 "$rc" "an explicit DeepSeek stand-in relaunch should be admitted: $out"
+  assert_contains "$out" "relaunched dsh-route harness=omp" \
+    "the stand-in relaunch should report the new harness"
+  [ "$(meta_field "$dir" dsh-route harness)" = omp ] \
+    || fail "the stand-in relaunch should record harness=omp"
+  [ "$(meta_field "$dir" dsh-route model)" = deepseek/deepseek-v4-flash ] \
+    || fail "the stand-in relaunch should record the DeepSeek model"
+  pass "fm-control relaunch: dsh-without-model refuses pre-stop and explicit DeepSeek stand-ins are admitted"
 }
 
 test_relaunch_omp_billing_admission_preserves_running_agents() {
