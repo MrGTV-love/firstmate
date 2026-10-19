@@ -2369,13 +2369,18 @@ The captain data-egress decision 2026-10-08 authorizes Jev guard requests only f
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
 The shared [guard service](../bin/ten-levels/extensions/report.ts) checks scope and the complete serialized request before resolving a credential or calling the provider.
 The same project decision governs omp's native model routes; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that separate launch contract.
-For authorized screening, shell state contains the command and working directory, write state contains the path and complete replacement content, and result state contains the tool name, `source_role: tool_result` and complete text output.
+For authorized screening, shell state contains the command and working directory, write state contains the path and replacement-content pieces, and result state contains the tool name, `source_role: tool_result` and complete text output.
 These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
-A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling, never as a prefix standing in for the whole.
+A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling.
 Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
-A payload that would need more than 16 pieces, about 230 KB of text, still requires review before anything is sent, and the never-send policy checks the whole payload before the first piece leaves.
-The pieces run together under the same per-try and handler budgets described below and the same thresholds; shell/write payloads pass only when every piece passes, while result handling retains the advisory-band and trusted-read exceptions above.
+Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent; their complete-cover screening is unchanged.
+Write/edit content is not refused because it exceeds that model-screening budget: the guard screens at most 16 pieces and admits the remainder under deterministic local rules only.
+The existing root check applies to the whole operation, and a budget-limited write/edit is also checked over its whole replacement text for credential-shaped provider tokens, private-key headers, Bearer tokens, credential assignments and password-bearing connection URLs before any model request.
+These conservative shape checks can reject placeholders that resemble credentials and miss unfamiliar, encoded or semantically sensitive values; the remainder receives no model credential or file-kind assessment.
+Every admitted write records unique UTF-8 content bytes as `write_coverage.model_screened_bytes` and `write_coverage.local_only_bytes`, excluding framing and repeated overlap; a nonzero local-only count adds an explicit unscreened-remainder note to the audit row.
+The never-send policy still checks the whole payload, including the remainder, before the first piece leaves.
+The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while result handling retains the advisory-band and trusted-read exceptions above.
 A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
@@ -2400,7 +2405,8 @@ Each call obtains its own bounded judgment; no outcome of one call is carried to
 This is not sustained-outage permission to execute shell commands or write files.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
-While active, required pre-tool judgments that fail, are too large to cover within the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
+While active, required pre-tool judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
+Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
 On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude retains its existing advisory-only path.
 Clear scores at or below 0.20 pass without an advisory.
 Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.

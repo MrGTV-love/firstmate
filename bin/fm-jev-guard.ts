@@ -240,6 +240,15 @@ function whereBlocked(settled: { part: number; of: number }, reason: string): st
   return settled.of > 1 ? `${reason} (part ${settled.part + 1} of ${settled.of})` : reason;
 }
 
+/** Conservative shapes, not semantic secret detection; scan the whole budget-limited write before egress. */
+function credentialShaped(content: string): boolean {
+  return /-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY-----/.test(content)
+    || /(?:sk-(?:(?:live|test|proj|ant)-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|(?:AKIA|ASIA)[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{16,})/.test(content)
+    || /Bearer[ \t]+[A-Za-z0-9._~+/-]{16,}/i.test(content)
+    || /(?:api[_-]?key|access[_-]?token|auth[_-]?token|password|passwd|client[_-]?secret|secret[_-]?key)["']?\s*[:=]\s*["']?[^\s"'`,;]{16,}/i.test(content)
+    || /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]{8,}@/i.test(content);
+}
+
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
@@ -323,7 +332,12 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
         const content = tool === "edit" ? input.new_string : input.content;
         if (typeof content !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-        const settled = settle(await screenParts(service.plan({ path, content }, "content", WRITE_QUESTIONS), async (piece, judge) => {
+        const { pieces, ...coverage } = service.planWrite({ path, content }, WRITE_QUESTIONS);
+        if (coverage.local_only_bytes > 0 && credentialShaped(content)) {
+          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
+            "contains a credential-shaped value: the whole write was checked locally; no content was sent for model screening");
+        }
+        const settled = settle(await screenParts(pieces, async (piece, judge) => {
           const { kind, contains_secret } = (await judge({ path, content: piece }, WRITE_QUESTIONS)).answers;
           if (kind?.type !== "choice" || contains_secret?.type !== "noul") throw new ContractError("Invalid write answers.");
           return { ...gateWrite({ kind, contains_secret }), risk: contains_secret.noul };
@@ -331,6 +345,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         ({ result, trail } = settled);
         if ("failure" in settled) throw settled.failure;
         return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
+          ...(!settled.decision.block ? { write_coverage: coverage } : {}),
           enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
       }
       if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
