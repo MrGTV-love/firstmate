@@ -1,0 +1,43 @@
+##### --apply while over budget: removes reapme, raises ONE wake through the wake queue #####
+exit=0
+copy-sweep: wake raised: copy-sweep: pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant is over its budget: 0.01 GiB against 0.004 GiB; largest copies: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/dirtybig1 0.00 GiB HELD-D
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/reapme	branch fm/reapme at c6c2da3a7d67 (clean, no process, no record, HEAD contained in a remote branch)
+budget pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant: 0.01 GiB of 0.004 GiB, over
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo: 0.01 GiB of 20 GiB, ok
+queue rows:        1
+1792374298	1	check	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/state/copy-sweep.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/state/copy-sweep.check.sh: copy-sweep: pool /Users/charlesabrooker
+##### --apply again: same budget still over => NO second wake row #####
+exit=0
+0
+queue rows:        1 (expect still 1)
+
+################ LOAD GUARD ################
+real load: 20:45  up 22:52, 4 users, load averages: 42.17 37.43 41.90
+##### report with load above limit: no du, one skip line, still classifies #####
+copy-sweep: mode=report containers=1 copies=2
+copy-sweep: scan skipped: load 42.17 above limit 0.01
+REAPABLE-PROVEN	? GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/a	clean, no process, no record, HEAD contained in a remote branch
+REAPABLE-PROVEN	? GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/b	clean, no process, no record, HEAD contained in a remote branch
+summary: REAPABLE-PROVEN=2
+summary: HELD-LIVE-TASK=0
+##### 7 consecutive 'check' runs while load is above limit: quiet until run 6, wake once, then quiet #####
+run 1: exit=0 output=""
+run 2: exit=0 output=""
+run 3: exit=0 output=""
+run 4: exit=0 output=""
+run 5: exit=0 output=""
+run 6: exit=0 output="copy-sweep: scan skipped: load 40.79 above limit 0.01 on 6 runs in a row"
+run 7: exit=0 output=""
+run 8: exit=0 output=""
+record:
+schema	fm-copy-sweep-v1
+last_scan	1792374307
+over	skip:load
+skip	8	1792374307	scan skipped: load 40.79 above limit 0.01
+##### load drops (limit raised above real load): streak ends, skip record cleared #####
+exit=0 output bytes=       0
+schema	fm-copy-sweep-v1
+last_scan	1792374309
+##### du ran under nice? (sizes now cached) #####
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/a 2060 KiB
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/b 1036 KiB

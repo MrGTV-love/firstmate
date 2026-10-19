@@ -1,0 +1,38 @@
+##### A) outer copy holding a DIRTY inner copy that git status cannot see (.claude/worktrees/ ignored): apply keeps both #####
+git status in outer sees: '' (empty => invisible)
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer	another registered copy is inside it: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner	1 uncommitted or untracked path(s), first: ?? work.txt
+outer + inner byte-identical after apply
+unsaved file: unsaved work
+removal log exists: no
+
+##### B) lane (secondmate) home, run from the root home #####
+copy-sweep: mode=report containers=2 copies=3
+HELD-LIVE-TASK	0.00 GiB	lane-nostate/projects/p/.claude/worktrees/only	task nostate's active record names it as its home
+REAPABLE-PROVEN	0.00 GiB	lane-open/projects/p/.claude/worktrees/clean	clean, no process, no record, HEAD contained in a remote branch
+HELD-LIVE-TASK	0.00 GiB	lane-open/projects/p/.claude/worktrees/held	task lane-task's active record names it as its worktree
+budget container lane-nostate: 0.00 GiB of 20 GiB, ok
+budget container lane-open: 0.00 GiB of 20 GiB, ok
+--- apply ---
+REMOVED	lane-open/projects/p/.claude/worktrees/clean	branch fm/clean at d0999c85fa37 (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED lane-open/clean
+KEPT    lane-open/held
+KEPT    lane-nostate/only
+
+##### C) arm binds the check, the registered shim runs it under the process budget, disarm unbinds #####
+armed: state/copy-sweep.check.sh
+-rw-------  1 charlesabrooker  staff   84 Oct 18 21:03 copy-sweep.check-trust
+-rwx------  1 charlesabrooker  staff  305 Oct 18 21:03 copy-sweep.check.sh
+--- shim body ---
+#!/usr/bin/env bash
+export FM_HOME=<LAB>
+exec <WT>/bin/fm-proc-budget.sh -- <WT>/bin/fm-copy-sweep.sh check
+--- run the registered shim exactly as the watcher would (no FM_HOME in env) ---
+copy-sweep: pool <LAB>/th/vernant is over its budget: 0.00 GiB against 0.001 GiB; largest copies: <LAB>/th/vernant/1/repo/.claude/
+copy-sweep.check-trust
+copy-sweep.check.sh
+copy-sweep.record
+copy-sweep.sizes
+disarmed: state/copy-sweep.check.sh
+after disarm:
+copy-sweep.sizes

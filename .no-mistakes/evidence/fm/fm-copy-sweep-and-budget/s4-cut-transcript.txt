@@ -1,0 +1,89 @@
+building 60 real pool slots, each with a 2 MiB nested copy ...
+pool big total ~ 120 MiB
+
+##### 1) COMPLETE run (unbounded --apply is not used; report mode is unbounded and read-only) #####
+copy-sweep: mode=report containers=60 copies=60
+budget pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big: 0.12 GiB of 0.01 GiB, over
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/1/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/10/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/11/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/12/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/13/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/14/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/15/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/16/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/17/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/18/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/19/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/2/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/20/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/21/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/22/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/23/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/24/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/25/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/26/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/27/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/28/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/29/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/3/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/30/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/31/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/32/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/33/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/34/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/35/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/36/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/37/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/38/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/39/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/4/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/40/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/41/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/42/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/43/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/44/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/45/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/46/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/47/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/48/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/49/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/5/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/50/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/51/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/52/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/53/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/54/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/55/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/56/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/57/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/58/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/59/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/6/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/60/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/7/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/8/repo: 0.00 GiB of 20 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/9/repo: 0.00 GiB of 20 GiB, ok
+wall: 87s
+
+##### 2) CUT check: FM_CHECK_TIMEOUT=6 => 1s of scan. Measure wall time and output #####
+exit=0 wall: 8s (kill limit would be 6s)
+wake lines: 0
+record after cut run:
+schema	fm-copy-sweep-v1
+(a cut run must NOT write last_scan)
+cache lines after cut run:        1
+
+##### 3) CUT check again: same overrun => no second wake; standing budget kept in record #####
+exit=0 wall: 7s output bytes:        0
+schema	fm-copy-sweep-v1
+
+##### 4) a COMPLETE check (watcher timeout generous) after the cut ones: still over, still no second wake, now writes last_scan #####
+exit=0 output bytes:      645
+schema	fm-copy-sweep-v1
+last_scan	1792374517
+over	pool:/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big
+cache lines after complete run:       60 (expect 60)
+
+##### 5) cut check keeps cached sizes of clones it never reached #####
+cache lines after another cut run:       60 (expect still 60)

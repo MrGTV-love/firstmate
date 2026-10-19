@@ -1,0 +1,40 @@
+=== test_ignored_files_that_exist_nowhere_else_hold_a_copy (load 28.26 25.86 31.91)
+ok - a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy
+ok - fm-copy-sweep
+rc=
+=== test_nothing_is_forced_deleted_cleaned_or_returned (load 32.45 26.98 32.16)
+ok - apply never forces, cleans, unlocks, recursively deletes or calls treehouse
+ok - fm-copy-sweep
+rc=
+=== test_one_du_at_a_time_under_nice (load 34.52 27.72 32.34)
+ok - du runs one at a time as nice -n 20 du -sk, with and without a deadline
+ok - fm-copy-sweep
+rc=
+=== test_real_lsof_sees_a_process_inside_a_copy (load 32.28 27.48 32.20)
+ok - the host's own lsof finds a process whose working directory is inside a copy
+ok - fm-copy-sweep
+rc=
+=== test_a_cut_check_keeps_a_pool_budget_it_reached_only_in_part (load 30.30 27.22 32.05)
+ok - a cut check keeps a pool budget it reached only in part, and only a complete run clears it
+ok - fm-copy-sweep
+rc=
+=== test_a_check_cut_and_skipped_on_every_poll_still_reaches_the_wake (load 25.54 26.32 31.65)
+ok - a check that is cut and skipped on every poll counts once per interval and raises exactly one wake on the 6th counted run
+ok - fm-copy-sweep
+rc=
+=== test_a_cut_check_keeps_the_fresh_cached_sizes_it_did_not_reach (load 24.24 25.75 31.12)
+ok - a cut check keeps the cached sizes of the copies it did not reach while they are fresh, and a complete run rewrites the cache
+ok - fm-copy-sweep
+rc=
+=== test_a_cut_check_keeps_the_standing_budgets_it_did_not_reach (load 23.27 25.42 30.82)
+ok - a cut check keeps the standing budgets it did not reach and counts toward the streak of skipped runs
+ok - fm-copy-sweep
+rc=
+=== test_a_slow_enumeration_still_prints_the_wake_for_the_clones_it_reached (load 27.37 26.35 30.92)
+ok - a check whose enumeration is slow stops looking for clones at its time bound and still prints the wake for the clones it reached
+ok - fm-copy-sweep
+rc=
+=== test_arm_and_disarm_bind_the_check (load 30.67 27.22 31.07)
+ok - arm binds the check to the existing watcher cadence and disarm removes it
+ok - fm-copy-sweep
+rc=

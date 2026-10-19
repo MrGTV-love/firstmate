@@ -1,0 +1,29 @@
+##### A) first-ever cut check, budget tripped by the first clones it reaches: wake names only what it measured #####
+exit=0 wall=1s wake lines=1
+copy-sweep: pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big is over its budget: 0.01 GiB against 0.001 GiB; largest copies: 1/repo/.claude/worktrees/c1 0.00 GiB UNCLASSIFIED, 2/repo/.claude/worktrees/c2 0.00 GiB UNCLASSIFIED, 3/repo/.claude/worktrees/c3 0.00 GiB UNCLASSIFIED, 4/repo/.claude/worktrees/c4 0.00 GiB UNCLASSIFIED, 5/repo/.claude/worktrees/c5 0.00 GiB UNCLASSIFIED
+record:
+schema	fm-copy-sweep-v1
+over	pool:/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big
+(cut run => no last_scan)
+
+##### B) check that is BOTH cut (FM_CHECK_TIMEOUT=6) AND load-skipped on every poll: still reaches the skip wake after 6 intervals (interval=2s here) #####
+poll 1: out="" skip-record="runs=1 at=1792375046"
+poll 2: out="" skip-record="runs=2 at=1792375049"
+poll 3: out="" skip-record="runs=3 at=1792375052"
+poll 4: out="" skip-record="runs=4 at=1792375055"
+poll 5: out="" skip-record="runs=5 at=1792375058"
+poll 6: out="copy-sweep: scan skipped: load 15.19 above limit 0.01 on 6 runs in a row" skip-record="runs=6 at=1792375061"
+poll 7: out="" skip-record="runs=7 at=1792375064"
+poll 8: out="" skip-record="runs=8 at=1792375067"
+poll 9: out="" skip-record="runs=9 at=1792375070"
+record:
+schema	fm-copy-sweep-v1
+over	skip:load
+skip	9	1792375070	scan skipped: load 14.83 above limit 0.01
+
+##### C) two polls inside ONE interval while cut+skipped count only once #####
+poll 1: runs=1
+poll 2: runs=1
+poll 3: runs=1
+poll 4: runs=1
+(expect runs=1 on every poll: the cut polls fall inside one 3600s interval)

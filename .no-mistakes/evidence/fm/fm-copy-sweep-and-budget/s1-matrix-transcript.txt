@@ -1,0 +1,130 @@
+=== world ready; proc pid 57113 ===
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo                                                 c4229c9 [main]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/dirty                         f36ae07 [fm/dirty]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/envfile                       d1f4458 [fm/envfile]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/landed                        75968c6 [fm/landed]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/live                          4979540 [fm/live]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/locked                        e71fcc5 [fm/locked] locked
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/nm                            97b79a7 [fm/nm]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/orphan                        2d3b42d [fm/orphan]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer                         196e410 [fm/outer]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner c4229c9 [fm/inner]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/proc                          fa71e95 [fm/proc]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/reap                          0043c3a [fm/reap]
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/unpushed                      0be436c [fm/unpushed]
+
+##### REPORT MODE (no flag) #####
+copy-sweep: mode=report containers=1 copies=12
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/envfile	it holds ignored files that exist nowhere else: .env
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/landed	clean, no process, no record, content already in the default branch
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/live	task live-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/nm	clean, no process, no record, HEAD contained in a remote branch
+ORPHAN-NO-RECORD	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/orphan	it is not a readable git worktree root
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer	another registered copy is inside it: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner	clean, no process, no record, HEAD contained in a remote branch
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/proc	process 57113 is running inside it
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/reap	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=4
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=3
+summary: ORPHAN-NO-RECORD=1
+budget pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant: 0.01 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo: 0.01 GiB of 20 GiB, ok
+exit=0
+report left reap byte-identical
+report left landed byte-identical
+report left dirty byte-identical
+report left unpushed byte-identical
+report left live byte-identical
+report left locked byte-identical
+report left orphan byte-identical
+report left envfile byte-identical
+report left nm byte-identical
+report left outer byte-identical
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/data:
+
+/Users/charlesabrooker/tmp/fm-lab.1T3WtT/state:
+live-task.meta
+
+##### APPLY #####
+copy-sweep: mode=apply containers=1 copies=8
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/envfile	it holds ignored files that exist nowhere else: .env
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/live	task live-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+ORPHAN-NO-RECORD	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/orphan	it is not a readable git worktree root
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer	another registered copy is inside it: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/proc	process 57113 is running inside it
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote and not in the default branch
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/reap	branch fm/reap at 0043c3a65112 (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner	branch fm/inner at c4229c953558 (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/nm	branch fm/nm at 97b79a78198d (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/landed	branch fm/landed at 75968c6fa161 (clean, no process, no record, content already in the default branch)
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=3
+summary: ORPHAN-NO-RECORD=1
+budget pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant: 0.01 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo: 0.01 GiB of 20 GiB, ok
+exit=0
+
+=== survivors / removed ===
+REMOVED reap
+REMOVED landed
+KEPT    dirty
+KEPT    unpushed
+KEPT    live
+KEPT    locked
+KEPT    orphan
+KEPT    proc
+KEPT    envfile
+REMOVED nm
+KEPT    outer
+REMOVED inner
+held copy dirty byte-identical
+held copy unpushed byte-identical
+held copy live byte-identical
+held copy locked byte-identical
+held copy orphan byte-identical
+held copy envfile byte-identical
+HELD COPY CHANGED outer
+env file content: SECRET=1
+=== removal log ===
+2026-10-19T01:42:44Z	removed	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/reap	clone=/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo	head=0043c3a651125c6f5d36982e9cfb13e71cd89c6f	branch=fm/reap	kib=2060	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-19T01:42:45Z	removed	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner	clone=/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo	head=c4229c953558802b6c10aecc3bcac322657344dc	branch=fm/inner	kib=12	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-19T01:42:46Z	removed	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/nm	clone=/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo	head=97b79a78198d305822d809edfc8a18d73862b313	branch=fm/nm	kib=1048	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-19T01:42:48Z	removed	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/landed	clone=/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo	head=75968c6fa161848fe901387bb7fb65212b67a08c	branch=fm/landed	kib=12	proof=clean, no process, no record, content already in the default branch
+=== git worktree remove calls in GIT_TRACE (force check) ===
+   1 git.c:502               trace: built-in: git worktree remove -- /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/landed
+   1 git.c:502               trace: built-in: git worktree remove -- /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/nm
+   1 git.c:502               trace: built-in: git worktree remove -- /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer/.claude/worktrees/inner
+   1 git.c:502               trace: built-in: git worktree remove -- /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/reap
+=== any forced/unlock/clean/prune? ===
+none
+
+##### APPLY AGAIN (idempotence; outer should now be reapable after inner... inner is held-dirty? ) #####
+copy-sweep: mode=apply containers=1 copies=7
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/envfile	it holds ignored files that exist nowhere else: .env
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/live	task live-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+ORPHAN-NO-RECORD	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/orphan	it is not a readable git worktree root
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/proc	process 57113 is running inside it
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote and not in the default branch
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/outer	branch fm/outer at 196e41022721 (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=1
+budget pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant: 0.01 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo: 0.01 GiB of 20 GiB, ok
+exit=0

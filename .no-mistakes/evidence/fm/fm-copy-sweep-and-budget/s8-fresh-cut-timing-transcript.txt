@@ -1,0 +1,13 @@
+right after building 60 slots; load 33.75 29.59 31.55
+fresh cut run 1: wall 1.16s out=0 load1=32.73
+fresh cut run 2: wall 0.76s out=0 load1=32.73
+fresh cut run 3: wall 0.98s out=0 load1=32.73
+fresh cut run 4: wall 0.96s out=0 load1=32.73
+fresh cut run 5: wall 1.05s out=0 load1=32.73
+fresh cut run 6: wall 0.90s out=0 load1=31.15
+--- now a complete report run, then cut again (the s4 order) ---
+report wall 30.91s
+cut run 1 after report: wall 1.14s out=0
+cut run 2 after report: wall 0.87s out=0
+cut run 3 after report: wall 0.90s out=0
+cut run 4 after report: wall 1.15s out=0

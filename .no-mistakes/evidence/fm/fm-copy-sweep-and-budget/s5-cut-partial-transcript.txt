@@ -1,0 +1,29 @@
+pool clones:       60
+##### 1) complete check (FM_CHECK_TIMEOUT=600): raises the one wake #####
+exit=0 wall=19s wake lines=1
+copy-sweep: pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big is over its budget: 0.12 GiB against 0.01 GiB; largest copies: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big/1/repo/.claude/worktrees
+schema	fm-copy-sweep-v1
+last_scan	1792374889
+over	pool:/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big
+cache lines:       60
+
+##### 2) twelve CUT checks (1s of scan each): partial totals sometimes under, sometimes over the budget #####
+cut  1: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  2: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  3: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  4: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  5: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  6: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  7: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  8: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut  9: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut 10: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut 11: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+cut 12: wake lines=0 record keeps over=yes cache lines=60 last_scan kept=1
+total extra wakes from cut runs: 0   record kept the standing overrun in 12 of 12 runs
+
+##### 3) complete check after the cut runs: still over => NO second wake #####
+exit=0 wake lines=0
+schema	fm-copy-sweep-v1
+last_scan	1792374920
+over	pool:/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/big

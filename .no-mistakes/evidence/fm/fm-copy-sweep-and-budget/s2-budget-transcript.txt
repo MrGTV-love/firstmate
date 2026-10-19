@@ -1,0 +1,45 @@
+=== config ===
+pool vernant 0.004
+interval 0
+
+##### check #1 (budget crossed): expect exactly ONE wake line #####
+exit=0
+copy-sweep: pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant is over its budget: 0.01 GiB against 0.004 GiB; largest copies: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/big1 0.00 GiB REAPABLE-PROVEN, /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/big2 0.00 GiB HELD-DIRTY, /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/big3 0.00 GiB REAPABLE-PROVEN, /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/big4 0.00 GiB REAPABLE-PROVEN, /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/big5 0.00 GiB REAPABLE-PROVEN
+wake lines: 1
+record:
+schema	fm-copy-sweep-v1
+last_scan	1792374232
+over	pool:/Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant
+
+##### check #2 (still over): expect NO wake #####
+exit=0
+output bytes:        0
+
+##### check #3 (still over): expect NO wake #####
+exit=0
+output bytes:        0
+
+##### drop under budget (test fixture removes the big copies by hand) #####
+exit=0
+output bytes:        0 (expect 0)
+record:
+schema	fm-copy-sweep-v1
+last_scan	1792374243
+
+##### cross again: expect a NEW wake #####
+exit=0
+copy-sweep: pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant is over its budget: 0.00 GiB against 0.004 GiB; largest copies: /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/big6 0.00 GiB REAPABLE-PROVEN, /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/big7 0.00 GiB REAPABLE-PROVEN, /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/small1 0.00 GiB REAPABLE-PROVEN, /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo/.claude/worktrees/small2 0.00 GiB REAPABLE-PROVEN
+wake lines: 1
+
+##### check never removes: all copies still registered #####
+       5
+
+##### report mode shows budget lines #####
+summary: REAPABLE-PROVEN=4
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant: 0.00 GiB of 0.004 GiB, over
+budget container /Users/charlesabrooker/tmp/fm-lab.1T3WtT/th/vernant/1/repo: 0.00 GiB of 20 GiB, ok
