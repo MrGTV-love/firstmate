@@ -761,18 +761,19 @@ def emit(watch, command):
 
 def main(argv):
     os.umask(0o077)
+    action = env_value('FM_SLACK_CHECK_ACTION') if argv and argv[0] == 'check' else ''
+    refusals = sys.stderr if action == 'arm' else sys.stdout
     if not argv:
         print('error: missing command')
         return 2
     try:
         command, replay_path = parse_command(argv)
     except SlackError as error:
-        print('error: slack ' + str(error))
+        print('error: slack ' + str(error), file=refusals)
         return 2
     if command not in ('mirror', 'poll', 'check'):
         print('error: unknown command; use --help')
         return 2
-    action = env_value('FM_SLACK_CHECK_ACTION') if command == 'check' else ''
     if action == 'disarm':
         return disarm()
     state, reason = mode()
@@ -805,17 +806,20 @@ def main(argv):
     except (SlackError, OSError, ValueError, KeyError, TypeError) as error:
         # Report once per failure episode. Pending rows and state remain durable;
         # lines said before the failure belong to state already committed.
-        if watch is not None:
+        name = str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'
+        if action == 'arm':
+            print('slack: refused: ' + name, file=sys.stderr)
+        elif watch is not None:
             watch.report_failure(error)
             emit(watch, command)
         else:
-            print('slack: transport failure: '
-                  + (str(error) if isinstance(error, SlackError) else 'local_state_or_response_error'))
+            print('slack: transport failure: ' + name)
         return 1
     except RuntimeError as error:
         if str(error).startswith('FM_SLACK_FAULT='):
             return 75
-        print('slack: local_runtime_error')
+        print('slack: refused: local_runtime_error' if action == 'arm' else 'slack: local_runtime_error',
+              file=refusals)
         return 1
     finally:
         if watch is not None:

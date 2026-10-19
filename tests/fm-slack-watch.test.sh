@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X20.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X21.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -942,5 +942,52 @@ out=$(poll card-payload)
 assert_eq "$(closed_count "$out")" 1 "X20 a thread_broadcast reply from the owner"
 assert_eq "$(answer_line no-options)" "ship the release" "X20 the broadcast reply's words are the answer"
 printf 'ok - X20\n'
+
+# X21: an explicit arm names every failure on stderr each time; only the standing check reports once
+arm_fails() {  # <label> <expected-text> [env assignments...]; runs arm with streams captured apart
+  local label=$1 expected=$2
+  shift 2
+  set +e
+  out=$(env "$@" "$ROOT/bin/fm-slack-check.sh" arm --replay "${ARM_TRANSCRIPT:-$FIX/arming/arm.json}" 2>"$TMP/arm.err"); rc=$?
+  set -e
+  assert_eq "$out" "" "X21 [$label] a failed arm wrote to stdout"
+  assert_contains "$(cat "$TMP/arm.err")" "$expected" "X21 [$label] the failure was not named on stderr"
+  [ "$rc" -ne 0 ] || fail "X21 [$label] a failed arm exited zero"
+}
+new_home typed-reply
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/arming/arm.json" >/dev/null
+set +e
+out=$("$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/arming/arm.json" 2>"$TMP/check.err"); rc=$?
+set -e
+assert_eq "$out" "" "X21 the healthy standing check wrote to stdout"
+assert_eq "$(cat "$TMP/check.err")" "" "X21 the healthy standing check wrote to stderr"
+assert_eq "$rc" 0 "X21 the healthy standing check exited nonzero"
+arm_fails "dm user changed" dm_user_changed FM_SLACK_DM_USER=U0OTHEROWNER
+arm_fails "dm user changed again" dm_user_changed FM_SLACK_DM_USER=U0OTHEROWNER
+set +e
+out=$(env FM_SLACK_DM_USER=U0OTHEROWNER "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/arming/arm.json" 2>"$TMP/check.err"); rc=$?
+set -e
+assert_contains "$out" 'transport failure: dm_user_changed' "X21 the standing check did not report the change"
+assert_eq "$(cat "$TMP/check.err")" "" "X21 the standing check wrote its report to stderr"
+assert_eq "$rc" 1 "X21 the failing standing check exit"
+set +e
+out=$(env FM_SLACK_DM_USER=U0OTHEROWNER "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/arming/arm.json" 2>"$TMP/check.err"); rc=$?
+set -e
+assert_eq "$out" "" "X21 the standing check repeated its report"
+assert_eq "$(cat "$TMP/check.err")" "" "X21 the repeated standing check wrote to stderr"
+arm_fails "dm user changed after the standing check recorded it" dm_user_changed FM_SLACK_DM_USER=U0OTHEROWNER
+new_home typed-reply
+mkdir -p "$FM_STATE_OVERRIDE/slack-watch"
+printf '{"schema":"not-this-one"}' > "$FM_STATE_OVERRIDE/slack-watch/state.json"
+arm_fails "invalid state schema" invalid_state_schema
+arm_fails "invalid state schema again" invalid_state_schema
+new_home typed-reply
+mkdir -p "$TMP/elsewhere"
+ln -s "$TMP/elsewhere" "$FM_STATE_OVERRIDE/slack-watch"
+arm_fails "unsafe state path" unsafe_state_path
+rm -f "$FM_STATE_OVERRIDE/slack-watch"
+new_home typed-reply
+ARM_TRANSCRIPT="$TMP/no-such-transcript.json" arm_fails "missing transcript" replay_transcript_unreadable
+printf 'ok - X21\n'
 
 printf 'ok - all Slack watch checks\n'

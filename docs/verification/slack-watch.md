@@ -227,7 +227,7 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 until the owner confirms it rides this PR.
 
-## X1..X20 - review-round regressions
+## X1..X21 - review-round regressions
 
 Each runs against replay transcripts and the real intake; none opens a socket.
 
@@ -252,6 +252,7 @@ Each runs against replay transcripts and the real intake; none opens a socket.
 - X18: a typed reply that Slack delivered as `merge 12 &amp; 13, skip CI &lt; 5 min &gt; see <https://example.com/b> and <https://example.com/a|the doc>` closed the call with the answer `merge 12 & 13, skip CI < 5 min > see https://example.com/b and the doc`, and the recorded label matched.
 - X19: two conflicts of 450-character wake lines on two threads, plus a later unmatched reply on a third, ran through the armed `check`. The first poll emitted the first conflict's line ending `; +2 queued` within 480 characters; the second conflict's replies and the unmatched reply were not marked seen, their rows stayed pending, and the second conflict's notice was not yet posted. The second poll emitted the second conflict ending `; +1 queued` and posted its notice. The third poll emitted the unmatched reply's line with no marker, and a fourth poll printed nothing. No conflict recorded an answer.
 - X20: an owner reply carrying only `subtype: thread_broadcast` closed the call with the typed words as the answer, while replies from the owner's id carrying `bot_id`, `app_id`, or `bot_profile` answered nothing and closed nothing.
+- X21: with stdout and stderr captured apart, an explicit `arm` named its failure on stderr, wrote nothing to stdout, and exited nonzero on every run: after `FM_SLACK_DM_USER` changed (`dm_user_changed`, run twice with the failure already recorded by the standing check in between), with a state file of the wrong schema (`invalid_state_schema`), with a symlinked state directory (`unsafe_state_path`), and with a missing transcript (`replay_transcript_unreadable`). The standing `check` was silent on both streams with exit 0 while healthy, reported `dm_user_changed` once on stdout when it changed, and was silent on the repeat.
 
 ## ACT-1 - live answer
 
