@@ -2346,6 +2346,9 @@ pr_is_merged() {
 # refuses for a fresh proof on retry rather than doing network work under it.
 TEARDOWN_LANDED_DIRS=()
 TEARDOWN_LANDED_HEADS=()
+# Why a failed proof could not ask the question (forge, fetch, HEAD or content
+# comparison), empty when it answered "not landed". A reader that types
+# refusals must not count an unasked proof as a policy refusal.
 TEARDOWN_LANDED_UNASKED=
 work_is_landed() {
   local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i

@@ -406,9 +406,11 @@ teardown_foreign_copy_unowned() {  # <copy>
 }
 
 # Proves foreign copy <copy>, or returns 1 with TEARDOWN_FOREIGN_WHY naming what
-# could not be proved. Writes nothing. A half-removed or unreadable copy fails
-# the first check. The landed-work rule gets an empty branch name so it never
-# adopts this copy's PR as the task's recorded one.
+# could not be proved and TEARDOWN_FOREIGN_RULE the predicate that failed
+# (inspection-unavailable when a read, not a policy, failed). Writes nothing. A
+# half-removed or unreadable copy fails the first check. The landed-work rule
+# gets an empty branch name so it never adopts this copy's PR as the task's
+# recorded one.
 teardown_foreign_copy_prove() {  # <copy>
   local copy=$1 rc=0
   TEARDOWN_FOREIGN_WHY=
@@ -434,8 +436,9 @@ teardown_foreign_copy_prove() {  # <copy>
 }
 
 # Proves every foreign copy in <slot> and records the provable ones in
-# TEARDOWN_FOREIGN_COPIES. An unprovable copy is named here and then refused by
-# the registered-copy check, which does not list it as allowed.
+# TEARDOWN_FOREIGN_COPIES. An unprovable copy is refused here, with its typed
+# envelope, and the registered-copy check then repeats the refusal without a
+# second event because it does not list the copy as allowed.
 teardown_foreign_copies_prove() {  # <slot>
   local slot=$1 copy known allowed
   TEARDOWN_FOREIGN_COPIES=()
@@ -545,7 +548,8 @@ teardown_copy_git_protects() {  # <copy>
 }
 
 # Preserves the ignored files of one proved foreign copy, then releases and
-# removes it. Returns 1 after printing a refusal.
+# removes it. Returns 1 after printing a refusal, or a plain error where Git's
+# removal failed for a reason other than protecting the copy's contents.
 teardown_foreign_copy_dispose() {  # <slot> <copy>
   local slot=$1 copy=$2 rc=0 remove_rc remove_err protected
   teardown_preserve_ignored "$copy" || {

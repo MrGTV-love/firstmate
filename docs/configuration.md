@@ -100,6 +100,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
+- The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
@@ -2356,6 +2357,7 @@ An edit without a string `path` and `new_string`, including a model-variant over
 A policy block (shell and write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
+A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.
 On Claude, review notices arrive as added context next to the unchanged output.
 The current [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; this integration intentionally does not use that capability without installed-host verification.
 Advisory context is not evidence that Claude was prevented from seeing or acting on the original output.
