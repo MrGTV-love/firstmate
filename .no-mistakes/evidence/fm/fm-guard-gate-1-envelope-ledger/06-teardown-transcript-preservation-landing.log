@@ -1,0 +1,43 @@
+ok - own and foreign typed preservation refusals retain unique bytes, and their printed commands complete cleanup after storage repair as one operation
+
+=================== CASE test_typed_preservation_exit_completes_cleanup ===================
+--- stderr (teardown task-x1, path scrubbed) ---
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of own nested copy <scratch>/typed-own-preservation-route/pool/1/project/.claude/worktrees/fc-one could not be preserved in <scratch>/typed-own-preservation-route/data/task-x1/nested-copy-preserved; it was not removed. Restore readable source and writable preservation storage, then run the completing command.
+completing-command: FM_FRICTION_OPERATION_ID=6c6f5d13-7762-4215-85cc-58e0ade20f67 FM_FRICTION_EPISODE_ID=6c6f5d13-7762-4215-85cc-58e0ade20f67 FM_HOME=<scratch>/typed-own-preservation-route/home bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M58P7KRCEP87GRQFCCM7XG70/bin/fm-teardown.sh task-x1
+--- completed.stderr (teardown task-x1, path scrubbed) ---
+teardown: preserved ignored files from <scratch>/typed-own-preservation-route/pool/1/project/.claude/worktrees/fc-one in <scratch>/typed-own-preservation-route/data/task-x1/nested-copy-preserved/11a4adae6f82d7cd763410013418aadfa0163b48473af60de0a1e12d3875f782
+teardown: removed landed own nested copy <scratch>/typed-own-preservation-route/pool/1/project/.claude/worktrees/fc-one from pool slot <scratch>/typed-own-preservation-route/pool/1/project
+--- state/friction.jsonl (one JSON event per line) ---
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"blocked","exit_kind":"machine","exit_printed":true,"execution_kind":"test","op":"6c6f5d13","subject_kind":"nested-copy","subject_identity":"sha256:11a4adae6f82","task_id":"sha256:bfd54ac3352a"}
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"retried","exit_kind":"machine","exit_printed":true,"execution_kind":"test","op":"6c6f5d13","subject_kind":"nested-copy","subject_identity":"sha256:11a4adae6f82","task_id":"sha256:bfd54ac3352a"}
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"blocked","exit_kind":"machine","exit_printed":true,"execution_kind":"test","op":"6c6f5d13","subject_kind":"nested-copy","subject_identity":"sha256:11a4adae6f82","task_id":"sha256:bfd54ac3352a"}
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"retried","exit_kind":"machine","exit_printed":true,"execution_kind":"test","op":"6c6f5d13","subject_kind":"nested-copy","subject_identity":"sha256:11a4adae6f82","task_id":"sha256:bfd54ac3352a"}
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"retry-succeeded","exit_kind":"machine","exit_printed":true,"execution_kind":"test","op":"6c6f5d13","subject_kind":"nested-copy","subject_identity":"sha256:11a4adae6f82","task_id":"sha256:bfd54ac3352a"}
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"completed","exit_kind":"machine","exit_printed":true,"execution_kind":"test","op":"6c6f5d13","subject_kind":"nested-copy","subject_identity":"sha256:11a4adae6f82","task_id":"sha256:bfd54ac3352a"}
+ok - a forced teardown whose ignored files cannot be preserved ends in a human-only exit with no command and no flag, for foreign and own copies
+
+=================== CASE test_forced_preservation_refusal_prints_no_completing_command ===================
+--- stderr (teardown task-x1, path scrubbed) ---
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved missing=the ignored files of own nested copy <scratch>/typed-forced-own/pool/1/project/.claude/worktrees/fc-one could not be preserved in <scratch>/typed-forced-own/data/task-x1/nested-copy-preserved; it was not removed.
+human-only-exit: This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?
+--- state/friction.jsonl (one JSON event per line) ---
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"ignored-bytes-preserved","outcome":"blocked","exit_kind":"human-only","exit_printed":true,"execution_kind":"test","op":"a9efb8d9","subject_kind":"nested-copy","subject_identity":"sha256:c03344bd93b9","task_id":"sha256:bfd54ac3352a"}
+ok - a landing check whose gh pr view fails is a plain error naming the forge failure, not a copy-landed refusal
+
+=================== CASE test_landing_check_that_could_not_ask_the_forge_is_a_plain_error ===================
+--- stderr (teardown task-x1, path scrubbed) ---
+error: foreign copy <scratch>/foreign-landing-forge-down/pool/1/project/.claude/worktrees/fc-one stays in pool slot <scratch>/foreign-landing-forge-down/pool/1/project: its landing could not be checked (gh pr view https://github.com/example/repo/pull/7 failed (exit 1)).
+REFUSED: pool slot <scratch>/foreign-landing-forge-down/pool/1/project contains registered copy <scratch>/foreign-landing-forge-down/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/pat
+--- state/friction.jsonl: ABSENT (no policy event recorded) ---
+ok - a landing check the forge answered with not merged is still refused as a typed copy-landed
+
+=================== CASE test_landing_check_that_the_forge_answered_not_merged_stays_a_copy_landed_refusal ===================
+--- stderr (teardown task-x1, path scrubbed) ---
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=foreign copy <scratch>/foreign-landing-open/pool/1/project/.claude/worktrees/fc-one stays in pool slot <scratch>/foreign-landing-open/pool/1/project: its HEAD f4a8fa59810b is not proved landed.
+human-only-exit: What verified landing or retained ownership covers <scratch>/foreign-landing-open/pool/1/project/.claude/worktrees/fc-one (its HEAD f4a8fa59810b is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot <scratch>/foreign-landing-open/pool/1/project contains registered copy <scratch>/foreign-landing-open/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/pat
+--- state/friction.jsonl (one JSON event per line) ---
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"copy-landed","outcome":"blocked","exit_kind":"human-only","exit_printed":true,"execution_kind":"test","op":"d0284096","subject_kind":"nested-copy","subject_identity":"sha256:a00bfe9048fa","task_id":"sha256:bfd54ac3352a"}
+exit=0

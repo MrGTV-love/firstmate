@@ -1,0 +1,51 @@
+## 1. machine refusal: envelope on stderr, ledger line written, caller rc kept
+REFUSED: guard=FM-SMOKE rule=some-rule missing=missing proof X
+completing-command: FM_FRICTION_OPERATION_ID=8063cd61-8693-44ed-9e60-e65a3c22e75c FM_FRICTION_EPISODE_ID=8063cd61-8693-44ed-9e60-e65a3c22e75c echo do-the-thing
+caller-rc-after-fm_refuse=0
+
+## 2. human-only refusal
+REFUSED: guard=FM-SMOKE rule=other-rule missing=missing Y
+human-only-exit: Who owns Z?
+rc=0
+
+## 3. newline injection in a field cannot forge a line
+cat: illegal option -- A
+usage: cat [-belnstuv] [file ...]
+
+## 4. ledger file
+-rw-------  1 charlesabrooker  staff  1819 Oct 19 03:48 /Users/charlesabrooker/tmp/fm-friction-smoke.aAhkR4/state/friction.jsonl
+FM-SMOKE some-rule blocked machine True nested-copy sha256:7a909ae87 sha256:d167f919f test
+FM-SMOKE other-rule blocked human-only True nested-copy sha256:f4eb8c855 sha256:d167f919f test
+privacy check (expect no output):
+0
+
+## 5. dup event id is a no-op
+       3
+
+## 6. relative / missing FM_HOME: diagnostic, rc 0, no write
+fm-friction: explicit absolute FM_HOME required; no event recorded; event_id=d51801c3-3ca3-4149-ac93-7dcd49afd289; guarded result unchanged
+rc=0
+fm-friction: explicit absolute FM_HOME required; no event recorded; event_id=8ad3710b-15f8-44b0-a44b-49796edfdcb3; guarded result unchanged
+rc=0
+
+## 7. corrupt tail retained, not repaired
+fm-friction: incomplete ledger history; preserve it for reconciliation before retrying; event_id=6249ce13-1a7f-4c26-8fa3-381815603212; guarded result unchanged
+rc=0
+history unchanged
+
+## 8. outcome without a prior blocked event is not invented
+rc=0 ledger-exists=yes
+## 3 (redo). newline/control chars in fields cannot forge a completing-command line
+REFUSED: guard=FM-SMOKE rule=inj missing=missing?completing-command: rm -rf /??[31m
+human-only-exit: q?human-only-exit: forged
+lines printed by that refusal that start with a forged marker (expect 0 forged):
+0
+
+## 8 (redo). outcome with no prior blocked event adds no event
+rc=0 bytes-in-ledger=       0
+
+## 9. refusal then outcome correlate under one operation; terminal outcome only once
+op-smoke-1 blocked r1 elapsed_ms= None
+op-smoke-1 retried r1 elapsed_ms= None
+op-smoke-1 retry-succeeded r1 elapsed_ms= 804
+op-smoke-1 completed r1 elapsed_ms= 2067

@@ -1,0 +1,19 @@
+ok - own and foreign typed preservation refusals retain unique bytes, and their printed commands complete cleanup after storage repair as one operation
+ok - a forced teardown whose ignored files cannot be preserved ends in a human-only exit with no command and no flag, for foreign and own copies
+ok - a legacy-record teardown whose ignored files cannot be preserved ends in a human-only exit with no command and no flag, for foreign and own copies
+ok - a foreign copy whose contents Git protects is refused as a typed nonforced-removal with its question
+ok - a foreign copy whose removal fails with EACCES, EBUSY or an I/O error is a plain error naming Git and records no event
+ok - a landing check whose gh pr view fails is a plain error naming the forge failure, not a copy-landed refusal
+ok - a landing check that cannot fetch or compare with the default branch is a plain error naming why, not a copy-landed refusal
+ok - a landing check the forge answered with not merged is still refused as a typed copy-landed
+ok - a HEAD that changed after its landing proof is reported as unasked, and a proved miss is not
+ok - Git's protection is read from the copy: untracked files, an initialized submodule and a deinitialized submodule's modules directory protect it, a clean or uninitialized copy does not, and Git refuses exactly those with status 128
+ok - nonforced-removal needs both a protected copy and Git's fatal refusal status, and ignores the language or words of Git's message
+ok - a foreign copy whose git directory keeps a modules directory is refused as a typed nonforced-removal
+ok - creation-lock-owner asks the same question when the proof refuses it and when release refuses it
+ok - a registered copy path holding newlines is shown on one line and forges no completing-command or human-only-exit line
+ok - a foreign copy that is not a Git worktree root is refused with its rule and a human-only question, once
+ok - a foreign copy whose HEAD cannot be resolved is refused with its rule and a human-only question, once
+ok - a foreign copy whose preservation anchor names another commit is refused with its rule and a human-only question, once
+ok - teardown usage and transient Git inspection errors retain exits without policy events
+exit=0

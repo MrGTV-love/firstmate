@@ -1,0 +1,9 @@
+ok - uncommitted files make a foreign copy refuse
+ok - a foreign copy's unique ignored file is preserved with its SHA-256 and the copy is retired
+ok - regenerable ignored caches are allow-listed and need no preservation or refusal
+ok - durable .tac state is preserved with the copy retired, while .tac/tmp stays regenerable
+ok - a foreign copy whose ignored files cannot be listed is refused, not treated as having nothing to preserve
+ok - a foreign copy that another active record names through a symlink alias is refused
+ok - a foreign copy nested in another foreign copy is removed before the copy that holds it
+ok - the closeout driver runs before the shared project lock is taken, and the slot return still runs under it
+exit=0

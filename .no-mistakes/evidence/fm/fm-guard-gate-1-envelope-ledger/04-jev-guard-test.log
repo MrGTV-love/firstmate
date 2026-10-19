@@ -1,0 +1,19 @@
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline
+ok - task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible
+ok - oversized payloads are screened in complete pieces: benign allowed, any blocked or unscreenable piece blocks, uncoverable and never-send payloads send nothing, deadlines hold
+ok - Claude hooks retain JSON/exit contracts, screen bounded writes, refuse uncoverable size with the typed completing route, and leave advisory-only results uncounted
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+exit=0

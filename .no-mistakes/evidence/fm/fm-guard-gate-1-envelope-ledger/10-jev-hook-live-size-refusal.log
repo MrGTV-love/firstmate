@@ -1,0 +1,20 @@
+## oversize Write via the real Claude hook (hook exit code, JSON, ledger)
+node:1: command not found: _nvm_lazy_load
+hook-exit=0
+{
+  "decision": "deny",
+  "reason": "[jev-guard] Review required: RequestTooLargeError. Refused path: \"/Users/charlesabrooker/tmp/fm-jev-live.VpKio6/worktree/huge.txt\". REVIEW_ON_UNAVAILABLE_V1. REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within 16 requests of 16384 UTF-8 bytes each, including model, questions and JSON framing, with 1024 JSON-escaped bytes of overlap. The 262144-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. Supported completing route for report writes: use the same write tool to split the report across separate files, each below 150,000 characters per write, and smaller again if encoded bytes stil"
+}
+hook stderr bytes:        0
+--- ledger ---
+{"guard_id":"FM-JEV-SIZE","rule_id":"complete-screening-budget","outcome":"blocked","exit_kind":"machine","execution_kind":"test","subject_kind":"tool_call-write","task_id":"sha256:628b49d96dcd"}
+raw path/content leaked into ledger? (expect 0): 0
+
+## small ordinary Write is admitted by the same hook (good case): hook output + no new ledger line
+node:1: command not found: _nvm_lazy_load
+hook-exit=0
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] Review required: Error. Refused path: \"/Users/charlesabrooker/tmp/fm-jev-live.VpKio6/worktree/ok.txt\". REVIEW_ON_UNAVAILABLE_V1. The review could not run, so this is not a verdict on the call. You may run the same call once more. If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding."}}
+
+ledger lines before/after:        1/       1
+
+NOTE: the second section above is NOT a valid good-case proof. This manual setup has no loopback judge backend, so the outage policy fails closed for any call that needs the judge. The admitted good case (a bounded report part completes) is proved by tests/fm-jev-guard.test.sh test_oversize_screening, which runs the real guard against a loopback judge fixture (see 04-jev-guard-test.log).

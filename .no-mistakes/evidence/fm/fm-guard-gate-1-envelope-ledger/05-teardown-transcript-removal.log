@@ -1,0 +1,23 @@
+ok - a foreign copy whose contents Git protects is refused as a typed nonforced-removal with its question
+
+=================== CASE test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal ===================
+--- stderr (teardown task-x1, path scrubbed) ---
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal missing=git worktree remove would not remove foreign copy <scratch>/foreign-git-protects/pool/1/project/.claude/worktrees/fc-one without force; it was not removed.
+human-only-exit: What retained disposition covers the contents Git still protects in <scratch>/foreign-git-protects/pool/1/project/.claude/worktrees/fc-one? Preserve this copy; no forced removal is authorized.
+--- state/friction.jsonl (one JSON event per line) ---
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"nonforced-removal","outcome":"blocked","exit_kind":"human-only","exit_printed":true,"execution_kind":"test","op":"e56b823b","subject_kind":"nested-copy","subject_identity":"sha256:f9a88538c211","task_id":"sha256:bfd54ac3352a"}
+ok - a foreign copy whose removal fails with EACCES, EBUSY or an I/O error is a plain error naming Git and records no event
+
+=================== CASE test_foreign_copy_removal_that_fails_for_another_reason_is_a_plain_error ===================
+--- stderr (teardown task-x1, path scrubbed) ---
+error: git worktree remove failed for foreign copy <scratch>/foreign-removal-fails-4/pool/1/project/.claude/worktrees/fc-one (exit 255): error: failed to delete '<scratch>/foreign-removal-fails-4/pool/1/project/.claude/worktrees/fc-one': denied?completing-command: touch forged; it was not removed.
+--- state/friction.jsonl: ABSENT (no policy event recorded) ---
+ok - a foreign copy whose git directory keeps a modules directory is refused as a typed nonforced-removal
+
+=================== CASE test_foreign_copy_with_a_modules_directory_is_a_typed_nonforced_removal ===================
+--- stderr (teardown task-x1, path scrubbed) ---
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal missing=git worktree remove would not remove foreign copy <scratch>/foreign-modules-dir/pool/1/project/.claude/worktrees/fc-one without force; it was not removed.
+human-only-exit: What retained disposition covers the contents Git still protects in <scratch>/foreign-modules-dir/pool/1/project/.claude/worktrees/fc-one? Preserve this copy; no forced removal is authorized.
+--- state/friction.jsonl (one JSON event per line) ---
+{"guard_id":"FM-TEARDOWN-PRESERVATION","rule_id":"nonforced-removal","outcome":"blocked","exit_kind":"human-only","exit_printed":true,"execution_kind":"test","op":"3eaa30b3","subject_kind":"nested-copy","subject_identity":"sha256:3e304d61672e","task_id":"sha256:bfd54ac3352a"}
+exit=0
