@@ -738,7 +738,7 @@ The ordinary finished-session sweep keeps its classification unchanged.
 It never uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
 A proof read that fails never counts as finding nothing.
-That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, or the attempt retries later when the failed read is a git read.
+That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
 
 Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged (`treehouse destroy` refuses an unmerged slot, and the fallback never uses `--include-unlanded`), or a destroy that fails.
 It is never forced or discarded.
