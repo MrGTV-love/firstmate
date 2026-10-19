@@ -10637,7 +10637,7 @@ test_verified_bundle_preserves_unlanded_copy() {
 
 test_invalid_preservation_bundle_refuses() {
   local shape case_dir rc reason record second digest first size stock_bash_path
-  for shape in missing-tip recorded-tip verify thin truncated hash no-record inside-copy inside-pool other-copy alias-copy symlink malformed empty-field blank-tips; do
+  for shape in missing-tip recorded-tip verify thin truncated hash no-record inside-copy inside-pool other-copy alias-copy symlink malformed two-lines empty-field blank-tips task-tmp state-inbox; do
     stock_bash_path=
     make_bundle_copy_case "bundle-invalid-$shape"
     case_dir=$NESTED_CASE
@@ -10703,7 +10703,7 @@ test_invalid_preservation_bundle_refuses() {
         ;;
       empty-field)
         printf '%s\t\t%s\n' "$BUNDLE_PATH" "$(git -C "$NESTED_COPY" rev-parse HEAD)" > "$record"
-        reason='malformed preservation record line 1'
+        reason='malformed preservation record in'
         ;;
       blank-tips)
         printf '%s\t%s\t \n' "$BUNDLE_PATH" "$(shasum -a 256 "$BUNDLE_PATH" | awk '{print $1}')" > "$record"
@@ -10718,7 +10718,24 @@ test_invalid_preservation_bundle_refuses() {
         ;;
       malformed)
         printf 'missing fields\n' >> "$record"
-        reason='malformed preservation record line 2'
+        reason='exactly one line required'
+        ;;
+      two-lines)
+        cp "$record" "$record.copy"
+        cat "$record.copy" >> "$record"
+        rm "$record.copy"
+        reason='exactly one line required'
+        ;;
+      task-tmp)
+        printf 'tasktmp=%s\n' "$case_dir/tasktmp" >> "$case_dir/state/task-x1.meta"
+        BUNDLE_PATH="$case_dir/tasktmp/work.bundle"
+        record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create scratch bundle'
+        reason='bundle is inside task scratch'
+        ;;
+      state-inbox)
+        BUNDLE_PATH="$case_dir/state/task-x1.inbox/work.bundle"
+        record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot create inbox bundle'
+        reason='bundle is inside task scratch'
         ;;
     esac
     rc=0
@@ -10791,6 +10808,136 @@ test_bundle_survives_a_stale_registered_worktree() {
   assert_absent "$NESTED_COPY" 'bundle-stale: preserved copy was not removed'
   assert_absent "$case_dir/state/task-x1.meta" 'bundle-stale: task was not retired'
   pass 'a deleted but still registered worktree does not block a valid recorded bundle'
+}
+
+test_bundle_must_hold_a_stale_siblings_unpushed_tip() {
+  local case_dir rc stale_head
+  make_bundle_copy_case bundle-stale-tip
+  case_dir=$NESTED_CASE
+  git -C "$case_dir/project" worktree add -q -b fm/stale-work "$case_dir/stale" main
+  printf 'stale in flight\n' > "$case_dir/stale/stale.txt"
+  git -C "$case_dir/stale" add stale.txt
+  git -C "$case_dir/stale" -c user.email=t@t -c user.name=t commit -qm 'stale unpublished work'
+  stale_head=$(git -C "$case_dir/stale" rev-parse HEAD)
+  rm -rf "$case_dir/stale"
+  git -C "$case_dir/project" worktree list --porcelain | grep -q '^prunable' \
+    || fail 'bundle-stale-tip: setup left no stale registered worktree'
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'a branch whose worktree is gone must still be held by the bundle'
+  assert_grep "bundle does not list unlanded tip $stale_head" "$case_dir/stderr" 'bundle-stale-tip: the missing tip was not named'
+  assert_present "$NESTED_COPY/.git" 'bundle-stale-tip: copy was removed'
+  assert_present "$case_dir/state/task-x1.meta" 'bundle-stale-tip: task record was removed'
+  assert_absent "$case_dir/treehouse.log" 'bundle-stale-tip: pool slot was returned'
+  record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot re-bundle with the stale tip'
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "bundle-stale-tip: a bundle holding the stale tip must allow teardown: $(cat "$case_dir/stderr2")"
+  assert_absent "$NESTED_COPY" 'bundle-stale-tip: preserved copy was not removed'
+  pass 'a branch whose registered worktree is gone counts as a side branch the bundle must hold'
+}
+
+# Counts the isolated-restore fetches teardown makes: each one reads the
+# recorded bundle by path into a scratch repository.
+install_restore_fetch_counter() {  # <case-dir>
+  local case_dir=$1
+  : > "$case_dir/restore-fetches"
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" fetch --quiet "*".bundle "*) printf 'fetch\n' >> "$case_dir/restore-fetches" ;;
+esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+}
+
+test_bundle_restore_runs_once_per_unchanged_proof() {
+  local case_dir rc proofs
+  make_bundle_copy_case bundle-memo
+  case_dir=$NESTED_CASE
+  install_restore_fetch_counter "$case_dir"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-memo: a verified bundle must allow ordinary teardown: $(cat "$case_dir/stderr")"
+  proofs=$(grep -c 'preserved unlanded commits in bundle' "$case_dir/stderr" || true)
+  [ "$proofs" -ge 2 ] || fail "bundle-memo: fixture made only $proofs proof; it cannot show a repeated proof"
+  assert_equals 1 "$(wc -l < "$case_dir/restore-fetches" | tr -d ' ')" 'bundle-memo: repeated proofs of one bundle restored it more than once'
+  pass 'repeated proofs of one unchanged bundle run the isolated restore once'
+}
+
+test_bundle_restore_memo_misses_a_changed_record_or_bundle() {
+  local shape case_dir rc head tips size
+  for shape in recorded-tips bundle-bytes; do
+    make_bundle_copy_case "bundle-memo-$shape"
+    case_dir=$NESTED_CASE
+    install_restore_fetch_counter "$case_dir"
+    head=$(git -C "$NESTED_COPY" rev-parse HEAD)
+    case "$shape" in
+      recorded-tips)
+        cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\t%s\t%s\n' '$BUNDLE_PATH' "\$(shasum -a 256 '$BUNDLE_PATH' | awk '{print \$1}')" '$head' > '$case_dir/data/task-x1/preservation-bundles.tsv' ;; esac
+exit 0
+SH
+        ;;
+      bundle-bytes)
+        size=$(wc -c < "$BUNDLE_PATH")
+        tips=$(git bundle list-heads "$BUNDLE_PATH" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+        cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*)
+  head -c $((size - 16)) '$BUNDLE_PATH' > '$BUNDLE_PATH.cut' && mv '$BUNDLE_PATH.cut' '$BUNDLE_PATH'
+  printf '%s\t%s\t%s\n' '$BUNDLE_PATH' "\$(shasum -a 256 '$BUNDLE_PATH' | awk '{print \$1}')" '$tips' > '$case_dir/data/task-x1/preservation-bundles.tsv' ;;
+esac
+exit 0
+SH
+        ;;
+    esac
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    assert_equals 2 "$(wc -l < "$case_dir/restore-fetches" | tr -d ' ')" "bundle-memo-$shape: a changed proof reused the remembered restore"
+    case "$shape" in
+      recorded-tips)
+        expect_code 0 "$rc" "bundle-memo-$shape: a narrower valid record must still allow teardown: $(cat "$case_dir/stderr")"
+        ;;
+      bundle-bytes)
+        expect_code 1 "$rc" "bundle-memo-$shape: a truncated bundle must refuse at the final proof"
+        assert_grep 'bundle cannot be restored in an isolated repository' "$case_dir/stderr" "bundle-memo-$shape: the truncated bundle was not refused"
+        assert_present "$NESTED_COPY/.git" "bundle-memo-$shape: copy was removed"
+        assert_present "$case_dir/state/task-x1.meta" "bundle-memo-$shape: task record was removed"
+        ;;
+    esac
+  done
+  pass 'a changed recorded tip set or changed bundle bytes is proved again, not taken from the remembered restore'
+}
+
+test_bundle_restore_memo_is_keyed_by_object_format() {
+  local case_dir sha1_copy sha256_copy bundle digest tips rc=0
+  case_dir=$(make_case bundle-memo-format)
+  sha1_copy="$case_dir/sha1-repo"
+  sha256_copy="$case_dir/sha256-repo"
+  git init -q "$sha1_copy"
+  git init -q --object-format=sha256 "$sha256_copy" 2>/dev/null || {
+    echo "skip: this git cannot create sha256 repositories"
+    return 0
+  }
+  git -C "$sha1_copy" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'sha1 work'
+  bundle="$case_dir/bundles/format.bundle"
+  mkdir -p "${bundle%/*}"
+  git -C "$sha1_copy" bundle create "$bundle" --all 2>/dev/null || fail 'cannot create the sha1 bundle'
+  digest=$(shasum -a 256 "$bundle" | awk '{print $1}')
+  tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -)
+  install_restore_fetch_counter "$case_dir"
+  PATH="$case_dir/fakebin:$PATH" bash -c '
+    . "$1/bin/fm-teardown-nested-lib.sh"
+    teardown_bundle_restorable "$2" "$3" "$4" "$5" || exit 11
+    teardown_bundle_restorable "$2" "$3" "$4" "$5" || exit 12
+    if teardown_bundle_restorable "$6" "$3" "$4" "$5"; then exit 13; fi
+  ' _ "$ROOT" "$sha1_copy" "$bundle" "$digest" "$tips" "$sha256_copy" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bundle-memo-format: restore memo harness failed: $(cat "$case_dir/stderr")"
+  assert_equals 2 "$(wc -l < "$case_dir/restore-fetches" | tr -d ' ')" 'bundle-memo-format: the same bundle in another object format reused the remembered restore'
+  pass 'the remembered restore is keyed by object format as well as bundle digest and tips'
 }
 
 test_bundle_kept_ship_closes_its_row_as_not_landed() {
@@ -13990,6 +14137,10 @@ test_invalid_preservation_bundle_refuses
 test_bundle_ignores_branches_other_worktrees_hold
 test_bundle_covers_a_removed_copys_branch_without_other_worktrees
 test_bundle_survives_a_stale_registered_worktree
+test_bundle_must_hold_a_stale_siblings_unpushed_tip
+test_bundle_restore_runs_once_per_unchanged_proof
+test_bundle_restore_memo_misses_a_changed_record_or_bundle
+test_bundle_restore_memo_is_keyed_by_object_format
 test_bundle_kept_ship_closes_its_row_as_not_landed
 test_bundle_hint_needs_unlanded_tips
 test_bundle_hint_skips_a_moved_head_at_final_custody

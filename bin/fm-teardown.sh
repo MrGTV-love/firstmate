@@ -63,40 +63,49 @@
 # (state database, run row, pushed head, input head) refuses and names the record.
 # Recorded bundle preservation is a cleanup alternative, not proof of delivery.
 # Its record is $DATA/$ID/preservation-bundles.tsv (normally
-# $FM_HOME/data/<task-id>/preservation-bundles.tsv): one bundle per line, exactly
-# three TAB-separated fields: absolute bundle path, lowercase SHA-256 (64 hex),
-# and space-separated full commit tips advertised by git bundle list-heads.
-# Paths cannot contain TAB, CR or newline; blank or malformed lines refuse.
+# $FM_HOME/data/<task-id>/preservation-bundles.tsv): exactly ONE line of three
+# TAB-separated fields: absolute bundle path, lowercase SHA-256 (64 hex), and
+# space-separated full commit tips advertised by git bundle list-heads.
+# Re-bundling replaces the line; a record of more than one line, or a blank or
+# malformed one, refuses. The path cannot contain TAB, CR or newline.
 # The record and bundle must be regular nonsymlink files. The bundle's physical
-# parent must be outside every registered copy (symlink aliases included) and
-# every enclosing Treehouse pool, including non-copy directories in it.
-# One recorded bundle must pass git bundle verify in the copy, match its recorded
+# parent must be outside every registered copy (symlink aliases included), every
+# enclosing Treehouse pool (non-copy directories in it included) and every
+# scratch root this teardown removes: the task's tasktmp, its launch-home temp
+# root, and $STATE/<task-id>.inbox and .git-hooks.
+# The recorded bundle must pass git bundle verify in the copy, match its recorded
 # SHA-256, advertise and record every maximal tip of git rev-list --children
 # <ref> <branches> --not --remotes, and restore on its own: fetching every
 # recorded tip from it into a fresh empty repository outside the copy and pool
-# must succeed and pass git fsck --connectivity-only. <ref> is the copy's HEAD (detached included) or a removed
-# copy's branch tip; <branches> are the local branches no worktree has checked
-# out, so side branches count and a branch another worktree holds is that task's
-# own. A thin bundle, a truncated pack or a missing tip refuses. Ancestors need
-# not be separate bundle heads.
+# must succeed and pass git fsck --connectivity-only.
+# <ref> is the copy's HEAD (detached included) or a removed copy's branch tip.
+# <branches> are the local branches no live worktree has checked out, so side
+# branches count; a branch checked out in another worktree whose directory still
+# exists is that task's own, but a branch whose worktree directory is gone or
+# prunable counts. A thin bundle, a truncated pack or a missing tip refuses.
+# Ancestors need not be separate bundle heads.
 # No unlanded tip means this alternative proves nothing: pushed-but-undelivered
-# ships still require the existing delivery proof. Bundle proofs are not cached:
-# final safety rechecks read the file and record and verify coverage again.
+# ships still require the existing delivery proof. Every proof reads the record
+# and the bundle's digest again and verifies coverage again; only a completed
+# isolated restore is remembered in this process, by bundle digest, object
+# format and recorded tips, so the final custody rechecks and the nested, prior
+# and foreign copy proofs do not repeat it. Nothing is cached on disk.
 # Success prints the bundle path, hash and preserved tips, and never waives dirt,
 # ignored-file preservation, process, ownership or closeout-driver proofs.
 # A ship kept only by its bundle closes its backlog item with the note
-# "preserved in bundle <bundle path>, not landed", never a PR or "local main".
+# "preserved in bundle <bundle path>, not landed", never a PR or "local main";
+# bin/fm-landed-lib.sh keeps such a row out of Recently Landed.
 # A Vernant-locked copy still needs its driver's independent landing verdict.
 # To create a self-contained bundle and its record (no creator is run by teardown),
-# choose an absolute durable bundle path OUTSIDE every copy and pool, set copy,
-# task and FM_HOME explicitly, then run under bash:
+# choose an absolute durable bundle path OUTSIDE every copy, pool and scratch root,
+# set copy, task and FM_HOME explicitly, then run under bash:
 #   bundle=/durable/preservation/task.bundle
 #   mkdir -p "${bundle%/*}" "$FM_HOME/data/$task"
 #   git -C "$copy" bundle create "$bundle" --all &&
 #   git -C "$copy" bundle verify "$bundle" &&
 #   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
 #   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
-#   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" >> "$FM_HOME/data/$task/preservation-bundles.tsv"
+#   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$FM_HOME/data/$task/preservation-bundles.tsv"
 # Keep the bundle and record until the preserved commits are no longer needed;
 # data/<task> survives cleanup. Restore into a new repository with
 # git -C <restore-repo> fetch <bundle-path> <tip-sha>:refs/heads/recovered.
