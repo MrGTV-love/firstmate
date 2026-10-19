@@ -20,8 +20,10 @@
 #     bin/fm-merge-prune.sh runs before it calls these proofs): the pool's
 #     treehouse-state.json sits beside the slot and the slot shares the
 #     project's git directory;
-#   - git reports no changed or untracked file and the copy holds no stash entry
-#     of its own work: for a linked worktree of the project, a stash made on
+#   - git reports no changed or untracked file (every untracked file and every
+#     changed submodule counts, whatever status.showUntrackedFiles or
+#     diff.ignoreSubmodules says) and the copy holds no stash entry of its own
+#     work: for a linked worktree of the project, a stash made on
 #     another branch of the project is another task's (a linked worktree shares
 #     the project's stash list), while a stash made on the copy's branch, or any
 #     stash of a detached copy, counts; a nested copy that is an independent
@@ -175,7 +177,7 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
     fm_mp_verdict keep "$copy is not a git work tree root"
     return 1
   fi
-  if ! dirty=$(git -C "$copy" status --porcelain 2>/dev/null); then
+  if ! dirty=$(git -C "$copy" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null); then
     fm_mp_verdict transient "git status failed in $copy"
     return 1
   fi
