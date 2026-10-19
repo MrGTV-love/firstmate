@@ -1131,7 +1131,8 @@ A burst of distinct events is never dropped below the cap.
 The writer never deletes, truncates or rewrites an event line.
 The writers inside Firstmate (spawn failures, model-fallback notes, pending-reply escalations, the parent channel, the secondmate report helper, the remote-reply mirror, and the guarded self-announced appends) use the same append.
 When the capped append refuses a mirrored remote status delta, `bin/fm-procevent-remote-reply.sh` stops that ingest before it commits anything: its cursor stays where it was, so the delta is read again whole, nothing is dropped, and one keyed `blocked [key=remote-reply-continuity-<id>-capped]` line names the log.
-The one writer left outside the capped append is the generated omp extension's `note: model-matrix fallback served` line, written inside the agent harness with a plain file append: it is one event-driven line per fallback, not a loop, and moving it behind the cap is a follow-up.
+Two writers are left outside the capped append, both in generated extension code that runs inside the agent harness and writes with a plain file append: the `note: model-matrix fallback served` line of the omp extension, and the `note: warning: ... unmatched exclusion entries` line `bin/fm-spawn.sh` generates for the pi extension.
+Each is one event-driven line per fallback or per session, not a loop, and moving them behind the cap is a follow-up.
 A refused spawn failure report is not dropped silently: `bin/fm-spawn.sh` prints the file, the writer's refusal text and the exit status on its own stderr.
 
 ### Foreign writers

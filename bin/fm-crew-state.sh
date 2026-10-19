@@ -372,7 +372,11 @@ map_log_state() {  # <line>
   esac
 }
 
-LOG_LINE=$(status_current_line "$LOG" "$KIND")
+LOG_RC=0
+LOG_LINE=$(status_current_line "$LOG" "$KIND") || LOG_RC=$?
+# A log the status read limits refuse (bin/fm-status-cap-lib.sh) is unreadable, which is
+# not the same as empty: say so, naming the log, instead of answering from the pane alone.
+[ "$LOG_RC" -ne 2 ] || emit unknown status-log "status log ${LOG##*/} is past the status read limits and cannot be read"
 LOG_VERB=$(status_line_verb "$LOG_LINE")
 
 # --- remote secondmate: the true source is the remote endpoint ---------------

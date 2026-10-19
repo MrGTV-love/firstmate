@@ -211,7 +211,7 @@ watch_cap() {  # <state> <out> [extra env...]
   local state=$1 out=$2
   shift 2
   FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_STATUS_CAP_BYTES=262144 \
-    FM_STATUS_CAP_SAMPLE_SECS=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 \
+    FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 \
     FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
     FM_OPEN_LOOPS_INTERVAL=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err" &
 }
@@ -349,7 +349,7 @@ test_a_resumed_writer_is_woken_for_and_stopped_again() {
 test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth() {
   local dir state side out ident size scan_env
   dir=$(make_case sidecar); state="$dir/state"; side="$state/.t1.open-decisions-cursor.unread.123"
-  scan_env=(env FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=262144 FM_STATUS_CAP_SAMPLE_SECS=1 FM_STATUS_CAP_LSOF=/usr/bin/false)
+  scan_env=(env FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=262144 FM_STATUS_CAP_LSOF=/usr/bin/false)
   head -c 300000 /dev/zero | tr '\0' 'y' > "$side"
   out=$("${scan_env[@]}" "$GUARD" scan) || fail "the guard scan failed"
   case "$out" in *'file=.t1.open-decisions-cursor.unread.123'*) ;; *) fail "the guard did not name the over-cap cursor scratch: $out" ;; esac
