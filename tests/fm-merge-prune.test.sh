@@ -477,6 +477,55 @@ scn_untracked_file_is_kept() {
   return 0
 }
 
+# Git config can hide what a plain `git status` prints: with
+# status.showUntrackedFiles=no an untracked file prints nothing, and with
+# diff.ignoreSubmodules=all a changed submodule prints nothing. The dirty-file
+# proof must see both whatever the config says, in the task's own copy and in a
+# nested copy. The fixture checks that the config really hides the work, so a
+# passing result is not a fixture that never held any.
+scn_hidden_untracked_file_is_kept() {  # <root|nested>
+  local where
+  make_world
+  where=$COPY
+  if [ "$1" = nested ]; then
+    make_nested .claude/worktrees/n1
+    where="$COPY/.claude/worktrees/n1"
+  fi
+  git -C "$where" config status.showUntrackedFiles no
+  printf 'mine\n' > "$where/new-file.txt"
+  [ -z "$(git -C "$where" status --porcelain)" ] || why "the fixture's git config does not hide the untracked file" || return 1
+  [ -n "$(git -C "$where" status --porcelain --untracked-files=all)" ] || why "the fixture has no untracked file" || return 1
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy ($1) holding an untracked file that git config hides was removed" || return 1
+  [ -e "$where/new-file.txt" ] || why "the untracked file ($1) was lost" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although an untracked file ($1) was left" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$where" "$STATE/.wake-queue" | grep -q 'changed or untracked' || why "the wake does not name the copy and the untracked file" || return 1
+  return 0
+}
+scn_hidden_untracked_file_is_kept_in_the_copy() { scn_hidden_untracked_file_is_kept root; }
+scn_hidden_untracked_file_is_kept_in_a_nested_copy() { scn_hidden_untracked_file_is_kept nested; }
+
+scn_hidden_submodule_change_is_kept() {
+  make_world
+  git init -q "$W/sub-origin"
+  git -C "$W/sub-origin" commit -q --allow-empty -m "sub base"
+  git -C "$COPY" -c protocol.file.allow=always submodule add -q "$W/sub-origin" sub >/dev/null 2>&1 || why "the fixture's submodule could not be added" || return 1
+  git -C "$COPY" commit -q -m "add the submodule"
+  git -C "$COPY" push -q origin fm/t1
+  squash_merge_into_main "$COPY" >/dev/null 2>&1
+  git -C "$COPY/sub" commit -q --allow-empty -m "work inside the submodule"
+  git -C "$COPY" config diff.ignoreSubmodules all
+  [ -z "$(git -C "$COPY" status --porcelain)" ] || why "the fixture's git config does not hide the changed submodule" || return 1
+  [ -n "$(git -C "$COPY" status --porcelain --ignore-submodules=none)" ] || why "the fixture has no changed submodule" || return 1
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy holding a changed submodule that git config hides was removed" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although a submodule was changed" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'changed or untracked' || why "the wake does not name the copy and the changed submodule" || return 1
+  return 0
+}
+
 scn_unpushed_commit_is_kept() {
   make_world
   printf 'later\n' > "$COPY/later.txt"
@@ -1339,6 +1388,9 @@ test_fallback_removes_a_clean_pushed_unused_scratch_copy() { assert_scenario scn
 test_fallback_keeps_a_changed_file() { assert_scenario scn_changed_file_is_kept "a changed tracked file keeps the copy with exactly one wake naming it"; }
 test_fallback_keeps_an_untracked_file() { assert_scenario scn_untracked_file_is_kept "an untracked file keeps the copy with exactly one wake"; }
 test_fallback_keeps_an_unpushed_commit() { assert_scenario scn_unpushed_commit_is_kept "an unpushed commit keeps the copy with exactly one wake naming it"; }
+test_fallback_keeps_an_untracked_file_that_git_config_hides() { assert_scenario scn_hidden_untracked_file_is_kept_in_the_copy "an untracked file that status.showUntrackedFiles=no hides from a plain git status still keeps the copy with exactly one wake"; }
+test_fallback_keeps_a_nested_copy_with_an_untracked_file_that_git_config_hides() { assert_scenario scn_hidden_untracked_file_is_kept_in_a_nested_copy "an untracked file in a nested copy that status.showUntrackedFiles=no hides still keeps the copy with exactly one wake"; }
+test_fallback_keeps_a_changed_submodule_that_git_config_hides() { assert_scenario scn_hidden_submodule_change_is_kept "a changed submodule that diff.ignoreSubmodules=all hides from a plain git status still keeps the copy with exactly one wake"; }
 test_fallback_keeps_a_stash() { assert_scenario scn_stash_is_kept "a stash entry keeps the copy"; }
 test_fallback_keeps_a_live_process() { assert_scenario scn_live_process_is_kept "a live process inside keeps the copy with exactly one wake"; }
 test_fallback_nested_unpushed_commit_keeps_the_slot() { assert_scenario scn_nested_unpushed_commit_keeps_the_slot "an unpushed commit in a NESTED copy keeps the whole slot"; }
@@ -1435,6 +1487,9 @@ test_unsafe_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
   expect_caught no-dirty-check $lib '  if [ -n "$dirty" ]; then' '  if false; then' scn_changed_file_is_kept "changed-file proof"
   expect_caught no-untracked-check $lib '  if [ -n "$dirty" ]; then' '  if false; then' scn_untracked_file_is_kept "untracked-file proof"
+  expect_caught status-flags-removed $lib 'status --porcelain --untracked-files=all --ignore-submodules=none' 'status --porcelain' scn_hidden_untracked_file_is_kept_in_the_copy "dirty-file status flags"
+  expect_caught status-untracked-all-removed $lib 'status --porcelain --untracked-files=all --ignore-submodules=none' 'status --porcelain --ignore-submodules=none' scn_hidden_untracked_file_is_kept_in_a_nested_copy "dirty-file status flag --untracked-files=all"
+  expect_caught status-ignore-submodules-removed $lib 'status --porcelain --untracked-files=all --ignore-submodules=none' 'status --porcelain --untracked-files=all' scn_hidden_submodule_change_is_kept "dirty-file status flag --ignore-submodules=none"
   expect_caught no-unpushed-check $lib '  if [ "$unpushed" != 0 ]; then' '  if false; then' scn_unpushed_commit_is_kept "unpushed-commit proof"
   expect_caught no-stash-check $lib '  if [ "$stashes" != 0 ]; then' '  if false; then' scn_stash_is_kept "stash proof"
   expect_caught no-process-check $lib "  out=\$(printf '%s\\n' \"\$out\" | sort -u | tr '\\n' ' ')" '  out=' scn_live_process_is_kept "live-process proof"
@@ -1792,6 +1847,9 @@ ALL_TESTS=(
   test_fallback_removes_a_clean_pushed_unused_scratch_copy
   test_fallback_keeps_a_changed_file
   test_fallback_keeps_an_untracked_file
+  test_fallback_keeps_an_untracked_file_that_git_config_hides
+  test_fallback_keeps_a_nested_copy_with_an_untracked_file_that_git_config_hides
+  test_fallback_keeps_a_changed_submodule_that_git_config_hides
   test_fallback_keeps_an_unpushed_commit
   test_fallback_keeps_a_stash
   test_fallback_keeps_a_live_process

@@ -712,7 +712,8 @@ Only a known landing refusal makes the fallback re-prove the copy from the live 
 The copy and every nested copy inside it, each checked one by one, must pass all of these:
 
 - It is a Treehouse pool slot of the task's project, by the test the rest of Firstmate uses (`fm_treehouse_pool_slot`): the pool's `treehouse-state.json` sits beside it and it shares the project's git directory.
-- Git reports no changed or untracked file and the copy holds no stash entry of its own work: for a linked worktree of the project, a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
+- Git reports no changed or untracked file, and every untracked file and every changed submodule counts, whatever `status.showUntrackedFiles` or `diff.ignoreSubmodules` says.
+- The copy holds no stash entry of its own work: for a linked worktree of the project, a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
 - A nested copy that is an independent clone, with its own git directory, shares nothing with the project, so every stash it holds keeps it.
 - No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; for a linked worktree, other branches of the project are other work and are not read.
 - For a nested copy that is an independent clone, every local branch that is not on a remote also keeps it, because removing the clone destroys that branch.
