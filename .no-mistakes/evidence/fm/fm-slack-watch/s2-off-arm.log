@@ -1,0 +1,73 @@
+
+=== S2.1 no token: poll, mirror, check all silent, exit 0, zero network, no state created
+PASS: poll with no token: rc/stdout+stderr (= 0/)
+PASS: mirror with no token: rc/stdout+stderr (= 0/)
+PASS: check with no token (= 0/)
+PASS: no request reached the server (= 0)
+PASS: no state/slack-watch created
+
+=== S2.2 token set, allowlist empty: still off and silent (the 'unconfigured' rule)
+poll output: [] rc=0
+PASS: poll rc with empty allowlist (= 0)
+PASS: no request with empty allowlist (= 0)
+PASS: no state created
+
+=== S2.3 explicit arm while unconfigured: stderr names the refusal, stdout empty, rc!=0, nothing registered
+stdout=[] stderr=[slack: refused: unconfigured] rc=1
+PASS: arm stdout empty (= )
+PASS: stderr reason (has: slack: refused: unconfigured)
+PASS: arm exits non-zero
+PASS: no shim registered
+
+=== S2.4 malformed allowlist refuses everything with a named reason
+poll output: [slack: refused: allowlist_unparseable]
+PASS: named refusal (has: slack: refused: allowlist_unparseable)
+PASS: server saw no request (= 0)
+
+=== S2.5 arm before 'bind slack-dm' is refused on stderr; no shim
+stdout=[] stderr=[slack: refused: source_not_bound] rc=1
+PASS: refusal names unbound source (has: source_not_bound)
+PASS: non-zero
+PASS: no shim
+
+=== S2.6 bind + arm: DM opened and proved readable; shim + trust written; stdout 'armed:'
+stdout=[armed: state/slack.check.sh] stderr=[] rc=0
+PASS: arm stdout (= armed: state/slack.check.sh)
+PASS: arm rc (= 0)
+PASS: shim + trust present
+methods during arm: ['auth.test', 'conversations.open', 'conversations.history']
+
+=== S2.7 the watcher contract: armed check runs trust-checked, quiet when nothing to report
+watcher-run check output: []
+PASS: armed check silent with no answer and (first) mirror of resolve-call (= )
+thread for resolve-call: 1760000001.000001
+PASS: armed check mirrored the open hold into a thread
+
+=== S2.8 AFK owner types answer; the next watcher sweep emits ONE wake line
+watcher-run check output: [closed: resolve-call]
+PASS: single wake line (= closed: resolve-call)
+PASS: answer recorded (= ship)
+PASS: next sweep silent (no repeat wake) (= )
+
+=== S2.9 edited shim is rejected by the watcher trust binding
+PASS: tampered shim not run by watcher (= WATCHER-REJECTED-CHECK)
+PASS: restored shim runs again (= )
+
+=== S2.10 hard off switch: disarm removes check immediately, even with token+allowlist still set
+disarm: [disarmed: state/slack.check.sh] rc=0
+PASS: disarm stdout (= disarmed: state/slack.check.sh)
+PASS: disarm rc (= 0)
+PASS: shim + trust gone
+PASS: watcher finds nothing to run (= WATCHER-REJECTED-CHECK)
+PASS: manual 'check' after disarm does nothing (= 0/)
+PASS: allow-a untouched after disarm (= open)
+
+=== S2.11 unbind slack-dm: poll no longer feeds answers
+poll after unbind: []
+PASS: no close while unbound (absent: closed:)
+PASS: allow-a still open while unbound (= open)
+poll after re-bind: [closed: allow-a]
+PASS: answer delivered once re-bound (has: closed: allow-a)
+S2 RESULT: ALL PASS
+/Users/charlesabrooker/.no-mistakes/evidence/01M59ZARSPM5WA50K9D683VMFR/lab/lab.sh: line 23: 41370 Terminated: 15          python3 "$LABTOOLS/fake_slack.py" "$LABROOT/port" "$FAKE_TOKEN" > "$LABROOT/server.log" 2>&1
+exit=0

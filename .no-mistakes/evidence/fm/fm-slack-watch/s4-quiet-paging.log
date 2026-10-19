@@ -1,0 +1,18 @@
+
+=== S4.1 armed check never wakes firstmate for .env typos (every 5-minute sweep stays silent)
+PASS: armed sweep x2 with FM_SLACK_ALLOWED_AUTHORS=oops (= [][])
+PASS: armed sweep x2 with FM_SLACK_DM_USER=not-a-member (= [][])
+PASS: armed sweep x2 with FM_SLACK_POLL_MAX_ANSWERS=0 (= [][])
+PASS: armed sweep x2 with FM_SLACK_ALLOWED_AUTHORS= (= [][])
+PASS: typo'd sweeps sent no Slack request (= 23)
+
+=== S4.2 a home with no open held decision and no tracked thread makes zero Slack requests
+PASS: idle poll/mirror/check silent (= [][][])
+PASS: zero requests while idle (= 23)
+
+=== S4.3 thread with 130 replies: the owner's reply on page 2 of conversations.replies is still found
+replies requests before poll: 0
+poll: [closed: typed-call]
+PASS: owner reply beyond page 1 delivered (has: closed: typed-call)
+PASS: option 3 value recorded (= abort)
+S4 RESULT: ALL PASS

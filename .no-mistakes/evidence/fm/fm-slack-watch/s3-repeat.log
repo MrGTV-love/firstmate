@@ -1,0 +1,24 @@
+iter 1 poll1 rc=0 elapsed=13s out=[closed: dup-a] bots=3 load=21.24 25.69 30.75
+iter 1 poll2 rc=0 elapsed=5s out=[] bots=3 load=20.42 25.45 30.63
+iter 1 poll3 rc=0 elapsed=3s out=[] bots=3 load=19.02 25.07 30.47
+iter 1 state=closed pending=[]
+iter 2 poll1 rc=0 elapsed=14s out=[closed: dup-a] bots=3 load=17.05 23.56 29.63
+iter 2 poll2 rc=0 elapsed=10s out=[] bots=3 load=21.94 24.43 29.87
+iter 2 poll3 rc=0 elapsed=6s out=[] bots=3 load=25.77 25.17 30.07
+iter 2 state=closed pending=[]
+iter 3 poll1 rc=0 elapsed=17s out=[closed: dup-a] bots=3 load=21.93 25.16 29.74
+iter 3 poll2 rc=0 elapsed=5s out=[] bots=3 load=21.37 24.99 29.66
+iter 3 poll3 rc=0 elapsed=5s out=[] bots=3 load=20.38 24.73 29.54
+iter 3 state=closed pending=[]
+iter 4 poll1 rc=0 elapsed=14s out=[closed: dup-a] bots=3 load=25.84 25.92 29.80
+iter 4 poll2 rc=0 elapsed=7s out=[] bots=3 load=23.20 25.34 29.55
+iter 4 poll3 rc=0 elapsed=4s out=[] bots=3 load=23.20 25.34 29.55
+iter 4 state=closed pending=[]
+iter 5 poll1 rc=0 elapsed=15s out=[closed: dup-a] bots=3 load=20.43 24.50 28.99
+iter 5 poll2 rc=0 elapsed=6s out=[] bots=3 load=18.30 23.91 28.72
+iter 5 poll3 rc=0 elapsed=5s out=[] bots=3 load=19.31 24.03 28.74
+iter 5 state=closed pending=[]
+iter 6 poll1 rc=0 elapsed=18s out=[closed: dup-a] bots=3 load=23.05 24.36 28.66
+iter 6 poll2 rc=0 elapsed=3s out=[] bots=3 load=21.60 24.03 28.52
+iter 6 poll3 rc=0 elapsed=4s out=[] bots=3 load=20.52 23.77 28.40
+iter 6 state=closed pending=[]

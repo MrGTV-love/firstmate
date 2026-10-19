@@ -1,0 +1,88 @@
+
+=== S1.0 four held decisions exist (real tasks-axi + captain-hold)
+PASS: allow-a open before mirror (= open)
+PASS: allow-b open before mirror (= open)
+PASS: allow-c open before mirror (= open)
+PASS: allow-d open before mirror (= open)
+
+=== S1.1 mirror creates one DM thread per open held decision (real HTTP client)
+mirror stdout: []
+PASS: mirror prints nothing when it only mirrors (= )
+threads: A=1760000001.000001 B=1760000002.000001 C=1760000003.000001 D=1760000004.000001
+PASS: 4 top-level cards posted
+
+=== card text for allow-a as posted to Slack
+--- BOT 1760000001.000001 user=UBOTLAB0001
+Task: allow-a
+Decision: Replay decision
+Select the release approach
+Captain hold set: 2026-10-01T00:00:00Z
+Pick one
+
+Recommendation: none recorded
+Evidence: none recorded
+Options:
+1. Ship it (ship) - Deploy now
+2. Wait (wait) - Hold current
+3. Abort (abort) - Stop
+Affordance: reaction
+React with one/two/three or reply in this thread with the option number.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+PASS: card lists options (has: Options:)
+PASS: option 1 line (has: 1. Ship it (ship))
+PASS: reaction affordance with scopes granted (has: Affordance: reaction)
+PASS: main-window note (has: Messages typed in the main DM window are not read.)
+PASS: bot seeded numbered reactions on the card (= one,two,three)
+
+=== S1.2 mirror again is idempotent (no second thread per hold occurrence)
+PASS: still 4 cards (= 4)
+
+=== S1.3 owner types '2' in thread A -> option 2 recorded through keyed-answer intake
+poll stdout: [closed: allow-a]
+PASS: wake line names closed key (has: closed: allow-a)
+PASS: recorded keyed answer is option 2's value (= wait)
+PASS: recorded label (= Wait)
+PASS: allow-a closed in the real backlog (= closed)
+Captain answered this call through slack-dm.
+Task: allow-a
+Answer: wait
+Answer as shown to the captain: Wait
+Pick one
+Option 1: Ship it (ship) - Deploy now
+Option 2: Wait (wait) - Hold current
+Option 3: Abort (abort) - Stop
+PASS: ack posted in thread (has: Answer recorded.)
+PASS: resolution posted back in thread (has: Resolved: allow-a)
+PASS: thread retired (= True)
+
+=== S1.4 owner taps reaction :one: on card B -> option 1 recorded
+poll stdout: [closed: allow-b]
+PASS: tap closes allow-b (has: closed: allow-b)
+PASS: tap recorded option 1 value (= ship)
+PASS: tap label (= Ship it)
+
+=== S1.5 adversarial: stranger, bot-flagged owner id, main-window DM, bot reaction all refused
+poll stdout: []
+PASS: nothing closed by unauthorized input (absent: closed:)
+PASS: allow-c still open (= open)
+PASS: allow-d still open (= open)
+
+=== S1.6 terminal close still works; Slack thread gets the resolution and retires
+poll stdout: []
+PASS: plane does not claim a terminal close as its own (absent: closed:)
+PASS: resolution in thread after terminal close (has: Resolved: allow-c)
+PASS: thread retired after terminal close (= True)
+
+=== S1.7 owner reply that Slack tags thread_broadcast ('also send to channel') is still read
+poll stdout: [closed: allow-d]
+PASS: broadcast reply closes allow-d (has: closed: allow-d)
+PASS: free text recorded verbatim (= ship it now)
+
+=== S1.8 every request carried the bot token; token never reached state/output
+PASS: no unauthenticated request (= 0)
+total requests seen by fake: 62
+PASS: token not written into state or data (= 0)
+S1 RESULT: ALL PASS
+/Users/charlesabrooker/.no-mistakes/evidence/01M59ZARSPM5WA50K9D683VMFR/lab/lab.sh: line 23: 49708 Terminated: 15          python3 "$LABTOOLS/fake_slack.py" "$LABROOT/port" "$FAKE_TOKEN" > "$LABROOT/server.log" 2>&1
+exit=0

@@ -1,0 +1,15 @@
+poll1 rc=1 elapsed=37s out=[closed: dup-a
+slack: transport failure: request_budget_exhausted] bot-msgs=1 open=closed pending=[('answer', 'ack')]
+poll2 rc=0 elapsed=6s out=[] bot-msgs=3 open=closed pending=[]
+poll3 rc=0 elapsed=5s out=[] bot-msgs=3 open=closed pending=[]
+poll4 rc=0 elapsed=4s out=[] bot-msgs=3 open=closed pending=[]
+--- BOT 1760000001.000001 user=UBOTLAB0001
+Task: dup-a
+--- BOT 1760000005.000001 user=UBOTLAB0001
+Answer recorded.
+--- BOT 1760000006.000001 user=UBOTLAB0001
+Resolved: dup-a
+PASS: call closed (= closed)
+PASS: exactly one resolution record (= 1)
+PASS: card + one ack + one resolution (caught up) (= 3)
+S3.8 RESULT: ALL PASS

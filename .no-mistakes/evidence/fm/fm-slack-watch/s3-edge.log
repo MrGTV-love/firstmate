@@ -1,0 +1,86 @@
+
+=== S3.1 tap :two: AND type 3 -> conflict surfaces once, nothing recorded, call stays open
+poll1: [check: slack 1760000001.000001 - conflicting signals: Abort vs Wait]
+PASS: wake line names conflict (has: conflicting signals)
+PASS: no close (absent: closed:)
+PASS: call open (= open)
+PASS: thread notice says nothing recorded (has: No answer was recorded.)
+poll2: []
+PASS: second poll silent (surfaces once) (= )
+poll3: [closed: reaction-call]
+PASS: fresh typed reply resolves it (has: closed: reaction-call)
+PASS: recorded option 2 (= wait)
+
+=== S3.2 outage: Slack 503 on thread reads -> named once, then quiet; terminal path and recovery intact
+poll1: [slack: transport failure: http_503]
+PASS: failure named (has: slack: transport failure:)
+PASS: exactly one failure line (= 1)
+poll2: []
+PASS: same episode stays quiet (= )
+PASS: call still open (reply not lost, not applied) (= open)
+poll after recovery: [closed: failure-call]
+PASS: queued owner reply delivered after recovery (has: closed: failure-call)
+PASS: recorded (= wait)
+
+=== S3.2b rate limit (HTTP 429) is named; bad token is named without echoing the token
+429 poll: [slack: transport failure: rate_limited]
+PASS: rate limit named (has: rate_limited)
+bad token poll: [slack: transport failure: invalid_auth]
+PASS: invalid_auth named (has: invalid_auth)
+PASS: bad token never echoed (absent: xoxb-lab-WRONG-token-9999)
+PASS: bad token not in state (= 0)
+
+=== S3.3 crash after intake applied, before ack journaled: rerun records ONCE and acks 'Answer recorded.'
+after-delivery first run rc=75
+PASS: after-delivery crashed the poll (= 75)
+after-delivery rerun: [closed: crash-a-call]
+PASS: after-delivery: call closed after rerun (= closed)
+PASS: after-delivery: exactly one resolution record (= 1)
+PASS: after-delivery: ack says recorded (has: Answer recorded.)
+PASS: after-delivery: no false 'not applied' (absent: not applied)
+PASS: after-delivery: later poll silent (= )
+after-answer first run rc=75
+PASS: after-answer crashed the poll (= 75)
+after-answer rerun: []
+PASS: after-answer: call closed after rerun (= closed)
+PASS: after-answer: exactly one resolution record (= 1)
+PASS: after-answer: ack says recorded (has: Answer recorded.)
+PASS: after-answer: no false 'not applied' (absent: not applied)
+PASS: after-answer: later poll silent (= )
+
+=== S3.4 reactions scopes revoked: card falls back to typed numbers; one scope notice; typed answer works
+mirror: [slack: missing reaction scope: reactions:read, users:read]
+PASS: scope diagnostic (has: missing reaction scope: reactions:read, users:read)
+PASS: card does not advertise taps (has: Affordance: single-character)
+PASS: typed fallback (has: Reply in this thread with the option number.)
+PASS: scope diagnostic reported once (= )
+poll: [closed: scope-call]
+PASS: typed answer still works (has: closed: scope-call)
+PASS: option 3 value (= abort)
+
+=== S3.5 late reply on a call already closed in the terminal is surfaced, never applied
+poll: [check: slack 1760000020.000001 - unmatched reply 1760000021.000001]
+PASS: wake line names unmatched reply (has: unmatched reply)
+PASS: not applied (absent: closed:)
+PASS: thread told (has: No open decision matches this reply.)
+PASS: record is still the terminal answer (has: Captain decision:\nclosed in terminal)
+PASS: late Slack reply was never recorded (absent: through slack-dm)
+
+=== S3.6 repeated polls after an answer never double-record or re-post
+poll1: [closed: dup-a] bot msgs in thread: 3
+3
+poll2: [] poll3: [] bot msgs: 3
+PASS: card + ack + resolution posted (= 3)
+PASS: no extra Slack posts on repeat polls (= 3)
+PASS: one resolution record (= 1)
+
+=== S3.7 hostile text: Slack-escaped typed reply is recorded as typed; reserved 'reconcile' never answers
+reconcile poll: [refused: free-nine-call (reconcile requests require a bound captured source)]
+PASS: reserved value does not close (absent: closed:)
+PASS: still open (= open)
+poll: [closed: free-nine-call]
+PASS: free text closes (has: closed: free-nine-call)
+PASS: unescaped as the owner typed it (= ship <now> & docs)
+S3 RESULT: ALL PASS
+/Users/charlesabrooker/.no-mistakes/evidence/01M59ZARSPM5WA50K9D683VMFR/lab/lab.sh: line 23: 52432 Terminated: 15          python3 "$LABTOOLS/fake_slack.py" "$LABROOT/port" "$FAKE_TOKEN" > "$LABROOT/server.log" 2>&1
+exit=0
