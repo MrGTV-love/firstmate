@@ -3898,8 +3898,8 @@ bin/fm-test-run.sh tests/fm-dsh-harness.test.sh
 ```
 
 ```text
-ok - live dsh-tui 0.16.1 ship brief, busy composer, mid-task steer, interrupt, exit, fresh relaunch with instructions, final exit
-ok - live dsh-tui 0.16.1 scout brief, busy composer, mid-task steer, interrupt, exit, fresh relaunch with instructions, final exit
+ok - live dsh-tui 0.16.1 ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+ok - live dsh-tui 0.16.1 scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
 cleanup_exit=0
 ok - dsh route boundaries, contradiction refusal, provider normalization, durable transitions, torn append, relaunch-session selection and ambiguity
 ok - dsh frame proves empty, typed draft, and busy-hint furniture
@@ -3915,7 +3915,7 @@ ok - dsh executable-slot attribution and lifecycle capability contract
 | Steer | `bin/fm-send.sh` delivered an inbox record mid-task and the worker replied with the requested token before the next interruption |
 | Interrupt and exit | `bin/fm-control.sh <id> interrupt` reported `interrupt-delivered ... verified=agent-alive`, and `exit` reported `stopped` with Herdr then reporting the pane dead |
 | Relaunch | `bin/fm-control.sh <id> relaunch` replaced the worker in the same endpoint; the new session read its relaunch instructions and the guard observed a new depth-zero session log |
-| Resume | NOT available: a launch naming an earlier session with `--resume=<id>` or `DSH_TUI_RESUME_SESSION=<id>` opened a new session without the earlier conversation. A probe asked the resumed session for a secret word it had memorized moments earlier, and the model answered that its context held no prior turn. Firstmate therefore never claims resumed context; a relaunch starts a fresh session that re-reads the task's instructions and worktree. |
+| Resume | Available through the launch overlay's `sessionId` field. The stock profile patch reads `DSH_TUI_RESUME_SESSION`, but the launch patch replaces that row config, so `--resume` or the env alone opened a fresh session; `bin/fm-dsh.py resume` now writes the task's newest session id explicitly and DSH continues the conversation in a new session id. Verified by a secret-word probe in which the resumed session recalled a word from the earlier turn, and by the live guard's resumed-recall assertion. |
 
 The 93 MB installed profile tree is reproduced inside each launch root rather than linked: Node resolves real paths before DSH's profile interception, so a linked `node_modules` escaped the isolated profile and loaded the launcher's own incompatible packages.
 The launcher needs the `dsh` CLI on `PATH`; a pane without the installing nvm bin directory exits with `dsh CLI not found`, so the launch prepends the launcher's own directory.

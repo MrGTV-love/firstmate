@@ -6959,11 +6959,17 @@ LAUNCH=${LAUNCH//__OMPSESSIONCFG__/$sq_ompsessioncfg}
 LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
 case "$HARNESS" in
 dsh)
-  # A relaunch starts a fresh session: dsh-tui 0.16.1 opens a requested
-  # session without its prior conversation (verified), so firstmate never
-  # claims resumed context. The task's instructions and worktree are what
-  # carry work forward.
-  DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT") || exit 1
+  # The launch patch replaces the dsh-tui row config, so it must also carry
+  # the sessionId that the stock profile patch would otherwise take from the
+  # launcher's --resume env. `resume` rewrites it for the task's newest
+  # session; anything it cannot prove falls back to a fresh session.
+  DSH_RUNTIME=
+  if [ "$RELAUNCH" = 1 ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
+    DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" 2>/dev/null) || DSH_RUNTIME=
+  fi
+  if [ -z "$DSH_RUNTIME" ]; then
+    DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT") || exit 1
+  fi
   LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}
   LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
   LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}

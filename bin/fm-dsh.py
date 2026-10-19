@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Private dsh-tui launch preparation and durable activity reader.
 
-A resumed launch opens a NEW depth-zero session without the earlier
-conversation (verified on dsh-tui 0.16.1), so firstmate never claims resumed
-context; the durable fold still follows the newest depth-zero log.
+`resume` rewrites the bound launch patch with the newest session id in the
+row config's sessionId field: the launch overlay replaces the stock profile
+patch field that reads DSH_TUI_RESUME_SESSION, so the env alone cannot resume.
+The durable fold follows the newest depth-zero log.
 
 prepare STATE ID GENERATION SOURCE_HOME MODEL EFFORT CWD stages a per-launch
 HOME and DSH_HOME at STATE/ID.dsh/GENERATION, then atomically publishes
 STATE/ID.dsh-session. Installed packages are read-only links; configuration,
 credentials, preferences, and session logs belong exclusively to this launch.
+resume STATE ID MODEL EFFORT CWD rewrites the bound launch patch to resume the
+newest depth-zero session, or prints nothing when the binding changed.
+session-file STATE ID prints the live depth-zero session log.
 state STATE ID folds only the unique depth-zero session in that launch's
 plain JSONL store. Missing, ambiguous, corrupt, or unsupported data is unknown.
 route MODEL [PROVIDER] prints the default model-family adapter.
@@ -79,6 +83,31 @@ def atomic_json(path, value):
         temporary.unlink(missing_ok=True)
 
 
+def launch_patch(model, effort, cwd, dsh, session_id):
+    # JSON is valid YAML. A complete row config is required: overlays replace
+    # config, not individual fields, and they also replace the profile patch
+    # fields this row carries (preset, workspace, sessionId, backend). The
+    # selected model is advertised exactly, and sessionId is what the launcher's
+    # --resume env cannot supply once this row replaces the stock patch.
+    return [
+        {"id": "dsh-tui", "config": {"provider": "deepseek-official", "model": model,
+            "cwd": str(Path(cwd).resolve()), "fullscreen": False, "launchpad": False,
+            **({"effort": effort} if effort not in ("", "default") else {}),
+            **({"sessionId": session_id} if session_id else {})}},
+        {"id": "llm-deepseek", "config": {"apiKeyEnv": "DEEPSEEK_API_KEY", "models": [{"id": model}]}},
+        {"id": "session-persistence-jsonl", "config": {"root": str(dsh / "sessions"), "compression": "none"}},
+    ]
+
+
+def resume_target(path):
+    header = json.loads(path.open().readline())
+    session = header["id"]
+    import uuid
+    if str(uuid.UUID(session)) != session:
+        raise ValueError("invalid dsh session id")
+    return session
+
+
 def prepare(args):
     state, task, generation, source_home, model, effort, cwd = args
     check("dsh", model)
@@ -123,17 +152,7 @@ def prepare(args):
     atomic_json(prefs / "model.json", {"provider": "deepseek-official", "model": model})
     if effort not in ("", "default"):
         atomic_json(prefs / "effort.json", {"effort": effort})
-    # JSON is valid YAML. A complete row config is required: overlays replace
-    # config, not individual fields. The selected model is advertised exactly,
-    # so the TUI cannot silently replace it with its default catalog model.
-    patch = [
-        {"id": "dsh-tui", "config": {"provider": "deepseek-official", "model": model,
-            "cwd": str(Path(cwd).resolve()), "fullscreen": False, "launchpad": False,
-            **({"effort": effort} if effort not in ("", "default") else {})}},
-        {"id": "llm-deepseek", "config": {"apiKeyEnv": "DEEPSEEK_API_KEY", "models": [{"id": model}]}},
-        {"id": "session-persistence-jsonl", "config": {"root": str(dsh / "sessions"), "compression": "none"}},
-    ]
-    atomic_json(root / "launch.yml", patch)
+    atomic_json(root / "launch.yml", launch_patch(model, effort, cwd, dsh, ""))
     atomic_json(Path(state) / f"{task}.dsh-session", {"root": str(root), "cwd": str(Path(cwd).resolve()), "generation": generation, "model": model, "effort": effort})
     print(root)
 
@@ -196,6 +215,22 @@ def turn_state(state, task):
         return result
 
 
+def resume(args):
+    state, task, model, effort, cwd = args
+    binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
+    model = model.removeprefix("deepseek/")
+    effort = "" if effort in ("", "default") else effort
+    if (binding.get("model"), binding.get("effort"), binding["cwd"]) != (model, effort, str(Path(cwd).resolve())):
+        return
+    path = session_path(binding)
+    if not isinstance(path, Path):
+        return
+    session = resume_target(path)
+    root = Path(binding["root"])
+    atomic_json(root / "launch.yml", launch_patch(model, effort, cwd, root / "dsh", session))
+    print(root)
+
+
 def session_file(args):
     state, task = args
     binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
@@ -209,6 +244,8 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("prepare")
     p.add_argument("values", nargs=7)
+    p = sub.add_parser("resume")
+    p.add_argument("values", nargs=5)
     p = sub.add_parser("session-file")
     p.add_argument("values", nargs=2)
     p = sub.add_parser("state")
@@ -230,6 +267,8 @@ def main():
     try:
         if args.command == "prepare":
             prepare(args.values)
+        elif args.command == "resume":
+            resume(args.values)
         elif args.command == "session-file":
             session_file(args.values)
         elif args.command == "route":

@@ -136,21 +136,25 @@ EOF
   control "$ID" interrupt
   control "$ID" exit
   [ "$(fm_backend_agent_state herdr "$SESSION:$PANE")" = dead ] || { echo "exit did not stop $ID" >&2; exit 1; }
-  # dsh-tui 0.16.1 does not restore the earlier conversation into a requested
-  # session, so a relaunch is a fresh session that re-reads its instructions;
-  # this asserts exactly that, never a resumed conversation.
-  control "$ID" relaunch --note "Do not run any tool and ignore any earlier sleep instruction. Reply exactly FMDSHRELAUNCH$KIND and nothing else."
+  # A resumed dsh session appends to the same log. Growth after the relaunch,
+  # plus an acknowledgement, is the local proof; the secret-word probe and the
+  # resumed-recall assertion cover the conversation itself.
+  before_bytes=$(wc -c < "$first_session")
+  control "$ID" relaunch --note "Reply exactly FMDSHRELAUNCH$KIND. Do not run sleep or edit files."
   wait_rendered "FMDSHRELAUNCH$KIND" || { lab pane read "$PANE" --source visible; echo "relaunched $ID never read its instructions" >&2; exit 1; }
   second_session=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$HOME_ROOT/state" "$ID")
-  [ -n "$second_session" ] || { echo "relaunch left no readable live dsh session" >&2; exit 1; }
-  [ "$second_session" != "$first_session" ] || { echo "relaunch did not open a fresh dsh session" >&2; exit 1; }
-  echo "relaunch opened a fresh session that read its instructions"
+  [ "$second_session" = "$first_session" ] || { echo "relaunch did not continue the bound session" >&2; exit 1; }
+  after_bytes=$(wc -c < "$second_session")
+  [ "$after_bytes" -gt "$before_bytes" ] || { echo "the resumed session recorded no new turn" >&2; exit 1; }
+  grep -q "FMDSHSTEER$KIND" "$second_session" \
+    || { echo "the resumed session lost its earlier conversation" >&2; exit 1; }
+  echo "resumed the earlier conversation in place"
   for _ in $(seq 1 60); do
     [ "$(fm_backend_herdr_composer_state "$SESSION:$PANE")" = empty ] && break
     sleep 1
   done
   control "$ID" exit
   [ "$(fm_backend_agent_state herdr "$SESSION:$PANE")" = dead ] || { echo "final exit did not stop $ID" >&2; exit 1; }
-  printf 'ok - live dsh-tui 0.16.1 %s brief, busy composer, mid-task steer, interrupt, exit, fresh relaunch with instructions, final exit\n' "$KIND"
+  printf 'ok - live dsh-tui 0.16.1 %s brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit\n' "$KIND"
 done
 printf 'lab_project=%s\nlab_copy=%s\nlab_home=%s\n' "$PROJECT" "$COPY" "$HOME_ROOT"

@@ -52,6 +52,14 @@ assert call('state', state, 'task') == 'busy', 'torn append must not create idle
 put([start,end])
 assert call('state', state, 'task') == 'idle'
 assert call('session-file',state,'task') == str(log)
+# The launch overlay replaces the stock profile patch's sessionId field, so
+# resume must write it explicitly into the bound launch patch.
+(runtime / 'launch.yml').write_text('[]\n')
+assert call('resume',state,'task','deepseek/v4','high',cwd) == str(runtime)
+overlay = json.loads((runtime / 'launch.yml').read_text())
+assert overlay[0]['config']['sessionId'] == header['id']
+assert call('resume',state,'task','deepseek/other','high',cwd) == '', 'a changed model must not resume'
+assert call('resume',state,'task','deepseek/v4','xhigh',cwd) == '', 'a changed effort must not resume'
 put([start, end, start])
 assert call('state',state,'task') == 'unknown', 'nonmonotonic durable sequence is corrupt'
 put([start,end])
