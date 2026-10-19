@@ -836,8 +836,7 @@ If the top-level path is the primary checkout or not the worktree you were launc
 
 1. First action: create your branch: \`git checkout -b $BRANCH_Q --\`
    You already sit in a pool slot, which is itself a worktree. Do not create a second tree with \`scripts/git-stability/start_task_worktree.py\` from inside this slot; that nested worktree has no owner.
-   If this slot ships \`scripts/git-stability/provision_existing_slot.py\`, the slot may need Vernant's own provisioner to write its lifecycle manifest. Run it yourself as Vernant's lane rule says, and follow \`docs/agentic-operations/worktree-python-environments.md\` for how.
-   If the provisioner refuses (for example manifest_exists), or the task needs a path outside the owned scope, or a fresh retry tree: stop, append a blocked line saying 'needs slot manifest or owned-path extension', and wait; Main routes it. Never run start_task_worktree.py from this slot.$SETUP2
+   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.$SETUP2
 
 # Rules
 $RULE1

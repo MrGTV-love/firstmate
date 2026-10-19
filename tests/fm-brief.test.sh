@@ -1763,10 +1763,10 @@ test_process_budget_command_quotes_foreign_firstmate_path() {
 }
 
 # A first lane must never be told to create the nested worktree that leaked
-# under pool slots, and must never be left with no way forward. The ship brief is
-# the generated text a lane reads: it forbids the second tree, points the lane at
-# Vernant's own provisioner, and routes a refusal or scope growth to a blocked
-# stop instead of a retry tree.
+# under pool slots, and must never be sent to a create-only provisioner that can
+# strand a reused slot. The ship brief is the generated text a lane reads: it
+# forbids the second tree and routes a manifest or second-worktree demand to a
+# blocked line that quotes the rule or guard and its refusal for Main.
 test_ship_brief_does_not_instruct_a_nested_worktree() {
   local home id brief mode
   home="$TMP_ROOT/slot-provisioning-home"
@@ -1780,12 +1780,14 @@ test_ship_brief_does_not_instruct_a_nested_worktree() {
       "the $mode ship brief does not forbid the nested worktree"
     assert_grep 'from inside this slot; that nested worktree has no owner.' "$brief" \
       "the $mode ship brief does not say the nested worktree has no owner"
-    assert_grep 'scripts/git-stability/provision_existing_slot.py' "$brief" \
-      "the $mode ship brief does not name Vernant's slot provisioner"
-    assert_grep 'docs/agentic-operations/worktree-python-environments.md' "$brief" \
-      "the $mode ship brief does not name Vernant's provisioning doc"
-    assert_grep "If the provisioner refuses (for example manifest_exists), or the task needs a path outside the owned scope, or a fresh retry tree: stop, append a blocked line saying 'needs slot manifest or owned-path extension', and wait; Main routes it. Never run start_task_worktree.py from this slot." "$brief" \
-      "the $mode ship brief lost its stop-and-wait route for a refusal, scope growth, or a retry tree"
+    if grep -F 'provision_existing_slot' "$brief" >/dev/null; then
+      fail "the $mode ship brief still sends the lane to Vernant's create-only slot provisioner"
+    fi
+    if grep -F 'worktree-python-environments.md' "$brief" >/dev/null; then
+      fail "the $mode ship brief still points at the slot-provisioning doc"
+    fi
+    assert_grep 'If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.' "$brief" \
+      "the $mode ship brief lost its Main-actionable blocked route for a manifest or second-worktree demand"
     if grep -F 'start_task_worktree.py' "$brief" | grep -vF -e 'Do not create' -e 'Never run' >/dev/null; then
       fail "the $mode ship brief mentions start_task_worktree.py outside a prohibition"
     fi
