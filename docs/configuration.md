@@ -1744,7 +1744,7 @@ The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothi
 
 ### Hourly command and watcher check
 
-The hourly hygiene job runs this one line:
+Firstmate installs no scheduler for `--apply`; run this one line from the host's own hourly job:
 
 ```sh
 bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
