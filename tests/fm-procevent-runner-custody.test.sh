@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Public Lavish/runner shutdown regressions: a TERM sent only to the owned
+# Public Lavish/runner shutdown regressions: TERM or HUP sent only to the owned
 # runner must drain its blocking native poll and descendants before custody is
-# released. A replacement must collect the answer; a crashed leader's surviving
-# group remains refused. The native CLI fixture implements an exclusive listener
+# released. SIGKILL must not leave an output reader waiting on surviving writers.
+# A replacement must collect the answer; a crashed leader's surviving group
+# remains refused. The native CLI fixture implements an exclusive listener
 # and destructive answer handoff, without starting a live Lavish server.
 set -u
 
@@ -71,6 +72,38 @@ fi
 exec "$FM_TEST_REAL_PS" "$@"
 SH
 chmod +x "$NATIVE_BIN/ps"
+
+# Identify only this suite's output readers, including the unfixed reader which
+# has no test-specific argument. Other Perl invocations have no FIFO on fd 4.
+export FM_TEST_REAL_PERL FM_TEST_READER_MARKER
+FM_TEST_REAL_PERL=$(command -v perl)
+FM_TEST_READER_MARKER="$TMP_ROOT/bounding-reader-marker"
+cat > "$NATIVE_BIN/perl" <<'SH'
+#!/usr/bin/env bash
+if [ -p /dev/fd/0 ] && [ -p /dev/fd/4 ]; then
+  exec "$FM_TEST_REAL_PERL" "$@" "$FM_TEST_READER_MARKER"
+fi
+exec "$FM_TEST_REAL_PERL" "$@"
+SH
+chmod +x "$NATIVE_BIN/perl"
+
+reader_rows() {
+  local snapshot
+  snapshot=$(ps -axww -o pid=,ppid=,etime=,command=) || return 1
+  # shellcheck disable=SC2016 # Perl owns variables in this literal program.
+  printf '%s\n' "$snapshot" | "$FM_TEST_REAL_PERL" -e '
+    my $marker = shift;
+    while (<STDIN>) {
+      next unless index($_, $marker) >= 0;
+      print if /^\s*\d+\s+\d+\s+\S+\s+\S*perl\s/;
+    }
+  ' "$FM_TEST_READER_MARKER"
+}
+readers_gone() {
+  local rows
+  rows=$(reader_rows) || return 1
+  [ -z "$rows" ]
+}
 
 cat > "$NATIVE_BIN/lavish-axi" <<'SH'
 #!/usr/bin/env bash
@@ -181,7 +214,37 @@ answer_and_capture() {  # <token>
   forget_group "$RUNNER_PID"
 }
 
-for scenario in term-0 term-1 inspection-failure-0 inspection-failure-1; do
+# SIGKILL cannot run the runner's traps. Its native poll deliberately keeps
+# stdout open, so the reader must notice parent loss rather than wait for EOF.
+export FM_TEST_NATIVE_TERM_RESISTANT=0
+saved_stub_limit=$FM_TEST_STUB_MAX_BLOCK_SECONDS
+export FM_TEST_STUB_MAX_BLOCK_SECONDS=600
+new_board reader-crash
+export FM_TEST_STUB_MAX_BLOCK_SECONDS=$saved_stub_limit
+reader_ready() {
+  reader_before=$(reader_rows) || return 1
+  [ -n "$reader_before" ]
+}
+wait_for reader_ready || fail "hanging source has no marked bounding reader"
+printf 'reader before launcher kill: %s\n' "$reader_before"
+kill -KILL "$RUNNER_PID" || fail "could not kill the fixture launcher"
+reader_exit_deadline=$((SECONDS + 10))
+while ! readers_gone; do
+  if [ "$SECONDS" -ge "$reader_exit_deadline" ]; then
+    printf 'reader after launcher kill: %s\n' "$(reader_rows)" >&2
+    fail "killed launcher left its marked bounding reader alive"
+  fi
+  sleep 0.1
+done
+kill -0 "$NATIVE_PID" 2>/dev/null || fail "native poll did not retain its open output pipe"
+kill -0 "$DESCENDANT_PID" 2>/dev/null || fail "native descendant did not retain its open output pipe"
+signal_owned_group || fail "crashed fixture group cleanup could not verify an owned member"
+wait_for group_gone "$RUNNER_PID" || fail "crashed fixture group cleanup left a group alive"
+forget_group "$RUNNER_PID"
+pe retire "$SOURCE_ID" >/dev/null || fail "could not retire the empty crashed fixture"
+pass "killed launcher leaves no marked bounding reader even while its source holds stdout open"
+
+for scenario in term-0 term-1 hup-0 inspection-failure-0 inspection-failure-1; do
   resist=${scenario##*-}
   export FM_TEST_NATIVE_TERM_RESISTANT=$resist
   new_board "$scenario"
@@ -192,7 +255,9 @@ for scenario in term-0 term-1 inspection-failure-0 inspection-failure-1; do
       : > "$FM_TEST_PS_FAILURE_PATH"
       ;;
   esac
-  kill -TERM "$old_runner" || fail "TERM could not reach the owned runner"
+  stop_signal=TERM
+  [ "$scenario" != hup-0 ] || stop_signal=HUP
+  kill -"$stop_signal" "$old_runner" || fail "$stop_signal could not reach the owned runner"
   # Never observe a free claim while any nonleader from this generation is
   # still alive. On the old implementation this was the exact custody break.
   custody_broken=0
@@ -213,20 +278,21 @@ for scenario in term-0 term-1 inspection-failure-0 inspection-failure-1; do
     if [ -f "$HOME_FIXTURE/state/procevent-inbox/$SOURCE_ID.1.result" ]; then
       cat "$HOME_FIXTURE/state/procevent-inbox/$SOURCE_ID.1.result" >&2
     fi
-    fail "TERM-only runner exit released custody while its native poll and descendants survived"
+    fail "signal-only runner exit released custody while its native poll and descendants survived"
   fi
-  group_gone "$old_runner" || fail "TERM-only runner exit left its native poll group alive"
+  group_gone "$old_runner" || fail "signal-only runner exit left its native poll group alive"
+  readers_gone || fail "$stop_signal left this fixture's marked bounding reader alive"
   case "$scenario" in
     inspection-failure-*)
       assert_absent "$FM_TEST_PS_FAILURE_PATH" "shutdown consumed the one-shot inspection failure"
       assert_present "$FM_TEST_PS_FAILURE_PATH.observed" "shutdown encountered a failed group inspection"
       ;;
   esac
-  kill -0 "$NATIVE_PID" 2>/dev/null && fail "old native listener survived TERM-only shutdown"
-  kill -0 "$DESCENDANT_PID" 2>/dev/null && fail "old descendant survived TERM-only shutdown"
+  kill -0 "$NATIVE_PID" 2>/dev/null && fail "old native listener survived signal-only shutdown"
+  kill -0 "$DESCENDANT_PID" 2>/dev/null && fail "old descendant survived signal-only shutdown"
   forget_group "$old_runner"
   out=$(pe reconcile)
-  assert_contains "$out" "started=1" "TERM-only shutdown lets reconcile confirm one replacement"
+  assert_contains "$out" "started=1" "signal-only shutdown lets reconcile confirm one replacement"
   wait_for nonempty "$ARTIFACT.listener/pid" || fail "replacement native listener did not start"
   {
     IFS= read -r _
@@ -239,7 +305,7 @@ for scenario in term-0 term-1 inspection-failure-0 inspection-failure-1; do
   while IFS= read -r member_pid; do DESCENDANT_PID=$member_pid; done < "$ARTIFACT.descendant-pids"
   own_group "$RUNNER_PID" "$NATIVE_PID" "$DESCENDANT_PID"
   answer_and_capture "$scenario-answer"
-  pass "TERM-only runner shutdown preserves custody and replacement answer ($scenario)"
+  pass "signal-only runner shutdown preserves custody and replacement answer ($scenario)"
 done
 
 export FM_TEST_NATIVE_TERM_RESISTANT=0
@@ -299,5 +365,49 @@ wait_for group_gone "$RUNNER_PID" || fail "unknown native error capture left its
 forget_group "$RUNNER_PID"
 assert_present "$HOME_FIXTURE/state/procevent/$SOURCE_ID.source" "unknown native error remains registered"
 pass "unknown native error remains exact, announced, and available for reconciliation"
+
+# Exercise the drain across an idle interval, multiple reads, truncation, an
+# empty bound, and a nonzero source exit carrying usable output.
+HOME_FIXTURE="$TMP_ROOT/bounded-home"
+mkdir -p "$HOME_FIXTURE/state"
+fm_test_track_procevent_home "$HOME_FIXTURE" "$FM_PROCEVENT_CLAIM_ROOT"
+cat > "$TMP_ROOT/bounded-source.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'prefix\000'
+sleep 2
+printf '%010000d' 0
+printf 'tail'
+exit "$1"
+SH
+for output_limit in 0 17 10011; do
+  SOURCE_ID="bounded-$output_limit"
+  source_status=7
+  [ "$output_limit" -ne 0 ] || source_status=0
+  pe register lavish "$SOURCE_ID" -- bash "$TMP_ROOT/bounded-source.sh" "$source_status" >/dev/null \
+    || fail "could not register bounded source"
+  FM_PROCEVENT_MAX_OUTPUT_BYTES=$output_limit pe start "$SOURCE_ID" \
+    > "$TMP_ROOT/$SOURCE_ID.out" 2> "$TMP_ROOT/$SOURCE_ID.err" \
+    || fail "bounded source runner failed"
+  bounded_result="$HOME_FIXTURE/state/procevent-inbox/$SOURCE_ID.1.result"
+  # shellcheck disable=SC2016 # Perl owns variables in this literal program.
+  "$FM_TEST_REAL_PERL" -e '
+    my $limit = shift;
+    print substr("prefix\0" . ("0" x 10000) . "tail", 0, $limit);
+  ' "$output_limit" > "$TMP_ROOT/$SOURCE_ID.expected"
+  cmp -s "$TMP_ROOT/$SOURCE_ID.expected" "$bounded_result" \
+    || fail "limit $output_limit changed exact captured bytes"
+  assert_contains "$(cat "$TMP_ROOT/$SOURCE_ID.out")" 'captured:' \
+    "nonzero source exit still captures usable bounded output"
+  if [ "$output_limit" -lt 10011 ]; then
+    assert_contains "$(cat "$TMP_ROOT/$SOURCE_ID.err")" "truncated: $SOURCE_ID at $output_limit bytes" \
+      "truncation remains reported"
+  else
+    assert_absent "$FM_PROCEVENT_CLAIM_ROOT/$SOURCE_ID.claim" "complete output releases its claim"
+    assert_not_contains "$(cat "$TMP_ROOT/$SOURCE_ID.err")" "truncated: $SOURCE_ID" \
+      "complete output is not reported truncated"
+  fi
+  pe retire "$SOURCE_ID" >/dev/null || fail "could not retire bounded source"
+done
+pass "normal delayed output preserves exact binary bytes, zero and partial bounds, and nonzero source exits"
 
 printf 'all runner custody regressions passed\n'
