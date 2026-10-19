@@ -1143,14 +1143,18 @@ Each poll costs one stat over every `state/*.status` and the per-task cursor, le
 When one passes the cap, `bin/fm-status-cap-guard.sh` investigates it and the watcher raises a `check: status-log-over-cap` wake naming the file, its size, its growth rate and the writer process found by `lsof`.
 An omp writer is stopped with `SIGSTOP`, which `kill -CONT <pid>` undoes; the guard first checks that the process is still the one `lsof` named, is not itself or one of its ancestors, and signals exactly the listed writers that are omp.
 Any other writer, and a log with no writer found, is named and left alone.
+A writer that reopens the log on every append, as the incident's loop `printf ... >> file` does, has it open for only a fraction of each `lsof` look: 9 of 30 looks named such a loop on 2026-10-19.
+So a log with no writer found is looked at again, back to back, until a look names one, up to 20 looks and 10 s in all; 20 looks miss that loop less than once in a thousand.
 The guard never deletes or rewrites a file.
 [`bin/fm-control.sh`](../bin/fm-control.sh) is addressed by task id and drives an endpoint, and has no verb for one process, so the one-process stop lives in the guard.
 
 For a foreign writer the guarantee is detection plus a stop of that one pid within one watcher poll.
+The check runs at the top of each poll, and again after each poll-sized slice of the status-signal linger.
+That second place matters because a runaway writer's first append is itself a status signal, the linger is 30 s (`FM_SIGNAL_GRACE`), and the wake it ends in exits the watcher before the next poll: a check that ran only at the top of the poll would reach the writer only after a drain, an ack and a re-arm.
 It is not a bound on size: the cap bounds the sanctioned writer only.
 How far a log passes the cap before the stop is the writer's growth rate times the poll interval.
 The poll interval is 15 s in a primary home, 30 s in a secondmate home, and `FM_POLL` can raise it to 240 s.
-At the 0.7 GB/s measured on 2026-10-18 that is about 10 GB at 15 s and about 21 GB at 30 s, before `lsof` and the stop.
+At the 0.7 GB/s measured on 2026-10-18 that is about 10 GB at 15 s and about 21 GB at 30 s, before `lsof` and the stop; the looks for a writer that reopens the log add up to 10 s.
 The watcher must be alive for any of it, and only a process named omp is stopped.
 
 An existing log is never deleted, so a log that went over the cap stays over it.

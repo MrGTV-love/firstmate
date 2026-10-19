@@ -2891,7 +2891,8 @@ lavish_auto_retire_tick() {
 # due when it first passes the cap and again each time it has grown by more than
 # one cap since its marker, so a resumed writer is caught again and an unchanged
 # file never wakes twice. The wake is queued before the marker is written, so a
-# failed append is retried on the next poll instead of being lost.
+# failed append is retried on the next poll instead of being lost. It runs at the top
+# of each loop and after each poll-sized slice of the signal linger (signal_grace_linger).
 status_cap_tick() {
   local rows records reason='' ident path size text keys='' key
   rows=$(fm_status_cap_unalerted "$STATE") || return 0
@@ -3470,6 +3471,33 @@ EOF
   watcher_beat
 }
 
+# Sleep the signal grace in slices of one poll and look at the status size cap after
+# each. A runaway writer is the likeliest reason this linger starts: its first append
+# is the signal, the log is still under the cap when the loop-top check runs, and the
+# wake the linger ends in exits this watcher before another loop top. One sleep of the
+# whole grace (30 s) would leave the writer unchecked for twice the one-poll bound the
+# docs state, about 21 GB at the 0.7 GB/s of 2026-10-18. A fractional or zero poll or
+# grace sleeps once and looks once, which is the same check after the whole grace.
+signal_grace_linger() {
+  local left=$SIGNAL_GRACE slice=$POLL
+  case "$left" in
+    ''|*[!0-9]*) sleep "$SIGNAL_GRACE"; status_cap_tick; return 0 ;;
+    *) left=$((10#$left)) ;;
+  esac
+  case "$slice" in
+    ''|*[!0-9]*) slice=$left ;;
+    *) slice=$((10#$slice)) ;;
+  esac
+  [ "$slice" -gt 0 ] || slice=$left
+  while :; do
+    [ "$slice" -le "$left" ] || slice=$left
+    sleep "$slice"
+    left=$((left - slice))
+    status_cap_tick
+    [ "$left" -gt 0 ] || return 0
+  done
+}
+
 signal_phase() {
   local reason pending files sf sig f file_reason surface_end surface_ident signal_actionable signal_commit_error
   local signal_append=fm_wake_append
@@ -3487,7 +3515,7 @@ signal_phase() {
   # test_procevent_wake_never_lingers_under_the_queue_lock).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
-    [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
+    [ "$signal_append" = fm_wake_append_locked ] || signal_grace_linger
     pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
     # The final coalesced signal set is the watcher-carried status-change
     # trigger for this home's published summary. Start it before either

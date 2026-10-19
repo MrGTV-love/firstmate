@@ -2663,7 +2663,9 @@ fi
 exec "$real_bin" "$@"
 SH
     chmod 0700 "$fakebin/$hook"
-    # The grace is 7s, a value no other watcher sleep uses.
+    # The grace is 7s, a value no other watcher sleep uses. The poll is 7s too, because the
+    # watcher sleeps the grace in slices of one poll (signal_grace_linger): with the poll
+    # at the grace the linger is the one `sleep 7` this fake sleep looks for.
     grace_log="$dir/grace-sleeps"
     real_sleep=$(type -P sleep)
     printf '#!/usr/bin/env bash\nreal_sleep=%q\ngrace_log=%q\n' "$real_sleep" "$grace_log" > "$fakebin/sleep"
@@ -2679,7 +2681,7 @@ exec "$real_sleep" "$@"
 SH
     chmod 0700 "$fakebin/sleep"
     watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
-      FM_WATCH_HANDLING_SUCCESSOR=1 FM_SIGNAL_GRACE=7
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_SIGNAL_GRACE=7 FM_POLL=7
     pid=$!
     wait_for_exit "$pid" 600 || { reap "$pid"; fail "$shape process-event wake never exited"; }
     [ -e "$state/late-signal-injected" ] || fail "$shape status line was never appended"
