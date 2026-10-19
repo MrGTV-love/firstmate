@@ -1,0 +1,22 @@
+Command: nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/fm-procevent-runner-custody.test.sh
+Target source view: unchanged regular-file copies of worktree product scripts; adapter symlinks removed to satisfy relisten ownership contract. Only the test reaper entry point scopes no-argument sweeping to this run private TMPDIR; explicit owner-scoped cleanup unchanged.
+FM_TEST_BEGIN 2026-10-19T18:00:17Z tests/fm-procevent-runner-custody.test.sh family=unclassified expected_gate_skip=none
+reader before launcher kill: 80883 79782       00:01 /usr/bin/perl -e \012      use strict;\012      use warnings;\012      my ($limit, $parent) = @ARGV;\012      my ($written, $truncated) = (0, 0);\012      my $readers = "";\012      vec($readers, fileno(STDIN), 1) = 1;\012      while (1) {\012        # SIGKILL cannot run shell cleanup, and the source may keep the FIFO\012        # open after its runner dies. Never block indefinitely awaiting EOF.\012        exit 2 if getppid() != $parent;\012        my $ready = $readers;\012        my $available = select($ready, undef, undef, 1);\012        exit 2 if $available < 0;\012        next unless $available;\012        my $count = sysread(STDIN, my $buffer, 65536);\012        exit 2 unless defined $count;\012        last if $count == 0;\012        my $take = $written < $limit ? $limit - $written : 0;\012        $take = $count if $take > $count;\012        if ($take > 0) {\012          my $offset = 0;\012          while ($offset < $take) {\012            my $count_written = syswrite(STDOUT, $buffer, $take - $offset, $offset);\012            exit 2 unless defined $count_written;\012            $offset += $count_written;\012          }\012          $written += $take;\012        }\012        $truncated = 1 if $take < $count;\012      }\012      exit($truncated ? 3 : 0);\012     1048576 79782 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5AMRV9YCEP5976Y6H3ABHJ7/.local-procevent-validation/tmp/fm-procevent-runner-custody.atyu9d/bounding-reader-marker
+ok - killed launcher leaves no marked bounding reader even while its source holds stdout open
+ok - signal-only runner shutdown preserves custody and replacement answer (term-0)
+ok - signal-only runner shutdown preserves custody and replacement answer (term-1)
+ok - signal-only runner shutdown preserves custody and replacement answer (hup-0)
+ok - signal-only runner shutdown preserves custody and replacement answer (inspection-failure-0)
+ok - signal-only runner shutdown preserves custody and replacement answer (inspection-failure-1)
+ok - crashed-leader group remains claimed and un-signalled by reconcile and public start
+ok - normal terminal capture preserves exact native bytes without a false shutdown signal
+ok - an outputless killed native poll relistens under the same runner and captures its answer
+ok - unknown native error remains exact, announced, and available for reconciliation
+ok - normal delayed output preserves exact binary bytes, zero and partial bounds, and nonzero source exits
+all runner custody regressions passed
+FM_TEST_END 2026-10-19T18:03:25Z tests/fm-procevent-runner-custody.test.sh exit=0 duration_ms=188235 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=188457
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=188235 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-procevent-runner-custody.test.sh duration_ms=188235
+
+Observed exit status: 0

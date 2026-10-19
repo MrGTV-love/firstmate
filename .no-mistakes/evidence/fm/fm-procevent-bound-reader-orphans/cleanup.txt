@@ -1,0 +1,1 @@
+Final cleanup: no remaining processes named this run’s disposable validation tree; removed the entire .local-procevent-validation workspace scaffold. No source or permanent test edits were made. Evidence files remain in the requested evidence directory.

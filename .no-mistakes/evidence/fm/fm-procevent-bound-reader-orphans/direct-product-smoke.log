@@ -1,0 +1,7 @@
+$ bin/fm-procevent.sh register lavish direct-kill --detach -- /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5AMRV9YCEP5976Y6H3ABHJ7/.local-procevent-validation/direct/holding-source.py
+exit=0
+stdout=registered: direct-kill (lavish)
+stderr=
+Before SIGKILL: {"runner_pid": 4230, "source_pid": 5818, "source_pgid": 4230, "reader_pid": 5914, "reader_ppid": 4230}
+After runner-only SIGKILL: reader absent in 1.830 seconds; source PID 5818 still alive in group 4230 and holding stdout open.
+Cleanup: signalled only the identity-checked process group belonging to this disposable source.

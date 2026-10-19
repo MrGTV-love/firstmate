@@ -1,0 +1,7 @@
+Existing orphan inventory
+Captured UTC: 2026-10-19T17:57:19.052177+00:00
+Read-only command: ps -axww -o pid=,ppid=,etime=,state=,command=
+Selection: Perl output-bounding readers (sysread(STDIN plus old/new limit signature), excluding this run’s private temp-tree marker.
+Existing orphan reader PIDs and ages: none found.
+Matching readers with live parents outside this run: 0
+No existing process was signalled. Only processes created inside this run’s disposable tree are eligible for test cleanup.

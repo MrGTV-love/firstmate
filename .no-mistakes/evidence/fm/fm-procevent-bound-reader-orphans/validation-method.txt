@@ -1,0 +1,20 @@
+Validation scope: built-in process-event output-reader lifetime and bounded capture, not harness/vendor behavior or UI.
+
+Targeted command, serial for baseline and target:
+nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/fm-procevent-runner-custody.test.sh
+
+Disposable source views were created entirely inside the run worktree. The baseline substitutes only fm-procevent.sh from base commit 44b16651f4ade7ea29fcfab1ec7f4bcfe1603f31. The corrected target uses regular-file copies of unchanged worktree bin scripts. The only test-tool customization is a reaper wrapper that restricts its no-argument sweep to this run's private TMPDIR; explicit owner-scoped sweeps are unchanged. HOME, TMPDIR, CPU pool, slot files, and duration state are worktree-local. No production credentials or fleet state are used.
+
+Initial setup correction: symlinked adapters caused the first target run to refuse relisten because adopt_relisten requires a regular non-symlink adapter. The initial transcript is retained separately. This was a disposable setup defect, not a product failure; regular-file copies preserve the adapter ownership contract for the corrected run.
+
+The regression's hanging native source is disposable test data, not a replacement product. The actual launcher, capture, cleanup, reconciliation, durable wake queue, and public result consumer execute. Its TERM cases also cover resistant descendants and a one-shot process-inspection failure.
+
+Direct original-worktree product checks, with normal Perl/PATH and no source-view or native-CLI substitute:
+nice -n 20 python3 .local-procevent-validation/direct-smoke.py
+nice -n 20 python3 .local-procevent-validation/binary-smoke.py
+
+The direct SIGKILL proof identifies the real reader by parent PID, kills only the owned runner, observes the reader absent while the source remains alive holding stdout, then cleans up the identity-checked source group. The binary smoke compares persisted result bytes against an independent 131083-byte payload with a NUL prefix, all byte values, a two-second idle interval, and multiple 65536-byte chunks.
+
+Direct fixture correction: the first binary probe expected a zero-bound source exiting 7 to produce a durable result. The product correctly returned no-result. The corrected probe verifies both successful zero-bound capture with source exit 0 and no-result with source exit 7, plus partial/full retained output with source exit 7. No product or permanent test edits were needed.
+
+The existing orphan inventory is read-only. No existing process was signalled. No UI-facing change exists here, so process observations, CLI transcripts and persisted binary captures are the appropriate evidence; no screenshot is applicable. No full suite, lint, formatter, static analysis, push, PR, or CI phase was run.
