@@ -44,8 +44,10 @@
 # other provider keeps the copy with one wake.
 #
 # The fallback re-proves from the live copy, by the criteria of
-# treehouse-reap-clean, that the copy and every nested copy is a pool copy, has
-# no changed or untracked file, holds no stash entry of its own work, has no
+# treehouse-reap-clean, that the copy is a Treehouse pool slot of the task's
+# project (the repo's one test, fm_treehouse_pool_slot: the pool's
+# treehouse-state.json beside it and the project's git directory shared), and
+# that it and every nested copy has no changed or untracked file, holds no stash entry of its own work, has no
 # commit reachable from its HEAD (its own checked-out branch; never the project's
 # other branches) missing from every remote (or from the merged PR's head), holds
 # only scratch or preserved ignored files, and has no process inside. The finished worker session is stopped first
@@ -63,8 +65,13 @@
 # copy. The Treehouse project lock is held from the worker stop to the destroy,
 # and the proof repeated while it and the task control lock are held makes no
 # fetch (it reuses the remote refs fetched before the locks), so a hung remote
-# never holds either lock. The slot-owner claim is read again right before the
-# signal, and a slot claimed by another task is left alone. The preserve-list
+# never holds either lock. The finished-session check is asked again once the
+# project lock is held, right before the worker is stopped: a worker that was
+# steered or became busy since the first answer backs off, and nothing is
+# stopped, signalled or destroyed. A proof read that fails (the ignored-file
+# listing, the stash listing, the search for nested copies) never counts as
+# finding nothing. The slot-owner claim is read again right before the signal,
+# and a slot claimed by another task is left alone. The preserve-list
 # files are copied to data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
 # `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
 # call the reaper makes; --include-unlanded, --include-in-use and --force are
@@ -297,6 +304,18 @@ retain() {  # <copy> <reason>
   fi
 }
 
+# The classifier must still call the finished worker reapable. It is asked
+# again once the project lock is held, right before the worker is stopped,
+# because the first answer is older than the fetches and the lock wait: a
+# worker that was steered or became busy since backs off and nothing is
+# stopped, signalled or destroyed.
+reapable() {
+  FM_IDLE_REAP_MERGE_PRUNE=1 fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
+  [ "$IDLE_REAP_CLASS" != reap ] || return 0
+  backoff "automatic reap ineligible: $IDLE_REAP_CLASS: $IDLE_REAP_DETAIL"
+  return 1
+}
+
 # Read the live copy's proofs; on success the copy is destroyed.
 # Returns 0 destroyed or already absent, 1 retained or transient (already recorded).
 fallback() {
@@ -309,23 +328,18 @@ fallback() {
   if [ ! -e "$wt" ]; then
     return 0
   fi
-  if ! real=$(fm_mp_real "$wt") || ! fm_mp_in_pool "$real"; then
-    retain "$wt" "not a pool copy under ${TREEHOUSE_ROOT:-\$HOME/.treehouse}/<pool>/<slot>/<repo>"
+  project=$(fm_meta_get "$META" project)
+  if ! real=$(fm_mp_real "$wt") || ! fm_treehouse_pool_slot "$project" "$real"; then
+    retain "$wt" "not a Treehouse pool slot of the project ${project:-<no project recorded>}"
     return 1
   fi
-  # The classifier must still call the finished worker reapable.
-  FM_IDLE_REAP_MERGE_PRUNE=1 fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
-  if [ "$IDLE_REAP_CLASS" != reap ]; then
-    backoff "automatic reap ineligible: $IDLE_REAP_CLASS: $IDLE_REAP_DETAIL"
-    return 1
-  fi
+  reapable || return 1
   pr_number=${R_PR##*/}
   if ! prove_all "$real" "$pr_number"; then
     return 1
   fi
   # A process lease on the slot lapses when the worker exits, so the project
   # lock, which every slot allocation takes, is held from the stop to the destroy.
-  project=$(fm_meta_get "$META" project)
   if ! plock=$(fm_treehouse_project_lock_path "$project"); then
     retain "$real" "cannot resolve the Treehouse project lock for ${project:-<no project recorded>}"
     return 1
@@ -333,6 +347,10 @@ fallback() {
   fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
     backoff "another operation holds or is queued for the task's project lock"
+    return 1
+  fi
+  if ! reapable; then
+    fm_project_lock_release "$plock" || true
     return 1
   fi
   rc=0
@@ -441,7 +459,7 @@ prove_all() {  # <real-copy> <pr-number> [nofetch]
   local real=$1 pr=$2 mode=${3:-fetch} n
   fm_mp_prove_git "$real" "$pr" "$mode" || { record_verdict "$real"; return 1; }
   fm_mp_prove_ignored "$real" || { record_verdict "$real"; return 1; }
-  fm_mp_find_nested "$real"
+  fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
   if [ "${#FM_MP_NESTED[@]}" -gt 0 ]; then
     for n in "${FM_MP_NESTED[@]}"; do
       fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }

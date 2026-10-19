@@ -7,12 +7,17 @@
 # task record, ignored scratch files). It follows the criteria of the owner's
 # treehouse-reap-clean reaper and proves, read live, that the copy holds nothing
 # worth keeping. It never forces, discards or hides anything: any proof it
-# cannot make keeps the copy.
+# cannot make keeps the copy. A read that fails (the ignored-file listing, the
+# stash listing, the search for nested copies, the listing of a .claude or .tac
+# directory) never counts as finding nothing: it keeps the copy, or retries
+# later when the failure is a git read.
 #
 # A copy passes only when ALL of these hold, for the task's own copy AND for
 # every nested copy found inside it, each checked one by one:
-#   - the path is a pool copy: <pool root>/<pool>/<slot>/<repo> (the pool root is
-#     $TREEHOUSE_ROOT, default $HOME/.treehouse);
+#   - the path is a Treehouse pool slot of the task's project, by the repo's one
+#     test (fm_treehouse_pool_slot in bin/fm-wake-lib.sh): the pool's
+#     treehouse-state.json sits beside the slot and the slot shares the
+#     project's git directory;
 #   - git reports no changed or untracked file and the copy holds no stash entry
 #     of its own work: a stash made on another branch of the project is another
 #     task's (a linked worktree shares the project's stash list), while a stash
@@ -77,44 +82,37 @@ fm_mp_scratch_name() {  # <basename>
   return 1
 }
 
-fm_mp_pool_root() {  # -> real pool root on stdout
-  local root=${TREEHOUSE_ROOT:-${HOME:-}/.treehouse}
-  case "$root" in /*) ;; *) return 1 ;; esac
-  [ -d "$root" ] || return 1
-  (cd "$root" 2>/dev/null && pwd -P)
-}
-
 fm_mp_real() {  # <path> -> physical path on stdout
   (cd "$1" 2>/dev/null && pwd -P)
-}
-
-# 0 when <real-path> is <root>/<pool>/<slot>/<repo> or inside one.
-fm_mp_in_pool() {  # <real-path>
-  local root
-  root=$(fm_mp_pool_root) || return 1
-  case "$1" in
-    "$root"/*/*/*) return 0 ;;
-  esac
-  return 1
 }
 
 # Paths of copies nested strictly inside <copy>: any directory below it that
 # holds its own .git, other than a tracked submodule. Dependency and
 # environment trees are not searched.
-fm_mp_find_nested() {  # <real-copy>; fills FM_MP_NESTED
-  local copy=$1 gitpath dir sub gitlinks
+fm_mp_find_nested() {  # <real-copy>; fills FM_MP_NESTED; 1 when a read failed
+  local copy=$1 gitpath dir sub gitlinks found
   FM_MP_NESTED=()
-  gitlinks=$(git -C "$copy" ls-files -s 2>/dev/null | sed -n 's/^160000 [0-9a-f]* [0-9]\t//p')
-  while IFS= read -r -d '' gitpath; do
+  if ! gitlinks=$(set -o pipefail; git -C "$copy" ls-files -s 2>/dev/null | sed -n 's/^160000 [0-9a-f]* [0-9]\t//p'); then
+    fm_mp_verdict keep "cannot list the tracked files of $copy"
+    return 1
+  fi
+  if ! found=$(set -o pipefail; find "$copy" \
+    \( -path "$copy/.git" -o -name node_modules -o -name .venv -o -name venv -o -name __pycache__ \) -prune -o \
+    -name .git -prune -print0 2>/dev/null | tr '\0' '\n'); then
+    fm_mp_verdict keep "cannot search $copy for nested copies"
+    return 1
+  fi
+  while IFS= read -r gitpath; do
+    [ -n "$gitpath" ] || continue
     dir=${gitpath%/.git}
     sub=${dir#"$copy"/}
     if [ -n "$gitlinks" ] && printf '%s\n' "$gitlinks" | grep -Fxq -- "$sub"; then
       continue
     fi
     FM_MP_NESTED+=("$dir")
-  done < <(find "$copy" \
-    \( -path "$copy/.git" -o -name node_modules -o -name .venv -o -name venv -o -name __pycache__ \) -prune -o \
-    -name .git -prune -print0 2>/dev/null)
+  done <<EOF
+$found
+EOF
 }
 
 fm_mp_verdict() {  # <ok|keep|transient> <reason>
@@ -129,10 +127,13 @@ fm_mp_verdict() {  # <ok|keep|transient> <reason>
 # <branch>: ..."), and a linked worktree shares its stash list with the project,
 # so a stash that names another branch is not this copy's. A detached copy, a
 # stash made with no branch, and a message that names no branch all count.
+# Returns 1 when git cannot list the stash entries.
 fm_mp_own_stashes() {  # <real-copy>
-  local copy=$1 branch subject name n=0
+  local copy=$1 branch subject name n=0 listing
   branch=$(git -C "$copy" symbolic-ref -q --short HEAD 2>/dev/null) || branch=
+  listing=$(git -C "$copy" stash list --format=%gs 2>/dev/null) || return 1
   while IFS= read -r subject; do
+    [ -n "$subject" ] || continue
     name=
     case "$subject" in
       "WIP on "*) name=${subject#"WIP on "} ;;
@@ -142,7 +143,9 @@ fm_mp_own_stashes() {  # <real-copy>
     if [ -z "$branch" ] || [ -z "$name" ] || [ "$name" = "(no branch)" ] || [ "$name" = "$branch" ]; then
       n=$((n + 1))
     fi
-  done < <(git -C "$copy" stash list --format=%gs 2>/dev/null)
+  done <<EOF
+$listing
+EOF
   printf '%s' "$n"
 }
 
@@ -167,7 +170,10 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
     fm_mp_verdict keep "$copy has changed or untracked files ($(printf '%s\n' "$dirty" | wc -l | tr -d ' ') entries, first: $(printf '%s\n' "$dirty" | sed -n 1p))"
     return 1
   fi
-  stashes=$(fm_mp_own_stashes "$copy")
+  if ! stashes=$(fm_mp_own_stashes "$copy"); then
+    fm_mp_verdict transient "git stash list failed in $copy"
+    return 1
+  fi
   if [ "$stashes" != 0 ]; then
     fm_mp_verdict keep "$copy holds $stashes stash entries of its own work"
     return 1
@@ -201,7 +207,7 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
 fm_mp_prove_ignored() {  # <real-copy>
   local copy=$1 entry rel listing
   FM_MP_PRESERVE=()
-  if ! listing=$(git -C "$copy" ls-files -o -i --exclude-standard --directory -z 2>/dev/null | tr '\0' '\n'); then
+  if ! listing=$(set -o pipefail; git -C "$copy" ls-files -o -i --exclude-standard --directory -z 2>/dev/null | tr '\0' '\n'); then
     fm_mp_verdict keep "cannot list ignored files in $copy"
     return 1
   fi
@@ -219,7 +225,7 @@ EOF
 # unique (keep verdict, return 1). Directories that may hold both kinds are
 # opened one level at a time.
 fm_mp_classify_entry() {  # <real-copy> <relative-path>
-  local copy=$1 rel=$2 name child n
+  local copy=$1 rel=$2 name child n children
   name=${rel##*/}
   if [ -L "$copy/$rel" ]; then
     return 0
@@ -242,10 +248,16 @@ fm_mp_classify_entry() {  # <real-copy> <relative-path>
       ;;
     .claude|.tac)
       if [ -d "$copy/$rel" ]; then
+        if ! children=$(ls -A "$copy/$rel" 2>/dev/null); then
+          fm_mp_verdict keep "cannot list $rel in $copy"
+          return 1
+        fi
         while IFS= read -r child; do
           [ -n "$child" ] || continue
           fm_mp_classify_entry "$copy" "$rel/$child" || return 1
-        done < <(ls -A "$copy/$rel" 2>/dev/null)
+        done <<EOF
+$children
+EOF
         return 0
       fi
       ;;

@@ -709,7 +709,7 @@ Every other refusal keeps the copy and raises one wake, with no fallback: a leak
 Only a known landing refusal makes the fallback re-prove the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
 The copy and every nested copy inside it, each checked one by one, must pass all of these:
 
-- It is a pool copy under the pool root (`TREEHOUSE_ROOT`, default `$HOME/.treehouse`).
+- It is a Treehouse pool slot of the task's project, by the test the rest of Firstmate uses (`fm_treehouse_pool_slot`): the pool's `treehouse-state.json` sits beside it and it shares the project's git directory.
 - Git reports no changed or untracked file and the copy holds no stash entry of its own work: a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
 - No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; other branches of the project are other work and are not read.
 - Every ignored file is scratch, a symlink, or on the preserve list.
@@ -728,6 +728,8 @@ On any other backend nothing is ignored.
 The fallback never sends SIGKILL, never closes the pane (it stays open on its outer shell), and waits up to `FM_MERGE_PRUNE_EXIT_WAIT` seconds for the shell to go; a shell that does not go keeps the copy.
 Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included.
 The task's Treehouse project lock is held from the worker stop to the destroy.
+The finished-session check is asked again once that lock is held, right before the worker is stopped.
+A worker that was steered or became busy since the first answer backs off, and nothing is stopped, signalled, or destroyed.
 The proof that is repeated while that lock and the task control lock are held makes no fetch and reuses the remote refs fetched before them, so a hung remote never holds either lock.
 The slot's owner claim is read again right before the signal: a slot that another task has claimed, or whose claim cannot be read, stays untouched.
 When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
@@ -735,7 +737,10 @@ That second teardown asks the same automatic-reap admission check, which in this
 The ordinary finished-session sweep keeps its classification unchanged.
 It never uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
-Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy outside the pool, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged (`treehouse destroy` refuses an unmerged slot, and the fallback never uses `--include-unlanded`), or a destroy that fails.
+A proof read that fails never counts as finding nothing.
+That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, or the attempt retries later when the failed read is a git read.
+
+Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged (`treehouse destroy` refuses an unmerged slot, and the fallback never uses `--include-unlanded`), or a destroy that fails.
 It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
 Each outcome is one line in `data/<id>/merge-prune.log`; the prune never writes to the task's status file.
@@ -4176,7 +4181,6 @@ FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of
 FM_MERGE_PRUNE=1   # 0 stops bin/fm-merge-prune.sh from arming a pool-copy prune after a verified merge (see "Pool-copy prune after a merge"); anything else leaves it on
 FM_MERGE_PRUNE_INTERVAL=60   # seconds between the watcher's detached pool-copy prune sweeps while a prune record exists; 0 turns the sweep off; invalid values use 60
 FM_MERGE_PRUNE_EXIT_WAIT=10   # seconds the fallback waits for the stopped worker's session to leave the copy, and for the pane's idle shell to exit on SIGHUP, before it keeps the copy; invalid values use 10
-TREEHOUSE_ROOT=   # the pool root the fallback accepts copies under (<root>/<pool>/<slot>/<repo>); unset means $HOME/.treehouse
 FM_MERGE_PRUNE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-merge-prune.sh
 FM_MERGE_PRUNE_TEARDOWN_BIN=   # test seam: the teardown the prune runs instead of bin/fm-teardown.sh
 FM_MERGE_PRUNE_CONTROL_BIN=   # test seam: the control command the fallback uses to stop the finished worker instead of bin/fm-control.sh
