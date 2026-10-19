@@ -26,16 +26,18 @@
 # lifecycle action already running. One wake is raised if a task is still not
 # pruned after 24 attempts.
 #
-# A teardown refusal (exit 1) that is one of teardown's known landing refusals
-# may be a false positive that `treehouse destroy` will settle: a squash-merged
-# copy that teardown calls "not landed" (treehouse counts it merged), a closeout
-# driver's "exact tree not covered", an orphan nested copy with no task record
-# whose HEAD is "not proved landed", or ignored files that "exist nowhere else".
-# Only then the fallback of bin/fm-merge-prune-lib.sh runs; every other refusal,
-# unknown text included (a leaked process, a launch agent still loaded, a
-# process whose ownership is not proven, a live pipeline, a captain call), keeps
-# the copy at once. Every refusal line of the output must be one of the known
-# landing refusals (fallback_allowed names each message). A copy whose work is
+# The fallback handles only the two refusal classes that really reach it, which
+# may be false positives that `treehouse destroy` will settle: the ship
+# deliverable teardown calls "not landed" (a squash-merged copy, which treehouse
+# counts merged) and a closeout driver's "exact tree not covered" for a nested
+# copy. Only then the fallback of bin/fm-merge-prune-lib.sh runs; every other
+# refusal, unknown text included, keeps the copy at once with one wake: a leaked
+# process, a launch agent still loaded, a process whose ownership is not proven,
+# a live pipeline, a captain call, and an orphan nested copy refused for a HEAD
+# that is not proved landed or for ignored files (teardown never prints that
+# text; it preserves such files itself, and it prints a second refusal with the
+# HEAD one). Every refusal line of the output must be one of the two classes
+# (fallback_allowed names each message). A copy whose work is
 # pushed but not merged (a follow-up commit after the merge) is refused by
 # `treehouse destroy` as unmerged, which only --include-unlanded would override
 # and which is never used, so it stays with one wake. The fallback also runs only
@@ -47,10 +49,15 @@
 # treehouse-reap-clean, that the copy is a Treehouse pool slot of the task's
 # project (the repo's one test, fm_treehouse_pool_slot: the pool's
 # treehouse-state.json beside it and the project's git directory shared), and
-# that it and every nested copy has no changed or untracked file, holds no stash entry of its own work, has no
-# commit reachable from its HEAD (its own checked-out branch; never the project's
-# other branches) missing from every remote (or from the merged PR's head), holds
-# only scratch or preserved ignored files, and has no process inside. The finished worker session is stopped first
+# that it and every nested copy has no changed or untracked file, holds no stash
+# entry of its own work, has no commit reachable from its HEAD (its own
+# checked-out branch) missing from every remote (or from the merged PR's head),
+# holds only scratch or preserved ignored files, and has no process inside. For a
+# linked worktree of the project the commit and stash proofs read only that
+# copy's work (never the project's other branches or other tasks' stashes); a
+# nested copy that is an independent clone, with its own git directory, is proved
+# in full: every local branch not on a remote and every stash keeps it. The
+# finished worker session is stopped first
 # (bin/fm-control.sh exit). That verb keeps the task's terminal pane open, and
 # the pane's idle shell, the one the pane entered the copy with, stays inside
 # the copy. That one process does not keep the copy, but treehouse refuses to
@@ -112,6 +119,8 @@ SWEEP_LOCK="$STATE/.merge-prune-sweep.lock"
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
+# shellcheck source=bin/fm-task-copy-lib.sh
+. "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # shellcheck source=bin/fm-merge-prune-lib.sh
 . "$SCRIPT_DIR/fm-merge-prune-lib.sh"
 
@@ -223,11 +232,15 @@ transient_refusal() {  # <teardown-output>
   return 1
 }
 
-# The only refusals the fallback may settle are teardown's own landing refusals
-# (bin/fm-teardown.sh validate_worktree_teardown_safety, and
-# bin/fm-teardown-nested-lib.sh for nested copies), and every refusal line of the
-# output must be one of them. Any other text, unknown text included, keeps the
-# copy.
+# The only refusals the fallback may settle are the two classes that really reach
+# it, in the words teardown prints them: the ship deliverable reported as not
+# landed (bin/fm-teardown.sh validate_worktree_teardown_safety) and a closeout
+# driver that did not release a nested copy (bin/fm-teardown-nested-lib.sh).
+# Every refusal line of the output must be one of them. Any other text, unknown
+# text included, keeps the copy. A foreign nested copy refused for a HEAD that is
+# not proved landed does not reach it: teardown always prints a second refusal
+# with it (the pool slot contains a registered copy that is not the task's), and
+# that line is not on this list.
 fallback_allowed() {  # <teardown-output>
   local line seen=0
   while IFS= read -r line || [ -n "$line" ]; do
@@ -237,9 +250,6 @@ fallback_allowed() {  # <teardown-output>
     esac
     case "$line" in
       "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.") seen=1 ;;
-      "REFUSED: foreign copy "*" stays in pool slot "*": its HEAD "*" is not proved landed.") seen=1 ;;
-      "REFUSED: foreign copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;
-      "REFUSED: own nested copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;
       "REFUSED: Vernant's closeout driver did not release foreign copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;
       "REFUSED: Vernant's closeout driver did not release own nested copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;
       *) return 1 ;;
@@ -453,16 +463,30 @@ fallback_remove() {  # <real-copy> <pr-number>
   return 0
 }
 
+# A copy that shares the project's git directory (a linked worktree, which is
+# what the repo's one test, fm_task_copy_same_repository, asks) shares its
+# branches and stash list, so only its own work is read. Any other copy, an
+# independent clone or one whose git directory cannot be resolved, is proved in
+# full.
+proof_scope() {  # <copy> <project>
+  if fm_task_copy_same_repository "$1" "$2"; then
+    printf 'own'
+  else
+    printf 'all'
+  fi
+}
+
 # Prove one copy and everything nested in it; sets FM_MP_VERDICT/REASON on failure.
 # The nofetch mode reuses what the earlier fetching pass left (fm_mp_prove_git).
 prove_all() {  # <real-copy> <pr-number> [nofetch]
-  local real=$1 pr=$2 mode=${3:-fetch} n
-  fm_mp_prove_git "$real" "$pr" "$mode" || { record_verdict "$real"; return 1; }
+  local real=$1 pr=$2 mode=${3:-fetch} n project
+  project=$(fm_meta_get "$META" project)
+  fm_mp_prove_git "$real" "$pr" "$mode" "$(proof_scope "$real" "$project")" || { record_verdict "$real"; return 1; }
   fm_mp_prove_ignored "$real" || { record_verdict "$real"; return 1; }
   fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
   if [ "${#FM_MP_NESTED[@]}" -gt 0 ]; then
     for n in "${FM_MP_NESTED[@]}"; do
-      fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }
+      fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }
       fm_mp_prove_ignored "$n" || { record_verdict "$real"; return 1; }
     done
   fi

@@ -3,8 +3,9 @@
 #
 # bin/fm-teardown.sh stays the authority. This library is used only when
 # teardown refused a merged task's pool copy for a reason that may not be real
-# unlanded work (a false-positive landing refusal, an orphan nested copy with no
-# task record, ignored scratch files). It follows the criteria of the owner's
+# unlanded work (a squash-merged copy that teardown calls not landed, or a
+# closeout driver's exact-tree refusal; bin/fm-merge-prune.sh names the only
+# refusals that reach it). It follows the criteria of the owner's
 # treehouse-reap-clean reaper and proves, read live, that the copy holds nothing
 # worth keeping. It never forces, discards or hides anything: any proof it
 # cannot make keeps the copy. A read that fails (the ignored-file listing, the
@@ -20,12 +21,17 @@
 #     treehouse-state.json sits beside the slot and the slot shares the
 #     project's git directory;
 #   - git reports no changed or untracked file and the copy holds no stash entry
-#     of its own work: a stash made on another branch of the project is another
-#     task's (a linked worktree shares the project's stash list), while a stash
-#     made on the copy's branch, or any stash of a detached copy, counts;
+#     of its own work: for a linked worktree of the project, a stash made on
+#     another branch of the project is another task's (a linked worktree shares
+#     the project's stash list), while a stash made on the copy's branch, or any
+#     stash of a detached copy, counts; a nested copy that is an independent
+#     clone (its own git directory) shares nothing, so every stash it holds
+#     counts;
 #   - no commit reachable from the copy's HEAD, which is its own checked-out
-#     branch, is missing from every remote (after a fetch); other branches of the
-#     project are other work. The task's own copy may also rely on the merged pull
+#     branch, is missing from every remote (after a fetch); for a linked
+#     worktree, other branches of the project are other work, but for an
+#     independent clone every local branch is read too, because removing the
+#     clone destroys them. The task's own copy may also rely on the merged pull
 #     request's head: a commit that is an ancestor of refs/pull/<n>/head landed;
 #   - every ignored file is scratch (list below), a preserved record, or a
 #     symlink; anything else is unique and keeps the copy;
@@ -126,15 +132,18 @@ fm_mp_verdict() {  # <ok|keep|transient> <reason>
 # The stash entries made on this copy's work, counted on stdout. Git names the
 # branch a stash was made on in its message ("WIP on <branch>: ..." or "On
 # <branch>: ..."), and a linked worktree shares its stash list with the project,
-# so a stash that names another branch is not this copy's. A detached copy, a
-# stash made with no branch, and a message that names no branch all count.
-# Returns 1 when git cannot list the stash entries.
-fm_mp_own_stashes() {  # <real-copy>
-  local copy=$1 branch subject name n=0 listing
+# so in the own scope a stash that names another branch is not this copy's. A
+# detached copy, a stash made with no branch, and a message that names no branch
+# all count. In the all scope (an independent clone, which shares nothing with
+# the project) every entry counts. Returns 1 when git cannot list the stash
+# entries.
+fm_mp_own_stashes() {  # <real-copy> [<own|all>]
+  local copy=$1 scope=${2:-all} branch subject name n=0 listing
   branch=$(git -C "$copy" symbolic-ref -q --short HEAD 2>/dev/null) || branch=
   listing=$(git -C "$copy" stash list --format=%gs 2>/dev/null) || return 1
   while IFS= read -r subject; do
     [ -n "$subject" ] || continue
+    if [ "$scope" = all ]; then n=$((n + 1)); continue; fi
     name=
     case "$subject" in
       "WIP on "*) name=${subject#"WIP on "} ;;
@@ -156,9 +165,12 @@ EOF
 # fetches the remotes (and the pull request's head) first and leaves that head in
 # FM_MP_PR_HEAD. The nofetch mode makes no network call: it reuses the remote
 # refs and the pull request head that an earlier fetching pass left, so a pass
-# made while the project lock is held can never wait on a hung remote.
-fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
-  local copy=$1 prn=${2:-} mode=${3:-fetch} top dirty stashes unpushed prsha='' extra=()
+# made while the project lock is held can never wait on a hung remote. The own
+# scope reads only this copy's work (its HEAD and its own branch's stashes) and
+# is for a linked worktree of the project; the all scope, the default, also
+# reads every local branch and every stash, and is for an independent clone.
+fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
+  local copy=$1 prn=${2:-} mode=${3:-fetch} scope=${4:-all} top dirty stashes unpushed prsha='' extra=() refs=(HEAD)
   if ! top=$(git -C "$copy" rev-parse --show-toplevel 2>/dev/null) || [ "$(fm_mp_real "$top")" != "$copy" ]; then
     fm_mp_verdict keep "$copy is not a git work tree root"
     return 1
@@ -171,7 +183,7 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
     fm_mp_verdict keep "$copy has changed or untracked files ($(printf '%s\n' "$dirty" | wc -l | tr -d ' ') entries, first: $(printf '%s\n' "$dirty" | sed -n 1p))"
     return 1
   fi
-  if ! stashes=$(fm_mp_own_stashes "$copy"); then
+  if ! stashes=$(fm_mp_own_stashes "$copy" "$scope"); then
     fm_mp_verdict transient "git stash list failed in $copy"
     return 1
   fi
@@ -192,7 +204,8 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch]
     fi
   fi
   [ -z "$prsha" ] || extra=("$prsha")
-  if ! unpushed=$(git -C "$copy" rev-list --count HEAD --not --remotes ${extra[@]+"${extra[@]}"} 2>/dev/null); then
+  [ "$scope" != all ] || refs+=(--branches)
+  if ! unpushed=$(git -C "$copy" rev-list --count "${refs[@]}" --not --remotes ${extra[@]+"${extra[@]}"} 2>/dev/null); then
     fm_mp_verdict keep "cannot compare $copy with its remotes"
     return 1
   fi

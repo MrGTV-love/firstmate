@@ -703,16 +703,19 @@ That covers the task lease or project lock held by another actor, a teardown tha
 The retry waits 60 seconds, then doubles up to 3600 seconds.
 One wake is raised if the task is still not pruned after 24 attempts.
 
-Only a known landing refusal of teardown may be a false positive.
-Those are the ship deliverable reported as not landed (the case that matters is a squash merge, which `treehouse destroy` counts as merged), a closeout driver that reports the exact tree as not covered, an orphan nested copy whose HEAD is not proved landed, and ignored files that exist nowhere else.
+The fallback handles only the two refusal classes that really reach it.
+Those are the ship deliverable reported as not landed (the case that matters is a squash merge, which `treehouse destroy` counts as merged) and a closeout driver that reports the exact tree of a nested copy as not covered.
 Every refusal line of the teardown output must be one of them.
-Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent that is still loaded, a process whose ownership is not proven, a live pipeline, a captain call, and any refusal text that is not on that list.
+Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent that is still loaded, a process whose ownership is not proven, a live pipeline, a captain call, an orphan nested copy refused for a HEAD that is not proved landed (teardown always prints a second refusal with it, that the pool slot contains a registered copy that is not the task's), and any refusal text that is not on that list.
+Teardown preserves ignored files that exist nowhere else itself, so a refusal about them is not one of the two classes.
 Only a known landing refusal makes the fallback re-prove the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
 The copy and every nested copy inside it, each checked one by one, must pass all of these:
 
 - It is a Treehouse pool slot of the task's project, by the test the rest of Firstmate uses (`fm_treehouse_pool_slot`): the pool's `treehouse-state.json` sits beside it and it shares the project's git directory.
-- Git reports no changed or untracked file and the copy holds no stash entry of its own work: a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
-- No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; other branches of the project are other work and are not read.
+- Git reports no changed or untracked file and the copy holds no stash entry of its own work: for a linked worktree of the project, a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
+- A nested copy that is an independent clone, with its own git directory, shares nothing with the project, so every stash it holds keeps it.
+- No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; for a linked worktree, other branches of the project are other work and are not read.
+- For a nested copy that is an independent clone, every local branch that is not on a remote also keeps it, because removing the clone destroys that branch.
 - Every ignored file is scratch, a symlink, or on the preserve list.
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
