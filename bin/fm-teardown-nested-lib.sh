@@ -414,8 +414,13 @@ teardown_foreign_copy_prove() {  # <copy>
   fi
   teardown_foreign_copy_unowned "$copy" || return 1
   if ! teardown_landed "$copy" HEAD ""; then
-    TEARDOWN_FOREIGN_RULE='copy-landed'
-    TEARDOWN_FOREIGN_WHY="its HEAD ${FM_TASK_COPY_HEAD:0:12} is not proved landed"
+    if [ -n "$TEARDOWN_LANDED_UNASKED" ]; then
+      TEARDOWN_FOREIGN_RULE=inspection-unavailable
+      TEARDOWN_FOREIGN_WHY="its landing could not be checked ($TEARDOWN_LANDED_UNASKED)"
+    else
+      TEARDOWN_FOREIGN_RULE='copy-landed'
+      TEARDOWN_FOREIGN_WHY="its HEAD ${FM_TASK_COPY_HEAD:0:12} is not proved landed"
+    fi
     return 1
   fi
 }
@@ -516,7 +521,7 @@ teardown_foreign_copy_present() {  # <slot> <copy>
 # Preserves the ignored files of one proved foreign copy, then releases and
 # removes it. Returns 1 after printing a refusal.
 teardown_foreign_copy_dispose() {  # <slot> <copy>
-  local slot=$1 copy=$2 rc=0
+  local slot=$1 copy=$2 rc=0 remove_rc remove_err
   teardown_preserve_ignored "$copy" || {
     teardown_refuse_copy ignored-bytes-preserved "the ignored files of foreign copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
@@ -538,9 +543,18 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
       fi
       ;;
     1)
-      if ! git -C "$slot" worktree remove "$copy" >/dev/null 2>&1; then
-        teardown_refuse_copy nonforced-removal "git worktree remove would not remove foreign copy $copy without force; it was not removed." "$copy" \
-          "What retained disposition covers the contents Git still protects in $copy? Preserve this copy; no forced removal is authorized."
+      remove_rc=0
+      remove_err=$(git -C "$slot" worktree remove "$copy" 2>&1 >/dev/null) || remove_rc=$?
+      if [ "$remove_rc" != 0 ]; then
+        case "$remove_err" in
+          *"use --force to delete it"*|*"containing submodules"*)
+            teardown_refuse_copy nonforced-removal "git worktree remove would not remove foreign copy $copy without force; it was not removed." "$copy" \
+              "What retained disposition covers the contents Git still protects in $copy? Preserve this copy; no forced removal is authorized."
+            ;;
+          *)
+            teardown_refuse_copy inspection-unavailable "git worktree remove failed for foreign copy $copy (exit $remove_rc): $remove_err; it was not removed." "$copy"
+            ;;
+        esac
         return 1
       fi
       ;;

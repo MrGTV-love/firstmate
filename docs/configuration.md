@@ -118,6 +118,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev size refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
 Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
+A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
 A copy that is not a Git worktree root, has a HEAD that cannot be resolved, or meets a preservation anchor naming another commit stays that way until someone decides, so teardown refuses it as `copy-worktree-root`, `copy-head-resolved` or `copy-anchor-commit` with a human-only question.
 The shell [refusal envelope](../bin/fm-refuse-lib.sh) prints `REFUSED: guard=<stable-id> rule=<predicate-id> missing=<actual missing proof>`, followed by `completing-command: <supported command>` or a literal `human-only-exit: <new question>` line.
 The caller retains its existing exit code; a telemetry failure never adds a refusal, changes that code, or changes hook JSON or the Claude Stop exit-2 contract.

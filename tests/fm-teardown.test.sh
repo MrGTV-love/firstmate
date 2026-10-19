@@ -10917,9 +10917,9 @@ assert_preservation_refusal_without_route() {  # <label>
   assert_grep 'REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=ignored-bytes-preserved ' "$FOREIGN_CASE/stderr" "$label: the refusal is not typed"
   assert_no_grep 'completing-command:' "$FOREIGN_CASE/stderr" "$label: a command that cannot complete this run was printed"
   assert_grep 'human-only-exit: This run was forced or used a legacy record' "$FOREIGN_CASE/stderr" "$label: the run was not named in the human-only exit"
-  envelope=$(grep -E '^(REFUSED: guard=FM-TEARDOWN-PRESERVATION|human-only-exit:)' "$FOREIGN_CASE/stderr")
+  envelope=$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr")
   case "$envelope" in
-    *--force*|*--drop-file*|*--legacy-record*) fail "$label: the refusal printed a force or legacy flag: $envelope" ;;
+    *--force*|*--drop-file*|*--legacy-record*) fail "$label: the output printed a force or legacy flag: $envelope" ;;
   esac
   jq -es 'length == 1 and .[0].rule_id == "ignored-bytes-preserved" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only" and .[0].exit_printed' \
     "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail "$label: expected exactly one human-only event: $(cat "$FOREIGN_CASE/home/state/friction.jsonl")"
@@ -10980,8 +10980,19 @@ test_legacy_preservation_refusal_prints_no_completing_command() {
 # A proof failure that needs a human decision is a typed refusal with a
 # human-only question and one event; it is not a plain error and not a second
 # event from the registered-copy custody refusal that repeats it.
+# The registered-copy wrapper tells the reader to follow what was printed above
+# for each listed copy, so that step line must exist before it.
+assert_wrapper_follows_step() {  # <label> <step-line-prefix>
+  local label=$1 step_line wrapper_line
+  step_line=$(grep -n -m1 -- "^$2" "$FOREIGN_CASE/stderr" | cut -d: -f1)
+  wrapper_line=$(grep -n -m1 -F 'Keep each listed copy and its records. For each one,' "$FOREIGN_CASE/stderr" | cut -d: -f1)
+  [ -n "$wrapper_line" ] || fail "$label: the registered-copy refusal did not tell the reader to follow the printed step"
+  [ -n "$step_line" ] && [ "$step_line" -lt "$wrapper_line" ] || fail "$label: no '$2' line precedes the registered-copy refusal's pointer to it"
+}
+
 assert_typed_copy_refusal() {  # <label> <rule>
   local label=$1 rule=$2
+  assert_wrapper_follows_step "$label" 'human-only-exit: '
   assert_grep "REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=$rule " "$FOREIGN_CASE/stderr" "$label: the refusal is not typed"
   assert_grep 'human-only-exit: ' "$FOREIGN_CASE/stderr" "$label: the refusal printed no question"
   assert_no_grep "error: foreign copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "$label: a policy refusal was printed as a plain error"
@@ -10992,6 +11003,159 @@ assert_typed_copy_refusal() {  # <label> <rule>
   assert_absent "$FOREIGN_CASE/closeout.log" "$label: the closeout driver ran"
   assert_absent "$FOREIGN_CASE/treehouse.log" "$label: the pool slot was returned"
   assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+}
+
+# A refusal is typed only when Git or the forge answered and the answer was no.
+# Git protecting the copy's contents is that answer; a removal that fails for any
+# other reason is a plain error with Git's own text and no event.
+test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal() {
+  local rc
+  make_foreign_copy_case foreign-git-protects
+  mkdir -p "$FOREIGN_COPY/.claude"
+  printf 'untracked\n' > "$FOREIGN_COPY/.claude/untracked.txt"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "git-protects: a copy Git refuses to remove must keep refusing: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=nonforced-removal ' "$FOREIGN_CASE/stderr" 'git-protects: the refusal is not typed'
+  assert_grep 'human-only-exit: ' "$FOREIGN_CASE/stderr" 'git-protects: the refusal printed no question'
+  jq -es 'length == 1 and .[0].rule_id == "nonforced-removal" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only"' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'git-protects: expected exactly one typed human-only event'
+  assert_foreign_copy_untouched git-protects
+  assert_present "$FOREIGN_COPY/.claude/untracked.txt" 'git-protects: the untracked file was lost'
+  pass 'a foreign copy whose contents Git protects is refused as a typed nonforced-removal with its question'
+}
+
+test_foreign_copy_removal_that_fails_for_another_reason_is_a_plain_error() {
+  local rc reason n=0
+  for reason in 'Permission denied' 'Device or resource busy' 'Input/output error'; do
+    n=$((n + 1))
+    make_foreign_copy_case "foreign-removal-fails-$n"
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" worktree remove "*) echo "error: failed to delete '$FOREIGN_COPY': $reason" >&2; exit 255 ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "removal-fails-$n: a failed removal must keep the exit: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "error: git worktree remove failed for foreign copy $FOREIGN_COPY (exit 255): error: failed to delete '$FOREIGN_COPY': $reason" \
+      "$FOREIGN_CASE/stderr" "removal-fails-$n: the plain error did not carry Git's exit and text"
+    assert_no_grep 'rule=nonforced-removal' "$FOREIGN_CASE/stderr" "removal-fails-$n: a $reason failure was typed as Git protection"
+    assert_absent "$FOREIGN_CASE/home/state/friction.jsonl" "removal-fails-$n: a $reason failure recorded a policy event"
+    assert_foreign_copy_untouched "removal-fails-$n"
+  done
+  pass 'a foreign copy whose removal fails with EACCES, EBUSY or an I/O error is a plain error naming Git and records no event'
+}
+
+# The landing check is typed copy-landed only when it was answered. Each stub
+# makes one probe unable to answer; the control gets a real "open, not merged".
+make_unlanded_foreign_copy_with_pr() {  # <name>
+  make_foreign_copy_case "$1"
+  printf 'pr=https://github.com/example/repo/pull/7\n' >> "$FOREIGN_CASE/state/task-x1.meta"
+  printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
+  git -C "$FOREIGN_COPY" add unlanded.txt
+  git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
+}
+
+assert_plain_landing_error() {  # <label> <cause-fragment>
+  assert_grep "error: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: its landing could not be checked (" "$FOREIGN_CASE/stderr" "$1: the plain error did not say the landing could not be checked"
+  assert_grep "$2" "$FOREIGN_CASE/stderr" "$1: the plain error did not name its cause"
+  assert_no_grep 'rule=copy-landed' "$FOREIGN_CASE/stderr" "$1: an unanswered landing check was typed as not landed"
+  assert_absent "$FOREIGN_CASE/home/state/friction.jsonl" "$1: an unanswered landing check recorded a policy event"
+  assert_wrapper_follows_step "$1" 'error: '
+  assert_foreign_copy_untouched "$1"
+}
+
+test_landing_check_that_could_not_ask_the_forge_is_a_plain_error() {
+  local rc
+  make_unlanded_foreign_copy_with_pr foreign-landing-forge-down
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "forge-down: an unlanded copy must stay refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_plain_landing_error forge-down 'gh pr view https://github.com/example/repo/pull/7 failed (exit 1)'
+  pass 'a landing check whose gh pr view fails is a plain error naming the forge failure, not a copy-landed refusal'
+}
+
+test_landing_check_that_could_not_compare_with_the_default_branch_is_a_plain_error() {
+  local rc way subcommand cause
+  for way in fetch merge-tree; do
+    make_foreign_copy_case "foreign-landing-no-compare-$way"
+    printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
+    git -C "$FOREIGN_COPY" add unlanded.txt
+    git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
+    case "$way" in
+      fetch) subcommand=fetch cause='origin/main could not be fetched' ;;
+      *) subcommand=merge-tree cause='the content check could not compare with the default branch' ;;
+    esac
+    cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case "\$1:\${2:-}:\${3:-}" in "-C:$FOREIGN_COPY:$subcommand") echo "fatal: simulated $subcommand failure" >&2; exit 128 ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/git"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "no-compare-$way: an unlanded copy must stay refused: $(cat "$FOREIGN_CASE/stderr")"
+    assert_plain_landing_error "no-compare-$way" "$cause"
+  done
+  pass 'a landing check that cannot fetch or compare with the default branch is a plain error naming why, not a copy-landed refusal'
+}
+
+test_landing_check_that_the_forge_answered_not_merged_stays_a_copy_landed_refusal() {
+  local rc head
+  make_unlanded_foreign_copy_with_pr foreign-landing-open
+  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+  cat > "$FOREIGN_CASE/fakebin/gh" <<SH
+#!/usr/bin/env bash
+case "\${1:-} \${2:-}" in
+  "pr view")
+    case " \$* " in *"state,headRefOid,url"*) printf 'OPEN\t%s\t%s\n' '$head' 'https://github.com/example/repo/pull/7'; exit 0 ;; esac ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/gh"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "forge-open: an unlanded copy must stay refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep 'REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed ' "$FOREIGN_CASE/stderr" 'forge-open: a proved not-landed result is not typed'
+  assert_no_grep 'its landing could not be checked' "$FOREIGN_CASE/stderr" 'forge-open: an answered check was reported as unanswered'
+  jq -es 'length == 1 and .[0].rule_id == "copy-landed" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only"' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'forge-open: expected exactly one typed copy-landed event'
+  assert_wrapper_follows_step forge-open 'human-only-exit: '
+  assert_foreign_copy_untouched forge-open
+  pass 'a landing check the forge answered with not merged is still refused as a typed copy-landed'
+}
+
+# work_is_landed itself, run from the script's own text with the proof stubbed
+# out: a HEAD that changed after its proof, under the project lock, cannot be
+# judged, so it reports why instead of a verdict.
+test_landing_proof_that_head_changed_after_its_proof_is_unasked() {
+  local repo=$TMP_ROOT/head-changed out
+  mkdir -p "$repo"
+  git init -q "$repo/work"
+  git -C "$repo/work" -c user.email=t@t -c user.name=t commit -q --allow-empty -m first
+  cat > "$repo/harness.sh" <<'SH'
+set -u
+eval "$(sed -n '/^work_is_landed() {/,/^}/p' "$FM_HARNESS_SCRIPT")"
+work_is_landed_proof() { return 1; }
+TREEHOUSE_PROJECT_LOCK_HELD=1 TEARDOWN_SLOT_CUSTODY=lease WT=$FM_HARNESS_REPO/work
+TEARDOWN_LANDED_DIRS=(/nonexistent) TEARDOWN_LANDED_HEADS=(0)
+TEARDOWN_UNPROVEN_COMMITS='' TEARDOWN_PIPELINE_INPUT_REASON='' TEARDOWN_LANDED_UNASKED=''
+rc=0; work_is_landed '' 2> "$FM_HARNESS_REPO/stderr" || rc=$?
+printf 'locked rc=%s unasked=%s\n' "$rc" "$TEARDOWN_LANDED_UNASKED"
+TEARDOWN_SLOT_CUSTODY=project TEARDOWN_LANDED_UNASKED=stale
+rc=0; work_is_landed '' 2> "$FM_HARNESS_REPO/stderr2" || rc=$?
+printf 'custody rc=%s unasked=%s\n' "$rc" "$TEARDOWN_LANDED_UNASKED"
+SH
+  out=$(FM_HARNESS_SCRIPT="$ROOT/bin/fm-teardown.sh" FM_HARNESS_REPO="$repo" bash "$repo/harness.sh") \
+    || fail "head-changed: the real work_is_landed could not be run: $out"
+  case "$(printf '%s\n' "$out" | sed -n 1p)" in
+    'locked rc=1 unasked=HEAD changed to '*) ;;
+    *) fail "head-changed: a changed HEAD was not reported as unasked: $out" ;;
+  esac
+  assert_equals 'custody rc=1 unasked=' "$(printf '%s\n' "$out" | sed -n 2p)" \
+    'head-changed: a proved miss under project custody was reported as unasked'
+  assert_grep 'changed to HEAD' "$repo/stderr" 'head-changed: the existing retry refusal was lost'
+  pass 'a HEAD that changed after its landing proof is reported as unasked, and a proved miss is not'
 }
 
 test_foreign_copy_that_is_not_a_worktree_root_is_a_typed_refusal() {
@@ -13242,6 +13406,12 @@ test_foreign_copy_is_not_removed_when_its_ignored_files_cannot_be_listed
 test_typed_preservation_exit_completes_cleanup
 test_forced_preservation_refusal_prints_no_completing_command
 test_legacy_preservation_refusal_prints_no_completing_command
+test_foreign_copy_that_git_protects_is_a_typed_nonforced_removal
+test_foreign_copy_removal_that_fails_for_another_reason_is_a_plain_error
+test_landing_check_that_could_not_ask_the_forge_is_a_plain_error
+test_landing_check_that_could_not_compare_with_the_default_branch_is_a_plain_error
+test_landing_check_that_the_forge_answered_not_merged_stays_a_copy_landed_refusal
+test_landing_proof_that_head_changed_after_its_proof_is_unasked
 test_foreign_copy_that_is_not_a_worktree_root_is_a_typed_refusal
 test_foreign_copy_with_an_unresolvable_head_is_a_typed_refusal
 test_foreign_copy_whose_anchor_names_another_commit_is_a_typed_refusal

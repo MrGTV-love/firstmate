@@ -2292,13 +2292,19 @@ pr_is_merged() {
   fi
   [ -n "$target" ] || return 1
   if fm_pr_url_parse "$target" && [ "$FM_PR_PROVIDER" = forgejo ]; then
-    fm_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
+    fm_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || {
+      TEARDOWN_LANDED_UNASKED="the forge record of $target could not be read"
+      return 1
+    }
     [ "$FM_PR_RECORD_MERGED" = true ] || return 1
     head=$FM_PR_RECORD_HEAD
     fm_pr_head_valid "$head" || return 1
     resolved_url=$FM_PR_URL
   else
-    view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || return 1
+    view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || {
+      TEARDOWN_LANDED_UNASKED="gh pr view $target failed (exit $?)"
+      return 1
+    }
     state=${view%%$'\t'*}
     remainder=${view#*$'\t'}
     [ "$state" != "$view" ] || return 1
@@ -2311,7 +2317,10 @@ pr_is_merged() {
     esac
   fi
   [ -n "$head" ] || return 1
-  ensure_commit_object "$target" "$head" || return 1
+  ensure_commit_object "$target" "$head" || {
+    TEARDOWN_LANDED_UNASKED="the merged head of $target could not be fetched"
+    return 1
+  }
   current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
   if git -C "$dir" merge-base --is-ancestor "$current" "$head" 2>/dev/null; then
     landed=1
@@ -2337,9 +2346,14 @@ pr_is_merged() {
 # refuses for a fresh proof on retry rather than doing network work under it.
 TEARDOWN_LANDED_DIRS=()
 TEARDOWN_LANDED_HEADS=()
+TEARDOWN_LANDED_UNASKED=
 work_is_landed() {
   local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
-  head=$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null) || return 1
+  TEARDOWN_LANDED_UNASKED=
+  head=$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null) || {
+    TEARDOWN_LANDED_UNASKED="HEAD of $dir cannot be resolved"
+    return 1
+  }
   TEARDOWN_UNPROVEN_COMMITS=
   TEARDOWN_PIPELINE_INPUT_REASON=
   for i in "${!TEARDOWN_LANDED_DIRS[@]}"; do
@@ -2349,6 +2363,7 @@ work_is_landed() {
   done
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] && [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
     echo "REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof" >&2
+    TEARDOWN_LANDED_UNASKED="HEAD changed to ${head:0:12} after its landing proof; retry for a fresh proof"
     return 1
   fi
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
@@ -2373,7 +2388,9 @@ work_is_landed_proof() {
     fi
   fi
   pr_is_merged "$branch" && return 0
-  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"
+  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" && return 0
+  [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
+  return 1
 }
 
 # Archive cleanup needs its own stricter proof, not the pipeline-input exception:
@@ -2709,7 +2726,7 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
   done < "$inventory"
   rm -f "$inventory"
   if [ "$refused" = 1 ]; then
-    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from $slot, never by forcing the removal). Re-run this teardown afterwards." >&2
+    echo "Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from $slot, never by forcing the removal). Re-run this teardown afterwards." >&2
     return 1
   fi
 }

@@ -62,12 +62,20 @@ fm_task_copy_default_branch() {
   return 1
 }
 
+# A failed content check is no verdict on the work while FM_TASK_COPY_UNASKED
+# names why: it is cleared only once the check compared the two trees, and a
+# merge conflict is that comparison's answer.
+FM_TASK_COPY_UNASKED=
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>]
   local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} ref default_tree merged_tree
+  FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
   if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
-    git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
+    git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
+      FM_TASK_COPY_UNASKED="origin/$name could not be fetched"
+      return 1
+    }
     ref="refs/remotes/origin/$name"
   elif git -C "$worktree" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
     ref="refs/heads/$name"
@@ -76,7 +84,11 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   fi
   default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || return 1
+  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || {
+    [ "$?" != 1 ] || FM_TASK_COPY_UNASKED=
+    return 1
+  }
+  FM_TASK_COPY_UNASKED=
   merged_tree=${merged_tree%%$'\n'*}
   [ "$merged_tree" = "$default_tree" ]
 }
