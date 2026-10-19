@@ -627,7 +627,7 @@ test_spawn_fixed_family_scope() {
     assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "refused task must not emit an overlay"
     [ ! -s "$LAUNCH_LOG" ] || fail "fixed-family $kind reached launch"
   done
-  id=family-claude
+  id="family-claude"
   rec=$(make_spawn_case "$id" claude "$id")
   read_case_record "$rec"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
@@ -635,7 +635,7 @@ test_spawn_fixed_family_scope() {
   expect_code 0 $? "other harnesses must accept fixed-family as a no-op: $out"
   assert_contains "$out" '--fixed-family has no effect on harness' "other harnesses need a plain no-op note"
   assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "other harnesses must not receive an omp overlay"
-  id=family-raw
+  id="family-raw"
   rec=$(make_spawn_case "$id" omp "$id")
   read_case_record "$rec"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
