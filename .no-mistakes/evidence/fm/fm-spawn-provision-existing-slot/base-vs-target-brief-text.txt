@@ -1,0 +1,11 @@
+BASE MISSING: Do not create a second tree with
+BASE MISSING: provision_existing_slot.py
+BASE MISSING: worktree-python-environments.md
+BASE MISSING: needs slot manifest or owned-path extension
+BASE MISSING: Never run start_task_worktree.py from this slot
+--- same phrases on target brief ---
+TARGET has:   Do not create a second tree with
+TARGET has:   provision_existing_slot.py
+TARGET has:   worktree-python-environments.md
+TARGET has:   needs slot manifest or owned-path extension
+TARGET has:   Never run start_task_worktree.py from this slot
