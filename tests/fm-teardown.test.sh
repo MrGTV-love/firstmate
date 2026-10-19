@@ -10970,11 +10970,32 @@ test_bundle_hint_needs_unlanded_tips() {
   rc=0
   FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" 'a pushed but undelivered copy must still refuse'
-  assert_grep 'copy has no unlanded tips to preserve' "$case_dir/stderr" 'bundle-pushed: the bundle limit was not named'
+  assert_grep 'copy has no unlanded tips of its own' "$case_dir/stderr" 'bundle-pushed: the bundle limit was not named'
   assert_no_grep 'Create a self-contained external bundle' "$case_dir/stderr" 'bundle-pushed: a bundle was advised for a copy with nothing unpushed'
   assert_present "$NESTED_COPY/.git" 'bundle-pushed: copy was removed'
   assert_present "$case_dir/state/task-x1.meta" 'bundle-pushed: task record was removed'
   pass 'a copy with no local-only commits is not advised to build a bundle'
+}
+
+test_bundle_needs_the_copys_own_unlanded_tip() {
+  local case_dir rc side
+  make_bundle_copy_case bundle-side-only
+  case_dir=$NESTED_CASE
+  append_pr_meta_url "$case_dir"
+  git -C "$NESTED_COPY" push -q origin fm/task-x1-v2
+  side=$(git -C "$NESTED_COPY" commit-tree 'HEAD^{tree}' -p origin/main -m 'unlanded side branch work')
+  git -C "$NESTED_COPY" update-ref refs/heads/fm/side-only "$side"
+  record_preservation_bundle "$case_dir" "$NESTED_COPY" "$BUNDLE_PATH" --all || fail 'cannot bundle the side branch'
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" 'a pushed copy must not take the bundle route through a side branch'
+  assert_grep 'copy has no unlanded tips of its own; existing delivery proof is still required' "$case_dir/stderr" 'bundle-side-only: the delivery-proof reason was not named'
+  assert_grep 'REFUSED: the ship deliverable is not landed' "$case_dir/stderr" 'bundle-side-only: the delivery refusal was waived'
+  assert_no_grep 'preserved unlanded commits in bundle' "$case_dir/stderr" 'bundle-side-only: the bundle was accepted'
+  assert_present "$NESTED_COPY/.git" 'bundle-side-only: copy was removed'
+  assert_present "$case_dir/state/task-x1.meta" 'bundle-side-only: task record was removed'
+  assert_absent "$case_dir/treehouse.log" 'bundle-side-only: pool slot was returned'
+  pass 'a pushed copy whose only local-only commits sit on a side branch still needs its delivery proof'
 }
 
 test_bundle_hint_skips_a_moved_head_at_final_custody() {
@@ -14143,6 +14164,7 @@ test_bundle_restore_memo_misses_a_changed_record_or_bundle
 test_bundle_restore_memo_is_keyed_by_object_format
 test_bundle_kept_ship_closes_its_row_as_not_landed
 test_bundle_hint_needs_unlanded_tips
+test_bundle_needs_the_copys_own_unlanded_tip
 test_bundle_hint_skips_a_moved_head_at_final_custody
 test_bundle_is_reverified_before_copy_removal
 test_bundle_does_not_excuse_dirty_copy

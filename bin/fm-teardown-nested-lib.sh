@@ -422,28 +422,37 @@ teardown_bundle_unheld_branches() {  # <copy>
   [ "${PIPESTATUS[0]}" = 0 ]
 }
 
-# The record is exactly one line, so re-bundling replaces it. The recorded
-# bundle must advertise all maximal locally-only tips. The walk starts at <ref>
-# and adds each local branch no live worktree has checked out; a checked-out
-# branch belongs to its own worktree's task. --children leaves maximal tips as
-# one-field lines.
+# The maximal locally-only tips reachable from the refs on stdin, one per line.
+# --children leaves maximal tips as one-field lines.
+teardown_bundle_tips() {  # <copy>
+  local walk
+  walk=$(git -C "$1" rev-list --stdin --children --not --remotes 2>/dev/null) || return 1
+  printf '%s\n' "$walk" | awk 'NF == 1 {print $1}'
+}
+
+# The record is exactly one line, so re-bundling replaces it. <ref> itself must
+# carry a locally-only commit, or the bundle proves nothing and the delivery
+# proof is still required. The recorded bundle must then advertise all maximal
+# locally-only tips of <ref> and of each local branch no live worktree has
+# checked out; a checked-out branch belongs to its own worktree's task.
 teardown_bundle_preserved() {  # <copy> <ref> [hint]
   local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
-  local line='' extra='' extra_seen='' rest bundle hash tips tip walk required side heads advertised digest
+  local line='' extra='' extra_seen='' rest bundle hash tips tip own required side heads advertised digest
   local -a recorded=()
   TEARDOWN_BUNDLE_ACCEPTED=
+  own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
+    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
+  }
+  if [ -z "$own" ]; then
+    teardown_bundle_refuse "copy has no unlanded tips of its own; existing delivery proof is still required"
+    return 1
+  fi
   side=$(teardown_bundle_unheld_branches "$copy") || {
     teardown_bundle_refuse "copy's branches cannot be inspected: $copy"; return 1;
   }
-  walk=$({ printf '%s\n' "$ref"; [ -z "$side" ] || printf '%s\n' "$side"; } \
-    | git -C "$copy" rev-list --stdin --children --not --remotes 2>/dev/null) || {
+  required=$({ printf '%s\n' "$ref"; [ -z "$side" ] || printf '%s\n' "$side"; } | teardown_bundle_tips "$copy") || {
     teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
   }
-  required=$(printf '%s\n' "$walk" | awk 'NF == 1 {print $1}')
-  if [ -z "$required" ]; then
-    teardown_bundle_refuse "copy has no unlanded tips to preserve; existing delivery proof is still required"
-    return 1
-  fi
   if [ ! -f "$record" ] || [ -L "$record" ]; then
     teardown_bundle_refuse "missing preservation record (regular nonsymlink file required): $record" "$hint"
     return 1

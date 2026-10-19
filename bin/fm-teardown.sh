@@ -78,14 +78,16 @@
 # <ref> <branches> --not --remotes, and restore on its own: fetching every
 # recorded tip from it into a fresh empty repository outside the copy and pool
 # must succeed and pass git fsck --connectivity-only.
-# <ref> is the copy's HEAD (detached included) or a removed copy's branch tip.
+# <ref> is the copy's HEAD (detached included) or a removed copy's branch tip,
+# and it must carry a locally-only commit of its own: <branches> only widen
+# what the bundle must cover, they never make a pushed <ref> eligible.
 # <branches> are the local branches no live worktree has checked out, so side
 # branches count; a branch checked out in another worktree whose directory still
 # exists is that task's own, but a branch whose worktree directory is gone or
 # prunable counts. A thin bundle, a truncated pack or a missing tip refuses.
 # Ancestors need not be separate bundle heads.
-# No unlanded tip means this alternative proves nothing: pushed-but-undelivered
-# ships still require the existing delivery proof. Every proof reads the record
+# No unlanded tip on <ref> itself means this alternative proves nothing:
+# pushed-but-undelivered ships still require the existing delivery proof. Every proof reads the record
 # and the bundle's digest again and verifies coverage again; only a completed
 # isolated restore is remembered in this process, by bundle digest, object
 # format and recorded tips, so the final custody rechecks and the nested, prior
