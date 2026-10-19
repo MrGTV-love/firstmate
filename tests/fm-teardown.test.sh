@@ -1102,6 +1102,97 @@ test_teardown_closes_the_backlog_item_itself() {
   pass "teardown closes its own backlog item before reporting success"
 }
 
+# The opt-in fleet ledger (docs/fleet-ledger.md): a completed backlog close
+# appends one task.closed record naming the evidence the close used.
+ledger_closed_rows() {  # <case-dir>
+  [ -f "$1/state/fleet-ledger.jsonl" ] || return 0
+  jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr, (.at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))]' \
+    "$1/state/fleet-ledger.jsonl"
+}
+
+test_teardown_records_task_closed_once() {
+  local case_dir rc=0
+  case_dir=$(make_case ledger-closed)
+  write_meta "$case_dir" no-mistakes ship
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
+  seed_backlog_in_flight "$case_dir"
+  : > "$case_dir/config/fleet-ledger"
+
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "teardown failed with the ledger on: $(cat "$case_dir/stderr")"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] || fail "the backlog item was not closed"
+  assert_equals '["task-x1","merged_pr","https://github.com/example/repo/pull/7",true]' \
+    "$(ledger_closed_rows "$case_dir")" "task.closed record"
+
+  # A second teardown finds no task record and closes nothing.
+  run_teardown "$case_dir" > /dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "a repeated teardown unexpectedly succeeded"
+  assert_equals 1 "$(ledger_closed_rows "$case_dir" | wc -l | tr -d ' ')" "task.closed records after a repeated teardown"
+  pass "ledger on: a completed teardown records one task.closed with the PR, and a repeat records none"
+}
+
+test_teardown_closed_record_names_each_evidence_kind() {
+  local case_dir
+  # A local-only landing is recorded as local main, with no PR.
+  case_dir=$(make_case ledger-closed-local)
+  write_meta "$case_dir" local-only ship
+  wt_commit_file "$case_dir" feature.txt landed "merged work"
+  git -C "$case_dir/project" update-ref refs/heads/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  seed_backlog_in_flight "$case_dir"
+  : > "$case_dir/config/fleet-ledger"
+  run_teardown "$case_dir" > /dev/null 2> "$case_dir/stderr" || fail "local-only teardown failed: $(cat "$case_dir/stderr")"
+  assert_equals '["task-x1","local_main",null,true]' "$(ledger_closed_rows "$case_dir")" "local-only task.closed record"
+
+  # A captain's drop is recorded as the drop file.
+  case_dir=$(make_case ledger-closed-drop)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unlanded work"
+  seed_backlog_in_flight "$case_dir"
+  : > "$case_dir/config/fleet-ledger"
+  printf 'Drop it, the plan changed.\n' > "$case_dir/drop.txt"
+  run_teardown "$case_dir" --force --drop-file "$case_dir/drop.txt" > /dev/null 2> "$case_dir/stderr" \
+    || fail "forced drop teardown failed: $(cat "$case_dir/stderr")"
+  assert_equals '["task-x1","drop_file",null,true]' "$(ledger_closed_rows "$case_dir")" "dropped task.closed record"
+  pass "ledger on: the closed record names local main and a captain's drop as its evidence"
+}
+
+test_teardown_refusal_and_failing_ledger_leave_teardown_alone() {
+  local case_dir off_dir rc=0 normalized_on normalized_off
+  # A refused teardown closes nothing and records nothing.
+  case_dir=$(make_case ledger-closed-refused)
+  write_meta "$case_dir" local-only ship
+  wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
+  seed_backlog_in_flight "$case_dir"
+  : > "$case_dir/config/fleet-ledger"
+  run_teardown "$case_dir" > /dev/null 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "ledger-closed-refused: teardown should refuse"
+  assert_equals "" "$(ledger_closed_rows "$case_dir")" "task.closed records after a refused teardown"
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] || fail "a refused teardown moved its backlog item"
+
+  # An unwritable ledger changes neither the exit status nor the output.
+  case_dir=$(make_case ledger-closed-failing)
+  off_dir=$(make_case ledger-closed-off)
+  for dir in "$case_dir" "$off_dir"; do
+    write_meta "$dir" no-mistakes ship
+    printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$dir/state/task-x1.meta"
+    seed_backlog_in_flight "$dir"
+  done
+  : > "$case_dir/config/fleet-ledger"
+  mkdir "$case_dir/state/fleet-ledger.jsonl"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "ledger-closed-failing: an unwritable ledger must not fail teardown"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] || fail "the backlog item was not closed when the ledger failed"
+  assert_grep 'fm-fleet-ledger: could not record closed for task-x1' "$case_dir/stderr" "the failed ledger write was not reported"
+  run_teardown "$off_dir" > "$off_dir/stdout" 2> "$off_dir/stderr" || fail "flag-off teardown failed"
+  normalized_on=$(sed "s#$case_dir#CASE#g" "$case_dir/stdout")
+  normalized_off=$(sed "s#$off_dir#CASE#g" "$off_dir/stdout")
+  assert_equals "$normalized_off" "$normalized_on" "teardown stdout with an unwritable ledger and with the flag absent"
+  # Each failing ledger write (cleaned_up, then closed) costs exactly one line.
+  assert_equals 1 "$(grep -c 'could not record closed for task-x1' "$case_dir/stderr")" "closed-record failure lines on stderr"
+  assert_equals 2 "$(grep -c 'fm-fleet-ledger' "$case_dir/stderr")" "ledger lines on stderr"
+  pass "a refused teardown records nothing, and an unwritable ledger costs one stderr line without changing teardown"
+}
+
 test_teardown_closes_a_gerrit_task_with_its_change_url_as_a_note() {
   local case_dir out real_tasks_axi gerrit_url=https://gerrit.example.com/c/project/+/12345
   case_dir=$(make_case tasks-axi-close-gerrit)
@@ -12742,6 +12833,9 @@ test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_fork_remote_allows
 test_teardown_does_not_wait_for_the_home_summary_refresh
 test_teardown_closes_the_backlog_item_itself
+test_teardown_records_task_closed_once
+test_teardown_closed_record_names_each_evidence_kind
+test_teardown_refusal_and_failing_ledger_leave_teardown_alone
 test_teardown_closes_a_gerrit_task_with_its_change_url_as_a_note
 test_teardown_manual_backend_leaves_the_backlog_to_the_operator
 test_local_only_truly_unpushed_refuses

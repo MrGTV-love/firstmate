@@ -2170,6 +2170,128 @@ test_recovery_backfills_a_recorded_link_on_an_already_done_item() {
   pass "recovery backfills recorded links onto already Done items"
 }
 
+# fm_backlog_retained_close_args reads back the deliverable line that
+# fm_backlog_retain wrote, so a captain close can name the evidence the retained
+# teardown used; every kind of deliverable must come back as the arguments it
+# was retained with.
+test_retained_deliverable_line_names_the_close_arguments() {
+  local case_dir home id spec flag value got n=0
+  case_dir=$(make_home retained-close-args)
+  home=$(home_of "$case_dir")
+  for spec in "--report|data/ID/report.md" "--pr|https://github.com/example/repo/pull/21" \
+      "--pr|https://gerrit.example.com/c/project/+/12345" "--note|local main" "--note|dropped"; do
+    n=$((n + 1))
+    id=atomic-retained-args-$n
+    flag=${spec%%|*}
+    value=${spec#*|}
+    value=${value//ID/$id}
+    add_item "$case_dir" "$id"
+    start_item "$case_dir" "$id"
+    got=$(bash -c '
+      . "$1/bin/fm-tasks-axi-lib.sh"
+      . "$1/bin/fm-backlog-transition-lib.sh"
+      fm_backlog_retain "$2" "$3" "$4" "$5" || exit 1
+      raw=$(fm_backlog_row_show "$2" "$3" --full | sed -n "s/^  body: //p" | head -1)
+      case "$raw" in \"*) body=$(printf "%s" "$raw" | jq -r .) ;; *) body=$raw ;; esac
+      fm_backlog_retained_close_args "$body"
+      printf "%s\n" "${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"
+    ' _ "$ROOT" "$home/data" "$id" "$flag" "$value") || fail "could not retain $flag $value"
+    assert_equals "$(printf '%s\n' "$flag" "$value")" "$got" "close arguments read back for the retained $flag"
+  done
+  got=$(bash -c '
+    . "$1/bin/fm-tasks-axi-lib.sh"
+    . "$1/bin/fm-backlog-transition-lib.sh"
+    fm_backlog_retained_close_args "Captain decision: go
+Historical deliverable of the finished work: report data/x/report.md"
+    printf "%s" "${#FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"
+  ' _ "$ROOT") || fail "could not read a body with no deliverable"
+  assert_equals 0 "$got" "close arguments read from a body whose deliverable is only historical"
+  got=$(bash -c '
+    . "$1/bin/fm-tasks-axi-lib.sh"
+    . "$1/bin/fm-backlog-transition-lib.sh"
+    fm_backlog_retained_close_args "Deliverable of the finished work: PR https://github.com/example/repo/pull/21
+Deliverable of the finished work: PR https://github.com/example/repo/pull/22"
+    printf "%s\n" "${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"
+  ' _ "$ROOT") || fail "could not read a body with two active deliverables"
+  assert_equals "$(printf '%s\n' --pr https://github.com/example/repo/pull/22)" "$got" \
+    "close arguments read from a body whose latest active deliverable replaced an earlier one"
+  pass "a retained deliverable line reads back as the close arguments it was retained with"
+}
+
+# New work (a start, a reopen, a dispatch) retires every earlier deliverable
+# line, keeping its text, so a reused task id reads only its current cycle's
+# deliverable; retaining and closing never retire one.
+test_new_work_retires_earlier_deliverable_lines() {
+  local case_dir home id body expected
+  case_dir=$(make_home retire-deliverables)
+  home=$(home_of "$case_dir")
+  id=atomic-retire-deliverables
+  lib() { bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; . "$1/bin/fm-backlog-transition-lib.sh"; shift; "$@"' _ "$ROOT" "$@"; }
+  body_of() {
+    local raw
+    raw=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")" | sed -n 's/^  body: //p' | head -1)
+    case "$raw" in \"*) printf '%s' "$raw" | jq -r . ;; *) printf '%s' "$raw" ;; esac
+  }
+  printf '%s\n' 'Body café 航海' 'Deliverable of the finished work: report data/x/report.md' \
+    'Deliverable of the finished work: PR https://github.com/example/repo/pull/21' \
+    'Deliverable of the finished work: dropped' 'Not a Deliverable of the finished work: PR line' \
+    > "$case_dir/body.txt"
+  add_item "$case_dir" "$id"
+  tasks-axi update "$id" --body-file "$case_dir/body.txt" --file "$(backlog_of "$case_dir")" >/dev/null \
+    || fail "could not attach the retained deliverables"
+
+  lib fm_backlog_start "$home/data" "$id" || fail "new work could not start the item"
+  expected=$(printf '%s\n' 'Body café 航海' 'Historical deliverable of the finished work: report data/x/report.md' \
+    'Historical deliverable of the finished work: PR https://github.com/example/repo/pull/21' \
+    'Historical deliverable of the finished work: dropped' 'Not a Deliverable of the finished work: PR line')
+  body=$(body_of)
+  assert_equals "$expected" "$body" "body after new work started the item"
+
+  lib fm_backlog_retain "$home/data" "$id" --pr https://github.com/example/repo/pull/22 \
+    || fail "could not retain the second cycle's deliverable"
+  body=$(body_of)
+  assert_contains "$body" "Historical deliverable of the finished work: PR https://github.com/example/repo/pull/21" \
+    "retaining retired an earlier cycle's line again"
+  assert_contains "$body" $'\nDeliverable of the finished work: PR https://github.com/example/repo/pull/22' \
+    "retaining did not record the current cycle's deliverable"
+  tasks-axi "done" "$id" --file "$(backlog_of "$case_dir")" >/dev/null || fail "could not close the item"
+  assert_equals "$body" "$(body_of)" "closing changed the body"
+  pass "new work retires every earlier deliverable line, and only new work does"
+}
+
+# The opt-in fleet ledger (docs/fleet-ledger.md): a close that session start
+# replays is recorded once, whether the row was still open or already Done.
+test_recovery_records_a_replayed_close_in_the_fleet_ledger() {
+  local case_dir home id other marker out rows pr=https://github.com/example/repo/pull/14
+  id=atomic-heal-ledger-b9
+  other=atomic-heal-ledger-local-b9
+  case_dir=$(make_home heal-ledger)
+  home=$(home_of "$case_dir")
+  : > "$home/config/fleet-ledger"
+  add_item "$case_dir" "$id"
+  start_item "$case_dir" "$id"
+  add_item "$case_dir" "$other"
+  start_item "$case_dir" "$other"
+  marker="$home/state/$id.backlog-close"
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-ledger\narg=--pr\narg=%s\n' "$id" "$home/data" "$pr" > "$marker"
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-ledger-local\narg=--note\narg=local%%20main\n' \
+    "$other" "$home/data" > "$home/state/$other.backlog-close"
+
+  out=$(run_bootstrap "$case_dir")
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "session start left the recorded close open: $out"
+  rows=$(jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
+  assert_equals "$(printf '%s\n' "[\"$id\",\"merged_pr\",\"$pr\",true]" "[\"$other\",\"local_main\",null,true]")" \
+    "$(printf '%s\n' "$rows" | sort)" "task.closed records after a replayed close"
+
+  # The same close arriving again for the now Done row changes nothing in the ledger.
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-ledger\narg=--pr\narg=%s\n' "$id" "$home/data" "$pr" > "$marker"
+  out=$(run_bootstrap "$case_dir")
+  assert_absent "$marker" "the repeated close marker survived session start: $out"
+  assert_equals 2 "$(jq -c 'select(.event == "task.closed")' "$home/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" \
+    "task.closed records after the same close was replayed twice"
+  pass "ledger on: a close that session start replays records one task.closed, however often it arrives"
+}
+
 test_recovery_preserves_a_close_when_the_backlog_cannot_be_read() {
   local case_dir id out
   id=atomic-heal-read-error-b10
@@ -3464,6 +3586,9 @@ test_recovery_ignores_a_symlinked_worker_record
 test_recovery_replays_a_close_an_interrupted_cleanup_left_open
 test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note
 test_recovery_backfills_a_recorded_link_on_an_already_done_item
+test_recovery_records_a_replayed_close_in_the_fleet_ledger
+test_retained_deliverable_line_names_the_close_arguments
+test_new_work_retires_earlier_deliverable_lines
 test_recovery_preserves_a_close_when_the_backlog_cannot_be_read
 test_recovery_retry_preserves_incomplete_cleanup_warning
 test_recovery_finishes_a_close_for_the_same_meta_incarnation

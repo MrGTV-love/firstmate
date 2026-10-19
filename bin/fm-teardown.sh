@@ -6084,6 +6084,13 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): the item is now Done, so
+# record when it closed and on what evidence. A retained (captain-held) item
+# returned to Queued is not a completion and writes nothing. A close the next
+# session start replays is recorded there instead (bin/fm-backlog-transition-lib.sh).
+if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ]; then
+  fm_backlog_ledger_closed "$STATE" "$CONFIG" "$ID" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"
+fi
 rm -f "$STATE/$ID.teardown-return-pending"
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then

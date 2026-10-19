@@ -1043,6 +1043,111 @@ test_completion_keep_count_and_normal_options() {
   pass "documented numeric keep forms, no-prune, note, json, and optional noun preserve ordinary completion"
 }
 
+# The opt-in fleet ledger (docs/fleet-ledger.md): `add` appends one task.filed
+# record for the item it created, and changes nothing else about the command.
+test_add_records_task_filed_once() {
+  local dir out rows plain_out plain_rc=0 on_rc=0 filed
+  dir=$(make_split ledger-filed)
+  : > "$dir/home/config/fleet-ledger"
+  out=$(wrapper_from_code "$dir" add ship-a "a ship item" --kind ship --repo sample --priority 2 2>&1) \
+    || fail "add with the ledger on failed: $out"
+  rows=$(jq -c '[.event, .task, .repo, .kind, .priority] , (.at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")), (.ts | type)' \
+    "$dir/home/state/fleet-ledger.jsonl")
+  assert_equals "$(printf '%s\n' '["task.filed","ship-a","sample","ship",2]' true '"number"')" "$rows" "task.filed record"
+  filed=$(jq -r '.ts | todate' "$dir/home/state/fleet-ledger.jsonl")
+  assert_equals "$filed" "$(jq -r '.at' "$dir/home/state/fleet-ledger.jsonl")" "at must be the same instant as ts"
+
+  # tasks-axi reports an add of an existing id as already present and exits 0;
+  # nothing was filed, so nothing is recorded.
+  wrapper_from_code "$dir" add ship-a "a ship item" --kind ship >/dev/null 2>&1 || fail "repeat add failed"
+  assert_equals 1 "$(wc -l < "$dir/home/state/fleet-ledger.jsonl" | tr -d ' ')" "records after a repeated add"
+
+  # A minted id, --json output, and absent fields are read from what tasks-axi stored.
+  wrapper_from_code "$dir" add "quick note" --mint --json >/dev/null 2>&1 || fail "minted add failed"
+  rows=$(jq -c 'select(.task != "ship-a") | [.event, .repo, .kind, .priority, (.task | startswith("quick-note") or startswith("quick"))]' \
+    "$dir/home/state/fleet-ledger.jsonl")
+  assert_equals '["task.filed",null,null,null,true]' "$rows" "minted --json add"
+
+  # The ledger changes neither the output nor the exit status of the command.
+  plain_out=$(wrapper_from_code "$dir" add ship-b "same item" --kind ship --repo sample 2>&1) || plain_rc=$?
+  rm -f "$dir/home/config/fleet-ledger"
+  empty_backlog "$dir/home/data/backlog.md"
+  out=$(wrapper_from_code "$dir" add ship-b "same item" --kind ship --repo sample 2>&1) || on_rc=$?
+  assert_equals "$out" "$plain_out" "add output with the ledger on and off"
+  assert_equals "$on_rc" "$plain_rc" "add exit status with the ledger on and off"
+  pass "ledger on: add records one task.filed with the stored fields, a repeat add records none, and output and status are unchanged"
+}
+
+test_add_ledger_off_and_failing_ledger_leave_add_alone() {
+  local dir out rc=0 stdout stderr
+  dir=$(make_split ledger-filed-off)
+  out=$(wrapper_from_code "$dir" add off-a "no ledger" --kind ship 2>&1) || fail "add with the flag absent failed: $out"
+  assert_absent "$dir/home/state/fleet-ledger.jsonl" "the flag-off add wrote a ledger"
+
+  : > "$dir/home/config/fleet-ledger"
+  mkdir "$dir/home/state/fleet-ledger.jsonl"
+  stdout=$(wrapper_from_code "$dir" add bad-a "ledger unwritable" --kind ship 2>"$dir/stderr") || rc=$?
+  stderr=$(cat "$dir/stderr")
+  assert_equals 0 "$rc" "add exit status with an unwritable ledger"
+  assert_contains "$stdout" "ok: added bad-a" "add stdout with an unwritable ledger"
+  assert_equals "fm-fleet-ledger: could not record filed for bad-a; the ledger may be missing records" "$stderr" \
+    "an unwritable ledger must cost exactly one stderr line"
+  wrapper_from_code "$dir" show bad-a >/dev/null 2>&1 || fail "the item was not filed when the ledger failed"
+  pass "ledger off writes nothing, and an unwritable ledger costs one stderr line without changing the add"
+}
+
+# The opt-in fleet ledger (docs/fleet-ledger.md): a `done` that passed the proof
+# check and closed an open row appends one task.closed record naming its proof.
+test_completion_records_task_closed_once_with_its_proof() {
+  local dir fakebin words rows out rc=0 pr=https://github.com/o/r/pull/9
+  dir=$(make_split ledger-closed)
+  fakebin=$(fm_fakebin "$dir")
+  words="$dir/words.txt"
+  : > "$dir/home/config/fleet-ledger"
+  for kind in "ship-a ship" "scout-a scout" "ship-d ship" "ship-e ship" "ship-f ship" "note-a docs"; do
+    # shellcheck disable=SC2086
+    set -- $kind
+    wrapper_from_code "$dir" add "$1" "item $1" --kind "$2" --repo p >/dev/null
+  done
+  rm -f "$dir/home/state/fleet-ledger.jsonl"
+  mkdir -p "$dir/home/data/scout-a"
+  printf '# findings\n' > "$dir/home/data/scout-a/report.md"
+  printf 'Drop it; the premise is gone.\n' > "$words"
+  cat > "$fakebin/gh-axi" <<'SH'
+#!/usr/bin/env bash
+printf 'api_response:\n  body: merged=true\n'
+SH
+  chmod +x "$fakebin/gh-axi"
+
+  completion_refused "$dir" "bare done" "done" ship-e >/dev/null
+  wrapper_from_code "$dir" task close scout-a --report data/scout-a/report.md >/dev/null 2>&1 || fail "the reported scout was refused"
+  (cd "$dir/code" && PATH="$fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" \
+    "$WRAPPER" "done" ship-a --pr "$pr" >/dev/null 2>&1) || fail "a merged pull request was refused"
+  wrapper_from_code "$dir" "done" ship-d --drop-file "$words" >/dev/null 2>&1 || fail "the captain's words were refused"
+  wrapper_from_code "$dir" "done" note-a >/dev/null 2>&1 || fail "a non-delivery row was refused"
+  rows=$(jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr, (.at | test("Z$"))]' "$dir/home/state/fleet-ledger.jsonl")
+  assert_equals "$(printf '%s\n' '["scout-a","report",null,true]' "[\"ship-a\",\"merged_pr\",\"$pr\",true]" '["ship-d","drop_file",null,true]')" \
+    "$rows" "task.closed records for a proven report, merged PR, and captain's drop; a refusal and a plain row write none"
+
+  # A row that is already Done records nothing, however it is closed again.
+  (cd "$dir/code" && PATH="$fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code" \
+    "$WRAPPER" "done" ship-a --pr "$pr" >/dev/null 2>&1) || true
+  wrapper_from_code "$dir" "done" ship-a --drop-file "$words" >/dev/null 2>&1 || true
+  assert_equals 3 "$(jq -c 'select(.event == "task.closed")' "$dir/home/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" \
+    "task.closed records after closing a Done row again"
+
+  # An unwritable ledger costs one stderr line and changes neither the close nor its output.
+  rm -f "$dir/home/state/fleet-ledger.jsonl"
+  mkdir "$dir/home/state/fleet-ledger.jsonl"
+  out=$(wrapper_from_code "$dir" "done" ship-f --drop-file "$words" 2>"$dir/stderr") || rc=$?
+  assert_equals 0 "$rc" "done exit status with an unwritable ledger"
+  assert_contains "$out" "ship-f" "done stdout with an unwritable ledger"
+  assert_equals "fm-fleet-ledger: could not record closed for ship-f; the ledger may be missing records" "$(cat "$dir/stderr")" \
+    "an unwritable ledger must cost exactly one stderr line"
+  [ "$(row_state "$dir" ship-f)" = x ] || fail "the row did not close when the ledger failed"
+  pass "ledger on: a proven done records one task.closed, a refusal or a Done row records none, and a failing ledger leaves the close alone"
+}
+
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in test_*) ;; *) fail "unknown test: $selected_test" ;; esac
@@ -1077,6 +1182,9 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_completion_serializes_with_a_concurrent_hold || exit "$?"
   test_restart_serializes_with_a_concurrent_body_change || exit "$?"
   test_failed_restart_reads_back_before_restoring_drop
+  test_add_records_task_filed_once
+  test_add_ledger_off_and_failing_ledger_leave_add_alone
+  test_completion_records_task_closed_once_with_its_proof
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi

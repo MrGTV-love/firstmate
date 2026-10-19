@@ -905,6 +905,82 @@ test_decision_answer_partition_relocates_under_the_record() {
   pass "fm-send --resolve-key: a decision answer refuses the attended branch before sending, a blocked: key stays steering, and the away-posture record relocates the answer"
 }
 
+# Opt-in fleet ledger: the close appends one task.answered per key, with
+# answered_by derived from this home's role; nothing about the send changes.
+test_resolve_key_records_task_answered() {
+  local dir fb log home rc rows
+  dir="$TMP_ROOT/ledger-answered"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_home ledger-answered)
+  mkdir -p "$home/config"
+  : > "$home/config/fleet-ledger"
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'needs-decision [key=api-shape]: pick REST or RPC\n' > "$home/state/t1.status"
+  printf 'needs-decision [key=db-choice]: pick a database\n' >> "$home/state/t1.status"
+  printf 'needs-decision [key=port-choice]: pick a port\n' >> "$home/state/t1.status"
+
+  run_send "$fb" "$home" "$log" t1 --resolve-key api-shape "go with REST"; rc=$?
+  expect_code 0 "$rc" "an answer send should succeed with the ledger on"
+  FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "away entry failed"
+  run_send "$fb" "$home" "$log" t1 --resolve-key db-choice "postgres"; rc=$?
+  expect_code 0 "$rc" "an answer send under the away record should succeed"
+  FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
+  printf 'needs-decision [key=cache-choice]: pick a cache\n' >> "$home/state/t1.status"
+  FM_HOME="$home" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "quiet entry failed"
+  : > "$home/state/.afk"
+  run_send "$fb" "$home" "$log" t1 --resolve-key cache-choice "redis"; rc=$?
+  expect_code 0 "$rc" "an answer send under a quiet record should succeed"
+  rm -f "$home/state/.afk"
+  FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "quiet archive failed"
+  printf 'mate-1\n' > "$home/.fm-secondmate-home"
+  run_send "$fb" "$home" "$log" t1 --resolve-key port-choice "9090" >/dev/null 2>&1; rc=$?
+  rm -f "$home/.fm-secondmate-home"
+  rows=$(jq -c 'select(.event == "task.answered") | [.task, .via, .key, .answered_by, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
+  assert_equals "$(printf '%s\n' '["t1","send","api-shape","main",true]' '["t1","send","db-choice","main-afk",true]' \
+    '["t1","send","cache-choice","main",true]')" \
+    "$(printf '%s\n' "$rows" | head -3)" "task.answered records for main, away, and quiet (present captain) answers"
+  assert_equals 4 "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" "task.answered records after four answers"
+  assert_contains "$(printf '%s\n' "$rows" | tail -1)" '"port-choice","secondmate"' "a secondmate home's answer was not recorded as such"
+
+  # A key that is not open is refused before anything is sent or recorded.
+  run_send "$fb" "$home" "$log" t1 --resolve-key not-open "nope"; rc=$?
+  expect_code 1 "$rc" "a mistyped key must still refuse"
+  assert_equals 4 "$(jq -c 'select(.event == "task.answered")' "$home/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" \
+    "a refused send must record nothing"
+  pass "fm-send --resolve-key: one task.answered per closed key, answered_by derived from the home's role, nothing on a refusal"
+}
+
+test_unwritable_ledger_leaves_the_send_alone() {
+  local dir fb log home rc on_out off_out on_err
+  dir="$TMP_ROOT/ledger-failing"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_home ledger-failing)
+  mkdir -p "$home/config"
+  : > "$home/config/fleet-ledger"
+  mkdir "$home/state/fleet-ledger.jsonl"
+  fm_write_meta "$home/state/t1.meta" "window=sess:fm-t1" "kind=ship"
+  printf 'needs-decision [key=api-shape]: pick REST or RPC\n' > "$home/state/t1.status"
+  : > "$log"
+  rc=0
+  on_out=$(env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 --resolve-key api-shape "go with REST" 2> "$dir/stderr") || rc=$?
+  on_err=$(cat "$dir/stderr")
+  expect_code 0 "$rc" "an unwritable ledger must not fail the send"
+  assert_contains "$on_err" "fm-fleet-ledger: could not record answered for t1" "the failed write was not reported"
+  assert_equals 1 "$(printf '%s\n' "$on_err" | grep -c 'fm-fleet-ledger')" "ledger lines on stderr"
+  sed -E 's/ \[at=[0-9]+\]//' "$home/state/t1.status" | grep -qF 'resolved [key=api-shape]: answered: go with REST' \
+    || fail "the close was not written when the ledger failed"
+
+  # The flag absent: same stdout, no ledger.
+  rm -f "$home/config/fleet-ledger"
+  printf 'needs-decision [key=api-shape]: pick REST or RPC\n' > "$home/state/t1.status"
+  rm -rf "$home/state/t1.inbox"
+  off_out=$(env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t1 --resolve-key api-shape "go with REST" 2>/dev/null) || fail "flag-off send failed"
+  assert_equals "$off_out" "$on_out" "send stdout with an unwritable ledger and with the flag absent"
+  pass "fm-send --resolve-key: an unwritable ledger costs one stderr line and changes neither the close nor the output"
+}
+
 test_answer_send_closes_open_decision
 test_answer_close_is_self_announced
 test_separate_resolve_key_answers_do_not_rewake
@@ -929,3 +1005,5 @@ test_stamped_close_line_stays_within_the_status_line_cap
 test_failed_close_recovery_command_is_shell_safe
 test_remote_reserved_pending_reply_key_closes_locally
 test_decision_answer_partition_relocates_under_the_record
+test_resolve_key_records_task_answered
+test_unwritable_ledger_leaves_the_send_alone

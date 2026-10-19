@@ -81,6 +81,8 @@ FM_BACKLOG_ROW_HOLD_KIND=
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
 FM_BACKLOG_CLOSE_REPLAY_RESULT=
 
+_FM_BACKLOG_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Bounded execution is fm-timeout-lib.sh's alone; source it rather than
 # re-deriving a deadline here. It is stateless, so the memoisation reason this
 # library does not source fm-tasks-axi-lib.sh does not apply.
@@ -645,7 +647,7 @@ fm_backlog_new_work_transition() {
     print {$prior} $prior_value;
     close $prior or die $!;
     $value =~ s/^([^\S\n]*)dropped([^\S\n]*)$/${1}Historical captain disposition: dropped${2}/mg;
-    $value =~ s/^([^\S\n]*)Deliverable of the finished work: dropped([^\S\n]*)$/${1}Historical deliverable of the finished work: dropped${2}/mg;
+    $value =~ s/^([^\S\n]*)Deliverable of the finished work:/${1}Historical deliverable of the finished work:/mg;
     utf8::encode($value) if utf8::is_utf8($value);
     open my $next, ">:raw", "$ARGV[0]/next" or die $!;
     print {$next} $value;
@@ -819,6 +821,25 @@ fm_backlog_retain() {  # <data-dir> <id> [flag...]
     fm_backlog_mutate "$authorized_data" update "$id" "${row_args[@]}" || return 1
   fi
   fm_backlog_mutate "$authorized_data" reopen "$id"
+}
+
+# The inverse of the deliverable line fm_backlog_retain records: the arguments the
+# retained close handed to `tasks-axi done`, read from the first deliverable on
+# the latest active "Deliverable of the finished work:" line of <decoded-body>. Sets
+# FM_BACKLOG_RETAINED_CLOSE_ARGS, empty when the body names none.
+fm_backlog_retained_close_args() {  # <decoded-body>
+  local line item
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+  FM_BACKLOG_RETAINED_CLOSE_ARGS=()
+  line=$(printf '%s\n' "$1" | sed -n 's/^Deliverable of the finished work: //p' | tail -1)
+  item=${line%%; *}
+  case "$item" in
+    '') ;;
+    'report '*) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--report "${item#report }") ;;
+    'PR '*) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--pr "${item#PR }") ;;
+    'Gerrit change '*) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--pr "${item#Gerrit change }") ;;
+    *) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--note "$item") ;;
+  esac
 }
 
 # The canonical path of an existing path. Bootstrap and every lifecycle script
@@ -1345,11 +1366,33 @@ fm_backlog_close_marker_clear() {  # <state-dir> <id>
   fm_backlog_close_marker_remove "$marker" "$1"
 }
 
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): record a close that just
+# landed. <done-arg>... are the arguments the close handed to `tasks-axi done`,
+# which name the evidence: a report, a merged PR, the captain's drop, a local
+# main landing, or none. The ledger writes a repeat of the same close once, so
+# the direct teardown, its replay, and a proven `done` can each call this. A
+# failed write never changes the caller's result.
+fm_backlog_ledger_closed() {  # <state-dir> <config-dir> <id> [<done-arg>...]
+  local state=$1 config=$2 id=$3 evidence pr=''
+  shift 3
+  [ -n "$config" ] && [ -e "$config/fleet-ledger" ] || return 0
+  case "${1:-}:${2:-}" in
+    --report:*) evidence=report ;;
+    --pr:*) evidence=merged_pr; pr=$2 ;;
+    --note:dropped) evidence=drop_file ;;
+    --note:*) evidence=local_main ;;
+    *) evidence=none ;;
+  esac
+  FM_STATE_OVERRIDE=$state FM_CONFIG_OVERRIDE=$config \
+    "$_FM_BACKLOG_TRANSITION_LIB_DIR/fm-fleet-ledger.sh" closed "$id" "$evidence" "$pr" || true
+}
+
 # Replay one recorded close or retention. Returns 0 when the row is closed (or
 # retained), the marker is stale, or an answer already closed a retained row,
 # and 1 when marker validation or recovery fails. Validation completes before
-# any meta or backlog mutation.
-fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data-dir>
+# any meta or backlog mutation. A close that lands is recorded in the fleet
+# ledger when the optional <config-dir> is given.
+fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data-dir> [<config-dir>]
   local state=$1 marker=$2 marker_name expected_id
   local id data marker_spawn_gen meta meta_spawn_gen row_state cleanup_incomplete mode
   local args=() mode_flags=()
@@ -1421,6 +1464,7 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       fi
       if fm_backlog_atomic_transition close '' "$marker" "$data" "$id" "$state" \
           "${args[@]+"${args[@]}"}"; then
+        fm_backlog_ledger_closed "$state" "${4:-}" "$id" "${args[@]+"${args[@]}"}"
         if [ "$cleanup_incomplete" = 1 ]; then
           FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
         else
@@ -1444,10 +1488,13 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       else
         FM_BACKLOG_CLOSE_REPLAY_RESULT=retained
       fi
-    elif [ "$cleanup_incomplete" = 1 ]; then
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
     else
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=closed
+      fm_backlog_ledger_closed "$state" "${4:-}" "$id" "${args[@]+"${args[@]}"}"
+      if [ "$cleanup_incomplete" = 1 ]; then
+        FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
+      else
+        FM_BACKLOG_CLOSE_REPLAY_RESULT=closed
+      fi
     fi
     return 0
   fi

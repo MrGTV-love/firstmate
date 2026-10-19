@@ -101,7 +101,9 @@
 # publication and pending reconcile-request retirement. The command exits nonzero when any key was
 # skipped. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
-# branch and no knowledge of chat, review decks, or any transport.
+# branch and no knowledge of chat, review decks, or any transport. It only
+# labels the record's `Answered by:` line, from two exact prefixes that
+# bin/fm-answered-by-lib.sh owns; the label changes nothing else.
 # Legacy input: an optional positional origin (or a stored concrete-origin
 # binding) makes a key that names no task fall back to the old
 # `<origin>-decision-<key>` identity, so an in-flight pre-collapse channel
@@ -326,6 +328,9 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-lease-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-lease-lib.sh"
+# shellcheck source=bin/fm-answered-by-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-answered-by-lib.sh"
 
 PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
@@ -665,15 +670,72 @@ closed_answer_replay_mode_compatible() {  # <mode> <task-body>
   return 1
 }
 
+# The source the decision file names ("Captain answered this call through
+# <source>."), empty when the file is not a keyed answer.
+decision_source() {
+  local first=${DECISION_TEXT%%$'\n'*}
+  case "$first" in
+    'Captain answered this call through '*.)
+      first=${first#'Captain answered this call through '}
+      printf '%s' "${first%.}"
+      ;;
+  esac
+}
+
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): one task.answered record
+# for a newly resolved hold. <source> defaults to the decision file's own; a
+# reconciliation passes `reconciled`, because evidence and not a person closed
+# it. A replay never reaches here, and a failed write never changes the result.
+ledger_hold_answered() {  # <task-id> [<source>]
+  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  [ -e "$config/fleet-ledger" ] || return 0
+  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$config \
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" answered "$1" hold "$1" "${2-$(decision_source)}" || true
+}
+
+# The same ledger's task.closed record for a captain-held task this command just
+# closed. The evidence is the deliverable teardown retained on the item: the
+# arguments of a retention that was still pending, else the deliverable line the
+# retention wrote on the row. The ledger writes a repeat of a close once, and a
+# failed read or write never changes the result.
+ledger_hold_closed() {  # <task-id> [<retained-done-arg>...]
+  local id=$1 config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} data out
+  local -a args=("${@:2}")
+  [ -e "$config/fleet-ledger" ] || return 0
+  if [ "${#args[@]}" -eq 0 ] \
+      && data=$(fm_backlog_data_absolute "$DATA") \
+      && out=$(fm_backlog_row_show "$data" "$id" --full 2>/dev/null); then
+    fm_backlog_retained_close_args "$(decode_shown_value "$(show_field "$out" body)")"
+    args=("${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]+"${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"}")
+  fi
+  fm_backlog_ledger_closed "$STATE" "$config" "$id" "${args[@]+"${args[@]}"}"
+  return 0
+}
+
+# The same ledger's task.filed record for a captain-hold item this command just
+# created; tasks-axi stores no priority for it.
+ledger_hold_filed() {  # <task-id> <repo>
+  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  [ -e "$config/fleet-ledger" ] || return 0
+  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$config \
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$1" "$2" captain '' || true
+}
+
 # The record's label is what keeps an evidence-backed reconciliation from
 # reading as the captain's own words. `reconciled` closes a call that went moot
 # and carries verified evidence; every other mode carries what the captain said.
+# Every record states when it was written (UTC) after its optional hold-set
+# line, which the occurrence and hold-set readers above expect directly after
+# the mode line. A captain answer also states who answered it, derived by
+# bin/fm-answered-by-lib.sh; reconciliation is evidence, not an answer.
 resolution_block() {
   local label='Captain decision:'
   [ "$1" != reconciled ] || label='Reconciliation evidence:'
   printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n' \
     "$DECISION_DIGEST" "$1"
   [ -z "$2" ] || printf 'Resolves hold set: %s\n' "$2"
+  printf 'Resolved at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  [ "$1" = reconciled ] || printf 'Answered by: %s\n' "$(fm_answered_by "$FM_HOME" "$STATE" hold "$(decision_source)")"
   printf '\n%s\n%s\n' "$label" "$DECISION_TEXT"
 }
 
@@ -1023,7 +1085,9 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
 
 # Whether an archived body's newest resolution record is the captain's recorded
 # answer: the exact record the answer path writes, with every line anchored at
-# its line start and a non-empty answer text under `Captain decision:`. The
+# its line start (the mode line, then optionally the hold-set, `Resolved at:`,
+# and `Answered by:` lines in that order) and a non-empty answer text under
+# `Captain decision:`. The
 # retired fm-decision-hold leader counts only with its own full shape. A record
 # of mode `reconciled` is evidence, never an answer, and prose that merely
 # quotes the marker strings is no record. Returns 0 for an answer, 4 for an
@@ -1062,8 +1126,15 @@ archived_answer_state() {  # <dedented-archived-body>
       verdict("none")
     }
     st == 4 {
-      if (!retired && !holdset && substr($0, 1, 19) == "Resolves hold set: " && length($0) > 19) {
+      if (!retired && !holdset && !resolvedat && !answeredby \
+          && substr($0, 1, 19) == "Resolves hold set: " && length($0) > 19) {
         holdset = 1; next
+      }
+      if (!retired && !resolvedat && !answeredby && substr($0, 1, 13) == "Resolved at: " && length($0) > 13) {
+        resolvedat = 1; next
+      }
+      if (!retired && !answeredby && substr($0, 1, 13) == "Answered by: " && length($0) > 13) {
+        answeredby = 1; next
       }
       if ($0 == "") { st = 5; next }
       verdict("none")
@@ -1399,6 +1470,7 @@ command_hold() {
       BD_DUE_REQUIRED=false tasks_axi add "$id" "$title" --kind captain --repo "$repo" >/dev/null \
         || fail "could not create task $id"
     fi
+    ledger_hold_filed "$id" "$repo"
   fi
   # Publish the timestamp before the captain-hold annotation. A concurrent
   # snapshot may see the harmless stamp by itself, but can never see a newly
@@ -1491,12 +1563,14 @@ apply_pending_retained_artifact() {  # <task-id>
   local id=$1 marker
   local -a args=()
   RETAINED_CLOSE_ARGS=()
+  RETAINED_ARTIFACT_ARGS=()
   marker=$(fm_backlog_close_marker_path "$STATE" "$id") || return 1
   [ -e "$marker" ] || [ -L "$marker" ] || return 0
   fm_backlog_close_marker_validate "$marker" "$DATA" "$id" "$STATE" \
     || { report_retained_artifact_failure "$id" "$marker"; return 1; }
   [ "$FM_BACKLOG_CLOSE_VALIDATED_MODE" = retain ] || return 0
   args=("${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
+  RETAINED_ARTIFACT_ARGS=("${args[@]+"${args[@]}"}")
   case "${args[0]-}" in
     --pr|--report)
       if [ "${args[0]}" = --pr ] && fm_backlog_pr_is_gerrit_change "${args[1]-}"; then
@@ -1517,13 +1591,15 @@ live_work_item() {  # <task-id> <backlog-state>
   [ "$2" = in_flight ] || [ -f "$STATE/$1.meta" ]
 }
 
-close_answered() {  # <task-id> <release-0-or-1>
+close_answered() {  # <task-id> <release-0-or-1> [<answer-source>]
   if [ "$2" = 1 ]; then
-    tasks_axi unhold "$1" >/dev/null
+    tasks_axi unhold "$1" >/dev/null || return $?
   else
     apply_pending_retained_artifact "$1" || return 1
-    tasks_axi "done" "$1" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null
+    tasks_axi "done" "$1" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null || return $?
+    ledger_hold_closed "$1" "${RETAINED_ARTIFACT_ARGS[@]+"${RETAINED_ARTIFACT_ARGS[@]}"}"
   fi
+  ledger_hold_answered "$1" ${3+"$3"}
 }
 
 remove_interrupted_answer_stamp() {  # <task-id>
@@ -1610,6 +1686,8 @@ command_answer() {
     [ "$hold_kind" = captain ] \
       || fail "task $id was never held for the captain; nothing to record an answer on"
     write_resolution_record "$id" repaired "$body"
+    ledger_hold_closed "$id"
+    ledger_hold_answered "$id"
     remove_interrupted_answer_stamp "$id"
     task_show "$id" || fail "task $id disappeared while recording the answer"
     show=$TASK_SHOW_OUTPUT
@@ -2199,7 +2277,7 @@ reconcile_close() {
     fi
     write_resolution_record "$id" reconciled "$body"
   fi
-  close_answered "$id" 0 || fail "could not close reconciled captain-held task $id"
+  close_answered "$id" 0 reconciled || fail "could not close reconciled captain-held task $id"
   remove_interrupted_answer_stamp "$id"
   task_show_or_fail "$id" "task $id disappeared after closing"
   body_has_resolution_record "$(show_field "$show" body)" \
