@@ -437,10 +437,13 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # past the current size; or a nonzero offset that does not sit just after a
 # newline, because a checkpoint taken mid-append folded a partial line the
 # whole-file fold would have read whole.
-# A failed tail read also falls back to byte 0; no pure read repairs the checkpoint.
+# A failed tail read also falls back to byte 0, except a tail refused by the read
+# limits (bin/fm-status-cap-lib.sh), which keeps the seeded set as the incremental
+# fold does; a whole-log read past the limits returns status 2 with one line on
+# stderr, never an empty set. No pure read repairs the checkpoint.
 # Regression coverage: tests/fm-wake-drain-open-decisions-cursor.test.sh.
 status_open_decisions() {  # <status-file> [<kind>]
-  local f=$1 kind=${2:-} line resolve held open='' verb offset=0 span seeded=0
+  local f=$1 kind=${2:-} line resolve held open='' verb offset=0 span seeded=0 text='' rc=0
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" "$kind" kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
@@ -465,11 +468,18 @@ $span
 EOF
       printf '%s' "$open"
       return 0
+    else
+      rc=$?
     fi
+    # A refused tail keeps the seeded set, exactly as the incremental fold does; any
+    # other failed tail read falls back to the whole log below.
+    if [ "$rc" -eq 2 ]; then printf '%s' "$open"; return 0; fi
     open=''
   fi
-  # A whole-log fold reads the log exactly, up to the read limit
-  # (bin/fm-status-cap-lib.sh); a log past it is refused, not folded from a clipped copy.
+  # A whole-log fold reads the log exactly, up to the read limits
+  # (bin/fm-status-cap-lib.sh). A log past them is refused with status 2 and one line on
+  # stderr, never folded from a clipped copy and never answered as an empty set.
+  text=$(fm_status_cat "$f") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" verb
     case "$verb" in
@@ -477,7 +487,9 @@ EOF
         _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open
         ;;
     esac
-  done < <(fm_status_cat "$f" 2>/dev/null)
+  done <<EOF
+$text
+EOF
   printf '%s' "$open"
 }
 
@@ -491,13 +503,18 @@ EOF
 # recovery and a fire-and-forget retry ring consult this set and leave a task
 # alone while it is non-empty.
 status_own_open_decisions() {  # <status-file>
-  local line prefix
-  status_open_decisions "$1" | while IFS= read -r line || [ -n "$line" ]; do
+  local line prefix open rc=0
+  open=$(status_open_decisions "$1") || rc=$?
+  [ "$rc" -eq 0 ] || return "$rc"
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
     for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT} remote-reply-continuity- captain-hold-; do
       case "$line" in "$prefix"*) continue 2 ;; esac
     done
     printf '%s\n' "$line"
-  done
+  done <<EOF
+$open
+EOF
 }
 
 # The same open set with each decision's opening time: one
@@ -512,12 +529,13 @@ status_own_open_decisions() {  # <status-file>
 # A summary never ends in a tab: the tab is this output's field separator.
 # Regression coverage: tests/fm-classify-decision-key.test.sh.
 status_open_decisions_dated() {  # <status-file> [<kind>]
-  local f=$1 open='' key verb summary line kind resolve held index=0 epoch tab=$'\t'
+  local f=$1 open='' key verb summary line kind resolve held index=0 epoch tab=$'\t' text rc
   local -a opened summaries
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" "${2:-}" kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  text=$(fm_status_cat "$f") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" verb
     case "$verb" in
@@ -528,7 +546,9 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
     opened[index]=$line
     summaries[index]=$summary
     index=$((index + 1))
-  done < <(fm_status_cat "$f" 2>/dev/null)
+  done <<EOF
+$text
+EOF
   while IFS=$'\t' read -r key verb index; do
     [ -n "$verb" ] || continue
     _fm_status_at_epoch "${opened[index]}" epoch || epoch=

@@ -1064,7 +1064,7 @@ cmd_status() {
     kind=$(sed -n 's/^kind=//p' "$m" | head -1)
     mode=$(sed -n 's/^mode=//p' "$m" | head -1)
     last=""
-    [ -f "$STATE/$id.status" ] && last=$(tail -c 65536 "$STATE/$id.status" 2>/dev/null | tail -1 | cut -c1-100)
+    [ -f "$STATE/$id.status" ] && last=$(tail -c 65536 "$STATE/$id.status" 2>/dev/null | head -c 65536 | tail -1 | cut -c1-100)
     printf '  %-42s %-6s %-10s %s\n' "$id" "${kind:-?}" "${mode:--}" "${last:-(no events yet)}"
   done
   [ "$any" -eq 1 ] || printf '\n(no workers on deck)\n'

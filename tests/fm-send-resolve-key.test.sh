@@ -347,6 +347,30 @@ test_not_open_key_refuses_before_send() {
   pass "fm-send --resolve-key: a key that is not open refuses loudly before anything is sent"
 }
 
+# A status log the read limits refuse (bin/fm-status-cap-lib.sh) is not a log with no
+# open decision: --resolve-key must say it cannot tell, not that the key is already
+# closed or mistyped, and must send nothing.
+test_log_past_the_read_limits_is_unknown_not_already_closed() {
+  local dir fb log home err rc
+  dir="$TMP_ROOT/refused-log"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"; err="$dir/send.err"
+  home=$(setup_home refused-log)
+  fm_write_meta "$home/state/t5.meta" "window=sess:fm-t5" "kind=ship"
+  { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t5.status"
+
+  : > "$log"
+  env PATH="$fb:$PATH" \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" t5 --resolve-key real-key "the answer" >/dev/null 2>"$err"; rc=$?
+  [ "$rc" -ne 0 ] || fail "a send whose decision ledger cannot be read should refuse"
+  assert_contains "$(cat "$err")" "cannot tell which decisions are open" "the refusal should say the open set is unknown"
+  assert_not_contains "$(cat "$err")" "already closed" "an unreadable log was reported as a closed decision"
+  assert_contains "$(cat "$err")" "nothing was sent" "the refusal should state nothing was sent"
+  [ ! -s "$log" ] || fail "a refused answer still typed text: $(cat "$log")"
+  [ ! -d "$home/state/t5.inbox" ] || fail "a refused answer still enqueued an inbox record"
+  pass "fm-send --resolve-key: a log past the read limits is unknown, never already closed, and nothing is sent"
+}
+
 # The close is an enqueue-time fact: the durable record IS the delivery, so a
 # failed doorbell keystroke must not reopen the split-brain where the close
 # waited on an unconfirmable submit.
@@ -988,6 +1012,7 @@ test_colon_first_key_position_is_answerable
 test_answer_starts_work_never_orphans
 test_routine_steer_never_closes
 test_not_open_key_refuses_before_send
+test_log_past_the_read_limits_is_unknown_not_already_closed
 test_failed_ring_still_closes_at_enqueue
 test_failed_enqueue_does_not_close
 test_multiple_keys_close_together
