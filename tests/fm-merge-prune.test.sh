@@ -183,9 +183,10 @@ case "$mode" in
   ineligible) echo "REFUSED: automatic reap ineligible: active: busy state busy" >&2; exit 1 ;;
   lifecycle) echo "error: another lifecycle action is already running for task $1; nothing was changed" >&2; exit 1 ;;
   pipeline) echo "REFUSED: no-mistakes run for $1 is still parked after axi abort" >&2; exit 1 ;;
-  false-positive|ship-not-landed|foreign-head|foreign-ignored|own-ignored|closeout-own)
-    # The known landing refusals, in the words of bin/fm-teardown.sh and
-    # bin/fm-teardown-nested-lib.sh; they stop once the copy is gone.
+  false-positive|ship-not-landed|closeout-own)
+    # The two refusal classes that reach the fallback, in the words of
+    # bin/fm-teardown.sh and bin/fm-teardown-nested-lib.sh; they stop once the
+    # copy is gone.
     if [ -e "$copy" ]; then
       case "$mode" in
         false-positive) echo "REFUSED: Vernant's closeout driver did not release foreign copy $copy/.claude/worktrees/n1 (exit 1): exact tree not covered by the merged PR" >&2 ;;
@@ -194,13 +195,18 @@ case "$mode" in
           echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
           echo "Land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
           ;;
-        foreign-head) echo "REFUSED: foreign copy $copy/.claude/worktrees/n1 stays in pool slot $copy: its HEAD 0123456789ab is not proved landed." >&2 ;;
-        foreign-ignored) echo "REFUSED: foreign copy $copy/.claude/worktrees/n1 stays in pool slot $copy: it holds ignored files that exist nowhere else: a.local b.local." >&2 ;;
-        own-ignored) echo "REFUSED: own nested copy $copy/.claude/worktrees/n1 stays in pool slot $copy: it holds ignored files that exist nowhere else: a.local." >&2 ;;
       esac
       exit 1
     fi
     done_ok "$1"
+    ;;
+  # An orphan nested copy refused for a HEAD that is not proved landed: teardown
+  # (bin/fm-teardown-nested-lib.sh teardown_foreign_copies_prove, then bin/
+  # fm-teardown.sh require_registered_slot_copies) always prints both lines.
+  foreign-head)
+    echo "REFUSED: foreign copy $copy/.claude/worktrees/n1 stays in pool slot $copy: its HEAD 0123456789ab is not proved landed." >&2
+    echo "REFUSED: pool slot $copy contains registered copy $copy/.claude/worktrees/n1 that is not one of task $1's proven copies; its record and lease must stay in place, even with --force." >&2
+    exit 1
     ;;
   # Refusals that are not landing refusals, in the words of bin/fm-teardown.sh.
   leaked-worktree) echo "REFUSED: leaked worktree processes for $1 remain after 3 reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2; exit 1 ;;
@@ -604,9 +610,7 @@ scn_other_refusal_keeps_the_copy() {  # <stub mode> <text the wake must name>
 }
 
 scn_ship_not_landed_is_settled() { scn_landing_refusal_is_settled ship-not-landed; }
-scn_foreign_head_is_settled() { scn_landing_refusal_is_settled foreign-head; }
-scn_foreign_ignored_is_settled() { scn_landing_refusal_is_settled foreign-ignored; }
-scn_own_ignored_is_settled() { scn_landing_refusal_is_settled own-ignored; }
+scn_orphan_nested_copy_refusal_keeps_the_copy() { scn_other_refusal_keeps_the_copy foreign-head 'stays in pool slot'; }
 scn_landing_refusal_via_closeout_foreign() { scn_landing_refusal_is_settled false-positive; }
 scn_closeout_own_is_settled() { scn_landing_refusal_is_settled closeout-own; }
 scn_leaked_worktree_keeps_the_copy() { scn_other_refusal_keeps_the_copy leaked-worktree 'leaked worktree processes'; }
@@ -1099,6 +1103,43 @@ scn_unreadable_subtree_keeps_the_copy() {  # <relative directory> <text the reco
 scn_unreadable_scratch_subtree_keeps_the_copy() { scn_unreadable_subtree_keeps_the_copy .mypy_cache/sub 'cannot search'; }
 scn_unreadable_claude_directory_keeps_the_copy() { scn_unreadable_subtree_keeps_the_copy .claude 'cannot list .claude'; }
 
+# A nested copy that is an independent clone has its own branches and stashes,
+# which removing it destroys. It is clean, on main and pushed, so a HEAD-only
+# proof passes it; the full proof sees the side branch's unpushed commit and the
+# stash made on that branch.
+scn_independent_clone_side_work_is_kept() {  # <branch|stash|both> <text the wake must name>
+  local n
+  make_world
+  make_nested .claude/worktrees/n1
+  n="$COPY/.claude/worktrees/n1"
+  git -C "$n" checkout -q -b wip
+  case "$1" in
+    branch|both)
+      printf 'side\n' > "$n/side.txt"
+      git -C "$n" add side.txt
+      git -C "$n" commit -q -m "unpushed on wip"
+      ;;
+  esac
+  case "$1" in
+    stash|both)
+      printf 'wip\n' >> "$n/README.md"
+      git -C "$n" stash -q
+      ;;
+  esac
+  git -C "$n" checkout -q main
+  [ -z "$(git -C "$n" status --porcelain)" ] || why "the fixture's clone is not clean" || return 1
+  [ "$(git -C "$n" rev-list --count HEAD --not --remotes)" = 0 ] || why "the fixture's clone HEAD is not pushed" || return 1
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy holding an independent clone with side work '$1' was removed" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped for a clone with side work '$1'" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$n" "$STATE/.wake-queue" | grep -q -- "$2" || why "the wake does not name the clone and '$2'" || return 1
+  return 0
+}
+scn_independent_clone_side_branch_is_kept() { scn_independent_clone_side_work_is_kept branch 'commit(s) on no remote'; }
+scn_independent_clone_side_stash_is_kept() { scn_independent_clone_side_work_is_kept stash 'stash entries'; }
+scn_independent_clone_side_branch_and_stash_is_kept() { scn_independent_clone_side_work_is_kept both 'stash entries'; }
+
 run_scenario() {  # <name>
   SCN_WHY=
   cleanup_workers
@@ -1316,9 +1357,10 @@ test_fallback_accepts_the_merged_pr_head() { assert_scenario scn_pr_head_proves_
 test_fallback_ignores_a_search_indexer() { assert_scenario scn_search_indexer_does_not_keep_the_copy "a system search indexer (Spotlight) reading the copy does not keep it; any other process does"; }
 test_fallback_never_overrides_a_live_pipeline_refusal() { assert_scenario scn_pipeline_refusal_never_falls_back "a refusal about a live pipeline is retained, never overridden"; }
 test_fallback_settles_a_ship_deliverable_not_landed_refusal() { assert_scenario scn_ship_not_landed_is_settled "the ship-deliverable-not-landed refusal is settled by the fallback"; }
-test_fallback_settles_a_foreign_copy_head_not_landed_refusal() { assert_scenario scn_foreign_head_is_settled "a foreign nested copy whose HEAD is not proved landed is settled by the fallback"; }
-test_fallback_settles_a_foreign_copy_ignored_files_refusal() { assert_scenario scn_foreign_ignored_is_settled "a foreign nested copy holding ignored files is settled by the fallback"; }
-test_fallback_settles_an_own_nested_copy_ignored_files_refusal() { assert_scenario scn_own_ignored_is_settled "an own nested copy holding ignored files is settled by the fallback"; }
+test_fallback_keeps_the_copy_on_an_orphan_nested_copy_refusal() { assert_scenario scn_orphan_nested_copy_refusal_keeps_the_copy "an orphan nested copy refused for a HEAD that is not proved landed, with the registered-copy refusal teardown always prints with it, is not settled: the copy stays with one wake"; }
+test_fallback_keeps_an_independent_clone_with_an_unpushed_side_branch() { assert_scenario scn_independent_clone_side_branch_is_kept "a nested independent clone that is clean and pushed on main but has an unpushed commit on a side branch keeps the copy with one wake"; }
+test_fallback_keeps_an_independent_clone_with_a_stash_of_a_side_branch() { assert_scenario scn_independent_clone_side_stash_is_kept "a nested independent clone with a stash made on a side branch keeps the copy with one wake"; }
+test_fallback_keeps_an_independent_clone_with_side_work_of_both_kinds() { assert_scenario scn_independent_clone_side_branch_and_stash_is_kept "a nested independent clone with an unpushed side branch and a stash made on it keeps the copy with one wake"; }
 test_fallback_settles_an_own_nested_copy_closeout_refusal() { assert_scenario scn_closeout_own_is_settled "a closeout driver's exact-tree refusal for an own nested copy is settled by the fallback"; }
 test_fallback_keeps_the_copy_on_leaked_worktree_processes() { assert_scenario scn_leaked_worktree_keeps_the_copy "a leaked worktree process refusal keeps the copy with one wake and no fallback"; }
 test_fallback_keeps_the_copy_on_leaked_tasktmp_processes() { assert_scenario scn_leaked_tasktmp_keeps_the_copy "a leaked task tmp process refusal keeps the copy with one wake and no fallback"; }
@@ -1422,18 +1464,23 @@ test_unsafe_mutations_are_caught() {
       *) return 1 ;;' scn_ownership_unproven_keeps_the_copy "process-ownership refusal"
   expect_caught allow-pipeline $orch '      *) return 1 ;;' '      *"no-mistakes run"*) seen=1 ;;
       *) return 1 ;;' scn_pipeline_refusal_never_falls_back "live-pipeline refusal"
+  expect_caught allow-orphan-nested-copy-refusals $orch '      *) return 1 ;;' '      *"stays in pool slot"*|*"contains registered copy"*) seen=1 ;;
+      *) return 1 ;;' scn_orphan_nested_copy_refusal_keeps_the_copy "orphan-nested-copy refusal"
   expect_caught allow-unknown-text $orch '      *) return 1 ;;' '      *) seen=1 ;;' scn_unknown_refusal_keeps_the_copy "unknown refusal text"
   expect_caught allow-when-any-line-is-landing $orch '      *) return 1 ;;' '      *) ;;' scn_mixed_refusals_keep_the_copy "every-line rule"
   expect_caught pane-exempts-any-process $lib '  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1' '  :' scn_pane_build_keeps_the_copy "shell-only pane exemption"
   expect_caught pane-exempts-busy-shell $lib '      if (child) exit 1' '      if (0) exit 1' scn_pane_busy_shell_keeps_the_copy "idle-shell-only pane exemption"
   expect_caught pane-exempts-any-shell $lib '        if (p == pane) exit 0' '        if (1) exit 0' scn_stray_shell_keeps_the_copy "pane-ancestry pane exemption"
+  expect_caught independent-clone-proved-as-linked $orch "    printf 'all'" "    printf 'own'" scn_independent_clone_side_branch_and_stash_is_kept "full proof of an independent clone"
+  expect_caught independent-clone-branches-ignored $lib '  [ "$scope" != all ] || refs+=(--branches)' '  :' scn_independent_clone_side_branch_is_kept "every-local-branch proof of an independent clone"
+  expect_caught independent-clone-stashes-filtered $lib '    if [ "$scope" = all ]; then n=$((n + 1)); continue; fi' '    :' scn_independent_clone_side_stash_is_kept "every-stash proof of an independent clone"
   expect_caught own-branch-stash-ignored $lib '    if [ -z "$branch" ] || [ -z "$name" ] || [ "$name" = "(no branch)" ] || [ "$name" = "$branch" ]; then' '    if false; then' scn_linked_slot_own_branch_stash_is_kept "own-branch stash proof"
   expect_caught detached-copy-ignores-stashes $lib '    if [ -z "$branch" ] || [ -z "$name" ]' '    if [ -z "$name" ]' scn_linked_detached_slot_keeps_every_stash "detached-copy stash proof"
   expect_caught linked-own-unpushed-ignored $lib '  if [ "$unpushed" != 0 ]; then' '  if false; then' scn_linked_slot_own_unpushed_commit_is_kept "own unpushed-commit proof in a linked slot"
   expect_caught non-github-guard-removed $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_enterprise_pr_keeps_the_copy "github.com-only guard"
   expect_caught non-github-guard-removed-forgejo $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_forgejo_pr_keeps_the_copy "github.com-only guard (Forgejo)"
   expect_caught fetch-back-in-the-lock $orch '  if ! prove_all "$real" "$pr_number" nofetch; then' '  if ! prove_all "$real" "$pr_number"; then' scn_hung_remote_never_holds_the_project_lock "no-fetch re-proof under the locks"
-  expect_caught nested-fetch-back-in-the-lock $orch '      fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }' '      fm_mp_prove_git "$n" "" || { record_verdict "$real"; return 1; }' scn_hung_remote_never_holds_the_project_lock "no-fetch nested re-proof under the locks"
+  expect_caught nested-fetch-back-in-the-lock $orch '      fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '      fm_mp_prove_git "$n" "" fetch "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' scn_hung_remote_never_holds_the_project_lock "no-fetch nested re-proof under the locks"
   expect_caught bare-pane-shell-exempt $lib '      if (child) exit 1
       p = parent[p]
 ' '      if (child) exit 1
@@ -1459,22 +1506,20 @@ test_over_strict_mutations_are_caught() {
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
   expect_caught nofetch-forgets-pr-head $lib '    [ -z "$prn" ] || prsha=$FM_MP_PR_HEAD' '    :' scn_pr_head_proves_a_squash_merged_commit "reuse of the merged PR head"
-  expect_caught other-branches-count-again $lib 'rev-list --count HEAD --not --remotes' 'rev-list --count HEAD --branches --not --remotes' scn_linked_slot_ignores_other_tasks_work "own-work-only branch proof"
+  expect_caught other-branches-count-again $lib '  [ "$scope" != all ] || refs+=(--branches)' '  refs+=(--branches)' scn_linked_slot_ignores_other_tasks_work "own-work-only branch proof"
+  expect_caught linked-slot-stashes-all-count $lib '    if [ "$scope" = all ]; then n=$((n + 1)); continue; fi' '    n=$((n + 1)); continue' scn_linked_slot_ignores_other_tasks_work "own-work-only stash proof (every stash counts)"
   expect_caught other-branch-stash-counts $lib '    if [ -z "$branch" ] || [ -z "$name" ] || [ "$name" = "(no branch)" ] || [ "$name" = "$branch" ]; then' '    if true; then' scn_linked_slot_ignores_other_tasks_work "own-work-only stash proof"
   expect_caught pane-shell-never-signaled $lib '  kill -HUP "$pid" 2>/dev/null || return 1' '  :' scn_lingering_pane_shell_on_herdr "SIGHUP step"
   expect_caught exit-never-accepted $reap '  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1' '  return 1' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "stopped-worker acceptance"
   expect_caught empty-checksums-fail $lib '  [ ! -s "$dest/SHA256SUMS" ] || (cd "$dest"' '  (cd "$dest"' scn_empty_preserve_paths_do_not_keep_the_copy "empty-manifest rule"
   expect_caught long-reason-relogs fm-merge-prune.sh '  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$(clean_detail "$reason")" ] && changed=0' '  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$reason" ] && changed=0' scn_long_reason_is_logged_once "saved-reason comparison"
   expect_caught ship-not-landed-not-allowed $orch '      "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.") seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_ship_not_landed_is_settled "ship-deliverable landing refusal"
-  expect_caught foreign-head-not-allowed $orch '      "REFUSED: foreign copy "*" stays in pool slot "*": its HEAD "*" is not proved landed.") seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_foreign_head_is_settled "foreign-copy HEAD refusal"
-  expect_caught foreign-ignored-not-allowed $orch '      "REFUSED: foreign copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_foreign_ignored_is_settled "foreign-copy ignored-files refusal"
-  expect_caught own-ignored-not-allowed $orch '      "REFUSED: own nested copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_own_ignored_is_settled "own-nested-copy ignored-files refusal"
   expect_caught closeout-foreign-not-allowed $orch '      "REFUSED: Vernant'"'"'s closeout driver did not release foreign copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_landing_refusal_via_closeout_foreign "foreign-copy closeout refusal"
   expect_caught closeout-own-not-allowed $orch '      "REFUSED: Vernant'"'"'s closeout driver did not release own nested copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_closeout_own_is_settled "own-nested-copy closeout refusal"
   expect_caught no-checksums $lib '      shasum -a 256 -- "$file" || exit 1' '      :' scn_scratch_copy_is_removed "checksum manifest"
   expect_caught indexer-counts-as-use $lib '    if fm_mp_indexer_pid "$pid"; then' '    if false; then' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
   expect_caught pr-head-ignored $lib '  [ -z "$prsha" ] || extra=("$prsha")' '  extra=()' scn_pr_head_proves_a_squash_merged_commit "merged-PR-head proof"
-  expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
+  expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
   pass "mutation proof (over-strict direction): tightening any permission makes its removal case fail"
 }
 
@@ -1766,9 +1811,10 @@ ALL_TESTS=(
   test_fallback_ignores_a_search_indexer
   test_fallback_never_overrides_a_live_pipeline_refusal
   test_fallback_settles_a_ship_deliverable_not_landed_refusal
-  test_fallback_settles_a_foreign_copy_head_not_landed_refusal
-  test_fallback_settles_a_foreign_copy_ignored_files_refusal
-  test_fallback_settles_an_own_nested_copy_ignored_files_refusal
+  test_fallback_keeps_the_copy_on_an_orphan_nested_copy_refusal
+  test_fallback_keeps_an_independent_clone_with_an_unpushed_side_branch
+  test_fallback_keeps_an_independent_clone_with_a_stash_of_a_side_branch
+  test_fallback_keeps_an_independent_clone_with_side_work_of_both_kinds
   test_fallback_settles_an_own_nested_copy_closeout_refusal
   test_fallback_keeps_the_copy_on_leaked_worktree_processes
   test_fallback_keeps_the_copy_on_leaked_tasktmp_processes
