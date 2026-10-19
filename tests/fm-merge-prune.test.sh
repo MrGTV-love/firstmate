@@ -266,6 +266,14 @@ SH
 # An idle shell: blocked opening a FIFO nobody writes, so it has no child process.
 read -r _ < "$1"
 SH
+  cat > "$W/bin/pane-returns-slot" <<'SH'
+#!/usr/bin/env bash
+# The idle `treehouse get` subshell of a pane. Like the real one it returns the
+# slot to the pool when it ends: the slot is reset to a detached origin/main, so
+# nothing is unmerged in it any more (th-gate counts it merged).
+trap 'git -C "$2" checkout -q --detach origin/main; exit 0' HUP
+read -r _ < "$1"
+SH
   cat > "$W/bin/pane-stubborn" <<'SH'
 #!/usr/bin/env bash
 # An idle shell that ignores SIGHUP.
@@ -286,7 +294,7 @@ SH
 wait
 SH
   chmod +x "$W/bin/treehouse" "$W/bin/th-gate" "$W/bin/th-remove" "$W/bin/teardown-stub" "$W/bin/control-stub" "$W/bin/tmux" "$W/bin/herdr" \
-    "$W/bin/pane-idle" "$W/bin/pane-busy" "$W/bin/pane-stubborn" "$W/bin/pane-holder"
+    "$W/bin/pane-idle" "$W/bin/pane-returns-slot" "$W/bin/pane-busy" "$W/bin/pane-stubborn" "$W/bin/pane-holder"
   mkfifo "$W/hold"
   : > "$W/th.log"; : > "$W/stub.log"; : > "$W/control.log"; : > "$W/th.fail"
   printf 'false-positive\n' > "$W/stub.mode"
@@ -620,6 +628,41 @@ scn_pr_head_proves_a_squash_merged_commit() {
   squash_merge_into_main "$COPY"
   go
   [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a commit proved landed by the PR head kept the copy: $(rec_field t1 reason)" || return 1
+  return 0
+}
+
+# The merged PR's head can carry a commit that the default branch does not (a
+# squash merge whose message or content was edited, or one that main later
+# changed): the head alone proves it landed. The pane's `treehouse get` subshell
+# returns the slot to the pool when it ends, as the real one does, which is what
+# lets `treehouse destroy` take a slot whose branch is not on the default branch.
+scn_pr_head_alone_proves_a_commit_the_default_branch_lacks() {
+  make_world
+  use_pane_backend tmux
+  printf 'edited at merge\n' > "$COPY/edited.txt"
+  git -C "$COPY" add edited.txt
+  git -C "$COPY" commit -q -m "carried by the PR head only"
+  git -C "$COPY" push -q origin HEAD:refs/pull/7/head
+  start_pane "$COPY" bash "$W/bin/pane-returns-slot" "$W/hold" "$COPY"
+  EXIT_WAIT=3 go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a commit proved landed by the PR head alone kept the copy: $(rec_field t1 reason)" || return 1
+  return 0
+}
+
+# The default branch moves on after a squash merge, so the copy's HEAD is
+# neither an ancestor of it nor has its tree; its content is still in it. The
+# pane's subshell returns the slot to the pool when it ends, as the real one does.
+scn_squash_merged_copy_after_the_default_branch_moved_on() {
+  make_world
+  use_pane_backend tmux
+  start_pane "$COPY" bash "$W/bin/pane-returns-slot" "$W/hold" "$COPY"
+  git clone -q "$ORIGIN" "$W/later" 2>/dev/null
+  printf 'later\n' > "$W/later/later.txt"
+  git -C "$W/later" add later.txt
+  git -C "$W/later" commit -q -m "a later change on main"
+  git -C "$W/later" push -q origin main
+  EXIT_WAIT=3 go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a squash-merged copy was kept after main moved on: $(rec_field t1 reason)" || return 1
   return 0
 }
 
@@ -978,23 +1021,27 @@ scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() {
   return 0
 }
 
-# `treehouse destroy` refuses a leased slot whose work is pushed but not merged
-# (only --include-unlanded would override it, which is never used): the copy
-# stays with one wake that names it.
+# A commit pushed after the merge but never merged is work the merged PR does not
+# carry. The fallback proves that itself, before it stops anything: the real
+# `treehouse get` subshell of the pane returns the slot to the pool, reset to
+# origin/main, when it ends, and after that `treehouse destroy` sees nothing
+# unmerged and would remove the copy. So the copy stays with one wake, the pane
+# shell is not ended and treehouse is not called.
 scn_pushed_but_unmerged_copy_is_kept() {
   make_world
+  use_pane_backend tmux
   printf 'follow-up\n' > "$COPY/followup.txt"
   git -C "$COPY" add followup.txt
   git -C "$COPY" commit -q -m "follow-up after the merge"
   git -C "$COPY" push -q origin fm/t1
-  go
-  [ -e "$COPY" ] || why "an unmerged copy was removed" || return 1
-  [ "$(cat "$W/th.log")" = "destroy $COPY --include-leased --yes" ] || why "treehouse was called as: $(cat "$W/th.log")" || return 1
+  start_pane "$COPY" bash "$W/bin/pane-returns-slot" "$W/hold" "$COPY"
+  EXIT_WAIT=3 go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a copy with a pushed, unmerged follow-up commit was destroyed" || return 1
+  [ "$(git -C "$COPY" symbolic-ref -q --short HEAD)" = fm/t1 ] || why "the slot was returned to the pool under its unmerged commit" || return 1
+  kill -0 "$PANE_CHILD" 2>/dev/null || why "the pane shell was ended over a copy that stays" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although the copy stays" || return 1
   [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
-  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'unmerged' || why "the wake does not name that the copy is unmerged" || return 1
-  if grep -Eq -- '--force|--include-unlanded|--include-in-use' "$W/th.log"; then
-    why "something was forced" || return 1
-  fi
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'not in the merged pull request' || why "the wake does not name that the commit is not in the merged pull request" || return 1
   return 0
 }
 
@@ -1406,6 +1453,8 @@ test_fallback_retries_when_the_stash_listing_fails() { assert_scenario scn_faili
 test_fallback_keeps_the_copy_when_a_subtree_cannot_be_searched() { assert_scenario scn_unreadable_scratch_subtree_keeps_the_copy "a subtree the nested-copy search cannot read keeps the copy and is never read as no nested copy"; }
 test_fallback_keeps_the_copy_when_the_claude_directory_cannot_be_listed() { assert_scenario scn_unreadable_claude_directory_keeps_the_copy "a .claude directory that cannot be listed keeps the copy and is never read as empty"; }
 test_fallback_accepts_the_merged_pr_head() { assert_scenario scn_pr_head_proves_a_squash_merged_commit "a commit proved landed by the merged PR head does not keep the copy"; }
+test_fallback_accepts_a_commit_only_the_merged_pr_head_carries() { assert_scenario scn_pr_head_alone_proves_a_commit_the_default_branch_lacks "a commit that only the merged PR head carries does not keep the copy"; }
+test_fallback_removes_a_squash_merged_copy_after_main_moved_on() { assert_scenario scn_squash_merged_copy_after_the_default_branch_moved_on "a squash-merged copy is removed although the default branch moved on after the merge"; }
 test_fallback_ignores_a_search_indexer() { assert_scenario scn_search_indexer_does_not_keep_the_copy "a system search indexer (Spotlight) reading the copy does not keep it; any other process does"; }
 test_fallback_never_overrides_a_live_pipeline_refusal() { assert_scenario scn_pipeline_refusal_never_falls_back "a refusal about a live pipeline is retained, never overridden"; }
 test_fallback_settles_a_ship_deliverable_not_landed_refusal() { assert_scenario scn_ship_not_landed_is_settled "the ship-deliverable-not-landed refusal is settled by the fallback"; }
@@ -1420,7 +1469,7 @@ test_fallback_keeps_the_copy_while_a_launch_agent_is_loaded() { assert_scenario 
 test_fallback_keeps_the_copy_when_process_ownership_is_not_proven() { assert_scenario scn_ownership_unproven_keeps_the_copy "a process whose ownership is not proven keeps the copy with one wake and no fallback"; }
 test_fallback_keeps_the_copy_on_an_unknown_refusal() { assert_scenario scn_unknown_refusal_keeps_the_copy "an unknown new refusal text keeps the copy with one wake and no fallback"; }
 test_fallback_keeps_the_copy_when_any_refusal_line_is_not_a_landing_refusal() { assert_scenario scn_mixed_refusals_keep_the_copy "a landing refusal printed together with a non-landing refusal keeps the copy"; }
-test_fallback_keeps_a_pushed_but_unmerged_copy() { assert_scenario scn_pushed_but_unmerged_copy_is_kept "a pushed but unmerged copy is refused by destroy as unmerged and stays with one wake, nothing forced"; }
+test_fallback_keeps_a_pushed_but_unmerged_copy() { assert_scenario scn_pushed_but_unmerged_copy_is_kept "a copy with a pushed follow-up commit that the merged PR does not carry stays with one wake before the pane shell is ended, nothing stopped and nothing destroyed"; }
 test_fallback_ignores_other_tasks_work_in_a_linked_slot() { assert_scenario scn_linked_slot_ignores_other_tasks_work "in a linked worktree slot, another task's local-only commit and stash do not keep the copy"; }
 test_fallback_keeps_a_linked_slot_with_its_own_unpushed_commit() { assert_scenario scn_linked_slot_own_unpushed_commit_is_kept "in a linked worktree slot, the copy's own unpushed commit keeps it"; }
 test_fallback_keeps_a_linked_slot_with_a_stash_of_its_own_branch() { assert_scenario scn_linked_slot_own_branch_stash_is_kept "in a linked worktree slot, a stash made on the copy's branch keeps it"; }
@@ -1532,6 +1581,7 @@ test_unsafe_mutations_are_caught() {
   expect_caught own-branch-stash-ignored $lib '    if [ -z "$branch" ] || [ -z "$name" ] || [ "$name" = "(no branch)" ] || [ "$name" = "$branch" ]; then' '    if false; then' scn_linked_slot_own_branch_stash_is_kept "own-branch stash proof"
   expect_caught detached-copy-ignores-stashes $lib '    if [ -z "$branch" ] || [ -z "$name" ]' '    if [ -z "$name" ]' scn_linked_detached_slot_keeps_every_stash "detached-copy stash proof"
   expect_caught linked-own-unpushed-ignored $lib '  if [ "$unpushed" != 0 ]; then' '  if false; then' scn_linked_slot_own_unpushed_commit_is_kept "own unpushed-commit proof in a linked slot"
+  expect_caught pushed-follow-up-counts-as-landed $lib '  [ -z "$prn" ] || fm_mp_prove_landed "$copy" "$prsha" || return 1' '  :' scn_pushed_but_unmerged_copy_is_kept "landed-in-the-merged-PR proof"
   expect_caught non-github-guard-removed $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_enterprise_pr_keeps_the_copy "github.com-only guard"
   expect_caught non-github-guard-removed-forgejo $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_forgejo_pr_keeps_the_copy "github.com-only guard (Forgejo)"
   expect_caught fetch-back-in-the-lock $orch '  if ! prove_all "$real" "$pr_number" nofetch; then' '  if ! prove_all "$real" "$pr_number"; then' scn_hung_remote_never_holds_the_project_lock "no-fetch re-proof under the locks"
@@ -1574,6 +1624,11 @@ test_over_strict_mutations_are_caught() {
   expect_caught no-checksums $lib '      shasum -a 256 -- "$file" || exit 1' '      :' scn_scratch_copy_is_removed "checksum manifest"
   expect_caught indexer-counts-as-use $lib '    if fm_mp_indexer_pid "$pid"; then' '    if false; then' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
   expect_caught pr-head-ignored $lib '  [ -z "$prsha" ] || extra=("$prsha")' '  extra=()' scn_pr_head_proves_a_squash_merged_commit "merged-PR-head proof"
+  expect_caught landed-proof-needs-the-pr-head $lib '  if [ -n "$prsha" ] && git -C "$copy" merge-base --is-ancestor "$head" "$prsha" 2>/dev/null; then
+    return 0
+  fi
+' '' scn_pr_head_alone_proves_a_commit_the_default_branch_lacks "merged-PR-head landing rule"
+  expect_caught landed-proof-needs-the-default-branch $lib '    && [ "${merged%%$'"'"'\n'"'"'*}" = "$tree" ]; then' '    && false; then' scn_squash_merged_copy_after_the_default_branch_moved_on "default-branch content landing rule"
   expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
   pass "mutation proof (over-strict direction): tightening any permission makes its removal case fail"
 }
@@ -1776,9 +1831,12 @@ test_e2e_squash_merged_copy_with_ignored_files_is_reaped_by_the_fallback() {
 }
 
 # Real teardown refuses a copy that went on after its PR merged (a stale PR
-# head). The follow-up commit is pushed but not merged, so `treehouse destroy`
-# refuses the slot as unmerged and only --include-unlanded would override it,
-# which the fallback never uses: the copy stays with one wake.
+# head). The follow-up commit is pushed but not merged. Ending the pane's
+# `treehouse get` subshell would return the slot to the pool, reset to
+# origin/main, and `treehouse destroy` would then see nothing unmerged. So the
+# fallback proves the commit is not in the merged PR before it stops anything:
+# the copy stays, the pane shell is not ended, treehouse is not called, and one
+# wake names it.
 test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy() {
   make_e2e_world
   printf 'follow-up\n' > "$COPY/followup.txt"
@@ -1787,17 +1845,19 @@ test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy() {
   git -C "$COPY" push -q origin fm/t1
   prune_real arm t1
   start_inside "$COPY" "$W/worker.pid"
-  start_pane "$COPY" bash "$W/bin/pane-idle" "$W/hold"
+  start_pane "$COPY" bash "$W/bin/pane-returns-slot" "$W/hold" "$COPY"
   FM_MERGE_PRUNE_EXIT_WAIT=3 prune_real run t1 --now >/dev/null 2>&1
   [ -e "$COPY" ] || fail "an unmerged copy was removed: $(cat "$DATA/t1/merge-prune.log")"
   [ -e "$STATE/t1.meta" ] || fail "the task record was closed over a kept copy"
-  [ "$(cat "$W/th.log")" = "destroy $COPY --include-leased --yes" ] || fail "the fallback did not make exactly the reaper's destroy call: $(cat "$W/th.log")"
+  [ "$(git -C "$COPY" symbolic-ref -q --short HEAD)" = fm/t1 ] || fail "the slot was returned to the pool under its unmerged commit"
+  kill -0 "$PANE_CHILD" 2>/dev/null || fail "the pane shell was ended over a copy that stays"
+  assert_not_destroyed "e2e unmerged"
   [ "$(wake_count_real)" = 1 ] || fail "want exactly one wake, got $(wake_count_real): $(cat "$STATE/.wake-queue" 2>/dev/null)"
-  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'unmerged' || fail "the wake does not name the copy and that it is unmerged: $(cat "$STATE/.wake-queue")"
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'not in the merged pull request' || fail "the wake does not name the copy and that its commit is not in the merged pull request: $(cat "$STATE/.wake-queue")"
   assert_nothing_forced "e2e unmerged"
   prune_real run t1 --now >/dev/null 2>&1; prune_real run t1 --now >/dev/null 2>&1
   [ "$(wake_count_real)" = 1 ] || fail "repeat attempts raised more wakes"
-  pass "end to end: a copy with a pushed follow-up commit that is not merged is refused by destroy as unmerged, stays, forces nothing and raises exactly one wake"
+  pass "end to end: a copy with a pushed follow-up commit that is not merged stays before anything is stopped, forces nothing and raises exactly one wake"
 }
 
 test_e2e_unsafe_copies_are_never_removed() {
@@ -1866,6 +1926,8 @@ ALL_TESTS=(
   test_fallback_keeps_the_copy_when_a_subtree_cannot_be_searched
   test_fallback_keeps_the_copy_when_the_claude_directory_cannot_be_listed
   test_fallback_accepts_the_merged_pr_head
+  test_fallback_accepts_a_commit_only_the_merged_pr_head_carries
+  test_fallback_removes_a_squash_merged_copy_after_main_moved_on
   test_fallback_ignores_a_search_indexer
   test_fallback_never_overrides_a_live_pipeline_refusal
   test_fallback_settles_a_ship_deliverable_not_landed_refusal

@@ -716,6 +716,7 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - A nested copy that is an independent clone, with its own git directory, shares nothing with the project, so every stash it holds keeps it.
 - No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; for a linked worktree, other branches of the project are other work and are not read.
 - For a nested copy that is an independent clone, every local branch that is not on a remote also keeps it, because removing the clone destroys that branch.
+- The task's own copy holds nothing the merged pull request leaves out: its HEAD is in the merged pull request's head (fetched before the locks), or the default branch already carries its content, which is what a squash merge leaves. A commit that is only pushed, such as a follow-up commit after the merge, is not landed and keeps the copy.
 - Every ignored file is scratch, a symlink, or on the preserve list.
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
@@ -744,7 +745,7 @@ It never uses `--force`, `--include-unlanded`, or `--include-in-use`.
 A proof read that fails never counts as finding nothing.
 That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
 
-Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged (`treehouse destroy` refuses an unmerged slot, and the fallback never uses `--include-unlanded`), or a destroy that fails.
+Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged, which the fallback proves itself before it stops anything (ending the pane's idle shell returns the slot to the pool, reset to the default branch, so `treehouse destroy` would no longer see it as unmerged), or a destroy that fails.
 It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
 Each outcome is one line in `data/<id>/merge-prune.log`; the prune never writes to the task's status file.
