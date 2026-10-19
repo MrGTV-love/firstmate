@@ -1,0 +1,5 @@
+{"task":"led-local","evidence":"local_main"}
+{"task":"led-drop","evidence":"drop_file"}
+{"task":"led-bundle","evidence":"none"}
+{"task":"led-plain","evidence":"none"}
+{"task":"led-lookalike","evidence":"local_main"}

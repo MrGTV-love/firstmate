@@ -1,0 +1,4 @@
+ok - ordinary teardown removes a copy with one or two unpublished tips preserved in a verified recorded bundle
+ok - a ship kept only by a verified bundle closes its backlog row as preserved in that bundle, not landed
+ok - ledger on: a ship kept only by a verified bundle records a close with no landing evidence
+exit=0

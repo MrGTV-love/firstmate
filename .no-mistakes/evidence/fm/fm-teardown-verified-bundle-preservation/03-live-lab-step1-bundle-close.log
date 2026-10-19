@@ -1,0 +1,46 @@
+$ fm-tasks-axi.sh add live-bundle ... (queued)
+ok: added live-bundle (ship, repo firstmate) -> Queued
+task:
+  id: live-bundle
+  title: Live bundle-preserved ship
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: firstmate
+  priority: "-"
+  created: 2026-10-19
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+$ fm-tasks-axi.sh start live-bundle
+ok: start live-bundle -> In flight
+help[1]:
+  - Run `tasks-axi done live-bundle --pr <url>` when it ships
+$ fm-tasks-axi.sh done live-bundle --note "preserved in bundle ..., not landed"
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+--- row after bundle close
+task:
+  id: live-bundle
+  title: Live bundle-preserved ship
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: firstmate
+  priority: "-"
+  created: 2026-10-19
+  closed: "-"
+  deps: none
+  links: none
+  body: ""

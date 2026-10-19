@@ -1,0 +1,18 @@
+stage: validated and accepted the bundle note
+marker published: /Users/charlesabrooker/tmp/fm-lab.JmGJ06/state/crash-bundle.backlog-close
+--- marker contents
+id=crash-bundle
+data=/Users/charlesabrooker/tmp/fm-lab.JmGJ06/data
+spawn_gen=1
+cleanup_incomplete=0
+arg=--note
+arg=preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed
+replay rc=0
+--- backlog row after replay
+- [x] crash-bundle - Crash window bundle close (repo: firstmate) (kind: ship) (done 2026-10-19)
+  preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed
+- [x] adv-local - Delivered locally (repo: firstmate) (kind: ship) (done 2026-10-19)
+--- fleet ledger rows for crash-bundle
+/Users/charlesabrooker/tmp/fm-lab.JmGJ06/config/fleet-ledger
+/Users/charlesabrooker/tmp/fm-lab.JmGJ06/state/fleet-ledger.jsonl
+{"v":1,"ts":1792442279,"at":"2026-10-19T20:37:59Z","event":"task.closed","task":"crash-bundle","evidence":"none","pr":null}

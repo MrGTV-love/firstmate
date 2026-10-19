@@ -1,0 +1,28 @@
+##### ADV-1: restart, then close on a bundle AGAIN -> must be a drop-like (not landed) again
+- [x] adv-reclose - Re-closed on bundle (repo: firstmate) (kind: ship) (done 2026-10-19)
+  Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed
+  preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/second.bundle, not landed
+- [x] live-bundle - Live bundle-preserved ship (repo: firstmate) (kind: ship) (done 2026-10-19)
+{"id":"adv-reclose","state":"done","captain_drop":true,"body_lines":["Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed","preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/second.bundle, not landed"]}
+{"landed_ids":["live-bundle"]}
+
+##### ADV-2: lookalike lines are NOT retired; neighbouring user text is untouched
+- [ ] adv-lookalike - Lookalike text (repo: firstmate) (kind: ship) (since 2026-10-19)
+  see preserved in bundle /not/at/line/start, not landed
+  preserved in bundle relative/path, not landed
+  Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed
+  keep this note exactly
+## Queued
+## Done
+- [x] adv-reclose - Re-closed on bundle (repo: firstmate) (kind: ship) (done 2026-10-19)
+
+##### ADV-3: dropped marker still retires on restart (existing mechanism unchanged)
+- [ ] adv-dropped - Dropped then restarted (repo: firstmate) (kind: ship) (since 2026-10-19)
+  Historical captain disposition: dropped
+- [ ] adv-lookalike - Lookalike text (repo: firstmate) (kind: ship) (since 2026-10-19)
+{"id":"adv-dropped","state":"done","captain_drop":false,"body_lines":["Historical captain disposition: dropped"]}
+{"landed_ids":["live-bundle","adv-dropped"]}
+
+##### ADV-4: restart, then real delivery note (local main) -> landed, artifact local main
+{"id":"adv-local","state":"done","captain_drop":false,"body_lines":["Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed","local main"]}
+{"landed_ids":["live-bundle","adv-local","adv-dropped"]}

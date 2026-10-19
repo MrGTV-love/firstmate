@@ -1,0 +1,3 @@
+ok - landed excludes rows closed on a bundle alone while real deliveries stay
+ok - a restarted bundle-preserved row is not a drop and is listed once it is really delivered
+ok - a restarted bundle-preserved row closed with a plain done is not a drop and is listed as landed

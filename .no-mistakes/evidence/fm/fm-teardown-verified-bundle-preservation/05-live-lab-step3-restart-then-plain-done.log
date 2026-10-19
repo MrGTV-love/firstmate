@@ -1,0 +1,27 @@
+== RESTART through the home's own path: bin/fm-tasks-axi.sh start live-bundle
+ok: start live-bundle -> In flight
+help[1]:
+  - Run `tasks-axi done live-bundle --pr <url>` when it ships
+== backlog.md after restart
+# Backlog
+
+## In flight
+- [ ] live-bundle - Live bundle-preserved ship (repo: firstmate) (kind: ship) (since 2026-10-19)
+  Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed
+## Queued
+## Done
+== snapshots while restarted (expect in_flight, captain_drop=false)
+{"id":"live-bundle","state":"in_flight","captain_drop":false,"pr_url":null,"report_path":null,"body_lines":["Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed"]}
+{"landed_ids":[]}
+== PLAIN DONE (no flag), as teardown does when PR is found by branch lookup
+== backlog.md after plain done
+# Backlog
+
+## In flight
+## Queued
+## Done
+- [x] live-bundle - Live bundle-preserved ship (repo: firstmate) (kind: ship) (done 2026-10-19)
+  Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed
+== snapshots after plain done (expect done, captain_drop=false, listed as landed)
+{"id":"live-bundle","state":"done","captain_drop":false,"pr_url":null,"report_path":null,"body_lines":["Historical preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed"]}
+{"landed_ids":["live-bundle"]}

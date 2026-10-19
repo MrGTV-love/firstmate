@@ -1,0 +1,13 @@
+== close live-bundle on a bundle (product close function)
+== backlog.md
+# Backlog
+
+## In flight
+## Queued
+## Done
+- [x] live-bundle - Live bundle-preserved ship (repo: firstmate) (kind: ship) (done 2026-10-19)
+  preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed
+== fleet snapshot record
+{"id":"live-bundle","state":"done","captain_drop":true,"pr_url":null,"report_path":null,"body_lines":["preserved in bundle /Users/charlesabrooker/tmp/fm-lab.JmGJ06/bundles/kept.bundle, not landed"]}
+== bearings landed
+{"landed_ids":[]}
