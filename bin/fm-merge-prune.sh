@@ -45,18 +45,20 @@
 # (bin/fm-control.sh exit). That verb keeps the task's terminal pane open, and
 # the pane's idle shell, the one the pane entered the copy with, stays inside
 # the copy. That one process does not keep the copy, but treehouse refuses to
-# destroy a copy with a process
-# working inside it, so it is ended with SIGHUP just before the destroy: it must
-# be a shell whose working directory is in the copy, with no child process, that
-# is the pane's shell or descends from it (found by the pane's process id; tmux
-# and herdr, any other backend exempts nothing), and the exit verb must have
-# stopped the agent. SIGKILL is never sent, the pane stays open on its outer
-# shell, and a shell that does not go keeps the copy. Any other process, such as
-# a build, an editor or a test started in the pane, keeps the copy. The
-# Treehouse project lock is held from the worker stop to the destroy, the
-# slot-owner claim is read again right before the signal, and a slot claimed by
-# another task is left alone. The preserve-list files are copied to
-# data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
+# destroy a copy with a process working inside it, so it is ended with SIGHUP
+# just before the destroy: it must be a shell whose working directory is in the
+# copy, with no child process, that is a strict descendant of the pane's shell
+# (found by the pane's process id; tmux and herdr, any other backend exempts
+# nothing), and the exit verb must have stopped the agent. The pane's own shell is never ended, so a bare pane shell
+# inside the copy keeps the copy. SIGKILL is never sent, the pane stays open on
+# its outer shell, and a shell that does not go keeps the copy. Any other
+# process, such as a build, an editor or a test started in the pane, keeps the
+# copy. The Treehouse project lock is held from the worker stop to the destroy,
+# and the proof repeated while it and the task control lock are held makes no
+# fetch (it reuses the remote refs fetched before the locks), so a hung remote
+# never holds either lock. The slot-owner claim is read again right before the
+# signal, and a slot claimed by another task is left alone. The preserve-list
+# files are copied to data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
 # `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
 # call the reaper makes; --include-unlanded, --include-in-use and --force are
 # never used), and teardown runs again to finish the task's records. In this
@@ -344,7 +346,7 @@ fallback_remove() {  # <real-copy> <pr-number>
     backoff "another lifecycle action is already running for task $ID"
     return 1
   fi
-  if ! prove_all "$real" "$pr_number"; then
+  if ! prove_all "$real" "$pr_number" nofetch; then
     fm_lock_release "$LOCK_CONTROL" || true
     return 1
   fi
@@ -429,14 +431,15 @@ fallback_remove() {  # <real-copy> <pr-number>
 }
 
 # Prove one copy and everything nested in it; sets FM_MP_VERDICT/REASON on failure.
-prove_all() {  # <real-copy> <pr-number>
-  local real=$1 pr=$2 n
-  fm_mp_prove_git "$real" "$pr" || { record_verdict "$real"; return 1; }
+# The nofetch mode reuses what the earlier fetching pass left (fm_mp_prove_git).
+prove_all() {  # <real-copy> <pr-number> [nofetch]
+  local real=$1 pr=$2 mode=${3:-fetch} n
+  fm_mp_prove_git "$real" "$pr" "$mode" || { record_verdict "$real"; return 1; }
   fm_mp_prove_ignored "$real" || { record_verdict "$real"; return 1; }
   fm_mp_find_nested "$real"
   if [ "${#FM_MP_NESTED[@]}" -gt 0 ]; then
     for n in "${FM_MP_NESTED[@]}"; do
-      fm_mp_prove_git "$n" "" || { record_verdict "$real"; return 1; }
+      fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }
       fm_mp_prove_ignored "$n" || { record_verdict "$real"; return 1; }
     done
   fi

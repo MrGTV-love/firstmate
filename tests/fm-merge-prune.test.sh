@@ -262,6 +262,7 @@ prune() {
     STUB_COUNT="$W/stub.count" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" \
     PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" \
     STOP_FAIL_FILE="$W/stop-fail" BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" \
+    PROJECT_LOCK_PATH="${PROJECT_LOCK_PATH:-}" FETCH_UNDER_LOCK_LOG="$W/fetch-under-lock.log" REAL_GIT="${REAL_GIT:-}" \
     FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-stub" FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" \
     FM_MERGE_PRUNE_EXIT_WAIT="${EXIT_WAIT:-0}" \
     "$BIN_DIR/fm-merge-prune.sh" "$@"
@@ -333,6 +334,14 @@ use_pane_backend() {  # <tmux|herdr>
 
 project_lock_path() {
   FM_HOME="$HOME_DIR" bash -c '. "$1/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$BIN_DIR" "$W/project"
+}
+
+kill_tree() {  # <pid>: the process and everything below it
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do
+    kill_tree "$child"
+  done
+  kill "$1" 2>/dev/null || true
 }
 
 why() { SCN_WHY=$1; return 1; }
@@ -680,6 +689,65 @@ scn_pane_busy_shell_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_c
 scn_stray_shell_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy stray-shell; }
 scn_pane_shell_working_elsewhere_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy holder; }
 
+# The pane's own shell is not a strict descendant of the pane: ending it would
+# close the pane, so a bare pane shell inside the copy keeps the copy, with one
+# wake, and is left alone.
+scn_bare_pane_shell_keeps_the_copy() {
+  make_world
+  use_pane_backend tmux
+  start_stray_shell "$COPY"
+  printf '%s\n' "$STRAY_SHELL" > "$W/pane.pid"
+  EXIT_WAIT=1 go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a bare pane shell did not keep the copy: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'process(es) inside' || why "the wake does not name the copy and the process" || return 1
+  kill -0 "$STRAY_SHELL" 2>/dev/null || why "the bare pane shell, which is the pane itself, was ended" || return 1
+  return 0
+}
+
+# A remote that never answers must not hold the project lock or the control
+# lock: the proof repeated under them reuses the refs fetched before them. The
+# stand-in git logs and hangs on any fetch made while the project lock exists,
+# and runs everything else as the real git does; the attempt, with a nested copy,
+# must finish within its bound with no fetch logged.
+scn_hung_remote_never_holds_the_project_lock() {
+  local PROJECT_LOCK_PATH REAL_GIT pid waited=0
+  make_world
+  make_nested .claude/worktrees/n1
+  PROJECT_LOCK_PATH=$(project_lock_path)
+  REAL_GIT=$(command -v git)
+  cat > "$W/bin/git" <<'SH'
+#!/usr/bin/env bash
+case " $* " in
+  *" fetch "*)
+    if [ -e "$PROJECT_LOCK_PATH" ]; then
+      printf '%s\n' "$*" >> "$FETCH_UNDER_LOCK_LOG"
+      exec sleep 300
+    fi
+    ;;
+esac
+exec "$REAL_GIT" "$@"
+SH
+  chmod +x "$W/bin/git"
+  : > "$W/fetch-under-lock.log"
+  prune arm t1 >/dev/null 2>&1
+  prune run t1 --now >/dev/null 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null && [ ! -s "$W/fetch-under-lock.log" ] && [ "$waited" -lt 900 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill_tree "$pid"
+    why "the attempt was still running (fetch made under the project lock: $(cat "$W/fetch-under-lock.log"))" || return 1
+  fi
+  wait "$pid" 2>/dev/null || true
+  [ ! -s "$W/fetch-under-lock.log" ] || why "a fetch ran while the project lock was held: $(cat "$W/fetch-under-lock.log")" || return 1
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the copy was not removed: $(rec_field t1 reason)" || return 1
+  [ ! -e "$PROJECT_LOCK_PATH" ] || why "the project lock outlived the attempt" || return 1
+  return 0
+}
+
 # A pane that cannot be read exempts nothing.
 scn_unreadable_pane_exempts_nothing() {
   make_world
@@ -1005,6 +1073,8 @@ test_fallback_keeps_a_pane_shell_that_works_elsewhere() { assert_scenario scn_pa
 test_fallback_keeps_the_copy_when_the_pane_shell_ignores_sighup() { assert_scenario scn_stubborn_pane_shell_keeps_the_copy "a pane shell that ignores SIGHUP keeps the copy with one wake and is never forced"; }
 test_fallback_leaves_the_pane_shell_until_the_agent_is_confirmed_stopped() { assert_scenario scn_unconfirmed_stop_leaves_the_pane_shell "an exit verb that does not confirm the agent stopped leaves the pane shell alone and keeps the copy"; }
 test_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() { assert_scenario scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "a worker stopped by fm-control.sh exit reads as reapable for the prune only when the busy record is gone, the exit marker is present and its last event is done"; }
+test_fallback_keeps_a_bare_pane_shell() { assert_scenario scn_bare_pane_shell_keeps_the_copy "a shell that is the pane's own shell keeps the copy with one wake and is left alone, so the pane stays open"; }
+test_fallback_never_holds_the_project_lock_on_a_hung_remote() { assert_scenario scn_hung_remote_never_holds_the_project_lock "a remote that never answers is never waited on while the project lock is held, and the attempt still finishes"; }
 test_fallback_keeps_a_shell_no_pane_started() { assert_scenario scn_stray_shell_keeps_the_copy "an idle shell that is not the task's pane shell keeps the copy with exactly one wake"; }
 test_fallback_exempts_nothing_when_the_pane_is_unreadable() { assert_scenario scn_unreadable_pane_exempts_nothing "a pane that cannot be read exempts no shell"; }
 test_fallback_never_destroys_a_reassigned_slot() { assert_scenario scn_reassigned_slot_is_never_destroyed "a slot another task claimed after the worker stopped, or whose claim cannot be read, is never destroyed"; }
@@ -1073,6 +1143,12 @@ test_unsafe_mutations_are_caught() {
   expect_caught pane-exempts-any-process $lib '  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1' '  :' scn_pane_build_keeps_the_copy "shell-only pane exemption"
   expect_caught pane-exempts-busy-shell $lib '      if (child) exit 1' '      if (0) exit 1' scn_pane_busy_shell_keeps_the_copy "idle-shell-only pane exemption"
   expect_caught pane-exempts-any-shell $lib '        if (p == pane) exit 0' '        if (1) exit 0' scn_stray_shell_keeps_the_copy "pane-ancestry pane exemption"
+  expect_caught fetch-back-in-the-lock $orch '  if ! prove_all "$real" "$pr_number" nofetch; then' '  if ! prove_all "$real" "$pr_number"; then' scn_hung_remote_never_holds_the_project_lock "no-fetch re-proof under the locks"
+  expect_caught nested-fetch-back-in-the-lock $orch '      fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }' '      fm_mp_prove_git "$n" "" || { record_verdict "$real"; return 1; }' scn_hung_remote_never_holds_the_project_lock "no-fetch nested re-proof under the locks"
+  expect_caught bare-pane-shell-exempt $lib '      if (child) exit 1
+      p = parent[p]
+' '      if (child) exit 1
+' scn_bare_pane_shell_keeps_the_copy "strict-descendant rule"
   expect_caught pane-shell-cwd-not-required $lib '  case "$cwd" in "$copy"|"$copy"/*) ;; *) return 1 ;; esac' '  :' scn_pane_shell_working_elsewhere_keeps_the_copy "pane-shell working-directory proof"
   expect_caught sigkill-instead-of-sighup $lib '  kill -HUP "$pid" 2>/dev/null || return 1' '  kill -KILL "$pid" 2>/dev/null || return 1' scn_stubborn_pane_shell_keeps_the_copy "SIGHUP-only rule"
   expect_caught no-stop-confirmation $orch '    if [ "$WORKER_STOPPED" != 1 ]; then' '    if false; then' scn_unconfirmed_stop_leaves_the_pane_shell "agent-stopped proof"
@@ -1092,6 +1168,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught no-tac-scratch $lib '    .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;' '    .tac/NEVER) return 0 ;;' scn_scratch_copy_is_removed ".tac scratch rule"
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
+  expect_caught nofetch-forgets-pr-head $lib '    [ -z "$prn" ] || prsha=$FM_MP_PR_HEAD' '    :' scn_pr_head_proves_a_squash_merged_commit "reuse of the merged PR head"
   expect_caught pane-shell-never-signaled $lib '  kill -HUP "$pid" 2>/dev/null || return 1' '  :' scn_lingering_pane_shell_on_herdr "SIGHUP step"
   expect_caught exit-never-accepted $reap '  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1' '  return 1' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "stopped-worker acceptance"
   expect_caught empty-checksums-fail $lib '  [ ! -s "$dest/SHA256SUMS" ] || (cd "$dest"' '  (cd "$dest"' scn_empty_preserve_paths_do_not_keep_the_copy "empty-manifest rule"
@@ -1105,7 +1182,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught no-checksums $lib '      shasum -a 256 -- "$file" || exit 1' '      :' scn_scratch_copy_is_removed "checksum manifest"
   expect_caught indexer-counts-as-use $lib '    if fm_mp_indexer_pid "$pid"; then' '    if false; then' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
   expect_caught pr-head-ignored $lib '  [ -z "$prsha" ] || extra=("$prsha")' '  extra=()' scn_pr_head_proves_a_squash_merged_commit "merged-PR-head proof"
-  expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
+  expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$mode" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
   pass "mutation proof (over-strict direction): tightening any permission makes its removal case fail"
 }
 
@@ -1229,7 +1306,7 @@ assert_not_destroyed() {  # <label>
 test_e2e_merge_prunes_the_copy_with_the_real_teardown() {
   make_e2e_world
   prune_real arm t1 --run || fail "arm --run failed"
-  fm_test_wait_until 60 test ! -e "$STATE/t1.merge-prune" || fail "the detached attempt did not finish: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
+  fm_test_wait_until 60 grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the detached attempt did not finish: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
   [ ! -e "$COPY" ] || fail "the pool copy is still there after the merge"
   [ ! -e "$STATE/t1.meta" ] || fail "the task record is still there: real teardown did not complete"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped: $(cat "$DATA/t1/merge-prune.log")"
@@ -1376,6 +1453,8 @@ ALL_TESTS=(
   test_fallback_keeps_a_pane_shell_that_runs_something
   test_fallback_keeps_a_shell_no_pane_started
   test_fallback_keeps_a_pane_shell_that_works_elsewhere
+  test_fallback_keeps_a_bare_pane_shell
+  test_fallback_never_holds_the_project_lock_on_a_hung_remote
   test_fallback_keeps_the_copy_when_the_pane_shell_ignores_sighup
   test_fallback_leaves_the_pane_shell_until_the_agent_is_confirmed_stopped
   test_deliberately_exited_worker_reads_as_stopped_only_for_the_prune
