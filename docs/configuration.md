@@ -123,6 +123,7 @@ The caller retains its existing exit code; a telemetry failure never adds a refu
 The teardown completing command re-enters its existing proof and automatic ignored-byte preservation path without force after readable source and writable preservation storage are restored.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
 Jev's size message names the existing request/overlap budget and same-write-tool report-splitting route without changing screening or admission.
+A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; on Claude a tool result is advisory only, so an oversized result there is neither printed as `REFUSED` nor counted.
 
 The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
 Only an explicit absolute `FM_HOME` selects the ledger; cwd and `FM_STATE_OVERRIDE` do not redirect it.

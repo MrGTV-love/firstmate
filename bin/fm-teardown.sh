@@ -2708,7 +2708,7 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
   done < "$inventory"
   rm -f "$inventory"
   if [ "$refused" = 1 ]; then
-    echo "Keep each listed copy and its records. Follow its typed completing step or answer its ownership/landing question above; --force does not waive these proofs." >&2
+    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from $slot, never by forcing the removal). Re-run this teardown afterwards." >&2
     return 1
   fi
 }

@@ -19,10 +19,14 @@ export const MAX_CHUNKS = 16;
 /** A span up to 1,000 JSON-escaped bytes always lies whole inside one piece; a longer one can be cut, and each half is still screened. */
 export const CHUNK_OVERLAP_BYTES = 1_024;
 /** Presentation only: these are the existing screening limits, not a new admission rule. */
-export const SIZE_REFUSAL_NOTICE = `REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within ${MAX_CHUNKS} requests of ${MAX_REQUEST_BYTES} UTF-8 bytes each, including model, questions and JSON framing, with ${CHUNK_OVERLAP_BYTES} JSON-escaped bytes of overlap. `
-  + `The ${MAX_CHUNKS * MAX_REQUEST_BYTES}-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. `
+const SIZE_REFUSAL_HEAD = `REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within ${MAX_CHUNKS} requests of ${MAX_REQUEST_BYTES} UTF-8 bytes each, including model, questions and JSON framing, with ${CHUNK_OVERLAP_BYTES} JSON-escaped bytes of overlap. `
+  + `The ${MAX_CHUNKS * MAX_REQUEST_BYTES}-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. `;
+export const SIZE_REFUSAL_NOTICE = SIZE_REFUSAL_HEAD
   + "Supported completing route for report writes: use the same write tool to split the report across separate files, each below 150,000 characters per write, and smaller again if encoded bytes still exceed the screening budget. Every write must fit and is screened completely. "
   + "This is size-budget compliance only, not permission to split or reroute a prohibited action. For a shell call or unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
+/** A result cannot be split by the worker; the withheld output is the thing to shrink. */
+export const SIZE_RESULT_NOTICE = SIZE_REFUSAL_HEAD
+  + "human-only-exit: what authorized smaller read or command output gives the intended information within this budget?";
 /** Outage-only deny guidance; the worker adapter owns policy-refusal next steps. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
@@ -312,9 +316,10 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       } catch (cause) {
         throw new GuardUnavailableError("AuditUnavailableError", terminal.request_started, cause);
       }
-      // Mirror only the named size refusal, never raw inputs or a second judgment.
+      // Mirror only a named size refusal the guard actually enforced, never raw inputs or a second judgment.
       // This optional bridge must not acquire the mandatory Jev audit's semantics.
-      if (active && terminal.error_type === "RequestTooLargeError") {
+      if (active && terminal.error_type === "RequestTooLargeError"
+        && (terminal.enforcement === "pretool_deny" || terminal.enforcement === "omp_replace")) {
         try {
           execFileSync("python3", [resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py"),
             "refusal", "FM-JEV-SIZE", "complete-screening-budget", `${terminal.hook}-${terminal.tool}`,

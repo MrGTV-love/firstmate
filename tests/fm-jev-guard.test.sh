@@ -1041,7 +1041,11 @@ for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repe
   assert.equal(row.error_type, 'RequestTooLargeError');
   assert.equal(row.request_started, false);
 }
-assert.equal((await result('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1))).isError, true);
+const oversizeResult = await result('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
+assert.equal(oversizeResult.isError, true);
+assert.match(oversizeResult.content[0].text, /guard=FM-JEV-SIZE rule=complete-screening-budget/);
+assert.match(oversizeResult.content[0].text, /human-only-exit/);
+assert.doesNotMatch(oversizeResult.content[0].text, /split the report/, 'output cannot be completed by splitting a write');
 assert.equal(sent().length, before, 'an uncoverable payload must not send any piece');
 const frictionPath = `${home}/state/friction.jsonl`;
 const friction = () => readFileSync(frictionPath, 'utf8').trim().split('\n').map(JSON.parse);
@@ -1139,11 +1143,12 @@ assert.ok(stalledRow.chunks >= 3);
 console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
+  [ "${out##*$'\n'}" = oversize-ok ] || fail "oversize screening did not reach its final line: $out"
   pass "oversized payloads are screened in complete pieces: benign allowed, any blocked or unscreenable piece blocks, uncoverable and never-send payloads send nothing, deadlines hold"
 }
 
 test_claude_oversize() {
-  local out before big="$TMP_ROOT/claude-big.txt" bad="$TMP_ROOT/claude-big-bad.txt" payload
+  local out before size_before big="$TMP_ROOT/claude-big.txt" bad="$TMP_ROOT/claude-big-bad.txt" payload
   awk 'BEGIN { for (i = 0; i < 700; i++) printf "L%d: const answer = compute(%d); // ordinary source line\n", i, i }' > "$big"
   { head -n 350 "$big"; printf 'token = sk-live-fixture\n'; tail -n 350 "$big"; } > "$bad"
   before=$(requests)
@@ -1166,7 +1171,14 @@ test_claude_oversize() {
   jq -e '.hookSpecificOutput.permissionDecisionReason | contains("guard=FM-JEV-SIZE rule=complete-screening-budget")' <<<"$out" >/dev/null \
     || fail 'Claude hook lost the typed size refusal'
   [ "$(requests)" = "$before" ] || fail 'Claude sent an uncoverable prefix'
-  pass "Claude hooks retain JSON/exit contracts, screen bounded writes, and refuse uncoverable size with the typed completing route"
+  size_before=$(jq -s '[.[] | select(.guard_id == "FM-JEV-SIZE")] | length' "$HOME_DIR/state/friction.jsonl")
+  [ "$size_before" -ge 1 ] || fail 'Claude size denial left no friction event'
+  claude_hook "$(WT="$WT" node -e 'process.stdout.write(JSON.stringify({hook_event_name:"PostToolUse",cwd:process.env.WT,tool_name:"Bash",tool_input:{command:"cat huge"},tool_response:{stdout:"x".repeat(262145),stderr:""},tool_use_id:"size-result"}))')"
+  jq -e '.hookSpecificOutput.additionalContext | contains("RequestTooLargeError") and contains("Advisory only") and (contains("REFUSED") | not)' <<<"$out" >/dev/null \
+    || fail "an oversized Claude result must be an advisory without a refusal line: $out"
+  [ "$(jq -s '[.[] | select(.guard_id == "FM-JEV-SIZE")] | length' "$HOME_DIR/state/friction.jsonl")" = "$size_before" ] \
+    || fail 'an advisory-only Claude result was counted as a blocked refusal'
+  pass "Claude hooks retain JSON/exit contracts, screen bounded writes, refuse uncoverable size with the typed completing route, and leave advisory-only results uncounted"
 }
 
 jev_test_cases=(
