@@ -1119,7 +1119,7 @@ test_teardown_records_task_closed_once() {
   : > "$case_dir/config/fleet-ledger"
 
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "teardown failed with the ledger on: $(cat "$case_dir/stderr")"
-  [ "$(backlog_row_state "$case_dir")" = done ] || fail "the backlog item was not closed"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] || fail "the backlog item was not closed"
   assert_equals '["task-x1","merged_pr","https://github.com/example/repo/pull/7",true]' \
     "$(ledger_closed_rows "$case_dir")" "task.closed record"
 
@@ -1181,7 +1181,7 @@ test_teardown_refusal_and_failing_ledger_leave_teardown_alone() {
   rc=0
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "ledger-closed-failing: an unwritable ledger must not fail teardown"
-  [ "$(backlog_row_state "$case_dir")" = done ] || fail "the backlog item was not closed when the ledger failed"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] || fail "the backlog item was not closed when the ledger failed"
   assert_grep 'fm-fleet-ledger: could not record closed for task-x1' "$case_dir/stderr" "the failed ledger write was not reported"
   run_teardown "$off_dir" > "$off_dir/stdout" 2> "$off_dir/stderr" || fail "flag-off teardown failed"
   normalized_on=$(sed "s#$case_dir#CASE#g" "$case_dir/stdout")
