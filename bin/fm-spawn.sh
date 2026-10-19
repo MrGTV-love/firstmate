@@ -364,16 +364,15 @@
 #   worker's own model cannot be resolved. If an operator's own omp config
 #   routes some other role to OpenRouter, that is their config and Firstmate
 #   does not override it.
-#   --fixed-family applies only to scout tasks, including independent review
-#   readers: it empties every per-task omp fallback chain so a provider error
-#   stops the reader instead of switching its model family. Other harnesses
-#   accept it as a no-op with a notice; a raw launch command is refused,
-#   because it carries no per-task overlay to empty. The task records
-#   fixed_family=on and
-#   relaunch inherits it; bin/fm-promote.sh drops it when the scout becomes a
-#   ship, so the ship relaunches with ordinary chains. Dispatch-time selection
-#   and default chains do not change; this controls only the per-task omp
-#   runtime fallback overlay.
+#   --fixed-family is refused for ships and secondmates and applies to scout
+#   tasks, including independent review readers: it empties every per-task omp
+#   fallback chain, so a provider error stops the reader instead of switching
+#   its model family. Other harnesses accept it as a no-op with a notice; a raw
+#   launch command is refused, because it carries no per-task overlay to empty.
+#   The task records fixed_family=on and relaunch inherits it;
+#   bin/fm-promote.sh drops it when the scout becomes a ship, so the ship
+#   relaunches with ordinary chains. Dispatch-time selection does not change;
+#   the flag controls only the per-task omp runtime fallback overlay.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
 #   to high (ultra is refused for omp before launch), disables
