@@ -11245,6 +11245,68 @@ SH
   pass "a foreign copy that is also dirty, named by another record, or running a process still refuses the whole close"
 }
 
+# A copy that a process of the closing task runs in, or whose creation-lock
+# launcher is the task's own session, is not held: retire would have to signal
+# a process inside a copy that stays. The refusal names that process, at both
+# the unique-ignored-files and the HEAD-not-landed site, and nothing is signalled
+# or removed.
+test_a_foreign_copy_not_held_for_a_process_of_this_teardown_names_that_process() {
+  local rc shape agent child pidfile i reason avoid
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
+  local script='my $child = fork(); if (!$child) { chdir $ARGV[1]; exec "sleep", "300"; } $SIG{CHLD} = "IGNORE"; open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
+  for shape in ignored-in-copy unlanded-in-copy ignored-with-launcher; do
+    child=
+    if [ "$shape" = ignored-with-launcher ]; then
+      start_foreign_session_case "held-own-$shape" agent
+      printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+      seed_backlog_in_flight "$FOREIGN_CASE"
+      held_foreign_ignored "$FOREIGN_COPY"
+      agent=$FOREIGN_AGENT
+      reason="process $FOREIGN_LAUNCHER of this teardown runs in it or launched its creation lock"
+      avoid="holds ignored files that exist nowhere else"
+    else
+      make_held_case "held-own-$shape"
+      if [ "$shape" = ignored-in-copy ]; then
+        held_foreign_ignored "$FOREIGN_COPY"
+        avoid="holds ignored files that exist nowhere else"
+      else
+        held_foreign_unlanded "$FOREIGN_COPY"
+        avoid="its HEAD"
+      fi
+      pidfile=$FOREIGN_CASE/child-pid
+      teardown_fixture_start "$FOREIGN_SLOT" KILL perl -e "$script" "$pidfile" "$FOREIGN_COPY"
+      agent=$TEARDOWN_FIXTURE_PID
+      for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
+      child=$(cat "$pidfile")
+      cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*)
+    if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi
+    if kill -0 $child 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $child '$FOREIGN_COPY'; fi
+    exit 0 ;;
+esac
+exit 1
+SH
+      reason="process $child of this teardown runs in it or launched its creation lock"
+    fi
+    held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+    run_foreign_teardown rc
+    kill -0 "$agent" 2>/dev/null || fail "held-own-$shape: a refused close ended the task's session"
+    [ -z "$child" ] || kill -0 "$child" 2>/dev/null || fail "held-own-$shape: a refused close ended the process inside the copy"
+    kill -KILL ${child:+"$child"} "$agent" 2>/dev/null || true
+    expect_code 1 "$rc" "held-own-$shape: a copy with a process of this teardown must not be held: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "REFUSED: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: $reason" "$FOREIGN_CASE/stderr" \
+      "held-own-$shape: the refusal did not name the process of this teardown: $(cat "$FOREIGN_CASE/stderr")"
+    assert_no_grep "$avoid" "$FOREIGN_CASE/stderr" "held-own-$shape: the refusal names the copy's unique work instead of the process"
+    assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "held-own-$shape: the refusal changed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-own-$shape: the task record was removed"
+    assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-own-$shape: a refused close wrote a held-copy record"
+    held_assert_untouched "held-own-$shape" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  done
+  pass "a copy not held because a process of the closing task runs in it, or launched its lock, is refused naming that process, and nothing is signalled or removed"
+}
+
 test_a_forced_close_never_holds_a_foreign_copy() {
   local rc
   make_held_case held-forced
@@ -13411,6 +13473,7 @@ test_a_held_copy_record_that_cannot_be_written_warns_and_the_close_completes
 test_a_legacy_record_held_close_still_names_the_held_copies
 test_a_foreign_copy_does_not_excuse_an_own_copy_that_is_not_landed
 test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close
+test_a_foreign_copy_not_held_for_a_process_of_this_teardown_names_that_process
 test_a_forced_close_never_holds_a_foreign_copy
 test_a_slot_with_no_foreign_copy_closes_and_returns_as_before
 test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal

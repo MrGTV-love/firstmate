@@ -59,7 +59,8 @@
 #
 # Requires bin/fm-task-copy-lib.sh and bin/fm-lock-lib.sh to be sourced first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, META, STATE, WT,
-# TASK_TMP, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT) and functions
+# TASK_TMP, FORCE, KIND, DATA, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT,
+# TEARDOWN_PEER_SLOT, TEARDOWN_HELD_SLOT) and functions
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
 
@@ -299,16 +300,24 @@ teardown_copy_inside_own_nested() {  # <copy>
 # ownership proof runs again here for the ignored-files case, whose reason is
 # judged before it; when that proof fails, its reason replaces the ignored-files
 # one, so the refusal names what really owns the copy. A copy any process runs in
-# is never held, so retire never signals a process inside a copy that stays. A
+# is never held, so retire never signals a process inside a copy that stays; when
+# the only such process is one of this teardown, the refusal names its pid. A
 # copy inside an own nested copy is never held, and neither is a path that would
 # break the one-line record.
 teardown_foreign_copy_holdable() {  # <copy>
-  local copy=$1 why=$TEARDOWN_FOREIGN_WHY procs=$TEARDOWN_FOREIGN_PROCS_BASE rc=0
+  local copy=$1 why=$TEARDOWN_FOREIGN_WHY procs=$TEARDOWN_FOREIGN_PROCS_BASE rc=0 entry pid own=
   case "$FORCE:$KIND" in --force:*|*:secondmate) return 1 ;; esac
   ! teardown_copy_inside_own_nested "$copy" || return 1
   case "$copy$why$ID$TEARDOWN_RETURN_SLOT" in *$'\t'*|*$'\n'*) return 1 ;; esac
   teardown_foreign_copy_unowned "$copy" || rc=1
   if [ "${#TEARDOWN_FOREIGN_PROCS[@]}" -gt "$procs" ]; then
+    if [ "$rc" = 0 ]; then
+      for entry in "${TEARDOWN_FOREIGN_PROCS[@]:$procs}"; do
+        pid=${entry%%$'\t'*}
+        case " $own " in *" $pid "*) ;; *) own+="${own:+ }$pid" ;; esac
+      done
+      TEARDOWN_FOREIGN_WHY="process ${own// /, } of this teardown runs in it or launched its creation lock"
+    fi
     TEARDOWN_FOREIGN_PROCS=(${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]:0:$procs}"})
     return 1
   fi

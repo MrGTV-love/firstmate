@@ -197,7 +197,9 @@
 # forced Treehouse return of a Git directory (pool slot or not), its Git
 # worktree registrations must contain no nested
 # copy outside this task's individually proven copies; otherwise teardown
-# refuses, even with --force, and names each such copy. If an active record
+# refuses, even with --force, and names each such copy, except that without
+# --force a copy the held-copy rule below leaves standing does not refuse the
+# close. If an active record
 # owns that copy's work, reassociate that task to it first. A nested copy that
 # no record of this task names is a foreign copy (Vernant's
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
@@ -212,7 +214,8 @@
 # that is not teardown's own is never signalled and refuses at once, named by its
 # pid; it is a clean worktree root with no ignored file unique to it; and its
 # work is landed by the existing landed-work rule. A copy whose work is not
-# proved landed stays, with the reason written.
+# proved landed stays, with the reason written, and refuses the close unless the
+# held-copy rule below applies.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -234,8 +237,23 @@
 # like a foreign copy, after the clean and landed proof and the same ignored-file,
 # record, process and launcher proofs; an own copy that is not locked is removed
 # as before.
-# Every other case, including a half-removed copy, refuses as before; --force
-# never waives these proofs. The by-hand route is in docs/agent-control.md.
+# Apart from the held-copy rule below, every other case, including a half-removed
+# copy, refuses as before; --force never waives these proofs. The by-hand route
+# is in docs/agent-control.md.
+# Held copies. A foreign copy that is clean, owned by no record, process or live
+# launcher outside this teardown, and held back only by ignored files that exist
+# nowhere else or by a HEAD that is not proved landed does not stop the close of
+# a task whose own copy passed the landed-work proof (bin/fm-teardown-nested-lib.sh
+# owns the rule). The task closes: its backlog item goes to Done, its record and
+# runtime state go, and only its own nested copies the proof covers are removed.
+# The pool slot is reserved under a durable lease exactly as an ordinary return
+# reserves it, but it is not returned, and no foreign copy is touched; a slot
+# that cannot be proved durably leased refuses the close before anything is
+# removed. Each held copy is named in the output and appended to
+# data/held-foreign-copies.log once the close is final. --force never holds a
+# copy, a copy inside the task's own nested copy is never held, and a copy that
+# is dirty, owned, or has a process in it still refuses. docs/agent-control.md
+# owns the rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
