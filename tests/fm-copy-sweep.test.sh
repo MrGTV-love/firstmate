@@ -747,6 +747,29 @@ test_a_bare_allowed_literal_plan_releases_the_copy() {
   pass "a plan whose whole answer is allowed=true releases the copy"
 }
 
+test_a_zero_padded_plan_timeout_is_read_as_decimal() {
+  local padded
+  make_locked_copy_case planpadhang dead
+  install_driver "$SLOT" "$W"
+  : > "$W/plan-hang"
+  FM_COPY_SWEEP_PLAN_TIMEOUT=08 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "a zero-padded plan bound failed the run ($RC): $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "did not answer within 8s" "a hung plan under a bound of 08 did not say 8s"
+  assert_not_contains "$OUT" "value too great" "a zero-padded plan bound was read as octal"
+  assert_driver_pids_gone "a hung plan under a bound of 08"
+  for padded in 08 09; do
+    make_locked_copy_case "planpadallow$padded" dead
+    install_driver "$SLOT" "$W"
+    FM_COPY_SWEEP_PLAN_TIMEOUT=$padded FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "an allowed plan under a bound of $padded failed the run ($RC): $OUT"
+    assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "an allowed plan under a bound of $padded did not release the copy"
+    assert_not_contains "$OUT" "value too great" "a bound of $padded was read as octal"
+    [ ! -e "$(copy_path locked)" ] || fail "an allowed plan under a bound of $padded left the copy on disk"
+  done
+  pass "a zero-padded plan bound is decimal: 08 holds a hung plan at 8s and 08 or 09 releases a copy whose plan allows it"
+}
+
 test_a_sweep_stopped_during_a_plan_stops_the_hung_driver() {
   local sweep waited=0
   make_locked_copy_case planstopped dead
@@ -1679,6 +1702,7 @@ run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
 run_case test_unproved_plan_verdicts_hold_the_copy
 run_case test_a_bare_allowed_literal_plan_releases_the_copy
+run_case test_a_zero_padded_plan_timeout_is_read_as_decimal
 run_case test_a_sweep_stopped_during_a_plan_stops_the_hung_driver
 run_case test_two_sweeps_of_one_path_keep_both_preserved_directories
 run_case test_a_removal_with_no_measured_size_says_so

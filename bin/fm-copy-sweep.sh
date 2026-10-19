@@ -948,7 +948,8 @@ driver_plan_allows() {  # <clone> <copy>
   local dir rc=0 limit ticks=0 timed_out=0 pid
   limit=${FM_COPY_SWEEP_PLAN_TIMEOUT:-120}
   case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
-  [ $((10#$limit)) -ge 1 ] || limit=120
+  limit=$((10#$limit))
+  [ "$limit" -ge 1 ] || limit=120
   dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-sweep-plan.XXXXXX") || {
     PLAN_WHY="its closeout driver could not be planned (no temporary directory)"
     return 1
