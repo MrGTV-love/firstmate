@@ -343,7 +343,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
     } catch (error) {
       return finishCall({ ...terminal, ...trail, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type: failureType(error),
-        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) });
+        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result });
     }
   }, "tool_call", service.host));
 
@@ -380,7 +380,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         branch: result ? "policy" : "empty", request_started: result !== undefined, result }, undefined, event);
     } catch (error) {
       return finishResult({ ...terminal, ...trail, decision: "review", enforcement, branch: "outage", error_type: failureType(error),
-        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) }, undefined, event);
+        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result }, undefined, event);
     }
   }, "tool_result", service.host));
 }

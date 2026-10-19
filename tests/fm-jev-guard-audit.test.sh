@@ -8,7 +8,7 @@ export AUDIT_ROOT="$ROOT" AUDIT_TMP="$TMP_ROOT"
 node --experimental-strip-types --experimental-test-module-mocks --no-warnings --input-type=module <<'JS' || fail 'guard settlement/audit regression'
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const reportUrl = pathToFileURL(`${process.env.AUDIT_ROOT}/bin/ten-levels/extensions/report.ts`).href;
 const report = await import(reportUrl);
@@ -139,6 +139,46 @@ await test('result: an all-blank result plans no screening and sends nothing', a
   assert.equal(r.planned_chunks, 0);
   assert.equal(r.cost.source, 'not_called');
   assert.equal(r.cost.incomplete, false);
+});
+// A failure before any piece exists has no chunk to report: no piece failed, none was planned, none was sent.
+const rowCount = () => readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').length;
+async function fresh(act) {
+  const before = rowCount();
+  await act();
+  assert.equal(rowCount(), before + 1, 'the call wrote exactly one audit row');
+  return row();
+}
+function assertNoPiece(r, errorType) {
+  assert.equal(r.error_type, errorType);
+  assert.equal(r.request_started, false);
+  assert.deepEqual(r.failures, [], 'a failure before planning invents no failed piece');
+  assert.equal(r.planned_chunks, 0);
+  assert.equal(r.chunks, 0);
+  assert.equal(r.attempts, null);
+  assert.equal(r.ms, null);
+}
+await test('call: invalid tool input fails before planning and invents no piece', async () => {
+  parts = []; next = 0;
+  assertNoPiece(await fresh(() => handlers.tool_call({ toolName: 'bash', input: { command: 42 } }, { cwd: state })), 'InvalidToolInputError');
+  assertNoPiece(await fresh(() => handlers.tool_call({ toolName: 'write', input: { path: 'file.ts', content: 42 } }, { cwd: state })), 'InvalidToolInputError');
+});
+await test('result: an oversize result no plan can cover fails before planning and invents no piece', async () => {
+  const text = 'x'.repeat(report.MAX_CHUNKS * report.MAX_REQUEST_BYTES + 1);
+  assertNoPiece(await fresh(() => runText(text, [])), 'RequestTooLargeError');
+});
+await test('result: a never-send refusal while planning invents no piece', async () => {
+  writeFileSync(`${state}/config/dispatch-never-send`, 'audit-never-send-canary\n');
+  try {
+    assertNoPiece(await fresh(() => runText(`audit-never-send-canary${' '.repeat(40_000)}tail`, [])), 'PrivacyWithheldError');
+  } finally {
+    rmSync(`${state}/config/dispatch-never-send`);
+  }
+});
+await test('result: an unsupported tool result fails before planning and invents no piece', async () => {
+  parts = []; next = 0;
+  for (const content of ['not a list of parts', [{ type: 'image' }]]) {
+    assertNoPiece(await fresh(() => handlers.tool_result({ toolName: 'bash', content }, { cwd: state })), 'UnsupportedToolResultError');
+  }
 });
 // The guard adds no retry accounting of its own: a retried success is exactly what the client reported.
 await test('real decide: a guard-retried success keeps the client result and a complete reported cost', async () => {

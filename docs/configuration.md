@@ -2310,6 +2310,7 @@ A row that holds a provider answer keeps the client's own `attempts` and `ms`, w
 A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer (a blank piece needs none and is not counted), separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
 Its usage totals every answered piece, its attempts include every answered piece and every unanswered piece whose request started, and `ms` is the longest elapsed time because pieces run concurrently.
 The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.
+A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning, an unsupported result shape) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
 When every planned piece answered, one answer carries its own reported or estimated charge, and several answers sum to a reported charge only when every one of them reported its cost, otherwise unknown.
 When a planned piece did not answer, whether it failed or was never sent, the total is unknown with `incomplete: true`.
 `reported_amount` retains the known reported subtotal, so a partial payload neither hides it nor presents it as the charge for the whole payload.

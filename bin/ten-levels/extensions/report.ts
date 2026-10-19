@@ -99,9 +99,6 @@ export interface GuardTerminal {
   refused_path?: string;
   error_type: GuardFailureType | null;
   request_started: boolean;
-  /** Set on failure rows, where no result carries meta. */
-  attempts?: number | null;
-  ms?: number | null;
   result?: SystemOneResult;
   /** Planned pieces, every answered piece, and minimized timing for every unanswered piece. */
   chunks?: number;
@@ -265,9 +262,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       const result = terminal.result;
       const answered = terminal.results ?? (result ? [result] : []);
       // Settlement keeps all unanswered pieces, even when a policy block wins over an outage.
-      // Before planning/settlement, a handler failure can still carry its single timing here.
-      const failures = terminal.failures ?? (terminal.error_type ? [{ chunk: 1, error_type: terminal.error_type,
-        request_started: terminal.request_started && !result, attempts: terminal.attempts ?? null, ms: terminal.ms ?? null }] : []);
+      const failures = terminal.failures ?? [];
       const sentFailures = failures.filter((failure) => failure.request_started);
       const chunks = answered.length + sentFailures.length;
       const requestStarted = chunks > 0;
