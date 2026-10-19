@@ -1,0 +1,28 @@
+### fm-brief.sh live-no-mistakes some-proj --mode no-mistakes
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.lwa9Z0/data/live-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=0
+--- branch step as emitted (no-mistakes) ---
+1. First action: create your branch: `git checkout -b fm/live-no-mistakes --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: `blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?` and stop. Never run start_task_worktree.py from this slot.
+2. Run `no-mistakes doctor`; if it reports the repo is not initialized here, run `no-mistakes init`.
+
+
+### fm-brief.sh live-direct-PR some-proj --mode direct-PR
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.lwa9Z0/data/live-direct-PR/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=0
+--- branch step as emitted (direct-PR) ---
+1. First action: create your branch: `git checkout -b fm/live-direct-PR --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: `blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?` and stop. Never run start_task_worktree.py from this slot.
+
+
+### fm-brief.sh live-local-only some-proj --mode local-only
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.lwa9Z0/data/live-local-only/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=0
+--- branch step as emitted (local-only) ---
+1. First action: create your branch: `git checkout -b fm/live-local-only --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: `blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?` and stop. Never run start_task_worktree.py from this slot.
+
+

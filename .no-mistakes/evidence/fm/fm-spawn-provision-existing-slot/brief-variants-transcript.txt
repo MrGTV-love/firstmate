@@ -1,0 +1,23 @@
+### scout brief: must NOT carry the new nested-worktree text
+scout rc=0
+scout hits for new text: 0
+
+### ship brief with --base-branch release/x and --branch-prefix zz: branch step still renders
+based rc=0
+1. First action: create your branch: `git checkout -b zzlive-based --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that
+   If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Ap
+2. Run `no-mistakes doctor`; if it reports the repo is not initialized here, run `no-mistakes init`.
+
+17:Base branch: release/x
+
+### ship brief with --forge gerrit --mode direct-PR
+forge rc=0
+1. First action: create your branch: `git checkout -b fm/live-forge --`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that
+   If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Ap
+
+
+### secondmate charter: must NOT carry the new text
+secondmate rc=0
+secondmate hits in brief.md: 0

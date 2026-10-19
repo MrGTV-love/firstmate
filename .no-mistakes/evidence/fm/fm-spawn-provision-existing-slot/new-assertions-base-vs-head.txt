@@ -1,0 +1,4 @@
+# New test's three key assertions against BASE-generated vs HEAD-generated no-mistakes brief (0 = absent, would FAIL the test; 1+ = present)
+Do not create a second tree with                        base=0 head=1
+which route should this slot use                        base=0 head=1
+Never run start_task_worktree.py from this slot         base=0 head=1

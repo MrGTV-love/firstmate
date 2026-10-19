@@ -1,0 +1,15 @@
+# Generated brief, base 065c13165 vs head 0d29ef22e, FM_ROOT path normalized (only script location differs otherwise)
+=== no-mistakes ===
+22a23,24
+>    You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+>    If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: `blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?` and stop. Never run start_task_worktree.py from this slot.
+=== direct-PR ===
+22a23,24
+>    You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+>    If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: `blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?` and stop. Never run start_task_worktree.py from this slot.
+=== local-only ===
+22a23,24
+>    You already sit in a pool slot, which is itself a worktree. Do not create a second tree with `scripts/git-stability/start_task_worktree.py` from inside this slot; that nested worktree has no owner.
+>    If a Vernant rule or guard demands a lifecycle manifest, or reports `manifest_exists` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: `blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?` and stop. Never run start_task_worktree.py from this slot.
+=== scout ===
+(byte-identical)

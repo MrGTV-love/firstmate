@@ -1,0 +1,11 @@
+### real status parser vs. the blocked line from the real brief
+template from brief : blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?
+line the lane writes: blocked [at=1792449640] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?
+verb                : blocked
+stamped epoch ok    : 1792449640 (yes)
+decision key        : slot-manifest
+prefix unrecognized : no (good)
+terminal verb       : yes
+surfaces to firstmate: yes
+open decisions after blocked   : [slot-manifest	blocked	firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?]
+open decisions after resolved  : []
