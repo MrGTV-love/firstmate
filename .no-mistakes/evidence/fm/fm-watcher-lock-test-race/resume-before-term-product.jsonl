@@ -1,0 +1,5 @@
+{"event": "real-beacon-write", "mtime": 1792432682.693474, "after_one_shot_marker": false}
+{"event": "backdated-beacon", "mtime": 946706400.0, "stopped_writer": "93740"}
+{"event": "real-beacon-write", "mtime": 1792432684.526446, "after_one_shot_marker": true}
+{"event": "resumed-watcher-after-next-beacon", "watcher_pid": "93740", "process_state": "SN", "arm_output": "watcher: started pid=93740 (beacon fresh)\n"}
+{"event": "production-cycle-exit-ledger", "grep_exit": 0, "content": "arm_pid=93703\twatcher_pid=93740\torigin=started\tstarted_at=1792432681\tended_at=1792432684\texit_code=143\tsignal=SIGTERM\treason=signal-exit\tbeacon_age=0\tlock_before=pid:93740|identity:Mon Oct 19 12:58:01 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5AKQ3DA9DCN4CJ5CF9EBF6S/bin/fm-watch.sh\tlock_after=pid:none|identity:none\tsuccessor=none\n"}

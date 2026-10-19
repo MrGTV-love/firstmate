@@ -1,0 +1,103 @@
+COMMAND: python3 bin/fm-duration.py run test.tests/fm-watcher-lock.test.sh -- bash bin/fm-proc-budget.sh -- python3 /Users/charlesabrooker/fleet/fm-mini-home/data/fm-watcher-lock-test-race/evidence/stress.py /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5AKQ3DA9DCN4CJ5CF9EBF6S /Users/charlesabrooker/.no-mistakes/evidence/01M5AKQ3DA9DCN4CJ5CF9EBF6S/after-one-shot-stress.txt --iterations 40 --load 40 --schedule
+ISOLATION: worktree-local TMPDIR, CPU pool, test slots; no inherited FM_* overrides; timing persistence off
+calibration: "0 of 5 samples for test.tests/fm-watcher-lock.test.sh on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+COMMAND: nice -n 20 bash bin/fm-test-run.sh tests/fm-watcher-lock.test.sh
+FM_TEST_ONLY=test_stopped_watcher_is_live_but_stale_then_exit_is_classifiedprogress: "test.tests/fm-watcher-lock.test.sh elapsed=0.1s output_bytes=149 tree_cpu=0.06s"
+
+ITERATIONS=40 LOAD_JOBS=40 LOAD_COMMAND=nice -n 20 yes (stdout=/dev/null)
+SCHEDULE_CONTROLLED_INTERLEAVING=True
+CAUSE: watcher forks touch; test stops only watcher parent and backdates beacon; in-flight child may then overwrite the stale mtime before health reads it.
+TOUCH_CHILD_THEORY=TRUE (see touch-theory.txt for isolated kernel-state and mtime proof)
+HEAD=1195b40dd1cf6677f4374ff1dcf0b4af0d3d5f06
+DIFF_STAT=
+OWNED_LOAD_PIDS=7925,7940,7948,7952,7967,7972,7997,8003,8019,8036,8040,8053,8073,8095,8103,8113,8123,8126,8129,8140,8143,8151,8158,8169,8173,8178,8190,8199,8218,8227,8240,8246,8268,8270,8294,8301,8308,8313,8337,8350
+ITERATION 1/40
+RESULT iteration=1 exit=0
+ITERATION 2/40
+RESULT iteration=2 exit=0
+ITERATION 3/40
+RESULT iteration=3 exit=0
+ITERATION 4/40
+RESULT iteration=4 exit=0
+ITERATION 5/40
+RESULT iteration=5 exit=0
+ITERATION 6/40
+RESULT iteration=6 exit=0
+ITERATION 7/40
+progress: "test.tests/fm-watcher-lock.test.sh elapsed=60.8s output_bytes=1041 tree_cpu=311.20s"
+RESULT iteration=7 exit=0
+ITERATION 8/40
+RESULT iteration=8 exit=0
+ITERATION 9/40
+RESULT iteration=9 exit=0
+ITERATION 10/40
+RESULT iteration=10 exit=0
+ITERATION 11/40
+RESULT iteration=11 exit=0
+ITERATION 12/40
+RESULT iteration=12 exit=0
+ITERATION 13/40
+RESULT iteration=13 exit=0
+ITERATION 14/40
+RESULT iteration=14 exit=0
+ITERATION 15/40
+progress: "test.tests/fm-watcher-lock.test.sh elapsed=121.4s output_bytes=1380 tree_cpu=626.76s"
+RESULT iteration=15 exit=0
+ITERATION 16/40
+RESULT iteration=16 exit=0
+ITERATION 17/40
+RESULT iteration=17 exit=0
+ITERATION 18/40
+RESULT iteration=18 exit=0
+ITERATION 19/40
+RESULT iteration=19 exit=0
+ITERATION 20/40
+RESULT iteration=20 exit=0
+ITERATION 21/40
+RESULT iteration=21 exit=0
+ITERATION 22/40
+progress: "test.tests/fm-watcher-lock.test.sh elapsed=182.3s output_bytes=1681 tree_cpu=929.20s"
+RESULT iteration=22 exit=0
+ITERATION 23/40
+RESULT iteration=23 exit=0
+ITERATION 24/40
+RESULT iteration=24 exit=0
+ITERATION 25/40
+RESULT iteration=25 exit=0
+ITERATION 26/40
+RESULT iteration=26 exit=0
+ITERATION 27/40
+RESULT iteration=27 exit=0
+ITERATION 28/40
+progress: "test.tests/fm-watcher-lock.test.sh elapsed=242.7s output_bytes=1939 tree_cpu=1205.13s"
+RESULT iteration=28 exit=0
+ITERATION 29/40
+RESULT iteration=29 exit=0
+ITERATION 30/40
+RESULT iteration=30 exit=0
+ITERATION 31/40
+RESULT iteration=31 exit=0
+ITERATION 32/40
+RESULT iteration=32 exit=0
+ITERATION 33/40
+RESULT iteration=33 exit=0
+ITERATION 34/40
+progress: "test.tests/fm-watcher-lock.test.sh elapsed=302.7s output_bytes=2197 tree_cpu=1502.08s"
+RESULT iteration=34 exit=0
+ITERATION 35/40
+RESULT iteration=35 exit=0
+ITERATION 36/40
+RESULT iteration=36 exit=0
+ITERATION 37/40
+RESULT iteration=37 exit=0
+ITERATION 38/40
+RESULT iteration=38 exit=0
+ITERATION 39/40
+RESULT iteration=39 exit=0
+ITERATION 40/40
+RESULT iteration=40 exit=0
+LOAD_CLEANUP: all owned nice yes jobs stopped and reaped
+SCHEDULE_CLEANUP: task-local PATH wrappers removed
+SUMMARY iterations=40 failures=0 failure_rate=0.000000 failed_iterations=[]
+COMMAND_EXIT=0

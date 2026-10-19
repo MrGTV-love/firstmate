@@ -1,0 +1,32 @@
+Work only in an already-isolated copy; no additional checkout or worktree is needed.
+All paths below are task-owned evidence paths or the existing isolated repository.
+
+REPO=/Users/charlesabrooker/.treehouse/fm-mini-home-27ba56/3/fm-mini-home
+EVIDENCE=/Users/charlesabrooker/fleet/fm-mini-home/data/fm-watcher-lock-test-race/evidence
+BUDGET=/Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh
+DURATION=/Users/charlesabrooker/fleet/fm-mini-home/bin/fm-duration.py
+
+Theory experiment (unmodified production watcher, temporary fake home):
+bash "$BUDGET" -- nice -n 20 python3 "$EVIDENCE/touch-theory.py" "$REPO"
+
+Original uncontrolled CPU-load run (0 failures in 40, preserved as before-natural.txt):
+python3 "$DURATION" run test.tests/fm-watcher-lock.test.sh -- bash "$BUDGET" -- python3 "$EVIDENCE/stress.py" "$REPO" "$EVIDENCE/before-natural.txt" --iterations 40 --load 40
+
+Controlled causal reproduction on original clean HEAD 19e0b6891edb720bd772806081cfc7e43f2db962 (40 failures in 40):
+python3 "$DURATION" run test.tests/fm-watcher-lock.test.sh -- bash "$BUDGET" -- python3 "$EVIDENCE/stress.py" "$REPO" "$EVIDENCE/before.txt" --iterations 40 --load 40 --schedule
+
+Identical stress command after the fixture fix (same 40 iterations, 40 nice yes jobs, PATH schedule):
+python3 "$DURATION" run test.tests/fm-watcher-lock.test.sh -- bash "$BUDGET" -- python3 "$EVIDENCE/stress.py" "$REPO" "$EVIDENCE/after.txt" --iterations 40 --load 40 --schedule
+
+The stress driver calls nice -n 20 bash bin/fm-test-run.sh tests/fm-watcher-lock.test.sh with FM_TEST_ONLY=test_stopped_watcher_is_live_but_stale_then_exit_is_classified for each serial iteration.
+It starts the 40 load jobs itself and stops and reaps them in a finally block.
+The controlled run uses temporary PATH wrappers from schedule.py; it never changes repository source files.
+The touch wrapper performs one actual system touch after a controlled SIGSTOP/SIGCONT boundary.
+The grep wrapper delays only readiness observation until that touch is pending, or the repaired fixture has already stopped its watcher after a completed touch.
+This is an adversarial scheduler, not an estimate of the natural failure rate.
+
+Whole targeted test file, serial, without FM_TEST_ONLY or scheduler:
+python3 "$DURATION" run test.tests/fm-watcher-lock.test.sh -- bash "$BUDGET" -- python3 "$EVIDENCE/run-command.py" "$EVIDENCE/whole-test.txt" nice -n 20 bash bin/fm-test-run.sh tests/fm-watcher-lock.test.sh
+
+Assertion-strength negative control, on the fixed source, intentionally keeps the beacon fresh and must reproduce the original assertion failure:
+python3 "$DURATION" run test.tests/fm-watcher-lock.test.sh -- bash "$BUDGET" -- python3 "$EVIDENCE/run-command.py" "$EVIDENCE/assertion-power.txt" nice -n 20 python3 "$EVIDENCE/assertion-power.py" "$REPO"

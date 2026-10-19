@@ -1,0 +1,6 @@
+PENDING_TOUCH pid=63019 parent=62104
+STOPPED_PARENT=TN
+BEACON_BEFORE_CHILD_RESUME=946706400
+BEACON_AFTER_CHILD_RESUME=1792429598 STOPPED_PARENT=TN HEALTH_EXIT=0
+THEORY TRUE: a touch already forked by the watcher refreshes the backdated beacon after SIGSTOP stops only the parent; a fresh beacon then correctly satisfies the existing health contract.
+CLEANUP: owned watcher and pending touch resumed and reaped

@@ -1,0 +1,373 @@
+COMMAND: nice -n 20 bash bin/fm-test-run.sh tests/fm-watcher-lock.test.sh
+FM_TEST_ONLY=test_stopped_watcher_is_live_but_stale_then_exit_is_classified
+ITERATIONS=40 LOAD_JOBS=40 LOAD_COMMAND=nice -n 20 yes (stdout=/dev/null)
+SCHEDULE_CONTROLLED_INTERLEAVING=True
+CAUSE: watcher forks touch; test stops only watcher parent and backdates beacon; in-flight child may then overwrite the stale mtime before health reads it.
+TOUCH_CHILD_THEORY=TRUE (see touch-theory.txt for isolated kernel-state and mtime proof)
+HEAD=19e0b6891edb720bd772806081cfc7e43f2db962
+DIFF_STAT=tests/fm-watcher-lock.test.sh | 31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
+OWNED_LOAD_PIDS=39016,39019,39024,39029,39033,39042,39048,39054,39061,39062,39063,39068,39071,39073,39075,39080,39085,39089,39094,39099,39102,39104,39116,39130,39152,39169,39189,39205,39213,39228,39233,39240,39250,39254,39259,39271,39275,39280,39290,39303
+ITERATION 1/40
+FM_TEST_BEGIN 2026-10-19T17:21:20Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:21:26Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6374 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6714
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6374 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6374
+RESULT iteration=1 exit=0
+ITERATION 2/40
+FM_TEST_BEGIN 2026-10-19T17:21:27Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:21:35Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=8554 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8929
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=8554 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=8554
+RESULT iteration=2 exit=0
+ITERATION 3/40
+FM_TEST_BEGIN 2026-10-19T17:21:36Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:21:42Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6304 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6634
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6304 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6304
+RESULT iteration=3 exit=0
+ITERATION 4/40
+FM_TEST_BEGIN 2026-10-19T17:21:43Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:21:49Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6336 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6631
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6336 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6336
+RESULT iteration=4 exit=0
+ITERATION 5/40
+FM_TEST_BEGIN 2026-10-19T17:21:50Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:21:56Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6794 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7088
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6794 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6794
+RESULT iteration=5 exit=0
+ITERATION 6/40
+FM_TEST_BEGIN 2026-10-19T17:21:57Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:05Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=8171 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8493
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=8171 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=8171
+RESULT iteration=6 exit=0
+ITERATION 7/40
+FM_TEST_BEGIN 2026-10-19T17:22:06Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:13Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6765 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7097
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6765 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6765
+RESULT iteration=7 exit=0
+ITERATION 8/40
+FM_TEST_BEGIN 2026-10-19T17:22:13Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:20Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6200 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6491
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6200 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6200
+RESULT iteration=8 exit=0
+ITERATION 9/40
+FM_TEST_BEGIN 2026-10-19T17:22:20Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:27Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6619 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6942
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6619 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6619
+RESULT iteration=9 exit=0
+ITERATION 10/40
+FM_TEST_BEGIN 2026-10-19T17:22:28Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:37Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=9336 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=9641
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=9336 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=9336
+RESULT iteration=10 exit=0
+ITERATION 11/40
+FM_TEST_BEGIN 2026-10-19T17:22:38Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:45Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6696 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7006
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6696 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6696
+RESULT iteration=11 exit=0
+ITERATION 12/40
+FM_TEST_BEGIN 2026-10-19T17:22:45Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:52Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6566 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6914
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6566 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6566
+RESULT iteration=12 exit=0
+ITERATION 13/40
+FM_TEST_BEGIN 2026-10-19T17:22:52Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:22:59Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6903 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7168
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6903 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6903
+RESULT iteration=13 exit=0
+ITERATION 14/40
+FM_TEST_BEGIN 2026-10-19T17:23:00Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:23:08Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=8601 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8916
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=8601 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=8601
+RESULT iteration=14 exit=0
+ITERATION 15/40
+FM_TEST_BEGIN 2026-10-19T17:23:09Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:23:16Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7088 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7370
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7088 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7088
+RESULT iteration=15 exit=0
+ITERATION 16/40
+FM_TEST_BEGIN 2026-10-19T17:23:17Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:23:24Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6918 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7250
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6918 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6918
+RESULT iteration=16 exit=0
+ITERATION 17/40
+FM_TEST_BEGIN 2026-10-19T17:23:24Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:23:32Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7756 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8104
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7756 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7756
+RESULT iteration=17 exit=0
+ITERATION 18/40
+FM_TEST_BEGIN 2026-10-19T17:23:33Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:23:43Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=10229 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=10565
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10229 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10229
+RESULT iteration=18 exit=0
+ITERATION 19/40
+FM_TEST_BEGIN 2026-10-19T17:23:44Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:23:52Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=8234 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8637
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=8234 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=8234
+RESULT iteration=19 exit=0
+ITERATION 20/40
+FM_TEST_BEGIN 2026-10-19T17:23:53Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:24:01Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7622 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7950
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7622 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7622
+RESULT iteration=20 exit=0
+ITERATION 21/40
+FM_TEST_BEGIN 2026-10-19T17:24:01Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:24:12Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=10277 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=10634
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10277 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10277
+RESULT iteration=21 exit=0
+ITERATION 22/40
+FM_TEST_BEGIN 2026-10-19T17:24:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:24:19Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6477 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6778
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6477 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6477
+RESULT iteration=22 exit=0
+ITERATION 23/40
+FM_TEST_BEGIN 2026-10-19T17:24:19Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:24:26Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6464 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6718
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6464 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6464
+RESULT iteration=23 exit=0
+ITERATION 24/40
+FM_TEST_BEGIN 2026-10-19T17:24:26Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:24:33Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6701 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7003
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6701 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6701
+RESULT iteration=24 exit=0
+ITERATION 25/40
+FM_TEST_BEGIN 2026-10-19T17:24:33Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:24:44Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=10263 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=10519
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10263 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10263
+RESULT iteration=25 exit=0
+ITERATION 26/40
+FM_TEST_BEGIN 2026-10-19T17:24:44Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:24:52Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7480 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7831
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7480 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7480
+RESULT iteration=26 exit=0
+ITERATION 27/40
+FM_TEST_BEGIN 2026-10-19T17:24:52Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:00Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7240 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7613
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7240 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7240
+RESULT iteration=27 exit=0
+ITERATION 28/40
+FM_TEST_BEGIN 2026-10-19T17:25:01Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:10Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=9830 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=10174
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=9830 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=9830
+RESULT iteration=28 exit=0
+ITERATION 29/40
+FM_TEST_BEGIN 2026-10-19T17:25:11Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:18Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6418 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6712
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6418 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6418
+RESULT iteration=29 exit=0
+ITERATION 30/40
+FM_TEST_BEGIN 2026-10-19T17:25:18Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:25Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6973 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7263
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6973 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6973
+RESULT iteration=30 exit=0
+ITERATION 31/40
+FM_TEST_BEGIN 2026-10-19T17:25:26Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:33Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6915 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7178
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6915 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6915
+RESULT iteration=31 exit=0
+ITERATION 32/40
+FM_TEST_BEGIN 2026-10-19T17:25:33Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:42Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=8482 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8812
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=8482 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=8482
+RESULT iteration=32 exit=0
+ITERATION 33/40
+FM_TEST_BEGIN 2026-10-19T17:25:42Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:51Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=8112 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8477
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=8112 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=8112
+RESULT iteration=33 exit=0
+ITERATION 34/40
+FM_TEST_BEGIN 2026-10-19T17:25:51Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:25:58Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=6555 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=6860
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=6555 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=6555
+RESULT iteration=34 exit=0
+ITERATION 35/40
+FM_TEST_BEGIN 2026-10-19T17:25:59Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:26:06Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7060 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7374
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7060 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7060
+RESULT iteration=35 exit=0
+ITERATION 36/40
+FM_TEST_BEGIN 2026-10-19T17:26:06Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:26:15Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=8855 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=9166
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=8855 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=8855
+RESULT iteration=36 exit=0
+ITERATION 37/40
+FM_TEST_BEGIN 2026-10-19T17:26:16Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:26:23Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7105 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7366
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7105 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7105
+RESULT iteration=37 exit=0
+ITERATION 38/40
+FM_TEST_BEGIN 2026-10-19T17:26:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:26:33Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=9286 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=9628
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=9286 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=9286
+RESULT iteration=38 exit=0
+ITERATION 39/40
+FM_TEST_BEGIN 2026-10-19T17:26:33Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:26:43Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=9135 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=9426
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=9135 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=9135
+RESULT iteration=39 exit=0
+ITERATION 40/40
+FM_TEST_BEGIN 2026-10-19T17:26:43Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-19T17:26:50Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=7230 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=7585
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=7230 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=7230
+RESULT iteration=40 exit=0
+LOAD_CLEANUP: all owned nice yes jobs stopped and reaped
+SCHEDULE_CLEANUP: task-local PATH wrappers removed
+SUMMARY iterations=40 failures=0 failure_rate=0.000000 failed_iterations=[]

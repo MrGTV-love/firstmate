@@ -1,0 +1,932 @@
+COMMAND: nice -n 20 bash bin/fm-test-run.sh tests/fm-watcher-lock.test.sh
+FM_TEST_ONLY=test_stopped_watcher_is_live_but_stale_then_exit_is_classified
+ITERATIONS=40 LOAD_JOBS=40 LOAD_COMMAND=nice -n 20 yes (stdout=/dev/null)
+SCHEDULE_CONTROLLED_INTERLEAVING=True
+CAUSE: watcher forks touch; test stops only watcher parent and backdates beacon; in-flight child may then overwrite the stale mtime before health reads it.
+TOUCH_CHILD_THEORY=TRUE (see touch-theory.txt for isolated kernel-state and mtime proof)
+HEAD=19e0b6891edb720bd772806081cfc7e43f2db962
+DIFF_STAT=
+OWNED_LOAD_PIDS=22671,22672,22673,22674,22676,22678,22682,22683,22685,22687,22688,22689,22710,22726,22727,22729,22736,22742,22744,22751,22753,22760,22764,22767,22768,22769,22773,22774,22775,22779,22784,22787,22789,22799,22804,22805,22807,22808,22810,22816
+ITERATION 1/40
+FM_TEST_BEGIN 2026-10-19T17:12:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=24879 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=24879
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 23372 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:22Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10195 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10435
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10195 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10195
+RESULT iteration=1 exit=1
+FM_TEST_BEGIN 2026-10-19T17:12:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=24879 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=24879
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 23372 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:22Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10195 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10435
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10195 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10195
+
+ITERATION 2/40
+FM_TEST_BEGIN 2026-10-19T17:12:22Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=32545 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=32545
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 27745 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:34Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11770 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12061
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11770 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11770
+RESULT iteration=2 exit=1
+FM_TEST_BEGIN 2026-10-19T17:12:22Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=32545 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=32545
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 27745 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:34Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11770 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12061
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11770 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11770
+
+ITERATION 3/40
+FM_TEST_BEGIN 2026-10-19T17:12:35Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=42197 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=42197
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 39421 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:45Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10574 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10901
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10574 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10574
+RESULT iteration=3 exit=1
+FM_TEST_BEGIN 2026-10-19T17:12:35Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=42197 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=42197
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 39421 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:45Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10574 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10901
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10574 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10574
+
+ITERATION 4/40
+FM_TEST_BEGIN 2026-10-19T17:12:46Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=54626 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=54626
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 50453 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:59Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13052 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=13555
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13052 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13052
+RESULT iteration=4 exit=1
+FM_TEST_BEGIN 2026-10-19T17:12:46Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=54626 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=54626
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 50453 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:12:59Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13052 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=13555
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13052 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13052
+
+ITERATION 5/40
+FM_TEST_BEGIN 2026-10-19T17:13:00Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=63520 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=63520
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 61611 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:11Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11184 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11477
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11184 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11184
+RESULT iteration=5 exit=1
+FM_TEST_BEGIN 2026-10-19T17:13:00Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=63520 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=63520
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 61611 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:11Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11184 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11477
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11184 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11184
+
+ITERATION 6/40
+FM_TEST_BEGIN 2026-10-19T17:13:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=72051 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=72051
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 67859 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:23Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11165 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11475
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11165 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11165
+RESULT iteration=6 exit=1
+FM_TEST_BEGIN 2026-10-19T17:13:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=72051 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=72051
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 67859 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:23Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11165 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11475
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11165 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11165
+
+ITERATION 7/40
+FM_TEST_BEGIN 2026-10-19T17:13:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=78367 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=78367
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 75648 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:34Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10257 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10513
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10257 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10257
+RESULT iteration=7 exit=1
+FM_TEST_BEGIN 2026-10-19T17:13:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=78367 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=78367
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 75648 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:34Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10257 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10513
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10257 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10257
+
+ITERATION 8/40
+FM_TEST_BEGIN 2026-10-19T17:13:34Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=86132 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=86132
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 83767 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:44Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10002 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10265
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10002 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10002
+RESULT iteration=8 exit=1
+FM_TEST_BEGIN 2026-10-19T17:13:34Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=86132 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=86132
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 83767 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:44Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10002 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10265
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10002 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10002
+
+ITERATION 9/40
+FM_TEST_BEGIN 2026-10-19T17:13:45Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=96424 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=96424
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 90695 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:59Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14505 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=14793
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14505 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14505
+RESULT iteration=9 exit=1
+FM_TEST_BEGIN 2026-10-19T17:13:45Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=96424 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=96424
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 90695 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:13:59Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14505 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=14793
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14505 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14505
+
+ITERATION 10/40
+FM_TEST_BEGIN 2026-10-19T17:14:00Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=12469 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=12469
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335:  6516 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:15Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14647 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=15393
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14647 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14647
+RESULT iteration=10 exit=1
+FM_TEST_BEGIN 2026-10-19T17:14:00Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=12469 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=12469
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335:  6516 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:15Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14647 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=15393
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14647 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14647
+
+ITERATION 11/40
+FM_TEST_BEGIN 2026-10-19T17:14:16Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=24474 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=24474
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 20936 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:31Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14667 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=15277
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14667 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14667
+RESULT iteration=11 exit=1
+FM_TEST_BEGIN 2026-10-19T17:14:16Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=24474 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=24474
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 20936 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:31Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14667 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=15277
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14667 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14667
+
+ITERATION 12/40
+FM_TEST_BEGIN 2026-10-19T17:14:31Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=33731 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=33731
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 30078 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:43Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11359 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11665
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11359 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11359
+RESULT iteration=12 exit=1
+FM_TEST_BEGIN 2026-10-19T17:14:31Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=33731 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=33731
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 30078 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:43Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11359 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11665
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11359 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11359
+
+ITERATION 13/40
+FM_TEST_BEGIN 2026-10-19T17:14:43Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=43870 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=43870
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 40197 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:56Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12499 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12785
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12499 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12499
+RESULT iteration=13 exit=1
+FM_TEST_BEGIN 2026-10-19T17:14:43Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=43870 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=43870
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 40197 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:14:56Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12499 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12785
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12499 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12499
+
+ITERATION 14/40
+FM_TEST_BEGIN 2026-10-19T17:14:56Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=50326 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=50326
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 47728 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:07Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10316 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10601
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10316 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10316
+RESULT iteration=14 exit=1
+FM_TEST_BEGIN 2026-10-19T17:14:56Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=50326 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=50326
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 47728 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:07Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10316 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10601
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10316 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10316
+
+ITERATION 15/40
+FM_TEST_BEGIN 2026-10-19T17:15:07Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=54246 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=54246
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 52770 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:17Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10158 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10422
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10158 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10158
+RESULT iteration=15 exit=1
+FM_TEST_BEGIN 2026-10-19T17:15:07Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=54246 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=54246
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 52770 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:17Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10158 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10422
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10158 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10158
+
+ITERATION 16/40
+FM_TEST_BEGIN 2026-10-19T17:15:18Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=64095 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=64095
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 58168 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:31Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13630 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=13959
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13630 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13630
+RESULT iteration=16 exit=1
+FM_TEST_BEGIN 2026-10-19T17:15:18Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=64095 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=64095
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 58168 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:31Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13630 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=13959
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13630 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13630
+
+ITERATION 17/40
+FM_TEST_BEGIN 2026-10-19T17:15:32Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=73824 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=73824
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 390: 70600 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:43Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10620 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10923
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10620 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10620
+RESULT iteration=17 exit=1
+FM_TEST_BEGIN 2026-10-19T17:15:32Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=73824 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=73824
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 390: 70600 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:43Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10620 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10923
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10620 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10620
+
+ITERATION 18/40
+FM_TEST_BEGIN 2026-10-19T17:15:43Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=82220 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=82220
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 79928 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:55Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11849 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12312
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11849 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11849
+RESULT iteration=18 exit=1
+FM_TEST_BEGIN 2026-10-19T17:15:43Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=82220 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=82220
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 79928 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:15:55Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11849 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12312
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11849 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11849
+
+ITERATION 19/40
+FM_TEST_BEGIN 2026-10-19T17:15:56Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=88874 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=88874
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 86734 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:06Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10135 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10507
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10135 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10135
+RESULT iteration=19 exit=1
+FM_TEST_BEGIN 2026-10-19T17:15:56Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=88874 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=88874
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 86734 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:06Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10135 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10507
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10135 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10135
+
+ITERATION 20/40
+FM_TEST_BEGIN 2026-10-19T17:16:07Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=98865 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=98865
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 94273 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:19Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12079 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12367
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12079 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12079
+RESULT iteration=20 exit=1
+FM_TEST_BEGIN 2026-10-19T17:16:07Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=98865 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=98865
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 94273 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:19Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12079 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12367
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12079 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12079
+
+ITERATION 21/40
+FM_TEST_BEGIN 2026-10-19T17:16:20Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=11100 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=11100
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335:  6910 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:36Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=15773 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=16204
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=15773 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=15773
+RESULT iteration=21 exit=1
+FM_TEST_BEGIN 2026-10-19T17:16:20Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=11100 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=11100
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335:  6910 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:36Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=15773 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=16204
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=15773 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=15773
+
+ITERATION 22/40
+FM_TEST_BEGIN 2026-10-19T17:16:36Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=23453 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=23453
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 19468 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:49Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12254 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12714
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12254 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12254
+RESULT iteration=22 exit=1
+FM_TEST_BEGIN 2026-10-19T17:16:36Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=23453 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=23453
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 19468 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:16:49Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12254 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12714
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12254 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12254
+
+ITERATION 23/40
+FM_TEST_BEGIN 2026-10-19T17:16:49Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=32202 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=32202
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 29943 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:01Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11495 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11759
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11495 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11495
+RESULT iteration=23 exit=1
+FM_TEST_BEGIN 2026-10-19T17:16:49Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=32202 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=32202
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 29943 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:01Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11495 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11759
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11495 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11495
+
+ITERATION 24/40
+FM_TEST_BEGIN 2026-10-19T17:17:02Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=38882 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=38882
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 36932 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:12Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10067 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10339
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10067 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10067
+RESULT iteration=24 exit=1
+FM_TEST_BEGIN 2026-10-19T17:17:02Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=38882 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=38882
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 36932 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:12Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10067 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10339
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10067 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10067
+
+ITERATION 25/40
+FM_TEST_BEGIN 2026-10-19T17:17:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=44183 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=44183
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 41904 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:22Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10245 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10538
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10245 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10245
+RESULT iteration=25 exit=1
+FM_TEST_BEGIN 2026-10-19T17:17:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=44183 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=44183
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 41904 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:22Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10245 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10538
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10245 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10245
+
+ITERATION 26/40
+FM_TEST_BEGIN 2026-10-19T17:17:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=53133 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=53133
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 49747 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:36Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13288 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=13575
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13288 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13288
+RESULT iteration=26 exit=1
+FM_TEST_BEGIN 2026-10-19T17:17:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=53133 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=53133
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 49747 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:36Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13288 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=13575
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13288 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13288
+
+ITERATION 27/40
+FM_TEST_BEGIN 2026-10-19T17:17:37Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=61659 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=61659
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 58930 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:48Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11228 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11524
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11228 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11228
+RESULT iteration=27 exit=1
+FM_TEST_BEGIN 2026-10-19T17:17:37Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=61659 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=61659
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 58930 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:17:48Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11228 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11524
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11228 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11228
+
+ITERATION 28/40
+FM_TEST_BEGIN 2026-10-19T17:17:49Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=71499 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=71499
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 68107 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:00Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11295 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11584
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11295 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11295
+RESULT iteration=28 exit=1
+FM_TEST_BEGIN 2026-10-19T17:17:49Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=71499 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=71499
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 68107 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:00Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=11295 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11584
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=11295 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=11295
+
+ITERATION 29/40
+FM_TEST_BEGIN 2026-10-19T17:18:00Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=80401 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=80401
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 77509 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:11Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10703 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11014
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10703 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10703
+RESULT iteration=29 exit=1
+FM_TEST_BEGIN 2026-10-19T17:18:00Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=80401 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=80401
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 77509 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:11Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10703 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11014
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10703 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10703
+
+ITERATION 30/40
+FM_TEST_BEGIN 2026-10-19T17:18:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=89936 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=89936
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 390: 87101 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:22Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10608 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10881
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10608 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10608
+RESULT iteration=30 exit=1
+FM_TEST_BEGIN 2026-10-19T17:18:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=89936 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=89936
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 390: 87101 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:22Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10608 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10881
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10608 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10608
+
+ITERATION 31/40
+FM_TEST_BEGIN 2026-10-19T17:18:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=96851 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=96851
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 390: 95259 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:34Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10905 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11226
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10905 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10905
+RESULT iteration=31 exit=1
+FM_TEST_BEGIN 2026-10-19T17:18:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=96851 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=96851
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 390: 95259 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:34Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10905 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11226
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10905 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10905
+
+ITERATION 32/40
+FM_TEST_BEGIN 2026-10-19T17:18:34Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=5912 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=5912
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335:  2424 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:45Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10931 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11235
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10931 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10931
+RESULT iteration=32 exit=1
+FM_TEST_BEGIN 2026-10-19T17:18:34Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=5912 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=5912
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335:  2424 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:45Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10931 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11235
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10931 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10931
+
+ITERATION 33/40
+FM_TEST_BEGIN 2026-10-19T17:18:46Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=13084 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=13084
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 10410 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:57Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10753 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11088
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10753 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10753
+RESULT iteration=33 exit=1
+FM_TEST_BEGIN 2026-10-19T17:18:46Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=13084 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=13084
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 10410 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:18:57Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10753 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11088
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10753 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10753
+
+ITERATION 34/40
+FM_TEST_BEGIN 2026-10-19T17:18:57Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=27614 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=27614
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 20234 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:12Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14475 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=14705
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14475 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14475
+RESULT iteration=34 exit=1
+FM_TEST_BEGIN 2026-10-19T17:18:57Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=27614 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=27614
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 20234 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:12Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=14475 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=14705
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=14475 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=14475
+
+ITERATION 35/40
+FM_TEST_BEGIN 2026-10-19T17:19:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=37745 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=37745
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 35572 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:23Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10561 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10836
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10561 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10561
+RESULT iteration=35 exit=1
+FM_TEST_BEGIN 2026-10-19T17:19:12Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=37745 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=37745
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 35572 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:23Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10561 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=10836
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10561 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10561
+
+ITERATION 36/40
+FM_TEST_BEGIN 2026-10-19T17:19:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=47996 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=47996
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 43835 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:37Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13705 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=14041
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13705 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13705
+RESULT iteration=36 exit=1
+FM_TEST_BEGIN 2026-10-19T17:19:23Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=47996 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=47996
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 43835 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:37Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=13705 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=14041
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=13705 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=13705
+
+ITERATION 37/40
+FM_TEST_BEGIN 2026-10-19T17:19:38Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=54778 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=54778
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 52276 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:48Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10819 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11105
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10819 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10819
+RESULT iteration=37 exit=1
+FM_TEST_BEGIN 2026-10-19T17:19:38Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=54778 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=54778
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 52276 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:19:48Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10819 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11105
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10819 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10819
+
+ITERATION 38/40
+FM_TEST_BEGIN 2026-10-19T17:19:49Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=70090 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=70090
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 64270 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:20:01Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12216 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12683
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12216 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12216
+RESULT iteration=38 exit=1
+FM_TEST_BEGIN 2026-10-19T17:19:49Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=70090 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=70090
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 64270 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:20:01Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=12216 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=12683
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=12216 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=12216
+
+ITERATION 39/40
+FM_TEST_BEGIN 2026-10-19T17:20:03Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=78671 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=78671
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 76277 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:20:14Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10843 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11408
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10843 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10843
+RESULT iteration=39 exit=1
+FM_TEST_BEGIN 2026-10-19T17:20:03Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=78671 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=78671
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 76277 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:20:14Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10843 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11408
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10843 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10843
+
+ITERATION 40/40
+FM_TEST_BEGIN 2026-10-19T17:20:14Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=87143 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=87143
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 83693 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:20:25Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10938 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11246
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10938 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10938
+RESULT iteration=40 exit=1
+FM_TEST_BEGIN 2026-10-19T17:20:14Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+SCHEDULE child=87143 resumed actual touch after stale write
+SCHEDULE stale write precedes pending touch child=87143
+not ok - SIGSTOP watcher with a stale beacon was classified healthy
+tests/lib.sh: line 335: 83693 Killed: 9               PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH_ARM" > "$armout"
+FM_TEST_END 2026-10-19T17:20:25Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=10938 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=11246
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=10938 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=10938
+
+LOAD_CLEANUP: all owned nice yes jobs stopped and reaped
+SCHEDULE_CLEANUP: task-local PATH wrappers removed
+SUMMARY iterations=40 failures=40 failure_rate=1.000000 failed_iterations=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
