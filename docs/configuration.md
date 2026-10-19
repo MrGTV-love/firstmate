@@ -1841,7 +1841,9 @@ A recorded rule still contains the task's profile when typed resolution raised i
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
-OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fallback.yml`, with exact model-and-effort chains, preventing ambient chains from weakening the task.
+OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fallback.yml`, with exact model-and-effort chains, preventing ambient chains from weakening the task; `fm-spawn.sh --fixed-family` empties those chains for scout tasks (including independent review readers), so a provider error stops the reader instead of switching its model family.
+The flag is refused for ships and secondmates, recorded as `fixed_family=on` in task metadata, and inherited on relaunch; other harnesses accept it as a no-op with a notice.
+It does not change dispatch-time selection or default chains; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the flag mechanics.
 Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.
 The tracked session overlay `.omp/fm-session-overlay.yml` chains `openai-codex/gpt-6.1-sol` to direct `deepseek/deepseek-v4-flash:high` for every omp launch, so a Sol session moves to the stand-in on any eligible provider error, a quota-out included, and `retry.fallbackRevertPolicy: cooldown-expiry` returns it to Sol once the suppression window ends.
 A worker's per-task chain replaces that entry for its own model, and is empty when the rule names no eligible native stand-in.

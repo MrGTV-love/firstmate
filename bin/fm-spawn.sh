@@ -2,7 +2,7 @@
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
 # Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
-#        fm-spawn.sh <task-id> <project-dir> --scout [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
+#        fm-spawn.sh <task-id> <project-dir> --scout [--fixed-family] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
@@ -364,6 +364,12 @@
 #   worker's own model cannot be resolved. If an operator's own omp config
 #   routes some other role to OpenRouter, that is their config and Firstmate
 #   does not override it.
+#   --fixed-family applies only to scout tasks, including independent review
+#   readers: it empties every per-task omp fallback chain so a provider error
+#   stops the reader instead of switching its model family. Other harnesses
+#   accept it as a no-op with a notice. The task records fixed_family=on and
+#   relaunch inherits it. Dispatch-time selection and default chains do not
+#   change; this controls only the per-task omp runtime fallback overlay.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
 #   to high (ultra is refused for omp before launch), disables
@@ -1009,6 +1015,7 @@ TRACEPARENT_SET=0
 RELAUNCH=0
 RECONCILE_ONLY=0
 CLAUDE_DEBUG=0
+FIXED_FAMILY=0
 OMP_NO_HELPERS=0
 RELOCATE_TO=
 RELOCATE_SET=0
@@ -1092,6 +1099,7 @@ for a in "$@"; do
     ;;
   --relaunch) RELAUNCH=1 ;;
   --reconcile-only) RECONCILE_ONLY=1 ;;
+  --fixed-family) FIXED_FAMILY=1 ;;
   --omp-no-helpers) OMP_NO_HELPERS=1 ;;
   --allow-api-key) ALLOW_API_KEY=1 ;;
   --herdr-resume-lock-wait) HERDR_RESUME_LOCK_WAIT=1 ;;
@@ -1252,6 +1260,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   }
 else
+  if [ "$FIXED_FAMILY" = 1 ] && [ "$KIND" != scout ]; then
+    echo "error: --fixed-family applies only to scout tasks, including review readers; ships and secondmates cannot use it" >&2
+    exit 1
+  fi
   [ "$RELOCATE_SET" -eq 0 ] || {
     echo "error: --worktree applies to --relaunch only: a fresh spawn allocates its own isolated copy" >&2
     exit 1
@@ -2057,6 +2069,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$BRANCH_PREFIX_SET" -eq 0 ] || shared_args+=(--branch-prefix "$BRANCH_PREFIX")
   [ "$ALLOW_API_KEY" -eq 0 ] || shared_args+=(--allow-api-key)
   [ "$OMP_NO_HELPERS" -eq 0 ] || shared_args+=(--omp-no-helpers)
+  [ "$FIXED_FAMILY" -eq 0 ] || shared_args+=(--fixed-family)
   [ "$BASE_BRANCH_SET" -eq 0 ] || shared_args+=(--base-branch "$BASE_BRANCH")
   [ "$HERDR_RESUME_LOCK_WAIT" -eq 0 ] || shared_args+=(--herdr-resume-lock-wait)
   for pair in "${POS[@]}"; do
@@ -2376,6 +2389,15 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
+  case "$(fm_meta_get "$RELAUNCH_META" fixed_family)" in
+    '') ;;
+    on) FIXED_FAMILY=1 ;;
+    *) echo "error: invalid recorded fixed_family posture for $ID" >&2; exit 1 ;;
+  esac
+  if [ "$FIXED_FAMILY" = 1 ] && [ "$KIND" != scout ]; then
+    echo "error: --fixed-family applies only to scout tasks, including review readers; ships and secondmates cannot use it" >&2
+    exit 1
+  fi
   case "$(fm_meta_get "$RELAUNCH_META" omp_no_helpers)" in
     '') ;;
     on) OMP_NO_HELPERS=1 ;;
@@ -3199,6 +3221,10 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   fi
 fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
+
+if [ "$FIXED_FAMILY" = 1 ] && { [ "$HARNESS" != omp ] || [ "$RAW_LAUNCH" != 0 ]; }; then
+  echo "note: --fixed-family has no effect on harness '$HARNESS'; only canonical omp launches receive a per-task fallback overlay" >&2
+fi
 
 if [ "$OMP_NO_HELPERS" = 1 ]; then
   if [ "$HARNESS" != omp ] || [ "$RAW_LAUNCH" != 0 ] || [ "$KIND" = secondmate ]; then
@@ -6177,7 +6203,7 @@ EOF
       [ "$candidate_model" != "$MODEL" ] || continue
       native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
     done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
-    [ "$OMP_NO_HELPERS" = 0 ] || native_fallback='[]'
+    [ "$OMP_NO_HELPERS" = 0 ] && [ "$FIXED_FAMILY" = 0 ] || native_fallback='[]'
     native_find=off
     [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
     native_helpers='{}'
@@ -6473,7 +6499,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -6496,6 +6522,7 @@ preserve_relaunch_meta() {
   echo "model=${MODEL:-default}"
   [ -z "${MODEL_STALE:-}" ] || echo "model_stale=$MODEL_STALE"
   echo "effort=${EFFORT:-default}"
+  [ "$FIXED_FAMILY" = 0 ] || echo "fixed_family=on"
   [ "$OMP_NO_HELPERS" = 0 ] || echo "omp_no_helpers=on"
   if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
     echo "jev_guard_policy=$guard_policy"
