@@ -60,6 +60,10 @@ overlay = json.loads((runtime / 'launch.yml').read_text())
 assert overlay[0]['config']['sessionId'] == header['id']
 assert call('resume',state,'task','deepseek/other','high',cwd) == '', 'a changed model must not resume'
 assert call('resume',state,'task','deepseek/v4','xhigh',cwd) == '', 'a changed effort must not resume'
+# Fallback: no binding means no recorded session id, and spawn prepares fresh.
+missing_state = tmp / 'fresh-state'
+missing_state.mkdir()
+assert call('resume',missing_state,'task','deepseek/v4','high',cwd) == '', 'no binding must fall back quietly'
 put([start, end, start])
 assert call('state',state,'task') == 'unknown', 'nonmonotonic durable sequence is corrupt'
 put([start,end])

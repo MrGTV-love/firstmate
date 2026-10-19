@@ -217,7 +217,11 @@ def turn_state(state, task):
 
 def resume(args):
     state, task, model, effort, cwd = args
-    binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
+    try:
+        binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
+    except (OSError, ValueError):
+        # No recorded session: the caller prepares a fresh launch.
+        return
     model = model.removeprefix("deepseek/")
     effort = "" if effort in ("", "default") else effort
     if (binding.get("model"), binding.get("effort"), binding["cwd"]) != (model, effort, str(Path(cwd).resolve())):
