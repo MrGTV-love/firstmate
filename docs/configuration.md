@@ -1714,32 +1714,9 @@ A task copy is nested when a clone registers it strictly inside its own director
 `treehouse prune` works on whole pool slots and does not see these copies, and a teardown only removes its own task's.
 Left alone, they pile up: each holds a full checkout, often 2 to 4 GiB, and nothing else bounds their total.
 [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) is the one mechanism that finds them, sizes them, removes the provably stale ones, and raises a single wake when the bytes they hold pass a budget.
-Its header owns the classes, the proofs, the size cache, and the wake record.
-
-### What it removes and what it never does
-
-The sweep reads every pool slot's clone, from each `<treehouse root>/<pool>/treehouse-state.json`, and every project clone under this home and each locally registered secondmate home.
-It judges a project clone under a secondmate home as that home would, so the lane's own task records apply and its secondmate record in the root home counts as its home chain, not as a live task.
-A lane whose records cannot be read holds all of its copies, and the report names the lane.
-It never calls Treehouse.
-Each copy gets one class:
-
-| Class | Meaning | Removed by `--apply` |
-| --- | --- | --- |
-| `REAPABLE-PROVEN` | Clean, no untracked file, HEAD contained in a remote branch or its content already in the default branch, no process inside, no active task record | Yes |
-| `HELD-LIVE-TASK` | An active task record, a process, or this home's own files are inside, or the records or process table cannot be read | No |
-| `HELD-UNPUSHED` | A commit is on no remote and not in the default branch | No |
-| `HELD-DIRTY` | Any change, untracked file, git operation in progress, ignored file that exists nowhere else, or another registered copy inside it | No |
-| `HELD-LOCKED` | A worktree lock holds it | No |
-| `ORPHAN-NO-RECORD` | Its directory is gone, or its git or lock state cannot be read | No |
-
-`--apply` removes only `REAPABLE-PROVEN` copies, one at a time, with a plain `git worktree remove` run from the registering clone after a fresh proof of that copy.
-It never forces, deletes recursively, unlocks, or cleans.
-A removal git refuses leaves the copy, is reported, and exits 1.
-Each removal appends one line to `data/copy-sweep.log`.
-A worktree lock holds a copy out of `--apply`: the sweep never removes or unlocks a `HELD-LOCKED` copy, and names its bytes in the wake.
-A copy under Vernant's creation lock is released only by Vernant's own closeout driver, and the teardown path is what releases locked copies through it.
-A copy that holds another registered copy is held until that inner copy is gone, because removing the outer copy would delete the inner one.
+The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
+It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, and how `check` stays inside the watcher's timeout.
+`bin/fm-copy-sweep.sh --help` prints that header.
 The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
 
 ### Hourly command and watcher check
@@ -1751,18 +1728,8 @@ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
 ```
 
 `bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake.
-`check` scans at most once per `interval` and stays inside the watcher's per-check timeout, to within the work of one clone.
-It scans each clone as it finds it and stops looking for clones once its time is spent, so on a host with many clones it covers the first clones it reaches, and the next poll starts from the same place.
-The size cache saves only `du` time, so a poll that `du` holds up reaches a little further each time.
-Once sizes are cached, the time goes to finding and listing clones, which the cache does not skip, and a poll bound that way stops at the same clone every time.
-Home project clones come after the pool clones, so such a check may never reach them.
-A cut run records no completed scan, and its wake names only what it measured.
-Every budget the record holds as over keeps its place in it, because a cut scan cannot prove any budget back under, and only a complete run clears one.
-A cut run also keeps the still-fresh cached sizes of the copies it did not reach.
-`check` cuts a size measurement it cannot finish, and classifies only the copies its wake names.
-A classification it cannot finish in time leaves that copy `UNCLASSIFIED`.
-The hourly `--apply` run has no such bound, is the only run certain to cover every clone, and warms the cache for large copies.
 `bin/fm-copy-sweep.sh disarm` removes the binding.
+The script header owns how much of the host one `check` covers per poll, what a cut run records, and why the hourly `--apply` is the only run certain to cover every clone.
 
 ### Budgets
 
@@ -1774,33 +1741,22 @@ default-pool 60
 default-container 20
 pool pool-name 80
 container /absolute/path/to/slot-or-home 10
+# 1-minute load average above which no du runs
 load-limit 90
+# whole seconds between scans by check
 interval 3600
+# whole seconds before a cached size is measured again
 cache-max-age 86400
 ```
 
 A pool is a `<treehouse root>/<pool>` directory, named by its directory name or full path.
 A container is a pool slot's clone or a Firstmate home, named by its absolute path.
 The values above are the built-in defaults for the lines that carry one, and a missing file means exactly those defaults.
-A budget is over when the measured bytes of its nested copies exceed it.
-A copy nested inside another copy is subtracted from the one around it, so no byte counts twice.
 A malformed file refuses the run and names its line.
-
-The sweep measures one copy at a time with `nice -n 20 du -sk`.
-It caches each size by copy path and mtime and measures it again after `cache-max-age` seconds, because a copy's root mtime does not move when a file deep inside grows.
-While the 1-minute load average is above `load-limit`, or cannot be read, it runs no `du`: the listing, the classes and `--apply` still run, and only fresh cached sizes are used.
-A report or `--apply` run prints one line, `scan skipped: load N above limit M`, or `scan skipped: load cannot be read, limit M` when the load is unreadable.
-`--apply` and `check` also record it, and `check` stays quiet.
-`--apply` and `check` raise one wake once 6 runs in a row have skipped.
-The hourly `--apply` and the `check` that `interval` gates each run about once per `interval`, so 6 runs are about 6 hours at the default.
-A `check` cut by its time bound is not gated, so it counts at most once per `interval`, measured from the last time the count advanced.
-A check that is cut and skipped on every poll therefore still reaches the wake after 6 intervals.
-When a budget goes over, the run raises exactly one wake, naming each budget that just went over, its total, and its five largest copies with their class.
-It raises no second wake while the same budget stays over, and a budget that drops under and goes over again wakes again.
-A scan that `check` had to cut short counts only what it measured, so an unmeasured copy can delay a wake and never cause one.
+The script header owns how a budget is measured, when it is over, and when its wake fires.
 
 `FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) is the only operator environment setting.
-The `check` time bound is the watcher's per-check timeout `FM_CHECK_TIMEOUT` minus five seconds, read as whole digits with leading zeros allowed and as 30 when it is anything else.
+`check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
 [`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
