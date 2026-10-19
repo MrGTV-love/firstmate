@@ -609,14 +609,6 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   return 1
 }
 
-# How to hold <slot> in place without touching its contents: the sentence that
-# names the treehouse lease command for the slot name fm_task_copy_pool_slot_held
-# just resolved. Only a slot that call found unleased has a name to lease.
-fm_task_copy_slot_lease_remedy() {  # <project> <slot> <task-id>
-  printf "To hold that slot in place without touching its contents, confirm that treehouse status run from %s lists slot %s at %s, then run: (cd '%s' && treehouse lease '%s' --lease-holder '%s')" \
-    "$1" "$FM_TASK_COPY_SLOT_NAME" "$2" "$1" "$FM_TASK_COPY_SLOT_NAME" "$3"
-}
-
 # True when no pool slot of <project> that treehouse get could hand out strictly
 # contains the current copy (worktree=) of a task record in this home or any
 # locally registered Firstmate home. treehouse get resets and reassigns the slot
@@ -655,7 +647,7 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       case "$FM_TASK_COPY_SLOT_STATE" in
         held) continue ;;
         unleased)
-          remedy=$(fm_task_copy_slot_lease_remedy "$project" "$slot" "$id")
+          remedy="To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')"
           ;;
         conflicting)
           remedy="Inspect the pool with: (cd '$project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict."

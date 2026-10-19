@@ -458,7 +458,7 @@ enumerate_clones() {
 }
 
 # The registered worktrees strictly inside <clone>; bin/fm-task-copy-lib.sh owns
-# the enumeration, which bin/fm-spawn.sh's slot admission shares.
+# the enumeration.
 list_nested() {  # <clone>
   fm_task_copy_registered_nested "$1"
 }

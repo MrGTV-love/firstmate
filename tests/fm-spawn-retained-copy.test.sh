@@ -24,13 +24,6 @@
 #      spawn acquires and claims it, whatever its commits.
 #   6. A registered local Firstmate home that cannot be read is named in one
 #      warning line and skipped: the spawn still proceeds.
-#   7. After treehouse get, a slot with any worktree registered strictly inside
-#      it whose directory is on disk (no live record needed) is refused before
-#      the slot is claimed or the worker is launched: the refusal names the slot,
-#      each such copy and the lease command that holds the slot out of the pool
-#      (or says no hold command can be named), and changes nothing. A
-#      registration whose directory is gone is no layer and does not refuse. A
-#      registration list that cannot be read refuses too.
 set -u
 
 # shellcheck source=tests/fixtures.sh disable=SC1091
@@ -595,119 +588,6 @@ test_unreadable_local_home_warns_and_proceeds() {
   pass "an unavailable registered local home is named in one warning and the spawn proceeds"
 }
 
-# A registered worktree strictly inside the slot, owned by no task record.
-# Sets INNER_COPY and INNER_REAL (its physical path).
-add_inner_worktree() {  # <name>
-  INNER_COPY="$SLOT_DIR/.claude/worktrees/inner"
-  mkdir -p "$SLOT_DIR/.claude/worktrees"
-  git -C "$PROJECT_DIR" worktree add --quiet -b "inner-$1" "$INNER_COPY"
-  printf 'inner bytes\n' > "$INNER_COPY/inner-owned.txt"
-  INNER_REAL="$(cd "$SLOT_DIR" && pwd -P)/.claude/worktrees/inner"
-}
-
-assert_slot_admission_refusal() {  # <name> <output>
-  local name=$1 out=$2
-  assert_not_contains "$out" "spawned new-$name" "a refused slot still launched the worker"
-  ! grep -Fq codex "$CASE_DIR/launch-log" || fail "a refused slot still launched the worker"
-  ! grep -Eq 'reset|treehouse return' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "a refused slot was sent a destructive command"
-  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "a refused slot changed its bytes"
-  git -C "$PROJECT_DIR" worktree list --porcelain | cmp -s - "$CASE_DIR/before-list" || fail "a refused slot changed the registrations"
-  [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "a refused slot was claimed"
-  [ ! -e "$HOME_DIR/state/new-$1.meta" ] || fail "a refused slot published task metadata"
-}
-
-test_slot_with_a_registered_inner_worktree_and_no_record_is_refused() {
-  local name=inner-layer out rc=0
-  make_retained_case "$name"
-  add_inner_worktree "$name"
-  retained_fingerprint > "$CASE_DIR/before-copy"
-  git -C "$PROJECT_DIR" worktree list --porcelain > "$CASE_DIR/before-list"
-  out=$(run_retained_spawn "$name") || rc=$?
-  [ "$rc" -ne 0 ] || fail "spawn launched a worker onto a slot carrying an inner worktree: $out"
-  assert_contains "$out" "slot '$(cd "$SLOT_DIR" && pwd -P)'" "the refusal did not name the slot"
-  assert_contains "$out" "registered inside the slot: $INNER_REAL" "the refusal did not name the inner registration"
-  assert_contains "$out" "(cd '$PROJECT_DIR' && treehouse lease '1' --lease-holder 'new-$name')" "the refusal did not name the command that holds the slot"
-  assert_contains "$out" "bin/fm-copy-sweep.sh reports them" "the refusal did not point at the sweep report"
-  grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "the refusal did not follow an acquisition"
-  assert_slot_admission_refusal "$name" "$out"
-  git -C "$PROJECT_DIR" worktree remove --force "$INNER_COPY"
-  : > "$CASE_DIR/pane-log"
-  : > "$CASE_DIR/launch-log"
-  assert_retained_spawn "$name" "the same slot without its inner registration"
-  grep -Fq codex "$CASE_DIR/launch-log" || fail "the control spawn never launched the worker, so the launch assertion proves nothing"
-  pass "a slot carrying a registered inner worktree with no record is refused after acquisition and before the claim, naming both, changing nothing"
-}
-
-test_slot_with_two_inner_worktrees_names_each_registration() {
-  local name=inner-two out rc=0 second
-  make_retained_case "$name"
-  add_inner_worktree "$name"
-  second="$SLOT_DIR/.claude/worktrees/second"
-  git -C "$PROJECT_DIR" worktree add --quiet -b "second-$name" "$second"
-  retained_fingerprint > "$CASE_DIR/before-copy"
-  git -C "$PROJECT_DIR" worktree list --porcelain > "$CASE_DIR/before-list"
-  out=$(run_retained_spawn "$name") || rc=$?
-  [ "$rc" -ne 0 ] || fail "spawn launched a worker onto a slot carrying two inner worktrees: $out"
-  assert_contains "$out" "registered inside the slot: $INNER_REAL" "the refusal did not name the first registration"
-  assert_contains "$out" "registered inside the slot: $(cd "$SLOT_DIR" && pwd -P)/.claude/worktrees/second" "the refusal did not name the second registration"
-  assert_slot_admission_refusal "$name" "$out"
-  pass "a slot carrying two inner worktrees is refused naming every registration"
-}
-
-test_slot_with_a_registration_whose_directory_is_gone_is_not_refused() {
-  local name=inner-gone
-  make_retained_case "$name"
-  add_inner_worktree "$name"
-  rm -rf "$INNER_COPY"
-  git -C "$PROJECT_DIR" worktree list --porcelain | grep -qxF "worktree $INNER_REAL" \
-    || fail "the fixture's registration did not outlive its directory"
-  assert_retained_spawn "$name" "a slot whose only inner registration has no directory"
-  git -C "$PROJECT_DIR" worktree list --porcelain | grep -qxF "worktree $INNER_REAL" \
-    || fail "the spawn pruned a registration it does not own"
-  pass "a stale registration whose directory is gone is no inner layer and does not refuse a spawn"
-}
-
-test_slot_whose_treehouse_name_cannot_be_resolved_names_no_lease() {
-  local name=inner-unnamed out rc=0
-  make_retained_case "$name"
-  add_inner_worktree "$name"
-  printf '{"worktrees":[{"name":"9","path":"%s/pool/9/project","leased":true,"lease_holder":"other"}]}\n' \
-    "$CASE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
-  cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
-  retained_fingerprint > "$CASE_DIR/before-copy"
-  git -C "$PROJECT_DIR" worktree list --porcelain > "$CASE_DIR/before-list"
-  out=$(run_retained_spawn "$name") || rc=$?
-  [ "$rc" -ne 0 ] || fail "spawn launched a worker onto a slot carrying an inner worktree: $out"
-  assert_contains "$out" "registered inside the slot: $INNER_REAL" "the refusal did not name the inner registration"
-  assert_contains "$out" "No hold command can be named" "the refusal did not say that no hold command exists"
-  assert_contains "$out" "has no entry in Treehouse state" "the refusal did not say why the slot name is unresolved"
-  assert_contains "$out" "(cd '$PROJECT_DIR' && treehouse status)" "the refusal did not name how to inspect the pool"
-  assert_not_contains "$out" "treehouse lease" "the refusal named a lease command that cannot work"
-  assert_slot_admission_refusal "$name" "$out"
-  cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "the refusal changed pool state"
-  pass "a slot whose Treehouse name cannot be resolved is refused without a lease command that cannot work"
-}
-
-test_slot_whose_registrations_cannot_be_listed_is_refused() {
-  local name=inner-unreadable out rc=0
-  make_retained_case "$name"
-  cat > "$FAKEBIN_DIR/git" <<SH
-#!/usr/bin/env bash
-case " \$* " in
-  *" worktree list "*) exit 128 ;;
-esac
-exec "$(command -v git)" "\$@"
-SH
-  chmod +x "$FAKEBIN_DIR/git"
-  retained_fingerprint > "$CASE_DIR/before-copy"
-  git -C "$PROJECT_DIR" worktree list --porcelain > "$CASE_DIR/before-list"
-  out=$(run_retained_spawn "$name") || rc=$?
-  [ "$rc" -ne 0 ] || fail "spawn launched a worker onto a slot whose registrations could not be read: $out"
-  assert_contains "$out" "registered inside it cannot be listed" "the refusal did not say the registrations were unreadable"
-  assert_slot_admission_refusal "$name" "$out"
-  pass "a slot whose registered worktrees cannot be listed is refused, never assumed empty"
-}
-
 test_conflicting_unleased_alias_refuses_before_allocation || exit 1
 test_unsupported_entry_paths_are_unproved || exit 1
 test_unleased_alias_beside_leased_entry_is_not_held || exit 1
@@ -723,8 +603,3 @@ test_nested_copy_in_leased_slot_allows_allocation
 test_secondmate_home_slot_with_other_project_copy_allows_allocation
 test_slot_left_by_reassociated_task_is_allocatable
 test_unreadable_local_home_warns_and_proceeds
-test_slot_with_a_registered_inner_worktree_and_no_record_is_refused
-test_slot_with_two_inner_worktrees_names_each_registration
-test_slot_with_a_registration_whose_directory_is_gone_is_not_refused
-test_slot_whose_treehouse_name_cannot_be_resolved_names_no_lease
-test_slot_whose_registrations_cannot_be_listed_is_refused
