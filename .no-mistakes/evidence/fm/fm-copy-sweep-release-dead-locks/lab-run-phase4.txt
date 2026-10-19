@@ -1,0 +1,24 @@
+===== 4a: net freed arithmetic with a big preserved dir (real du) =====
+rc=0
+REMOVED	Q	branch fm/Q at 25495874fea8, copy 0.20 GiB, preserved 0.10 GiB, net freed 0.10 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 59394 is gone)
+REMOVED	P	branch fm/P at d499c5f6c193, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 71975 is gone)
+REMOVED	C	branch fm/C at b518ae38e3c2, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 92477 is gone)
+freed 0.10 GiB measured, 0 copies unmeasured
+-- du of the preserved dir for Q:
+102408	<LAB>/data/copy-sweep/20261019T132445Z.59419-25495874fea8926083a345506f3ef46f649e5f2f/nested-copy-preserved
+-- removal log Q:
+2026-10-19T13:24:47Z	removed	Q	clone=<LAB>/th/pool1/1/repo	head=25495874fea8926083a345506f3ef46f649e5f2f	branch=fm/Q	kib=204872	preserved_kib=102408	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant la
+
+===== 4b: load above limit -> size not measured, says so =====
+rc=0
+copy-sweep: scan skipped: load 51.81 above limit 1
+REMOVED	R	branch fm/R at 6fe2da14f946, copy - GiB, preserved - GiB, net freed - GiB, unmeasured (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 82477 is gone)
+freed 0.00 GiB measured, 1 copies unmeasured
+
+===== 4c: FM_COPY_SWEEP_PLAN_TIMEOUT=08 (zero padded) hung plan then allowed plan =====
+rc=0 elapsed=26s
+HELD-LOCKED	0.00 GiB	S	its closeout driver did not answer within 8s
+0
+rerun with S allowed, timeout 08: rc=0
+REMOVED	S	branch fm/S at bb293fb9eecd, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 96061 is gone)
+REMOVED	O	branch fm/O at 6f1b4e63fe05, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 7454 is gone)

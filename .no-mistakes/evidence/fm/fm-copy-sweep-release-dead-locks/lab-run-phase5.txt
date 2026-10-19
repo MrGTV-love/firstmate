@@ -1,0 +1,40 @@
+===== 5: the hourly one-liner: bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply =====
+rc=0
+REMOVED	T	branch fm/T at f6cb699fec9b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 39276 is gone)
+budget pool <LAB>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <LAB>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+freed 0.00 GiB measured, 0 copies unmeasured
+-- second hourly run (idempotence):
+rc=0
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+freed 0.00 GiB measured, 0 copies unmeasured
+-- registered worktrees at the end:
+<LAB>/th/pool1/1/repo                     769a55d [main]
+B b5fa02f [fm/B] locked
+D 26df362 [fm/D] locked
+E 3643c67 [fm/E] locked
+F 9b9e4ad [fm/F] locked
+I fd7b049 [fm/I]
+N 98ba053 [fm/N] locked
+-- final removal log (copy, kib, preserved):
+L branch=fm/L kib=56
+H branch=fm/H kib=36
+G branch=fm/G kib=36
+A branch=fm/A kib=206864
+M branch=fm/M kib=60
+K branch=fm/K kib=52
+J branch=fm/J kib=48
+A branch=detached kib=20
+Q branch=fm/Q kib=204872
+P branch=fm/P kib=72
+C branch=fm/C kib=20
+R branch=fm/R kib=-
+S branch=fm/S kib=88
+O branch=fm/O kib=64
+T branch=fm/T kib=3160

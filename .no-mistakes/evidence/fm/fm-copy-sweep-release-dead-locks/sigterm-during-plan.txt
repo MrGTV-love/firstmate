@@ -1,0 +1,9 @@
+M line from last run:
+HELD-LOCKED	0.00 GiB	M	its closeout driver did not answer within 2s
+=== SIGTERM the sweep while its plan hangs (timeout 120s) ===
+driver=93457 grandchild=94119
+sweep pid 82683 alive: yes
+before TERM: driver 93457 alive=yes grandchild 94119 alive=yes
+after TERM:  sweep alive=no driver 93457 alive=no grandchild 94119 alive=no
+sweep exit: 1
+sleep-300 count now:       16 (baseline 16 belongs to other sessions)

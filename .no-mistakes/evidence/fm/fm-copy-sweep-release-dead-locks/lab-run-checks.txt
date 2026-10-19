@@ -1,0 +1,99 @@
+### line 495 in head vs base
+  done <<< "$out"
+}
+
+# Prints the first pid whose cwd is the copy or inside it.
+process_inside() {  # <copy>
+  printf '%s' "$PROC_TABLE" | awk -F '\t' -v c="$1" '
+    index($2, c) == 1 && (length($2) == length(c) || substr($2, length(c) + 1, 1) == "/") { print $1; exit }'
+}
+438:scan_processes() {
+
+### driver calls (mode per copy)
+pid=21269 cwd=<slot> mode=PLAN copy=M
+pid=39577 cwd=<slot> mode=PLAN copy=L
+pid=40502 cwd=<slot> mode=EXECUTE copy=L
+pid=43651 cwd=<slot> mode=PLAN copy=K
+pid=46309 cwd=<slot> mode=PLAN copy=J
+pid=60692 cwd=<slot> mode=PLAN copy=G
+pid=61922 cwd=<slot> mode=EXECUTE copy=G
+pid=68066 cwd=<slot> mode=PLAN copy=B
+pid=72505 cwd=<slot> mode=PLAN copy=A
+pid=73885 cwd=<slot> mode=EXECUTE copy=A
+
+### sweep git calls with force/unlock/prune/lock
+191:-C <LAB>/th/pool1/1/repo worktree remove -- <LAB>/th/pool1/1/repo/.claude/worktrees/H
+
+### registered worktrees now
+<LAB>/th/pool1/1/repo                     769a55d [main]
+<LAB>/th/pool1/1/repo/.claude/worktrees/B b5fa02f [fm/B] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/C b518ae3 [fm/C] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/D 26df362 [fm/D] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/E 3643c67 [fm/E] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/F 9b9e4ad [fm/F] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/I fd7b049 [fm/I]
+<LAB>/th/pool1/1/repo/.claude/worktrees/J b21d16e [fm/J] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/K 19c62e5 [fm/K] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/M b198ee0 [fm/M] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/N 98ba053 [fm/N] locked
+<LAB>/th/pool1/1/repo/.claude/worktrees/O 6f1b4e6 [fm/O] locked
+
+### removal log
+2026-10-19T13:15:34Z	removed	<LAB>/th/pool1/1/repo/.claude/worktrees/L	clone=<LAB>/th/pool1/1/repo	head=480c3ebf4d6c91753ffaadb18bd30c91e8edb85f	branch=fm/L	kib=56	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 5908 is gone
+2026-10-19T13:15:38Z	removed	<LAB>/th/pool1/1/repo/.claude/worktrees/H	clone=<LAB>/th/pool1/1/repo	head=99dbd7309f5aefd2f970b29610302803a667b929	branch=fm/H	kib=36	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-19T13:15:44Z	removed	<LAB>/th/pool1/1/repo/.claude/worktrees/G	clone=<LAB>/th/pool1/1/repo	head=807b034f396314597633137561b661c0069ad44c	branch=fm/G	kib=36	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 99279 is gone
+2026-10-19T13:15:48Z	removed	<LAB>/th/pool1/1/repo/.claude/worktrees/A	clone=<LAB>/th/pool1/1/repo	head=b2c236f2814a8e29a008d845fa9629f84adbe854	branch=fm/A	kib=206864	preserved_kib=2056	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 90765 is gone
+
+### preserved tree
+<LAB>/data/copy-sweep/20261019T131525Z.9273-480c3ebf4d6c91753ffaadb18bd30c91e8edb85f/nested-copy-preserved/e9c4efc0d1ec9b890316a477fddd3dd354eba10ee629e0148aada3ba87ec1832/SHA256SUMS
+<LAB>/data/copy-sweep/20261019T131525Z.9273-480c3ebf4d6c91753ffaadb18bd30c91e8edb85f/nested-copy-preserved/e9c4efc0d1ec9b890316a477fddd3dd354eba10ee629e0148aada3ba87ec1832/copy-path
+<LAB>/data/copy-sweep/20261019T131525Z.9273-480c3ebf4d6c91753ffaadb18bd30c91e8edb85f/nested-copy-preserved/e9c4efc0d1ec9b890316a477fddd3dd354eba10ee629e0148aada3ba87ec1832/outbox/channel.log
+<LAB>/data/copy-sweep/20261019T131525Z.9273-807b034f396314597633137561b661c0069ad44c/nested-copy-preserved/fa616e4c46a4b8b5d574c624994bfed96fd4e4f3e12db0be56268ae69e7ce747/SHA256SUMS
+<LAB>/data/copy-sweep/20261019T131525Z.9273-807b034f396314597633137561b661c0069ad44c/nested-copy-preserved/fa616e4c46a4b8b5d574c624994bfed96fd4e4f3e12db0be56268ae69e7ce747/copy-path
+<LAB>/data/copy-sweep/20261019T131525Z.9273-807b034f396314597633137561b661c0069ad44c/nested-copy-preserved/fa616e4c46a4b8b5d574c624994bfed96fd4e4f3e12db0be56268ae69e7ce747/outbox/channel.log
+<LAB>/data/copy-sweep/20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854/nested-copy-preserved/17dee7541f69ce495d21dd348959e9cc9244ae809d4964de20bc0788be2e3fd4/SHA256SUMS
+<LAB>/data/copy-sweep/20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854/nested-copy-preserved/17dee7541f69ce495d21dd348959e9cc9244ae809d4964de20bc0788be2e3fd4/copy-path
+<LAB>/data/copy-sweep/20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854/nested-copy-preserved/17dee7541f69ce495d21dd348959e9cc9244ae809d4964de20bc0788be2e3fd4/outbox/channel.log
+
+### SHA256SUMS + copy-path
+-- <LAB>/data/copy-sweep/20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854/nested-copy-preserved/17dee7541f69ce495d21dd348959e9cc9244ae809d4964de20bc0788be2e3fd4/copy-path
+<LAB>/th/pool1/1/repo/.claude/worktrees/A
+-- <LAB>/data/copy-sweep/20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854/nested-copy-preserved/17dee7541f69ce495d21dd348959e9cc9244ae809d4964de20bc0788be2e3fd4/SHA256SUMS
+0a7da3fd5915f145fb6a4c9af159fcf5af1797a14b4f72715737c80dfbf8f329  outbox/channel.log
+-- <LAB>/data/copy-sweep/20261019T131525Z.9273-807b034f396314597633137561b661c0069ad44c/nested-copy-preserved/fa616e4c46a4b8b5d574c624994bfed96fd4e4f3e12db0be56268ae69e7ce747/copy-path
+<LAB>/th/pool1/1/repo/.claude/worktrees/G
+-- <LAB>/data/copy-sweep/20261019T131525Z.9273-807b034f396314597633137561b661c0069ad44c/nested-copy-preserved/fa616e4c46a4b8b5d574c624994bfed96fd4e4f3e12db0be56268ae69e7ce747/SHA256SUMS
+d3ca2f197d5dfaf02119fa0817447018b05b46e1804b546a7d474f6834a3256d  outbox/channel.log
+-- <LAB>/data/copy-sweep/20261019T131525Z.9273-480c3ebf4d6c91753ffaadb18bd30c91e8edb85f/nested-copy-preserved/e9c4efc0d1ec9b890316a477fddd3dd354eba10ee629e0148aada3ba87ec1832/copy-path
+<LAB>/th/pool1/1/repo/.claude/worktrees/L
+-- <LAB>/data/copy-sweep/20261019T131525Z.9273-480c3ebf4d6c91753ffaadb18bd30c91e8edb85f/nested-copy-preserved/e9c4efc0d1ec9b890316a477fddd3dd354eba10ee629e0148aada3ba87ec1832/SHA256SUMS
+5e241d05096eb70e9438e4f1331bd1664561b4a1374fceddd519321702334bc9  outbox/channel.log
+
+### leftover plan processes: see hang-pids-after-timeout.txt (pid-level check)
+
+### held copies byte-identical?
+B identical
+C identical
+D identical
+E identical
+F identical
+I identical
+N identical
+O identical
+
+### still-locked state of held locked copies
+B: vernant-session-active owner=launcher:92336 launcher=92336
+
+C: vernant-session-active owner=launcher:92477 launcher=92477
+
+F: manual hold by the owner
+
+J: vernant-session-active owner=launcher:4499 launcher=4499
+
+K: vernant-session-active owner=launcher:5251 launcher=5251
+
+M: vernant-session-active owner=launcher:6382 launcher=6382
+
+
+### branch refs kept
+fm/A fm/B fm/C fm/D fm/E fm/F fm/G fm/H fm/I fm/J fm/K fm/L fm/M fm/N fm/O main 

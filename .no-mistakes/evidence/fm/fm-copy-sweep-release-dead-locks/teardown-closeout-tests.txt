@@ -1,0 +1,8 @@
+ok - a landed copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned
+ok - a foreign copy's unique ignored file is preserved with its SHA-256 and the copy is retired
+ok - without FM_TEARDOWN_VERNANT_PYTHON the driver runs under the slot's own .venv interpreter
+ok - a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing
+ok - a driver refusal or a lock that is not Vernant's leaves the foreign copy, the slot and the record in place
+ok - a landed, clean own nested copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place

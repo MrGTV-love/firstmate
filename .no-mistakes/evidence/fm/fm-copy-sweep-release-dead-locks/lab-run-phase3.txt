@@ -1,0 +1,35 @@
+b2c236f2814a8e29a008d845fa9629f84adbe854
+before: 20261019T131525Z.9273-480c3ebf4d6c91753ffaadb18bd30c91e8edb85f
+before: 20261019T131525Z.9273-807b034f396314597633137561b661c0069ad44c
+before: 20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854
+===== PHASE 3: --apply with an execute refusal, plus A recreated at the same path+HEAD =====
+rc=1
+HELD-LOCKED	0.00 GiB	B	its closeout driver would not release it (exit 3): {"allowed": false, "reason": "pull_request_not_merged: HEAD is on a remote branch but not in origin/main"}
+HELD-LOCKED	0.00 GiB	C	worktree lock: vernant-session-active owner=launcher:92477 launcher=92477 (launcher 92477 is alive or its start cannot be proved)
+HELD-LOCKED	0.00 GiB	F	worktree lock: manual hold by the owner (not the supported Vernant creation-lock format)
+FAILED	P	the copy was left: REFUSED: Vernant's closeout driver did not release foreign copy P (exit 3): refused: pull request not merged next: wait for the merge, then rerun
+REMOVED	M	branch fm/M at b198ee001d00, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 6382 is gone)
+REMOVED	K	branch fm/K at 19c62e58a58d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 5251 is gone)
+REMOVED	J	branch fm/J at b21d16edfd2e, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 4499 is gone)
+REMOVED	A	branch detached at b2c236f2814a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 72270 is gone)
+freed 0.00 GiB measured, 0 copies unmeasured
+--- P still registered and locked?
+<LAB>/th/pool1/1/repo/.claude/worktrees/P d499c5f [fm/P] locked
+--- driver calls for P and A:
+pid=82879 cwd=<slot> mode=PLAN copy=P
+pid=83382 cwd=<slot> mode=EXECUTE copy=P
+pid=3259 cwd=<slot> mode=PLAN copy=A
+pid=3853 cwd=<slot> mode=EXECUTE copy=A
+--- preserved dirs after:
+after: 20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854
+after: 20261019T132254Z.72429-b2c236f2814a8e29a008d845fa9629f84adbe854
+<LAB>/data/copy-sweep/20261019T131525Z.9273-b2c236f2814a8e29a008d845fa9629f84adbe854
+?Ô·¿
+?££a
+outbox/channel.log: OK
+<LAB>/data/copy-sweep/20261019T132254Z.72429-b2c236f2814a8e29a008d845fa9629f84adbe854
+SECOND copy at the same path
+outbox/channel.log: OK
+--- removal log lines for A
+2026-10-19T13:15:48Z	removed	<LAB>/th/pool1/1/repo/.claude/worktrees/A	clone=<LAB>/th/pool1/1/repo	head=b2c236f2814a8e29a008d845fa9629f84adbe854	branch=fm/A	kib=206864	preserved_kib=2056	proof=clean, 
+2026-10-19T13:23:07Z	removed	<LAB>/th/pool1/1/repo/.claude/worktrees/A	clone=<LAB>/th/pool1/1/repo	head=b2c236f2814a8e29a008d845fa9629f84adbe854	branch=detached	kib=20	preserved_kib=12	proof=clean, no

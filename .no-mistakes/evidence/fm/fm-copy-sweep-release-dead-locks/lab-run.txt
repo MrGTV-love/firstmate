@@ -1,0 +1,47 @@
+===== PHASE 1: report mode (no --apply) =====
+copy-sweep: mode=report containers=1 copies=6
+REAPABLE-DRIVER	0.20 GiB	/Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1/1/repo/.claude/worktrees/A	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 90765 is gone
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1/1/repo/.claude/worktrees/B	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 92336 is gone
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1/1/repo/.claude/worktrees/C	worktree lock: vernant-session-active owner=launcher:92477 launcher=92477 (launcher 92477 is alive or its start cannot be proved)
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1/1/repo/.claude/worktrees/D	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1/1/repo/.claude/worktrees/E	1 uncommitted or untracked path(s), first: ?? scratch.txt
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1/1/repo/.claude/worktrees/F	worktree lock: manual hold by the owner (not the supported Vernant creation-lock format)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=2
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1: 0.20 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.dcWVrl/th/pool1/1/repo: 0.20 GiB of 20 GiB, ok
+rc=
+===== PHASE 2: --apply (plan timeout 2s) =====
+bin/fm-copy-sweep.sh: line 495: printf: write error: Broken pipe
+copy-sweep: mode=apply containers=1 copies=11
+HELD-LOCKED	0.00 GiB	B	its closeout driver would not release it (exit 3): {"allowed": false, "reason": "pull_request_not_merged: HEAD is on a remote branch but not in origin/main"}
+HELD-LOCKED	0.00 GiB	C	worktree lock: vernant-session-active owner=launcher:92477 launcher=92477 (launcher 92477 is alive or its start cannot be proved)
+HELD-UNPUSHED	0.00 GiB	D	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+HELD-DIRTY	0.00 GiB	E	1 uncommitted or untracked path(s), first: ?? scratch.txt
+HELD-LOCKED	0.00 GiB	F	worktree lock: manual hold by the owner (not the supported Vernant creation-lock format)
+HELD-DIRTY	0.00 GiB	I	it holds ignored files that exist nowhere else: outbox
+HELD-LOCKED	0.00 GiB	J	its closeout driver would not release it (exit 0): {"allowed": false, "reason": "set allowed=true to override"}
+HELD-LOCKED	0.00 GiB	K	its closeout driver would not release it (exit 0): garbage allowed=true
+HELD-LOCKED	0.00 GiB	M	its closeout driver did not answer within 2s
+HELD-LIVE-TASK	0.00 GiB	N	task task-n's active record names it as its worktree
+HELD-LIVE-TASK	0.00 GiB	O	process 7522 is running inside it
+REMOVED	L	branch fm/L at 480c3ebf4d6c, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 5908 is gone)
+REMOVED	H	branch fm/H at 99dbd7309f5a, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	G	branch fm/G at 807b034f3963, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 99279 is gone)
+REMOVED	A	branch fm/A at b2c236f2814a, copy 0.20 GiB, preserved 0.00 GiB, net freed 0.20 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 90765 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=6
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=2
+summary: ORPHAN-NO-RECORD=0
+budget pool <LAB>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <LAB>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+freed 0.20 GiB measured, 0 copies unmeasured
+rc=0

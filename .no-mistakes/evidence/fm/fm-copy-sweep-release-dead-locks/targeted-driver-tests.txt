@@ -1,0 +1,36 @@
+=== test_recycled_launcher_lock_is_released_by_the_driver
+ok - a locked copy whose launcher pid is recycled is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - fm-copy-sweep
+=== test_dead_launcher_lock_is_released_by_the_driver
+ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - fm-copy-sweep
+=== test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
+ok - a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it
+ok - fm-copy-sweep
+=== test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
+ok - a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code
+ok - fm-copy-sweep
+=== test_unproved_plan_verdicts_hold_the_copy
+ok - an empty, malformed, missing, false-with-text or garbage-literal plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, leave no driver process running, and exit 0
+ok - fm-copy-sweep
+=== test_a_bare_allowed_literal_plan_releases_the_copy
+ok - a plan whose whole answer is allowed=true releases the copy
+ok - fm-copy-sweep
+=== test_a_zero_padded_plan_timeout_is_read_as_decimal
+ok - a zero-padded plan bound is decimal: 08 holds a hung plan at 8s and 08 or 09 releases a copy whose plan allows it
+ok - fm-copy-sweep
+=== test_a_sweep_stopped_during_a_plan_stops_the_hung_driver
+ok - a sweep stopped while its plan hangs stops the driver and its child too
+ok - fm-copy-sweep
+=== test_two_sweeps_of_one_path_keep_both_preserved_directories
+ok - two sweeps of the same copy path keep both preserved directories
+ok - fm-copy-sweep
+=== test_a_removal_with_no_measured_size_says_so
+ok - a removal whose size was not measured shows - and unmeasured, and the closing total counts it
+ok - fm-copy-sweep
+=== test_locked_copy_with_an_unpushed_equivalence_is_still_held
+ok - a locked copy with an unpushed but content-equivalent commit is held, and the driver never runs
+ok - fm-copy-sweep
+=== test_live_foreign_or_unreleasable_locks_are_kept
+ok - a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched
+ok - fm-copy-sweep
