@@ -250,7 +250,8 @@
 # reserves it, but it is not returned, and no foreign copy is touched; a slot
 # that cannot be proved durably leased refuses the close before anything is
 # removed. Each held copy is named in the output and appended to
-# data/held-foreign-copies.log once the close is final. --force never holds a
+# data/held-foreign-copies.log once the task record and the task's own nested
+# copies are gone, before the backlog close. --force never holds a
 # copy, a copy inside the task's own nested copy is never held, and a copy that
 # is dirty, owned, or has a process in it still refuses. docs/agent-control.md
 # owns the rule.

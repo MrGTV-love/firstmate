@@ -31,7 +31,8 @@
 # already passed the landed-work proof, bin/fm-teardown.sh closes the task and
 # reserves the slot under a durable lease, defers its return and leaves every
 # foreign copy exactly as it was (teardown_held_copies_record appends each one to
-# data/held-foreign-copies.log once the close is final).
+# data/held-foreign-copies.log once the task record and the task's own nested
+# copies are gone, before the backlog close).
 # Nothing here ever removes or alters a held copy, and --force never holds one.
 # The task's own nested copies (the record's worktree= and prior_worktree= copies
 # inside the slot) were already proved clean and landed or anchored by the
@@ -417,11 +418,12 @@ teardown_foreign_copies_prove() {  # <slot>
 # Appends each held foreign copy of the last proof to the record
 # data/held-foreign-copies.log: UTC time, closing task id, slot path, copy path
 # and the exact reason, tab separated. bin/fm-teardown.sh calls it only once the
-# close is final, so the record never names a task that did not close. A record
-# that cannot be written returns 1 and refuses nothing: the caller warns and the
-# close stands. The record is only ever appended to here; nothing returns the slot
-# or removes a held copy on its own, and a held copy goes only on the owner's word
-# naming it.
+# task record and the task's own nested copies are gone, before the backlog
+# close, so a refusal before that point leaves no line, while a later failure
+# still leaves one. A record that cannot be written returns 1 and refuses
+# nothing: the caller warns and the close stands. The record is only ever
+# appended to here; nothing returns the slot or removes a held copy on its own,
+# and a held copy goes only on the owner's word naming it.
 teardown_held_copies_record() {
   local record="$DATA/held-foreign-copies.log" entry copy why stamp rc=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
