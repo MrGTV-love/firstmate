@@ -459,7 +459,8 @@ test_apply_removes_only_the_reapable_copy() {
 # info/exclude. Without --execute-cleanup it only plans: it says allowed true, or
 # allowed false with exit 3 while <log-dir>/refuse-plan exists, or answers with
 # whatever <log-dir>/plan-<mode> asks (an empty, malformed, verdictless, false,
-# garbage or bare-literal answer, or a hang that leaves a child running). It
+# garbage or bare-literal answer, a re-lock of the copy by someone else, or a
+# hang that leaves a child running). It
 # records its own pid, and a hung plan's child, in <log-dir>/driver.pids. With it, it
 # unlocks and plainly removes the copy it is given, or prints two lines and
 # exits 3 while <log-dir>/refuse-execute exists. The interpreter runs it as a
@@ -498,6 +499,12 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   fi
   if [ -e "$log/plan-bare-literal" ]; then
     echo 'allowed=true'
+    exit 0
+  fi
+  if [ -e "$log/plan-relock" ]; then
+    git worktree unlock "\$2" || exit 4
+    git worktree lock --reason 'hand-held by an operator' "\$2" || exit 4
+    echo '{"allowed": true}'
     exit 0
   fi
   if [ -e "$log/plan-hang" ]; then
@@ -690,7 +697,7 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text(
   pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code"
 }
 
-test_a_failed_preservation_prints_no_completing_command_and_leaves_the_copy() {
+test_a_failed_preservation_is_the_sweeps_own_human_only_refusal() {
   local admin line
   make_locked_copy_case preservefailed dead
   install_driver "$SLOT" "$W"
@@ -703,11 +710,14 @@ test_a_failed_preservation_prints_no_completing_command_and_leaves_the_copy() {
   [ "$RC" = 1 ] || fail "a failed preservation should exit 1, got $RC: $OUT"
   line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
     || fail "the failed preservation was not reported as FAILED: $OUT"
-  assert_contains "$line" "rule=ignored-bytes-preserved" "the FAILED line lost the typed refusal"
-  assert_contains "$line" "human-only-exit: " "the failed preservation did not end in a human-only exit"
-  assert_not_contains "$OUT" "completing-command:" "a sweep refusal printed a command that cannot run"
-  assert_not_contains "$OUT" "fm-teardown.sh" "a sweep refusal named the teardown command"
+  assert_contains "$line" "could not be preserved" "the FAILED line did not say what failed"
+  assert_contains "$line" "human-only-exit: " "the failed preservation did not end in a human-only question"
+  assert_contains "$line" "The next sweep run tries again" "the FAILED line did not say what happens next"
+  assert_not_contains "$OUT" "completing-command:" "a sweep refusal printed a command"
+  assert_not_contains "$OUT" "fm-teardown.sh" "a sweep refusal named a teardown command built from its release id"
+  assert_not_contains "$OUT" "FM_FRICTION_OPERATION_ID" "a sweep refusal printed a friction-correlated route"
   assert_not_contains "$OUT" "REMOVED" "a copy whose preservation failed was reported removed"
+  assert_absent "$HOMED/state/friction.jsonl" "a sweep refusal wrote a friction event under its synthetic release id"
   [ -e "$(copy_path locked)" ] || fail "a copy whose preservation failed was removed"
   registered locked || fail "a copy whose preservation failed is no longer registered"
   [ -f "$admin/locked" ] || fail "a copy whose preservation failed lost its lock"
@@ -715,10 +725,28 @@ test_a_failed_preservation_prints_no_completing_command_and_leaves_the_copy() {
   [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a copy whose preservation failed was logged as removed"
   assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
     "the driver was asked for more than its plan"
-  jq -es 'length == 1 and .[0].rule_id == "ignored-bytes-preserved" and .[0].outcome == "blocked" and .[0].exit_kind == "human-only"' \
-    "$HOMED/state/friction.jsonl" >/dev/null \
-    || fail "the refusal was not one human-only friction event: $(cat "$HOMED/state/friction.jsonl" 2>/dev/null)"
-  pass "a copy whose ignored files cannot be preserved stays locked and registered, the FAILED line ends in a human-only exit with no completing command, and the run exits 1"
+  pass "a copy whose ignored files cannot be preserved stays locked and registered, the sweep's own FAILED line ends in a human-only question with no command and no friction event, and the run exits 1"
+}
+
+test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released() {
+  local admin line
+  make_locked_copy_case relocked dead
+  install_driver "$SLOT" "$W"
+  : > "$W/plan-relock"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a lock that changed after its plan should exit 1, got $RC: $OUT"
+  line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
+    || fail "the changed lock was not reported as FAILED: $OUT"
+  assert_contains "$line" "no longer locked by Vernant's exact creation lock" "the FAILED line did not name the changed lock"
+  assert_not_contains "$OUT" "completing-command:" "a sweep refusal printed a command"
+  assert_not_contains "$OUT" "REMOVED" "a copy whose lock changed was reported removed"
+  [ -e "$(copy_path locked)" ] || fail "a copy whose lock changed was removed"
+  registered locked || fail "a copy whose lock changed is no longer registered"
+  assert_equals 'hand-held by an operator' "$(cat "$admin/locked")" "the sweep touched the lock someone else took"
+  assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
+    "the driver was asked to release a copy whose lock was no longer Vernant's"
+  pass "a copy whose creation lock became someone else's after its plan stays locked, is not released by the driver, and is reported as the sweep's own refusal"
 }
 
 driver_pid_count() { [ -f "$W/driver.pids" ] && wc -l < "$W/driver.pids" | tr -d ' ' || printf '0\n'; }
@@ -1731,7 +1759,8 @@ run_case test_recycled_launcher_lock_is_released_by_the_driver
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
-run_case test_a_failed_preservation_prints_no_completing_command_and_leaves_the_copy
+run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
+run_case test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
 run_case test_unproved_plan_verdicts_hold_the_copy
 run_case test_a_bare_allowed_literal_plan_releases_the_copy
 run_case test_a_zero_padded_plan_timeout_is_read_as_decimal

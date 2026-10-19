@@ -107,15 +107,20 @@
 # the owner's rule holds a copy whose plan does not answer. The plan runs as a
 # process group of its own and the timeout kills that whole group, so neither the
 # driver nor anything it started outlives the sweep. A copy whose plan allows it
-# has its ignored entries preserved and is then released and removed by the
-# driver, exactly as bin/fm-teardown.sh does it. The preserved entries land in
+# has its ignored entries preserved by the teardown library's own preservation,
+# its creation lock read again, and is then released and removed by the driver,
+# as bin/fm-teardown.sh does it. The preserved entries land in
 # data/copy-sweep/<run stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>,
 # so no later run or copy at the same path replaces them. Never a force flag,
 # never a recursive delete of a copy (the only recursive delete is the teardown
 # library's of its own staging directory under data/), never a hand unlock, never
 # a Treehouse call. A removal that fails after its plan was allowed, or that git
 # refuses, leaves the copy and is reported with the refusal text, and the run
-# exits 1; it is not retried in that run. Each REMOVED line reports "copy X GiB,
+# exits 1; it is not retried in that run. The sweep prints that refusal itself:
+# a preservation that fails, a lock that is no longer Vernant's, or a driver that
+# refuses is one line ending in the driver's own words or a human-only question,
+# never a completing command, because the release id is no teardown task id and
+# bin/fm-teardown.sh would reject a command built from it. Each REMOVED line reports "copy X GiB,
 # preserved Y GiB, net freed Z GiB" (the copy's size less the bytes it preserved;
 # a size that was not measured shows "-" and "unmeasured"), and the run ends with
 # one line "freed X GiB measured, N copies unmeasured". Each removal appends one
@@ -998,16 +1003,34 @@ driver_plan_allows() {  # <clone> <copy>
 # removes it through Vernant's own closeout driver, which is the only supported
 # release for its creation lock. The preservation lands under this sweep's data
 # directory in <release-id>, which holds the run stamp and the copy's HEAD, so a
-# later copy at the same path never replaces it. The teardown library owns both
-# the preservation and the driver run.
+# later copy at the same path never replaces it. The teardown library owns the
+# preservation and the driver run; the refusals are the sweep's own, one REFUSED
+# line each on stderr, because the library's envelope names a teardown command
+# built from the release id, which is no task id.
 teardown_driver_release() {  # <clone> <copy> <release-id>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-}
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown
+  shown=$(fm_refuse_text "$copy")
   DATA=$DATA_DIR
   ID=$3
-  teardown_foreign_copy_dispose "$clone" "$copy" || rc=$?
+  teardown_preserve_ignored "$copy" || rc=$?
   DATA=$saved_data
   ID=$saved_id
-  return "$rc"
+  if [ "$rc" != 0 ]; then
+    echo "REFUSED: the ignored files of $shown could not be preserved in $DATA_DIR/$3/nested-copy-preserved; it was not removed. human-only-exit: Which owner-approved storage or disposition preserves them? The next sweep run tries again; no removal or forced cleanup is authorized." >&2
+    return 1
+  fi
+  rc=0
+  teardown_copy_lock_file "$copy" || rc=$?
+  if [ "$rc" != 0 ] || ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
+    echo "REFUSED: $shown is no longer locked by Vernant's exact creation lock; it was not removed. The next sweep run proves it again." >&2
+    return 1
+  fi
+  rc=0
+  teardown_run_closeout "$clone" "$copy" || rc=$?
+  if [ "$rc" != 0 ]; then
+    echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
+    return 1
+  fi
 }
 
 # Removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time, deepest
