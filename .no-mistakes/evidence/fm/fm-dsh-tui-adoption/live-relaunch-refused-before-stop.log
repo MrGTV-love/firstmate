@@ -1,0 +1,18 @@
+LAB=/Users/charlesabrooker/tmp/fm-lab.iJNAy2 TMUXDIR=/tmp/fml.lbV0F7
+=== D: adversarial - relaunch onto a contradictory dsh route must refuse BEFORE stopping the running dsh worker
+skill selection for guard-d: unavailable - no TypeSafe or OpenRouter key
+spawned guard-d harness=dsh kind=scout window=firstmate:fm-guard-d worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/2/freshproj
+spawn rc=0
+dsh state before refusal attempts: busy
+--- relaunch --harness dsh --model claude-opus-4-1
+error: dsh runs only DeepSeek models, not 'claude-opus-4-1'
+rc=1
+agent still running? pane cmd=node dsh state=busy
+--- relaunch --harness dsh
+error: relaunch of a scout task requires --note (or --note-file): the replacement worker inherits the local copy but none of the conversation, so it must be told what happened
+rc=1
+agent still running? pane cmd=node dsh state=busy
+--- cleanup worker
+interrupt-delivered guard-d harness=dsh backend=tmux verified=agent-alive cancel=unconfirmed
+stopped guard-d harness=dsh backend=tmux endpoint=firstmate:fm-guard-d worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/2/freshproj
+LAB_D_DONE LAB=/Users/charlesabrooker/tmp/fm-lab.iJNAy2

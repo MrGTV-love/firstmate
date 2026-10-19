@@ -1,0 +1,53 @@
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411771/data/dsh-ship-35991/launch-brief.md records no ship branch; relaunching on the task's recorded branch labcopy-br
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411771/data/dsh-ship-35991/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-35991 ships mode=local-only while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-35991 ships branch=labcopy-br while labproj registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-35991) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-35991: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-ship-35991 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-live-14511-21904:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+observed dsh-ship-35991 busy
+first session=/Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411771/state/dsh-ship-35991.dsh/s1792411774.16140.27461/dsh/sessions/--Users-charlesabrooker-tmp-dshval.AwDlWi-labcopy--/527a2008-1fe5-4ca7-a034-4e1157f76b3d/session.v4.jsonl
+busy composer=empty
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+steer acknowledged by dsh-ship-35991
+observed dsh-ship-35991 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-ship-35991 busy
+interrupt-delivered dsh-ship-35991 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-ship-35991 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-14511-21904:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411771/data/dsh-ship-35991/launch-brief.md records no ship branch; relaunching on the task's recorded branch labcopy-br
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411771/data/dsh-ship-35991/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-35991 ships mode=local-only while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-35991 ships branch=labcopy-br while labproj registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-35991) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-35991: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-ship-35991 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-14511-21904:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+resumed the earlier conversation in place
+stopped dsh-ship-35991 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-14511-21904:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+ok - live dsh-tui 0.16.1 ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+skill selection for dsh-scout-35991: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-scout-35991 harness=dsh kind=scout window=fm-lab-dsh-live-14511-21904:w2:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+observed dsh-scout-35991 busy
+first session=/Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411771/state/dsh-scout-35991.dsh/s1792412021.44204.16295/dsh/sessions/--Users-charlesabrooker-tmp-dshval.AwDlWi-labcopy--/fdb0eee6-0a5e-479d-a6aa-e4c613bf4560/session.v4.jsonl
+busy composer=empty
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+steer acknowledged by dsh-scout-35991
+observed dsh-scout-35991 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-scout-35991 busy
+interrupt-delivered dsh-scout-35991 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-scout-35991 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-14511-21904:w2:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+skill selection for dsh-scout-35991: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-scout-35991 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-14511-21904:w2:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+resumed the earlier conversation in place
+stopped dsh-scout-35991 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-14511-21904:w2:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+ok - live dsh-tui 0.16.1 scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+lab_project=/Users/charlesabrooker/tmp/dshval.AwDlWi/labproj
+lab_copy=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+lab_home=/Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411771
+cleanup_exit=0
+exit=0

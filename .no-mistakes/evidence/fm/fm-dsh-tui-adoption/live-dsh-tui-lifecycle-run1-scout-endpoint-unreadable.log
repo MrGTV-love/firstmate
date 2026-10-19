@@ -1,0 +1,34 @@
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411455/data/dsh-ship-69385/launch-brief.md records no ship branch; relaunching on the task's recorded branch labcopy-br
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411455/data/dsh-ship-69385/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-69385 ships mode=local-only while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-69385 ships branch=labcopy-br while labproj registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-69385) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-69385: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-ship-69385 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-live-31390-26324:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+observed dsh-ship-69385 busy
+first session=/Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411455/state/dsh-ship-69385.dsh/s1792411459.33435.17443/dsh/sessions/--Users-charlesabrooker-tmp-dshval.AwDlWi-labcopy--/ad4c40f8-c425-420c-ad5f-69fe8bf33585/session.v4.jsonl
+busy composer=empty
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+steer acknowledged by dsh-ship-69385
+observed dsh-ship-69385 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-ship-69385 busy
+interrupt-delivered dsh-ship-69385 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-ship-69385 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-31390-26324:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411455/data/dsh-ship-69385/launch-brief.md records no ship branch; relaunching on the task's recorded branch labcopy-br
+warning: /Users/charlesabrooker/tmp/dshval.AwDlWi/task/home-1792411455/data/dsh-ship-69385/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-69385 ships mode=local-only while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-69385 ships branch=labcopy-br while labproj registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-69385) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-69385: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-ship-69385 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-31390-26324:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+resumed the earlier conversation in place
+stopped dsh-ship-69385 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-31390-26324:w1:p1 worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/labcopy
+ok - live dsh-tui 0.16.1 ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+error: task dsh-scout-69385's endpoint reads 'unreadable'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh dsh-scout-69385 exit)
+cleanup_exit=1
+exit=1

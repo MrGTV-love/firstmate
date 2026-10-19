@@ -1,0 +1,33 @@
+# Portable dsh regressions (executed in this run, head 1e4538ba)
+
+## bash tests/fm-dsh-harness.test.sh
+ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement
+ok - dsh frame proves empty, typed draft, and busy-hint furniture
+ok - dsh executable-slot attribution, lifecycle capability and fatal cleanup contract
+exit=0
+
+## bash tests/fm-dsh-spawn.test.sh
+ok - fm-harness: dsh detects by anchored name or script argv; the marker is a precedence override that needs real dsh ancestry
+ok - session lock and process classification: dsh is anchored, decoys stay out
+ok - fm_backend_tmux_agent_state: dsh is alive by name and by script argv, an unrelated node is not
+ok - fm_busy_classify: dsh follows the launch's own durable session log
+ok - fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default
+ok - fm-spawn: an explicit dsh pin is honored and a dsh launch without a DeepSeek model is refused
+ok - fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME
+ok - fm-spawn: config/session-launch-policy=omp-or-tc refuses a dsh launch with the policy's own message
+
+## bash tests/fm-quota-choose.test.sh (dsh lines + final line)
+41:ok - dsh remains resolver-only
+60:# all fm-quota-choose tests passed
+
+## bash tests/fm-omp-harness.test.sh (full file; exit=0; ok=69 not-ok=0); dsh/stand-in lines
+16:ok - launch preserves healthy pooled accounts and uses only the selected rule's stand-in
+19:ok - typed route class and effort constrain launch stand-ins while manual routes are unchanged
+32:ok - fm-spawn: a DeepSeek model never reroutes a secondmate to dsh, and only an explicit dsh pin refuses
+
+## bash tests/fm-control-relaunch.test.sh (partial run stopped by me; ok=141 not-ok=0); dsh lines
+26:ok - fm-control relaunch: dsh-without-model refuses pre-stop and explicit DeepSeek stand-ins are admitted
+68:ok - fm-control relaunch: a dsh secondmate target refuses before the agent is stopped
+
+## bash tests/fm-teardown.test.sh test_teardown_retires_the_dsh_launch_state
+ok - teardown retires the task's own dsh launch state and no other task's

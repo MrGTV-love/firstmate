@@ -1,0 +1,38 @@
+LAB=/Users/charlesabrooker/tmp/fm-lab.wjS6GX TMUXDIR=/tmp/fml.7RllER
+=== A: adversarial - dsh pinned with a non-DeepSeek model (expect refusal, no endpoint)
+error: dsh runs only DeepSeek models, not 'claude-opus-4-1'
+rc=1
+tmux windows before=       1 after=       1; meta present: no
+=== B: adversarial - dsh secondmate (expect refusal)
+error: dsh is a verified crewmate/scout adapter only and cannot run a secondmate yet; it has no primary supervision protocol. Select a harness verified for secondmates.
+rc=1
+=== C: fresh scout, crew-harness=omp, --model deepseek/deepseek-v4-flash, no harness named
+skill selection for route-c: unavailable - no TypeSafe or OpenRouter key
+spawned route-c harness=dsh kind=scout window=firstmate:fm-route-c worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/1/freshproj
+rc=0
+--- meta
+harness=dsh
+kind=scout
+model=deepseek/deepseek-v4-flash
+effort=high
+dsh state after wait: idle
+--- pane process
+firstmate:sentinel cmd=sleep
+firstmate:fm-route-c cmd=node
+--- pane text
+7:🌳 Entered worktree at ~/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/1
+13:Mac-Studio:freshproj charlesabrooker$ cd -- '/Users/charlesabrooker/tmp/dshval.A
+22:  ✦ dsh-TUI  v0.16.1
+34:  deepseek-v4-flash · High effort
+35:  /Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/…
+69:    Prove DeepSeek routes to dsh by default.
+71:    Reply exactly FMROUTEPROOF and nothing else.
+85:  ⏺ FMROUTEPROOF
+91:   deepseek-v4-… · hi… · cache 7 · ≈$0.0012 … · freshp…  ctx 0.7% (7.3k/1.0m)
+--- is omp running anywhere in the lab? (expect none)
+--- exit the worker
+stopped route-c harness=dsh backend=tmux endpoint=firstmate:fm-route-c worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/1/freshproj
+--- state dir listing of dsh launch state
+route-c.dsh
+route-c.dsh-session
+LAB_DONE

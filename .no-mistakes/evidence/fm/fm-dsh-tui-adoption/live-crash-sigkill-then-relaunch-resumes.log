@@ -1,0 +1,21 @@
+LAB=/Users/charlesabrooker/tmp/fm-lab.GqbJOv TMUXDIR=/tmp/fml.71GHEf
+=== E: crash - SIGKILL a busy dsh worker, then relaunch; the replacement must resume the same conversation
+skill selection for crash-e: unavailable - no TypeSafe or OpenRouter key
+spawned crash-e harness=dsh kind=scout window=firstmate:fm-crash-e worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/4/freshproj
+spawn rc=0
+dsh state before crash: busy
+pane shell pid=58691; descendants:
+  PID COMMAND
+98350 node /Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin/dsh-tui --patch /Users/charlesabrooker/tmp/fm-lab.GqbJO
+98618 /Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin/node /Users/charlesabrooker/tmp/fm-lab.GqbJOv/state/crash-e.
+98858 node /Users/charlesabrooker/.nvm/versions/node/v24.4.1/bin/dsh --profile dsh-tui --patch /Users/charlesabrooker/tm
+after SIGKILL: pane cmd=bash dsh state=busy
+skill selection for crash-e: unavailable - no TypeSafe or OpenRouter key
+relaunched crash-e harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=tmux endpoint=firstmate:fm-crash-e worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/4/freshproj
+relaunch rc=0
+relaunched worker acknowledged the instruction: yes
+same session log: yes  bytes before=   39897 after=   68006
+resumed log still holds the original brief turn: yes
+pane process after relaunch: node
+stopped crash-e harness=dsh backend=tmux endpoint=firstmate:fm-crash-e worktree=/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/4/freshproj
+LAB_E_DONE LAB=/Users/charlesabrooker/tmp/fm-lab.GqbJOv

@@ -1,0 +1,9 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+🌳 Leased worktree 1 at ~/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/1/freshproj. Run 'treehouse return ~/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/1/freshproj' to release it.
+/Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/1/freshproj
+warning: Docker container listing failed
+failed to connect to the docker API at unix:///Users/charlesabrooker/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/charlesabrooker/.docker/run/docker.sock: connect: no such file or directory
+warning: Docker could not be listed for route-c and its task record retains no Docker project identities, so Docker cleanup was skipped; with Docker running, list its own with: docker ps -a --filter label=fm.task=route-c
+🌳 Worktree returned to pool.
+teardown route-c complete (window firstmate:fm-route-c, worktree /Users/charlesabrooker/tmp/dshval.AwDlWi/th-root/.treehouse/freshproj-e814ff/1/freshproj)
+Backlog: route-c just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/tmp/fm-lab.wjS6GX/data/backlog.md - move route-c to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
