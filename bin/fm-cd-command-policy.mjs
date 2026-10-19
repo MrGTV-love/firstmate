@@ -50,6 +50,10 @@ function deny(code) {
   return { decision: "deny", code, reason: REASONS[code] };
 }
 
+function warn(code) {
+  return { decision: "warn", code, reason: REASONS[code] };
+}
+
 function hasPathQualifiedCommandPrefix(position) {
   return position.words
     .slice(position.prefixAssignments, position.index)
@@ -94,7 +98,7 @@ function decision(command) {
     if (!command) continue;
     if (!CD_BUILTINS.has(command.value)) continue;
     if (position.wrappers.some((wrapper) => FORKING_WRAPPERS.has(wrapper))) continue;
-    return deny("persistent-cd");
+    return warn("persistent-cd");
   }
   return { decision: "allow" };
 }
@@ -141,7 +145,7 @@ if (invokedDirectly()) {
       if (result.decision === "allow") {
         process.stdout.write("allow\n");
       } else {
-        process.stdout.write(`deny\t${result.code}\t${result.reason}\n`);
+        process.stdout.write(`${result.decision}\t${result.code}\t${result.reason}\n`);
       }
     }
   } catch (error) {
