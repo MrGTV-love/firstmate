@@ -1763,10 +1763,10 @@ test_process_budget_command_quotes_foreign_firstmate_path() {
 }
 
 # A first lane must never be told to create the nested worktree that leaked
-# under pool slots, and must never be sent to a create-only provisioner that can
-# strand a reused slot. The ship brief is the generated text a lane reads: it
-# forbids the second tree and routes a manifest or second-worktree demand to a
-# blocked line that quotes the rule or guard and its refusal for Main.
+# under pool slots, and must never be left with a wait and no route. The ship
+# brief is the generated text a lane reads: it forbids the second tree and, for
+# a manifest or second-worktree demand, tells the lane to stop with one blocked
+# line naming the single firstmate question and the slot-manifest key.
 test_ship_brief_does_not_instruct_a_nested_worktree() {
   local home id brief mode
   home="$TMP_ROOT/slot-provisioning-home"
@@ -1786,8 +1786,13 @@ test_ship_brief_does_not_instruct_a_nested_worktree() {
     if grep -F 'worktree-python-environments.md' "$brief" >/dev/null; then
       fail "the $mode ship brief still points at the slot-provisioning doc"
     fi
-    assert_grep 'If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.' "$brief" \
-      "the $mode ship brief lost its Main-actionable blocked route for a manifest or second-worktree demand"
+    assert_grep 'do not create a second tree and do not wait without a route. Append exactly one blocked line:' "$brief" \
+      "the $mode ship brief lost its no-wait route line for a manifest or second-worktree demand"
+    assert_grep 'blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?' "$brief" \
+      "the $mode ship brief lost its keyed firstmate route line"
+    if grep -qw 'Main' "$brief"; then
+      fail "the $mode ship brief says Main instead of firstmate"
+    fi
     if grep -F 'start_task_worktree.py' "$brief" | grep -vF -e 'Do not create' -e 'Never run' >/dev/null; then
       fail "the $mode ship brief mentions start_task_worktree.py outside a prohibition"
     fi

@@ -118,8 +118,9 @@
 # scripts/git-stability/start_task_worktree.py would nest a locked copy under
 # the slot that no one owns the release of (bin/fm-teardown-nested-lib.sh and
 # bin/fm-copy-sweep.sh only clean up after it). A Vernant rule or guard that
-# demands a manifest or a second worktree becomes a blocked status line that
-# quotes the demand, not a tree the lane creates.
+# demands a manifest or a second worktree becomes one blocked status line that
+# names the single firstmate route question and slot-manifest key, not a tree
+# the lane creates.
 # Both crewmate scaffolds carry one shared rule against administering the
 # infrastructure every lane shares - the no-mistakes daemon and the worktree pool
 # their own slot came from - so ship and scout cannot drift apart. A secondmate
@@ -842,7 +843,7 @@ If the top-level path is the primary checkout or not the worktree you were launc
 
 1. First action: create your branch: \`git checkout -b $BRANCH_Q --\`
    You already sit in a pool slot, which is itself a worktree. Do not create a second tree with \`scripts/git-stability/start_task_worktree.py\` from inside this slot; that nested worktree has no owner.
-   If a Vernant rule or guard demands a manifest or a second worktree, do not create it. Append a blocked line that quotes the rule or guard text and the exact refusal, then wait; Main decides. Never run start_task_worktree.py from this slot.$SETUP2
+   If a Vernant rule or guard demands a lifecycle manifest, or reports \`manifest_exists\` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: \`blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?\` and stop. Never run start_task_worktree.py from this slot.$SETUP2
 
 # Rules
 $RULE1
