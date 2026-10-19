@@ -4423,21 +4423,38 @@ validate_spawn_worktree() { # <source> <inspect-target>
 }
 
 # The task copy is the isolation, so a slot that already has a worktree
-# registered strictly inside it carries a stale inner layer and is not handed out
-# for new work. The refusal names the slot and every registration, and removes,
-# locks, unlocks, and returns nothing; a registration list that cannot be read
+# registered strictly inside it, with its directory on disk, carries a stale inner
+# layer and is not handed out for new work. A registration whose directory is gone
+# only awaits `git worktree prune` and is no layer. The refusal names the slot and
+# every such copy, and removes, locks, unlocks, and returns nothing; it names the
+# lease command that holds the slot out of the pool when the slot's Treehouse name
+# resolves, and says so when it does not. A registration list that cannot be read
 # refuses too, because an unreadable list proves nothing empty.
 validate_spawn_slot_has_no_inner_worktree() { # <inspect-target>
-  local inspect_target=$1 slot nested line
-  if ! slot=$(fm_task_copy_canonical_dir "$WT") || ! nested=$(fm_task_copy_registered_nested "$slot"); then
+  local inspect_target=$1 slot listed nested='' line
+  if ! slot=$(fm_task_copy_canonical_dir "$WT") || ! listed=$(fm_task_copy_registered_nested "$slot"); then
     echo "error: treehouse get yielded '$WT', but the worktrees registered inside it cannot be listed; refusing to launch onto a slot that may carry a second isolation layer. Inspect target $inspect_target" >&2
     exit 1
   fi
+  while IFS= read -r line; do
+    if [ -n "$line" ] && [ -d "$line" ]; then
+      nested="$nested$line"$'\n'
+    fi
+  done <<< "$listed"
   [ -n "$nested" ] || return 0
-  echo "error: treehouse get yielded slot '$slot', which already has a worktree registered inside it; the task copy is the isolation, so a slot carrying an inner layer is not handed out for new work. Nothing was removed, locked, unlocked, or returned; bin/fm-copy-sweep.sh reports these copies. Inspect target $inspect_target" >&2
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$slot" || true
+  echo "error: treehouse get yielded slot '$slot', which already has a worktree registered inside it; the task copy is the isolation, so a slot carrying an inner layer is not handed out for new work. Nothing was removed, locked, unlocked, or returned. Inspect target $inspect_target" >&2
   while IFS= read -r line; do
     echo "  registered inside the slot: $line" >&2
-  done < <(printf '%s\n' "$nested")
+  done <<< "$nested"
+  echo "These copies are cleared only through the existing proved release path, never by this spawn, and bin/fm-copy-sweep.sh reports them." >&2
+  if [ "$FM_TASK_COPY_SLOT_STATE" = unleased ] && [ -n "$FM_TASK_COPY_SLOT_NAME" ]; then
+    { fm_task_copy_slot_lease_remedy "$PROJ_ABS" "$slot" "$ID"; echo; } >&2
+  else
+    echo "No hold command can be named: the slot's Treehouse name cannot be resolved${FM_TASK_COPY_SLOT_REASON:+ because it $FM_TASK_COPY_SLOT_REASON}; inspect the pool with: (cd '$PROJ_ABS' && treehouse status)" >&2
+  fi
   exit 1
 }
 
