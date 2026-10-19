@@ -18,10 +18,16 @@
 # follow-up event only for the operation FM_FRICTION_OPERATION_ID names and only
 # when the ledger already holds its blocked event; an empty SUBJECT is the whole
 # operation. Call it only where the outcome was observed.
+# Every field the envelope prints is shown through fm_refuse_text, so text a
+# copy path, lock reason or tool message carries can never add a line of its own.
 # docs/configuration.md "Friction ledger" owns the schema and privacy contract.
 
 FM_REFUSE_LIB_DIR=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 FM_REFUSE_OPERATION=
+
+fm_refuse_text() {  # <text>: the text with every control character, newline included, shown as ?
+  printf '%s' "${1//[[:cntrl:]]/?}"
+}
 
 fm_friction_event() {  # <guard> <rule> <subject-kind> <subject> <exit-kind> [task]
   python3 "$FM_REFUSE_LIB_DIR/fm-friction-ledger.py" refusal \
@@ -39,7 +45,7 @@ fm_friction_outcome() {  # <outcome> <guard> <subject-kind> <subject> [task]
 
 fm_refuse() {  # <guard> <rule> <missing> <exit-kind> <exit> <subject-kind> <subject> [task]
   local operation episode
-  printf 'REFUSED: guard=%s rule=%s missing=%s\n' "$1" "$2" "$3" >&2
+  printf 'REFUSED: guard=%s rule=%s missing=%s\n' "$(fm_refuse_text "$1")" "$(fm_refuse_text "$2")" "$(fm_refuse_text "$3")" >&2
   case "$4" in
     machine|human-only) ;;
     *) printf 'fm-friction: invalid refusal exit category; guarded result unchanged\n' >&2; return 0 ;;
@@ -50,9 +56,9 @@ fm_refuse() {  # <guard> <rule> <missing> <exit-kind> <exit> <subject-kind> <sub
   episode=${FM_FRICTION_EPISODE_ID:-$operation}
   if [ "$4" = machine ]; then
     printf 'completing-command: %s%s\n' \
-      "${operation:+FM_FRICTION_OPERATION_ID=$operation FM_FRICTION_EPISODE_ID=$episode }" "$5" >&2
+      "${operation:+FM_FRICTION_OPERATION_ID=$operation FM_FRICTION_EPISODE_ID=$episode }" "$(fm_refuse_text "$5")" >&2
   else
-    printf 'human-only-exit: %s\n' "$5" >&2
+    printf 'human-only-exit: %s\n' "$(fm_refuse_text "$5")" >&2
   fi
   FM_FRICTION_OPERATION_ID=$operation FM_FRICTION_EPISODE_ID=$episode \
     fm_friction_event "$1" "$2" "$6" "$7" "$4" "${8:-${FM_TASK_ID:-}}"

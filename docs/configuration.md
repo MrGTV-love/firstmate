@@ -119,7 +119,10 @@ The pilot refusal instrument records teardown nested-copy/preservation predicate
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
 Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
 A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
+Git's own refusal is decided from the copy itself before the attempt (modified or untracked files, or a submodule, which are Git's documented conditions) and the removal's failing status, never from Git's message text, so the user's locale cannot change what is counted.
 A copy that is not a Git worktree root, has a HEAD that cannot be resolved, or meets a preservation anchor naming another commit stays that way until someone decides, so teardown refuses it as `copy-worktree-root`, `copy-head-resolved` or `copy-anchor-commit` with a human-only question.
+Each rule asks one question, worded the same at every site that refuses it; a rule about a process or a creation-lock launcher names its pid.
+Every field the envelope prints shows any control character, newline included, as `?`, so a copy path, lock reason or tool message cannot add a `completing-command:` or `human-only-exit:` line of its own.
 The shell [refusal envelope](../bin/fm-refuse-lib.sh) prints `REFUSED: guard=<stable-id> rule=<predicate-id> missing=<actual missing proof>`, followed by `completing-command: <supported command>` or a literal `human-only-exit: <new question>` line.
 The caller retains its existing exit code; a telemetry failure never adds a refusal, changes that code, or changes hook JSON or the Claude Stop exit-2 contract.
 The teardown completing command re-enters its existing proof and automatic ignored-byte preservation path without force after readable source and writable preservation storage are restored.

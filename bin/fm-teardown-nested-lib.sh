@@ -76,6 +76,7 @@ TEARDOWN_FOREIGN_LOCK_FILE=
 TEARDOWN_SLOT_COPIES=()
 TEARDOWN_CLOSEOUT_OUT=
 TEARDOWN_FOREIGN_RULE=
+TEARDOWN_FOREIGN_PID=
 TEARDOWN_REFUSED_COPIES=()
 TEARDOWN_FRICTION_GUARD=FM-TEARDOWN-PRESERVATION
 
@@ -86,13 +87,21 @@ teardown_friction_outcome() {  # <outcome> [<copy>]
   FM_HOME="$FM_HOME" fm_friction_outcome "$1" "$TEARDOWN_FRICTION_GUARD" nested-copy "${2:-}" "$ID"
 }
 
-# The human-only question for a copy the proof refused; <rule> names the proof.
-teardown_copy_question() {  # <rule> <copy> <why>
+# The one human-only question of <rule>, whatever site refuses it. The failed
+# proof's TEARDOWN_FOREIGN_WHY and TEARDOWN_FOREIGN_PID complete the rules that
+# name them.
+teardown_copy_question() {  # <rule> <copy>
   case "$1" in
-    copy-worktree-root) printf 'What owner-approved repair, removal or retained ownership applies to %s (%s)? Keep it; no removal or forced cleanup is authorized.' "$2" "$3" ;;
-    copy-head-resolved) printf 'Which verified commit holds the work in %s (%s)? Keep the copy; no discard is authorized.' "$2" "$3" ;;
-    copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$3" ;;
-    *) printf 'What verified landing or retained ownership covers %s (%s)? Keep this copy until that evidence exists; no discard is authorized.' "$2" "$3" ;;
+    copy-worktree-root) printf 'What owner-approved repair, removal or retained ownership applies to %s (%s)? Keep it; no removal or forced cleanup is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
+    copy-head-resolved) printf 'Which verified commit holds the work in %s (%s)? Keep the copy; no discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
+    copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
+    process-cwd-owner) printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
+    lock-launcher-owner) printf 'Is launcher %s, named in the creation lock on %s, still running, and who owns it?' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
+    creation-lock-owner) printf 'Who owns the creation lock on %s, and may it be released?' "$2" ;;
+    nonforced-removal) printf 'What retained disposition covers the contents Git still protects in %s? Preserve this copy; no forced removal is authorized.' "$2" ;;
+    registered-copy-proven) printf 'Which task and home retain the work in %s, or what verified landing covers it? No discard or forced removal is authorized.' "$2" ;;
+    ignored-bytes-preserved) printf "This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?" ;;
+    *) printf 'What verified landing or retained ownership covers %s (%s)? Keep this copy until that evidence exists; no discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
   esac
 }
 
@@ -101,22 +110,18 @@ teardown_copy_question() {  # <rule> <copy> <why>
 # owner without force, so a forced or legacy-record run, which it could not
 # complete, gets a human-only exit instead. A new custody/disposition decision is
 # asked explicitly.
-teardown_refuse_copy() {  # <rule> <missing> <copy> [new-question]
-  local command kind=machine exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh}
+teardown_refuse_copy() {  # <rule> <missing> <copy>
+  local command kind=human-only exit_text missing=$2 revision=${FM_FRICTION_REVISION_FILE:-$SCRIPT_DIR/fm-teardown-nested-lib.sh}
   # An unavailable inspection is not a policy judgment. The later custody
   # wrapper repeats this diagnostic without manufacturing a policy event.
   if [ "$1" = inspection-unavailable ]; then
-    printf 'error: %s\n' "$2" >&2
+    printf 'error: %s\n' "$(fm_refuse_text "$2")" >&2
     TEARDOWN_REFUSED_COPIES+=("$3")
     return 0
   fi
-  if [ -n "${4:-}" ]; then
-    kind=human-only
-    exit_text=$4
-  elif [ "${FORCE:-}" = --force ] || [ "${LEGACY_RECORD_GIVEN:-0}" = 1 ]; then
-    kind=human-only
-    exit_text="This run was forced or used a legacy record, so no completing command is printed. Once readable source and writable preservation storage are restored, which of the owner's own flags apply when the owner re-runs this teardown?"
-  else
+  exit_text=$(teardown_copy_question "$1" "$3")
+  if [ "$1" = ignored-bytes-preserved ] && [ "${FORCE:-}" != --force ] && [ "${LEGACY_RECORD_GIVEN:-0}" != 1 ]; then
+    kind=machine
     printf -v command 'FM_HOME=%q bash %q %q' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID"
     exit_text=$command
     missing="$missing Restore readable source and writable preservation storage, then run the completing command."
@@ -332,7 +337,7 @@ teardown_preserve_ignored() {  # <copy>
   done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
   rm -rf "$dest" || return 1
   mv "$stage" "$dest" || return 1
-  echo "teardown: preserved ignored files from $copy in $dest" >&2
+  echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
 }
 
 # Does an active record, a running process, or a live lock launcher outside this
@@ -341,6 +346,7 @@ teardown_preserve_ignored() {  # <copy>
 teardown_foreign_copy_unowned() {  # <copy>
   local copy=$1 rc=0 pids pid
   TEARDOWN_OWN_SCANNED=0
+  TEARDOWN_FOREIGN_PID=
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
   fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
   case "$rc" in
@@ -365,6 +371,7 @@ teardown_foreign_copy_unowned() {  # <copy>
     [ -n "$pid" ] || continue
     if ! teardown_pid_is_task_own "$pid"; then
       TEARDOWN_FOREIGN_RULE=process-cwd-owner
+      TEARDOWN_FOREIGN_PID=$pid
       TEARDOWN_FOREIGN_WHY="process $pid is running in it"
       return 1
     fi
@@ -382,6 +389,7 @@ teardown_foreign_copy_unowned() {  # <copy>
       if teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
         if ! teardown_pid_is_task_own "$pid"; then
           TEARDOWN_FOREIGN_RULE='lock-launcher-owner'
+          TEARDOWN_FOREIGN_PID=$pid
           TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
           return 1
         fi
@@ -443,8 +451,7 @@ teardown_foreign_copies_prove() {  # <slot>
     if teardown_foreign_copy_prove "$copy"; then
       TEARDOWN_FOREIGN_COPIES+=("$copy")
     else
-      teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." "$copy" \
-        "$(teardown_copy_question "$TEARDOWN_FOREIGN_RULE" "$copy" "$TEARDOWN_FOREIGN_WHY")"
+      teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." "$copy"
     fi
   done
 }
@@ -518,10 +525,26 @@ teardown_foreign_copy_present() {  # <slot> <copy>
   return 1
 }
 
+# Would a plain git worktree remove refuse <copy>? Git's documented conditions,
+# read from the copy itself and taken before the attempt, since a failed removal
+# can leave files missing: modified or untracked files, or an initialized
+# submodule. A copy that cannot be read is not proved protected.
+teardown_copy_git_protects() {  # <copy>
+  local status entry
+  status=$(git -C "$1" status --porcelain --ignore-submodules=none 2>/dev/null) || return 1
+  [ -z "$status" ] || return 0
+  while IFS= read -r -d '' entry; do
+    case "$entry" in
+      '160000 '*) [ ! -e "$1/${entry#*$'\t'}/.git" ] || return 0 ;;
+    esac
+  done < <(git -C "$1" ls-files --stage -z 2>/dev/null)
+  return 1
+}
+
 # Preserves the ignored files of one proved foreign copy, then releases and
 # removes it. Returns 1 after printing a refusal.
 teardown_foreign_copy_dispose() {  # <slot> <copy>
-  local slot=$1 copy=$2 rc=0 remove_rc remove_err
+  local slot=$1 copy=$2 rc=0 remove_rc remove_err protected
   teardown_preserve_ignored "$copy" || {
     teardown_refuse_copy ignored-bytes-preserved "the ignored files of foreign copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." "$copy"
     return 1
@@ -530,44 +553,39 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
   case "$rc" in
     0)
       if ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
-        teardown_refuse_copy creation-lock-owner "foreign copy $copy is locked by something other than Vernant's creation lock; it was not removed." "$copy" \
-          "Who owns the lock on $copy, and what owner-approved release is supported? No lock removal or forced cleanup is authorized."
-
+        teardown_refuse_copy creation-lock-owner "foreign copy $copy is locked by something other than Vernant's creation lock; it was not removed." "$copy"
         return 1
       fi
       rc=0
       teardown_run_closeout "$slot" "$copy" || rc=$?
       if [ "$rc" != 0 ]; then
-        echo "REFUSED: Vernant's closeout driver did not release foreign copy $copy (exit $rc): ${TEARDOWN_CLOSEOUT_OUT:0:600}" >&2
+        echo "REFUSED: Vernant's closeout driver did not release foreign copy $(fm_refuse_text "$copy") (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
         return 1
       fi
       ;;
     1)
       remove_rc=0
+      teardown_copy_git_protects "$copy" && protected=1 || protected=0
       remove_err=$(git -C "$slot" worktree remove "$copy" 2>&1 >/dev/null) || remove_rc=$?
       if [ "$remove_rc" != 0 ]; then
-        case "$remove_err" in
-          *"use --force to delete it"*|*"containing submodules"*)
-            teardown_refuse_copy nonforced-removal "git worktree remove would not remove foreign copy $copy without force; it was not removed." "$copy" \
-              "What retained disposition covers the contents Git still protects in $copy? Preserve this copy; no forced removal is authorized."
-            ;;
-          *)
-            teardown_refuse_copy inspection-unavailable "git worktree remove failed for foreign copy $copy (exit $remove_rc): $remove_err; it was not removed." "$copy"
-            ;;
-        esac
+        if [ "$protected" = 1 ]; then
+          teardown_refuse_copy nonforced-removal "git worktree remove would not remove foreign copy $copy without force; it was not removed." "$copy"
+        else
+          teardown_refuse_copy inspection-unavailable "git worktree remove failed for foreign copy $copy (exit $remove_rc): $remove_err; it was not removed." "$copy"
+        fi
         return 1
       fi
       ;;
     *)
-      echo "REFUSED: the lock state of foreign copy $copy cannot be read; it was not removed." >&2
+      echo "REFUSED: the lock state of foreign copy $(fm_refuse_text "$copy") cannot be read; it was not removed." >&2
       return 1
       ;;
   esac
   if teardown_foreign_copy_present "$slot" "$copy"; then
-    echo "REFUSED: foreign copy $copy is still present or registered after its release; the pool slot was not returned." >&2
+    echo "REFUSED: foreign copy $(fm_refuse_text "$copy") is still present or registered after its release; the pool slot was not returned." >&2
     return 1
   fi
-  echo "teardown: removed landed foreign copy $copy from pool slot $slot" >&2
+  echo "teardown: removed landed foreign copy $(fm_refuse_text "$copy") from pool slot $slot" >&2
   teardown_friction_outcome retry-succeeded "$copy"
 }
 
@@ -583,8 +601,7 @@ teardown_foreign_copies_release() {
   slot=$(fm_task_copy_canonical_dir "$slot") || return 1
   for copy in "${TEARDOWN_FOREIGN_COPIES[@]}"; do
     if ! teardown_foreign_copy_prove "$copy"; then
-      teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "foreign copy $copy in pool slot $slot is no longer provable: $TEARDOWN_FOREIGN_WHY; nothing was removed." "$copy" \
-        "$(teardown_copy_question "$TEARDOWN_FOREIGN_RULE" "$copy" "$TEARDOWN_FOREIGN_WHY")"
+      teardown_refuse_copy "$TEARDOWN_FOREIGN_RULE" "foreign copy $copy in pool slot $slot is no longer provable: $TEARDOWN_FOREIGN_WHY; nothing was removed." "$copy"
       return 1
     fi
   done
@@ -624,8 +641,7 @@ teardown_own_locked_copies_prove() {
       FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
     fi
     if [ -n "$TEARDOWN_FOREIGN_WHY" ]; then
-      teardown_refuse_copy "${TEARDOWN_FOREIGN_RULE:-creation-lock-owner}" "own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." "$copy" \
-        "Who owns the remaining lock or active use of $copy, and what owner-approved release is supported? No forced cleanup is authorized."
+      teardown_refuse_copy "${TEARDOWN_FOREIGN_RULE:-creation-lock-owner}" "own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." "$copy"
       return 1
     fi
   done
@@ -638,7 +654,7 @@ teardown_own_copy_dispose() {  # <slot> <copy>
   local slot=$1 copy=$2 rc=0
   teardown_copy_lock_file "$copy" || rc=$?
   if [ "$rc" != 0 ] || ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
-    echo "REFUSED: own nested copy $copy is not locked by Vernant's creation lock any more; it was not removed." >&2
+    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is not locked by Vernant's creation lock any more; it was not removed." >&2
     return 1
   fi
   teardown_preserve_ignored "$copy" || {
@@ -648,14 +664,14 @@ teardown_own_copy_dispose() {  # <slot> <copy>
   rc=0
   teardown_run_closeout "$slot" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
-    echo "REFUSED: Vernant's closeout driver did not release own nested copy $copy (exit $rc): ${TEARDOWN_CLOSEOUT_OUT:0:600}" >&2
+    echo "REFUSED: Vernant's closeout driver did not release own nested copy $(fm_refuse_text "$copy") (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
     return 1
   fi
   if teardown_foreign_copy_present "$slot" "$copy"; then
-    echo "REFUSED: own nested copy $copy is still present or registered after its release; the pool slot was not returned." >&2
+    echo "REFUSED: own nested copy $(fm_refuse_text "$copy") is still present or registered after its release; the pool slot was not returned." >&2
     return 1
   fi
-  echo "teardown: removed landed own nested copy $copy from pool slot $slot" >&2
+  echo "teardown: removed landed own nested copy $(fm_refuse_text "$copy") from pool slot $slot" >&2
   teardown_friction_outcome retry-succeeded "$copy"
 }
 

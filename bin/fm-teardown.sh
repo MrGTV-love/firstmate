@@ -2717,11 +2717,10 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
       [ "$copy" != "$allowed" ] || known=1
     done
     if [ "$known" = 1 ]; then
-      echo "REFUSED: pool slot $slot contains registered copy $copy that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." >&2
+      echo "REFUSED: pool slot $slot contains registered copy $(fm_refuse_text "$copy") that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." >&2
     else
       FM_FRICTION_REVISION_FILE="$SCRIPT_DIR/fm-teardown.sh" \
-        teardown_refuse_copy registered-copy-proven "pool slot $slot contains registered copy $copy that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." "$copy" \
-        "Which task and home retain the work in $copy, or what verified landing covers it? No discard or forced removal is authorized."
+        teardown_refuse_copy registered-copy-proven "pool slot $slot contains registered copy $copy that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." "$copy"
     fi
   done < "$inventory"
   rm -f "$inventory"
