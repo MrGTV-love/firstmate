@@ -121,16 +121,22 @@ EOF
   chmod +x "$FAKEBIN"/*
 }
 
-# Runs the sweep in the current world; sets OUT and RC.
-run_sweep() {
-  RC=0
-  OUT=$(env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_DATA_OVERRIDE \
+# Replaces the calling subshell with the sweep in the current world, so $! of a
+# backgrounded `( sweep_cmd ... ) &` is the sweep's own pid.
+sweep_cmd() {
+  exec env -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_DATA_OVERRIDE \
     PATH="$FAKEBIN:$ORIGINAL_PATH" FAKE_REAL_GIT="$REAL_GIT" FAKE_REAL_RM="$REAL_RM" \
     FM_HOME="$HOMED" FM_COPY_SWEEP_TREEHOUSE_ROOT="$TH" \
     FAKE_DU_TABLE="$W/du-table" FAKE_DU_LOG="$W/du.log" FAKE_DU_ACTIVE="$W/du-active" \
     FAKE_NICE_LOG="$W/nice.log" FAKE_GIT_LOG="$W/git.log" FAKE_RM_LOG="$W/rm.log" \
     FAKE_TREEHOUSE_LOG="$W/treehouse.log" \
-    "$SWEEP" "$@" 2>&1) || RC=$?
+    "$SWEEP" "$@"
+}
+
+# Runs the sweep in the current world; sets OUT and RC.
+run_sweep() {
+  RC=0
+  OUT=$( ( sweep_cmd "$@" ) 2>&1) || RC=$?
 }
 
 # add_copy <name>: a nested copy of the slot on branch fm/<name>, one commit,
@@ -451,7 +457,10 @@ test_apply_removes_only_the_reapable_copy() {
 # Vernant's closeout driver and its interpreter, stubbed inside the slot. The
 # driver stands where the real one lives and is kept out of the slot's status by
 # info/exclude. Without --execute-cleanup it only plans: it says allowed true, or
-# allowed false with exit 3 while <log-dir>/refuse-plan exists. With it, it
+# allowed false with exit 3 while <log-dir>/refuse-plan exists, or answers with
+# whatever <log-dir>/plan-<mode> asks (an empty, malformed, verdictless, false,
+# garbage or bare-literal answer, or a hang that leaves a child running). It
+# records its own pid, and a hung plan's child, in <log-dir>/driver.pids. With it, it
 # unlocks and plainly removes the copy it is given, or prints two lines and
 # exits 3 while <log-dir>/refuse-execute exists. The interpreter runs it as a
 # shell script. Both log what they were asked to do.
@@ -462,6 +471,7 @@ install_driver() {  # <slot> <log-dir>
   mkdir -p "$slot/scripts/git-stability"
   cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
 printf '%s|%s\n' "\$PWD" "\$*" >> "$log/closeout.log"
+printf '%s\n' "\$\$" >> "$log/driver.pids"
 if [ "\${3:-}" != --execute-cleanup ]; then
   if [ -e "$log/refuse-plan" ]; then
     echo '{"allowed": false, "reason": "pull_request_not_merged"}'
@@ -478,8 +488,22 @@ if [ "\${3:-}" != --execute-cleanup ]; then
     printf '{"reason": "no verdict"}'
     exit 0
   fi
+  if [ -e "$log/plan-false-with-text" ]; then
+    printf '{"allowed": false, "reason": "set allowed=true to override"}'
+    exit 0
+  fi
+  if [ -e "$log/plan-garbage-literal" ]; then
+    echo 'garbage allowed=true'
+    exit 0
+  fi
+  if [ -e "$log/plan-bare-literal" ]; then
+    echo 'allowed=true'
+    exit 0
+  fi
   if [ -e "$log/plan-hang" ]; then
-    sleep 30
+    sleep 30 &
+    printf '%s\n' "\$!" >> "$log/driver.pids"
+    wait
     exit 0
   fi
   echo '{"allowed": true}'
@@ -666,9 +690,25 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text(
   pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code"
 }
 
+driver_pid_count() { [ -f "$W/driver.pids" ] && wc -l < "$W/driver.pids" | tr -d ' ' || printf '0\n'; }
+
+# Fails when any pid the fake driver recorded is still running.
+assert_driver_pids_gone() {  # <message>
+  local pid tries
+  [ -s "$W/driver.pids" ] || fail "$1: the driver recorded no pid"
+  while IFS= read -r pid; do
+    tries=0
+    while kill -0 "$pid" 2>/dev/null && [ "$tries" -lt 30 ]; do
+      sleep 0.1
+      tries=$((tries + 1))
+    done
+    ! kill -0 "$pid" 2>/dev/null || { kill -s KILL "$pid" 2>/dev/null; fail "$1: driver process $pid is still running"; }
+  done < "$W/driver.pids"
+}
+
 test_unproved_plan_verdicts_hold_the_copy() {
   local mode admin
-  for mode in empty malformed missing hang; do
+  for mode in empty malformed missing false-with-text garbage-literal hang; do
     make_locked_copy_case "plan-$mode" dead
     install_driver "$SLOT" "$W"
     printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
@@ -687,8 +727,46 @@ test_unproved_plan_verdicts_hold_the_copy() {
     [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "an unproved plan ($mode) logged a removal"
     assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
       "an unproved plan ($mode) asked the driver for more than its plan"
+    if [ "$mode" = hang ]; then
+      assert_contains "$OUT" "did not answer within 1s" "a plan that never answers did not say so"
+      [ "$(driver_pid_count)" -ge 2 ] || fail "the hung plan did not leave a child running"
+    fi
+    assert_driver_pids_gone "a finished plan ($mode)"
   done
-  pass "an empty, malformed or missing plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, and exit 0"
+  pass "an empty, malformed, missing, false-with-text or garbage-literal plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, leave no driver process running, and exit 0"
+}
+
+test_a_bare_allowed_literal_plan_releases_the_copy() {
+  make_locked_copy_case planbare dead
+  install_driver "$SLOT" "$W"
+  : > "$W/plan-bare-literal"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "a bare allowed=true plan failed the run ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "a bare allowed=true plan did not release the copy"
+  [ ! -e "$(copy_path locked)" ] || fail "a bare allowed=true plan left the copy on disk"
+  pass "a plan whose whole answer is allowed=true releases the copy"
+}
+
+test_a_sweep_stopped_during_a_plan_stops_the_hung_driver() {
+  local sweep waited=0
+  make_locked_copy_case planstopped dead
+  install_driver "$SLOT" "$W"
+  : > "$W/plan-hang"
+  (
+    export FM_COPY_SWEEP_PLAN_TIMEOUT=120 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY"
+    sweep_cmd --apply > "$W/stopped.out" 2>&1
+  ) &
+  sweep=$!
+  while [ "$(driver_pid_count)" != 2 ] && [ "$waited" -lt 100 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ "$(driver_pid_count)" = 2 ] || { kill "$sweep" 2>/dev/null; fail "the hung plan never started"; }
+  kill -s TERM "$sweep"
+  wait "$sweep" 2>/dev/null || true
+  assert_driver_pids_gone "a sweep stopped during its plan"
+  [ -e "$(copy_path locked)" ] || fail "a sweep stopped during its plan removed the copy"
+  pass "a sweep stopped while its plan hangs stops the driver and its child too"
 }
 
 test_two_sweeps_of_one_path_keep_both_preserved_directories() {
@@ -1600,6 +1678,8 @@ run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
 run_case test_unproved_plan_verdicts_hold_the_copy
+run_case test_a_bare_allowed_literal_plan_releases_the_copy
+run_case test_a_sweep_stopped_during_a_plan_stops_the_hung_driver
 run_case test_two_sweeps_of_one_path_keep_both_preserved_directories
 run_case test_a_removal_with_no_measured_size_says_so
 run_case test_locked_copy_with_an_unpushed_equivalence_is_still_held

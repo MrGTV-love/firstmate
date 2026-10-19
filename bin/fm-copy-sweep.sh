@@ -95,26 +95,30 @@
 # copy goes by a plain `git worktree remove` run from the parent clone. A locked
 # one first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before anything is copied or hashed. The plan must exit
-# 0 AND state allowed=true (a JSON boolean true, or the literal allowed=true);
-# a non-zero exit, an empty, malformed or verdictless answer, a timeout, or any
-# other value holds the copy as HELD-LOCKED with the driver's own words (the
-# first 600 characters, on one line), copies nothing, and is not a failure. A
-# copy whose plan allows it has its ignored entries preserved and is then
-# released and removed by the driver, exactly as bin/fm-teardown.sh
-# does it. The preserved entries land in data/copy-sweep/<run stamp>-<HEAD>/
-# nested-copy-preserved/<sha256 of the path>, so no later run or copy at the same
-# path replaces them. Never a force flag, never a recursive delete of a copy
-# (the only recursive delete is the teardown library's of its own staging
-# directory under data/), never a hand unlock, never a Treehouse call. A removal
-# that fails after its plan was allowed, or that git refuses, leaves the copy and
-# is reported with the refusal text, and the run exits 1; it is not retried in
-# that run. Each REMOVED line reports "copy X GiB, preserved Y GiB, net freed Z
-# GiB" (the copy's size less the bytes it preserved; a size that was not measured
-# shows "-" and "unmeasured"), and the run ends with one line "freed X GiB
-# measured, N copies unmeasured". Each removal appends one line to
-# data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
-# in the same run is removed by the next run; a second run otherwise finds
-# nothing left to remove. Report mode (no flag) reads the size cache and writes
+# 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
+# boolean true, or is exactly the literal allowed=true. A non-zero exit, an empty,
+# malformed or verdictless answer, text that only mentions allowed=true, any other
+# value, or a timeout holds the copy as HELD-LOCKED with the driver's own words
+# (the first 600 characters, on one line), copies nothing, and is not a failure.
+# The timeout is deliberate (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by default):
+# the owner's rule holds a copy whose plan does not answer. The plan runs as a
+# process group of its own and the timeout kills that whole group, so neither the
+# driver nor anything it started outlives the sweep. A copy whose plan allows it
+# has its ignored entries preserved and is then released and removed by the
+# driver, exactly as bin/fm-teardown.sh does it. The preserved entries land in
+# data/copy-sweep/<run stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>,
+# so no later run or copy at the same path replaces them. Never a force flag,
+# never a recursive delete of a copy (the only recursive delete is the teardown
+# library's of its own staging directory under data/), never a hand unlock, never
+# a Treehouse call. A removal that fails after its plan was allowed, or that git
+# refuses, leaves the copy and is reported with the refusal text, and the run
+# exits 1; it is not retried in that run. Each REMOVED line reports "copy X GiB,
+# preserved Y GiB, net freed Z GiB" (the copy's size less the bytes it preserved;
+# a size that was not measured shows "-" and "unmeasured"), and the run ends with
+# one line "freed X GiB measured, N copies unmeasured". Each removal appends one
+# line to data/copy-sweep.log (append-only). An outer copy whose inner copy was
+# removed in the same run is removed by the next run; a second run otherwise
+# finds nothing left to remove. Report mode (no flag) reads the size cache and writes
 # nothing; `check` writes only the size cache and the record (budgets and live copies).
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
@@ -910,60 +914,72 @@ gib_or_dash() {  # <KiB or ->
   case "$1" in ''|*[!0-9]*) printf -- '-' ;; *) kib_to_gib "$1" ;; esac
 }
 
-# True only when <driver output> carries a real positive verdict: JSON whose
-# "allowed" key is the boolean true, or the literal `allowed=true`. Everything
-# else - no verdict, an empty or malformed document, a false or non-boolean
-# value - is not permission.
+# True only when <driver output> carries a real positive verdict: the whole
+# trimmed answer is the literal `allowed=true`, or it is exactly one JSON
+# document whose top-level "allowed" key is the boolean true. Text that merely
+# mentions allowed=true, a false or non-boolean value, no verdict, an empty or
+# malformed answer, and more than one document are not permission.
 plan_verdict_allows() {  # <driver output>
   local out=$1
-  if command -v python3 >/dev/null 2>&1; then
-    printf '%s' "$out" | python3 -c 'import json, sys
-try:
-    gate = json.load(sys.stdin)
-except Exception:
-    sys.exit(1)
-sys.exit(0 if isinstance(gate, dict) and gate.get("allowed") is True else 1)' 2>/dev/null \
-      && return 0
-  fi
-  printf '%s' "$out" | grep -Eiq '(^|[^[:alnum:]_"])allowed[[:space:]]*=[[:space:]]*"?true"?([^[:alnum:]_]|$)'
+  out=${out#"${out%%[![:space:]]*}"}
+  out=${out%"${out##*[![:space:]]}"}
+  [[ $out =~ ^allowed[[:blank:]]*=[[:blank:]]*true$ ]] && return 0
+  printf '%s' "$out" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
+}
+
+# The plan's process group, while one runs. Killing the whole group is the only
+# way the driver and what it started stop with the sweep, so every exit path of
+# the plan, and the sweep's own signal traps, go through stop_plan.
+PLAN_PID=
+stop_plan() {
+  [ -z "$PLAN_PID" ] || kill -s KILL -- "-$PLAN_PID" 2>/dev/null
+  PLAN_PID=
 }
 
 # Asks Vernant's closeout driver, in plan mode, whether it would release <copy>,
 # before anything is copied or hashed. The copy stays unless the driver exits 0
 # AND states allowed=true; a non-zero exit, silence, an unparsable verdict, or
 # no answer within the plan timeout (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by
-# default) all keep it, with PLAN_WHY holding the driver's own words.
+# default) all keep it, with PLAN_WHY holding the driver's own words. The plan
+# runs as the leader of its own process group, and the timeout kills that whole
+# group, so the driver and anything it started never outlive the sweep.
 PLAN_WHY=
 driver_plan_allows() {  # <clone> <copy>
-  local dir rc=0 limit waited=0 pid
+  local dir rc=0 limit ticks=0 timed_out=0 pid
   limit=${FM_COPY_SWEEP_PLAN_TIMEOUT:-120}
+  case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
+  [ $((10#$limit)) -ge 1 ] || limit=120
   dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-sweep-plan.XXXXXX") || {
     PLAN_WHY="its closeout driver could not be planned (no temporary directory)"
     return 1
   }
+  set -m
   (
     local r=0
     teardown_run_closeout "$1" "$2" plan || r=$?
     printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$dir/out"
     printf '%s' "$r" > "$dir/rc"
-  ) &
+  ) </dev/null &
   pid=$!
-  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$limit" ]; do
-    sleep 1
-    waited=$((waited + 1))
+  PLAN_PID=$pid
+  set +m
+  while kill -0 "$pid" 2>/dev/null && [ "$ticks" -lt $((limit * 10)) ]; do
+    sleep 0.1
+    ticks=$((ticks + 1))
   done
   if kill -0 "$pid" 2>/dev/null; then
-    kill "$pid" 2>/dev/null
-    wait "$pid" 2>/dev/null
-    TEARDOWN_CLOSEOUT_OUT=$(cat "$dir/out" 2>/dev/null) || TEARDOWN_CLOSEOUT_OUT=
-    rm -rf "$dir"
-    PLAN_WHY="its closeout driver did not answer within ${limit}s"
-    return 1
+    timed_out=1
   fi
+  stop_plan
   wait "$pid" 2>/dev/null
   rc=$(cat "$dir/rc" 2>/dev/null) || rc=1
   TEARDOWN_CLOSEOUT_OUT=$(cat "$dir/out" 2>/dev/null) || TEARDOWN_CLOSEOUT_OUT=
-  rm -rf "$dir"
+  rm -f "$dir/out" "$dir/rc"
+  rmdir "$dir" 2>/dev/null
+  if [ "$timed_out" = 1 ]; then
+    PLAN_WHY="its closeout driver did not answer within ${limit}s"
+    return 1
+  fi
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
   PLAN_WHY=${PLAN_WHY:0:600}
   if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_OUT"; then
@@ -1502,8 +1518,8 @@ run_sweep() {  # report|apply|check
       return 0
     fi
     LOCK_HELD=1
-    trap 'release_lock' EXIT
-    trap 'release_lock; exit 1' HUP INT TERM
+    trap 'stop_plan; release_lock' EXIT
+    trap 'stop_plan; release_lock; exit 1' HUP INT TERM
   fi
   read_record
   now=$(now_epoch)
