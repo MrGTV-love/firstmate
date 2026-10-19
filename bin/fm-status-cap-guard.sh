@@ -36,9 +36,8 @@
 # one writer, so how far a file passes the cap before the stop is the writer's growth
 # rate times the poll interval, which docs/configuration.md "Status log size bounds"
 # states with measured numbers.
-# Environment: FM_STATE_OVERRIDE (state dir), FM_STATUS_CAP_SAMPLE_SECS (growth
-# sample, default 1), FM_STATUS_CAP_LSOF (the lsof command, for tests). The cap itself
-# is FM_STATUS_CAP_BYTES.
+# Environment: FM_STATE_OVERRIDE (state dir), FM_STATUS_CAP_LSOF (the lsof command,
+# for tests). The cap itself is FM_STATUS_CAP_BYTES.
 #
 # tests/fm-status-runaway-guard.test.sh is the regression entry point.
 set -u
@@ -54,13 +53,9 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 
 LSOF=${FM_STATUS_CAP_LSOF:-lsof}
 # One second between the first lsof look and the second look for a writer that reopens
-# the log on every append. It is a sampling interval, not a deadline.
+# the log on every append. It is a sampling interval, not a deadline, and a constant.
 # measured: value=1 date=2026-10-18 host=Mac-Studio.local margin=5 (one lsof look takes 0.20 to 0.23 s)
-SAMPLE_SECS=${FM_STATUS_CAP_SAMPLE_SECS:-1}
-# measured: value=1 date=2026-10-18 host=Mac-Studio.local margin=5 (same interval; a malformed value falls back to it)
-case "$SAMPLE_SECS" in ''|*[!0-9]*) SAMPLE_SECS=1 ;; esac
-# measured: value=1 date=2026-10-18 host=Mac-Studio.local margin=5 (same interval; a zero value falls back to it)
-[ "$SAMPLE_SECS" -gt 0 ] || SAMPLE_SECS=1
+SAMPLE_SECS=1
 
 clean() { LC_ALL=C tr '\t\r\n' '   '; }
 
@@ -166,7 +161,7 @@ rate_between() {  # <size-a> <time-a> <size-b> <time-b>
 # megabytes. Only a log with no writer found yet waits one sample for a second look.
 investigate() {  # <size> <ident> <path>
   local size=$1 ident=$2 path=$3 cap size_a size_b size_end time_a time_b rate writers pid cmd name start line reason
-  local writer_text='' action_text='' omp_found=0 seen_other='' retried=0
+  local writer_text='' action_text='' omp_found=0 seen_other=''
   fm_status_cap_bytes cap
   size_a=$(file_size "$path") || size_a=$size
   time_a=$(now_hires)
@@ -178,7 +173,6 @@ investigate() {  # <size> <ident> <path>
     # A writer that reopens the log on every append is between opens for most of an
     # lsof read; look once more after one sample, which also measures growth.
     sleep "$SAMPLE_SECS"
-    retried=1
     writers=$(unique_writers "$path")
     size_end=$(file_size "$path") || size_end=$size_b
     time_b=$(now_hires)
@@ -211,7 +205,6 @@ EOF
       action_text="$action_text; left alone: $seen_other"
     fi
   fi
-  : "$retried"
   # The size after containment is the one the marker keeps, so growth is measured from it.
   size_b=$(file_size "$path") && size_end=$size_b
   reason=$(printf 'check: status-log-over-cap: file=%s size=%s bytes (cap %s) growth=%s bytes/s writer=%s; %s; nothing was deleted, truncated or rewritten' \
