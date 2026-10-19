@@ -1,0 +1,50 @@
+### S1: a merged task's copy is pruned right after the merge: arm --run (the call bin/fm-pr-merge.sh makes), REAL teardown, REAL treehouse, REAL tmux pane
+slot: /Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-happy/th/.treehouse/proj-fa8773/1/proj
+slot before (real treehouse status):
+base  main  (repository default)
+1     in-use       <LAB>/w-happy/th/.treehouse/proj-fa8773/1/proj  [fm/happy]
+                   zsh (45650), sleep (46919)
+pane tree before:
+  45650 <- 38663 /bin/zsh
+  46919 <- 45650 sleep
+  38663 <- 36392 treehouse
+--- arm happy --run
+arm exit=0
+--- prune record:
+(none)
+--- prune log:
+2026-10-19T18:42:40Z armed for https://github.com/acme/widget/pull/101
+2026-10-19T18:43:16Z reaped: teardown completed
+--- wake queue (this task):
+--- treehouse calls:
+status
+lease --help
+lease 1 --lease-holder happy
+return --force <LAB>/w-happy/th/.treehouse/proj-fa8773/1/proj
+--- teardown calls:
+teardown call: args=[happy] admission=1 copy_present=yes tmux_windows=[anchor fm-happy ] pane_shell=36392 descendants=[45650(/bin/zsh) 46919(sleep) 38663(treehouse) ]
+teardown exit=0 copy_present_after=yes tmux_windows_after=[anchor ] descendants_after=[]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+🌳 Leased worktree 1 at <LAB>/w-happy/th/.treehouse/proj-fa8773/1/proj. Run 'treehouse return <LAB>/w-happy/th/.treehouse/proj-fa8773/1/proj' to release it.
+<LAB>/w-happy/th/.treehouse/proj-fa8773/1/proj
+teardown: reaping leaked worktree process(es) for happy: 45650 46919
+teardown: force-killing leaked worktree process(es) for happy: 45650
+🌳 Worktree returned to pool.
+<LAB>/w-happy/proj: synced 1f93329..df4aeed
+teardown happy complete (window firstmate:fm-happy, worktree <LAB>/w-happy/th/.treehouse/proj-fa8773/1/proj)
+Backlog: happy just finished (this home keeps no markdown backlog at <LAB>/data/backlog.md). Update <LAB>/data/backlog.md - move happy to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- control (agent stop) calls:
+--- real treehouse status:
+base  main  (repository default)
+1     available    <LAB>/w-happy/th/.treehouse/proj-fa8773/1/proj  (detached)
+--- tmux windows: anchor 
+PASS S1 task record closed (meta gone)
+PASS S1 prune record removed
+PASS S1 log says reaped: teardown completed
+PASS S1 no wake raised
+PASS S1 nothing forced (no --include-unlanded/--include-in-use/destroy --force)
+PASS S1 teardown asked for the task by name with the automatic-reap admission
+PASS S1 slot returned to the real pool: clean, off the task branch
+PASS S1 tmux window closed by teardown
+=== 8 pass, 0 fail

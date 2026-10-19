@@ -1,0 +1,91 @@
+== live-S1-merge-arms-and-prunes.txt
+PASS S1 task record closed (meta gone)
+PASS S1 prune record removed
+PASS S1 log says reaped: teardown completed
+PASS S1 no wake raised
+PASS S1 nothing forced (no --force/--include-unlanded/--include-in-use)
+PASS S1 teardown asked for the task by name, with the automatic-reap admission
+PASS S1 slot returned to the real pool, clean, off the task branch
+== live-S2-fallback-destroys-squash-merged-slot.txt
+PASS S2 teardown first refused with the closeout driver's exact-tree text
+PASS S2 slot destroyed (gone from disk)
+PASS S2 real treehouse destroy called once, as the reaper does
+PASS S2 nothing forced
+PASS S2 task record closed after the fallback
+PASS S2 log says fallback destroyed and reaped
+PASS S2 preserve-list record copied before removal
+PASS S2 no wake raised
+== live-S3-pane-shell-sighup-and-destroy.txt
+PASS S3 first teardown refused as not landed (the fallback class)
+PASS S3 the finished agent was stopped through the exit verb once
+PASS S3 slot destroyed by real treehouse, one destroy call of the reaper's exact shape
+PASS S3 slot gone from disk
+PASS S3 idle shell inside the copy ended; pane's own shell and window left open when the second teardown began
+PASS S3 nothing forced
+PASS S3 task record closed, prune record gone, no wake
+== live-S4-unsafe-copies-kept.txt
+PASS S4/ustash copy kept on disk
+PASS S4/ustash task record kept
+PASS S4/ustash exactly one wake after three attempts
+PASS S4/ustash treehouse destroy calls = 0
+PASS S4/ustash nothing forced
+PASS S4/ustash wake names the copy
+PASS S4/uunpushed copy kept on disk
+PASS S4/uunpushed task record kept
+PASS S4/uunpushed exactly one wake after three attempts
+PASS S4/uunpushed treehouse destroy calls = 0
+PASS S4/uunpushed nothing forced
+PASS S4/uunpushed wake names the copy
+PASS S4/uclone copy kept on disk
+PASS S4/uclone task record kept
+PASS S4/uclone exactly one wake after three attempts
+PASS S4/uclone treehouse destroy calls = 0
+PASS S4/uclone nothing forced
+PASS S4/uclone wake names the copy
+PASS S4/uignored copy kept on disk
+PASS S4/uignored task record kept
+PASS S4/uignored exactly one wake after three attempts
+PASS S4/uignored treehouse destroy calls = 0
+PASS S4/uignored nothing forced
+PASS S4/uignored wake names the copy
+PASS S4/ubusy copy kept on disk
+PASS S4/ubusy task record kept
+PASS S4/ubusy exactly one wake after three attempts
+PASS S4/ubusy treehouse destroy calls = 0
+PASS S4/ubusy nothing forced
+PASS S4/ubusy wake names the copy
+PASS S4/uhidden copy kept on disk
+PASS S4/uhidden task record kept
+PASS S4/uhidden exactly one wake after three attempts
+PASS S4/uhidden treehouse destroy calls = 0
+PASS S4/uhidden nothing forced
+PASS S4/uhidden wake names the copy
+PASS S4/udirty copy kept on disk
+PASS S4/udirty task record kept
+PASS S4/udirty exactly one wake after three attempts
+PASS S4/udirty treehouse destroy calls = 0
+PASS S4/udirty nothing forced
+PASS S4/udirty wake names the copy
+== live-S5-pushed-follow-up-commit.txt
+PASS S5 the pushed follow-up commit is still reachable from the remote and the project's branch
+FAIL S5 copy kept as the docs say (the copy was destroyed; the work survives on origin/fm/fu)
+== live-S6-busy-worker-and-plain-tree.txt
+PASS S6 busy worker still running
+PASS S6 no stop (exit verb) was sent
+PASS S6 nothing destroyed, copy and record kept
+PASS S6 record is pending with one attempt, backoff set
+PASS S6 silent: no wake
+PASS S6 window still open
+PASS S7 plain tree kept
+PASS S7 nothing destroyed
+PASS S7 exactly one wake
+PASS S7 wake says it is not a pool slot
+PASS S7 no stop was sent
+== live-S8-arming-rules-and-sweep.txt
+PASS S8a an unverified merge arms nothing
+PASS S8b FM_MERGE_PRUNE=0 arms nothing
+PASS S8c a PR the poll never saw merged arms nothing
+PASS S8d a verified merge arms; arming twice leaves the record unchanged
+PASS S8e1 task record closed by the sweep
+PASS S8e2 prune record removed by the sweep
+PASS S8e3 log says reaped

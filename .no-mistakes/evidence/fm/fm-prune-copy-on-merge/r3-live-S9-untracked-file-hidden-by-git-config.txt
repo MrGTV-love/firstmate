@@ -1,0 +1,43 @@
+### S9 (adversarial, review round 9): status.showUntrackedFiles=no hides an untracked file from a plain 'git status --porcelain'. The file appears right after teardown's own dirt check (SEAM), so only the fallback's proof can stop the removal. The copy must be kept with one wake, and the file must survive.
+plain 'git status --porcelain' in the copy prints: []  (hidden by config)
+'git status --porcelain --untracked-files=all' prints: [?? late-untracked.txt]
+--- prune record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/150
+attempts=2
+next_at=1792459572
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-hid/th/.treehouse/proj-9a068a/1/proj has changed or untracked files (1 entries, first: ?? late-untracked.txt)
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-hid/th/.treehouse/proj-9a068a/1/proj
+armed_at=1792437969
+--- prune log:
+2026-10-19T19:26:09Z armed for https://github.com/acme/widget/pull/150
+2026-10-19T19:26:12Z retained <LAB>/w-hid/th/.treehouse/proj-9a068a/1/proj: <LAB>/w-hid/th/.treehouse/proj-9a068a/1/proj has changed or untracked files (1 entries, first: ?? late-untracked.txt)
+--- wake queue (this task):
+1792437972	1	check	merge-prune:hid	check: merge-prune kept <LAB>/w-hid/th/.treehouse/proj-9a068a/1/proj for hid: <LAB>/w-hid/th/.treehouse/proj-9a068a/1/proj has changed or untracked files (1 entries, first: ?? late-untracked.txt)
+--- treehouse calls:
+--- teardown calls:
+teardown call: args=[hid] admission=1 copy_present=yes tmux_windows=[anchor fm-hid ] pane_shell=4358 descendants=[6551(treehouse) 11920(sleep) 10453(/bin/zsh) ]
+teardown exit=1 (SEAM refusal) copy_present_after=yes
+teardown call: args=[hid] admission=1 copy_present=yes tmux_windows=[anchor fm-hid ] pane_shell=4358 descendants=[6551(treehouse) 11920(sleep) 10453(/bin/zsh) ]
+teardown exit=1 (SEAM refusal) copy_present_after=yes
+--- teardown output:
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+--- control (agent stop) calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       <LAB>/w-hid/th/.treehouse/proj-9a068a/1/proj  [fm/hid]
+                   zsh (10453), sleep (11920)
+--- tmux windows: anchor fm-hid 
+record: <LAB>/w-hid/th/.treehouse/proj-9a068a/1/proj has changed or untracked files (1 entries, first: ?? late-untracked.txt)
+PASS S9 the late file is hidden from the plain status (the trap is set)
+PASS S9 copy kept, the untracked file still there
+PASS S9 task record kept
+PASS S9 treehouse destroy never called
+PASS S9 agent not stopped
+PASS S9 exactly one wake after two attempts
+PASS S9 the reason names changed or untracked files
+PASS S9 nothing forced
+=== 8 pass, 0 fail

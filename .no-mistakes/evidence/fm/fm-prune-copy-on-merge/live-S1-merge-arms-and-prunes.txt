@@ -1,0 +1,43 @@
+### S1: a merged task's copy is pruned right after the merge (arm --run, as fm-pr-merge.sh starts it)
+slot before:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/th/.treehouse/proj-6a739d/1/proj  [fm/happy]
+                   bash (68985), sleep (70268)
+--- arm happy --run
+arm exit=0
+wait rc=0
+--- record:
+(none)
+--- log:
+2026-10-19T15:56:53Z armed for https://github.com/acme/widget/pull/101
+2026-10-19T15:57:07Z reaped: teardown completed
+--- wake queue (this task):
+(none)
+--- treehouse calls:
+lease --help
+lease 1 --lease-holder happy
+return --force /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/th/.treehouse/proj-6a739d/1/proj
+--- teardown calls:
+teardown call: args=[happy] admission=1 copy_present=yes tmux_windows=[anchor fm-happy ]
+teardown exit=0
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0VM4EX
+🌳 Leased worktree 1 at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/th/.treehouse/proj-6a739d/1/proj. Run 'treehouse return /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/th/.treehouse/proj-6a739d/1/proj' to release it.
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/th/.treehouse/proj-6a739d/1/proj
+teardown: reaping leaked worktree process(es) for happy: 68985 70268
+teardown: force-killing leaked worktree process(es) for happy: 68985
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/proj: synced 73ad90c..253fc70
+teardown happy complete (window firstmate:fm-happy, worktree /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/th/.treehouse/proj-6a739d/1/proj)
+Backlog: happy just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md - move happy to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- real treehouse status:
+base  main  (repository default)
+1     available    /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-happy/th/.treehouse/proj-6a739d/1/proj  (detached)
+--- slot present: yes; task meta present: no; tmux window open: no
+PASS S1 task record closed (meta gone)
+PASS S1 prune record removed
+PASS S1 log says reaped: teardown completed
+PASS S1 no wake raised
+PASS S1 nothing forced (no --force/--include-unlanded/--include-in-use)
+PASS S1 teardown asked for the task by name, with the automatic-reap admission
+PASS S1 slot returned to the real pool, clean, off the task branch

@@ -1,0 +1,49 @@
+### H1: the idle-shell handling on a HERDR pane (session fm-lab-prune-92303-31880, via bin/fm-herdr-lab.sh). Real herdr, real treehouse, real git. Teardown's first answer is the exact 'not landed' line (SEAM); the fallback finds the pane's shell through 'herdr pane process-info', ends the idle treehouse subshell with SIGHUP, and the real treehouse destroys the slot.
+herdr pane: w4:p1
+slot: /Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-hd/th/.treehouse/proj-903289/1/proj
+agent (sleep) pid: 32154
+herdr pane process-info: {"shell_pid":95129,"procs":[{"pid":32154,"name":"sleep"}]}
+pane tree before:
+  32154 <- 23341 sleep
+  21176 <- 95129 /Users/charlesabrooker/.local/bin/treehouse
+  23341 <- 21176 /bin/zsh
+--- prune log:
+2026-10-19T19:37:25Z armed for https://github.com/acme/widget/pull/160
+2026-10-19T19:37:35Z fallback destroyed <LAB>/w-hd/th/.treehouse/proj-903289/1/proj (head 398e923); preserved records, if any, are in <LAB>/data/hd/merge-prune-preserved/1792438645
+2026-10-19T19:37:47Z reaped: removed by fallback, teardown completed
+--- treehouse calls:
+get -b fm/hd
+destroy <LAB>/w-hd/th/.treehouse/proj-903289/1/proj --include-leased --yes
+   [at destroy time] slot HEAD=398e923 (task work hd (#160)); branch=detached; status=[]; processes inside=[]
+--- teardown calls:
+teardown call: args=[hd] admission=1 copy_present=yes herdr_panes=[w1:p1,w2:p1,w3:p1,w4:p1] pane_shell=95129 descendants=[32154(sleep) 21176(/Users/charlesabrooker/.local/bin/treehouse) 23341(/bin/zsh) ]
+teardown exit=1 (SEAM refusal) copy_present_after=yes
+teardown call: args=[hd] admission=1 copy_present=no herdr_panes=[w1:p1,w2:p1,w3:p1,w4:p1] pane_shell=95129 descendants=[]
+teardown exit=0 copy_present_after=no herdr_panes_after=[w1:p1,w2:p1,w3:p1]
+--- teardown output:
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<LAB>/w-hd/proj: synced 6d5a55f..398e923
+teardown hd complete (window fm-lab-prune-92303-31880:w4:p1, worktree <LAB>/w-hd/th/.treehouse/proj-903289/1/proj)
+Backlog: hd just finished (this home keeps no markdown backlog at <LAB>/data/backlog.md). Update <LAB>/data/backlog.md - move hd to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- control calls:
+hd exit
+--- wake queue:
+(none)
+--- herdr panes after: w1:p1,w2:p1,w3:p1
+PASS H1 the herdr pane shell was found via process-info and the first teardown answered 'not landed'
+PASS H1 the finished agent was stopped through the exit verb once
+PASS H1 slot destroyed by the real treehouse with the reaper's exact call (one destroy)
+PASS H1 slot gone from disk
+PASS H1 the herdr pane was still open when the second teardown began (only its idle shell ended)
+PASS H1 nothing forced
+PASS H1 task record closed, prune record gone
+PASS H1 no wake
+=== 8 pass, 0 fail

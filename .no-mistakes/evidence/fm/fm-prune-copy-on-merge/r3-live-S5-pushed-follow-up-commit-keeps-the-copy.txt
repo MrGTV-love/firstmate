@@ -1,0 +1,63 @@
+### S5 (adversarial, the round-2 failure): a follow-up commit pushed after the merge but never merged. REAL teardown refuses it; the fallback must keep the copy with one wake BEFORE it stops the agent or ends the pane's treehouse subshell (which would return the slot to the pool and hide the commit)
+follow-up commit f6ab9c2870d3c03f5be0582bd42c41e1cc20c75b is on origin: fm/fu 
+slot before (real treehouse status):
+base  main  (repository default)
+1     in-use       <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj  [fm/fu]
+                   zsh (40278), sleep (41473)
+arm exit=0
+--- prune record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/103
+attempts=1
+next_at=1792457361
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-fu/th/.treehouse/proj-36ff55/1/proj has commits that are not in the merged pull request: its HEAD f6ab9c2870d3 is not in the pull request's head and the default branch does not carry its content
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-fu/th/.treehouse/proj-36ff55/1/proj
+armed_at=1792435760
+--- prune log:
+2026-10-19T18:49:21Z armed for https://github.com/acme/widget/pull/103
+2026-10-19T18:49:37Z retained <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj: <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj has commits that are not in the merged pull request: its HEAD f6ab9c2870d3 is not in the pull request's head and the default branch ...
+--- wake queue (this task):
+1792435777	1	check	merge-prune:fu	check: merge-prune kept <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj for fu: <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj has commits that are not in the merged pull request: its HEAD f6ab9c2870d3 is not in the pull request's head and the default branch does not carry its content
+--- treehouse calls:
+status
+--- teardown calls:
+teardown call: args=[fu] admission=1 copy_present=yes tmux_windows=[anchor fm-fu ] pane_shell=36583 descendants=[41473(sleep) 40278(/bin/zsh) 38343(treehouse) ]
+teardown exit=1 copy_present_after=yes tmux_windows_after=[anchor fm-fu ] descendants_after=[41473(sleep) 40278(/bin/zsh) 38343(treehouse) ]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+commits whose change is not proven present in the merged PR head:
+f6ab9c2 follow-up after the merge
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes state database at <LAB>/nm/state.sqlite, so no run record ties this copy to https://github.com/acme/widget/pull/103
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+--- control (agent stop) calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj  [fm/fu]
+                   zsh (40278), sleep (41473)
+--- tmux windows: anchor fm-fu 
+--- still-running processes of the task:
+41473 sleep
+--- slot after: HEAD=f6ab9c2 branch=fm/fu
+--- real treehouse dry run (what a destroy would see now):
+🌳 Dry run: nothing disposable to destroy in <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj.
+🌳 Skipped 1 worktree:
+  1     [in-use:40278,41473,unmerged]  <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj  re-run with --include-in-use --include-unlanded to include
+--- two more attempts (must not add wakes or change anything)
+PASS S5 REAL teardown refused the follow-up as not landed
+PASS S5 teardown named the follow-up commit
+PASS S5 copy kept on disk
+PASS S5 slot still on the task branch with the follow-up commit (not returned to the pool)
+PASS S5 task record kept
+PASS S5 treehouse destroy never called
+PASS S5 agent was not stopped (no exit verb)
+PASS S5 agent process still running
+PASS S5 pane's idle shell not ended (window and shell still there)
+PASS S5 nothing forced
+PASS S5 exactly one wake after three attempts
+PASS S5 the wake names the copy and says the commit is not in the merged pull request
+PASS S5 the follow-up commit is still on origin
+=== 13 pass, 0 fail

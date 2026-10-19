@@ -1,0 +1,107 @@
+### S4: unsafe copies are kept: exactly one wake, nothing destroyed, nothing forced
+
+=== case stash
+record state=retained attempts=3
+reason: <LAB>/w-ustash/th/.treehouse/proj-87b510/1/proj holds 1 stash entries of its own work
+teardown said: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+treehouse calls: 0 (destroy: 0); control calls: 0
+PASS S4/stash copy kept on disk
+PASS S4/stash task record kept
+PASS S4/stash treehouse destroy never called
+PASS S4/stash nothing forced
+PASS S4/stash wakes after three attempts = 1
+PASS S4/stash the wake names the copy
+
+=== case ignored
+record state=retained attempts=3
+reason: <LAB>/w-uignored/th/.treehouse/proj-24d3ed/1/proj holds an ignored file that is neither scratch nor on the preserve list: notes.local
+teardown said: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+treehouse calls: 0 (destroy: 0); control calls: 0
+PASS S4/ignored copy kept on disk
+PASS S4/ignored task record kept
+PASS S4/ignored treehouse destroy never called
+PASS S4/ignored nothing forced
+PASS S4/ignored wakes after three attempts = 1
+PASS S4/ignored the wake names the copy
+
+=== case unpushed
+record state=retained attempts=3
+reason: <LAB>/w-uunpushed/th/.treehouse/proj-a2f271/1/proj has 1 commit(s) on no remote
+teardown said: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+treehouse calls: 0 (destroy: 0); control calls: 0
+PASS S4/unpushed copy kept on disk
+PASS S4/unpushed task record kept
+PASS S4/unpushed treehouse destroy never called
+PASS S4/unpushed nothing forced
+PASS S4/unpushed wakes after three attempts = 1
+PASS S4/unpushed the wake names the copy
+
+=== case nested
+record state=retained attempts=3
+reason: <LAB>/w-unested/th/.treehouse/proj-a8d899/1/proj/.claude/worktrees/n1 has 1 commit(s) on no remote
+teardown said: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+treehouse calls: 0 (destroy: 0); control calls: 0
+PASS S4/nested copy kept on disk
+PASS S4/nested task record kept
+PASS S4/nested treehouse destroy never called
+PASS S4/nested nothing forced
+PASS S4/nested wakes after three attempts = 1
+PASS S4/nested the wake names the copy
+
+=== case clone_side
+record state=retained attempts=3
+reason: <LAB>/w-uclone_side/th/.treehouse/proj-94603f/1/proj/.claude/worktrees/n1 holds 1 stash entries of its own work
+teardown said: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+treehouse calls: 0 (destroy: 0); control calls: 0
+PASS S4/clone_side copy kept on disk
+PASS S4/clone_side task record kept
+PASS S4/clone_side treehouse destroy never called
+PASS S4/clone_side nothing forced
+PASS S4/clone_side wakes after three attempts = 1
+PASS S4/clone_side the wake names the copy
+
+=== case process
+record state=retained attempts=3
+reason: process(es) inside <LAB>/w-uprocess/th/.treehouse/proj-ca8d79/1/proj: 16439
+teardown said: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+treehouse calls: 0 (destroy: 0); control calls: 3
+PASS S4/process copy kept on disk
+PASS S4/process task record kept
+PASS S4/process treehouse destroy never called
+PASS S4/process nothing forced
+PASS S4/process wakes after three attempts = 1
+PASS S4/process the wake names the copy
+
+=== case dirty
+record state=retained attempts=3
+reason: REFUSED: worktree <LAB>/w-udirty/th/.treehouse/proj-4fcfbe/1/proj has uncommitted changes.
+teardown said: REFUSED: worktree <LAB>/w-udirty/th/.treehouse/proj-4fcfbe/1/proj has uncommitted changes.
+treehouse calls: 0 (destroy: 0); control calls: 0
+PASS S4/dirty copy kept on disk
+PASS S4/dirty task record kept
+PASS S4/dirty treehouse destroy never called
+PASS S4/dirty nothing forced
+PASS S4/dirty wakes after three attempts = 1
+PASS S4/dirty the wake names the copy
+
+=== case hidden
+record state=retained attempts=3
+reason: REFUSED: worktree <LAB>/w-uhidden/th/.treehouse/proj-76e173/1/proj has uncommitted changes.
+teardown said: REFUSED: worktree <LAB>/w-uhidden/th/.treehouse/proj-76e173/1/proj has uncommitted changes.
+treehouse calls: 0 (destroy: 0); control calls: 0
+PASS S4/hidden copy kept on disk
+PASS S4/hidden task record kept
+PASS S4/hidden treehouse destroy never called
+PASS S4/hidden nothing forced
+PASS S4/hidden wakes after three attempts = 1
+PASS S4/hidden the wake names the copy
+
+=== case unreadable
+record: version=fm-merge-prune-v1|pr=https://github.com/acme/widget/pull/209|attempts=3|next_at=1792458457|state=retained|reason=cannot search <LAB>/w-uunreadable/th/.treehouse/proj-0673bf/1/proj for nested copies|wake_sent=1|copy=<LAB>/w-uunreadable/th/.treehouse/proj-0673bf/1/proj|armed_at=1792436809|
+teardown said: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+PASS S4/unreadable copy kept on disk
+PASS S4/unreadable task record kept
+PASS S4/unreadable treehouse destroy never called
+PASS S4/unreadable nothing forced
+PASS S4/unreadable at most one wake
+=== 53 pass, 0 fail

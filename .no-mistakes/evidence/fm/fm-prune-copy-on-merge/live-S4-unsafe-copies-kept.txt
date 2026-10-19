@@ -1,0 +1,197 @@
+### S4: unsafe copies are kept, never forced, with exactly one wake (real treehouse pool, real tmux pane, real git)
+
+=== case ustash (first teardown refusal: ship-deliverable-not-landed text)
+--- record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/101
+attempts=3
+next_at=1792449996
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ustash/th/.treehouse/proj-97f00c/1/proj holds 1 stash entries of its own work
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ustash/th/.treehouse/proj-97f00c/1/proj
+armed_at=1792428394
+--- log:
+2026-10-19T16:46:34Z armed for https://github.com/acme/widget/pull/101
+2026-10-19T16:46:35Z retained /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ustash/th/.treehouse/proj-97f00c/1/proj: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ustash/th/.treehouse/proj-97f00c/1/proj holds 1 stash entries of its own work
+--- wake queue:
+1792428394	24	check	merge-prune:ustash	check: merge-prune kept /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ustash/th/.treehouse/proj-97f00c/1/proj for ustash: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ustash/th/.treehouse/proj-97f00c/1/proj holds 1 stash entries of its own work
+--- treehouse calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ustash/th/.treehouse/proj-97f00c/1/proj  [fm/ustash]
+                   bash (77524), sleep (78865)
+PASS S4/ustash copy kept on disk
+PASS S4/ustash task record kept
+PASS S4/ustash exactly one wake after three attempts
+PASS S4/ustash treehouse destroy calls = 0
+PASS S4/ustash nothing forced
+PASS S4/ustash wake names the copy
+
+=== case uunpushed (first teardown refusal: ship-deliverable-not-landed text)
+--- record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/102
+attempts=3
+next_at=1792450008
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uunpushed/th/.treehouse/proj-c2635a/1/proj has 1 commit(s) on no remote
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uunpushed/th/.treehouse/proj-c2635a/1/proj
+armed_at=1792428401
+--- log:
+2026-10-19T16:46:41Z armed for https://github.com/acme/widget/pull/102
+2026-10-19T16:46:43Z retained /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uunpushed/th/.treehouse/proj-c2635a/1/proj: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uunpushed/th/.treehouse/proj-c2635a/1/proj has 1 commit(s) on no remote
+--- wake queue:
+1792428403	25	check	merge-prune:uunpushed	check: merge-prune kept /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uunpushed/th/.treehouse/proj-c2635a/1/proj for uunpushed: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uunpushed/th/.treehouse/proj-c2635a/1/proj has 1 commit(s) on no remote
+--- treehouse calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uunpushed/th/.treehouse/proj-c2635a/1/proj  [fm/uunpushed]
+                   bash (95965), sleep (97044)
+PASS S4/uunpushed copy kept on disk
+PASS S4/uunpushed task record kept
+PASS S4/uunpushed exactly one wake after three attempts
+PASS S4/uunpushed treehouse destroy calls = 0
+PASS S4/uunpushed nothing forced
+PASS S4/uunpushed wake names the copy
+
+=== case uclone (first teardown refusal: ship-deliverable-not-landed text)
+--- record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/103
+attempts=3
+next_at=1792450022
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uclone/th/.treehouse/proj-7aaa40/1/proj/.claude/worktrees/n2 holds 1 stash entries of its own work
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uclone/th/.treehouse/proj-7aaa40/1/proj
+armed_at=1792428417
+--- log:
+2026-10-19T16:46:57Z armed for https://github.com/acme/widget/pull/103
+2026-10-19T16:46:59Z retained /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uclone/th/.treehouse/proj-7aaa40/1/proj: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uclone/th/.treehouse/proj-7aaa40/1/proj/.claude/worktrees/n2 holds 1 stash entries of its own work
+--- wake queue:
+1792428419	26	check	merge-prune:uclone	check: merge-prune kept /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uclone/th/.treehouse/proj-7aaa40/1/proj for uclone: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uclone/th/.treehouse/proj-7aaa40/1/proj/.claude/worktrees/n2 holds 1 stash entries of its own work
+--- treehouse calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uclone/th/.treehouse/proj-7aaa40/1/proj  [fm/uclone]
+                   bash (32562), sleep (35631)
+PASS S4/uclone copy kept on disk
+PASS S4/uclone task record kept
+PASS S4/uclone exactly one wake after three attempts
+PASS S4/uclone treehouse destroy calls = 0
+PASS S4/uclone nothing forced
+PASS S4/uclone wake names the copy
+
+=== case uignored (first teardown refusal: ship-deliverable-not-landed text)
+--- record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/104
+attempts=3
+next_at=1792450032
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uignored/th/.treehouse/proj-fda697/1/proj holds an ignored file that is neither scratch nor on the preserve list: notes.local
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uignored/th/.treehouse/proj-fda697/1/proj
+armed_at=1792428428
+--- log:
+2026-10-19T16:47:08Z armed for https://github.com/acme/widget/pull/104
+2026-10-19T16:47:09Z retained /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uignored/th/.treehouse/proj-fda697/1/proj: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uignored/th/.treehouse/proj-fda697/1/proj holds an ignored file that is neither scratch nor on the preserve list: notes.local
+--- wake queue:
+1792428429	27	check	merge-prune:uignored	check: merge-prune kept /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uignored/th/.treehouse/proj-fda697/1/proj for uignored: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uignored/th/.treehouse/proj-fda697/1/proj holds an ignored file that is neither scratch nor on the preserve list: notes.local
+--- treehouse calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uignored/th/.treehouse/proj-fda697/1/proj  [fm/uignored]
+                   bash (64942), sleep (65719)
+PASS S4/uignored copy kept on disk
+PASS S4/uignored task record kept
+PASS S4/uignored exactly one wake after three attempts
+PASS S4/uignored treehouse destroy calls = 0
+PASS S4/uignored nothing forced
+PASS S4/uignored wake names the copy
+
+=== case ubusy (first teardown refusal: ship-deliverable-not-landed text)
+--- record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/105
+attempts=3
+next_at=1792450075
+state=retained
+reason=process(es) inside /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ubusy/th/.treehouse/proj-332c7e/1/proj: 82047 89604
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ubusy/th/.treehouse/proj-332c7e/1/proj
+armed_at=1792428441
+--- log:
+2026-10-19T16:47:21Z armed for https://github.com/acme/widget/pull/105
+2026-10-19T16:47:36Z retained /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ubusy/th/.treehouse/proj-332c7e/1/proj: process(es) inside /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ubusy/th/.treehouse/proj-332c7e/1/proj: 82047 89604
+--- wake queue:
+1792428455	28	check	merge-prune:ubusy	check: merge-prune kept /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ubusy/th/.treehouse/proj-332c7e/1/proj for ubusy: process(es) inside /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ubusy/th/.treehouse/proj-332c7e/1/proj: 82047 89604
+--- treehouse calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-ubusy/th/.treehouse/proj-332c7e/1/proj  [fm/ubusy]
+                   bash (82047), sleep (89604)
+PASS S4/ubusy copy kept on disk
+PASS S4/ubusy task record kept
+PASS S4/ubusy exactly one wake after three attempts
+PASS S4/ubusy treehouse destroy calls = 0
+PASS S4/ubusy nothing forced
+PASS S4/ubusy wake names the copy
+
+=== case uhidden (first teardown refusal: ship-deliverable-not-landed text)
+--- record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/106
+attempts=3
+next_at=1792450097
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uhidden/th/.treehouse/proj-c094cc/1/proj has changed or untracked files (1 entries, first: ?? untracked.txt)
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uhidden/th/.treehouse/proj-c094cc/1/proj
+armed_at=1792428494
+--- log:
+2026-10-19T16:48:14Z armed for https://github.com/acme/widget/pull/106
+2026-10-19T16:48:15Z retained /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uhidden/th/.treehouse/proj-c094cc/1/proj: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uhidden/th/.treehouse/proj-c094cc/1/proj has changed or untracked files (1 entries, first: ?? untracked.txt)
+--- wake queue:
+1792428495	29	check	merge-prune:uhidden	check: merge-prune kept /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uhidden/th/.treehouse/proj-c094cc/1/proj for uhidden: /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uhidden/th/.treehouse/proj-c094cc/1/proj has changed or untracked files (1 entries, first: ?? untracked.txt)
+--- treehouse calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-uhidden/th/.treehouse/proj-c094cc/1/proj  [fm/uhidden]
+                   bash (80642), sleep (82627)
+PASS S4/uhidden copy kept on disk
+PASS S4/uhidden task record kept
+PASS S4/uhidden exactly one wake after three attempts
+PASS S4/uhidden treehouse destroy calls = 0
+PASS S4/uhidden nothing forced
+PASS S4/uhidden wake names the copy
+
+=== case udirty (first teardown refusal: real teardown)
+--- record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/107
+attempts=3
+next_at=1792450109
+state=retained
+reason=REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-udirty/th/.treehouse/proj-fbed84/1/proj has uncommitted changes.
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-udirty/th/.treehouse/proj-fbed84/1/proj
+armed_at=1792428502
+--- log:
+2026-10-19T16:48:22Z armed for https://github.com/acme/widget/pull/107
+2026-10-19T16:48:25Z retained /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-udirty/th/.treehouse/proj-fbed84/1/proj: REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-udirty/th/.treehouse/proj-fbed84/1/proj has uncommitted changes.
+--- wake queue:
+1792428505	30	check	merge-prune:udirty	check: merge-prune kept /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-udirty/th/.treehouse/proj-fbed84/1/proj for udirty: REFUSED: worktree /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-udirty/th/.treehouse/proj-fbed84/1/proj has uncommitted changes.
+--- treehouse calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-udirty/th/.treehouse/proj-fbed84/1/proj  [fm/udirty]
+                   bash (97857), sleep (98804)
+PASS S4/udirty copy kept on disk
+PASS S4/udirty task record kept
+PASS S4/udirty exactly one wake after three attempts
+PASS S4/udirty treehouse destroy calls = 0
+PASS S4/udirty nothing forced
+PASS S4/udirty wake names the copy

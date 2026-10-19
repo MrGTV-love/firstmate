@@ -1,0 +1,50 @@
+### S8: arming rules and the sweep (what the watcher runs each minute)
+arm without a verified merge: exit=0
+PASS S8a an unverified merge arms nothing
+arm with FM_MERGE_PRUNE=0: exit=0
+PASS S8b FM_MERGE_PRUNE=0 arms nothing
+PASS S8c a PR the poll never saw merged arms nothing
+PASS S8d a verified merge arms; arming twice leaves the record unchanged
+--- record after arming:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/101
+attempts=0
+next_at=1792428358
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792428358
+--- sweep (what bin/fm-watch.sh starts detached every minute while a record exists)
+sweep exit=0
+--- record:
+(none)
+--- log:
+2026-10-19T16:45:59Z armed for https://github.com/acme/widget/pull/101
+2026-10-19T16:46:27Z reaped: teardown completed
+--- wake queue (this task):
+(none)
+--- treehouse calls:
+lease --help
+lease 1 --lease-holder arm1
+return --force /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-arm1/th/.treehouse/proj-89a874/1/proj
+--- teardown calls:
+teardown call: args=[arm1] admission=1 copy_present=yes tmux_windows=[anchor fm-arm1 ] pane_shell(87443)=alive idle_inner_shell(92148)=alive
+teardown exit=0 copy_present_after=yes tmux_windows_after=[anchor ]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0VM4EX
+🌳 Leased worktree 1 at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-arm1/th/.treehouse/proj-89a874/1/proj. Run 'treehouse return /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-arm1/th/.treehouse/proj-89a874/1/proj' to release it.
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-arm1/th/.treehouse/proj-89a874/1/proj
+teardown: reaping leaked worktree process(es) for arm1: 92148 94742
+teardown: force-killing leaked worktree process(es) for arm1: 92148
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-arm1/proj: synced 706f043..190aa5c
+teardown arm1 complete (window firstmate:fm-arm1, worktree /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-arm1/th/.treehouse/proj-89a874/1/proj)
+Backlog: arm1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md - move arm1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- real treehouse status:
+base  main  (repository default)
+1     available    /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-arm1/th/.treehouse/proj-89a874/1/proj  (detached)
+--- slot present: yes; task meta present: no; tmux window open: no
+PASS S8e1 task record closed by the sweep
+PASS S8e2 prune record removed by the sweep
+PASS S8e3 log says reaped

@@ -1,0 +1,55 @@
+### S2: real teardown refuses a squash-merged slot (Vernant closeout driver: exact tree not covered); the fallback proves it scratch and removes it with the real treehouse
+slot before:
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj  [fm/fb]
+                   bash (5972), sleep (6523)
+pane tree before:
+ 4794 16656 bash             bash --noprofile --norc
+ 5511  4794 /Users/charlesab /Users/charlesabrooker/.local/bin/treehouse get -b fm/fb
+--- run fb --now
+run exit=0
+--- record:
+(none)
+--- log:
+2026-10-19T16:00:09Z armed for https://github.com/acme/widget/pull/101
+2026-10-19T16:00:45Z fallback destroyed /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj (head 5bffd60); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/fb/merge-prune-preserved/1792425610
+2026-10-19T16:00:50Z reaped: removed by fallback, teardown completed
+--- wake queue (this task):
+(none)
+--- treehouse calls:
+lease --help
+lease 1 --lease-holder fb
+destroy /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj --include-leased --yes
+--- teardown calls:
+teardown call: args=[fb] admission=1 copy_present=yes tmux_windows=[anchor fm-fb ]
+teardown exit=1 copy_present_after=yes tmux_windows_after=[anchor ]
+teardown call: args=[fb] admission=1 copy_present=no tmux_windows=[anchor ]
+teardown exit=0 copy_present_after=no tmux_windows_after=[anchor ]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0VM4EX
+🌳 Leased worktree 1 at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj. Run 'treehouse return /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj' to release it.
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj
+teardown: reaping leaked worktree process(es) for fb: 5972 6523
+teardown: force-killing leaked worktree process(es) for fb: 5972
+REFUSED: Vernant's closeout driver did not release foreign copy /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj/.claude/worktrees/n1 (exit 1): refusing to remove copy: exact tree not covered by the merged PR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0VM4EX
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/proj: synced 67587f3..fe03504
+teardown fb complete (window firstmate:fm-fb, worktree /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fb/th/.treehouse/proj-aa806b/1/proj)
+Backlog: fb just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md - move fb to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- real treehouse status:
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- slot present: no; task meta present: no; tmux window open: no
+--- preserved:
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/fb/merge-prune-preserved/1792425610/root/.claude/bug-evidence/slot.json
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/fb/merge-prune-preserved/1792425610/root/SHA256SUMS
+--- pane after:
+anchor
+PASS S2 teardown first refused with the closeout driver's exact-tree text
+PASS S2 slot destroyed (gone from disk)
+PASS S2 real treehouse destroy called once, as the reaper does
+PASS S2 nothing forced
+PASS S2 task record closed after the fallback
+PASS S2 log says fallback destroyed and reaped
+PASS S2 preserve-list record copied before removal
+PASS S2 no wake raised

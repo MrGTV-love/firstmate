@@ -1,0 +1,186 @@
+== r3-live-S1-merge-arms-and-prunes.txt
+PASS S1 task record closed (meta gone)
+PASS S1 prune record removed
+PASS S1 log says reaped: teardown completed
+PASS S1 no wake raised
+PASS S1 nothing forced (no --include-unlanded/--include-in-use/destroy --force)
+PASS S1 teardown asked for the task by name with the automatic-reap admission
+PASS S1 slot returned to the real pool: clean, off the task branch
+PASS S1 tmux window closed by teardown
+=== 8 pass, 0 fail
+== r3-live-S10-watcher-sweep-prunes-an-armed-record.txt
+PASS S10 the watcher's sweep removed the prune record
+PASS S10 the task record is closed
+PASS S10 log says armed then reaped
+PASS S10 no wake
+PASS S10 nothing forced
+PASS S10 slot returned to the real pool (clean, detached)
+=== 6 pass, 0 fail
+== r3-live-S2-fallback-closeout-refusal-ignored-files-and-nested-copy.txt
+PASS S2 teardown first refused with the closeout driver's exact-tree text
+PASS S2 slot destroyed (gone from disk)
+PASS S2 real treehouse destroy called once, as the reaper does
+PASS S2 nothing forced
+PASS S2 task record closed after the fallback
+PASS S2 preserved bug-evidence record copied with a checksum before removal
+PASS S2 no wake
+PASS S2 pane window still open when the second teardown began (only its idle shell was ended)
+=== 8 pass, 0 fail
+== r3-live-S3-fallback-squash-merged-ends-pane-shell-and-destroys.txt
+PASS S3 first teardown refused as not landed (the fallback class)
+PASS S3 the finished agent was stopped through the exit verb once
+PASS S3 slot destroyed by the real treehouse with the reaper's exact call
+PASS S3 exactly one destroy call
+PASS S3 slot gone from disk
+PASS S3 pane shell and window were still open when the second teardown began
+PASS S3 nothing forced
+PASS S3 task record closed, prune record gone
+PASS S3 no wake
+PASS S3 log says removed by fallback then reaped
+=== 10 pass, 0 fail
+== r3-live-S4-unsafe-copies-are-kept.txt
+=== case stash
+PASS S4/stash copy kept on disk
+PASS S4/stash task record kept
+PASS S4/stash treehouse destroy never called
+PASS S4/stash nothing forced
+PASS S4/stash wakes after three attempts = 1
+PASS S4/stash the wake names the copy
+=== case ignored
+PASS S4/ignored copy kept on disk
+PASS S4/ignored task record kept
+PASS S4/ignored treehouse destroy never called
+PASS S4/ignored nothing forced
+PASS S4/ignored wakes after three attempts = 1
+PASS S4/ignored the wake names the copy
+=== case unpushed
+PASS S4/unpushed copy kept on disk
+PASS S4/unpushed task record kept
+PASS S4/unpushed treehouse destroy never called
+PASS S4/unpushed nothing forced
+PASS S4/unpushed wakes after three attempts = 1
+PASS S4/unpushed the wake names the copy
+=== case nested
+PASS S4/nested copy kept on disk
+PASS S4/nested task record kept
+PASS S4/nested treehouse destroy never called
+PASS S4/nested nothing forced
+PASS S4/nested wakes after three attempts = 1
+PASS S4/nested the wake names the copy
+=== case clone_side
+PASS S4/clone_side copy kept on disk
+PASS S4/clone_side task record kept
+PASS S4/clone_side treehouse destroy never called
+PASS S4/clone_side nothing forced
+PASS S4/clone_side wakes after three attempts = 1
+PASS S4/clone_side the wake names the copy
+=== case process
+PASS S4/process copy kept on disk
+PASS S4/process task record kept
+PASS S4/process treehouse destroy never called
+PASS S4/process nothing forced
+PASS S4/process wakes after three attempts = 1
+PASS S4/process the wake names the copy
+=== case dirty
+PASS S4/dirty copy kept on disk
+PASS S4/dirty task record kept
+PASS S4/dirty treehouse destroy never called
+PASS S4/dirty nothing forced
+PASS S4/dirty wakes after three attempts = 1
+PASS S4/dirty the wake names the copy
+=== case hidden
+PASS S4/hidden copy kept on disk
+PASS S4/hidden task record kept
+PASS S4/hidden treehouse destroy never called
+PASS S4/hidden nothing forced
+PASS S4/hidden wakes after three attempts = 1
+PASS S4/hidden the wake names the copy
+=== case unreadable
+PASS S4/unreadable copy kept on disk
+PASS S4/unreadable task record kept
+PASS S4/unreadable treehouse destroy never called
+PASS S4/unreadable nothing forced
+PASS S4/unreadable at most one wake
+=== 53 pass, 0 fail
+== r3-live-S5-AB-prefix-commit-a996812f2-copy-destroyed.txt
+PASS S5 REAL teardown refused the follow-up as not landed
+PASS S5 teardown named the follow-up commit
+FAIL S5 copy kept on disk
+FAIL S5 slot still on the task branch with the follow-up commit (not returned to the pool)
+FAIL S5 task record kept
+FAIL S5 treehouse destroy never called
+FAIL S5 agent was not stopped (no exit verb)
+FAIL S5 agent process still running
+FAIL S5 pane's idle shell not ended (window and shell still there)
+PASS S5 nothing forced
+FAIL S5 exactly one wake after three attempts
+FAIL S5 the wake names the copy and says the commit is not in the merged pull request
+PASS S5 the follow-up commit is still on origin
+=== 4 pass, 9 fail
+== r3-live-S5-pushed-follow-up-commit-keeps-the-copy.txt
+PASS S5 REAL teardown refused the follow-up as not landed
+PASS S5 teardown named the follow-up commit
+PASS S5 copy kept on disk
+PASS S5 slot still on the task branch with the follow-up commit (not returned to the pool)
+PASS S5 task record kept
+PASS S5 treehouse destroy never called
+PASS S5 agent was not stopped (no exit verb)
+PASS S5 agent process still running
+PASS S5 pane's idle shell not ended (window and shell still there)
+PASS S5 nothing forced
+PASS S5 exactly one wake after three attempts
+PASS S5 the wake names the copy and says the commit is not in the merged pull request
+PASS S5 the follow-up commit is still on origin
+=== 13 pass, 0 fail
+== r3-live-S6-busy-worker-and-plain-tree.txt
+PASS S6 busy worker still running
+PASS S6 no stop (exit verb) was sent
+PASS S6 nothing destroyed, copy and record kept
+PASS S6 record is pending with one attempt
+PASS S6 silent: no wake
+PASS S6 window still open
+PASS S7 plain tree kept
+PASS S7 nothing destroyed
+PASS S7 exactly one wake
+PASS S7 wake says it is not a pool slot
+PASS S7 no stop was sent
+=== 11 pass, 0 fail
+== r3-live-S6b-worker-steered-after-teardown-answered.txt
+PASS S6b worker still running
+PASS S6b no stop (exit verb) was sent
+PASS S6b nothing destroyed, copy and record kept
+PASS S6b record is pending (backed off), not retained
+PASS S6b the reason says the worker is not finished
+PASS S6b silent: no wake
+PASS S6b pane shell and window untouched
+=== 7 pass, 0 fail
+== r3-live-S8-arming-rules-and-sweep.txt
+PASS S8a an unverified merge (no merge-poll marker) arms nothing
+PASS S8c a marker for a different PR arms nothing
+PASS S8b FM_MERGE_PRUNE=0 arms nothing
+PASS S8d a verified merge arms
+PASS S8d arming twice leaves the record unchanged
+PASS S8e1 task record closed by the sweep
+PASS S8e2 prune record removed by the sweep
+PASS S8e3 log says reaped
+=== 8 pass, 0 fail
+== r3-live-S9-untracked-file-hidden-by-git-config.txt
+PASS S9 the late file is hidden from the plain status (the trap is set)
+PASS S9 copy kept, the untracked file still there
+PASS S9 task record kept
+PASS S9 treehouse destroy never called
+PASS S9 agent not stopped
+PASS S9 exactly one wake after two attempts
+PASS S9 the reason names changed or untracked files
+PASS S9 nothing forced
+=== 8 pass, 0 fail
+== r3-live-H1-herdr-pane-fallback.txt
+PASS H1 the herdr pane shell was found via process-info and the first teardown answered 'not landed'
+PASS H1 the finished agent was stopped through the exit verb once
+PASS H1 slot destroyed by the real treehouse with the reaper's exact call (one destroy)
+PASS H1 slot gone from disk
+PASS H1 the herdr pane was still open when the second teardown began (only its idle shell ended)
+PASS H1 nothing forced
+PASS H1 task record closed, prune record gone
+PASS H1 no wake
+=== 8 pass, 0 fail

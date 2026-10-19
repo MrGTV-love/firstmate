@@ -1,0 +1,47 @@
+### S3: the forge cannot be read, main moved on after the squash merge: REAL teardown refuses 'not landed'; the fallback proves the copy landed from refs/pull/N/head, stops the agent, ends the idle shell of the pane (SIGHUP), the REAL treehouse destroys the slot, the second teardown closes the task
+slot: /Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-pane/th/.treehouse/proj-f48e36/1/proj
+pane tree before:
+  17260 <- 15182 treehouse
+  20149 <- 17260 /bin/zsh
+  21525 <- 20149 sleep
+arm exit=0
+--- prune record:
+(none)
+--- prune log:
+2026-10-19T18:43:27Z armed for https://github.com/acme/widget/pull/102
+2026-10-19T18:44:00Z fallback destroyed <LAB>/w-pane/th/.treehouse/proj-f48e36/1/proj (head 4f9a3bf); preserved records, if any, are in <LAB>/data/pane/merge-prune-preserved/1792435407
+2026-10-19T18:44:09Z reaped: removed by fallback, teardown completed
+--- wake queue (this task):
+--- treehouse calls:
+destroy <LAB>/w-pane/th/.treehouse/proj-f48e36/1/proj --include-leased --yes
+   [at destroy time] slot HEAD=bfae020 (later PR edits the file); branch=detached; status=[]; processes inside=[]
+--- teardown calls:
+teardown call: args=[pane] admission=1 copy_present=yes tmux_windows=[anchor fm-pane ] pane_shell=15182 descendants=[17260(treehouse) 20149(/bin/zsh) 21525(sleep) ]
+teardown exit=1 copy_present_after=yes tmux_windows_after=[anchor fm-pane ] descendants_after=[17260(treehouse) 20149(/bin/zsh) 21525(sleep) ]
+teardown call: args=[pane] admission=1 copy_present=no tmux_windows=[anchor fm-pane ] pane_shell=15182 descendants=[]
+teardown exit=0 copy_present_after=no tmux_windows_after=[anchor ] descendants_after=[]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+<LAB>/w-pane/proj: synced ee7a210..bfae020
+teardown pane complete (window firstmate:fm-pane, worktree <LAB>/w-pane/th/.treehouse/proj-f48e36/1/proj)
+Backlog: pane just finished (this home keeps no markdown backlog at <LAB>/data/backlog.md). Update <LAB>/data/backlog.md - move pane to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- control (agent stop) calls:
+pane exit
+--- real treehouse status:
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- tmux windows: anchor 
+PASS S3 first teardown refused as not landed (the fallback class)
+PASS S3 the finished agent was stopped through the exit verb once
+PASS S3 slot destroyed by the real treehouse with the reaper's exact call
+PASS S3 exactly one destroy call
+PASS S3 slot gone from disk
+PASS S3 pane shell and window were still open when the second teardown began
+PASS S3 nothing forced
+PASS S3 task record closed, prune record gone
+PASS S3 no wake
+PASS S3 log says removed by fallback then reaped
+=== 10 pass, 0 fail

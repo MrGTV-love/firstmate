@@ -1,0 +1,41 @@
+### S2: teardown refuses with the closeout driver's text (SEAM: exact line from bin/fm-teardown-nested-lib.sh; everything after it is real). The copy is squash-merged (tree == main), has scratch ignored files, a preserved bug-evidence record and a clean pushed orphan nested clone. The fallback proves it, keeps the records, ends the pane's shell, REAL treehouse destroys the slot.
+arm exit=0
+--- prune record:
+(none)
+--- prune log:
+2026-10-19T19:17:02Z armed for https://github.com/acme/widget/pull/120
+2026-10-19T19:17:31Z fallback destroyed <LAB>/w-ign/th/.treehouse/proj-8a1fd6/1/proj (head 983115f); preserved records, if any, are in <LAB>/data/ign/merge-prune-preserved/1792437423
+2026-10-19T19:17:45Z reaped: removed by fallback, teardown completed
+--- wake queue (this task):
+--- treehouse calls:
+destroy <LAB>/w-ign/th/.treehouse/proj-8a1fd6/1/proj --include-leased --yes
+   [at destroy time] slot HEAD=983115f (task work ign (#120)); branch=detached; status=[]; processes inside=[]
+--- teardown calls:
+teardown call: args=[ign] admission=1 copy_present=yes tmux_windows=[anchor fm-ign ] pane_shell=72162 descendants=[76039(/bin/zsh) 73764(treehouse) 78944(sleep) ]
+teardown exit=1 (SEAM refusal) copy_present_after=yes
+teardown call: args=[ign] admission=1 copy_present=no tmux_windows=[anchor fm-ign ] pane_shell=72162 descendants=[]
+teardown exit=0 copy_present_after=no tmux_windows_after=[anchor ] descendants_after=[]
+--- teardown output:
+REFUSED: Vernant's closeout driver did not release own nested copy <LAB>/w-ign/th/.treehouse/proj-8a1fd6/1/proj/.claude/worktrees/n1 (exit 1): exact tree not covered by the merged PR
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+<LAB>/w-ign/proj: synced 641ad52..af75f4f
+teardown ign complete (window firstmate:fm-ign, worktree <LAB>/w-ign/th/.treehouse/proj-8a1fd6/1/proj)
+Backlog: ign just finished (this home keeps no markdown backlog at <LAB>/data/backlog.md). Update <LAB>/data/backlog.md - move ign to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- control (agent stop) calls:
+ign exit
+--- real treehouse status:
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- tmux windows: anchor 
+--- preserved records:
+./1792437423/root/.claude/bug-evidence/slot.json
+./1792437423/root/SHA256SUMS
+PASS S2 teardown first refused with the closeout driver's exact-tree text
+PASS S2 slot destroyed (gone from disk)
+PASS S2 real treehouse destroy called once, as the reaper does
+PASS S2 nothing forced
+PASS S2 task record closed after the fallback
+PASS S2 preserved bug-evidence record copied with a checksum before removal
+PASS S2 no wake
+PASS S2 pane window still open when the second teardown began (only its idle shell was ended)
+=== 8 pass, 0 fail

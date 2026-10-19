@@ -1,0 +1,45 @@
+### S5 (adversarial): a copy whose follow-up commit was pushed after the merge but never merged. Docs say it stays (treehouse refuses it as unmerged) with one wake.
+follow-up commit 6132c58a7f39c9fa4e881632702c30fd655af9b2 is on origin/fm/fu: fm/fu 
+treehouse's own verdict now (dry run, pane shell still inside):
+   🌳 Dry run: nothing disposable to destroy in /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fu/th/.treehouse/proj-08f872/1/proj.
+   🌳 Skipped 1 worktree:
+     1     [in-use:37300,39827,unmerged]  /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fu/th/.treehouse/proj-08f872/1/proj  re-run with --include-in-use --include-unlanded to include
+run exit=0
+--- record:
+(none)
+--- log:
+2026-10-19T16:24:42Z armed for https://github.com/acme/widget/pull/101
+2026-10-19T16:24:53Z fallback destroyed /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fu/th/.treehouse/proj-08f872/1/proj (head a98f228); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/fu/merge-prune-preserved/1792427082
+2026-10-19T16:24:59Z reaped: removed by fallback, teardown completed
+--- wake queue (this task):
+(none)
+--- treehouse calls:
+destroy /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fu/th/.treehouse/proj-08f872/1/proj --include-leased --yes
+   [at destroy time] slot HEAD=a98f228 (task work fu (#101)); branch=detached; status=[]; processes inside=[]
+--- teardown calls:
+teardown call: args=[fu] admission=1 copy_present=yes tmux_windows=[anchor fm-fu ] pane_shell(34016)=alive idle_inner_shell(37300)=alive
+teardown exit=1 copy_present_after=yes tmux_windows_after=[anchor fm-fu ]
+teardown call: args=[fu] admission=1 copy_present=no tmux_windows=[anchor fm-fu ] pane_shell(34016)=alive idle_inner_shell(37300)=gone
+teardown exit=0 copy_present_after=no tmux_windows_after=[anchor ]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0VM4EX
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+commits whose change is not proven present in the merged PR head:
+6132c58 follow-up after the merge
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes state database at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/nm/state.sqlite, so no run record ties this copy to https://github.com/acme/widget/pull/101
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0VM4EX
+/Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fu/proj: synced 90f365e..a98f228
+teardown fu complete (window firstmate:fm-fu, worktree /Users/charlesabrooker/tmp/fm-lab.0VM4EX/w-fu/th/.treehouse/proj-08f872/1/proj)
+Backlog: fu just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.0VM4EX/data/backlog.md - move fu to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- real treehouse status:
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- slot present: no; task meta present: no; tmux window open: no
+--- where the follow-up commit lives afterwards:
+origin branches containing it: fm/fu 
+project local branches containing it: fm/fu 
+object still present in project clone: commit
+PASS S5 the pushed follow-up commit is still reachable from the remote and the project's branch
+FAIL S5 copy kept as the docs say (the copy was destroyed; the work survives on origin/fm/fu)

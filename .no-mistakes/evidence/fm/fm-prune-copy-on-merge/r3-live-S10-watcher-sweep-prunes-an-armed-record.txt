@@ -1,0 +1,53 @@
+### S10: the REAL bin/fm-watch.sh (isolated lab home, 2s poll) starts the prune sweep while a record exists; the armed merged task's copy is pruned with no human step
+armed (no --run): record present = yes
+slot before: base  main  (repository default) 1     in-use       <LAB>/w-wsw/th/.treehouse/proj-8c5eb3/1/proj  [fm/wsw]                    zsh (21041), sleep (22777) 
+watcher launches: 4
+--- watcher output (head):
+signal: <LAB>/state/wsw.status
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 82981 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 32359 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 84374 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 31088 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 83150 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 29490 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 81823 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/fm-wake-lib.sh: line 645: 32758 Terminated: 15          sleep "$SIGNAL_GRACE"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M586AMGM98NA3A9EA5XJ1TPG/bin/
+--- prune record:
+(none)
+--- prune log:
+2026-10-19T19:54:58Z armed for https://github.com/acme/widget/pull/170
+2026-10-19T19:55:16Z reaped: teardown completed
+--- wake queue (this task):
+--- treehouse calls:
+status
+lease --help
+lease 1 --lease-holder wsw
+return --force <LAB>/w-wsw/th/.treehouse/proj-8c5eb3/1/proj
+--- teardown calls:
+teardown call: args=[wsw] admission=1 copy_present=yes tmux_windows=[anchor fm-wsw ] pane_shell=16452 descendants=[21041(/bin/zsh) 19489(treehouse) 22777(sleep) ]
+teardown exit=0 copy_present_after=yes tmux_windows_after=[anchor ] descendants_after=[]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+🌳 Leased worktree 1 at <LAB>/w-wsw/th/.treehouse/proj-8c5eb3/1/proj. Run 'treehouse return <LAB>/w-wsw/th/.treehouse/proj-8c5eb3/1/proj' to release it.
+<LAB>/w-wsw/th/.treehouse/proj-8c5eb3/1/proj
+teardown: reaping leaked worktree process(es) for wsw: 21041 22777
+teardown: force-killing leaked worktree process(es) for wsw: 21041
+🌳 Worktree returned to pool.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+<LAB>/w-wsw/proj: synced 7d5ce36..233684d
+teardown wsw complete (window firstmate:fm-wsw, worktree <LAB>/w-wsw/th/.treehouse/proj-8c5eb3/1/proj)
+Backlog: wsw just finished (this home keeps no markdown backlog at <LAB>/data/backlog.md). Update <LAB>/data/backlog.md - move wsw to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- control (agent stop) calls:
+--- real treehouse status:
+base  main  (repository default)
+1     available    <LAB>/w-wsw/th/.treehouse/proj-8c5eb3/1/proj  (detached)
+--- tmux windows: anchor 
+PASS S10 the watcher's sweep removed the prune record
+PASS S10 the task record is closed
+PASS S10 log says armed then reaped
+PASS S10 no wake
+PASS S10 nothing forced
+PASS S10 slot returned to the real pool (clean, detached)
+=== 6 pass, 0 fail

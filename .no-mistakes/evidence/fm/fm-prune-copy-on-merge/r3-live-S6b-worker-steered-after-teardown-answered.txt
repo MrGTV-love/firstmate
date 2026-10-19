@@ -1,0 +1,36 @@
+### S6b: teardown answers 'not landed' (SEAM line), then the captain steers the worker. The fallback asks again whether the worker is finished: nothing is stopped, signalled or destroyed; the attempt backs off silently
+--- prune record:
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/132
+attempts=1
+next_at=1792437739
+state=pending
+reason=automatic reap ineligible: active: busy state busy claude-hook
+wake_sent=0
+copy=
+armed_at=1792437672
+--- prune log:
+2026-10-19T19:21:19Z armed for https://github.com/acme/widget/pull/132
+2026-10-19T19:21:22Z retry in 60s (attempt 1): automatic reap ineligible: active: busy state busy claude-hook
+--- wake queue (this task):
+--- treehouse calls:
+--- teardown calls:
+teardown call: args=[steer] admission=1 copy_present=yes tmux_windows=[anchor fm-steer ] pane_shell=55713 descendants=[63448(treehouse) 80423(/bin/zsh) 96320(sleep) ]
+teardown exit=1 (SEAM refusal) copy_present_after=yes
+--- teardown output:
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+--- control (agent stop) calls:
+--- real treehouse status:
+base  main  (repository default)
+1     in-use       <LAB>/w-steer/th/.treehouse/proj-2aba13/1/proj  [fm/steer]
+                   zsh (80423), sleep (96320)
+--- tmux windows: anchor fm-steer 
+record: version=fm-merge-prune-v1|pr=https://github.com/acme/widget/pull/132|attempts=1|next_at=1792437739|state=pending|reason=automatic reap ineligible: active: busy state busy claude-hook|wake_sent=0|copy=|armed_at=1792437672|
+PASS S6b worker still running
+PASS S6b no stop (exit verb) was sent
+PASS S6b nothing destroyed, copy and record kept
+PASS S6b record is pending (backed off), not retained
+PASS S6b the reason says the worker is not finished
+PASS S6b silent: no wake
+PASS S6b pane shell and window untouched
+=== 7 pass, 0 fail

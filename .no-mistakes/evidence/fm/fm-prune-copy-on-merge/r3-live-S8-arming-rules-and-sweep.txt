@@ -1,0 +1,39 @@
+### S8: only a verified merge arms; FM_MERGE_PRUNE=0 arms nothing; arming twice keeps one record; the watcher's sweep makes the due attempt
+PASS S8a an unverified merge (no merge-poll marker) arms nothing
+PASS S8c a marker for a different PR arms nothing
+PASS S8b FM_MERGE_PRUNE=0 arms nothing
+PASS S8d a verified merge arms
+PASS S8d arming twice leaves the record unchanged
+--- sweep (what bin/fm-watch.sh starts every 60s while a record exists)
+--- prune record:
+(none)
+--- prune log:
+2026-10-19T19:25:00Z armed for https://github.com/acme/widget/pull/140
+2026-10-19T19:25:26Z reaped: teardown completed
+--- wake queue (this task):
+--- treehouse calls:
+lease --help
+lease 1 --lease-holder arm
+return --force <LAB>/w-arm/th/.treehouse/proj-0f50d2/1/proj
+--- teardown calls:
+teardown call: args=[arm] admission=1 copy_present=yes tmux_windows=[anchor fm-arm ] pane_shell=90355 descendants=[541(/bin/zsh) 93065(treehouse) 1316(sleep) ]
+teardown exit=0 copy_present_after=yes tmux_windows_after=[anchor ] descendants_after=[]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+🌳 Leased worktree 1 at <LAB>/w-arm/th/.treehouse/proj-0f50d2/1/proj. Run 'treehouse return <LAB>/w-arm/th/.treehouse/proj-0f50d2/1/proj' to release it.
+<LAB>/w-arm/th/.treehouse/proj-0f50d2/1/proj
+teardown: reaping leaked worktree process(es) for arm: 541 1316
+teardown: force-killing leaked worktree process(es) for arm: 541
+🌳 Worktree returned to pool.
+<LAB>/w-arm/proj: synced 6afbd1a..e83c049
+teardown arm complete (window firstmate:fm-arm, worktree <LAB>/w-arm/th/.treehouse/proj-0f50d2/1/proj)
+Backlog: arm just finished (this home keeps no markdown backlog at <LAB>/data/backlog.md). Update <LAB>/data/backlog.md - move arm to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- control (agent stop) calls:
+--- real treehouse status:
+base  main  (repository default)
+1     available    <LAB>/w-arm/th/.treehouse/proj-0f50d2/1/proj  (detached)
+--- tmux windows: anchor 
+PASS S8e1 task record closed by the sweep
+PASS S8e2 prune record removed by the sweep
+PASS S8e3 log says reaped
+=== 8 pass, 0 fail

@@ -1,0 +1,61 @@
+### A/B CONTROL: live scenario S5 run against the commit BEFORE the fix (a996812f2). The FAIL lines are the bug: a pushed, never-merged follow-up copy is destroyed and no wake is raised. The same scenario against the target commit e8495343a (r3-live-S5-pushed-follow-up-commit-keeps-the-copy.txt) passes all 13 checks.
+### S5 (adversarial, the round-2 failure): a follow-up commit pushed after the merge but never merged. REAL teardown refuses it; the fallback must keep the copy with one wake BEFORE it stops the agent or ends the pane's treehouse subshell (which would return the slot to the pool and hide the commit)
+follow-up commit a75b82d3ee47bdaca019aa34f2effb36ab223ffb is on origin: fm/fu 
+slot before (real treehouse status):
+base  main  (repository default)
+1     in-use       <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj  [fm/fu]
+                   zsh (62981), sleep (64746)
+arm exit=0
+--- prune record:
+(none)
+--- prune log:
+2026-10-19T19:59:16Z armed for https://github.com/acme/widget/pull/103
+2026-10-19T19:59:24Z fallback destroyed <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj (head 6a4125d); preserved records, if any, are in <LAB>/data/fu/merge-prune-preserved/1792439956
+2026-10-19T19:59:27Z reaped: removed by fallback, teardown completed
+--- wake queue (this task):
+--- treehouse calls:
+status
+destroy <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj --include-leased --yes
+   [at destroy time] slot HEAD=6a4125d (task work fu (#103)); branch=detached; status=[]; processes inside=[]
+--- teardown calls:
+teardown call: args=[fu] admission=1 copy_present=yes tmux_windows=[anchor fm-fu ] pane_shell=59071 descendants=[64746(sleep) 62981(/bin/zsh) 61773(treehouse) ]
+teardown exit=1 copy_present_after=yes tmux_windows_after=[anchor fm-fu ] descendants_after=[64746(sleep) 62981(/bin/zsh) 61773(treehouse) ]
+teardown call: args=[fu] admission=1 copy_present=no tmux_windows=[anchor fm-fu ] pane_shell=59071 descendants=[]
+teardown exit=0 copy_present_after=no tmux_windows_after=[anchor ] descendants_after=[]
+--- teardown output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+commits whose change is not proven present in the merged PR head:
+a75b82d follow-up after the merge
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes state database at <LAB>/nm/state.sqlite, so no run record ties this copy to https://github.com/acme/widget/pull/103
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+<LAB>/w-fu/proj: synced dbe83f7..6a4125d
+teardown fu complete (window firstmate:fm-fu, worktree <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj)
+Backlog: fu just finished (this home keeps no markdown backlog at <LAB>/data/backlog.md). Update <LAB>/data/backlog.md - move fu to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- control (agent stop) calls:
+fu exit
+--- real treehouse status:
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- tmux windows: anchor 
+--- still-running processes of the task:
+--- slot after: HEAD=fatal: cannot change to '/Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-fu/th/.treehouse/proj-36ff55/1/proj': No such file or directory branch=fatal: cannot change to '/Users/charlesabrooker/tmp/fm-lab.YRzM0q/w-fu/th/.treehouse/proj-36ff55/1/proj': No such file or directory
+--- real treehouse dry run (what a destroy would see now):
+worktree <LAB>/w-fu/th/.treehouse/proj-36ff55/1/proj is not managed by treehouse
+--- two more attempts (must not add wakes or change anything)
+PASS S5 REAL teardown refused the follow-up as not landed
+PASS S5 teardown named the follow-up commit
+FAIL S5 copy kept on disk
+FAIL S5 slot still on the task branch with the follow-up commit (not returned to the pool)
+FAIL S5 task record kept
+FAIL S5 treehouse destroy never called
+FAIL S5 agent was not stopped (no exit verb)
+FAIL S5 agent process still running
+FAIL S5 pane's idle shell not ended (window and shell still there)
+PASS S5 nothing forced
+FAIL S5 exactly one wake after three attempts
+FAIL S5 the wake names the copy and says the commit is not in the merged pull request
+PASS S5 the follow-up commit is still on origin
+=== 4 pass, 9 fail
