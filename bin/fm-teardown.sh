@@ -4057,8 +4057,8 @@ TEARDOWN_PEER_IDS=()
 TEARDOWN_PEER_HOMES=()
 
 # Held slots. A task whose own copy passed the landed-work proof closes even when
-# foreign copies in its slot hold ignored files or commits that exist nowhere
-# else (bin/fm-teardown-nested-lib.sh owns which copies are held). The slot is
+# foreign copies in its slot hold commits that exist nowhere else
+# (bin/fm-teardown-nested-lib.sh owns which copies are held). The slot is
 # reserved under a durable lease exactly as an ordinary return reserves it, but
 # never returned; its claim and every foreign copy stay exactly as they were, and
 # only the task's own nested copies the proof covers go. A held close that cannot

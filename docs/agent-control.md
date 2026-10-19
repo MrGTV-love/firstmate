@@ -390,7 +390,7 @@ The route removes only the retiring task's own current copy, under the same proo
 It reserves, reaps, scans, detaches and returns nothing slot-wide, leaves Treehouse's lease and every other record and copy untouched, and passes the slot claim to the first remaining peer when it was this task's, so the last task out finds the slot its own.
 A claim that already names a peer stays as it is.
 The route works the same when a rerun finds the copy already removed, judged by its `branch=` ref as above.
-A foreign copy in the root is neither judged nor touched by this route, and it is proved again when the last task out returns the root; a copy held back by unique files or unlanded commits then closes that last task under the held-copy rule above and the root stays.
+A foreign copy in the root is neither judged nor touched by this route, and it is proved again when the last task out returns the root; a copy held back only by unlanded commits then closes that last task under the held-copy rule above and the root stays.
 A peer that has left the root between the proof and the removal refuses with the record in place, and a re-run takes the ordinary route.
 `--force` skips only the landed-work test on the task's own copy, as always, and waives none of the other proofs.
 `tests/fm-control-reassociate.test.sh` exercises the sequence from the joint reassociation through the last teardown.
