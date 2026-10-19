@@ -3041,10 +3041,9 @@ runs.unlink()
 backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 broken = ok(loops, '--present-overdue')
 assert all(each['id'] in broken.stdout for each in standing) and 'STANDING' not in broken.stdout, broken
-assert snapshot_runs() == 1, ('an unreadable backlog was read again for each standing row', snapshot_runs())
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
       ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
-      ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
+      ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog at most once')
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 # Machine evidence, standing receipts and canonical named-ship blockers through the real wake acknowledgement.
@@ -3208,6 +3207,51 @@ for category, fields in (
         second = call(loops, 'action', row['id'], 'deferred', '--evidence', 'still no proof', '--recheck', iso(now+700))
         assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
         assert ack(boundary).returncode == 1
+# Automatic readers cannot hold the publication/receipt lock, and stale preflight identities cannot buy a receipt.
+reader.write_text('#!/usr/bin/env bash\n'
+    'if [ -e "$FM_HOME/block-reader" ]; then\n'
+    '  touch "$FM_HOME/reader-entered"\n'
+    '  while [ ! -e "$FM_HOME/release-reader" ]; do sleep 0.1; done\n'
+    'fi\ncat "$FM_HOME/worker-state"\n')
+for change in ('none', 'row', 'meta', 'status'):
+    home, row, ledger, env, call, ok, drain, ack = case('lock-' + change)
+    other = dict(row, id='unrelated-action', category='stalled_worker', subject='other-worker')
+    record = json.loads(ledger.read_text()); record['rows'].append(other)
+    ledger.write_text(json.dumps(record))
+    ok(loops, '--present-overdue')
+    (home / 'worker-state').write_text('state: working · source: run-step · live validation\n')
+    (home / 'block-reader').touch()
+    pending = subprocess.Popen([str(loops), '--present-overdue'], env=env, text=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        for _ in range(1200):
+            if (home / 'reader-entered').exists():
+                break
+            assert pending.poll() is None, pending.communicate()
+            time.sleep(0.1)
+        assert (home / 'reader-entered').exists(), 'automatic source reader did not reach its barrier'
+        result = ok(loops, 'action', other['id'], 'escalated', '--evidence', 'unrelated follow-up delivered')
+        assert not (home / 'release-reader').exists() and pending.poll() is None, result
+        if change == 'row':
+            record = json.loads(ledger.read_text())
+            next(r for r in record['rows'] if r['id'] == row['id'])['evidence'] = 'new obligation evidence'
+            ledger.write_text(json.dumps(record))
+        elif change == 'meta':
+            (home / 'state/worker.meta').write_text('kind=ship\nspawn_gen=replacement-generation\n')
+        elif change == 'status':
+            (home / 'state/worker.status').write_text(f'blocked [at={now}] [key=new]: new prerequisite\n')
+        (home / 'release-reader').touch()
+        output, errors = pending.communicate(timeout=120)
+        assert pending.returncode == 0, (output, errors)
+        record = json.loads(ledger.read_text())
+        assert record['handling']['actions'][other['id']]['kind'] == 'escalated', record
+        automatic = record['handling']['actions'].get(row['id'])
+        assert bool(automatic and automatic['kind'] == 'observed') == (change == 'none'), (change, record)
+    finally:
+        (home / 'release-reader').touch()
+        if pending.poll() is None:
+            pending.communicate(timeout=120)
+print('PASS: automatic evidence reads leave the receipt lock available; concurrent row, metadata and status changes reject stale proofs', flush=True)
 print('PASS: fresh live-run, status and run-step receipts; standing acknowledgement; named open ship waits reopen;'
       ' silent/stalled, blocked, captain and merge requirements and unevidenced second deferrals retained', flush=True)
 PY

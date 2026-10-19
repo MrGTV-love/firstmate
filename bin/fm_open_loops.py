@@ -1500,6 +1500,100 @@ class SatisfactionVerifier(WaitVerifier):
         proof = self.named_ship_evidence(row)
         return ("backlog_wait", proof) if proof else (None, None)
 
+    @staticmethod
+    def identity(row):
+        return fingerprint([row_digest(row), row.get("source"), row.get("limit_seconds"),
+                            row.get("stale"), row.get("informational")])
+
+    @staticmethod
+    def file_guard(path):
+        if path.is_symlink():
+            raise ValueError("automatic evidence sources must not be redirected")
+        try:
+            info = path.stat()
+            return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+        except FileNotFoundError:
+            return None
+
+    def backlog_records(self):
+        path = self.collector.data / "backlog.md"
+        guard = self.file_guard(path)
+        if guard != getattr(self, "backlog_guard", object()):
+            self.backlog, self.backlog_error, self.backlog_guard = None, None, guard
+        records = super().backlog_records()
+        if guard != self.file_guard(path):
+            raise ValueError("backlog changed during automatic evidence collection")
+        return records
+
+    def rebind(self, report, now):
+        """Rebind only the reloaded ledger; cached backlog reads remain guarded by their live file identity."""
+        self.rows = {row["id"]: row for row in report["rows"]}
+        self.actions = report.get("handling", {}).get("actions", {})
+        self.stale = bool(report.get("stale"))
+        self.decisions.clear()
+        self.collector.now = now
+        self.collector.env["FM_SNAPSHOT_NOW_EPOCH"] = str(now)
+        self.collector.env["FM_SNAPSHOT_NOW"] = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return self
+
+    def input_guard(self, row):
+        """Cheap local identities rechecked under the receipt lock; no source subprocess runs here."""
+        task = row.get("subject") if row.get("category") == "silent_report" else (row.get("source") or {}).get("task")
+        if not task or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):
+            raise ValueError("automatic evidence requires an exact local task identity")
+        c = self.collector
+        paths = [c.state / (task + ".meta"), c.state / (task + ".status")]
+        if row.get("category") == "unanswered_question":
+            paths.append(c.data / "backlog.md")
+        return [self.file_guard(path) for path in paths]
+
+    def prepare(self, report):
+        self.proofs = {}
+        status_guards, backlog_guard = {}, object()
+        for row in overdue_rows(report, self.collector.now):
+            if row.get("category") not in ("silent_report", "unanswered_question"):
+                continue
+            try:
+                guard = self.input_guard(row)
+                if row.get("category") == "unanswered_question":
+                    task = row["source"]["task"]
+                    if status_guards.get(task) != guard[:2]:
+                        self.decisions.pop(task, None)
+                        status_guards[task] = guard[:2]
+                    if backlog_guard != guard[-1]:
+                        self.backlog, self.backlog_error, backlog_guard = None, None, guard[-1]
+                if receipt_stands(self.actions.get(row["id"], {}), row, self.collector.now, self):
+                    continue
+                kind, proof = self.automatic(row)
+                if proof and guard == self.input_guard(row):
+                    self.proofs[row["id"]] = (self.identity(row), guard, kind, proof)
+            except SOURCE_ERRORS:
+                continue  # incomplete or concurrently changed evidence never excuses follow-up
+        return self
+
+    def prepared(self, row, now):
+        entry = self.proofs.get(row["id"])
+        if entry is not None:
+            identity, guard, kind, proof = entry
+            try:
+                if identity == self.identity(row) and guard == self.input_guard(row) \
+                        and proof.get("recheck_epoch", now + 1) > now:
+                    return kind, proof
+            except SOURCE_ERRORS:
+                pass
+        return None, None
+
+
+def prepare_satisfaction(state, now):
+    """Perform slow machine/backlog reads without the publication/receipt lock."""
+    try:
+        report = read_ledger(state)
+        if report and overdue_rows(report, now):
+            return SatisfactionVerifier(report, state, now).prepare(report)
+    except SOURCE_ERRORS:
+        pass  # ledger_action owns unreadable-ledger diagnostics and the acknowledgement boundary
+    return None
+
 
 def receipt_stands(action, row, now, waits=None):
     """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
@@ -1553,7 +1647,7 @@ def render_overdue(rows):
     return "\n".join(lines)
 
 
-def ledger_action(args, state, now):
+def ledger_action(args, state, now, prepared=None):
     """Receipts and per-actor presentations share the ledger's short publication lock range."""
     try:
         report = read_ledger(state)
@@ -1581,13 +1675,9 @@ def ledger_action(args, state, now):
     recorded = getattr(args, "kind", None)
     pending_waits = any(a.get("kind") == "waiting" or a.get("hold") for a in actions.values())
     parks = recorded == "escalated" and getattr(args, "row_id", None) in by_id and parkable(by_id[args.row_id])
-    automatic_mode = args.present_overdue or args.check_actions
-    automatic_candidates = any(row.get("category") == "silent_report" or (
-        row.get("category") == "unanswered_question" and (row.get("source") or {}).get("kind") == "status")
-        for row in rows)
-    if recorded == "waiting" or pending_waits or parks or (automatic_mode and automatic_candidates):
+    if recorded == "waiting" or pending_waits or parks:
         try:
-            waits = SatisfactionVerifier(report, state, now)
+            waits = prepared.rebind(report, now) if prepared is not None else WaitVerifier(report, state, now)
         except SOURCE_ERRORS as error:
             if recorded == "waiting":
                 raise
@@ -1597,16 +1687,13 @@ def ledger_action(args, state, now):
                       file=sys.stderr)
     automatic = set()
     changed = False
-    if automatic_mode and waits is not None:
+    if prepared is not None:
         for row in rows:
-            # Existing standing receipts need no substitute action, even when their original
-            # presentation sequence predates another actor's requirement.
+            # Reloaded actions remain authoritative; only cheap row/file identity checks
+            # happen here, never the preflight's machine or backlog subprocesses.
             if receipt_stands(actions.get(row["id"], {}), row, now, waits):
                 continue
-            try:
-                kind, proof = waits.automatic(row)
-            except SOURCE_ERRORS:
-                continue  # missing machine evidence never excuses follow-up
+            kind, proof = prepared.prepared(row, now)
             if not proof:
                 continue
             ident = row["id"]
@@ -1829,10 +1916,12 @@ def main():
         lock_fd = os.open(lock_dir / ".open-loops.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         now = int(os.environ.get("FM_OPEN_LOOPS_NOW", time.time()))
         if receipt_mode:
+            prepared = prepare_satisfaction(lock_dir, now) if args.present_overdue or args.check_actions else None
             # Byte 0 excludes concurrent collections; byte 1 serializes only
             # atomic publication and receipts on the same existing lock file.
             fcntl.lockf(lock_fd, fcntl.LOCK_EX, 1, 1)
-            return ledger_action(args, lock_dir, now)
+            now = int(os.environ.get("FM_OPEN_LOOPS_NOW", time.time()))
+            return ledger_action(args, lock_dir, now, prepared)
         try:
             fcntl.lockf(lock_fd, fcntl.LOCK_EX | (fcntl.LOCK_NB if args.heartbeat else 0), 1, 0)
         except (BlockingIOError, PermissionError):
