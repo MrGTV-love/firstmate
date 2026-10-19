@@ -62,12 +62,20 @@ fm_task_copy_default_branch() {
   return 1
 }
 
+# A failed content check is no verdict on the work while FM_TASK_COPY_UNASKED
+# names why: it is cleared only once the check compared the two trees, and a
+# merge conflict is that comparison's answer.
+FM_TASK_COPY_UNASKED=
 fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>]
   local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} ref default_tree merged_tree
+  FM_TASK_COPY_UNASKED='the content check could not compare with the default branch'
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
   if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
-    git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
+    git -C "$worktree" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || {
+      FM_TASK_COPY_UNASKED="origin/$name could not be fetched"
+      return 1
+    }
     ref="refs/remotes/origin/$name"
   elif git -C "$worktree" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
     ref="refs/heads/$name"
@@ -76,7 +84,11 @@ fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [
   fi
   default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || return 1
+  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || {
+    [ "$?" != 1 ] || FM_TASK_COPY_UNASKED=
+    return 1
+  }
+  FM_TASK_COPY_UNASKED=
   merged_tree=${merged_tree%%$'\n'*}
   [ "$merged_tree" = "$default_tree" ]
 }
@@ -122,19 +134,25 @@ fm_task_copy_priors_inside() {  # <meta> <slot>
 # written and verified; with 0 nothing is written and a missing anchor returns
 # 2. FM_TASK_COPY_HEAD and FM_TASK_COPY_ANCHOR name the HEAD and its anchor.
 # Any other failure returns 1 with FM_TASK_COPY_REASON, a clause following the
-# copy's path, and FM_TASK_COPY_DIRTY listing any dirt.
+# copy's path, and FM_TASK_COPY_DIRTY listing any dirt. A failure that stays the
+# same until someone decides (not a worktree root, unresolved HEAD, an anchor
+# naming another commit) also sets FM_TASK_COPY_STABLE to its predicate id; a
+# Git read or write failure leaves it empty.
 FM_TASK_COPY_HEAD=
 FM_TASK_COPY_ANCHOR=
 FM_TASK_COPY_DIRTY=
+FM_TASK_COPY_STABLE=
 fm_task_copy_preserve() {  # <project> <task> <copy> <write> [<nested-copy>...]
   local project=$1 task=$2 copy=$3 write=$4 top status ref short current
   shift 4
   FM_TASK_COPY_HEAD=
   FM_TASK_COPY_ANCHOR=
   FM_TASK_COPY_DIRTY=
+  FM_TASK_COPY_STABLE=
   FM_TASK_COPY_REASON=
   top=$(git -C "$copy" rev-parse --show-toplevel 2>/dev/null) \
     && top=$(fm_task_copy_canonical_dir "$top") && [ "$top" = "$copy" ] || {
+    FM_TASK_COPY_STABLE='copy-worktree-root'
     FM_TASK_COPY_REASON="is not a Git worktree root, so its contents cannot be proved preserved"
     return 1
   }
@@ -148,6 +166,7 @@ fm_task_copy_preserve() {  # <project> <task> <copy> <write> [<nested-copy>...]
     return 1
   fi
   FM_TASK_COPY_HEAD=$(git -C "$copy" rev-parse --verify --quiet 'HEAD^{commit}') || {
+    FM_TASK_COPY_STABLE='copy-head-resolved'
     FM_TASK_COPY_REASON="has a HEAD that cannot be resolved"
     return 1
   }
@@ -167,6 +186,7 @@ fm_task_copy_preserve() {  # <project> <task> <copy> <write> [<nested-copy>...]
   }
   FM_TASK_COPY_ANCHOR="refs/fm/anchor/$task-$short"
   if git -C "$project" rev-parse --verify --quiet "$FM_TASK_COPY_ANCHOR" >/dev/null; then
+    FM_TASK_COPY_STABLE='copy-anchor-commit'
     FM_TASK_COPY_REASON="cannot be anchored: preservation anchor $FM_TASK_COPY_ANCHOR already names a different commit"
     return 1
   fi
