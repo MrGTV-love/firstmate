@@ -12,6 +12,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
+| Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
@@ -84,6 +85,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Host-local command durations in `command-durations.jsonl`, produced by `bin/fm-duration.py`; its header and help own timing calibration and repeated-timeout work publication.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
+- The nested-copy sweep's append-only removal log `data/copy-sweep.log`, produced by `bin/fm-copy-sweep.sh --apply`.
 - The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
 
 `state/` holds runtime records:
@@ -103,6 +105,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
+- The nested-copy sweep's size cache `state/copy-sweep.sizes` and budget record `state/copy-sweep.record`, owned by `bin/fm-copy-sweep.sh`.
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
@@ -1705,6 +1708,57 @@ The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
+
+## Nested task copy sweep (config/copy-budget)
+
+A task copy is nested when a clone registers it strictly inside its own directory, such as `<clone>/.claude/worktrees/<name>`.
+`treehouse prune` works on whole pool slots and does not see these copies, and a teardown only removes its own task's.
+Left alone, they pile up: each holds a full checkout, often 2 to 4 GiB, and nothing else bounds their total.
+[`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) is the one mechanism that finds them, sizes them, removes the provably stale ones, and raises a single wake when the bytes they hold pass a budget.
+The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
+It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, and how `check` stays inside the watcher's timeout.
+`bin/fm-copy-sweep.sh --help` prints that header.
+The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
+
+### Hourly command and watcher check
+
+Firstmate installs no scheduler for `--apply`; run this one line from the host's own hourly job:
+
+```sh
+bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
+```
+
+`bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake.
+`bin/fm-copy-sweep.sh disarm` removes the binding.
+The script header owns how much of the host one `check` covers per poll, what a cut run records, and why the hourly `--apply` is the only run certain to cover every clone.
+
+### Budgets
+
+The optional local, gitignored `config/copy-budget` holds one directive per line; `#` starts a comment:
+
+```text
+# GiB budgets; a decimal value is allowed and "off" turns a budget off
+default-pool 60
+default-container 20
+pool pool-name 80
+container /absolute/path/to/slot-or-home 10
+# 1-minute load average above which no du runs
+load-limit 90
+# whole seconds between scans by check
+interval 3600
+# whole seconds before a cached size is measured again
+cache-max-age 86400
+```
+
+A pool is a `<treehouse root>/<pool>` directory, named by its directory name or full path.
+A container is a pool slot's clone or a Firstmate home, named by its absolute path.
+The values above are the built-in defaults for the lines that carry one, and a missing file means exactly those defaults.
+A malformed file refuses the run and names its line.
+The script header owns how a budget is measured, when it is over, and when its wake fires.
+
+`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) is the only operator environment setting.
+`check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
+[`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
@@ -3598,6 +3652,7 @@ FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 pro
 FM_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git probe
 FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit FM_CHECK_TIMEOUT, and the cut is reported
 FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
+FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_PROCEVENT_MAX_OUTPUT_BYTES=1048576   # bound on one captured process-to-event result
 FM_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/firstmate/procevent-claims
 FM_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400
