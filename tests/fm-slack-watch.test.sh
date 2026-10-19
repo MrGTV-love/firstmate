@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X17.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X18.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -222,7 +222,9 @@ reply_to 900.000001 900.000012 "$(python3 -c 'print("b" * 45000)')"
 out=$(poll contradiction-typed)
 assert_not_contains "$out" 'transport failure' "DOD-08 a long conflict notice failed to post"
 assert_eq "$(check_count "$out")" 1 "DOD-08 long conflict surfaces once"
-assert_contains "$(thread_texts 900.000001)" 'Full text remains in the local backlog.' "DOD-08 long conflict notice was not cut"
+assert_not_contains "$(thread_texts 900.000001)" 'Full text remains in the local backlog.' "DOD-08 long conflict notice was cut by size, not by label"
+assert_contains "$(thread_texts 900.000001)" 'Please reply once.' "DOD-08 long conflict notice lost its remedy"
+[ "$(printf '%s' "$out" | wc -c | tr -d ' ')" -lt 240 ] || fail "DOD-08 a long label filled the wake line"
 assert_open conflict-call 0 "DOD-08 long conflict records nothing"
 new_home reaction-answer
 bind
@@ -856,5 +858,18 @@ env FM_SHIM_ENVLOG="$TMP/env.log" "$SHIM/fm-slack-mirror.sh" --replay "$FIX/mirr
 [ -s "$TMP/env.log" ] || fail "X17 no child ran during the mirror"
 assert_eq "$(sort -u "$TMP/env.log")" unset "X17 a mirror child inherited the bot token"
 printf 'ok - X17\n'
+
+# X18: Slack's message escaping is undone before a typed reply is recorded
+new_home card-payload
+bind
+mirror card-payload >/dev/null
+ts=$(thread_field no-options ts)
+reply_to "$ts" 900.000099 'merge 12 &amp; 13, skip CI &lt; 5 min &gt; see <https://example.com/b> and <https://example.com/a|the doc>'
+out=$(poll card-payload)
+assert_eq "$(closed_count "$out")" 1 "X18 escaped reply close"
+expected='merge 12 & 13, skip CI < 5 min > see https://example.com/b and the doc'
+assert_eq "$(answer_line no-options)" "$expected" "X18 the recorded answer is what the owner typed"
+assert_eq "$(label_line no-options)" "$expected" "X18 the recorded label is what the owner typed"
+printf 'ok - X18\n'
 
 printf 'ok - all Slack watch checks\n'

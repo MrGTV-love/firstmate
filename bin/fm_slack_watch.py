@@ -33,6 +33,8 @@ REACTIONS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'ni
 USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
+LABEL_LIMIT = 60
+SLACK_LINK = re.compile(r'<((?:https?://|mailto:)[^<>|\s]+)(?:\|([^<>]*))?>')
 CARD_TAIL = ('\nFull decision remains in the local backlog.'
              '\nReply in this thread with your answer.'
              '\nMessages typed in the main DM window are not read.')
@@ -74,6 +76,17 @@ def flat(value):
     """Keep the intake's one-line framing: newlines, tabs, and controls become spaces."""
     value = str(value).replace('\r', ' ').replace('\n', ' ').replace('\t', ' ')
     return ''.join(ch for ch in value if ord(ch) >= 32 and ord(ch) != 127)
+
+
+def typed_text(value):
+    """Undo Slack's escaping of a typed message so the record holds what the owner typed."""
+    value = SLACK_LINK.sub(lambda match: match.group(2) or match.group(1), value)
+    return value.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+
+
+def short(value):
+    value = flat(value)
+    return value if len(value) <= LABEL_LIMIT else value[:LABEL_LIMIT - 3] + '...'
 
 
 def stamp(value):
@@ -571,6 +584,7 @@ class Watch:
             text = message.get('text', '')
             if not isinstance(text, str) or not text.strip():
                 continue
+            text = typed_text(text)
             answer = label = text
             if text.isdecimal() and 1 <= int(text) <= len(record.get('options', [])):
                 option = record['options'][int(text) - 1]
@@ -638,7 +652,7 @@ class Watch:
             if len(typed) > 1 or len(tapped) > 1 or (typed and tapped and typed.keys() != tapped.keys()):
                 record['conflicts'] = record.get('conflicts', 0) + 1
                 record['blocked'] = signature
-                labels = ' vs '.join(sorted(set(typed.values()) | set(tapped.values())))
+                labels = ' vs '.join(short(label) for label in sorted(set(typed.values()) | set(tapped.values())))
                 event = new_replies[0]['event'] if new_replies else self.event(
                     record, 'conflict', str(record['conflicts']))
                 if len(tapped) > 1:

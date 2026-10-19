@@ -105,7 +105,7 @@ Observed: one `check: slack 900.000001 - conflicting signals: Abort vs Wait`, ze
 (c) Two different reactions produced one check line and one notice; later polls stayed silent; removing one reaction changed the reaction set and recorded the remaining option.
 (d) A reaction the intake refused (`refused: typed-call`, call still open) was not submitted again by the next poll, and no second acknowledgement was posted.
 The conflict notice in the thread named the remedy: `Remove the :two: reaction, or type 2.` for a reaction against a typed reply, `Please reply once.` for two typed replies, and `Remove all but one reaction.` for two reactions.
-Two conflicting typed replies of 45,000 characters each produced one conflict notice cut with `Full text remains in the local backlog.`, no transport failure, and an unanswered call.
+Two conflicting typed replies of 45,000 characters each produced one conflict notice that named each answer cut to 60 characters and still ended with its remedy, one check line shorter than 240 characters, no transport failure, and an unanswered call.
 Result: pass.
 
 ## DOD-09 - duplicate and cross-channel answers record once
@@ -226,7 +226,7 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 until the owner confirms it rides this PR.
 
-## X1..X17 - review-round regressions
+## X1..X18 - review-round regressions
 
 Each runs against replay transcripts and the real intake; none opens a socket.
 
@@ -248,6 +248,7 @@ Each runs against replay transcripts and the real intake; none opens a socket.
 - X15: a tap by a second allowlisted member was staged with that member as its author; with that member removed from the allowlist, the next poll dropped the staged answer and left the call open.
 - X16: `prepare` is no longer a command: the entry point exited 2 with `unknown command`.
 - X17: with the bot token in the process environment, every local child the poll and the mirror ran (the call-state probe, the answer intake, the fleet snapshot) saw it unset.
+- X18: a typed reply that Slack delivered as `merge 12 &amp; 13, skip CI &lt; 5 min &gt; see <https://example.com/b> and <https://example.com/a|the doc>` closed the call with the answer `merge 12 & 13, skip CI < 5 min > see https://example.com/b and the doc`, and the recorded label matched.
 
 ## ACT-1 - live answer
 
