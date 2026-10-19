@@ -216,6 +216,8 @@ MAX_LINE=1600
 . "$SCRIPT_DIR/fm-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-refuse-lib.sh
+. "$SCRIPT_DIR/fm-refuse-lib.sh"
 # shellcheck source=bin/fm-teardown-nested-lib.sh
 . "$SCRIPT_DIR/fm-teardown-nested-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
