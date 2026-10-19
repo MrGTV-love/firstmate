@@ -9,13 +9,14 @@
 # worth keeping. It never forces, discards or hides anything: any proof it
 # cannot make keeps the copy. A read that fails (the ignored-file listing, the
 # stash listing, the search for nested copies, the listing of a .claude or .tac
-# directory) never counts as finding nothing: it keeps the copy, or retries
-# later when the failure is a git read.
+# directory) never counts as finding nothing: it keeps the copy, except that a
+# failed stash listing is retried later.
 #
 # A copy passes only when ALL of these hold, for the task's own copy AND for
 # every nested copy found inside it, each checked one by one:
 #   - the path is a Treehouse pool slot of the task's project, by the repo's one
-#     test (fm_treehouse_pool_slot in bin/fm-wake-lib.sh): the pool's
+#     test (fm_treehouse_pool_slot in bin/fm-wake-lib.sh, which
+#     bin/fm-merge-prune.sh runs before it calls these proofs): the pool's
 #     treehouse-state.json sits beside the slot and the slot shares the
 #     project's git directory;
 #   - git reports no changed or untracked file and the copy holds no stash entry

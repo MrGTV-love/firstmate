@@ -115,7 +115,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-idle-session-reap.sh` | Report parked sessions with their reasons and ask `fm-teardown.sh` to clean up idle finished tasks whose work landed |
 | `fm-idle-reap-lib.sh` | Shared automatic-reap eligibility for scan and locked teardown admission |
 | `fm-merge-prune.sh` | Prune a merged task's pool copy right after its PR merges: run teardown unforced, retry transient refusals, and keep or remove a refused copy only on live proof |
-| `fm-merge-prune-lib.sh` | Provable-scratch proofs for the merge prune's fallback (pool copy, clean, pushed, scratch-only, unused, nested copies) |
+| `fm-merge-prune-lib.sh` | Provable-scratch proofs for the merge prune's fallback (clean, pushed, scratch-only, unused, nested copies) |
 | `fm-afk-contract.sh`     | Own the away-or-quiet record's posture, schema, entry, read-back, archive, and cross-subsystem authority lock |
 | `fm-afk-start.sh`        | Run the common sourceable away-mode daemon entry in the foreground                      |
 | `fm-afk-launch.sh`       | Own away/quiet entry (same-turn record write, then read-back), exit, rollback, and any backend terminal lifecycle |
