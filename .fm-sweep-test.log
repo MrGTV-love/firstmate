@@ -1,0 +1,5 @@
+ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
+ok - apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent
+ok - a locked copy whose launcher pid is recycled is preserved, released by the driver and removed, one run
+tests/fm-copy-sweep.test.sh: line 1043: unexpected EOF while looking for matching `"'
+tests/fm-copy-sweep.test.sh: line 1044: syntax error: unexpected end of file

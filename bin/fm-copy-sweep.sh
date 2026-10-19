@@ -45,9 +45,10 @@
 #                      holds all of its copies.
 #   HELD-DIRTY         git status shows any change or untracked file, an
 #                      operation (rebase, merge, cherry-pick, revert, bisect) is
-#                      in progress, it holds an ignored file that exists
-#                      nowhere else (the teardown library's rule), or another
-#                      registered copy with an existing directory is inside it:
+#                      in progress, it holds an ignored entry that removal would
+#                      lose or an ignored list that cannot be read (the teardown
+#                      library's allow-list rule), or another registered copy
+#                      with an existing directory is inside it:
 #                      a plain `git worktree remove` of the outer copy would
 #                      delete that inner copy and whatever it holds, and git
 #                      status cannot see it when `.claude/worktrees/` is ignored.
@@ -654,6 +655,10 @@ classify() {  # <copy> <clone> <pool> <container>
       return 0
     fi
   done
+  # Every ignored entry removal would lose, by the teardown library's own
+  # allow-list: regenerable caches are excluded, everything else counts. A copy
+  # this sweep removes must first preserve them, so a listing failure keeps the
+  # copy rather than reading as "nothing to lose".
   if ! unique=$(teardown_preservable_ignored "$copy"); then
     CLASS=HELD-DIRTY
     REASON="its ignored files cannot be listed for preservation"
@@ -661,7 +666,7 @@ classify() {  # <copy> <clone> <pool> <container>
   fi
   if [ "$locked" != 1 ] && [ -n "$unique" ]; then
     CLASS=HELD-DIRTY
-    REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
+    REASON="it holds ignored files that removal would lose: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 0
   fi
   while IFS= read -r inner; do

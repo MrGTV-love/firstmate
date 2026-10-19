@@ -473,7 +473,7 @@ SH
 LIVE_PID=
 
 make_locked_copy_case() {
-  local name=$1 mode=$2 pid= admin=
+  local name=$1 mode=$2 pid='' admin=''
   make_world "$name"
   add_copy locked
   admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
@@ -548,8 +548,30 @@ test_recycled_launcher_lock_is_released_by_the_driver() {
   pass "a locked copy whose launcher pid is recycled is preserved, released by the driver and removed, one run"
 }
 
+test_unlocked_ignored_files_are_kept_unless_regenerable() {
+  local exclude
+  make_world ignoredproof
+  exclude=$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\nnode_modules/\n' >> "$exclude"
+  add_copy durable
+  printf 'durable state\n' > "$(copy_path durable)/unique.dat"
+  add_copy cache
+  mkdir -p "$(copy_path cache)/node_modules/pkg"
+  printf 'cache\n' > "$(copy_path cache)/node_modules/pkg/index.js"
+  take_snapshots before durable
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_class durable HELD-DIRTY
+  assert_contains "$OUT" "ignored files that removal would lose: unique.dat" \
+    "the report did not name the ignored file removal would lose"
+  take_snapshots after durable
+  assert_untouched durable
+  [ ! -e "$(copy_path cache)" ] || fail "a copy holding only regenerable ignored caches was kept"
+  pass "an unlocked copy with durable ignored files is kept, and regenerable caches do not block removal"
+}
+
 test_live_foreign_or_unreleasable_locks_are_kept() {
-  local mode rc
+  local mode
   for mode in live foreign; do
     make_locked_copy_case "lock-$mode" "$mode"
     install_driver "$SLOT" "$W"
@@ -1394,6 +1416,7 @@ run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy
 run_case test_recycled_launcher_lock_is_released_by_the_driver
+run_case test_unlocked_ignored_files_are_kept_unless_regenerable
 run_case test_live_foreign_or_unreleasable_locks_are_kept
 run_case test_copy_with_one_untracked_file_and_unpushed_tip_are_kept
 run_case test_landed_content_without_a_pushed_tip_is_reaped_by_apply
