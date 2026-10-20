@@ -259,7 +259,9 @@ fm_status_cap_stat_rows() {  # <state>
 
 fm_status_cap_marker_path() {  # <state> <path> [<out-var>]
   local __fm_cm_name=${2##*/} __fm_cm_path
-  __fm_cm_path="$1/.status-cap-alerted.${__fm_cm_name//[^A-Za-z0-9._-]/_}"
+  # No _ in the class: it maps to itself, and ShellCheck reads a bare _ inside
+  # ${..//[..]/..} as a variable, which flags every caller that loops with `for _`.
+  __fm_cm_path="$1/.status-cap-alerted.${__fm_cm_name//[^A-Za-z0-9.-]/_}"
   if [ -n "${3-}" ]; then printf -v "$3" '%s' "$__fm_cm_path"; else printf '%s' "$__fm_cm_path"; fi
 }
 
