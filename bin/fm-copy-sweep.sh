@@ -62,9 +62,10 @@
 # `git worktree remove`, so calling it live or orphaned would mislead.
 # Independently of class and byte budgets, one HELD-LIVE-TASK report line names
 # every nested copy on disk strictly inside a ship/scout record's current or prior
-# copy inside its registering clone, with its absolute path, owning task, and
-# age in seconds from the lock mtime (source=lock) or, when unlocked, the
-# directory mtime (source=directory). A lock state that cannot be read, such as
+# copy, where that copy is the registering clone itself (a pool slot) or lies
+# inside it, with its absolute path, owning task, and age in seconds from the
+# lock mtime (source=lock) or, when unlocked, the directory mtime
+# (source=directory). A lock state that cannot be read, such as
 # a probe cut by `check`'s time bound, reads source=unknown and age=unknown, never
 # the directory of a copy that may be locked. A record's presence means it is
 # still in custody; teardown removes closed records. This check only reports,
@@ -116,7 +117,8 @@
 # The live-copy fact wakes once when a copy joins the named set, not once per poll,
 # and a copy leaving it is silent. state/copy-sweep.record keeps that set beside
 # the budget memory, so an unchanged set stays silent in `check` and `--apply`
-# while every report still prints it. A cut scan keeps a recorded path because it cannot prove it gone.
+# while every report still prints it. A cut scan keeps a recorded path because
+# it cannot prove it gone.
 #
 # `arm` writes state/copy-sweep.check.sh and binds its bytes with
 # fm-check-register.sh, so the existing watcher runs `check` on its normal

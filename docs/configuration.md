@@ -1769,7 +1769,8 @@ A task copy is nested when a clone registers it strictly inside its own director
 `treehouse prune` works on whole pool slots and does not see these copies, and a teardown only removes its own task's.
 Left alone, they pile up: each holds a full checkout, often 2 to 4 GiB, and nothing else bounds their total.
 [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) is the one mechanism that finds them, sizes them, removes the provably stale ones, and raises one aggregated wake when the bytes they hold pass a budget or when a nested copy sits inside the copy of a live ship or scout task.
-The second wake is a named fact, not a budget breach: it names the copy's path, owning task and age, fires once when a copy joins the named set (a copy leaving it is silent), and only reports. The wake line carries the count and five copies in all, new copies first and then the oldest, with a pointer to the full report line.
+The second wake is a named fact, not a budget breach: it names the copy's path, owning task and age, fires once when a copy joins the named set (a copy leaving it is silent), and only reports.
+The wake line carries the count and five copies in all, new copies first and then the oldest, with a pointer to the full report line.
 No budget gates it, so it still fires when both budgets are `off`.
 The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
 It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, the live-copy fact and its record, and how `check` stays inside the watcher's timeout.
