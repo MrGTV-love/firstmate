@@ -260,8 +260,9 @@
 # output names each held copy and the next step for its owner. --force never
 # holds a copy, nor does retiring a secondmate home, a copy inside the task's own
 # nested copy is never held, and a copy that is dirty, owned, or has a process in
-# it (this teardown's own included) still refuses. docs/agent-control.md owns the
-# rule.
+# it (this teardown's own included) still refuses. A copy the hold does not apply
+# to that holds unique ignored files has them preserved and is released like any
+# other proved copy. docs/agent-control.md owns the rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -4125,7 +4126,7 @@ teardown_reprove_same_route() {
 # later, these lines were already printed. The held-copy record was written
 # before anything was removed (teardown_held_copies_record_or_refuse).
 teardown_held_copies_report() {
-  local i entry copy copy_q record="$DATA/held-foreign-copies.log" slot=$TEARDOWN_HELD_SLOT slot_q proj_q holder_q return_cmd
+  local i entry copy copy_q record="$DATA/held-foreign-copies.log" slot=$TEARDOWN_HELD_SLOT slot_q proj_q holder_q return_cmd sweep=
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_task_copy_pool_slot_held "$slot" >/dev/null 2>&1 || true
@@ -4142,6 +4143,7 @@ teardown_held_copies_report() {
     entry=${TEARDOWN_FOREIGN_HELD[$i]}
     copy=${entry%%$'\t'*}
     copy_q=$(printf '%q' "$copy")
+    [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" != commits ] || sweep="; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and never a copy locked by Vernant's creation lock or held for ignored files"
     echo "notice: held foreign copy $(fm_refuse_text "$copy") stays in pool slot $(fm_refuse_text "$slot"): $(fm_refuse_text "${entry#*$'\t'}")."
     if [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" = ignored ]; then
       echo "notice: next step for the owner of $(fm_refuse_text "$copy"): review its ignored files with git -C $copy_q status --ignored and save the ones you need, with any commits only it holds (git -C $copy_q log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with $return_cmd."
@@ -4149,7 +4151,7 @@ teardown_held_copies_report() {
       echo "notice: next step for the owner of $(fm_refuse_text "$copy"): list the commits only it holds with git -C $copy_q log --oneline HEAD --not --remotes, land them, remove the copy with git -C $slot_q worktree remove $copy_q (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree $copy_q --execute-cleanup, run from the slot), and when no copy is left in the slot return it with $return_cmd."
     fi
   done
-  echo "notice: pool slot $slot is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, or once its HEAD is landed."
+  echo "notice: pool slot $slot is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it$sweep."
   echo "notice: each held copy is also listed in $record."
 }
 

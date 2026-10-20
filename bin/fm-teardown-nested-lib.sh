@@ -12,11 +12,12 @@
 # bin/fm-teardown.sh's header owns the rule; this file owns the mechanics.
 #
 # A copy is released only when every proof holds, and each proof fails closed:
-#   - it is a clean worktree root, and each ignored file it holds is
-#     regenerable machinery (listed in teardown_preservable_ignored); a foreign
-#     copy that holds any other ignored file is held, below, never released,
-#     while the task's own locked copy has such files copied with their SHA-256
-#     into $DATA/$ID/nested-copy-preserved before removal;
+#   - it is a clean worktree root, and each ignored file it holds is either
+#     regenerable machinery (listed in teardown_preservable_ignored) or copied
+#     with its SHA-256 into $DATA/$ID/nested-copy-preserved before removal; a
+#     foreign copy that holds any other ignored file is held, below, instead of
+#     released wherever the hold applies (teardown_foreign_copy_hold_applies),
+#     and is preserved and released as above wherever it does not;
 #   - no other active task record names it, no process outside this teardown's
 #     own runs in it, and no live process outside this teardown's own is its
 #     lock launcher (a process is this teardown's own when it, or an ancestor by
@@ -118,6 +119,7 @@ teardown_copy_question() {  # <rule> <copy>
   case "$1" in
     copy-worktree-root) printf 'What owner-approved repair, removal or retained ownership applies to %s (%s)? Keep it; no removal or forced cleanup is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-head-resolved) printf 'Which verified commit holds the work in %s (%s)? Keep the copy; no discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
+    copy-ignored-files) printf 'What owner-approved disposition covers the ignored files only %s holds (%s)? Keep the copy; no removal or discard is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     copy-anchor-commit) printf 'Which commit does the existing preservation anchor protect, and does it cover %s (%s)? Keep the copy and the anchor; no overwrite is authorized.' "$2" "$TEARDOWN_FOREIGN_WHY" ;;
     process-cwd-owner) printf 'Which task or person owns process %s, which is running in %s? Stop it or tell me it is yours.' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
     lock-launcher-owner) printf 'Is launcher %s, named in the creation lock on %s, still running, and who owns it?' "${TEARDOWN_FOREIGN_PID:-unknown}" "$2" ;;
@@ -439,22 +441,30 @@ teardown_copy_inside_own_nested() {  # <copy>
   return 1
 }
 
-# May foreign copy <copy>, refused for TEARDOWN_FOREIGN_WHY, be left standing
-# while the task closes? Only when teardown_foreign_copy_prove found it a clean
-# worktree root and no record, no process outside this teardown and no live
-# launcher owns it, so the one reason it stays is work only it holds. The
-# ownership proof runs again here, so a process of this teardown found in the
-# copy is seen as the refusal it is. A copy any process runs in is never held, so
-# retire never signals a process inside a copy that stays; when the only such
-# process is one of this teardown, the refusal names its pid. A copy inside an
-# own nested copy is never held, and neither is a path that would break the
-# one-line record.
-teardown_foreign_copy_holdable() {  # <copy>
-  local copy=$1 why=$TEARDOWN_FOREIGN_WHY procs=$TEARDOWN_FOREIGN_PROCS_BASE rc=0 entry pid own=
+# Does the held-copy rule apply to <copy> at all? Not for a forced close or the
+# retirement of a secondmate home, not for a copy inside an own nested copy, which
+# the close removes with it, and not for a path that would break the one-line
+# record. Such a copy is proved, preserved and released as any other.
+teardown_foreign_copy_hold_applies() {  # <copy>
+  local copy=$1
   # shellcheck disable=SC2153 # KIND is bin/fm-teardown.sh's global, not a typo of a local.
   case "${FORCE:-}:$KIND" in --force:*|*:secondmate) return 1 ;; esac
   ! teardown_copy_inside_own_nested "$copy" || return 1
-  case "$copy$why$ID$TEARDOWN_RETURN_SLOT" in *$'\t'*|*$'\n'*) return 1 ;; esac
+  case "$copy$ID$TEARDOWN_RETURN_SLOT" in *$'\t'*|*$'\n'*) return 1 ;; esac
+}
+
+# May foreign copy <copy>, refused for TEARDOWN_FOREIGN_WHY, be left standing
+# while the task closes? Only when the hold applies to it and
+# teardown_foreign_copy_prove found it a clean worktree root and no record, no
+# process outside this teardown and no live launcher owns it, so the one reason it
+# stays is work only it holds. The ownership proof runs again here, so a process
+# of this teardown found in the copy is seen as the refusal it is. A copy any
+# process runs in is never held, so retire never signals a process inside a copy
+# that stays; when the only such process is one of this teardown, the refusal
+# names its pid.
+teardown_foreign_copy_holdable() {  # <copy>
+  local copy=$1 procs=$TEARDOWN_FOREIGN_PROCS_BASE rc=0 entry pid own=
+  teardown_foreign_copy_hold_applies "$copy" || return 1
   teardown_foreign_copy_unowned "$copy" || rc=1
   if [ "${#TEARDOWN_FOREIGN_PROCS[@]}" -gt "$procs" ]; then
     if [ "$rc" = 0 ]; then
@@ -517,8 +527,8 @@ teardown_foreign_copy_prove() {  # <copy>
     TEARDOWN_FOREIGN_WHY="its ignored files could not be listed"
     return 1
   fi
-  if [ -n "$unique" ]; then
-    TEARDOWN_FOREIGN_RULE='copy-landed'
+  if [ -n "$unique" ] && teardown_foreign_copy_hold_applies "$copy"; then
+    TEARDOWN_FOREIGN_RULE='copy-ignored-files'
     unique=$(printf '%s\n' "$unique" | LC_ALL=C sort -u | tr '\n' ' ')
     TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(fm_refuse_text "${unique% }")"
     ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=ignored
@@ -672,8 +682,8 @@ teardown_held_copies_record() {
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
     copy=$(fm_refuse_text "${entry%%$'\t'*}")
     why=$(fm_refuse_text "${entry#*$'\t'}")
-    if [ -f "$record" ] && awk -F'\t' -v i="$ID" -v s="$slot" -v c="$copy" -v w="$why" \
-        '$2 == i && $3 == s && $4 == c && $5 == w { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
+    if [ -f "$record" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$slot FM_HELD_COPY=$copy FM_HELD_WHY=$why awk -F'\t' \
+        '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
       continue
     fi
     { printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$slot" "$copy" "$why" >> "$record"; } 2>/dev/null || rc=1
