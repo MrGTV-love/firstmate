@@ -52,7 +52,8 @@ FM_STATUS_FALLBACK_NOTICE='model-matrix fallback served '
 # (empty if missing/blank), and with <previous-event-var> the event before it.
 # The optional previous event is what this reader returned before the latest one
 # was appended, so a consumer can name the head it is superseding; asking for it
-# always reads the whole file, since a bounded window cannot bound two events.
+# always reads the whole log, since a bounded window cannot bound two events; a log
+# past the read limit (bin/fm-status-cap-lib.sh) is refused and nothing is read.
 # This is an event read; status_current_line in bin/fm-classify-lib.sh reconciles open decisions.
 last_status_line() {  # <status-file> [<previous-event-var>]
   local f=$1 scan=''
