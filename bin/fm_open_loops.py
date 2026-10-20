@@ -887,7 +887,7 @@ class Collector:
             teams = ["team:" + t["slug"] for t in pr.get("requested_teams", [])]
             owner, action = ",".join(people + teams), "complete the requested PR review"
         else:
-            owner, action = "firstmate", "route the green PR's review and obtain merge approval"
+            owner, action = "firstmate", "route an independent read of the exact head by a different model family; merge through bin/fm-pr-merge.sh on PASS with green required checks; ask the captain only if the PR loosens a deny or allow-list, widens what a guard permits, or touches customer data, billing or spend"
         task_id = task["id"] if task else next((r["id"] for r in self.backlog
                     if url == r.get("pr_url") or url in (r.get("links") or [])), None)
         source = self.source("PR provenance " + url, self.task_source, task_id) if task_id else self.source_context()
@@ -1450,7 +1450,9 @@ def steer_record_epoch(state, row, record):
     if not re.fullmatch(r"[0-9]+[.]msg", record):
         return None
     owner = str(row.get("owner", ""))
-    tasks = [owner[len("worker:"):]] if owner.startswith("worker:") else []
+    tasks = [str(row.get("source", {}).get("task", ""))]
+    if owner.startswith("worker:"):
+        tasks.append(owner[len("worker:"):])
     tasks.append(str(row.get("subject", "")).split(":", 1)[0])
     for task in tasks:
         if not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):

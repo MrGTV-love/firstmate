@@ -206,6 +206,12 @@ open_prs = cat('open_pr')
 assert set(open_prs) == {PR_URL + '8', PR_URL + '9'}, open_prs
 assert open_prs[PR_URL + '8']['owner'] == 'reviewer' and open_prs[PR_URL + '9']['owner'] == 'firstmate', open_prs
 assert open_prs[PR_URL + '9']['age_seconds'] == 3600 and open_prs[PR_URL + '9']['overdue'], open_prs
+merge_action = open_prs[PR_URL + '9']['next_action']
+for requirement in ('independent read of the exact head', 'different model family',
+                    'bin/fm-pr-merge.sh on PASS with green required checks',
+                    'ask the captain only if', 'loosens a deny or allow-list',
+                    'widens what a guard permits', 'touches customer data, billing or spend'):
+    assert requirement in merge_action, (requirement, merge_action)
 # Every row names an owner, a next action and an age (or an unknown age that stays overdue).
 for row in report['rows']:
     assert row['owner'] and row['next_action'] and 'age_seconds' in row and row['id'], row
@@ -2098,6 +2104,31 @@ assert reused.returncode == 1 and 'new delivery' in reused.stdout, reused
 inbox(home, '005.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
 assert ack(boundary).returncode == 0
+
+# PR URLs do not encode the owning task; provenance selects its inbox in both delivery locations.
+for handled in (False, True):
+    home, ledger, row, call, ok, drain, ack = case(
+        'pr-steer-' + str(handled), category='open_pr', subject=PR, owner='firstmate',
+        source=dict(task='worker'))
+    _, boundary = drain()
+    args = [code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence']
+    foreign = home / 'state/another-task.inbox/001.msg'
+    foreign.parent.mkdir()
+    foreign.write_text(inbox(home, '001.msg').read_text())
+    (home / 'state/worker.inbox/001.msg').unlink()
+    refused = call(*args, '001.msg')
+    assert refused.returncode == 1 and 'task inbox' in refused.stdout, refused
+    inbox(home, '002.msg', handled=handled, offset=-60)
+    refused = call(*args, '002.msg')
+    assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
+    inbox(home, '003.msg', handled=handled, offset=1)
+    ok(*args, '003.msg')
+    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+    assert action['kind'] == 'steered' and action['evidence'] == '003.msg', action
+    assert ack(boundary).returncode == 0
+    reused = call(*args, '003.msg')
+    assert reused.returncode == 1 and 'new delivery' in reused.stdout, reused
+print('PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement', flush=True)
 
 # Steering evidence is judged against the acting actor's own presentation, not another actor's later one.
 home, ledger, row, call, ok, drain, ack = case('actors')
