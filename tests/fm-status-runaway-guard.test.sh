@@ -164,21 +164,28 @@ make_named_shell() {  # <dir> <name>
   printf '%s\n' "$1/bin/$2"
 }
 
-# A bounded writer that holds a descriptor open and appends short lines the way the
-# harness did, 13000 lines (65000 bytes) every three seconds for up to 60 rounds. It is
-# paced so that it is still writing when the watcher, which takes several seconds to
-# start and far longer on a loaded host, finds it, and a stopped and then resumed one
-# still has most of its work left. It runs under a hard file-size limit and a hard round
-# count: 60 rounds are 3.9 MB, under the 4 MiB limit.
+# A bounded writer that holds a descriptor open and appends 65 lines of 1000 bytes
+# (65000 bytes) every three seconds for up to 60 rounds. It is paced so that it is
+# still writing when the watcher, which takes several seconds to start and far longer on
+# a loaded host, finds it, and a stopped and then resumed one still has most of its
+# work left. It runs under a hard file-size limit and a hard round count: 60 rounds are
+# 3.9 MB, under the 4 MiB limit.
+# The lines are long on purpose. The watcher classifies the unread lines of a signaled
+# log one at a time in the shell, 2.7 to 5 ms each, and the over-cap check cannot run
+# while it does. 13000 five-byte lines per round held one classification for 67 s on a
+# loaded host, past the 30 s the wait gives a watcher, so the wake never came.
+# The cap is a count of bytes, so long lines reach it the same way, and the
+# held-open incident writer without a pause is pinned by its own case below.
 start_paced_writer() {  # <shell> <status-file> <pid-file>
   (
     ulimit -f "$HARD_LIMIT_BLOCKS"
     "$1" -c '
       exec 9>>"$1"
+      line=$(head -c 999 /dev/zero | tr "\0" x)
       i=0
       while [ "$i" -lt 60 ]; do
         i=$((i + 1))
-        printf "text\n%.0s" {1..13000} >&9
+        printf "${line}\n%.0s" {1..65} >&9
         sleep 3 9>&-
       done
     ' _ "$2" &
