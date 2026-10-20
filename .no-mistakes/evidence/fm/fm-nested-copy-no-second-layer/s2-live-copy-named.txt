@@ -1,0 +1,45 @@
+# S2/S3/S4: a nested copy appears inside the slot of a live ship task (record outer-task)
+## 0. baseline, no nested copy: report, then check
+copy-sweep: mode=report containers=0 copies=0
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+rc=0
+check rc=0 (silent expected)
+copy-sweep.record
+copy-sweep.sizes
+outer-task.meta
+
+## 1. 'worker' runs a Vernant-style flow: git worktree add inside the slot + vernant lock
+worktree /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt
+HEAD 2faa6e217bcc39da6f05e7f61b8d66a86f56e95e
+branch refs/heads/fm/vernant-wt
+locked vernant-session-active owner=launcher:999999 launcher=999999
+
+
+## 2. report (no flag): names the copy
+copy-sweep: mode=report containers=1 copies=1
+copy-sweep: HELD-LIVE-TASK nested copies=1: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt (task=outer-task age=0s source=lock)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1: 0.00 GiB, no budget (off)
+budget container /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo: 0.00 GiB, no budget (off)
+rc=0
+
+## 3. check: ONE wake line, budgets are off
+copy-sweep: HELD-LIVE-TASK nested copies=1, 1 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt (task=outer-task age=2s source=lock); run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line
+rc=0
+## 4. check again: same set, must be silent
+rc=0 (silent expected)
+## 5. record file
+schema	fm-copy-sweep-v1
+last_scan	1792482477
+live	/Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt

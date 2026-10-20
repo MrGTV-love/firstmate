@@ -1,0 +1,40 @@
+# S1: fm-brief.sh scaffolds ship (3 modes), scout and secondmate briefs in throwaway home /Users/charlesabrooker/tmp/fm-lab.lTE3fw
+## fm-brief.sh ship-no-mistakes alpha --mode no-mistakes
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/data/ship-no-mistakes/brief.md (ship, mode=no-mistakes; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=0
+93:   The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.
+count=1
+## fm-brief.sh ship-direct-PR alpha --mode direct-PR
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/data/ship-direct-PR/brief.md (ship, mode=direct-PR; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=0
+90:   The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.
+count=1
+## fm-brief.sh ship-local-only alpha --mode local-only
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/data/ship-local-only/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=0
+90:   The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.
+count=1
+## fm-brief.sh scout-1 alpha --scout
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/data/scout-2/brief.md (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=0
+count=1
+## secondmate charter (worker rule must be absent)
+count=0
+## context around the rule in ship-no-mistakes brief
+     Only after ruling out socket refusal, if the run is still running or fixing, reattach and keep
+     going. A drive-call error, timeout, slow read, or generic unreachability is NOT a daemon error:
+     the daemon accepts `respond` immediately and runs the round in the background, so a killed or
+     timed-out call was only waiting for a read while the run kept working.
+   - The worktree pool your own worktree came from, and the repository every lane's worktree
+     shares. Never create, remove, return, prune, move, or reassign a worktree or pool slot, and
+     never write into a sibling slot's directory. Rule 2 does not cover this: removing a worktree
+     is administration rather than an edit outside your directory, and it lands on lanes that are
+     running right now. The act is the rule and commands are only examples of it - `treehouse`
+     get/return/remove/prune, the equivalent operations on any other worktree provider or runtime
+     backend, and `git worktree add|remove|move|prune`. A slot that looks unused is not evidence
+     that it is free, and returning your own worktree is firstmate's job at cleanup, not yours.
+   The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.
+   If you genuinely need a second checkout, another slot, or the daemon touched, append
+   `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
+8. Stop every private service you start. A private service is any daemon, server, or watcher that
+   only your task needs, including a `no-mistakes` home whose `NO_MISTAKES_HOME` sits inside your

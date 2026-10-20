@@ -1,0 +1,19 @@
+# S6: no live owner => not a live fact (closed task, secondmate), copies still present and untouched
+## task closed (record gone): report must not carry a HELD-LIVE-TASK nested line; check silent
+0
+(want 0)
+check rc=0 (silent expected)
+## a secondmate record names the same slot: still not a live task copy
+0
+(want 0)
+check rc=0 (silent expected)
+registered copies still in git: 7
+
+# S6b: the task comes back live => the set re-joins => ONE wake again, then silent
+copy-sweep: HELD-LIVE-TASK nested copies=7, 5 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-la
+...
+second check rc=0 (silent expected)
+
+# S7: a home-project clone (not a pool slot) with a live SCOUT record
+worktrees/inner (task=scout-task age=0s source=directory)
+copies=8, 5 shown

@@ -1,0 +1,21 @@
+# S5: backlog (the 288-copy case in small): wake is bounded to five and names the NEW copy first
+## check #1 after 5 older copies join (7 live copies in total)
+copy-sweep: HELD-LIVE-TASK nested copies=7, 5 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n1 (task=outer-task age=744579s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n2 (task=outer-task age=658179s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n3 (task=outer-task age=571779s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n4 (task=outer-task age=485379s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n5 (task=outer-task age=398979s source=directory); run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line
+rc=0
+## check #2, same set (silent expected)
+rc=0 bytes-of-output=0
+## a NEW youngest copy 'fresh' appears
+## check #3
+copy-sweep: HELD-LIVE-TASK nested copies=8, 5 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/fresh (task=outer-task age=0s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n1 (task=outer-task age=744582s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n2 (task=outer-task age=658182s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n3 (task=outer-task age=571782s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/n4 (task=outer-task age=485382s source=directory); run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line
+--- assertions
+lines=1 (want 1)
+copies named=5 (want 5)
+fresh named: yes
+count=8 shown=5: yes
+## check #4, nothing new (silent expected)
+rc=0
+## full line from the no-flag run names all 8:
+worktrees/fresh (task worktrees/n1 (task worktrees/n2 (task worktrees/n3 (task worktrees/n4 (task worktrees/n5 (task worktrees/pushed-live (task worktrees/vernant-wt (task 
+## a copy LEAVES the set (worker/owner removes n5): next check must be silent
+rc=0 (silent expected)
+copy-sweep: HELD-LIVE-TASK nested copies=7: /Users/charlesabrooker/tmp/fm-lab.lT

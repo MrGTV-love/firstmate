@@ -1,0 +1,31 @@
+# S4: --apply never deletes, unlocks or unregisters a live nested copy (named, not deleted)
+## setup: add a CLEAN, PUSHED, UNLOCKED copy (the kind that would otherwise be removable)
+wake queue before: ls: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/state/.wake-queue: No such file or directory
+## apply
+copy-sweep: wake raised: copy-sweep: HELD-LIVE-TASK nested copies=2, 2 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/pushed-live (task=outer-task age=0s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt (task=outer-task age=49s source=lock); run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line
+copy-sweep: mode=apply containers=1 copies=2
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/pushed-live	task outer-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1: 0.00 GiB, no budget (off)
+budget container /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo: 0.00 GiB, no budget (off)
+rc=0
+## after apply
+registrations IDENTICAL
+files IDENTICAL
+worktree /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo
+worktree /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/pushed-live
+worktree /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt
+locked vernant-session-active owner=launcher:999999 launcher=999999
+removal log: ls: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/data/copy-sweep.log: No such file or directory
+## wake queue content
+1792482525	1	check	/Users/charlesabrooker/tmp/fm-lab.lTE3fw/state/copy-sweep.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/state/copy-sweep.check.sh: copy-sweep: HELD-LIVE-TASK nested copies=2, 2 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/pushed-live (task=outer-task age=0s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt (task=outer-task age=49s source=lock); run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line
+## report after apply
+copy-sweep: HELD-LIVE-TASK nested copies=2: /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/pushed-live (task=outer-task age=2s source=directory); /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt (task=outer-task age=51s source=lock)
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/pushed-live	task outer-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.claude/worktrees/vernant-wt	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)

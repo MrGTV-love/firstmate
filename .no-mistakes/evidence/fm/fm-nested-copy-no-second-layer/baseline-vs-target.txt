@@ -1,0 +1,13 @@
+# BASELINE (base commit 03bff4bce): same lab world, same records, same budgets (off)
+records: outer-task.meta scout-task.meta 
+registered nested copies: 7
+## base report: HELD-LIVE-TASK nested line count
+0
+(base: 0 means the live nested copies are never named)
+## base check, budgets off: output bytes
+       0
+## base brief
+rule count in base scout brief: 0
+
+# TARGET (this branch): same world
+1

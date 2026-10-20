@@ -1,0 +1,19 @@
+# S8: same-day visibility path — arm binds check to the watcher cadence; the bound script emits the live-copy fact; disarm removes the record
+## arm
+armed: state/copy-sweep.check.sh
+rc=0
+copy-sweep.check-trust
+copy-sweep.check.sh
+copy-sweep.sizes
+## generated check script (what the watcher runs)
+#!/usr/bin/env bash
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.lTE3fw
+exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5BZSC78RBPV0K1YDTPY8RHH/bin/fm-proc-budget.sh -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5BZSC78RBPV0K1YDTPY8RHH/bin/fm-copy-sweep.sh check
+## run it the way the watcher does
+copy-sweep: HELD-LIVE-TASK nested copies=8, 5 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.lTE3fw/th/pool1/1/repo/.clau
+rc=
+## disarm
+disarmed: state/copy-sweep.check.sh
+rc=0
+copy-sweep.sizes
+(record + check script gone expected; sizes cache may remain)
