@@ -196,8 +196,7 @@ The optional friction writer is separate from Jev's existing mandatory audit: th
 ## Orchestrator behavior (AGENTS.md)
 
 The shared orchestrator behavior lives in [`AGENTS.md`](../AGENTS.md).
-Edit it like any prompt when the fleet is empty.
-While tasks are in flight, dispatch shared-repo edits to a crewmate.
+Its section 1 owns when firstmate edits shared tracked material directly and when it delegates, and its section 7 owns the direct-edit class that skips delegation.
 
 ## Calm preference (config/calm)
 
