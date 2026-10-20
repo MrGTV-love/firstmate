@@ -1281,7 +1281,9 @@ for (const host of ['omp', 'claude']) {
   assert.equal(sent().length, beforeOutside);
   // Privacy rules cover every piece a model would see, and one refused piece keeps every clean piece home.
   const canary = 'large-report-never-send-canary';
-  writeFileSync(`${home}/config/dispatch-never-send`, canary + '\n');
+  const entry = Array.from({ length: 480 }, (_, i) => `zq${String(i).padStart(4, '0')}`).join(' ').slice(0, 3299);
+  assert.equal(entry.length, 3299);
+  writeFileSync(`${home}/config/dispatch-never-send`, canary + '\n' + entry + '\n');
   try {
     for (const at of [1000, expected.model_screened_bytes - 2000]) {
       const denied = await call(host, report.slice(0, at) + '\n' + canary + '\n' + report.slice(at));
@@ -1290,11 +1292,27 @@ for (const host of ['omp', 'claude']) {
       assert.equal(row().request_started, false);
       assert.equal(sent().length, beforeOutside, 'a clean piece must not leave beside a refused one');
     }
+    // Pieces are checked one at a time: a value longer than the 1,024-byte overlap that lies whole in one piece is withheld, and one cut across a boundary reaches the model only as fragments.
+    const first = JSON.parse(requests[0].body).state.content.length;
+    const base = report.slice(0, 4 * first);
+    const around = (at) => base.slice(0, at) + '\n' + entry + '\n' + base.slice(at);
+    const wholeValue = await call(host, around(1000));
+    assert.ok(wholeValue?.block || wholeValue?.permissionDecision === 'deny', `${host}: a long never-send value inside one piece must be refused`);
+    assert.equal(row().error_type, 'PrivacyWithheldError');
+    assert.equal(row().request_started, false);
+    assert.equal(sent().length, beforeOutside);
+    assert.equal(await call(host, around(first - 2000)), undefined, `${host}: a never-send value cut across a piece boundary is admitted`);
+    assert.equal(row().decision, 'allow');
+    const cut = sent().slice(beforeOutside).map(request => JSON.parse(request.body).state.content);
+    assert.ok(cut.length > 1);
+    assert.ok(cut.every(piece => !piece.includes(entry)), 'no piece holds the whole cut value');
+    assert.ok(cut.some(piece => piece.includes(entry.slice(0, 500))) && cut.some(piece => piece.includes(entry.slice(-500))), 'both fragments of the cut value reached the model');
+    const afterCut = sent().length;
     // The unscreened remainder never reaches a model, so the never-send policy has nothing to withhold.
     const start = performance.now();
     assert.equal(await call(host, report + '\n' + canary), undefined, `${host}: a canary only in the remainder must not stop the write`);
     assert.equal(row().decision, 'allow');
-    assert.ok(sent().slice(beforeOutside).every(request => !request.body.includes(canary)), 'the remainder must never be sent');
+    assert.ok(sent().slice(afterCut).every(request => !request.body.includes(canary)), 'the remainder must never be sent');
     console.log(`${host}: never-send file present; 396924-byte report admitted in ${Math.round(performance.now() - start)} ms`);
     // The never-send check cost must not grow with the size of the write.
     const megabyte = 'Ordinary report line with measured observations and no credentials.\n'.repeat(16000).slice(0, 1048576);
@@ -1320,18 +1338,20 @@ for (const request of sent().slice(before)) {
   const piece = JSON.parse(request.body).state.content;
   assert.equal(/\ud83d(?!\ude00)|(?<!\ud83d)\ude00/.test(piece), false, 'a valid astral pair must not be cut');
 }
-for (const [shape, fake] of [['private-key', '-----BEGIN PRIVATE KEY-----'], ['github-token', 'ghp_FAKECREDENTIALFORTESTSONLY123456'],
+for (const [shape, fake] of [['private-key', '-----BEGIN PRIVATE KEY-----'], ['pgp-private-key', '-----BEGIN PGP PRIVATE KEY BLOCK-----'], ['github-token', 'ghp_FAKECREDENTIALFORTESTSONLY123456'],
   ['github-fine-grained-token', 'github_pat_FAKECREDENTIALFORTESTSONLY123456'], ['aws-key', 'AKIAFAKEFORTESTSONLY'],
-  ['slack-token', 'xoxb-FAKECREDENTIALFORTESTS'], ['connection-url', 'postgres://fixture:FAKE_PASSWORD@localhost/db']]) {
+  ['slack-token', 'xoxb-FAKECREDENTIALFORTESTS'], ['connection-url', 'postgres://fixture:FAKE_PASSWORD@localhost/db'],
+  ['password-only-url', 'redis://:hunter2hunter2@cache:6379']]) {
   before = sent().length;
   assert.equal((await call('omp', report + '\n' + fake))?.block, true, `embedded ${shape} must be refused locally`);
   assert.equal(row().branch, 'deterministic');
   assert.equal(sent().length, before);
 }
-// Ordinary hyphenated prose, prefix look-alikes inside words and unanchored credential-like wording are not credentials.
+// Ordinary hyphenated prose, prefix look-alikes inside words, query-string addresses and unanchored credential-like wording are not credentials.
 const prose = ['task-specific-guidelines', 'risk-based-assessment', 'disk-backed-storage-layer', 'task-local-logs-and-evidence',
   'Bearer authentication-scheme', 'password = process.env.DATABASE_PASSWORD', 'password: must-be-at-least-sixteen',
-  'prefix-ghp_FAKECREDENTIALFORTESTSONLY123456', 'task-AKIAFAKEFORTESTSONLY', 'inbox-xoxb-FAKECREDENTIALFORTESTS'].join('\n');
+  'prefix-ghp_FAKECREDENTIALFORTESTSONLY123456', 'task-AKIAFAKEFORTESTSONLY', 'inbox-xoxb-FAKECREDENTIALFORTESTS',
+  'http://localhost:3000?email=foo@bar.com', 'https://example.com:8080?contact=someone@example.com'].join('\n');
 for (const host of ['omp', 'claude']) {
   before = sent().length;
   assert.equal(await call(host, report + '\n' + prose), undefined, `${host}: benign prose in a budget-limited write must be admitted`);
