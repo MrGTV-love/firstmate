@@ -1,0 +1,2 @@
+ok - scopeForUnreadWake refuses to read a status log past the status read limit and reads one inside it once
+exit=0

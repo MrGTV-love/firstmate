@@ -1,0 +1,10 @@
+watcher pid 27243 up after 5x0.1s
+watcher exited 7.3 s after omp was launched (alive=no)
+--- the one wake the watcher printed:
+check: status-log-over-cap: file=incident.status size=614727680 bytes (cap 8388608) growth=261361450 bytes/s writer=pid 29633 omp; stopped pid 29633 (omp) with SIGSTOP; resume it with kill -CONT 29633; nothing was deleted, truncated or rewritten
+--- writer pid named in the wake: 29633
+state of that pid (T = stopped):
+29633 29606 TN+  omp
+log size now / 3 s later: 614727680 / 614727680 (omp hard limit 8589934592)
+--- queued wake rows naming the over-cap check: 1
+--- file intact, 614727680 bytes

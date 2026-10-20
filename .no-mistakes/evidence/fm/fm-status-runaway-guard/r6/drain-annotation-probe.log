@@ -1,0 +1,30 @@
+##### small4MiB (under the 34603008-byte read limit)
+log=4194305 bytes (read limit with default cap+reserve = 34603008)
+drain rc=0
+16.49 real         6.72 user         3.10 sys
+53379072  maximum resident set size
+--- drain stdout (annotation lines, cut to 160 chars):
+1792426033	1	signal	lane-small4MiB.status	signal: <lab>/state/lane-small4MiB.status
+wake annotation: unread wake-EVENT since last drain, not current state: lane-small4MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-small4MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-small4MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-small4MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-small4MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-small4MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-small4MiB.status: working [at=1]: text
+--- drain stderr refusal lines naming the log:
+##### big256MiB (about 7.4 times the read limit)
+log=268435457 bytes (read limit with default cap+reserve = 34603008)
+drain rc=124
+120.18 real         0.10 user         0.28 sys
+5586944  maximum resident set size
+--- drain stdout (annotation lines, cut to 160 chars):
+1792426052	1	signal	lane-big256MiB.status	signal: <lab>/state/lane-big256MiB.status
+wake annotation: unread wake-EVENT since last drain, not current state: lane-big256MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-big256MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-big256MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-big256MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-big256MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-big256MiB.status: working [at=1]: text
+wake annotation: unread wake-EVENT since last drain, not current state: lane-big256MiB.status: working [at=1]: text
+--- drain stderr refusal lines naming the log:

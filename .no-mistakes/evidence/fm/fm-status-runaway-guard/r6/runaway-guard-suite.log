@@ -1,0 +1,13 @@
+ok - the sanctioned writer holds the cap, refuses a repeat loop and filler loudly, keeps the reserve for done:, and refuses everything past cap plus reserve
+ok - mutation: the same loop through a raw append passes the cap, so the helper is what holds it
+ok - the 2026-10-18 shape (3000 distinct lines, then one line repeated) keeps every distinct line and is refused loudly at the cap with exit 75
+# wake text: check: status-log-over-cap: file=victim.status size=520000 bytes (cap 262144) growth=92554 bytes/s writer=pid 54072 omp; stopped pid 54072 (omp) with SIGSTOP; resume it with kill -CONT 54072; nothing was deleted, truncated or rewritten
+wait_for_exit: owned pid 24399 exceeded 30 polls; sending TERM
+24399 72607 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a raw omp writer over the cap is detected within polls, named by pid, stopped alone, and the log is left intact with one wake while it does not grow
+tests/fm-status-runaway-guard.test.sh: line 788: 54027 Killed: 9               "$omp" -c 'sleep 600'
+wait_for_exit: owned pid 45436 exceeded 300 polls; sending TERM
+45436 72607 RN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+not ok - no first wake for the paced writer: 
+nice -n 20 bash tests/fm-status-runaway-guard.test.sh  35.68s user 53.85s system 52% cpu 2:50.54 total
+exit=1

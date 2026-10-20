@@ -1,0 +1,2 @@
+i=0; while [ $i -lt 40 ]; do printf 'text
+' "$(date +%s)"; i=$((i+1)); sleep 0.25; done >> /Users/charlesabrooker/tmp/fm-lab.3Jt80M/state/real.status

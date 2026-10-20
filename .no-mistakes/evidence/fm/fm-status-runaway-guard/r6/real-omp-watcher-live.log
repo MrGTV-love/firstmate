@@ -1,0 +1,8 @@
+watcher pid 61045 started (beat file after 8x0.1s)
+watcher exited after ~1 s of omp running (kill -0 alive? no)
+--- wake text printed by the watcher:
+signal: <lab>/state/incident.status
+--- watcher stderr (first lines):
+--- writer pid named in wake: none
+--- queued wake rows naming the over-cap check: 0
+--- file intact: 0 bytes

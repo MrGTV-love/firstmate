@@ -1,0 +1,11 @@
+[t+  0s] load: 20.94 32.23 51.08  cap=4194304 bytes  FM_POLL=2  FM_SIGNAL_GRACE=default(30)
+[t+  1s] writer pid 61511 (omp-named raw shell, hard ulimit 200 MB, 8000 iterations)
+[t+  1s] watcher 1 armed; log 208013 bytes
+[t+ 24s] LOG PASSED THE CAP: 4224264 bytes
+[t+ 34s] watcher 1 exited; log 5888368 bytes; output: signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/cyc1/state/runaway.status 
+[t+ 55s] acked wake seq=2; log 9040565 bytes
+[t+ 55s] watcher 2 armed; log 9088568 bytes
+[t+102s] watcher 2 exited; log 9760610 bytes; output: check: status-log-over-cap: file=runaway.status size=9760610 bytes (cap 4194304) growth=184343 bytes/s writer=pid 61511 omp; stopped pid 61511 (omp) with SIGSTOP; resume it with kill -CONT 61511; nothing was deleted, truncated or rewritten 
+[t+102s] OVER-CAP WAKE: log 9760610 bytes = 2.x the cap; writer state T
+[t+102s] seconds from cap crossing to over-cap wake: 78; bytes written meanwhile: 5536346
+[t+102s] final: writer state 'T' log 9760610 bytes

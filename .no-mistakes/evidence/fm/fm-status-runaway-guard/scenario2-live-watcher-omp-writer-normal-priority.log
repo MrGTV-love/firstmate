@@ -1,0 +1,10 @@
+[t+  0s] load: 66.77 63.15 74.61
+[t+  1s] writer pid 60526 (omp-named raw shell, 65000 bytes per 3 s, ulimit -f 4096 blocks)
+[t+  1s] start watcher attempt 1; log is 65000 bytes
+[t+174s] watcher attempt 1 exited after 148s; log is 3185000 bytes; output: signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/watchdrive2/state/victim.status
+[t+232s] acked seq=2
+[t+232s] start watcher attempt 2; log is 3900000 bytes
+[t+239s] watcher attempt 2 exited after 6s; log is 3900000 bytes; output: check: status-log-over-cap: file=victim.status size=3900000 bytes (cap 262144) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+[t+239s] OVER-CAP WAKE RECEIVED
+[t+239s] writer state:   log size: 3900000
+[t+239s] queue rows: 1

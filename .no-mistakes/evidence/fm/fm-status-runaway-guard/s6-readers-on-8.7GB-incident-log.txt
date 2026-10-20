@@ -1,0 +1,27 @@
+
+=== fleet snapshot (secondmate home summary) ===
+rc=0
+ 3.14 real 0.23 user 0.46 sys; 9371648 maximum resident set size;
+stdout: {   "schema": "fm-secondmate-home-summary.v1",   "hold_classifier_schema": "fm-captain-hold-buckets.v1",   "contributions": {     "known": 0,     "checked": 0,     "counts": {       "captain": 0,       "fleet": 0,       "maintainer": 0,       "nobody": 0     },     "unmeasured": 0,     "complete": t
+stderr: fm-status: refused to read huge.status: a span of 8744861696 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log 
+
+=== crew state ===
+rc=0
+ 0.76 real 0.04 user 0.06 sys; 7028736 maximum resident set size;
+stdout: state: unknown · source: status-log · status log huge.status is past the status read limits and cannot be read 
+stderr: fm-status: refused to read huge.status: a span of 8744861696 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log 
+
+=== captain-hold diverged (r4-1 reader) ===
+rc=0
+ 0.38 real 0.03 user 0.05 sys; 6324224 maximum resident set size;
+stdout: 
+stderr: 
+
+=== append a done: line to the over-limit log ===
+rc=75
+ 0.07 real 0.00 user 0.01 sys; 5619712 maximum resident set size;
+stdout: 
+stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.vnW2u4/st-b/huge.status is 8744861696 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines) 
+
+log after: size/inode/mtime = 8744861696 753906784 1792436009
+UNCHANGED (size, inode, mtime identical)

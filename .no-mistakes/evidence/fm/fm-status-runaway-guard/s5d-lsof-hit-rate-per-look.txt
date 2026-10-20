@@ -1,0 +1,2 @@
+kind=date looks=60 hits=2 secs=105 size=31465 load=93.43 78.76 71.26
+kind=random looks=60 hits=16 secs=37 size=1427510 load=87.70 79.30 71.78

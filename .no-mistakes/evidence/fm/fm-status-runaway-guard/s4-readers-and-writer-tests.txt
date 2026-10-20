@@ -1,0 +1,21 @@
+ok - the sanctioned writer holds the cap, refuses a repeat loop and filler loudly, keeps the reserve for done:, and refuses everything past cap plus reserve
+ok - mutation: the same loop through a raw append passes the cap, so the helper is what holds it
+ok - the 2026-10-18 shape (3000 distinct lines, then one line repeated) keeps every distinct line and is refused loudly at the cap with exit 75
+# timing table (seconds, 2 GiB sparse log: 3000 events, a hole, a 6 MiB repeated tail)
+# | reader | seconds |
+# | open-decisions fold | 0s |
+# | status-event library (last_status_line) | 0s |
+# | status-event library (declared wait) | 1s |
+# | retry check (status_event_recorded) | 0s |
+# | wake drain (cold cursor) | 1s |
+# | wake drain (warm cursor) | 1s |
+ok - every reader finishes inside 60s on a 2 GiB log and creates no file over 1 MB
+ok - a history reader refuses a 2 GiB log and a log of too many lines, names it, and reads nothing; a short span from it is exact
+ok - a fold that cannot read its span leaves the saved cursor and its open decision where they were
+ok - a log the read limits refuse reads as unknown (status 2), never as no open decision, while a checkpointed fold keeps its open set
+ok - one lane's log past the read limits is named on stderr and the drain still presents every other lane's open decisions
+# | fleet snapshot (secondmate home summary) | 0s |
+ok - the fleet snapshot summarizes a home with a 2 GiB log inside 60s, names the log it will not copy, and leaves no large file
+ok - mutation: with the read limit raised past the log the same reader takes all 2 GiB; with the default it takes nothing
+ok - a drain killed with SIGKILL mid-run leaves no scratch or cursor file
+exit=0

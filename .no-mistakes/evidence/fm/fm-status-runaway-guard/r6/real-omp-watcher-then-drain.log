@@ -1,0 +1,11 @@
+1) watcher wake after ~4 s: check: status-log-over-cap: file=incident.status size=134217728 bytes (cap 8388608) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+   writer pid none state:    log size: 134217728
+   queued wake rows (kind key): check status-log-over-cap-2687637304;signal incident.status;signal incident.status;
+2) the real wake drain on that state dir (90 s timeout)
+   drain rc=124 (124 = killed by the 90 s timeout) secs=90 stdout_lines=1007708 peak_rss_bytes=30310400
+   first stdout lines:
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "1dd7357606a4432fdb8de38a","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisit
+   refusal lines naming the log on stderr: 0

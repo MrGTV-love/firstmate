@@ -1,0 +1,5 @@
+ok - a key close binds its staged evidence to the opening's true line number in a log past the tail window
+ok - diverged reports a log inside the read limit, skips one past it, and never hands a status log to grep
+ok - a captain call with no routed work, a verified transfer, an open decision, and an answered call all stay silent
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+exit=0

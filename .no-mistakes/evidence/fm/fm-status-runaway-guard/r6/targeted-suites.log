@@ -1,0 +1,42 @@
+=== fm-crew-state.test.sh start (load: 26.76 31.84 30.62)
+ok - selected-error run selection reports unknown with candidate ids
+ok - legacy conflicting run records report unknown
+ok - omp live-model record adds model-drift and run-error only on positive evidence
+all fm-crew-state tests passed
+=== fm-crew-state.test.sh exit=0 secs=404
+=== fm-brief.test.sh start (load: 26.81 31.35 31.11)
+ok - fm-brief.sh: ref-format-valid shell metacharacters stay literal in generated branch commands
+ok - fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool
+ok - fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line
+ok - fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not
+=== fm-brief.test.sh exit=0 secs=59
+=== fm-captain-hold-reconcile.test.sh start (load: 24.00 29.72 30.51)
+ok - a status resolution over a still-open captain-held task is signalled, not closed
+ok - diverged reports a log inside the read limit, skips one past it, and never hands a status log to grep
+ok - a captain call with no routed work, a verified transfer, an open decision, and an answered call all stay silent
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+=== fm-captain-hold-reconcile.test.sh exit=0 secs=352
+=== fm-pi-branch-extension.test.sh start (load: 27.36 25.15 27.84)
+ok - outcome delivery keeps the event loop running and interleaved reports stay ordered and exactly once
+ok - a session replaced mid-delivery cancels cleanly and the stored outcome still arrives exactly once
+ok - a failing store script surfaces to the branch and its outcome is neither lost nor delivered twice
+ok - a failed cursor write re-delivers a routine note exactly once more while a captain outcome stays deduplicated
+=== fm-pi-branch-extension.test.sh exit=0 secs=222
+=== fm-send-resolve-key.test.sh start (load: 25.19 24.33 26.81)
+ok - fm-send --resolve-key: a stamped close line stays inside the status-line cap
+ok - fm-send --resolve-key: failed-close recovery commands safely quote operator text and paths
+ok - fm-send --resolve-key: a remote secondmate reserved-key close is the same local ledger append
+ok - fm-send --resolve-key: a decision answer refuses the attended branch before sending, a blocked: key stays steering, and the away-posture record relocates the answer
+=== fm-send-resolve-key.test.sh exit=0 secs=150
+=== fm-remote-reply.test.sh start (load: 39.04 29.80 28.57)
+ok - a continuity break after retirement and an identical restore opens the decision once
+ok - a failed cursor removal does not increase the retirement count
+ok - a retirement that stops after removing the cursor leaves the old count
+ALL TESTS PASSED
+=== fm-remote-reply.test.sh exit=0 secs=607
+=== fm-fleet-ledger.test.sh start (load: 27.30 30.50 29.27)
+ok - flag off: the worker's status command is a plain append and leaves no ledger file, offset, or lock
+ok - a burst past 256 lines is captured from its last 256 lines and the ledger records how many bytes it skipped
+ok - a capture reads exactly the bytes it counted and leaves a late append for the next capture
+ok - flag off: the whole lifecycle leaves no ledger file, offset, or lock
+=== fm-fleet-ledger.test.sh exit=0 secs=87

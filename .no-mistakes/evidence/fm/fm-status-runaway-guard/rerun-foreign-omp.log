@@ -1,0 +1,7 @@
+# wake text: check: status-log-over-cap: file=victim.status size=975000 bytes (cap 262144) growth=0 bytes/s writer=pid 64767 omp; stopped pid 64767 (omp) with SIGSTOP; resume it with kill -CONT 64767; nothing was deleted, truncated or rewritten
+wait_for_exit: owned pid 59953 exceeded 30 polls; sending TERM
+59953  4704 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a raw omp writer over the cap is detected within polls, named by pid, stopped alone, and the log is left intact with one wake while it does not grow
+tests/lib.sh: line 257: 64753 Killed: 9               "$omp" -c 'sleep 600'
+--- rc=0 secs=220
+ 4:17  up 1 day,  6:25, 4 users, load averages: 78.42 78.94 86.92

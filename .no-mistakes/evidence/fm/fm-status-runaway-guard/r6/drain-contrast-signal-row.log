@@ -1,0 +1,4 @@
+[without-signal] log=67108865 bytes (limit 34603008) signal_row=0 drain_rc=0 real_secs=3.04 peak_rss_bytes=6324224 stdout_lines=0
+    refusal line on stderr: 0
+[with-signal] log=67108865 bytes (limit 34603008) signal_row=1 drain_rc=124 real_secs=100.12 peak_rss_bytes=5521408 stdout_lines=673512
+    refusal line on stderr: 0

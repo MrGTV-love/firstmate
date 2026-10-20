@@ -1,0 +1,11 @@
+[a] pane shell pid=54602  omp pid=87352  omp comm=omp  omp ppid=54602
+[a] watcher pid=97470 poll=1s signal-grace=30s cap=20000000
+[a] watcher exited 16.2s after the loop was sent
+[a] omp process state=T (T = stopped)  log size at exit=1053818880  2s later=1053818880  growth after stop=0 bytes
+[a] wake text printed by the watcher:
+check: status-log-over-cap: file=incident.status size=1053818880 bytes (cap 20000000) growth=51722425 bytes/s writer=pid 87352 omp; stopped pid 87352 (omp) with SIGSTOP; resume it with kill -CONT 87352; nothing was deleted, truncated or rewritten
+[a] queued rows:
+1792435867	1	check	status-log-over-cap-1335851556	check: status-log-over-cap: file=incident.status size=1053818880 bytes (cap 20000000) growth=51722425 bytes/s writer=pid 87352 omp; stopped pid 87352 (omp) with SIGSTOP; resume it with kill -CONT 87352; nothing was deleted, truncated or rewritten
+1792435870	2	signal	incident.status	signal: /Users/charlesabrooker/tmp/fm-lab.vnW2u4/st-a/incident.status
+1792435870	3	signal	incident.status	signal: /Users/charlesabrooker/tmp/fm-lab.vnW2u4/st-a/incident.status
+[a] watcher stderr:

@@ -1,0 +1,5 @@
+wait_for_exit: owned pid 26873 exceeded 300 polls; sending TERM
+26873 61533 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+not ok - no first wake for the paced writer: 
+--- rc=1 secs=126
+ 4:20  up 1 day,  6:27, 4 users, load averages: 61.70 71.01 82.30

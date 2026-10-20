@@ -1,0 +1,6 @@
+### worker status command from the generated brief, run as the worker runs it (cap 4096, reserve 512)
+first working line rc=0 size=36
+first refusal at iteration 91, size=4086: fm-status-append: refused: <lab>/state/labtask.status is 4086 bytes and this line would pass the limit of 4096 bytes (cap 4096, reserve
+after 400 more working lines: refusals=310 size=4086 (cap 4096)
+done line in the reserve: rc=0 size=4117 tail=done [at=1792427024]: finished
+done line past cap+reserve: rc=75 size=10118 (not changed by the refusal)

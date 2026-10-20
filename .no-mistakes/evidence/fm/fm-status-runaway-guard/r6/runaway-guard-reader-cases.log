@@ -1,0 +1,39 @@
+=== test_readers_stay_bounded_on_a_two_gib_log (load: 19.09 22.48 25.22)
+# timing table (seconds, 2 GiB sparse log: 3000 events, a hole, a 6 MiB repeated tail)
+# | reader | seconds |
+# | open-decisions fold | 0s |
+# | status-event library (last_status_line) | 0s |
+# | status-event library (declared wait) | 1s |
+# | retry check (status_event_recorded) | 0s |
+# | wake drain (cold cursor) | 2s |
+# | wake drain (warm cursor) | 1s |
+ok - every reader finishes inside 60s on a 2 GiB log and creates no file over 1 MB
+=== test_readers_stay_bounded_on_a_two_gib_log exit=0 secs=10
+=== test_history_readers_refuse_a_log_past_the_limit_and_name_it (load: 18.37 22.21 25.09)
+ok - a history reader refuses a 2 GiB log and a log of too many lines, names it, and reads nothing; a short span from it is exact
+=== test_history_readers_refuse_a_log_past_the_limit_and_name_it exit=0 secs=5
+=== test_a_saved_cursor_never_advances_past_bytes_that_were_not_read (load: 18.82 22.24 25.09)
+ok - a fold that cannot read its span leaves the saved cursor and its open decision where they were
+=== test_a_saved_cursor_never_advances_past_bytes_that_were_not_read exit=0 secs=5
+=== test_a_refused_read_is_unknown_never_an_empty_open_set (load: 18.35 22.09 25.02)
+ok - a log the read limits refuse reads as unknown (status 2), never as no open decision, while a checkpointed fold keeps its open set
+=== test_a_refused_read_is_unknown_never_an_empty_open_set exit=0 secs=5
+=== test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain (load: 18.24 22.00 24.97)
+ok - one lane's log past the read limits is named on stderr and the drain still presents every other lane's open decisions
+=== test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain exit=0 secs=16
+=== test_latest_event_endpoint_is_a_position_in_the_whole_log (load: 25.13 23.38 25.41)
+ok - the latest-event endpoint of a log of tiny lines is its true byte position, 100023
+=== test_latest_event_endpoint_is_a_position_in_the_whole_log exit=0 secs=5
+=== test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log (load: 24.00 23.18 25.32)
+ok - a long log's declared wait keeps one identity at its true line position however many continuation lines follow
+=== test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log exit=0 secs=5
+=== test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log (load: 24.00 23.19 25.32)
+# | fleet snapshot (secondmate home summary) | 0s |
+ok - the fleet snapshot summarizes a home with a 2 GiB log inside 60s, names the log it will not copy, and leaves no large file
+=== test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log exit=0 secs=7
+=== test_without_the_read_limit_the_same_reader_takes_the_whole_log (load: 23.60 23.12 25.28)
+ok - mutation: with the read limit raised past the log the same reader takes all 2 GiB; with the default it takes nothing
+=== test_without_the_read_limit_the_same_reader_takes_the_whole_log exit=0 secs=6
+=== test_a_killed_drain_leaves_no_large_cursor_file (load: 22.83 22.97 25.21)
+ok - a drain killed with SIGKILL mid-run leaves no scratch or cursor file
+=== test_a_killed_drain_leaves_no_large_cursor_file exit=0 secs=18

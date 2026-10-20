@@ -1,0 +1,6 @@
+[t+  0s] load: 27.07 40.65 57.83  cap=4194304  watcher FM_POLL=2  FM_SIGNAL_GRACE=default(30)
+[t+  1s] writer pid 94637 started; log 224014 bytes
+[t+ 28s] log passed the cap: 4256266 bytes
+[t+ 43s] watcher exited; log 7056441 bytes; seconds since cap crossing: 15; output: signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/lat1/state/runaway.status
+[t+ 43s] writer state: S
+[t+ 43s] final log size: 7056441 bytes

@@ -1,0 +1,8 @@
+### S1 sanctioned helper under the incident loop shape (cap 64 KiB, reserve 4 KiB, hard ulimit -f 4 MiB)
+iterations=2626 ok=2621 refused=5 other=0
+final size: 65525 bytes (cap 65536)
+first stderr line: fm-status-append: refused: <lab>/state/incident.status is 65525 bytes and this line would pass the limit of 65536 bytes (cap 65536, reserve 4096 for decision and terminal lines)
+working rc=75   (refused, reserve is kept for decisions)
+done rc=0       (done: lands in the reserve; size 65547)
+log pushed to 75548 bytes by a foreign write, past cap+reserve (69632): done rc=75, file named, size unchanged
+raw printf-loop with NO helper, same host: log reached 194665 bytes when I stopped it, already past the same 65536 cap and still growing

@@ -1,0 +1,7 @@
+[t+  0s] load: 56.60 65.63 78.89
+[t+  1s] writer pid 96995 (omp-named raw shell, 65000 bytes per 3 s, ulimit -f 4096 blocks)
+[t+  1s] start watcher attempt 1; log is 65000 bytes
+[t+175s] watcher attempt 1 still running after 150s; log is 3445000 bytes
+[t+175s] stderr: 
+[t+175s] writer state: S  log size: 3445000
+[t+175s] queue rows: 

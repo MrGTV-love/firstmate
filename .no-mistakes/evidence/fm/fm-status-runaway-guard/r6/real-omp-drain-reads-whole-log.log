@@ -1,0 +1,10 @@
+### snapshot of the wake drain reading the over-limit log (lab home, my own processes)
+Mon Oct 19 11:03:52 CDT 2026
+60740 60482       08:41 SN     5424 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-wake-drain.sh
+63659 60740       08:39 RN   1066816 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-wake-drain.sh
+63956 63659       08:39 SN     2496 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-wake-drain.sh
+63958 63956       08:39 SN   4741568 perl -MFcntl=:DEFAULT -e \012    my ($path, $start, $end) = @ARGV;\012    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;\012    my @stat = stat $file o
+log size: 4849664000 bytes; read limit with defaults is 34603008 bytes
+queue rows:
+1792425266	1	signal	incident.status	signal: <lab>/state/incident.status
+1792425266	2	signal	incident.status	signal: <lab>/state/incident.status

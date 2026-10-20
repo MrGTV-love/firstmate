@@ -1,0 +1,21 @@
+du (real blocks) of state dir: 40 KiB
+a size=140000000001 head_sha=78bbd73b4ec5 mtime=1792426747
+b size=265000000001 head_sha=78bbd73b4ec5 mtime=1792426747
+c size=122000000001 head_sha=78bbd73b4ec5 mtime=1792426747
+--- 1. the sanctioned helper on each: refuses, exit 75, names the file, a done: line too
+lane-a append rc=75 msg=fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.3Jt80M/state/lane-a.status is 140000000001 bytes and this line would pass the limit of 34
+lane-b append rc=75 msg=fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.3Jt80M/state/lane-b.status is 265000000001 bytes and this line would pass the limit of 34
+lane-c append rc=75 msg=fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.3Jt80M/state/lane-c.status is 122000000001 bytes and this line would pass the limit of 34
+--- 2. the guard scan (nothing holds them open): names each, stops nothing, deletes nothing
+16777234:748752154:1792426747	140000000001	check: status-log-over-cap: file=lane-a.status size=140000000001 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+16777234:748752155:1792426747	265000000001	check: status-log-over-cap: file=lane-b.status size=265000000001 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+16777234:748752178:1792426747	122000000001	check: status-log-over-cap: file=lane-c.status size=122000000001 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+--- 3. readers on the same logs, each with a 60 s timeout
+   rc=0 secs=3 out= err=fm-status: lane-a.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it|fm-status: lane-b.status h
+   rc=0 secs=1 out={|  "schema": "fm-fleet-snapshot.v1",|  "generated": "2026-10-19T16:19:21Z",|  "fm_home": "/Users/charlesabrooker/tmp/fm err=
+--- 4. after
+a size=140000000001 head_sha=78bbd73b4ec5 mtime=1792426747
+b size=265000000001 head_sha=78bbd73b4ec5 mtime=1792426747
+c size=122000000001 head_sha=78bbd73b4ec5 mtime=1792426747
+IDENTICAL: nothing deleted, truncated or rewritten
+big files created beside the logs: 0

@@ -1,0 +1,5 @@
+ok - the sanctioned writer holds the cap, refuses a repeat loop and filler loudly, keeps the reserve for done:, and refuses everything past cap plus reserve
+ok - mutation: the same loop through a raw append passes the cap, so the helper is what holds it
+ok - the 2026-10-18 shape (3000 distinct lines, then one line repeated) keeps every distinct line and is refused loudly at the cap with exit 75
+# wake text: check: status-log-over-cap: file=victim.status size=1040000 bytes (cap 262144) growth=0 bytes/s writer=pid 78260 omp; stopped pid 78260 (omp) with SIGSTOP; resume it with kill -CONT 78260; nothing was deleted, truncated or rewritten
+Terminated: 15

@@ -1,0 +1,17 @@
+=== test_a_resumed_writer_is_woken_for_and_stopped_again (load: 26.56 26.57 27.14)
+wait_for_exit: owned pid 53663 exceeded 30 polls; sending TERM
+53663 51954 RN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a stopped writer that is continued gets a second wake and a second stop, and a log that has not grown gets none
+=== test_a_resumed_writer_is_woken_for_and_stopped_again exit=0 secs=128
+=== test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped (load: 27.23 26.90 27.17)
+ok - the incident writer, which holds the log open and writes without a pause, is named and stopped by the guard and the log is left in place
+=== test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped exit=0 secs=6
+=== test_a_lingering_signal_does_not_hold_back_the_over_cap_stop (load: 26.17 26.68 27.09)
+ok - the watcher checks the cap during the status-signal linger, so the over-cap stop is the first wake and waits for no ack or re-arm
+=== test_a_lingering_signal_does_not_hold_back_the_over_cap_stop exit=0 secs=20
+=== test_non_omp_and_missing_writers_wake_but_stop_nothing (load: 25.85 26.60 27.05)
+ok - a non-omp writer, and no writer at all, still raise the wake and stop nothing
+=== test_non_omp_and_missing_writers_wake_but_stop_nothing exit=0 secs=71
+=== test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth (load: 21.23 25.21 26.50)
+ok - a per-task sidecar over the cap is named once, wakes again only after one cap of growth, and its marker clears when it shrinks
+=== test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth exit=0 secs=8

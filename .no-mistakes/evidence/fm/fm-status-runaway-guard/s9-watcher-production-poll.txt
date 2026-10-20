@@ -1,0 +1,9 @@
+trial=p1 watcher_alive_at_end=no secs_from_writer_start_to_watcher_exit=56.6
+first_wake: check: status-log-over-cap: file=victim.status size=24300022 bytes (cap 1048576) growth=1363702 bytes/s writer=pid 37007 omp; stopped pid 37007 (omp) with SIGSTOP; resume it with kill -CONT 37007; nothing was deleted, truncated or rewritten
+cap=1048576 final_size=24300022 (23.2 x cap) writer_pid=37007 writer_state=T (T = stopped)
+WPROD-DONE
+trial=p2 watcher_alive_at_end=no secs_from_writer_start_to_watcher_exit=49.2
+first_wake: check: status-log-over-cap: file=victim.status size=24282063 bytes (cap 1048576) growth=1616297 bytes/s writer=pid 69865 omp; stopped pid 69865 (omp) with SIGSTOP; resume it with kill -CONT 69865; nothing was deleted, truncated or rewritten
+cap=1048576 final_size=24300022 (23.2 x cap) writer_pid=69865 writer_state=T (T = stopped)
+WPROD-DONE
+exit=0

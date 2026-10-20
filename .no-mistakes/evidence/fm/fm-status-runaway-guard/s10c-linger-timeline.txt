@@ -1,0 +1,6 @@
+watcher loop started after 1 s
+writer stopped at +8.9 s
+watcher_exited=yes after 58.1 s from writer start (grace was 40 s)
+wake: check: status-log-over-cap: file=linger.status size=195038 bytes (cap 65536) growth=42012 bytes/s writer=pid 7928 omp; stopped pid 7928 (omp) with SIGSTOP; resume it with kill -CONT 7928; nothing was deleted, truncated or rewritten
+size=195038 writer_state=T load=39.46 45.68 52.38
+LINGER-DONE

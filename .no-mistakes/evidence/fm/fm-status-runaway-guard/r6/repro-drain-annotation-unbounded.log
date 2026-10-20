@@ -1,0 +1,4 @@
+log size: 25000 bytes, read limit: 5000 bytes
+annotation lines printed from the over-limit log: 5000
+stderr names the refused log: 1
+FAIL: the drain read the whole over-limit log and printed 5000 annotation lines

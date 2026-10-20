@@ -1,0 +1,24 @@
+### test_foreign_omp_writer_is_named_stopped_and_never_deleted
+# wake text: check: status-log-over-cap: file=victim.status size=1560000 bytes (cap 262144) growth=160891 bytes/s writer=pid 1829 omp; stopped pid 1829 (omp) with SIGSTOP; resume it with kill -CONT 1829; nothing was deleted, truncated or rewritten
+wait_for_exit: owned pid 13882 exceeded 30 polls; sending TERM
+13882 88315 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a raw omp writer over the cap is detected within polls, named by pid, stopped alone, and the log is left intact with one wake while it does not grow
+tests/lib.sh: line 257:  1813 Killed: 9               "$omp" -c 'sleep 600'
+case-exit=
+### test_non_omp_and_missing_writers_wake_but_stop_nothing
+ok - a non-omp writer, and no writer at all, still raise the wake and stop nothing
+case-exit=
+### test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth
+ok - a per-task sidecar over the cap is named once, wakes again only after one cap of growth, and its marker clears when it shrinks
+case-exit=
+### test_a_resumed_writer_is_woken_for_and_stopped_again
+wait_for_exit: owned pid 12530 exceeded 30 polls; sending TERM
+12530 60441 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a stopped writer that is continued gets a second wake and a second stop, and a log that has not grown gets none
+case-exit=
+### test_a_lingering_signal_does_not_hold_back_the_over_cap_stop
+wait_for_exit: owned pid 54152 exceeded 300 polls; sending TERM
+54152 93787 RN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+not ok - the watcher kept lingering on the status signal while the log ran past the cap: 
+case-exit=
+ALLDONE

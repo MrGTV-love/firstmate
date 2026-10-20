@@ -1,0 +1,6 @@
+[t+  0s] load: 44.28 36.26 49.74  cap=4194304 bytes  FM_POLL=2  FM_SIGNAL_GRACE=default(30)
+[t+ 33s] watcher exited before the burst (ordinary first wake): signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/fast1/state/runaway.status
+[t+ 33s] watcher alive=no; log 32 bytes; starting the fast writer
+[t+ 35s] fast writer pid 7168: 5 MB per 0.2 s sleep (hard ulimit 200 MB, 100 iterations)
+[t+ 35s] watcher exited 2s after the writer started; log 15000047 bytes (14 MB written); output: signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/fast1/state/runaway.status 
+[t+ 35s] writer state: 'S'  final log 15000047 bytes

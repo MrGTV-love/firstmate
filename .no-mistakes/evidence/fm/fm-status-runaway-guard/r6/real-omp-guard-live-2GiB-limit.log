@@ -1,0 +1,15 @@
+waited 17x0.1s; size at detection: 36569088
+--- who holds it, by lsof
+p70090 comp f44 aw f45 aw 
+--- running scan (cap 1 MiB)
+scan rc=0
+16777234:747652557:1792425153	346882048	check: status-log-over-cap: file=incident.status size=346882048 bytes (cap 1048576) growth=406208636 bytes/s writer=pid 70090 omp; stopped pid 70090 (omp) with SIGSTOP; resume it with kill -CONT 70090; nothing was deleted, truncated or rewritten
+--- stopped pid: 70090
+process state after guard (T = stopped):
+  PID  PPID STAT COMM
+70090 70072 TN+  omp
+size before/after 3 s wait: 346882048 / 346882048
+--- resuming it with kill -CONT, as the wake text says, and checking it is a live omp
+  PID STAT COMM
+70090 RN+  omp
+--- file still exists: 550305792 bytes; line count  168637235

@@ -1,0 +1,7 @@
+tests/fm-status-runaway-guard.test.sh: line 304: 20482 Killed: 9               "$dir/sleepbin/omp" 600
+ok - the guard looks again until lsof names a writer that reopens the log, stops that one process, and gives up after a bounded number of looks
+ok - the incident loop, which reopens the log on every append, is named and stopped by the guard and the log is left in place
+wait_for_exit: owned pid 26682 exceeded 300 polls; sending TERM
+26682 79278 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+not ok - the watcher kept lingering on the status signal while the log ran past the cap: 
+exit=1

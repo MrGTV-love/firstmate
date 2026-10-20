@@ -1,0 +1,13 @@
+trial=1 kind=random size_at_scan_start=32965 result=STOPPED ps_state=T final_size=75350 writer=32659
+   wake: 16777234:740934800:1792414420	<lab>/probe-random-1/state/loop.status	75350	check: status-log-over-cap: file=loop.status size=75350 bytes (cap 32768) growth=14987 bytes/s writer=pid 32659 omp; stopped pid 32659 (omp) with SIGSTOP; resume it with kill -CONT 32659; nothing was deleted, truncated or rewritten
+trial=2 kind=random size_at_scan_start=36870 result=STOPPED ps_state=T final_size=57005 writer=46154
+   wake: 16777234:740936278:1792414426	<lab>/probe-random-2/state/loop.status	57005	check: status-log-over-cap: file=loop.status size=57005 bytes (cap 32768) growth=2280 bytes/s writer=pid 46154 omp; stopped pid 46154 (omp) with SIGSTOP; resume it with kill -CONT 46154; nothing was deleted, truncated or rewritten
+trial=3 kind=random size_at_scan_start=36685 result=STOPPED ps_state=T final_size=78160 writer=75340
+   wake: 16777234:740943563:1792414437	<lab>/probe-random-3/state/loop.status	78160	check: status-log-over-cap: file=loop.status size=78160 bytes (cap 32768) growth=14860 bytes/s writer=pid 75340 omp; stopped pid 75340 (omp) with SIGSTOP; resume it with kill -CONT 75340; nothing was deleted, truncated or rewritten
+trial=4 kind=random size_at_scan_start=40875 result=STOPPED ps_state=T final_size=249860 writer=89719
+   wake: 16777234:740954794:1792414443	<lab>/probe-random-4/state/loop.status	249860	check: status-log-over-cap: file=loop.status size=249860 bytes (cap 32768) growth=16972 bytes/s writer=pid 89719 omp; stopped pid 89719 (omp) with SIGSTOP; resume it with kill -CONT 89719; nothing was deleted, truncated or rewritten
+trial=5 kind=random size_at_scan_start=40720 result=STOPPED ps_state=T final_size=135875 writer=20497
+   wake: 16777234:740959398:1792414458	<lab>/probe-random-5/state/loop.status	135875	check: status-log-over-cap: file=loop.status size=135875 bytes (cap 32768) growth=15146 bytes/s writer=pid 20497 omp; stopped pid 20497 (omp) with SIGSTOP; resume it with kill -CONT 20497; nothing was deleted, truncated or rewritten
+trial=6 kind=random size_at_scan_start=38600 result=STOPPED ps_state=T final_size=79365 writer=38725
+   wake: 16777234:740962787:1792414466	<lab>/probe-random-6/state/loop.status	79365	check: status-log-over-cap: file=loop.status size=79365 bytes (cap 32768) growth=7744 bytes/s writer=pid 38725 omp; stopped pid 38725 (omp) with SIGSTOP; resume it with kill -CONT 38725; nothing was deleted, truncated or rewritten
+SUMMARY kind=random trials=6 stopped=6 missed=0 other=0

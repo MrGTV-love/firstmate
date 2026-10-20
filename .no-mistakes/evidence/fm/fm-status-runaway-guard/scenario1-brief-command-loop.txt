@@ -1,0 +1,13 @@
+--- looped worker status command, cap=8192 reserve=1024, ulimit -f 2048 blocks, max 5000 iterations
+first refusal at iteration 200:
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/state/labtask.status is 8159 bytes and this line would pass the limit of 8192 bytes (cap 8192, reserve 1024 for decision and terminal lines)
+--- scenario 1 (continued): the log from the looped brief command stands at 8159 bytes; cap=8192 reserve=1024
+--- a working: line is refused (exit 75) at the cap:
+rc=0
+--- a done: line (terminal) may still use the reserve, exit 0:
+rc=0
+last line: done [at=1792400973]: finished
+final size: 8221 bytes (cap+reserve 9216)
+--- a second done: that would pass cap+reserve is refused:
+blocked #25 refused with rc=75
+final size: 9196 bytes (never past 9216)

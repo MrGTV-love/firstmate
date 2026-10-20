@@ -1,0 +1,5 @@
+wait_for_exit: owned pid 98147 exceeded 30 polls; sending TERM
+98147 97940 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a stopped writer that is continued gets a second wake and a second stop, and a log that has not grown gets none
+--- rc=0 secs=104
+ 5:08  up 1 day,  7:16, 4 users, load averages: 26.31 26.96 34.96

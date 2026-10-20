@@ -1,0 +1,12 @@
+### S3 brief-generated worker status command, run verbatim
+command template (line 26 of the generated brief):
+  '<worktree>/bin/fm-status-append.sh' '<lab>/home/state/lab-brief.status' "{state} [at=<epoch>]: {one short line}" && { [ ! -e '<lab>/home/config/fleet-ledger' ] || '<worktree>/bin/fm-fleet-ledger.sh' appended '<lab>/home/config' '<lab>/home/state/lab-brief.status' >/dev/null 2>&1 || true; }
+worker command rc=0
+status file:
+working [at=1792413636]: first real line
+--- same command with a tiny cap (FM_STATUS_CAP_BYTES=200 FM_STATUS_CAP_RESERVE_BYTES=100) repeated 12 times:
+rc=0 rc=0 rc=0 rc=0 rc=0 rc=0 rc=0 rc=75 rc=75 rc=75 rc=75 rc=75 
+size: 188 (cap 200)
+done-in-reserve: the done: line landed (see the tail line below); the pipe hid its exit code
+working [at=1]: loop
+done [at=2]: finished

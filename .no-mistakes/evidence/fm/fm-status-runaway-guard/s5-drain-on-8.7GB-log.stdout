@@ -1,0 +1,6 @@
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "dacd6d83c18464415e8a8a56","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable; questions incident.status: fm-status: refused to read incident.status: a span of 751763456 bytes is past the read limit of 34603008 bytes (cap plus",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792436009	1	check	status-log-over-cap-1352010184	check: status-log-over-cap: file=incident.status size=8744861696 bytes (cap 33554432) growth=317493524 bytes/s writer=pid 26178 omp; stopped pid 26178 (omp) with SIGSTOP; resume it with kill -CONT 26178; nothing was deleted, truncated or rewritten
+1792436012	3	signal	incident.status	signal: /Users/charlesabrooker/tmp/fm-lab.vnW2u4/st-b/incident.status

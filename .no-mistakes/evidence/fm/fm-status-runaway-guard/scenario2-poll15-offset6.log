@@ -1,0 +1,9 @@
+[t+  0s] load: 28.61 42.84 46.97  cap=8388608 bytes  FM_POLL=15  FM_SIGNAL_GRACE=default(30)
+[t+ 23s] settled watcher alive after 20 s (arm 1); log 32 bytes
+[t+ 30s] waited an extra 6s idle
+[t+ 30s] RAW WRITER STARTED pid 35966 (omp-named, 2 MB per 0.5 s sleep, hard ulimit 100 MB, 50 iterations); log 2000034 bytes
+[t+ 51s] watcher 1 exited 21s after the writer started; log 56000088 bytes (51 MB written so far); writer 'S'; output: signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/p15-6/state/runaway.status 
+[t+124s] wake acked; log 100000132 bytes
+[t+158s] watcher 2 exited 128s after the writer started; log 100000132 bytes (93 MB written so far); writer ''; output: check: status-log-over-cap: file=runaway.status size=100000132 bytes (cap 8388608) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten 
+[t+158s] OVER-CAP STOP LANDED 128s after the first raw byte, with 95 MB in the log (cap 8 MB)
+[t+158s] final: writer '' log 100000132 bytes

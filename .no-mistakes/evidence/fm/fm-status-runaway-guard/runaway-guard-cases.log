@@ -1,0 +1,57 @@
+=== test_foreign_omp_writer_is_named_stopped_and_never_deleted
+wait_for_exit: owned pid 60806 exceeded 300 polls; sending TERM
+60806 11049 RN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+not ok - the watcher did not wake for the runaway log: 
+tests/lib.sh: line 125: 60277 Killed: 9               "$omp" -c 'sleep 600'
+--- rc=1 secs=146 test_foreign_omp_writer_is_named_stopped_and_never_deleted
+=== test_a_resumed_writer_is_woken_for_and_stopped_again
+wait_for_exit: owned pid 44539 exceeded 300 polls; sending TERM
+44539 81777 RN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+not ok - no first wake for the paced writer: 
+--- rc=1 secs=172 test_a_resumed_writer_is_woken_for_and_stopped_again
+=== test_non_omp_and_missing_writers_wake_but_stop_nothing
+ok - a non-omp writer, and no writer at all, still raise the wake and stop nothing
+--- rc=0 secs=169 test_non_omp_and_missing_writers_wake_but_stop_nothing
+=== test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth
+ok - a per-task sidecar over the cap is named once, wakes again only after one cap of growth, and its marker clears when it shrinks
+--- rc=0 secs=67 test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth
+=== test_readers_stay_bounded_on_a_two_gib_log
+# timing table (seconds, 2 GiB sparse log: 3000 events, a hole, a 6 MiB repeated tail)
+# | reader | seconds |
+# | open-decisions fold | 0s |
+# | status-event library (last_status_line) | 3s |
+# | status-event library (declared wait) | 2s |
+# | retry check (status_event_recorded) | 0s |
+# | wake drain (cold cursor) | 16s |
+# | wake drain (warm cursor) | 12s |
+ok - every reader finishes inside 60s on a 2 GiB log and creates no file over 1 MB
+--- rc=0 secs=97 test_readers_stay_bounded_on_a_two_gib_log
+=== test_history_readers_refuse_a_log_past_the_limit_and_name_it
+ok - a history reader refuses a 2 GiB log and a log of too many lines, names it, and reads nothing; a short span from it is exact
+--- rc=0 secs=46 test_history_readers_refuse_a_log_past_the_limit_and_name_it
+=== test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
+ok - a fold that cannot read its span leaves the saved cursor and its open decision where they were
+--- rc=0 secs=57 test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
+=== test_a_refused_read_is_unknown_never_an_empty_open_set
+ok - a log the read limits refuse reads as unknown (status 2), never as no open decision, while a checkpointed fold keeps its open set
+--- rc=0 secs=72 test_a_refused_read_is_unknown_never_an_empty_open_set
+=== test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain
+ok - one lane's log past the read limits is named on stderr and the drain still presents every other lane's open decisions
+--- rc=0 secs=71 test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain
+=== test_latest_event_endpoint_is_a_position_in_the_whole_log
+ok - the latest-event endpoint of a log of tiny lines is its true byte position, 100023
+--- rc=0 secs=46 test_latest_event_endpoint_is_a_position_in_the_whole_log
+=== test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log
+ok - a long log's declared wait keeps one identity at its true line position however many continuation lines follow
+--- rc=0 secs=40 test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log
+=== test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log
+# | fleet snapshot (secondmate home summary) | 10s |
+ok - the fleet snapshot summarizes a home with a 2 GiB log inside 60s, names the log it will not copy, and leaves no large file
+--- rc=0 secs=49 test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log
+=== test_without_the_read_limit_the_same_reader_takes_the_whole_log
+ok - mutation: with the read limit raised past the log the same reader takes all 2 GiB; with the default it takes nothing
+--- rc=0 secs=71 test_without_the_read_limit_the_same_reader_takes_the_whole_log
+=== test_a_killed_drain_leaves_no_large_cursor_file
+ok - a drain killed with SIGKILL mid-run leaves no scratch or cursor file
+--- rc=0 secs=32 test_a_killed_drain_leaves_no_large_cursor_file
+ALL-DONE

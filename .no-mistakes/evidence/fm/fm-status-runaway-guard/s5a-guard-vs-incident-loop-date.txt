@@ -1,0 +1,13 @@
+trial=1 kind=date size_at_scan_start=32780 result=STOPPED ps_state=T final_size=34250 writer=31339
+   wake: 16777234:740617636:1792413868	<lab>/probe-date-1/state/loop.status	34250	check: status-log-over-cap: file=loop.status size=34250 bytes (cap 32768) growth=544 bytes/s writer=pid 31339 omp; stopped pid 31339 (omp) with SIGSTOP; resume it with kill -CONT 31339; nothing was deleted, truncated or rewritten
+trial=2 kind=date size_at_scan_start=32940 result=MISSED ps_state=S final_size=37525 writer=10183
+   wake: 16777234:740651774:1792413927	<lab>/probe-date-2/state/loop.status	37510	check: status-log-over-cap: file=loop.status size=37510 bytes (cap 32768) growth=444 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+trial=3 kind=date size_at_scan_start=32905 result=MISSED ps_state=R final_size=38905 writer=53201
+   wake: 16777234:740709369:1792414050	<lab>/probe-date-3/state/loop.status	38890	check: status-log-over-cap: file=loop.status size=38890 bytes (cap 32768) growth=602 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+trial=4 kind=date size_at_scan_start=32795 result=MISSED ps_state=S final_size=39995 writer=16931
+   wake: 16777234:740761261:1792414145	<lab>/probe-date-4/state/loop.status	39985	check: status-log-over-cap: file=loop.status size=39985 bytes (cap 32768) growth=560 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+trial=5 kind=date size_at_scan_start=32825 result=MISSED ps_state=R final_size=40620 writer=94767
+   wake: 16777234:740819900:1792414246	<lab>/probe-date-5/state/loop.status	40605	check: status-log-over-cap: file=loop.status size=40605 bytes (cap 32768) growth=647 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+trial=6 kind=date size_at_scan_start=32845 result=MISSED ps_state=S final_size=39295 writer=14388
+   wake: 16777234:740865126:1792414331	<lab>/probe-date-6/state/loop.status	39275	check: status-log-over-cap: file=loop.status size=39275 bytes (cap 32768) growth=545 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+SUMMARY kind=date trials=6 stopped=1 missed=5 other=0

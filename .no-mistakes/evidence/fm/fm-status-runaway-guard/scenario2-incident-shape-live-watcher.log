@@ -1,0 +1,14 @@
+[t+  0s] load: 17.65 22.32 31.03  cap=1048576 bytes  FM_POLL=2  FM_SIGNAL_GRACE=1 (the repo test value)
+[t+  1s] writer pid 64155 (omp-named raw shell, the incident loop: printf text-newline with an extra argument, appended with >> on every iteration; hard ulimit 8 MB, 3000000 iterations)
+[t+  1s] watcher 1 armed; log 55940 bytes
+[t+  4s] watcher 1 exited; log 368065 bytes; output: signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/inc1/state/runaway.status 
+[t+  9s] acked wake seq=2; log 815410 bytes
+[t+  9s] watcher 2 armed; log 816205 bytes
+[t+ 13s] watcher 2 exited; log 1062960 bytes; output: signal: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/inc1/state/runaway.status 
+[t+ 35s] acked wake seq=4; log 1961515 bytes
+[t+ 35s] watcher 3 armed; log 1962450 bytes
+[t+ 35s] LOG PASSED THE CAP: 1963380 bytes
+[t+ 40s] watcher 3 exited; log 2514795 bytes; output: check: status-log-over-cap: file=runaway.status size=2249515 bytes (cap 1048576) growth=107399 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten 
+[t+ 40s] OVER-CAP WAKE: log 2516940 bytes = 2.x the cap; writer state R
+[t+ 40s] seconds from cap crossing to over-cap wake: 5; bytes written meanwhile: 555650
+[t+ 40s] final: writer state 'R' log 2520300 bytes

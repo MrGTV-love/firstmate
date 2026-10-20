@@ -1,0 +1,20 @@
+Adversarial writer cases for bin/fm-status-cap-guard.sh scan (cap 1,000,000 bytes).
+Real `omp shell` idle in its own tmux pane (pid 13715, state S+) is the bystander.
+Writers hold the log open through a symlink to bash named notomp / omp, each under ulimit -f 40000.
+
+=== A: a writer named notomp holds an over-cap log ===
+log size 1500000
+check: status-log-over-cap: file=a.status size=2000000 bytes (cap 1000000) growth=263157 bytes/s writer=pid 15183 notomp; stopped nothing: pid 15183 (notomp) is not an omp process; nothing was deleted, truncated or rewritten
+writer state: RN (not T = left running); bystander real omp: S+
+
+=== B: a writer named omp holds the over-cap log; a real omp bystander is idle in the same lab ===
+log size 1600000
+check: status-log-over-cap: file=b.status size=2400000 bytes (cap 1000000) growth=251889 bytes/s writer=pid 23738 omp; stopped pid 23738 (omp) with SIGSTOP; resume it with kill -CONT 23738; nothing was deleted, truncated or rewritten
+omp writer state: TN (T = stopped); bystander real omp: S+ (S = untouched)
+log kept: 2400000 bytes
+(the scan also printed a stale a.status record with writer=none found because the shell did not clear a.status; stopped nothing)
+
+=== C: no process holds the over-cap log open ===
+(three records, one per leftover over-cap log a.status, b.status, c.status; each read "growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten")
+check: status-log-over-cap: file=c.status size=2000000 bytes (cap 1000000) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+omp processes in state T on the host after all runs: 0 (expect 0)

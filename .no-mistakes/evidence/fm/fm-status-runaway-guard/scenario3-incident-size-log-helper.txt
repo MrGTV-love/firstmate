@@ -1,0 +1,17 @@
+# Incident-shape log inside my disposable lab only (sparse, no real blocks): 3 events then a hole to 2 GiB
+log size before: 2147483648 bytes; disk blocks used: 20480 bytes
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/state/incident-shape.status is 2147483648 bytes and this line would pass the limit of 33554432 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+exit=75
+real 0.02
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/state/incident-shape.status is 2147483648 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+exit=75
+real 0.02
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.4ufZ98/state/incident-shape.status is 2147483648 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+exit=75
+real 0.01
+log size after: 2147483648 bytes (unchanged: yes)
+head of file unchanged: yes
+Watcher-side stat row (the one stat the poll costs):
+2147483648	16777234:734603226:1792404618	/Users/charlesabrooker/tmp/fm-lab.4ufZ98/state/incident-shape.status
+--- unalerted rows:
+2147483648	16777234:734603226:1792404618	/Users/charlesabrooker/tmp/fm-lab.4ufZ98/state/incident-shape.status

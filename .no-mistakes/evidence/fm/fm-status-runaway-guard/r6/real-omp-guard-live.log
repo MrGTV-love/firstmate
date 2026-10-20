@@ -1,0 +1,9 @@
+waited 16x0.1s; size at detection: 4194304
+--- who holds it, by lsof
+
+--- running scan (cap 1 MiB)
+scan rc=0
+16777234:747518788:1792424946	4194304	check: status-log-over-cap: file=incident.status size=4194304 bytes (cap 1048576) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+16777234:747434538:1792424749	4194304	check: status-log-over-cap: file=real.status size=4194304 bytes (cap 1048576) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+--- stopped pid: none
+--- file still exists: 4194304 bytes; line count   838860

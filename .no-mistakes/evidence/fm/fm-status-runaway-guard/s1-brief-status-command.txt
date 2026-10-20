@@ -1,0 +1,13 @@
+== command taken from the generated brief ==
+'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-status-append.sh' '/Users/charlesabrooker/tmp/fm-lab.vxGnsF/state/brieftask.status' "{state} [at=<epoch>]: {one short line}" && { [ ! -e '/Users/charlesabrooker/tmp/f
+loop iteration 347 refused: rc=75
+stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.vxGnsF/state/brieftask.status is 19960 bytes and this line would pass the limit of 20000 bytes (cap 20000, reserve 2000 for decision and terminal lines)
+size after working loop: 19960 bytes (cap 20000, reserve 2000)
+terminal done: rc=0 size=19982
+done [at=1]: finished
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.vxGnsF/state/brieftask.status is 19982 bytes and this line would pass the limit of 20000 bytes (cap 20000, reserve 2000 for decision and terminal lines)
+working after cap: rc=75
+size after terminal flood: 21994 (limit 22000)
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.vxGnsF/state/brieftask.status is 21994 bytes and this line would pass the limit of 22000 bytes (cap 20000, reserve 2000 for decision and terminal lines)
+terminal after limit: rc=75
+line count:      382  first line: working [at=1792434187]: loop 1 padding padding padding
