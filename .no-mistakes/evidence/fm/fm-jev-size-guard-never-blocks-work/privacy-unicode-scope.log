@@ -1,0 +1,8 @@
+node:1: command not found: _nvm_lazy_load
+PASS | canary in model-sent piece: write refused, nothing sent | blocked=true extra_reqs=0 error_type=PrivacyWithheldError
+PASS | canary only in unscreened remainder: admitted, canary never sent (documented) | blocked=false reqs=16
+PASS | multibyte/escape/lone-surrogate oversize write admitted within 16 requests of <=16384 bytes | reqs=16 max=16383
+PASS | coverage bytes sum to UTF-8 size | {"model_screened_bytes":56966,"local_only_bytes":519034} vs 576000
+PASS | no valid astral pair cut in any piece | checked
+PASS | non-authorized project: oversize write sends nothing to a model | blocked=false reqs=0
+PRIVACY bad=0

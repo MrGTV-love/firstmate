@@ -1,0 +1,16 @@
+node:1: command not found: _nvm_lazy_load
+PASS | hyphens (1048576 chars) | {"blocked":true,"ms":4231} wall_ms=4341
+PASS | hyphen-words (1048576 chars) | {"blocked":true,"ms":8227} wall_ms=8558
+PASS | scheme-chars (1048576 chars) | {"blocked":true,"ms":5004} wall_ms=5262
+PASS | slashes-colon (1040000 chars) | {"blocked":true,"ms":4500} wall_ms=4666
+PASS | colon-run-after-scheme (1040004 chars) | {"blocked":true,"ms":4420} wall_ms=4526
+PASS | empty-user-long-pw-no-at (1048576 chars) | {"blocked":true,"ms":4249} wall_ms=4444
+PASS | many-colon-urls-no-at (990000 chars) | {"blocked":true,"ms":4121} wall_ms=4218
+PASS | user-long-no-colon (1048576 chars) | {"blocked":true,"ms":4224} wall_ms=4334
+PASS | ghp-prefix-spam (1040000 chars) | {"blocked":true,"ms":4503} wall_ms=4607
+PASS | xox-spam (1000000 chars) | {"blocked":true,"ms":547} wall_ms=644
+PASS | begin-spam (990000 chars) | {"blocked":true,"ms":4146} wall_ms=4253
+PASS | at-spam (980000 chars) | {"blocked":true,"ms":4768} wall_ms=5059
+PASS | pw-then-delims (940000 chars) | {"blocked":true,"ms":7974} wall_ms=11042
+PASS | unicode-escapes (600000 chars) | {"blocked":true,"ms":4056} wall_ms=4163
+REDOS bad=0

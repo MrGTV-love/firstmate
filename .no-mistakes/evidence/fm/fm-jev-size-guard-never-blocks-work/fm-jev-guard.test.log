@@ -1,0 +1,31 @@
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline
+ok - task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible
+ok - bounded pieces preserve policy/outage decisions; uncoverable shell/results and never-send payloads send nothing, deadlines hold
+ok - Claude hooks retain JSON/exit contracts, admit budget-limited benign writes, and leave advisory-only results uncounted
+hyphenated-scan-ok bytes=1048576 offline_loopback_ms=2439
+omp: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=1754
+omp: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
+omp: never-send file present; 396924-byte report admitted in 5589 ms
+omp: never-send file present; 1048576-byte write admitted in 5810 ms
+claude: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=1209
+claude: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
+claude: never-send file present; 396924-byte report admitted in 7662 ms
+claude: never-send file present; 1048576-byte write admitted in 7375 ms
+punctuation-led URL credentials: both hosts refuse write/edit locally with zero provider requests
+large-write-budget-ok
+ok - 396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+bash tests/fm-jev-guard.test.sh  39.84s user 39.72s system 14% cpu 9:13.98 total

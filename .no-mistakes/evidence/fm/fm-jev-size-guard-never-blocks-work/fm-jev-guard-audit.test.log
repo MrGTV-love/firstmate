@@ -1,0 +1,30 @@
+✔ result: a fully answered estimated piece keeps its amount and source (1.783083ms)
+✔ result: a fully answered reported piece keeps its amount and source (0.340334ms)
+✔ result: an answered piece with an unsent planned piece stays incomplete (0.399666ms)
+✔ result: every failed chunk survives settlement (0.896208ms)
+✔ result: partial cost is incomplete and unsent chunks are not egress (1.645167ms)
+✔ result: a planned payload with no request sent is not-called and not incomplete (0.598709ms)
+✔ result: complete runs retain full reported cost without failures (0.408625ms)
+✔ write: every failed chunk survives settlement (4.778167ms)
+✔ write: partial cost is incomplete and unsent chunks are not egress (3.047333ms)
+✔ write: a planned payload with no request sent is not-called and not incomplete (0.52ms)
+✔ write: complete runs retain full reported cost without failures (0.827834ms)
+✔ result: a blank middle piece is not planned screening work (147.04275ms)
+✔ result: an unsent failed piece stays planned beside a blank piece (63.277709ms)
+✔ result: an all-blank result plans no screening and sends nothing (0.432917ms)
+✔ call: invalid tool input fails before planning and invents no piece (1.056875ms)
+✔ result: an oversize result no plan can cover fails before planning and invents no piece (400.393875ms)
+✔ result: a never-send refusal while planning invents no piece (101.941083ms)
+✔ result: an unsupported tool result fails before planning and invents no piece (0.679125ms)
+✔ real decide: a guard-retried success keeps the client result and a complete reported cost (628.533042ms)
+✔ policy verdict precedence never discards failed spend (0.312958ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1366.209334
+ok - offline guard settlement and cost completeness
+bash tests/fm-jev-guard-audit.test.sh  1.57s user 3.67s system 56% cpu 9.351 total

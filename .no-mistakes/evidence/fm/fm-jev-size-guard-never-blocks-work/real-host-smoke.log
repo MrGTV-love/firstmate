@@ -1,0 +1,10 @@
+== Real installed omp 18.12.2, guard loaded with -e, tiny write (in budget), loopback provider ==
+{"tool":"write","inputKeys":["path","content"],"contentBytes":5}
+guard audit row (omp):
+{"hook":"tool_call","tool":"write","decision":"allow","enforcement":"pretool_allow","branch":"policy","request_started":true,"write_coverage":{"model_screened_bytes":5,"local_only_bytes":0}}
+hello.txt in omp lab worktree: hello
+
+== Real installed Claude Code 2.1.304, PreToolUse hook = bin/fm-jev-guard-hook.sh, tiny Write (in budget), loopback provider ==
+audit row (claude):
+{"hook":"tool_call","tool":"write","decision":"allow","enforcement":"pretool_allow","branch":"policy","request_started":true,"write_coverage":{"model_screened_bytes":5,"local_only_bytes":0}}
+hello.txt in claude lab worktree: hello
