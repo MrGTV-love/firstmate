@@ -18,9 +18,9 @@
 #
 # Stdin mode extracts .toolInput.command for Grok or .tool_input.command for
 # Claude, Codex, and Cursor. CLI mode is used by OpenCode and Pi after their
-# adapters extract the exact command string. --cursor selects Cursor's own deny
-# rendering and marks this invocation as the Cursor registration rather than the
-# Claude-settings duplicate Cursor also loads.
+# adapters extract the exact command string. --cursor selects Cursor's own
+# decision rendering and marks this invocation as the Cursor registration rather
+# than the Claude-settings duplicate Cursor also loads.
 #
 # Exit/output contract (FM_CD_GUARD_MODE=warn by default; deny restores blocks):
 #   ALLOW - exit 0 and no output.
