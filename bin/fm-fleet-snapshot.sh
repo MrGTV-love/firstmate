@@ -450,13 +450,13 @@ status_event_json() {  # <observed-status-log> [<contract-path>]
 # Assign in the caller's shell; status lines name the current PR first by
 # convention, regardless of the event verb.
 current_pr_url_in_file_to() {  # <file> <out-var>
-  local line selected=''
+  local selected=''
   local pattern='https?://[^[:space:])"]+/pull/[0-9]+'
   if [ -f "$1" ]; then
-    IFS= read -r line < <(grep -E "$pattern" "$1" 2>/dev/null | tail -n 1) || :
-    if [[ $line =~ $pattern ]]; then
-      selected=${BASH_REMATCH[0]}
-    fi
+    IFS= read -r selected < <(
+      LC_ALL=C grep -aE "$pattern" "$1" 2>/dev/null | tail -n 1 |
+        LC_ALL=C grep -aoE "$pattern" 2>/dev/null | head -n 1
+    ) || :
   fi
   printf -v "$2" '%s' "$selected"
 }

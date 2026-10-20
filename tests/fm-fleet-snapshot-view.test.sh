@@ -1153,10 +1153,12 @@ EOF
 }
 
 test_current_status_pr() {
-  local home fakebin out id start elapsed
+  local home fakebin out id start elapsed utf8
+  utf8=$(locale -a 2>/dev/null | grep -i -E '^(C|en_US)\.utf-?8$' | head -1)
+  [ -n "$utf8" ] || fail "no UTF-8 locale is installed to read a status log under"
   home=$(make_home current-status-pr)
   fakebin=$(make_fakebin "$home")
-  for id in replacement replacement-decision replacement-same-line single fallback absent explicit; do
+  for id in replacement replacement-decision replacement-same-line single fallback absent explicit invalid-bytes nul-byte; do
     fm_write_meta "$home/state/$id.meta" "kind=ship" "remote_host=example.invalid"
   done
   printf 'done: PR https://github.com/example/repo/pull/1 checks green\nworking: PR 1 withdrawn, replacement https://github.com/example/repo/pull/2\n' > "$home/state/replacement.status"
@@ -1167,7 +1169,9 @@ test_current_status_pr() {
   printf 'working: no pull request yet\n' > "$home/state/absent.status"
   printf 'pr=https://github.com/example/repo/pull/8\n' >> "$home/state/explicit.meta"
   printf 'done: https://github.com/example/repo/pull/9\n' > "$home/state/explicit.status"
-  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
+  printf 'working: https://github.com/example/repo/pull/10\nworking: \377\376 replacement https://github.com/example/repo/pull/11\n' > "$home/state/invalid-bytes.status"
+  printf 'working: https://github.com/example/repo/pull/12\nworking: nul\0byte replacement https://github.com/example/repo/pull/13\n' > "$home/state/nul-byte.status"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" LC_ALL="$utf8" "$SNAPSHOT" --json)
   printf '%s' "$out" | jq -e '
     [.tasks[] | {key:.id,value:{url:.pr.url,source:.pr.source}}] | from_entries
     | .replacement == {url:"https://github.com/example/repo/pull/2",source:"status_event"}
@@ -1177,10 +1181,12 @@ test_current_status_pr() {
       and .fallback == {url:"https://github.com/example/repo/pull/6",source:"status_event"}
       and .absent == {url:null,source:"absent"}
       and .explicit == {url:"https://github.com/example/repo/pull/8",source:"meta"}
+      and .["invalid-bytes"] == {url:"https://github.com/example/repo/pull/11",source:"status_event"}
+      and .["nul-byte"] == {url:"https://github.com/example/repo/pull/13",source:"status_event"}
   ' >/dev/null || fail "current PR selection or explicit metadata precedence wrong"
-  pass "snapshot selects first URL on newest URL-bearing line, all three replacement logs, absent URL, and explicit metadata precedence"
+  pass "snapshot selects first URL on newest URL-bearing line, all three replacement logs, absent URL, explicit metadata precedence, and invalid-byte and NUL logs"
 
-  for id in replacement replacement-decision replacement-same-line single fallback absent explicit; do
+  for id in replacement replacement-decision replacement-same-line single fallback absent explicit invalid-bytes nul-byte; do
     rm "$home/state/$id.meta" "$home/state/$id.status"
   done
   fm_write_meta "$home/state/large.meta" "kind=ship" "remote_host=example.invalid"
