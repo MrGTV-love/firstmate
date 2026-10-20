@@ -1279,6 +1279,35 @@ Already-running agents, unpublished work, durable task records, and validation c
 This setting governs Firstmate-owned worker and secondmate launches only, not supervision-host engine sessions, separately configured validation tools, or the operator's own primary session.
 The Pi supervision branch is an in-process part of the exempt operator primary session, not a Firstmate-invoked worker, and is also exempt.
 
+### OMP fallback approvals (config/omp-approved-fallback-chains)
+
+The optional captain-private, gitignored `config/omp-approved-fallback-chains` records deliberate paid fallback-route approvals for the read-only diagnostic shared by [`fm-bootstrap.sh`](../bin/fm-bootstrap.sh) (`OMP_API_BILLING`) and [`fm-remote-doctor.sh`](../bin/fm-remote-doctor.sh) (`omp-api-billing`).
+[`fm-api-key-guard-lib.sh`](../bin/fm-api-key-guard-lib.sh) is their shared reader; it never edits this file or omp configuration, invokes omp, or calls a provider.
+The file is read from `FM_CONFIG_OVERRIDE` when set, otherwise the operational home's `config/` directory under the [home resolution rules](#fm_home).
+Record approvals separately in every home that needs them; this file is not automatically inherited by secondmates.
+
+Each nonblank, noncomment line has exactly three whitespace-separated fields: `YYYY-MM-DD key|target provider/model`.
+The date must be a real ISO calendar date, and `key` or `target` selects the position class within omp's `retry.fallbackChains`, not an array index or a model role.
+The route must begin with lowercase `openai-codex/`, `openrouter/`, or `openai/`, followed by an ASCII alphanumeric character and then only ASCII alphanumerics, `.`, `_`, `:`, `/`, or `-`; wildcards and comma-separated patterns are not approvals.
+Blank lines and lines whose first nonwhitespace character is `#` are allowed; inline comments and extra fields are not.
+For example:
+
+```text
+2026-10-20 key openai-codex/gpt-6.1-sol
+2026-10-20 target openrouter/xiaomi/mimo-v2.6-pro
+2026-10-20 target openrouter/anthropic/claude-haiku-5.5
+```
+
+An exception matches only the exact, case-sensitive route string and position class; selector padding, another suffix, a different route, or the same route used in `modelRoles` is not covered.
+Only non-GPT `openrouter/*` fallback references can be exempted.
+All `openai/*` references, OpenRouter's `openai/` model namespace, and OpenRouter model path segments beginning with `gpt` (case-insensitive) remain flagged even if recorded.
+`openai-codex/*` already uses the subscription route and needs no billing exception; recording it documents the approved chain without broadening permission.
+A missing approval file grants no exceptions.
+An unreadable or nonregular file reports a configuration problem, and a malformed line reports its line number without its contents; either invalidates all exceptions from that file while unapproved API references are still reported.
+These approvals do not relax explicit worker-launch or relaunch billing-route admission.
+
+[`tests/fm-api-key-guard-lib.test.sh`](../tests/fm-api-key-guard-lib.test.sh), [`tests/fm-bootstrap.test.sh`](../tests/fm-bootstrap.test.sh), and [`tests/fm-remote-doctor.test.sh`](../tests/fm-remote-doctor.test.sh) exercise the approval boundary and its two diagnostic consumers.
+
 ### Installed hooks and launch details
 
 For grok, `fm-spawn.sh` installs one firstmate-owned global turn-end hook under `$GROK_HOME/hooks/`, or `~/.grok/hooks/` when `GROK_HOME` is unset, and drops a per-task `.fm-grok-turnend` pointer in the worktree, with teardown removing the task token and pointer.
@@ -1293,7 +1322,7 @@ Pi-family secondmates can start unattended in Firstmate-seeded homes without acc
 
 For omp session posture, worker-only memory scope, disabled worker title generation, ordinary-worker smol and tiny helper roles (skill-description compression among them) on the worker's own model, direct-only native Jev credentials, the per-worker `--omp-no-helpers` switch, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
 For omp billing-route admission and the GPT subscription selector, see [`fm-spawn.sh --help`](../bin/fm-spawn.sh), with [relaunch preflight](agent-control.md#transactional-relaunch) and the [billing-route regression map](verification/runtime-backends.md#billing-route-configuration-inspection).
-For read-only omp billing-route configuration diagnostics, see [`fm-bootstrap.sh`](../bin/fm-bootstrap.sh) and [`fm-remote-doctor.sh`](../bin/fm-remote-doctor.sh); the shared check is owned by [`fm-api-key-guard-lib.sh`](../bin/fm-api-key-guard-lib.sh) and exercised by their behavioral suites.
+For read-only omp billing-route configuration diagnostics and recorded exceptions, see [OMP fallback approvals](#omp-fallback-approvals-configomp-approved-fallback-chains).
 [Native direct-route and no-helper verification](verification/runtime-backends.md#omp-direct-judge-and-primary-model-only-workers) records the real-runtime fake-key probes, unavailable-provider boundary, interactive speech check and evidence limits.
 
 For a Claude secondmate, `fm-spawn.sh` writes the busy hooks into the parent home's `state/<id>.claude-settings.json` and passes that file as Claude Code's one `--settings` value.

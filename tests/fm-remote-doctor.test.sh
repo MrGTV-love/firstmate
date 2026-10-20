@@ -17,6 +17,8 @@ command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (the herdr adapter p
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found (plistlib parses the owned launch-agent contract)"; exit 0; }
 
 TMP_ROOT=$(fm_test_tmproot fm-remote-doctor)
+# The worker may carry its real omp agent directory; every case uses CASE_HOME.
+export PI_CODING_AGENT_DIR='' OMP_PROFILE='' FM_CONFIG_OVERRIDE=''
 LABEL=dev.firstmate.herdr.fm-remote
 INTERACTIVE_LABEL=dev.firstmate.herdr
 mkdir -p "$TMP_ROOT"
@@ -518,6 +520,54 @@ assert_not_contains "$DOCTOR_OUT" 'fix launchagent-loaded=applied:' "a second --
 [ ! -s "$CASE_LAUNCHCTL_LOG" ] || assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" bootstrap \
   "a second --fix re-bootstrapped a loaded launch agent"
 pass "--fix is idempotent once the host is ready"
+
+# --- recorded omp fallback approval removes only that readiness gap ---------
+
+mkdir -p "$CASE_HOME/.omp/agent" "$CASE_PROJECT_HOME/config"
+cat > "$CASE_HOME/.omp/agent/config.yml" <<'YAML'
+retry:
+  fallbackChains:
+    openai-codex/gpt-6.1-sol:
+      - openrouter/xiaomi/mimo-v2.6-pro
+      - openrouter/anthropic/claude-haiku-5.5
+YAML
+cp "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/approved-before.yml"
+PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
+expect_code 1 "$DOCTOR_RC" "the otherwise ready host must refuse unrecorded paid routes"
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "unapproved fallback chain must prevent readiness"
+assert_contains "$DOCTOR_OUT" 'target[0][0]' "first paid target missing from readiness gap"
+assert_contains "$DOCTOR_OUT" 'target[0][1]' "second paid target missing from readiness gap"
+printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
+cat > "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" <<'APPROVAL'
+2026-10-20 key openai-codex/gpt-6.1-sol
+2026-10-20 target openrouter/xiaomi/mimo-v2.6-pro
+2026-10-20 target openrouter/anthropic/claude-haiku-5.5
+APPROVAL
+cp "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" "$CASE_DIR/approval-before"
+PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
+expect_code 0 "$DOCTOR_RC" "recorded exact fallback chain must leave the host ready"
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=ok:' "approved fallback check must report ok"
+printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
+cmp -s "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/approved-before.yml" || fail "doctor modified approved omp config"
+cmp -s "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" "$CASE_DIR/approval-before" || fail "doctor modified approval records"
+cat >> "$CASE_HOME/.omp/agent/config.yml" <<'YAML'
+    default:
+      - openrouter/unapproved/model
+      - openrouter/openai/gpt-6.1-sol
+      - openai/gpt-6.1-sol
+YAML
+cat >> "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" <<'APPROVAL'
+2026-10-20 target openrouter/openai/gpt-6.1-sol
+2026-10-20 target openai/gpt-6.1-sol
+APPROVAL
+PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
+expect_code 1 "$DOCTOR_RC" "unapproved and GPT fallback routes must still prevent readiness"
+for field in 'target[1][0]' 'target[1][1]' 'target[1][2]'; do
+  assert_contains "$DOCTOR_OUT" "$field" "doctor must retain forbidden-route finding $field"
+done
+assert_not_contains "$DOCTOR_OUT" 'target[0]' "approved targets must not be diagnosed alongside forbidden targets"
+printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
+pass "recorded fallback approval makes a ready host usable but never bypasses unlisted, GPT or openai route findings"
 
 # --- a loaded, running launch agent with contract drift is repaired ----------
 
