@@ -2376,10 +2376,13 @@ A payload whose request would exceed it is screened as a series of overlapping p
 Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
 Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent; their complete-cover screening is unchanged.
 Write/edit content is not refused because it exceeds that model-screening budget: the guard screens at most 16 pieces and admits the remainder under deterministic local rules only.
-The existing root check applies to the whole operation, and a budget-limited write/edit is also checked over its whole replacement text for credential-shaped provider tokens, private-key headers, Bearer tokens, credential assignments and password-bearing connection URLs before any model request.
-These conservative shape checks can reject placeholders that resemble credentials and miss unfamiliar, encoded or semantically sensitive values; the remainder receives no model credential or file-kind assessment.
+The existing root check applies to the whole operation.
+A budget-limited write/edit is also checked over its whole replacement text, before any model request, for exactly these shapes: a private-key header, a GitHub token (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` or `github_pat_` prefix), an AWS access key ID (`AKIA` or `ASIA` prefix), a Slack token (`xox` prefix) and a connection URL with an embedded password.
+A prefix shape counts only when no letter, digit, underscore or hyphen comes right before it.
+Other credential shapes in the remainder, including `sk-` keys, Bearer tokens and key or password assignments, are not checked beyond the model-screened pieces.
+These checks can reject placeholders that resemble the listed shapes and miss unfamiliar or encoded values; the remainder receives no model credential or file-kind assessment.
 Every admitted write records unique UTF-8 content bytes as `write_coverage.model_screened_bytes` and `write_coverage.local_only_bytes`, excluding framing and repeated overlap; a nonzero local-only count adds an explicit unscreened-remainder note to the audit row.
-The never-send policy still checks the whole payload, including the remainder, before the first piece leaves.
+The never-send policy checks every model-screened piece of a write/edit before the first piece leaves; the remainder is never sent to a model, so that policy does not check it.
 The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while result handling retains the advisory-band and trusted-read exceptions above.
 A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.

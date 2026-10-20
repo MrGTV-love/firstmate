@@ -40,7 +40,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
 - `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
 - `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
-  It checks whole-payload privacy before key lookup, plans overlapping pieces that each fit the request ceiling, and retains strict complete-cover planning for shell calls and results (`plan`).
+  It checks privacy before key lookup, over the whole payload for shell calls and results and over every model-screened piece for writes, plans overlapping pieces that each fit the request ceiling, and retains strict complete-cover planning for shell calls and results (`plan`).
   Its write-only planner and coverage audit follow the [operator contract](../../docs/configuration.md#jev-guard).
   It uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.

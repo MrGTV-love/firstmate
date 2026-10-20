@@ -240,12 +240,10 @@ function whereBlocked(settled: { part: number; of: number }, reason: string): st
   return settled.of > 1 ? `${reason} (part ${settled.part + 1} of ${settled.of})` : reason;
 }
 
-/** Conservative shapes, not semantic secret detection; scan the whole budget-limited write before egress. */
+/** Anchored, low false-positive shapes only, not semantic secret detection; scan the whole budget-limited write before egress. */
 function credentialShaped(content: string): boolean {
   return /-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY-----/.test(content)
-    || /(?:sk-(?:(?:live|test|proj|ant)-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|(?:AKIA|ASIA)[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{16,})/.test(content)
-    || /Bearer[ \t]+[A-Za-z0-9._~+/-]{16,}/i.test(content)
-    || /(?:api[_-]?key|access[_-]?token|auth[_-]?token|password|passwd|client[_-]?secret|secret[_-]?key)["']?\s*[:=]\s*["']?[^\s"'`,;]{16,}/i.test(content)
+    || /(?<![A-Za-z0-9_-])(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|(?:AKIA|ASIA)[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{16,})/.test(content)
     // Consume each complete scheme-character run, including punctuation-led runs, without restarting at hyphens.
     || /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s/:@]+:[^\s/@]{8,}@/i.test(content);
 }

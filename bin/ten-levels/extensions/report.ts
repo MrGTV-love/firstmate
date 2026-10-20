@@ -310,14 +310,13 @@ export function createGuardService(context: GuardServiceContext): GuardService {
     },
     planWrite(state, questions) {
       const whole = JSON.stringify({ model: GUARD_MODEL, state, questions });
-      // Privacy still covers the entire write, including content the model will not see.
-      permitted(whole);
       const bytes = Buffer.byteLength(state.content, "utf8");
       if (Buffer.byteLength(whole, "utf8") <= MAX_REQUEST_BYTES) {
         return { pieces: [state.content], model_screened_bytes: bytes, local_only_bytes: 0 };
       }
       const frame = Buffer.byteLength(JSON.stringify({ model: GUARD_MODEL, state: { ...state, content: "" }, questions }), "utf8");
       const { pieces, covered } = writePieces(state.content, MAX_REQUEST_BYTES - frame);
+      for (const piece of pieces) permitted(JSON.stringify({ model: GUARD_MODEL, state: { ...state, content: piece }, questions }));
       const screened = Buffer.byteLength(state.content.slice(0, covered), "utf8");
       return { pieces, model_screened_bytes: screened, local_only_bytes: bytes - screened };
     },

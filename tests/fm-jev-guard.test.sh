@@ -1264,7 +1264,7 @@ for (const host of ['omp', 'claude']) {
   console.log(`${host}: wrote and committed 396924 bytes; requests=${requests.length}; model_screened_bytes=${expected.model_screened_bytes}; local_only_bytes=${expected.local_only_bytes}; offline_loopback_ms=${elapsed}`);
   for (const tool of ['write', 'edit']) {
     for (const [position, at] of [['start', 0], ['middle', 198462], ['end', report.length]]) {
-      const fake = 'sk-live-FAKE_NOT_A_REAL_CREDENTIAL_FOR_TESTS';
+      const fake = '\nghp_FAKECREDENTIALFORTESTSONLY123456\n';
       const payload = report.slice(0, at) + fake + report.slice(at);
       const count = sent().length;
       const denied = await call(host, payload, tool);
@@ -1279,13 +1279,31 @@ for (const host of ['omp', 'claude']) {
   const outside = await call(host, report, 'write', '/etc/large-guard-report');
   assert.ok(outside?.block || outside?.permissionDecision === 'deny');
   assert.equal(sent().length, beforeOutside);
-  // Privacy rules must inspect the remainder as well, before sending a clean prefix.
-  writeFileSync(`${home}/config/dispatch-never-send`, 'large-report-never-send-canary\n');
+  // Privacy rules cover every piece a model would see, and one refused piece keeps every clean piece home.
+  const canary = 'large-report-never-send-canary';
+  writeFileSync(`${home}/config/dispatch-never-send`, canary + '\n');
   try {
-    const denied = await call(host, report + 'large-report-never-send-canary');
-    assert.ok(denied?.block || denied?.permissionDecision === 'deny');
-    assert.equal(row().error_type, 'PrivacyWithheldError');
-    assert.equal(sent().length, beforeOutside);
+    for (const at of [1000, expected.model_screened_bytes - 2000]) {
+      const denied = await call(host, report.slice(0, at) + '\n' + canary + '\n' + report.slice(at));
+      assert.ok(denied?.block || denied?.permissionDecision === 'deny', `${host}: canary at ${at} must be refused`);
+      assert.equal(row().error_type, 'PrivacyWithheldError');
+      assert.equal(row().request_started, false);
+      assert.equal(sent().length, beforeOutside, 'a clean piece must not leave beside a refused one');
+    }
+    // The unscreened remainder never reaches a model, so the never-send policy has nothing to withhold.
+    const start = performance.now();
+    assert.equal(await call(host, report + '\n' + canary), undefined, `${host}: a canary only in the remainder must not stop the write`);
+    assert.equal(row().decision, 'allow');
+    assert.ok(sent().slice(beforeOutside).every(request => !request.body.includes(canary)), 'the remainder must never be sent');
+    console.log(`${host}: never-send file present; 396924-byte report admitted in ${Math.round(performance.now() - start)} ms`);
+    // The never-send check cost must not grow with the size of the write.
+    const megabyte = 'Ordinary report line with measured observations and no credentials.\n'.repeat(16000).slice(0, 1048576);
+    const largeStart = performance.now();
+    assert.equal(await call(host, megabyte), undefined, `${host}: a 1 MiB write with a never-send file must be admitted`);
+    const largeMs = Math.round(performance.now() - largeStart);
+    assert.ok(largeMs < 30000, `${host}: a 1 MiB write took ${largeMs} ms with a never-send file`);
+    assert.equal(row().decision, 'allow');
+    console.log(`${host}: never-send file present; ${Buffer.byteLength(megabyte)}-byte write admitted in ${largeMs} ms`);
   } finally {
     const { unlinkSync } = await import('node:fs');
     unlinkSync(`${home}/config/dispatch-never-send`);
@@ -1303,12 +1321,23 @@ for (const request of sent().slice(before)) {
   assert.equal(/\ud83d(?!\ude00)|(?<!\ud83d)\ude00/.test(piece), false, 'a valid astral pair must not be cut');
 }
 for (const [shape, fake] of [['private-key', '-----BEGIN PRIVATE KEY-----'], ['github-token', 'ghp_FAKECREDENTIALFORTESTSONLY123456'],
-  ['aws-key', 'AKIAFAKEFORTESTSONLY'], ['password', 'password="FAKE_NOT_A_REAL_PASSWORD"'],
-  ['bearer', 'Bearer FAKE_NOT_A_REAL_TOKEN'], ['connection-url', 'postgres://fixture:FAKE_PASSWORD@localhost/db']]) {
+  ['github-fine-grained-token', 'github_pat_FAKECREDENTIALFORTESTSONLY123456'], ['aws-key', 'AKIAFAKEFORTESTSONLY'],
+  ['slack-token', 'xoxb-FAKECREDENTIALFORTESTS'], ['connection-url', 'postgres://fixture:FAKE_PASSWORD@localhost/db']]) {
   before = sent().length;
-  assert.equal((await call('omp', report + fake))?.block, true, `embedded ${shape} must be refused locally`);
+  assert.equal((await call('omp', report + '\n' + fake))?.block, true, `embedded ${shape} must be refused locally`);
   assert.equal(row().branch, 'deterministic');
   assert.equal(sent().length, before);
+}
+// Ordinary hyphenated prose, prefix look-alikes inside words and unanchored credential-like wording are not credentials.
+const prose = ['task-specific-guidelines', 'risk-based-assessment', 'disk-backed-storage-layer', 'task-local-logs-and-evidence',
+  'Bearer authentication-scheme', 'password = process.env.DATABASE_PASSWORD', 'password: must-be-at-least-sixteen',
+  'prefix-ghp_FAKECREDENTIALFORTESTSONLY123456', 'task-AKIAFAKEFORTESTSONLY', 'inbox-xoxb-FAKECREDENTIALFORTESTS'].join('\n');
+for (const host of ['omp', 'claude']) {
+  before = sent().length;
+  assert.equal(await call(host, report + '\n' + prose), undefined, `${host}: benign prose in a budget-limited write must be admitted`);
+  assert.equal(row().decision, 'allow');
+  assert.equal(row().branch, 'policy');
+  assert.equal(sent().length - before, MAX_CHUNKS);
 }
 for (const host of ['omp', 'claude']) {
   for (const prefix of ['-', '+', '.', '---.+', '1-']) {
@@ -1335,7 +1364,7 @@ JS
 ) || fail "large report write budget: $out"
   printf '%s\n' "$out"
   [ "${out##*$'\n'}" = large-write-budget-ok ] || fail "large report regression did not finish: $out"
-  pass "396924-byte reports write and commit through both guards; full-text credentials/privacy/roots still refuse and coverage is audited"
+  pass "396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited"
 }
 
 test_claude_effects
