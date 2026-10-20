@@ -7911,6 +7911,198 @@ test_paused_until_that_passed_is_rechecked_before_the_cadence() {
   pass "a declared wait whose until time has passed is rechecked at once, then held to the cadence"
 }
 
+# A recorded status identity comes from stat in production. Keep its test reader
+# independent of the real volume so one unchanged file can cross a device shift.
+watch_identity_fixture() {  # <name>
+  local dir
+  dir=$(make_case "$1")
+  cat > "$dir/identity-reader" <<'SH'
+#!/usr/bin/env bash
+IFS= read -r identity < "${1%.status}.identity" || exit 1
+printf '%s' "$identity"
+SH
+  chmod +x "$dir/identity-reader"
+  printf '%s' "$dir"
+}
+
+prime_watch_identity() {  # <state> <task> <identity>
+  local state=$1 task=$2 identity=$3 size
+  printf '%s\n' "$identity" > "$state/$task.identity"
+  size=$(size_of "$state/$task.status")
+  status_presentation_marker_commit "$state/.seen-${task}_status" "$state/$task.status" "$size" "$identity" \
+    || fail "could not prime seen identity"
+  status_presentation_marker_commit "$state/.hb-surfaced-$task" "$state/$task.status" "$size" "$identity" \
+    || fail "could not prime heartbeat identity"
+}
+
+test_status_device_shift_does_not_resignal() (
+  local dir state out pid marker current i
+  dir=$(watch_identity_fixture device-shift); state="$dir/state"; out="$dir/watch.out"
+  local FM_STATUS_IDENTITY_READER="$dir/identity-reader"
+  export FM_STATUS_IDENTITY_READER
+  printf 'done: already delivered\n' > "$state/task.status"
+  prime_watch_identity "$state" task 'strong:16777232:123:2026-10-09 12:34:56'
+  printf '%s\n' 'strong:16777233:123:2026-10-09 12:34:56' > "$state/task.identity"
+  current=$(seen_sig "$state/task.status")
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  for i in 1 2; do
+    wait_poll_cycle "$state" "$pid" \
+      || { reap "$pid"; fail "device-only shift re-signalled an unchanged status on pass $i"; }
+    [ ! -s "$state/.wake-queue" ] && [ ! -s "$out" ] \
+      || { reap "$pid"; fail "device-only shift created a wake on pass $i"; }
+    for marker in "$state/.seen-task_status" "$state/.hb-surfaced-task"; do
+      [ "$(cat "$marker")" = "$current" ] \
+        || { reap "$pid"; fail "device-only shift did not migrate $marker"; }
+    done
+  done
+  reap "$pid"
+  pass "device-only shift migrates seen and heartbeat markers; two passes enqueue no wake"
+
+  # A later append is still a real signal, and is delivered only once.
+  printf 'done: new result\n' >> "$state/task.status"
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  wait_for_exit "$pid" 150 || { reap "$pid"; fail "growth after migration was swallowed"; }
+  [ "$(awk -F '\t' '$3 == "signal" { n++ } END { print n+0 }' "$state/.wake-queue")" = 1 ] \
+    || fail "growth after device migration did not signal exactly once"
+  ack_stopped_cycle "$state" || fail "could not acknowledge appended result"
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "growth signalled again after acknowledgement"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "growth enqueued a second signal"; }
+  reap "$pid"
+  pass "a log that grows after device migration signals once"
+)
+
+test_status_identity_replacement_still_signals() (
+  local dir state out pid variant identity
+  for variant in inode birth device-inode weak growth mode; do
+    dir=$(watch_identity_fixture "identity-$variant"); state="$dir/state"; out="$dir/watch.out"
+    local FM_STATUS_IDENTITY_READER="$dir/identity-reader"
+    export FM_STATUS_IDENTITY_READER
+    printf 'done: replacement must surface\n' > "$state/task.status"
+    prime_watch_identity "$state" task 'strong:16777232:123:2026-10-09 12:34:56'
+    case "$variant" in
+      inode) identity='strong:16777232:124:2026-10-09 12:34:56' ;;
+      birth) identity='strong:16777232:123:2026-10-10 12:34:56' ;;
+      growth)
+        identity='strong:16777233:123:2026-10-09 12:34:56'
+        printf 'done: appended across reboot\n' >> "$state/task.status"
+        ;;
+      mode)
+        identity='strong:16777233:123:2026-10-09 12:34:56'
+        chmod 400 "$state/task.status"
+        ;;
+      device-inode) identity='strong:16777233:124:2026-10-09 12:34:56' ;;
+      weak)
+        prime_watch_identity "$state" task 'weak:16777232:123'
+        identity='weak:16777233:123'
+        ;;
+    esac
+    printf '%s\n' "$identity" > "$state/task.identity"
+    watch_bg "$state" "$dir/fakebin" "$out" bash
+    pid=$!
+    wait_for_exit "$pid" 150 || { reap "$pid"; fail "$variant identity change did not signal"; }
+    grep -F $'\tsignal\ttask.status\t' "$state/.wake-queue" >/dev/null \
+      || fail "$variant identity change was not queued"
+    [ "$(awk -F '\t' '$3 == "signal" { n++ } END { print n+0 }' "$state/.wake-queue")" = 1 ] \
+      || fail "$variant change signalled more than once"
+  done
+  pass "changed inode, birth, device plus inode, weak identity, growth, and mode still signal once"
+)
+
+test_signal_rescan_deduplicates_pending() (
+  local dir state out pid i expected actual
+  dir=$(make_case pending-eight); state="$dir/state"; out="$dir/watch.out"
+  for i in 1 2 3 4 5 6 7 8; do
+    printf 'done: result %s\n' "$i" > "$state/task$i.status"
+  done
+  # The first grace sleep changes a file already found by scan one. The second
+  # scan must retain its newest signature without retaining a second row.
+  cat > "$dir/fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = 1 ] && [ ! -e "$FM_STATE_OVERRIDE/.test-grace-append" ]; then
+  printf 'done: newest result\n' >> "$FM_STATE_OVERRIDE/task1.status"
+  : > "$FM_STATE_OVERRIDE/.test-grace-append"
+fi
+exec /bin/sleep "$@"
+SH
+  chmod +x "$dir/fakebin/sleep"
+  # Keep task1 unclassified so its reported signature, not a later successful
+  # endpoint commit, proves which scan's row won the merge.
+  cat > "$dir/span-reader" <<'SH'
+#!/usr/bin/env bash
+case "$1" in */task1.status) exit 1 ;; esac
+exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; read($f, my $b, $ARGV[2]) == $ARGV[2] or exit 1; print $b or exit 1' "$@"
+SH
+  chmod +x "$dir/span-reader"
+  local FM_STATUS_SPAN_READER="$dir/span-reader"
+  export FM_STATUS_SPAN_READER
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  wait_for_exit "$pid" 200 || { reap "$pid"; fail "eight pending files did not signal"; }
+  expected=$(printf 'task%s.status\n' 1 2 3 4 5 6 7 8)
+  actual=$(awk -F '\t' '$3 == "signal" { print $4 }' "$state/.wake-queue" | sort)
+  [ "$actual" = "$expected" ] || fail "pending re-scan did not queue eight unique files: $actual"
+  status_presentation_marker_reported_matches "$state/.seen-task1_status" "$(status_observed_signature "$state/task1.status")" \
+    || fail "pending re-scan kept the old state of the file changed during grace"
+  [ "$(status_presentation_marker_offset "$state/.seen-task1_status" "$state/task1.status")" = 0 ] \
+    || fail "newest-row assertion was masked by a successful classification"
+  [ -e "$state/.test-grace-append" ] || fail "the between-scan mutation was not exercised"
+  pass "eight pending files produce eight rows, retaining the newest between-scan state"
+)
+
+test_long_status_scan_keeps_beacon_fresh() (
+  local dir state out pid reader i beat now first last padding
+  dir=$(make_case long-scan-beat); state="$dir/state"; out="$dir/watch.out"; reader="$dir/slow-span"
+  # A 1.6 MB existing log needs full classification; the reader deliberately
+  # takes longer than WATCHER_STALE_GRACE=3, with production bounds unchanged.
+  printf -v padding '%04000d' 0
+  for i in {1..400}; do printf 'working: historical progress %s %s\n' "$i" "$padding"; done > "$state/task.status"
+  printf 'done: new result\n' >> "$state/task.status"
+  cat > "$reader" <<'SH'
+#!/usr/bin/env bash
+: > "$FM_STATE_OVERRIDE/.test-read-started"
+/bin/sleep 7
+exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; read($f, my $b, $ARGV[2]) == $ARGV[2] or exit 1; print $b or exit 1' "$@"
+SH
+  chmod +x "$reader"
+  # Keep a production-sized hard bound while shortening only the stale grace:
+  # the injected read plus real classification can exceed the derived 9s bound.
+  local FM_STATUS_SPAN_READER="$reader" FM_WATCHER_STALE_GRACE=3 FM_WATCHER_STALL_BOUND=300
+  export FM_STATUS_SPAN_READER FM_WATCHER_STALE_GRACE FM_WATCHER_STALL_BOUND
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  i=0
+  while [ ! -e "$state/.test-read-started" ] && [ "$i" -lt 150 ]; do
+    kill -0 "$pid" 2>/dev/null || fail "watcher exited before the slow read"
+    sleep 0.1; i=$((i + 1))
+  done
+  [ -e "$state/.test-read-started" ] || { reap "$pid"; fail "slow read did not start"; }
+  first=$(file_mtime "$state/.last-watcher-beat")
+  for i in 1 2 3 4 5; do
+    /bin/sleep 1
+    beat=$(file_mtime "$state/.last-watcher-beat"); now=$(date +%s)
+    [ "$((now - beat))" -lt 3 ] \
+      || { reap "$pid"; fail "scan heartbeat exceeded WATCHER_STALE_GRACE=3"; }
+  done
+  last=$(file_mtime "$state/.last-watcher-beat")
+  [ "$last" -gt "$first" ] || { reap "$pid"; fail "scan heartbeat never refreshed"; }
+  wait_for_exit "$pid" 300 || { reap "$pid"; fail "long classification never delivered the result"; }
+  grep -F $'\tsignal\ttask.status\t' "$state/.wake-queue" >/dev/null || fail "long classification lost the result"
+  [ "$(status_presentation_marker_offset "$state/.seen-task_status" "$state/task.status")" = "$(size_of "$state/task.status")" ] \
+    || fail "long classification reported an error instead of committing the complete result"
+  pass "slow 1.6 MB log classification commits its endpoint and refreshes the beacon within WATCHER_STALE_GRACE=3"
+)
+
+test_watch_device_shift_regressions() {
+  test_status_device_shift_does_not_resignal
+  test_status_identity_replacement_still_signals
+  test_signal_rescan_deduplicates_pending
+  test_long_status_scan_keeps_beacon_fresh
+}
+
 # CI's stock macOS Bash lane sets FM_TEST_ONLY to run just the bash-3.2
 # churn-deferral regression. The rest of this file is not a 3.2 snapshot suite.
 if [ -n "${FM_TEST_ONLY:-}" ]; then

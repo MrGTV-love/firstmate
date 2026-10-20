@@ -824,6 +824,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     fm-status-event-lib.sh \
     fm-status-wake-lib.sh \
     fm-status-io-lib.sh \
+    fm-file-identity-lib.sh \
     fm-utc-lib.sh; do
     printf '\n' >>"$repo/bin/$owner"
     listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
@@ -869,7 +870,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm "$owner-change"
   done
   rm -rf "$tmp"
-  pass "all six status and UTC owner-only changes select consuming families and exact additional consumers"
+  pass "all status, identity, and UTC owner-only changes select consuming families and exact additional consumers"
 }
 
 # A direct test reference is per-script evidence. Widening it to the referencing

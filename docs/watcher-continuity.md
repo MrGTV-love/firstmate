@@ -516,7 +516,7 @@ The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYC
 ### Grace, beacon, and stop signals
 
 The default 300-second grace is unchanged.
-Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
+Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check, status reclassification, or reboot-recovery inspection.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
 The main shell enforces each capture deadline even if its timeout controller stops responding.
 Home-summary publication runs separately so its inventory-sized work does not delay the main poll.
@@ -605,6 +605,7 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 It also exercises a single TERM with a live foreign downtime-marker lock holder, retained stale singleton and subsequent arm-style recovery, including decimal `08` and zero `00` cleanup bounds.
 It checks that a newly appended keyed decision is classified without rereading earlier status bytes, so signal handling can return to the watcher's beacon refresh even when the status history is long.
 It also checks that a slow pending-reply pass keeps refreshing the beacon between records, so the pass is not mistaken for a stalled watcher.
+`tests/fm-watch-triage.test.sh` also verifies that status reclassification keeps the main shell's beacon fresh during an injected slow read of a large log, without increasing the stale bound.
 Completed-cycle waits observe the test-owned terminal poll-wait boundary in the fixture's explicit state directory, not intermediate progress-beacon writes.
 Process-event fixtures pass both the home and its matching explicit state directory to every watcher launch, including output-failure launches, so the same completed-cycle boundary covers replay, handling acknowledgement, and the absence of duplicate wakes.
 `tests/fm-wake-queue.test.sh` proves TERM likewise stops a watcher blocked in the drain-ring idle check's pane capture.

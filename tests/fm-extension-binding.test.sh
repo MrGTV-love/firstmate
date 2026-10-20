@@ -1395,7 +1395,7 @@ PRE_PROC_ROOT="$TMP_ROOT/pre-proc-root"
 mkdir -p "$PRE_PROC_ROOT/bin"
 for pre_proc_file in \
   fm-extension.mjs fm-extension-launch-barrier.mjs fm-extension.sh fm-procevent.sh fm-procevent-lib.sh \
-  fm-procevent-extension-capture.pl fm-procevent-lavish.sh fm-pr-lib.sh fm-wake-lib.sh fm-path-lib.sh; do
+  fm-procevent-extension-capture.pl fm-procevent-lavish.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-wake-lib.sh fm-path-lib.sh; do
   cp "$ROOT/bin/$pre_proc_file" "$PRE_PROC_ROOT/bin/$pre_proc_file"
 done
 chmod +x "$PRE_PROC_ROOT/bin"/fm-*.sh "$PRE_PROC_ROOT/bin/fm-extension.mjs" "$PRE_PROC_ROOT/bin/fm-extension-launch-barrier.mjs"
@@ -1939,7 +1939,7 @@ mkdir -p "$H_REMOTE_CONTROL/data" "$H_REMOTE" "$REMOTE_ROOT/bin"
 printf 'fixture\n' > "$REMOTE_ROOT/AGENTS.md"
 for remote_file in \
   fm-extension.mjs fm-extension-launch-barrier.mjs fm-extension.sh fm-procevent.sh fm-procevent-lib.sh fm-procevent-extension-capture.pl fm-procevent-lavish.sh \
-  fm-pr-lib.sh fm-wake-lib.sh fm-path-lib.sh fm-secondmate-parent-lib.sh fm-remote-entrypoint.sh fm-remote-job-lib.sh \
+  fm-pr-lib.sh fm-file-identity-lib.sh fm-wake-lib.sh fm-path-lib.sh fm-secondmate-parent-lib.sh fm-remote-entrypoint.sh fm-remote-job-lib.sh \
   fm-remote-job-worker.sh; do
   cp "$ROOT/bin/$remote_file" "$REMOTE_ROOT/bin/$remote_file"
 done
