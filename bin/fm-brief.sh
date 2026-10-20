@@ -114,6 +114,13 @@
 # disagrees, so an adjusted brief and the recorded task metadata cannot drift
 # apart.
 # Ship briefs begin with a worktree-isolation assertion before the branch step.
+# The branch step also forbids a second tree inside the pool slot: Vernant's
+# scripts/git-stability/start_task_worktree.py would nest a locked copy under
+# the slot that no one owns the release of (bin/fm-teardown-nested-lib.sh and
+# bin/fm-copy-sweep.sh only clean up after it). A Vernant rule or guard that
+# demands a manifest or a second worktree becomes one blocked status line that
+# names the single firstmate route question and slot-manifest key, not a tree
+# the lane creates.
 # Both crewmate scaffolds carry one shared rule against administering the
 # infrastructure every lane shares - the no-mistakes daemon and the worktree pool
 # their own slot came from - so ship and scout cannot drift apart. A secondmate
@@ -834,7 +841,9 @@ $SETUP_BASE
 The path check is authoritative: \`git rev-parse --git-dir\` and \`git rev-parse --git-common-dir\` can help inspect the repo, but they do not prove you are outside the primary checkout.
 If the top-level path is the primary checkout or not the worktree you were launched in, STOP - do not branch or commit here - append \`blocked [at=<epoch>]: launched in primary checkout, not an isolated worktree\` to the status file and stop.
 
-1. First action: create your branch: \`git checkout -b $BRANCH_Q --\`$SETUP2
+1. First action: create your branch: \`git checkout -b $BRANCH_Q --\`
+   You already sit in a pool slot, which is itself a worktree. Do not create a second tree with \`scripts/git-stability/start_task_worktree.py\` from inside this slot; that nested worktree has no owner.
+   If a Vernant rule or guard demands a lifecycle manifest, or reports \`manifest_exists\` on a reused slot, do not create a second tree and do not wait without a route. Append exactly one blocked line: \`blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?\` and stop. Never run start_task_worktree.py from this slot.$SETUP2
 
 # Rules
 $RULE1

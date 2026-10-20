@@ -1762,6 +1762,47 @@ test_process_budget_command_quotes_foreign_firstmate_path() {
   pass "fm-brief.sh: emitted process-budget commands execute from foreign paths"
 }
 
+# A first lane must never be told to create the nested worktree that leaked
+# under pool slots, and must never be left with a wait and no route. The ship
+# brief is the generated text a lane reads: it forbids the second tree and, for
+# a manifest or second-worktree demand, tells the lane to stop with one blocked
+# line naming the single firstmate question and the slot-manifest key.
+test_ship_brief_does_not_instruct_a_nested_worktree() {
+  local home id brief mode
+  home="$TMP_ROOT/slot-provisioning-home"
+  mkdir -p "$home/data"
+  for mode in no-mistakes direct-PR local-only; do
+    id="brief-slot-provisioning-$mode"
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh failed to scaffold the $mode slot-provisioning brief"
+    brief="$home/data/$id/brief.md"
+    assert_grep 'Do not create a second tree with' "$brief" \
+      "the $mode ship brief does not forbid the nested worktree"
+    assert_grep 'from inside this slot; that nested worktree has no owner.' "$brief" \
+      "the $mode ship brief does not say the nested worktree has no owner"
+    if grep -F 'provision_existing_slot' "$brief" >/dev/null; then
+      fail "the $mode ship brief still sends the lane to Vernant's create-only slot provisioner"
+    fi
+    if grep -F 'worktree-python-environments.md' "$brief" >/dev/null; then
+      fail "the $mode ship brief still points at the slot-provisioning doc"
+    fi
+    assert_grep 'do not create a second tree and do not wait without a route. Append exactly one blocked line:' "$brief" \
+      "the $mode ship brief lost its no-wait route line for a manifest or second-worktree demand"
+    assert_grep 'blocked [at=<epoch>] [key=slot-manifest]: firstmate, which route should this slot use - run the existing-slot provisioner, retire or replace the manifest, or accept the existing one?' "$brief" \
+      "the $mode ship brief lost its keyed firstmate route line"
+    if grep -qw 'Main' "$brief"; then
+      fail "the $mode ship brief says Main instead of firstmate"
+    fi
+    if grep -F 'start_task_worktree.py' "$brief" | grep -vF -e 'Do not create' -e 'Never run' >/dev/null; then
+      fail "the $mode ship brief mentions start_task_worktree.py outside a prohibition"
+    fi
+    # shellcheck disable=SC2016  # literal backticks around the branch name must stay unexpanded
+    assert_grep "\`git checkout -b fm/$id --\`" "$brief" \
+      "the $mode ship brief lost its branch step"
+  done
+  pass "fm-brief.sh: a ship brief forbids the nested worktree and gives the lane a blocked route"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
@@ -1770,6 +1811,7 @@ test_forge_selection_renders_correct_cli
 test_ship_mode_is_required_and_closed_set
 test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget
 test_process_budget_command_quotes_foreign_firstmate_path
+test_ship_brief_does_not_instruct_a_nested_worktree
 test_ship_mode_is_explicit_not_registry
 test_delivery_flags_are_refused_where_they_do_not_apply
 test_faster_paths_use_configured_authority_without_stacked_review
