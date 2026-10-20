@@ -2374,7 +2374,7 @@ These fields can contain worker prompt or instruction text, so guard calls can s
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling.
 Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
-Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent; their complete-cover screening is unchanged.
+Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent, and the never-send policy still checks their whole payload before the first piece leaves; their complete-cover screening is unchanged.
 Write/edit content is not refused because it exceeds that model-screening budget: the guard screens at most 16 pieces and admits the remainder under deterministic local rules only.
 The existing root check applies to the whole operation.
 A budget-limited write/edit is also checked over its whole replacement text, before any model request, for exactly these shapes: a private-key header, a GitHub token (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` or `github_pat_` prefix), an AWS access key ID (`AKIA` or `ASIA` prefix), a Slack token (`xox` prefix) and a connection URL with an embedded password.

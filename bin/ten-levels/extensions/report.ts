@@ -125,7 +125,10 @@ export interface GuardService {
    * overlapping pieces that each fit it. Refuses before any egress when the payload cannot be covered completely.
    */
   plan(state: Record<string, unknown>, field: string, questions: Questions): string[];
-  /** Writes retain whole-text local checks but may exhaust their model budget before the end. */
+  /**
+   * The pieces of a write that fit within MAX_CHUNKS requests; the caller screens any remainder locally.
+   * Unlike `plan`, each piece gets its own never-send check, so a value longer than the overlap can be cut across a boundary.
+   */
   planWrite(state: { path: string; content: string }, questions: Questions): { pieces: string[]; model_screened_bytes: number; local_only_bytes: number };
   record(terminal: GuardTerminal): void;
 }
