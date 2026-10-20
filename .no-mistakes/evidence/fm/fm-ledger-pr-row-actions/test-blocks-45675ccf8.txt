@@ -1,0 +1,39 @@
+Action-test block (tests/fm-open-loops.test.sh lines 1955-2317) run against three versions of bin/.
+The block is the current test: PR provenance steers + damaged non-object source steers.
+
+=== TARGET 45675ccf8 ===
+--- action block (current test) vs bin from: work ---
+PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
+PASS: a steer on a row with a non-object source falls back to its owner inbox
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+real 114.58
+user 20.73
+sys 41.01
+exit=0
+
+=== 39795ddaf (round-1 code, before the damaged-source guard) ===
+--- action block (current test) vs bin from: mid ---
+PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
+Traceback (most recent call last):
+  File "<stdin>", line 178, in <module>
+  File "<stdin>", line 45, in ok
+AssertionError: ((PosixPath('/Users/charlesabrooker/tmp/fm-r2.aAw4Hh/w-mid/action-code/bin/fm-open-loops.sh'), 'action', 'row-damaged-source-0', 'steered', '--evidence', '001.msg'), '', 'Traceback (most recent call last):\n  File "/Users/charlesabrooker/tmp/fm-r2.aAw4Hh/w-mid/action-code/bin/fm_open_loops.py", line 1764, in <module>\n    sys.exit(main())\n             ~~~~^^\n  File "/Users/charlesabrooker/tmp/fm-r2.aAw4Hh/w-mid/action-code/bin/fm_open_loops.py", line 1722, in main\n    return ledger_action(args, lock_dir, now)\n  File "/Users/charlesabrooker/tmp/fm-r2.aAw4Hh/w-mid/action-code/bin/fm_open_loops.py", line 1575, in ledger_action\n    sent = steer_record_epoch(state, by_id[iden
+real 50.76
+user 9.13
+sys 17.34
+exit=1
+
+=== BASE 03bff4bce (before the whole change) ===
+(output of the first base run in this turn; a second re-run hit a leftover work dir and is discarded)
+Traceback (most recent call last):
+  File "<stdin>", line 163, in <module>
+AssertionError: CompletedProcess(args=['.../action-code/bin/fm-open-loops.sh', 'action', 'row-pr-steer-False', 'steered', '--evidence', '002.msg'], returncode=1, stdout='error: "steered evidence must be a delivery record name (NNN.msg) in this row\'s task inbox"\n', stderr='')
+
+=== waiting-receipt block (tests lines 2320-2712) vs TARGET ===
+PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers
+PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup
+exit=0
+
+=== captain-hold block (tests lines 2715-3079) vs TARGET ===
+PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger; a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidenc
+exit=0

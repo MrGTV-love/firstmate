@@ -1,0 +1,54 @@
+===== base-03bff4bce: /Users/charlesabrooker/tmp/fm-base-bin.BJ5z4b/bin =====
+-- collector: real heartbeat builds the PR rows
+  [PASS] heartbeat publishes the ledger
+  PR row 175: id=15261cd1668fc9e3e6ea495e category=open_pr owner=firstmate overdue=True source.task=fm-prune-copy-on-merge next_action="route the green PR's review and obtain merge approval"
+  PR row 176: id=bc0c2b39e69532572b0eac46 category=open_pr owner=firstmate overdue=True source.task=fm-second-ship next_action="route the green PR's review and obtain merge approval"
+  PR row 181: id=c02eff626cd974aca5248f84 category=open_pr owner=firstmate overdue=True source.task=fm-third-ship next_action="route the green PR's review and obtain merge approval"
+  question row: id=e25ee4b5d9704b6d1dadf846 category=unanswered_question owner=firstmate overdue=True source.task=fm-prune-copy-on-merge
+  [PASS] PR rows are overdue open_pr rows whose subject is the URL and source.task is the owning ship
+  [PASS] wake drain presents the overdue PR rows
+  [PASS] wake acknowledgement is refused while no action is recorded
+-- adversarial: evidence that must be refused
+  [PASS] record that exists nowhere is refused
+     error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  [PASS] record sent before the presentation is refused (not a new delivery)
+     error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  [PASS] another ship's inbox record is refused for this ship's PR row (no cross-task borrowing)
+     error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  [PASS] source.task with path separators is ignored (no path traversal)
+     error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+-- the reported case: steer a PR row from its owning ship inbox
+  delivered 002.msg to state/fm-prune-copy-on-merge.inbox/
+  action steered -> error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  [FAIL] PR row 175: action steered --evidence NNN.msg is accepted from source.task inbox  -- error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  [FAIL] receipt recorded as steered with the cited record  -- {}
+  [FAIL] same record cannot be cited twice  -- error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+-- handled/ variant on a second ship
+  action steered (record moved to handled/) -> error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  [FAIL] PR row 176: record found in handled/ is accepted  -- error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+-- wake acknowledgement after answering both rows
+  ack with row 181 still unanswered -> error: overdue rows have no action recorded since presentation; acknowledgement refused | OVERDUE: | rows[4]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}: |   "15261cd1668fc9e3e6ea495e","firstmate","https://g
+  [PASS] ack still refused while a third PR row has no action
+-- deferred once, second deferral refused, steer is the truthful action left
+  [PASS] first deferral of PR row 181 accepted
+  [PASS] second deferral refused for the captain-visible row
+     error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+  action steered after deferral -> error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  [FAIL] PR row 181: steer accepted after the deferral (row is no longer stuck)  -- error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+-- regression: question row keeps working through its subject prefix
+  question row action steered -> action: "e25ee4b5d9704b6d1dadf846" | kind: steered
+  [PASS] question row steer still accepted (task id leading the subject)
+  ack -> error: overdue rows have no action recorded since presentation; acknowledgement refused | OVERDUE: | rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}: |   "15261cd1668fc9e3e6ea495e","firstmate","https://g
+  [FAIL] wake acknowledgement permitted once every overdue row has an action  -- error: overdue rows have no action recorded since presentation; acknowledgement refused | OVERDUE: | rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}: |   "15261cd1668fc9e3e6ea495e","firstmate","https://g
+  [FAIL] acknowledged wake is consumed from the queue  -- '1792472419\t1\tcheck\treport\tcheck: board report\n'
+  [FAIL] --check-actions reports no unmet requirement
+
+SUMMARY base-03bff4bce: 12 passed, 8 failed
+  FAILED: PR row 175: action steered --evidence NNN.msg is accepted from source.task inbox
+  FAILED: receipt recorded as steered with the cited record
+  FAILED: same record cannot be cited twice
+  FAILED: PR row 176: record found in handled/ is accepted
+  FAILED: PR row 181: steer accepted after the deferral (row is no longer stuck)
+  FAILED: wake acknowledgement permitted once every overdue row has an action
+  FAILED: acknowledged wake is consumed from the queue
+  FAILED: --check-actions reports no unmet requirement

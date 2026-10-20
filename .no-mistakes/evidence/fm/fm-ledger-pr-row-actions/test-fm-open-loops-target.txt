@@ -1,0 +1,37 @@
+PASS: ordinary categories, PR proof, ages and configuration
+PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion
+PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
+PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
+PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
+PASS: interrupted teardown records bound to the current task record
+PASS: correction coverage and landed/drop exclusions
+PASS: recorded task-only PR classification, fork landing, and correction coverage
+PASS: patch-equivalent delivery
+PASS: approved local landing and qualified defaults
+PASS: independent failed delivery and worker liveness axes
+PASS: unknown current state degrades independently of live verdict
+PASS: future pipeline stamps do not mask older valid progress
+PASS: future status commit and reflog cannot hide unknown-age stalls
+PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
+PASS: collection leaves Git index and object inventory unchanged
+PASS: last-error JSON and human representations
+PASS: local-path origins are disclosed without degrading the ledger
+PASS: exact GitHub host admission and PR projection
+PASS: unreadable shared state inventory cannot publish complete empty coverage
+PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
+PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
+PASS: generation-invalidated snapshots retain coverage failures despite live stop events
+PASS: only dispatched ready work is overdue
+PASS: ordinary recovery adapters and source degradation
+PASS: publication suppression reset success/failure/skip
+PASS: held-gate singleflight and child cleanup
+PASS: unset and empty address overrides share shell defaults before collection
+PASS: command deadline owns resistant descendant cleanup
+PASS: collection deadline owns resistant descendant cleanup
+PASS: deadline escapes origins source recovery
+PASS: deadline escapes pr-checks source recovery
+PASS: deadline escapes pr-state source recovery
+Traceback (most recent call last):
+  File "<stdin>", line 1515, in <module>
+AssertionError: ('questions', {'schema': 'fm-open-loops.v1', 'generated_epoch': 1792472494, 'home': '/Users/charlesabrooker/tmp/fm-open-loops.9RNCh4/deadline-questions/home', 'complete': False, 'rows': [{'id': '6cc7350973c8042241250293', 'category': 'coverage', 'subject': 'ledger degraded', 'owner': 'firstmate', 'next_action': 'restore the unreadable sources and rerun the reconciler', 'age_seconds': None, 'limit_seconds': 0, 'overdue': True, 'evidence': 'questions 0.status: source command failure; questions 1.status: [Errno 1] Operation not permitted; questions 10.status: source command failure; questions 11.status: source command failure; questions 12.status: source command failure; questions 13.status: source command failure; questions 14.status: source command failure; questions 15.status: source command failure; questions 16.status: source com'}]})
+bash tests/fm-open-loops.test.sh  126.63s user 213.41s system 55% cpu 10:10.23 total

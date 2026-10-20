@@ -1,0 +1,10 @@
+--- TARGET ---
+PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+bash "$X/run.sh" "$PWD" "$PWD" "$X/action-block.py"  19.11s user 38.25s system 77% cpu 1:13.74 total
+exit=0
+--- BASE (old bin, new test) ---
+Traceback (most recent call last):
+  File "<stdin>", line 163, in <module>
+AssertionError: CompletedProcess(args=['/Users/charlesabrooker/tmp/fm-open-loops-block.ZTd7tG/action-code/bin/fm-open-loops.sh', 'action', 'row-pr-steer-False', 'steered', '--evidence', '002.msg'], returncode=1, stdout='error: "steered evidence must be a delivery record name (NNN.msg) in this row\'s task inbox"\n', stderr='')
+exit=1

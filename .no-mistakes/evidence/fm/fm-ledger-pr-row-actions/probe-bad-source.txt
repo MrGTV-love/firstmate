@@ -1,0 +1,12 @@
+base: source='a string'     rc=0 traceback=False out=kind: steered
+base: source=None           rc=0 traceback=False out=kind: steered
+base: source=['x']          rc=0 traceback=False out=kind: steered
+base: source=7              rc=0 traceback=False out=kind: steered
+base: source={'task': 5}    rc=0 traceback=False out=kind: steered
+base: source={'task': ['w']} rc=0 traceback=False out=kind: steered
+target: source='a string'     rc=1 traceback=True out=AttributeError: 'str' object has no attribute 'get'
+target: source=None           rc=1 traceback=True out=AttributeError: 'NoneType' object has no attribute 'get'
+target: source=['x']          rc=1 traceback=True out=AttributeError: 'list' object has no attribute 'get'
+target: source=7              rc=1 traceback=True out=AttributeError: 'int' object has no attribute 'get'
+target: source={'task': 5}    rc=0 traceback=False out=kind: steered
+target: source={'task': ['w']} rc=0 traceback=False out=kind: steered
