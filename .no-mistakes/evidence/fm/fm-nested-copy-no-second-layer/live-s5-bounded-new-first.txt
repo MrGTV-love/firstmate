@@ -1,0 +1,11 @@
+### S5: backlog of 5 known copies; TWO new youngest copies join -> wake counts 7, shows five in all, names BOTH new ones first, then oldest; repeat is silent
+record before:
+5
+--- check
+copy-sweep: HELD-LIVE-TASK nested copies=7, 5 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/n6 (task=task-alpha age=1s source=directory); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/n7 (task=task-alpha age=1s source=directory); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1 (task=task-alpha age=237s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1 (task=task-alpha age=222s source=directory); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2 (task=task-alpha age=195s source=lock); the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh
+--- number of copies named in the wake line: 5
+--- check again (expect silent)
+output=[]
+--- full report line names all seven
+nested copies=7
+/worktrees/fresh2 /worktrees/late3 /worktrees/n6 /worktrees/n7 /worktrees/orphan1 /worktrees/unlocked1 /worktrees/watch5 

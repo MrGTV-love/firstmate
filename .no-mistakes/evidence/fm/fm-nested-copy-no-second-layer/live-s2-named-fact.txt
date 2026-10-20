@@ -1,0 +1,34 @@
+### S2: live ship task owns the slot; Vernant-shaped locked copy + unlocked copy nested inside -> named fact (report), one wake (check), silent repeat
+lock file: /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.git/worktrees/orphan1/locked
+vernant-session-active owner=launcher:999999
+
+--- report mode
+copy-sweep: mode=report containers=1 copies=2
+copy-sweep: HELD-LIVE-TASK nested copies=2: /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1 (task=task-alpha age=15s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1 (task=task-alpha age=0s source=directory)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1	worktree lock: vernant-session-active owner=launcher:999999
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1	task task-alpha's active record names it as its worktree
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1: 0.00 GiB, no budget (off)
+budget container /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo: 0.00 GiB, no budget (off)
+--- wake queue after report:
+ls: /Users/charlesabrooker/tmp/fm-lab.akB8EA/state/.wake-queue: No such file or directory
+--- check #1 (expect ONE line carrying both copies)
+copy-sweep: HELD-LIVE-TASK nested copies=2, 2 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1 (task=task-alpha age=17s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1 (task=task-alpha age=2s source=directory); the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh
+rc=0
+--- record file
+schema	fm-copy-sweep-v1
+last_scan	1792464625
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1
+--- check #2 same set (expect silent)
+output=[]
+--- lock + registrations unchanged?
+lock file identical
+registrations identical
+/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1
+/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1

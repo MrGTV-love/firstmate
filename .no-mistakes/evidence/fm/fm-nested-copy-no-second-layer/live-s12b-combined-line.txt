@@ -1,0 +1,5 @@
+### S12b: the combined line carries BOTH the budget part and the live part
+is over its budget
+HELD-LIVE-TASK nested copies=6, 5 shown (new first, then oldest)
+line count: 1
+

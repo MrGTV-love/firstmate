@@ -1,0 +1,15 @@
+### S11c: real sweep + real git, except a pass-through git wrapper that fails ONLY 'worktree list' on the slot (the one failure real git cannot be made to give here)
+copy-sweep: mode=report containers=0 copies=0
+note: clone /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo was not read: its registered worktrees cannot be listed
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+--- check under the same fault
+check output=[]
+--- copies still on disk, registered:
+       5
+--- git healthy again -> the same set is back in the report
+nested copies=5

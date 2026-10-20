@@ -1,0 +1,45 @@
+ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
+ok - live nested copies are named once with lock/directory ages, below budget, without changing copies or locks
+ok - a lock probe cut by the time bound names the copy with an unknown source and age, never its directory age
+ok - a registered copy whose directory is gone is not named as a live nested copy
+ok - the wake carries the count, the oldest five live copies and a pointer to the report, as one line
+ok - a new youngest copy is named first, the wake names five copies in all, and an unchanged set stays silent
+ok - home-project nested copies are reported while their task is live, but not after closure or for a secondmate home
+ok - unreadable registered-worktree enumeration reports the gap without a directory-walk fallback
+ok - apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent
+ok - a copy with one untracked file and a copy whose tip is on no remote are both kept
+ok - a copy whose tip is on no remote but whose content already landed is removed by the teardown landed rule
+ok - a project clone under a Firstmate home is enumerated, budgeted as a container, and swept
+ok - a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once
+ok - apply never forces, cleans, unlocks, recursively deletes or calls treehouse
+ok - a load above the limit skips only the sizing, says so in the report and the record, and listing, classes and apply still run
+ok - 6 skipped runs in a row raise one wake, none while the streak stands, and again after a sized run breaks it
+ok - du runs one at a time as nice -n 20 du -sk, with and without a deadline
+ok - sizes are cached by copy path and mtime and expire with cache-max-age
+ok - a copy nested in another copy is subtracted from the enclosing one
+ok - the budget wake names budget, total and the five largest copies with class, fires once, and fires again after a drop and a new overrun
+ok - a pool budget and a container budget that go over together raise one wake
+ok - apply raises the budget wake once through the wake queue
+ok - a scan cut at its time bound wakes only on bytes it measured and records no completed scan
+ok - a registered copy whose directory is gone counts as 0 KiB, so it never latches a budget record
+ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time
+ok - run from the root home, a lane's proven copy is reaped, its own live record holds a copy, and an unreadable lane holds every copy
+ok - an outer copy that holds a dirty inner copy is held and apply keeps both, even when git status cannot see the inner copy
+ok - an outer copy is held while an inner copy exists, reaped by the next run once it is removed, and not held by a registration whose directory is gone
+ok - a zero-padded or non-numeric FM_CHECK_TIMEOUT no longer aborts the check
+ok - a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy
+ok - a check whose enumeration is slow stops looking for clones at its time bound and still prints the wake for the clones it reached
+ok - a check stops looking at a home's project clones at its time bound
+ok - a cut check keeps the standing budgets it did not reach and counts toward the streak of skipped runs
+ok - a check that is cut and skipped on every poll counts once per interval and raises exactly one wake on the 6th counted run
+ok - a cut check keeps a pool budget it reached only in part, and only a complete run clears it
+ok - a cut check keeps the cached sizes of the copies it did not reach while they are fresh, and a complete run rewrites the cache
+ok - check classifies exactly the copies its wake names
+ok - check scans at most once per interval and polls inside it do nothing
+ok - check is report-only
+ok - a malformed config/copy-budget is refused with its line named and reported once by check
+ok - the host's own lsof finds a process whose working directory is inside a copy
+ok - arm binds the check to the existing watcher cadence and disarm removes it
+ok - help carries the hourly command and bad calls are refused
+ok - fm-copy-sweep
+bash tests/fm-copy-sweep.test.sh  42.69s user 89.99s system 35% cpu 6:10.43 total

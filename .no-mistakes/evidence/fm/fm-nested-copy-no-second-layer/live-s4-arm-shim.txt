@@ -1,0 +1,17 @@
+### S4: arm binds check to the watcher cadence; the armed shim (what the watcher runs) names a new copy once
+--- arm
+armed: state/copy-sweep.check.sh
+rc=0
+-rw-------   1 charlesabrooker  staff   84 Oct 19 21:51 copy-sweep.check-trust
+-rwx------   1 charlesabrooker  staff  305 Oct 19 21:51 copy-sweep.check.sh
+-rw-------   1 charlesabrooker  staff  310 Oct 19 21:50 copy-sweep.record
+-rw-------   1 charlesabrooker  staff  322 Oct 19 21:50 copy-sweep.sizes
+--- shim body
+#!/usr/bin/env bash
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.akB8EA
+exec /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5AN6K0WF8RAK510NFXYF1C2/bin/fm-proc-budget.sh -- /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5AN6K0WF8RAK510NFXYF1C2/bin/fm-copy-sweep.sh check
+--- run shim as the watcher does (FM_HOME set, scan interval 0)
+copy-sweep: HELD-LIVE-TASK nested copies=4, 4 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/late3 (task=task-alpha age=4s source=directory); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1 (task=task-alpha age=77s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1 (task=task-alpha age=62s source=directory); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2 (task=task-alpha age=35s source=lock); the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh
+rc=0
+--- run shim again (expect silent)
+output=[]

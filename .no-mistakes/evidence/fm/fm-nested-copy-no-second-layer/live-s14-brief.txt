@@ -1,0 +1,24 @@
+fm-brief --scout rc=0
+81:   The task copy is the isolation: do not create a second worktree inside it.
+--- context in the scout brief
+77-     running right now. The act is the rule and commands are only examples of it - `treehouse`
+78-     get/return/remove/prune, the equivalent operations on any other worktree provider or runtime
+79-     backend, and `git worktree add|remove|move|prune`. A slot that looks unused is not evidence
+80-     that it is free, and returning your own worktree is firstmate's job at cleanup, not yours.
+81:   The task copy is the isolation: do not create a second worktree inside it.
+82-   If you genuinely need a second checkout, another slot, or the daemon touched, append
+83-   `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
+84-8. Stop every private service you start. A private service is any daemon, server, or watcher that
+--- secondmate charter must not carry it (not a task copy worker):
+rc=0
+0
+### S14 (ship modes): real fm-brief.sh in the lab home
+fm-brief --mode no-mistakes rc=0
+93:   The task copy is the isolation: do not create a second worktree inside it.
+fm-brief --mode direct-PR rc=0
+90:   The task copy is the isolation: do not create a second worktree inside it.
+fm-brief --mode local-only rc=0
+90:   The task copy is the isolation: do not create a second worktree inside it.
+--- scout (from previous run):
+81:   The task copy is the isolation: do not create a second worktree inside it.
+--- secondmate charter count of the rule: 0

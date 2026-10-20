@@ -1,0 +1,9 @@
+### S9: boundary - a record whose worktree IS the nested copy (first layer) does not name that copy; only copies strictly inside a record's copy count
+report:
+(lines above = fact lines; expect none)
+HELD-LIVE-TASK fact lines: 0
+
+### S10: prior_worktree= of a ship record also makes the slot live
+nested copies=5:
+   5 (task=task-gamma
+

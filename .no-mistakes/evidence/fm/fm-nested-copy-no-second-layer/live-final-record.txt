@@ -1,0 +1,10 @@
+schema	fm-copy-sweep-v1
+last_scan	1792465160
+over	pool:/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1
+over	container:/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/budgetcopy
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/late3
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/n6
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1
+live	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1

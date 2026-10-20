@@ -1,0 +1,16 @@
+### S1: nested copy, NO task record -> no live-copy fact, no wake
+--- report
+copy-sweep: mode=report containers=1 copies=1
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1	worktree lock: vernant-session-active owner=launcher:999999
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1: 0.00 GiB, no budget (off)
+budget container /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo: 0.00 GiB, no budget (off)
+--- check (rc=0)
+check rc=0
+--- wake queue:
+ls: /Users/charlesabrooker/tmp/fm-lab.akB8EA/state/.wake-queue: No such file or directory

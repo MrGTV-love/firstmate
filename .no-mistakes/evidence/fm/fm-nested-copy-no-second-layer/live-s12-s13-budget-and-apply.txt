@@ -1,0 +1,11 @@
+### S12: budget breach + a new live copy in ONE aggregated line; budget wake behavior intact
+lines: 1
+copy-sweep: pool /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1 is over its budget: 0.00 GiB against 0 GiB; largest copies: /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/budgetcopy 0.00 GiB HELD-LIVE-TASK, /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2 0.00 GiB HELD-LOCKED, /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/lat
+--- same again (expect silent: budget unchanged, set unchanged)
+output=[]
+
+### S13: --apply still reaps a provably stale, closed copy (old behavior) and keeps every live/locked copy
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/stale1	branch fm/stale1 at 8b5f1e42b064 (clean, no process, no record, HEAD contained in a remote branch)
+stale1 dir present after apply? no
+locked orphan1 + fresh2 present? YES
+2026-10-20T02:58:52Z	removed	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/stale1	clone=/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo	head=8b5f1e42b064940a79552

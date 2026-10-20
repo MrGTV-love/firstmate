@@ -1,0 +1,29 @@
+### S3: a NEW nested copy appears; hourly --apply raises ONE wake through the wake queue and deletes nothing it must not
+--- apply #1
+copy-sweep: wake raised: copy-sweep: HELD-LIVE-TASK nested copies=3, 3 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2 (task=task-alpha age=0s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1 (task=task-alpha age=42s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1 (task=task-alpha age=27s source=directory); the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2	worktree lock: vernant-session-active owner=launcher:999998
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1	worktree lock: vernant-session-active owner=launcher:999999
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1	task task-alpha's active record names it as its worktree
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1: 0.00 GiB, no budget (off)
+budget container /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo: 0.00 GiB, no budget (off)
+rc=0
+--- wake queue rows:
+1792464651	1	check	/Users/charlesabrooker/tmp/fm-lab.akB8EA/state/copy-sweep.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.akB8EA/state/copy-sweep.check.sh: copy-sweep: HELD-LIVE-TASK nested copies=3, 3 shown (new first, then oldest): /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2 (task=task-alpha age=0s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1 (task=task-alpha age=42s source=lock); /Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1 (task=task-alpha age=27s source=directory); the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh
+--- apply #2 (no change; expect no new wake row)
+rows now: 1
+--- removal log:
+ls: /Users/charlesabrooker/tmp/fm-lab.akB8EA/data/copy-sweep.log: No such file or directory
+--- registrations + dirs unchanged?
+registrations identical
+/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/fresh2
+/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/orphan1
+/Users/charlesabrooker/tmp/fm-lab.akB8EA/th/pool1/1/repo/.claude/worktrees/unlocked1
+lock orphan1: vernant-session-active owner=launcher:999999
+lock fresh2: vernant-session-active owner=launcher:999998

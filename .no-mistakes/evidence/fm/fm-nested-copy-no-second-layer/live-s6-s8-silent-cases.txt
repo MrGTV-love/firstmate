@@ -1,0 +1,16 @@
+### S6: a copy LEAVES the set -> silent (no wake), record shrinks
+check output=[]
+record live count: 6 (expect 6)
+
+### S7: registered copy whose directory is gone is not named; record does not keep it
+check output=[]
+nested copies=5
+record lines naming n7: 0
+
+### S8: SECONDMATE record naming the slot does not make copies 'live'; CLOSED task (record gone) raises nothing
+report with only a secondmate record:
+HELD-LIVE-TASK fact lines: 0
+--- closed (no record at all):
+HELD-LIVE-TASK fact lines: 0
+check output=[]
+copies still on disk (nothing deleted):        5
