@@ -180,10 +180,10 @@ Do not build wrappers, control planes, policy layers, custom verifiers, or autom
 Two kinds of work on this repository's own shared tracked material skip the brief, the worker, the capacity slot and the acceptance section: a single-file change whose content is documentation, configuration or comments, and any revert or revert-of-revert the captain ordered in the current exchange.
 Firstmate makes that change itself in an isolated copy and opens the PR through the selected delivery path, with no reviewer or gate beyond that path's own.
 It writes the intent as the captain's own words only.
-It answers all review findings in one batch: warnings and info go to the PR's follow-ups, and only an error, data-loss, lost-record, security or widened-guard finding triggers a fix round.
-Shared tracked material still requires `firstmate-coding-guidelines`, and merge authority is unchanged.
+There is no worker, so it answers all review findings itself in one batch: warnings and info go to the PR's follow-ups, and only an error, data-loss, lost-record, security or widened-guard finding triggers a fix round; `ask-user-authority` still owns how an ask-user finding is decided, and this only caps the rounds.
+Shared tracked material still requires `firstmate-coding-guidelines`, and merge authority is unchanged: with no task record, track and land the PR through `bin/fm-pr-merge.sh` on a bookkeeping landing record, never a hand-written `gh pr merge`.
 Everything else keeps the intake above.
-Hard rule 1 and `firstmate-self-repo` still govern every registered project.
+Hard rule 1 governs every registered project, and `firstmate-self-repo`'s publication gate still governs this class's own PR.
 
 Before commissioning an investigation, consult existing reports and established evidence.
 Classify the deliverable:
