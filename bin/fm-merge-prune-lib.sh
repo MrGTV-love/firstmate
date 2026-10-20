@@ -22,13 +22,14 @@
 #     project's git directory;
 #   - git reports no changed or untracked file (every untracked file and every
 #     changed submodule counts, whatever status.showUntrackedFiles or
-#     diff.ignoreSubmodules says) and the copy holds no stash entry of its own
-#     work: for a linked worktree of the project, a stash made on
-#     another branch of the project is another task's (a linked worktree shares
-#     the project's stash list), while a stash made on the copy's branch, or any
-#     stash of a detached copy, counts; a nested copy that is an independent
-#     clone (its own git directory) shares nothing, so every stash it holds
-#     counts;
+#     diff.ignoreSubmodules says; the one exception is the untracked directory
+#     of a nested copy, which is proved on its own) and the copy holds no stash
+#     entry of its own work: for a linked worktree of the project, a stash made
+#     on another branch of the project is another task's (a linked worktree
+#     shares the project's stash list), while a stash made on the copy's branch,
+#     or any stash of a detached copy, counts; a nested copy that is an
+#     independent clone (its own git directory) shares nothing, so every stash
+#     it holds counts;
 #   - no commit reachable from the copy's HEAD, which is its own checked-out
 #     branch, is missing from every remote (after a fetch); for a linked
 #     worktree, other branches of the project are other work, but for an
@@ -49,9 +50,13 @@
 # Ignored scratch: virtual environments, node_modules, tool and build caches
 # (.venv, venv, node_modules, __pycache__, .pytest_cache, .ruff_cache,
 # .mypy_cache, .next, graphify-out, .import_linter_cache, *.tsbuildinfo,
-# .tac/tmp, .tac/uv-cache), .DS_Store, Firstmate's turn-end hook files, and
-# anything ignored under .claude or .opencode. The preserve list is exempt from
-# that last rule: .claude/bug-evidence (slot-specific closeout records) and
+# .tac/tmp, .tac/uv-cache), .DS_Store, Firstmate's own hook files, and
+# scripts/hooks/_conformance_manifest.json: the disposable entries of
+# teardown_preservable_ignored in bin/fm-teardown-nested-lib.sh, which
+# tests/fm-merge-prune.test.sh holds to the same verdict. Under .claude and
+# .opencode only the hook files and a clone (proved on its own) are scratch;
+# any other ignored entry there is unique, stricter than teardown. The preserve
+# list is .claude/bug-evidence (slot-specific closeout records) and
 # .claude/channel-outbox (rate files). Before removal those are copied to the
 # task's data folder with SHA-256 checksums and verified there.
 #
@@ -176,8 +181,12 @@ EOF
 # scope reads only this copy's work (its HEAD and its own branch's stashes) and
 # is for a linked worktree of the project; the all scope, the default, also
 # reads every local branch and every stash, and is for an independent clone.
+# A clone that fm_mp_find_nested found (FM_MP_NESTED, which the caller fills
+# first) shows in the status of the copy that holds it as one untracked
+# directory, "?? <path>/". That line alone is not counted: the clone is proved on
+# its own. Every other untracked file still is.
 fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
-  local copy=$1 prn=${2:-} mode=${3:-fetch} scope=${4:-all} top dirty stashes unpushed prsha='' extra=() refs=(HEAD)
+  local copy=$1 prn=${2:-} mode=${3:-fetch} scope=${4:-all} top dirty stashes unpushed prsha='' extra=() refs=(HEAD) nested
   if ! top=$(git -C "$copy" rev-parse --show-toplevel 2>/dev/null) || [ "$(fm_mp_real "$top")" != "$copy" ]; then
     fm_mp_verdict keep "$copy is not a git work tree root"
     return 1
@@ -186,6 +195,11 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
     fm_mp_verdict transient "git status failed in $copy"
     return 1
   fi
+  for nested in ${FM_MP_NESTED[@]+"${FM_MP_NESTED[@]}"}; do
+    case "$nested" in
+      "$copy"/*) [ -z "$dirty" ] || dirty=$(printf '%s\n' "$dirty" | grep -Fxv -- "?? ${nested#"$copy"/}/") ;;
+    esac
+  done
   if [ -n "$dirty" ]; then
     fm_mp_verdict keep "$copy has changed or untracked files ($(printf '%s\n' "$dirty" | wc -l | tr -d ' ') entries, first: $(printf '%s\n' "$dirty" | sed -n 1p))"
     return 1
@@ -311,6 +325,7 @@ EOF
       fi
       ;;
     .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;
+    scripts/hooks/_conformance_manifest.json) return 0 ;;
     # Firstmate's own hook files, and a clone under .claude/worktrees, which the
     # search for nested copies proves on its own.
     .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;
