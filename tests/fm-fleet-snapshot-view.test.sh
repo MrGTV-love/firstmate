@@ -1152,6 +1152,57 @@ EOF
   pass "home-summary excludes kind=secondmate from unowned_current and terminal_in_flight"
 }
 
+test_current_status_pr() {
+  local home fakebin out id start elapsed
+  home=$(make_home current-status-pr)
+  fakebin=$(make_fakebin "$home")
+  for id in replacement single fallback absent explicit legacy old-ready; do
+    fm_write_meta "$home/state/$id.meta" "kind=ship" "remote_host=example.invalid"
+  done
+  printf 'done [at=1]: PR https://github.com/example/repo/pull/1 checks green\ndone corr=0123456789abcdef [at=2]: pr=https://github.com/example/repo/pull/2 checks green\nworking: compare https://github.com/example/repo/pull/3\n' > "$home/state/replacement.status"
+  printf 'done: https://github.com/example/repo/pull/4\n' > "$home/state/single.status"
+  printf 'working: https://github.com/example/repo/pull/5\nnote: compare https://github.com/example/repo/pull/6 and https://github.com/example/repo/pull/7' > "$home/state/fallback.status"
+  printf 'working: no pull request yet\n' > "$home/state/absent.status"
+  printf 'pr=https://github.com/example/repo/pull/8\n' >> "$home/state/explicit.meta"
+  printf 'done: https://github.com/example/repo/pull/9\n' > "$home/state/explicit.status"
+  printf 'PR ready: https://github.com/example/repo/pull/10\nchecks green [at=2]: pr=https://github.com/example/repo/pull/11\nfailed: https://github.com/example/repo/pull/12\n' > "$home/state/legacy.status"
+  printf 'done: https://github.com/example/repo/pull/13\n' > "$home/state/old-ready.status"
+  printf '%s\n' {1..250} >> "$home/state/old-ready.status"
+  printf 'working: https://github.com/example/repo/pull/14\n' >> "$home/state/old-ready.status"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
+  printf '%s' "$out" | jq -e '
+    [.tasks[] | {key:.id,value:{url:.pr.url,source:.pr.source}}] | from_entries
+    | .replacement == {url:"https://github.com/example/repo/pull/2",source:"status_event"}
+      and .single == {url:"https://github.com/example/repo/pull/4",source:"status_event"}
+      and .fallback == {url:"https://github.com/example/repo/pull/7",source:"status_event"}
+      and .absent == {url:null,source:"absent"}
+      and .explicit == {url:"https://github.com/example/repo/pull/8",source:"meta"}
+      and .legacy == {url:"https://github.com/example/repo/pull/11",source:"status_event"}
+      and .["old-ready"] == {url:"https://github.com/example/repo/pull/13",source:"status_event"}
+  ' >/dev/null || fail "current PR selection or explicit metadata precedence wrong"
+  pass "snapshot selects newest ready PR, last-URL fallback, absent URL, and explicit metadata precedence"
+
+  for id in replacement single fallback absent explicit legacy old-ready; do
+    rm "$home/state/$id.meta" "$home/state/$id.status"
+  done
+  fm_write_meta "$home/state/large.meta" "kind=ship" "remote_host=example.invalid"
+  # Keep the long-log fixture independent of shell expansion and external tools.
+  local i
+  for ((i=0; i<200000; i++)); do printf 'working: routine progress\n'; done > "$home/state/large.status"
+  printf 'done: https://github.com/example/repo/pull/15\n' >> "$home/state/large.status"
+  # Production drains checkpoint the independent open-decision fold. Seed it
+  # through its public reader so this measures PR discovery, not a cold fold.
+  bash -c '. "$1"; status_open_decisions_incremental "$2" >/dev/null' \
+    _ "$ROOT/bin/fm-classify-lib.sh" "$home/state/large.status" || fail "could not checkpoint large fixture"
+  start=$SECONDS
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
+  elapsed=$((SECONDS - start))
+  printf '%s' "$out" | jq -e '.tasks[] | select(.id == "large") | .pr.url == "https://github.com/example/repo/pull/15" and .pr.source == "status_event"' >/dev/null || fail "long status log lost newest PR"
+  [ "$elapsed" -lt 5 ] || fail "200,000-line snapshot took ${elapsed}s (must finish inside 5s)"
+  pass "200,000-line status snapshot finishes inside 5s (${elapsed}s)"
+}
+
+test_current_status_pr
 test_empty_fleet_json
 test_fixture_snapshot_json
 test_home_summary_excludes_secondmate_from_child_inventory
