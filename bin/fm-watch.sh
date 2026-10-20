@@ -2557,8 +2557,8 @@ event_wait_or_sleep() {
 
 # Ready-PR registration belongs with housekeeping repairs, not the backed-off
 # heartbeat: a missed supervisor command must not keep capacity occupied. The
-# helper owns the bounded rotating scan and refusal memory; detach forge reads
-# like the existing repair sweeps so a slow forge cannot stall supervision.
+# helper owns the scan and refusal memory; detach forge reads like the existing
+# repair sweeps so a slow forge cannot stall supervision.
 PR_READY_RECONCILE_PID=
 pr_ready_reconcile_tick() {
   if [ -n "$PR_READY_RECONCILE_PID" ]; then

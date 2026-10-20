@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Automatic PR handoff: real registration, capacity release, bounded status
-# reads, rotating admission, and per-head refusal memory in an isolated home.
+# reads, whole-fleet admission, and ten-minute refusal age-out in an isolated home.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -79,8 +79,12 @@ occupancy() {
   printf '%s\n' "$FM_PROJECT_CAPACITY_OCCUPANTS"
 }
 
+age_refusal() {  # <id> <seconds>
+  fm_touch_epoch "$(($(date +%s) - $2))" "$CASE/home/state/.pr-ready-reconcile/$1.refused"
+}
+
 assert_registered() {
-  grep -qxF "pr=$URL" "$CASE/home/state/$1.meta" || fail "$1 PR not recorded: ${out:-}"
+  grep -qxF "pr=${2:-$URL}" "$CASE/home/state/$1.meta" || fail "$1 PR not recorded: ${out:-}"
   grep -qxF "pr_head=$HEAD" "$CASE/home/state/$1.meta" || fail "$1 head not recorded"
   # Static poll scripts are private 0600 data, not executable custom checks.
   [ -f "$CASE/home/state/$1.check.sh" ] || fail "$1 merge poll not armed"
@@ -94,28 +98,26 @@ assert_unregistered() {
   [ ! -e "$CASE/home/state/$1.check.sh" ] || fail "$1 unexpectedly armed"
 }
 
-make_case forge-head
+make_case age-out
 write_ship ready
-# The standard signal has no SHA, and pipeline publication need not move the
-# worker copy. Refusal identity must therefore follow the forge in this mode.
 printf 'done: PR %s checks green\n' "$URL" > "$CASE/home/state/ready.status"
-copy_head=$HEAD
-printf '%s\n' "$HEAD" > "$CASE/forge-head"
 : > "$CASE/draft"
 out=$(run_pass)
 assert_unregistered ready
-[ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail 'initial forge head refusal missing'
-registrations_before=$(grep -c -- '--json isDraft' "$CASE/gh.calls")
-[ -z "$(run_pass)" ] || fail 'unchanged forge head repeated refusal'
-[ "$registrations_before" -eq "$(grep -c -- '--json isDraft' "$CASE/gh.calls")" ] || fail 'unchanged forge head retried registrar'
-HEAD=$(git -C "$CASE/project" commit-tree "$copy_head^{tree}" -p "$copy_head" -m pipeline-head)
-printf '%s\n' "$HEAD" > "$CASE/forge-head"
+[ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail 'initial refusal missing'
+# The worker marks the PR ready without moving the copy: the head is unchanged.
 rm "$CASE/draft"
+calls_before=$(wc -l < "$CASE/gh.calls")
+age_refusal ready 540
+[ -z "$(run_pass)" ] || fail 'fresh refusal repeated output'
+[ "$calls_before" -eq "$(wc -l < "$CASE/gh.calls")" ] || fail 'fresh refusal reached the forge'
+assert_unregistered ready
+age_refusal ready 660
 out=$(run_pass)
-[ "$copy_head" = "$(git -C "$CASE/project" rev-parse HEAD)" ] || fail 'fixture moved worker HEAD'
+[ "$HEAD" = "$(git -C "$CASE/project" rev-parse HEAD)" ] || fail 'fixture moved worker HEAD'
 assert_registered ready
-[ "$registrations_before" -lt "$(grep -c -- '--json isDraft' "$CASE/gh.calls")" ] || fail 'new forge head never retried registrar'
-pass 'no-mistakes SHA-free ready signal retries new forge head while copy HEAD stays unchanged'
+[ ! -e "$CASE/home/state/.pr-ready-reconcile/ready.refused" ] || fail 'registered task kept its refusal marker'
+pass 'refusal skips the task before any forge call for ten minutes, then registers once the cause healed at the same head'
 
 make_case registration
 write_ship ready
@@ -154,17 +156,36 @@ out=$(run_pass)
 grep -qx 'pr=https://github.com/example/project/pull/43' "$CASE/home/state/ready.meta" || fail 'old ready signal won'
 pass 'newest ready signal wins over an older PR and survives later resolution notes'
 
+make_case declared-pr
+write_ship ready
+printf 'done: PR https://github.com/example/project/pull/195 checks green; follows up https://github.com/example/project/pull/180\n' \
+  > "$CASE/home/state/ready.status"
+out=$(run_pass)
+assert_registered ready https://github.com/example/project/pull/195
+! grep -q 'pull/180' "$CASE/home/state/ready.meta" || fail 'unrelated PR recorded'
+pass 'the declared PR registers even when the note names another PR after it'
+
+make_case leading-url
+write_ship ready
+printf 'done: follows up https://github.com/example/project/pull/180 - PR https://github.com/example/project/pull/195 checks green\n' \
+  > "$CASE/home/state/ready.status"
+out=$(run_pass)
+assert_unregistered ready
+[ -z "$out" ] || fail "malformed note produced output: $out"
+[ ! -s "$CASE/gh.calls" ] || fail 'malformed note reached the forge'
+pass 'a note that does not open with PR <url> registers no PR, least of all an unrelated leading one'
+
 for rejection in draft unreachable unreadable-forge; do
   make_case "$rejection"
-  write_ship ready ship direct-PR
-  case "$rejection" in
-    draft) : > "$CASE/draft" ;;
-    unreadable-forge) : > "$CASE/unreadable-forge" ;;
-  esac
+  mode=direct-PR
+  [ "$rejection" != unreadable-forge ] || mode=no-mistakes
+  write_ship ready ship "$mode"
+  [ "$rejection" != draft ] || : > "$CASE/draft"
   if [ "$rejection" != draft ]; then
     git -C "$CASE/project" commit -q --allow-empty -m unpublished
     HEAD=$(git -C "$CASE/project" rev-parse HEAD)
   fi
+  [ "$rejection" != unreadable-forge ] || : > "$CASE/unreadable-forge"
   before=$(shasum -a 256 "$CASE/home/state/ready.meta")
   out=$(run_pass)
   [ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail "$rejection refusal not printed exactly once"
@@ -172,13 +193,19 @@ for rejection in draft unreachable unreadable-forge; do
   [ "$before" = "$(shasum -a 256 "$CASE/home/state/ready.meta")" ] || fail "$rejection refusal changed record"
   calls_before=$(wc -l < "$CASE/gh.calls")
   [ -z "$(run_pass)" ] || fail "$rejection repeated refusal output"
-  [ "$calls_before" -eq "$(wc -l < "$CASE/gh.calls")" ] || fail "$rejection retried same head"
-  git -C "$CASE/project" commit -q --allow-empty -m next-head
-  HEAD=$(git -C "$CASE/project" rev-parse HEAD)
+  [ "$calls_before" -eq "$(wc -l < "$CASE/gh.calls")" ] || fail "$rejection retried inside the interval"
+  case "$rejection" in
+    draft) rm "$CASE/draft" ;;
+    unreadable-forge) rm "$CASE/unreadable-forge" ;;
+    unreachable) git -C "$CASE/project" update-ref refs/remotes/origin/main "$HEAD" ;;
+  esac
+  age_refusal ready 540
+  [ -z "$(run_pass)" ] || fail "$rejection healed cause retried inside the interval"
+  assert_unregistered ready
+  age_refusal ready 660
   out=$(run_pass)
-  [ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail "$rejection new head not retried"
-  [ "$calls_before" -lt "$(wc -l < "$CASE/gh.calls")" ] || fail "$rejection new head never reached registration"
-  pass "$rejection is refused once without mutation; same head stays quiet and new head retries"
+  assert_registered ready
+  pass "$rejection is refused once without mutation, stays quiet for ten minutes, then registers at the same head"
 done
 
 make_case bounded
@@ -196,15 +223,13 @@ assert_registered huge
 [ "$((SECONDS - started))" -lt 60 ] || fail 'large-log ready registration exceeded 60-second fixture bound'
 pass '200,000-line log uses only its bounded tail; old ready outside tail is ignored and new ready registers within 60s'
 
-make_case cap
+make_case all-candidates
 for id in a b c d e f g h i j k; do write_ship "$id"; done
-out=$(run_pass)
-registered=$(grep -l '^pr=' "$CASE/home/state/"*.meta | wc -l)
-[ "$registered" -eq 8 ] || fail "candidate cap was $registered instead of 8"
-assert_unregistered i
+before=$(occupancy)
 out=$(run_pass)
 for id in a b c d e f g h i j k; do assert_registered "$id"; done
-pass 'fixed eight-record pass cap rotates fairly and later candidates register on the next pass'
+[ "$before" -eq "$(($(occupancy) + 11))" ] || fail 'capacity did not fall by one per ship'
+pass 'one pass registers every ready ship however many task records exist'
 
 make_case unreadable
 write_ship a-record
