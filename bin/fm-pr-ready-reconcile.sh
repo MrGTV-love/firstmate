@@ -8,9 +8,11 @@
 # verbs and readiness use fm-status-event-lib.sh and fm-dod-lib.sh, not a second
 # status grammar. The newest ready declaration in that window wins, even when
 # subsequent resolution notes follow it. A missing ready declaration is a no-op.
-# Refusals are printed once and retained per task, URL and named head (the copy's
-# HEAD plus any explicitly reported commit); another head can try again. Use
-# fm-pr-check.sh by hand after repairing a refusal on the same head.
+# Refusals are printed once and retained per task, URL, mode and named head,
+# using fm-pr-check.sh's authority: the forge's valid GitHub no-mistakes head,
+# otherwise the copy's HEAD. Forge-head probes continue after a refusal so a
+# pipeline-only publication can retry without moving the copy or changing the
+# ready prose. Use fm-pr-check.sh by hand after repairing the same refused head.
 # The watcher runs this single-flight pass detached from its housekeeping tick;
 # forge delays must not stop supervision. This script never merges, steers, or
 # writes a status log, and fm-pr-check.sh remains the only pr= writer.
@@ -46,7 +48,7 @@ CURSOR=
 # Metadata is read once, without sourcing worker-controlled bytes.
 reconcile_one() {  # <meta> <id>
   local meta=$1 id=$2 line kind='' mode='' pr='' wt='' note url='' token
-  local ready='' head reported='' fingerprint refusal output
+  local ready='' head fingerprint refusal output
   if [ ! -f "$meta" ] || [ -L "$meta" ] || [ ! -r "$meta" ]; then
     printf 'pr-ready: %s: unreadable task record; skipped\n' "$id"
     return 0
@@ -90,12 +92,17 @@ reconcile_one() {  # <meta> <id>
     if fm_pr_url_parse "$token"; then url=$FM_PR_URL; break; fi
   done
   [ -n "$url" ] || return 0
-  head=$(git -C "$wt" rev-parse --verify HEAD 2>/dev/null || true)
-  # Ready prose can name a newly published head before the worker copy syncs.
-  if [[ "$note" =~ (^|[^[:alnum:]])([[:xdigit:]]{7,64})([^[:alnum:]]|$) ]]; then
-    reported=${BASH_REMATCH[2]}
+  # Match fm-pr-check.sh's mode-specific authority. GitHub no-mistakes
+  # publication can advance only on the forge; polling that head is necessary
+  # even after a refusal, while the registrar itself stays deduplicated.
+  head=''
+  if fm_dod_forge_head_is_named_head "$mode" && [ "$FM_PR_PROVIDER" = github ]; then
+    head=$(cd "$wt" 2>/dev/null && gh pr view "$url" --json headRefOid -q .headRefOid 2>/dev/null || true)
   fi
-  printf '%s\n' "$wt" "$url" "$head" "$reported" > "$SCRATCH"
+  if ! fm_pr_head_valid "$head"; then
+    head=$(git -C "$wt" rev-parse --verify HEAD 2>/dev/null || true)
+  fi
+  printf '%s\n' "$wt" "$url" "$mode" "$head" > "$SCRATCH"
   fingerprint=$(fm_pr_sha256 "$SCRATCH")
   refusal="$CACHE/$id.$fingerprint.refused"
   [ ! -e "$refusal" ] && [ ! -L "$refusal" ] || return 0
