@@ -1,0 +1,10 @@
+fm-brief.sh rc=0 out: scaffolded: /Users/charlesabrooker/tmp/fm-lab.gJdatD/data/brieftask/brief.md (ship, mode=no-mistakes; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, { err: 
+status-command line in the generated brief:
+  '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-status-append.sh' '<lab>/state/brieftask.status' "{state} [at=<epoch>]: {one short line}" && { [ ! -e '<lab>/config/fleet-ledger' ] || '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-fleet-ledger.sh' appended '<lab>/config' '<lab>/state/brieftask.status' >/dev/null 2>&1 || true
+first refusal at iteration 67: rc=75 size=4083  stderr: fm-status-append: refused: <lab>/state/brieftask.status is 4083 bytes and this line would pass the limit of 4096 bytes (cap 4096, reserve 512 for decision and terminal lines)
+3000 iterations done: size=4083 (cap 4096, reserve 512)  refused=2934
+terminal done: line in the reserve: rc=0 size=4123 last line: done [at=1792459014]: finished the work
+working: line after cap: rc=75 size=4123
+after 200 more blocked: lines: size=4590 (limit 4608)
+terminal line past cap+reserve: rc=75 size=4590 stderr: fm-status-append: refused: <lab>/state/brieftask.status is 4590 bytes and this line would pass the limit of 4608 bytes (cap 4096, reserve 512 for decision and terminal lines)
+distinct first/last lines kept: first=working [at=1792458929]: loop line 1 padding padding padding  line_count=81

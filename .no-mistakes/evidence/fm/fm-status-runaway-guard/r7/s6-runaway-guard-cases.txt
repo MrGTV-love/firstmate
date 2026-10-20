@@ -1,0 +1,77 @@
+head=9c47e6b83
+=== test_sanctioned_loop_stops_growing_at_the_cap (load: 26.97 27.45 25.67)
+ok - the sanctioned writer holds the cap, refuses a repeat loop and filler loudly, keeps the reserve for done:, and refuses everything past cap plus reserve
+=== test_sanctioned_loop_stops_growing_at_the_cap exit=0 secs=26
+=== test_without_the_helper_the_same_loop_passes_the_cap (load: 22.19 26.29 25.30)
+ok - mutation: the same loop through a raw append passes the cap, so the helper is what holds it
+=== test_without_the_helper_the_same_loop_passes_the_cap exit=0 secs=6
+=== test_incident_shape_is_refused_at_the_cap_and_loses_no_distinct_line (load: 22.17 26.22 25.28)
+ok - the 2026-10-18 shape (3000 distinct lines, then one line repeated) keeps every distinct line and is refused loudly at the cap with exit 75
+=== test_incident_shape_is_refused_at_the_cap_and_loses_no_distinct_line exit=0 secs=6
+=== test_foreign_omp_writer_is_named_stopped_and_never_deleted (load: 22.36 26.12 25.25)
+# wake text: check: status-log-over-cap: file=victim.status size=975000 bytes (cap 262144) growth=0 bytes/s writer=pid 65504 omp; stopped pid 65504 (omp) with SIGSTOP; resume it with kill -CONT 65504; nothing was deleted, truncated or rewritten
+wait_for_exit: owned pid 92536 exceeded 30 polls; sending TERM
+92536 55033 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a raw omp writer over the cap is detected within polls, named by pid, stopped alone, and the log is left intact with one wake while it does not grow
+tests/lib.sh: line 257: 65500 Killed: 9               "$omp" -c 'sleep 600'
+=== test_foreign_omp_writer_is_named_stopped_and_never_deleted exit=0 secs=69
+=== test_a_resumed_writer_is_woken_for_and_stopped_again (load: 21.04 24.69 24.77)
+wait_for_exit: owned pid 94807 exceeded 30 polls; sending TERM
+94807 19971 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M587J2B7SWACYS0486QFX4P8/bin/fm-watch.sh
+ok - a stopped writer that is continued gets a second wake and a second stop, and a log that has not grown gets none
+=== test_a_resumed_writer_is_woken_for_and_stopped_again exit=0 secs=99
+=== test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped (load: 23.76 24.88 24.84)
+ok - the incident writer, which holds the log open and writes without a pause, is named and stopped by the guard and the log is left in place
+=== test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped exit=0 secs=6
+=== test_a_lingering_signal_does_not_hold_back_the_over_cap_stop (load: 23.46 24.79 24.81)
+ok - the watcher checks the cap during the status-signal linger, so the over-cap stop is the first wake and waits for no ack or re-arm
+=== test_a_lingering_signal_does_not_hold_back_the_over_cap_stop exit=0 secs=28
+=== test_non_omp_and_missing_writers_wake_but_stop_nothing (load: 28.98 25.89 25.20)
+ok - a non-omp writer, and no writer at all, still raise the wake and stop nothing
+=== test_non_omp_and_missing_writers_wake_but_stop_nothing exit=0 secs=78
+=== test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth (load: 24.24 24.99 24.90)
+ok - a per-task sidecar over the cap is named once, wakes again only after one cap of growth, and its marker clears when it shrinks
+=== test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth exit=0 secs=11
+=== test_readers_stay_bounded_on_a_two_gib_log (load: 24.58 25.02 24.91)
+# timing table (seconds, 2 GiB sparse log: 3000 events, a hole, a 6 MiB repeated tail)
+# | reader | seconds |
+# | open-decisions fold | 0s |
+# | status-event library (last_status_line) | 0s |
+# | status-event library (declared wait) | 1s |
+# | retry check (status_event_recorded) | 0s |
+# | wake drain (cold cursor) | 1s |
+# | wake drain (warm cursor) | 1s |
+ok - every reader finishes inside 60s on a 2 GiB log and creates no file over 1 MB
+=== test_readers_stay_bounded_on_a_two_gib_log exit=0 secs=11
+=== test_history_readers_refuse_a_log_past_the_limit_and_name_it (load: 24.69 25.05 24.93)
+ok - a history reader refuses a 2 GiB log and a log of too many lines, names it, and reads nothing; a short span from it is exact
+=== test_history_readers_refuse_a_log_past_the_limit_and_name_it exit=0 secs=4
+=== test_a_saved_cursor_never_advances_past_bytes_that_were_not_read (load: 23.43 24.78 24.83)
+ok - a fold that cannot read its span leaves the saved cursor and its open decision where they were
+=== test_a_saved_cursor_never_advances_past_bytes_that_were_not_read exit=0 secs=5
+=== test_a_refused_read_is_unknown_never_an_empty_open_set (load: 25.24 25.14 24.96)
+ok - a log the read limits refuse reads as unknown (status 2), never as no open decision, while a checkpointed fold keeps its open set
+=== test_a_refused_read_is_unknown_never_an_empty_open_set exit=0 secs=4
+=== test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain (load: 24.02 24.89 24.87)
+ok - one lane's log past the read limits is named on stderr and the drain still presents every other lane's open decisions
+=== test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain exit=0 secs=8
+=== test_the_drain_annotation_never_reads_a_log_past_the_limit (load: 24.10 24.89 24.87)
+ok - a signal row for a log past the read limit annotates nothing and names the log; a log within the limit is annotated whole
+=== test_the_drain_annotation_never_reads_a_log_past_the_limit exit=0 secs=22
+=== test_latest_event_endpoint_is_a_position_in_the_whole_log (load: 26.73 25.62 25.14)
+ok - the latest-event endpoint of a log of tiny lines is its true byte position, 100023
+=== test_latest_event_endpoint_is_a_position_in_the_whole_log exit=0 secs=9
+=== test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log (load: 25.79 25.44 25.08)
+ok - a long log's declared wait keeps one identity at its true line position however many continuation lines follow
+=== test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log exit=0 secs=6
+=== test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log (load: 24.52 25.18 25.00)
+# | fleet snapshot (secondmate home summary) | 0s |
+ok - the fleet snapshot summarizes a home with a 2 GiB log inside 60s, names the log it will not copy, and leaves no large file
+=== test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log exit=0 secs=6
+=== test_without_the_read_limit_the_same_reader_takes_the_whole_log (load: 23.51 24.96 24.92)
+ok - mutation: with the read limit raised past the log the same reader takes all 2 GiB; with the default it takes nothing
+=== test_without_the_read_limit_the_same_reader_takes_the_whole_log exit=0 secs=7
+=== test_a_killed_drain_leaves_no_large_cursor_file (load: 22.75 24.78 24.85)
+ok - a drain killed with SIGKILL mid-run leaves no scratch or cursor file
+=== test_a_killed_drain_leaves_no_large_cursor_file exit=0 secs=7
+ALL-CASES-DONE

@@ -1,0 +1,44 @@
+head=9c47e6b83  real blocks used by the three logs: 12 KiB
+--- before
+lane-a size=140000000001 inode=764219865 mtime=1792458873 head4k=671d1c75b1c1
+lane-b size=265000000001 inode=764219871 mtime=1792458873 head4k=671d1c75b1c1
+lane-c size=122000000001 inode=764219873 mtime=1792458873 head4k=671d1c75b1c1
+--- 1. the REAL watcher (poll 1 s, default 32 MiB cap) with the three logs already in place
+[watcher] still_running=no secs=8.8 peak_rss_KB=2032 (a wake exits the watcher; running after 120 s would mean it hung)
+check: status-log-over-cap: file=lane-a.status size=140000000001 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=lane-b.status size=265000000001 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=lane-c.status size=122000000001 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+    watcher stderr: 
+--- 2. the REAL wake drain
+[drain] rc=0 secs=1.5 (alarm 120s; rc 142 = killed by the alarm)  max_rss_MB=55  stdout_bytes=1423
+    stderr: WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 49450.1792458879.3PnBBt
+    stderr: fm-status: refused to read lane-a.status: a span of 140000000001 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+    stderr: fm-status: refused to read lane-b.status: a span of 265000000001 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+    stderr: fm-status: refused to read lane-c.status: a span of 122000000001 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+    stderr: fm-status: lane-a.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+    stderr: fm-status: lane-b.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+    drain stdout kinds: 4 lines; annotation lines: 0
+--- 3. fleet snapshot
+[fleet-snapshot] rc=0 secs=0.3 (alarm 120s; rc 142 = killed by the alarm)  max_rss_MB=6  stdout_bytes=2187
+    stderr:                    0  average shared memory size
+    stderr:                    0  average unshared data size
+    stderr:                    0  average unshared stack size
+--- 4. crew-state on a lane
+[crew-state] rc=0 secs=0.1 (alarm 120s; rc 142 = killed by the alarm)  max_rss_MB=6  stdout_bytes=57
+    stderr:                    0  average shared memory size
+    stderr:                    0  average unshared data size
+    stderr:                    0  average unshared stack size
+    stdout: state: unknown · source: none · no metadata for lane-a
+--- 5. captain-hold diverged (r4-1 reader)
+[captain-hold-diverged] rc=0 secs=0.2 (alarm 120s; rc 142 = killed by the alarm)  max_rss_MB=55  stdout_bytes=0
+    stderr:                    0  average shared memory size
+    stderr:                    0  average unshared data size
+    stderr:                    0  average unshared stack size
+--- 6. sanctioned append helper (done: line, the most privileged kind) on each log
+[append lane-a] rc=75 (75 = refused)  fm-status-append: refused: <lab>/state/lane-a.status is 140000000001 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+[append lane-b] rc=75 (75 = refused)  fm-status-append: refused: <lab>/state/lane-b.status is 265000000001 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+[append lane-c] rc=75 (75 = refused)  fm-status-append: refused: <lab>/state/lane-c.status is 122000000001 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+--- after
+lane-a size=140000000001 inode=764219865 mtime=1792458873 head4k=671d1c75b1c1
+lane-b size=265000000001 inode=764219871 mtime=1792458873 head4k=671d1c75b1c1
+lane-c size=122000000001 inode=764219873 mtime=1792458873 head4k=671d1c75b1c1
+IDENTICAL: size, inode, mtime and first 4 KiB of all three logs unchanged
+files over 1 MB created in state/ besides the logs: 0

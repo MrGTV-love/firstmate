@@ -1,0 +1,27 @@
+[fast-poll] repo head=9c47e6b83 poll=1s cap=20000000 ceiling=6000000000 omp=omp/18.12.2
+[fast-poll] pane shell pid=24403  omp pid=24461  omp comm=omp  omp ppid=24403
+[fast-poll] watcher pid=21735
+[fast-poll] command typed into the omp shell: printf 'text\n' "$(date +%s)" >> /Users/charlesabrooker/tmp/fm-lab.7tiO4J/state/incident.status
+[fast-poll] watcher_still_running=no; watcher exited 3.1 s after the command was sent
+[fast-poll] omp state at exit=T (T = stopped), 3 s later=T; log size at exit=543817728; 3 s later=543817728; growth after stop=0 bytes
+[fast-poll] ratio size/cap: 27.2  size in GB: 0.54
+[fast-poll] wake text printed by the watcher:
+check: status-log-over-cap: file=incident.status size=543817728 bytes (cap 20000000) growth=445330867 bytes/s writer=pid 24461 omp; stopped pid 24461 (omp) with SIGSTOP; resume it with kill -CONT 24461; nothing was deleted, truncated or rewritten
+[fast-poll] queued rows (time seq kind key text):
+1792458557	1	check	status-log-over-cap-2935047600	check: status-log-over-cap: file=incident.status size=543817728 bytes (cap 20000000) growth=445330867 bytes/s writer=pid 24461 omp; stopped pid 24461 (omp) with SIGSTOP; resume it with kill -CONT 24461; nothing
+1792458557	2	signal	incident.status	signal: <lab>/state/incident.status
+1792458557	3	signal	incident.status	signal: <lab>/state/incident.status
+[fast-poll] watcher stderr: 
+[fast-poll] over-cap marker: 16777234:764062879:1792458552	<lab>/state/incident.status	543817728
+[fast-poll] log still on disk: size=543817728 inode=764062879
+[fast-poll] real wake drain (timeout 90 s):
+[fast-poll] drain rc=0 secs=9.8 stdout_lines=6 annotation_lines=0
+[fast-poll] drain stdout mentions of incident.status:
+5:1792458557	1	check	status-log-over-cap-2935047600	check: status-log-over-cap: file=incident.status size=543817728 bytes (cap 20000000) growth=445330867 bytes/s writer=pid 24461 omp; stopped pid 24461 (omp) with SIGSTOP; resume it with kill -CONT 24461; nothing was deleted, truncated or rewritten
+6:1792458557	3	signal	incident.status	signal: <lab>/state/incident.status
+[fast-poll] drain stderr:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 21735.1792458557.gf2Sg3
+fm-status: refused to read incident.status: a span of 543817728 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: incident.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[fast-poll] log after the drain: size=543817728 inode=764062879  (unchanged = nothing deleted, truncated or rewritten)

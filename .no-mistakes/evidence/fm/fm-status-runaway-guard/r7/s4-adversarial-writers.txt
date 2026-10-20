@@ -1,0 +1,18 @@
+bystander real omp shell pid=31591 state=S
+
+=== A: omp-named writer holding the log open ===
+1497200	check: status-log-over-cap: file=a.status size=1497200 bytes (cap 1000000) growth=599054 bytes/s writer=pid 44198 omp; stopped pid 44198 (omp) with SIGSTOP; resume it with kill -CONT 44198; nothing was deleted, truncated or rewritten
+writer A state=T (T = stopped); bystander state=S (S = untouched); a.status size=1497200 still present
+
+=== B: notomp-named writer holding the log open ===
+1497200	check: status-log-over-cap: file=a.status size=1497200 bytes (cap 1000000) growth=0 bytes/s writer=pid 44198 omp; stopped pid 44198 (omp) with SIGSTOP; resume it with kill -CONT 44198; nothing was deleted, truncated or rewritten
+1735715	check: status-log-over-cap: file=b.status size=1735715 bytes (cap 1000000) growth=297513 bytes/s writer=pid 55977 notomp; stopped nothing: pid 55977 (notomp) is not an omp process; nothing was deleted, truncated or rewritten
+writer B state=R (R/S/U/N flags = still running; not T); bystander state=S
+
+=== C: omp-named bash loop of the literal shape printf 'text\n' "$(date +%s)" >> file (reopens on every append) ===
+c.status size at scan start=20010
+23790	check: status-log-over-cap: file=c.status size=23790 bytes (cap 20000) growth=715 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+writer C state=S (not T = not stopped: the documented limit for a writer that reopens the log on every append; the log wakes and is named, and the append rate of this shape is ~1 KB/s)
+
+=== after ===
+omp-named lab writers stopped: A=T  bystander real omp=S

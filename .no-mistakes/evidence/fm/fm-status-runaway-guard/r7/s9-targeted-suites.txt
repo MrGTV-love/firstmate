@@ -1,0 +1,26 @@
+head=9c47e6b83
+=== fm-pi-branch-extension.test.sh start (load: 15.88 17.61 21.02)
+ok - a Pi session that does not own the lock accepts nothing and mutates no branch state
+ok - an extension rebind re-mirrors undelivered dialog instead of dropping it
+ok - outcome delivery keeps the event loop running and interleaved reports stay ordered and exactly once
+ok - a session replaced mid-delivery cancels cleanly and the stored outcome still arrives exactly once
+ok - a failing store script surfaces to the branch and its outcome is neither lost nor delivered twice
+ok - a failed cursor write re-delivers a routine note exactly once more while a captain outcome stays deduplicated
+=== fm-pi-branch-extension.test.sh exit=0 secs=217 ok-lines=50 not-ok-lines=0
+=== fm-captain-hold-reconcile.test.sh start (load: 20.36 19.98 21.30)
+ok - the chat channel feeds the same keyed-answer intake a captured review does
+ok - completion and verification validate origins before constructing paths
+ok - a status resolution over a still-open captain-held task is signalled, not closed
+ok - diverged reports a log inside the read limit, skips one past it, and never hands a status log to grep
+ok - a captain call with no routed work, a verified transfer, an open decision, and an answered call all stay silent
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+=== fm-captain-hold-reconcile.test.sh exit=0 secs=315 ok-lines=24 not-ok-lines=0
+=== fm-crew-state.test.sh start (load: 19.72 20.50 21.12)
+ok - malformed-table run selection reports unknown with candidate ids
+ok - inventory-error run selection reports unknown with candidate ids
+ok - selected-error run selection reports unknown with candidate ids
+ok - legacy conflicting run records report unknown
+ok - omp live-model record adds model-drift and run-error only on positive evidence
+all fm-crew-state tests passed
+=== fm-crew-state.test.sh exit=0 secs=298 ok-lines=326 not-ok-lines=0
+ALL-SUITES-DONE

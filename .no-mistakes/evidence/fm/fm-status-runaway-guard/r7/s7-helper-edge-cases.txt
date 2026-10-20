@@ -1,0 +1,26 @@
+head=9c47e6b83
+--- no arguments / one argument
+usage: fm-status-append.sh <status-file> <line>...
+rc=2
+usage: fm-status-append.sh <status-file> <line>...
+rc=2
+--- a line with an embedded newline is refused, nothing written
+fm-status-append: one event per argument; no newline inside a line
+rc=2 exists=no
+--- a symbolic link as the status file is refused; its target is untouched
+fm-status-append: refusing a symbolic link: <d>/link.status
+rc= target=target
+--- torn foreign write (no trailing newline) cannot glue to the next event
+rc=0
+cat: illegal option -- A
+usage: cat [-belnstuv] [file ...]
+--- many distinct lines in one call below the cap are all kept, in order
+rc=0 lines=500 first=working [at=1]: distinct 1 last=working [at=500]: distinct 500
+--- the incident's own format used through the helper: 3000 distinct then one line repeated 20000 times, cap 262144, 4 MiB hard ulimit
+iteration 5462 refused rc=75 size=262128
+--- a symbolic link as the status file is refused; its target is untouched
+rc=1 stderr=fm-status-append: refusing a symbolic link: <d>/link.status target=target
+--- torn foreign write (no trailing newline) cannot glue to the next event
+rc=0
+working [at=1]: torn$
+done [at=2]: ok$

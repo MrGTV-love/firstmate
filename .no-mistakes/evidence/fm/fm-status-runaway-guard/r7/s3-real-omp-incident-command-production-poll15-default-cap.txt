@@ -1,0 +1,27 @@
+[production-poll15] repo head=9c47e6b83 poll=15s cap=default ceiling=15000000000 omp=omp/18.12.2
+[production-poll15] pane shell pid=59901  omp pid=60336  omp comm=omp  omp ppid=59901
+[production-poll15] watcher pid=40555
+[production-poll15] command typed into the omp shell: printf 'text\n' "$(date +%s)" >> /Users/charlesabrooker/tmp/fm-lab.dqxqnT/state/incident.status
+[production-poll15] watcher_still_running=no; watcher exited 19.9 s after the command was sent
+[production-poll15] omp state at exit=T (T = stopped), 3 s later=T; log size at exit=1420230656; 3 s later=1420230656; growth after stop=0 bytes
+[production-poll15] ratio size/cap: 42.3  size in GB: 1.42
+[production-poll15] wake text printed by the watcher:
+check: status-log-over-cap: file=incident.status size=1420230656 bytes (cap 33554432) growth=58680992 bytes/s writer=pid 60336 omp; stopped pid 60336 (omp) with SIGSTOP; resume it with kill -CONT 60336; nothing was deleted, truncated or rewritten
+[production-poll15] queued rows (time seq kind key text):
+1792458674	1	check	status-log-over-cap-3278902296	check: status-log-over-cap: file=incident.status size=1420230656 bytes (cap 33554432) growth=58680992 bytes/s writer=pid 60336 omp; stopped pid 60336 (omp) with SIGSTOP; resume it with kill -CONT 60336; nothing
+1792458675	2	signal	incident.status	signal: <lab>/state/incident.status
+1792458675	3	signal	incident.status	signal: <lab>/state/incident.status
+[production-poll15] watcher stderr: 
+[production-poll15] over-cap marker: 16777234:764109505:1792458651	<lab>/state/incident.status	1420230656
+[production-poll15] log still on disk: size=1420230656 inode=764109505
+[production-poll15] real wake drain (timeout 90 s):
+[production-poll15] drain rc=0 secs=4.1 stdout_lines=6 annotation_lines=0
+[production-poll15] drain stdout mentions of incident.status:
+5:1792458674	1	check	status-log-over-cap-3278902296	check: status-log-over-cap: file=incident.status size=1420230656 bytes (cap 33554432) growth=58680992 bytes/s writer=pid 60336 omp; stopped pid 60336 (omp) with SIGSTOP; resume it with kill -CONT 60336; nothing was deleted, truncated or rewritten
+6:1792458675	3	signal	incident.status	signal: <lab>/state/incident.status
+[production-poll15] drain stderr:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 40555.1792458674.x3O2mx
+fm-status: refused to read incident.status: a span of 1420230656 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: incident.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[production-poll15] log after the drain: size=1420230656 inode=764109505  (unchanged = nothing deleted, truncated or rewritten)

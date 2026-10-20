@@ -1,0 +1,26 @@
+head=9c47e6b83
+=== fm-brief.test.sh start (load: 24.63 20.12 20.48)
+ok - fm-brief.sh: --branch-prefix is refused on scout and secondmate scaffolds
+ok - fm-brief.sh: --branch-prefix value is validated against embedded spaces and a leading dash
+ok - fm-brief.sh: ref-format-valid shell metacharacters stay literal in generated branch commands
+ok - fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool
+ok - fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line
+ok - fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not
+=== fm-brief.test.sh exit=0 secs=49 ok-lines=44 not-ok-lines=0
+=== fm-remote-secondmate-lifecycle-e2e.test.sh start (load: 22.41 20.08 20.43)
+ok - watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over
+ok - the host-local state read steps around a stale shadowing herdr client
+ok - startup reports alive legacy backends without changing their routes
+ok - unreachable no-ledger remote state remains explicit with no local respawn or failover
+ok - remote retirement refuses child work, then removes only its own endpoint while a shared-session sibling survives
+ALL TESTS PASSED
+=== fm-remote-secondmate-lifecycle-e2e.test.sh exit=0 secs=1629 ok-lines=34 not-ok-lines=0
+=== fm-send-resolve-key.test.sh start (load: 53.95 44.22 31.78)
+ok - fm-send --resolve-key: a stamped close line stays inside the status-line cap
+ok - fm-send --resolve-key: failed-close recovery commands safely quote operator text and paths
+ok - fm-send --resolve-key: a remote secondmate reserved-key close is the same local ledger append
+ok - fm-send --resolve-key: a decision answer refuses the attended branch before sending, a blocked: key stays steering, and the away-posture record relocates the answer
+ok - fm-send --resolve-key: one task.answered per closed key, answered_by derived from the home's role, nothing on a refusal
+ok - fm-send --resolve-key: an unwritable ledger costs one stderr line and changes neither the close nor the output
+=== fm-send-resolve-key.test.sh exit=0 secs=229 ok-lines=27 not-ok-lines=0
+ALL-SUITES-DONE

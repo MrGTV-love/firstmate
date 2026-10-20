@@ -1,0 +1,26 @@
+head=9c47e6b83
+=== fm-spawn-claude-start-confirm.test.sh start (load: 44.86 46.37 36.03)
+ok - a startup report the capped writer refuses is surfaced on the spawn's stderr with the file, the refusal and the exit status
+ok - verified active and completed turns override all four historical dialog signatures
+ok - absence of proof without a dialog is not a fault
+ok - a dialog that clears inside the window is not reported
+ok - an unreadable pane ends the start wait immediately
+# all fm-spawn-claude-start-confirm tests passed
+=== fm-spawn-claude-start-confirm.test.sh exit=0 secs=122 ok-lines=6 not-ok-lines=0
+=== fm-fleet-ledger.test.sh start (load: 21.47 37.21 33.76)
+ok - flag off: the whole lifecycle leaves no ledger file, offset, or lock
+ok - flag on: filed, closed, and answered write exactly their fields, one line each, with ts and at the same instant
+ok - closed: a repeat of the same task, evidence, and PR writes nothing; any difference writes a record
+ok - closed: a replay inside one incarnation writes nothing, and the same close after a new dispatch is recorded again, for every evidence
+ok - answered_by is derived from the home role and two exact source prefixes, and is unknown when neither says
+ok - flag off writes nothing, and an unwritable ledger fails with one line for the producer to ignore
+=== fm-fleet-ledger.test.sh exit=0 secs=63 ok-lines=17 not-ok-lines=0
+=== fm-secondmate-safety.test.sh start (load: 14.49 32.18 32.13)
+ok - force teardown refuses unregistered child worktree paths
+ok - secondmate teardown path-boundary matrix refuses unmarked/ancestor/active-descendant/repo-descendant homes
+ok - idle kind=secondmate pane is healthy and not stale
+ok - secondmate charter brief is idle by default and does not self-initiate work
+ok - fm-backlog-handoff aborts atomically on unmatched, in-flight, and unregistered targets
+ok - fm-backlog-handoff refuses Done items under whitespace section headings and unsafe homes
+=== fm-secondmate-safety.test.sh exit=0 secs=230 ok-lines=85 not-ok-lines=0
+ALL-SUITES-DONE
