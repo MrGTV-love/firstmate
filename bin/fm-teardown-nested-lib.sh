@@ -83,10 +83,12 @@ TEARDOWN_OWN_SCAN=
 TEARDOWN_OWN_SCANNED=0
 TEARDOWN_FOREIGN_WHY=
 # One "copy<TAB>reason" entry per held foreign copy of the last
-# teardown_foreign_copies_prove, how many of its refusals were not holdable, and
-# the refusals it has not printed yet (see that function), kept as parallel
-# arrays because a copy path may hold any character, newlines included.
+# teardown_foreign_copies_prove, the hold class of each (ignored or commits) in
+# the same order, how many of its refusals were not holdable, and the refusals it
+# has not printed yet (see that function), kept as parallel arrays because a copy
+# path may hold any character, newlines included.
 TEARDOWN_FOREIGN_HELD=()
+TEARDOWN_FOREIGN_HELD_KIND=()
 TEARDOWN_FOREIGN_REFUSED=0
 TEARDOWN_DEF_RULE=()
 TEARDOWN_DEF_WHY=()
@@ -473,8 +475,9 @@ teardown_foreign_copy_holdable() {  # <copy>
 # Proves foreign copy <copy>, or returns 1 with TEARDOWN_FOREIGN_WHY naming what
 # could not be proved, TEARDOWN_FOREIGN_RULE the predicate that failed
 # (inspection-unavailable when a read, not a policy, failed) and
-# TEARDOWN_FOREIGN_HOLDABLE set to 1 when the copy may stay held
-# (teardown_foreign_copy_holdable). Writes nothing. A half-removed or unreadable
+# TEARDOWN_FOREIGN_HOLDABLE set to the hold class, ignored or commits, when the
+# copy may stay held (teardown_foreign_copy_holdable). Writes nothing. A
+# half-removed or unreadable
 # copy fails the first check. A landing check or an ignored-file listing that
 # could not run never leaves the copy holdable. The landed-work rule gets an
 # empty branch name so it never adopts this copy's PR as the task's recorded one.
@@ -517,8 +520,8 @@ teardown_foreign_copy_prove() {  # <copy>
   if [ -n "$unique" ]; then
     TEARDOWN_FOREIGN_RULE='copy-landed'
     unique=$(printf '%s\n' "$unique" | LC_ALL=C sort -u | tr '\n' ' ')
-    TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: ${unique% }"
-    ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=1
+    TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(fm_refuse_text "${unique% }")"
+    ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=ignored
     return 1
   fi
   # Under the project lock the landed-work rule asks no forge and fetches nothing,
@@ -530,7 +533,7 @@ teardown_foreign_copy_prove() {  # <copy>
       && teardown_foreign_unlanded_cached "$copy" "$head"; then
     TEARDOWN_FOREIGN_RULE='copy-landed'
     TEARDOWN_FOREIGN_WHY="its HEAD ${head:0:12} is not proved landed"
-    ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=1
+    ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=commits
     return 1
   fi
   diag=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-landed.XXXXXX") || diag=
@@ -544,7 +547,7 @@ teardown_foreign_copy_prove() {  # <copy>
       TEARDOWN_FOREIGN_RULE='copy-landed'
       TEARDOWN_FOREIGN_WHY="its HEAD ${FM_TASK_COPY_HEAD:0:12} is not proved landed"
       [ -z "$head" ] || { TEARDOWN_UNLANDED_COPIES+=("$copy"$'\t'"$head"); }
-      ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=1
+      ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=commits
     fi
     return 1
   fi
@@ -580,6 +583,7 @@ teardown_foreign_copies_prove() {  # <slot>
   TEARDOWN_FOREIGN_COPIES=()
   TEARDOWN_FOREIGN_PROCS=()
   TEARDOWN_FOREIGN_HELD=()
+  TEARDOWN_FOREIGN_HELD_KIND=()
   TEARDOWN_FOREIGN_REFUSED=0
   TEARDOWN_DEF_RULE=() TEARDOWN_DEF_WHY=() TEARDOWN_DEF_PID=() TEARDOWN_DEF_COPY=() TEARDOWN_DEF_DIAG=()
   teardown_slot_registered_copies "$slot" || return 0
@@ -600,8 +604,9 @@ teardown_foreign_copies_prove() {  # <slot>
       TEARDOWN_DEF_PID+=("${TEARDOWN_FOREIGN_PID:-}")
       TEARDOWN_DEF_COPY+=("$copy")
       TEARDOWN_DEF_DIAG+=("$TEARDOWN_FOREIGN_DIAG")
-      if [ "$TEARDOWN_FOREIGN_HOLDABLE" = 1 ]; then
+      if [ "$TEARDOWN_FOREIGN_HOLDABLE" != 0 ]; then
         TEARDOWN_FOREIGN_HELD+=("$copy"$'\t'"$TEARDOWN_FOREIGN_WHY")
+        TEARDOWN_FOREIGN_HELD_KIND+=("$TEARDOWN_FOREIGN_HOLDABLE")
       else
         TEARDOWN_FOREIGN_REFUSED=$((TEARDOWN_FOREIGN_REFUSED + 1))
       fi
@@ -658,19 +663,20 @@ teardown_own_nested_other_repos() {
 # appended to here; nothing returns the slot or removes a held copy on its own,
 # and a held copy goes only on the owner's word naming it.
 teardown_held_copies_record() {
-  local record="$DATA/held-foreign-copies.log" entry copy why stamp rc=0
+  local record="$DATA/held-foreign-copies.log" entry copy why slot stamp rc=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
   stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  slot=$(fm_refuse_text "$TEARDOWN_HELD_SLOT")
   mkdir -p "$DATA" 2>/dev/null || return 1
   [ ! -e "$record" ] || [ -f "$record" ] || return 1
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
-    copy=${entry%%$'\t'*}
-    why=${entry#*$'\t'}
-    if [ -f "$record" ] && awk -F'\t' -v i="$ID" -v s="$TEARDOWN_HELD_SLOT" -v c="$copy" -v w="$why" \
+    copy=$(fm_refuse_text "${entry%%$'\t'*}")
+    why=$(fm_refuse_text "${entry#*$'\t'}")
+    if [ -f "$record" ] && awk -F'\t' -v i="$ID" -v s="$slot" -v c="$copy" -v w="$why" \
         '$2 == i && $3 == s && $4 == c && $5 == w { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
       continue
     fi
-    { printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$TEARDOWN_HELD_SLOT" "$copy" "$why" >> "$record"; } 2>/dev/null || rc=1
+    { printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$slot" "$copy" "$why" >> "$record"; } 2>/dev/null || rc=1
   done
   return "$rc"
 }

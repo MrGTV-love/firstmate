@@ -10750,6 +10750,53 @@ test_a_foreign_copy_with_only_unique_ignored_files_is_held_and_the_slot_is_not_r
   pass "an own landed copy beside a foreign copy with only a unique ignored file closes, the foreign copy is kept byte-identical, treehouse return --force is not called, and the record has one line"
 }
 
+test_the_next_step_for_a_copy_held_for_ignored_files_never_names_a_removal() {
+  local rc copy_q
+  make_held_case held-ignored-notice
+  held_ignored_file "$FOREIGN_COPY"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-ignored-notice: a landed task must close beside a copy held for an ignored file: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-ignored-notice
+  held_assert_untouched held-ignored-notice "$FOREIGN_CASE" "$FOREIGN_COPY"
+  printf -v copy_q '%q' "$FOREIGN_COPY"
+  assert_grep "next step for the owner of $FOREIGN_COPY: review its ignored files with git -C $copy_q status --ignored" "$FOREIGN_CASE/stdout" \
+    "held-ignored-notice: the next step did not tell the owner to review the ignored files: $(cat "$FOREIGN_CASE/stdout")"
+  assert_no_grep "worktree remove" "$FOREIGN_CASE/stdout" \
+    "held-ignored-notice: the next step names a removal that deletes the ignored files it protects: $(cat "$FOREIGN_CASE/stdout")"
+  assert_no_grep "--cleanup-worktree" "$FOREIGN_CASE/stdout" \
+    "held-ignored-notice: the next step names a removal that deletes the ignored files it protects: $(cat "$FOREIGN_CASE/stdout")"
+  pass "the next step for a copy held for ignored files says to review and save them, and names no removal"
+}
+
+test_held_copy_notices_and_record_show_no_control_character_and_quote_the_command() {
+  local rc quoted record
+  make_held_case held-hostile-names
+  quoted="$FOREIGN_SLOT/.claude/worktrees/it's"
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$quoted" main
+  printf '%s\n' 'esc*name.dat' >> "$(git -C "$quoted" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'only here\n' > "$quoted/"$'esc\033[31mred\rname.dat'
+  held_snapshot "$FOREIGN_CASE" "$quoted"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-hostile-names: a landed task must close beside a copy whose names hold control characters: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-hostile-names
+  held_assert_untouched held-hostile-names "$FOREIGN_CASE" "$quoted"
+  record=$FOREIGN_CASE/data/held-foreign-copies.log
+  assert_equals 1 "$(wc -l < "$record" | tr -d ' ')" "held-hostile-names: the record is not one line"
+  if LC_ALL=C grep -q '[[:cntrl:]]' "$FOREIGN_CASE/stdout"; then
+    fail "held-hostile-names: the notice carries a control character: $(cat -v "$FOREIGN_CASE/stdout")"
+  fi
+  if LC_ALL=C tr -d '\t\n' < "$record" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    fail "held-hostile-names: the record carries a control character: $(cat -v "$record")"
+  fi
+  assert_grep 'esc?[31mred?name.dat' "$FOREIGN_CASE/stdout" "held-hostile-names: the notice did not show the cleaned file name: $(cat -v "$FOREIGN_CASE/stdout")"
+  assert_grep 'esc?[31mred?name.dat' "$record" "held-hostile-names: the record did not show the cleaned file name: $(cat -v "$record")"
+  printf -v quoted '%q' "$quoted"
+  assert_grep "git -C $quoted status --ignored" "$FOREIGN_CASE/stdout" \
+    "held-hostile-names: the printed command does not quote the copy path with printf %q: $(cat -v "$FOREIGN_CASE/stdout")"
+  pass "held-copy notices and the record show control characters as ?, and the printed command quotes the copy path so it pastes back unchanged"
+}
+
 test_foreign_copy_regenerable_ignored_files_need_no_preservation() {
   local rc exclude
   make_foreign_copy_case foreign-regenerable
@@ -11998,7 +12045,7 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
 }
 
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
-  local rc second copy holder
+  local rc second copy holder copy_q holder_q slot_q proj_q
   make_held_case held-notice
   second=$FOREIGN_SLOT/.claude/worktrees/fc-two
   git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
@@ -12019,8 +12066,12 @@ test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
     "held-notice: the output did not say how a held copy is removed"
   holder=$(jq -r '.worktrees[0].lease_holder // empty' "$FOREIGN_CASE/pool/treehouse-state.json")
   [ -n "$holder" ] || fail "held-notice: the fixture slot has no lease holder"
+  printf -v holder_q '%q' "$holder"
+  printf -v slot_q '%q' "$FOREIGN_SLOT"
+  printf -v proj_q '%q' "$FOREIGN_CASE/project"
   for copy in "$FOREIGN_COPY" "$second"; do
-    assert_grep "notice: next step for the owner of $copy: list the commits only it holds with git -C '$copy' log --oneline HEAD --not --remotes, land them, remove the copy with git -C '$FOREIGN_SLOT' worktree remove '$copy' (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree '$copy' --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd '$FOREIGN_CASE/project' && treehouse return '$FOREIGN_SLOT' --if-lease-holder '$holder' </dev/null)." \
+    printf -v copy_q '%q' "$copy"
+    assert_grep "notice: next step for the owner of $copy: list the commits only it holds with git -C $copy_q log --oneline HEAD --not --remotes, land them, remove the copy with git -C $slot_q worktree remove $copy_q (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree $copy_q --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd $proj_q && treehouse return $slot_q --if-lease-holder $holder_q </dev/null)." \
       "$FOREIGN_CASE/stdout" "held-notice: the output did not print the exact next step for the owner of $copy: $(cat "$FOREIGN_CASE/stdout")"
   done
   assert_grep "each held copy is also listed in $FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/stdout" \
@@ -14497,6 +14548,8 @@ test_a_slot_with_no_foreign_copy_closes_and_returns_as_before
 test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal
 test_foreign_copy_with_unsaved_files_is_refused
 test_a_foreign_copy_with_only_unique_ignored_files_is_held_and_the_slot_is_not_returned
+test_the_next_step_for_a_copy_held_for_ignored_files_never_names_a_removal
+test_held_copy_notices_and_record_show_no_control_character_and_quote_the_command
 test_foreign_copy_regenerable_ignored_files_need_no_preservation
 test_a_foreign_copy_with_durable_tac_state_is_held_and_tac_tmp_is_not_the_reason
 test_a_foreign_copy_whose_ignored_files_cannot_be_listed_is_refused_not_held

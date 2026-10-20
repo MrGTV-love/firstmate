@@ -4093,7 +4093,8 @@ TEARDOWN_PEER_IDS=()
 TEARDOWN_PEER_HOMES=()
 
 # Held slots. A task whose own copy passed the landed-work proof closes even when
-# foreign copies in its slot hold commits that exist nowhere else
+# foreign copies in its slot hold commits that exist nowhere else or ignored
+# files that exist nowhere else
 # (bin/fm-teardown-nested-lib.sh owns which copies are held). The slot is
 # reserved under a durable lease exactly as an ordinary return reserves it, but
 # never returned; its claim and every foreign copy stay exactly as they were, and
@@ -4124,16 +4125,29 @@ teardown_reprove_same_route() {
 # later, these lines were already printed. The held-copy record was written
 # before anything was removed (teardown_held_copies_record_or_refuse).
 teardown_held_copies_report() {
-  local entry copy record="$DATA/held-foreign-copies.log" slot=$TEARDOWN_HELD_SLOT holder
+  local i entry copy copy_q record="$DATA/held-foreign-copies.log" slot=$TEARDOWN_HELD_SLOT slot_q proj_q holder_q return_cmd
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_task_copy_pool_slot_held "$slot" >/dev/null 2>&1 || true
-  holder=${FM_TASK_COPY_SLOT_HOLDER:-<the lease holder that treehouse status shows for the slot>}
+  slot_q=$(printf '%q' "$slot")
+  proj_q=$(printf '%q' "$PROJ")
+  if [ -n "${FM_TASK_COPY_SLOT_HOLDER:-}" ]; then
+    holder_q=$(printf '%q' "$FM_TASK_COPY_SLOT_HOLDER")
+  else
+    holder_q="'<the lease holder that treehouse status shows for the slot>'"
+  fi
+  return_cmd="(cd $proj_q && treehouse return $slot_q --if-lease-holder $holder_q </dev/null)"
   echo "notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy."
-  for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
+  for i in "${!TEARDOWN_FOREIGN_HELD[@]}"; do
+    entry=${TEARDOWN_FOREIGN_HELD[$i]}
     copy=${entry%%$'\t'*}
-    echo "notice: held foreign copy $copy stays in pool slot $slot: ${entry#*$'\t'}."
-    echo "notice: next step for the owner of $copy: list the commits only it holds with git -C '$copy' log --oneline HEAD --not --remotes, land them, remove the copy with git -C '$slot' worktree remove '$copy' (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree '$copy' --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd '$PROJ' && treehouse return '$slot' --if-lease-holder '$holder' </dev/null)."
+    copy_q=$(printf '%q' "$copy")
+    echo "notice: held foreign copy $(fm_refuse_text "$copy") stays in pool slot $(fm_refuse_text "$slot"): $(fm_refuse_text "${entry#*$'\t'}")."
+    if [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" = ignored ]; then
+      echo "notice: next step for the owner of $(fm_refuse_text "$copy"): review its ignored files with git -C $copy_q status --ignored and save the ones you need, with any commits only it holds (git -C $copy_q log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with $return_cmd."
+    else
+      echo "notice: next step for the owner of $(fm_refuse_text "$copy"): list the commits only it holds with git -C $copy_q log --oneline HEAD --not --remotes, land them, remove the copy with git -C $slot_q worktree remove $copy_q (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree $copy_q --execute-cleanup, run from the slot), and when no copy is left in the slot return it with $return_cmd."
+    fi
   done
   echo "notice: pool slot $slot is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, or once its HEAD is landed."
   echo "notice: each held copy is also listed in $record."

@@ -306,7 +306,10 @@ A slot that is already durably leased is not changed.
 When the slot cannot be proved durably leased, or the reservation fails, the whole close refuses before it removes anything, and the output says why.
 The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot is reserved under a durable lease and stays claimed.
 Nothing returns the slot automatically, and nothing removes a held copy: a held copy goes only on the owner's word naming it, or once its HEAD is landed.
-For each held copy the output also prints the next step for that copy's owner: list the commits only it holds with `git -C <copy> log --oneline HEAD --not --remotes`, land them, then remove the copy and return the slot with the commands the output prints.
+For each held copy the output also prints the next step for that copy's owner, which depends on why the copy is held.
+For a copy held for commits on no remote: list the commits only it holds with `git -C <copy> log --oneline HEAD --not --remotes`, land them, then remove the copy and return the slot with the commands the output prints.
+For a copy held for unique ignored files: review them with `git -C <copy> status --ignored` and save the ones needed, with any commits only the copy holds, before the copy is removed in any way; the output names no removal command for it, because `git worktree remove` deletes ignored files without asking.
+The output shows every copy path, slot path and reason with control characters replaced by `?`, and quotes each path in a printed command with `printf %q`; the record carries the same cleaned text.
 Once every proof has passed and before it removes anything, teardown appends each such copy to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
 A line already there for the same task, slot, copy and reason is not written again, and teardown never edits or clears the file.
 A record that cannot be written refuses the close with nothing removed, so a close that happened never lacks its inventory.
@@ -393,7 +396,7 @@ The route removes only the retiring task's own current copy, under the same proo
 It reserves, reaps, scans, detaches and returns nothing slot-wide, leaves Treehouse's lease and every other record and copy untouched, and passes the slot claim to the first remaining peer when it was this task's, so the last task out finds the slot its own.
 A claim that already names a peer stays as it is.
 The route works the same when a rerun finds the copy already removed, judged by its `branch=` ref as above.
-A foreign copy in the root is neither judged nor touched by this route, and it is proved again when the last task out returns the root; a copy held back only by unlanded commits then closes that last task under the held-copy rule above and the root stays.
+A foreign copy in the root is neither judged nor touched by this route, and it is proved again when the last task out returns the root; a copy held back only by unlanded commits or only by unique ignored files then closes that last task under the held-copy rule above and the root stays.
 A peer that has left the root between the proof and the removal refuses with the record in place, and a re-run takes the ordinary route.
 `--force` skips only the landed-work test on the task's own copy, as always, and waives none of the other proofs.
 `tests/fm-control-reassociate.test.sh` exercises the sequence from the joint reassociation through the last teardown.
