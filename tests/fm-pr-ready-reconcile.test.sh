@@ -38,7 +38,9 @@ case "$*" in
   *'--json isDraft'*)
     if [ -f "$FM_READY_CASE/draft" ]; then printf '{"isDraft":true}\n';
     else printf '{"isDraft":false}\n'; fi ;;
-  *'--json headRefOid'*) git -C "$FM_READY_CASE/project" rev-parse HEAD ;;
+  *'--json headRefOid'*)
+    if [ -f "$FM_READY_CASE/forge-head" ]; then cat "$FM_READY_CASE/forge-head";
+    else git -C "$FM_READY_CASE/project" rev-parse HEAD; fi ;;
   *) printf '[]\n' ;;
 esac
 SH
@@ -91,6 +93,29 @@ assert_unregistered() {
   ! grep -q '^pr=' "$CASE/home/state/$1.meta" || fail "$1 unexpectedly registered"
   [ ! -e "$CASE/home/state/$1.check.sh" ] || fail "$1 unexpectedly armed"
 }
+
+make_case forge-head
+write_ship ready
+# The standard signal has no SHA, and pipeline publication need not move the
+# worker copy. Refusal identity must therefore follow the forge in this mode.
+printf 'done: PR %s checks green\n' "$URL" > "$CASE/home/state/ready.status"
+copy_head=$HEAD
+printf '%s\n' "$HEAD" > "$CASE/forge-head"
+: > "$CASE/draft"
+out=$(run_pass)
+assert_unregistered ready
+[ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail 'initial forge head refusal missing'
+registrations_before=$(grep -c -- '--json isDraft' "$CASE/gh.calls")
+[ -z "$(run_pass)" ] || fail 'unchanged forge head repeated refusal'
+[ "$registrations_before" -eq "$(grep -c -- '--json isDraft' "$CASE/gh.calls")" ] || fail 'unchanged forge head retried registrar'
+HEAD=$(git -C "$CASE/project" commit-tree "$copy_head^{tree}" -p "$copy_head" -m pipeline-head)
+printf '%s\n' "$HEAD" > "$CASE/forge-head"
+rm "$CASE/draft"
+out=$(run_pass)
+[ "$copy_head" = "$(git -C "$CASE/project" rev-parse HEAD)" ] || fail 'fixture moved worker HEAD'
+assert_registered ready
+[ "$registrations_before" -lt "$(grep -c -- '--json isDraft' "$CASE/gh.calls")" ] || fail 'new forge head never retried registrar'
+pass 'no-mistakes SHA-free ready signal retries new forge head while copy HEAD stays unchanged'
 
 make_case registration
 write_ship ready
