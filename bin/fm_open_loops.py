@@ -1450,7 +1450,8 @@ def steer_record_epoch(state, row, record):
     if not re.fullmatch(r"[0-9]+[.]msg", record):
         return None
     owner = str(row.get("owner", ""))
-    tasks = [str(row.get("source", {}).get("task", ""))]
+    source = row.get("source") if isinstance(row.get("source"), dict) else {}
+    tasks = [str(source.get("task", ""))]
     if owner.startswith("worker:"):
         tasks.append(owner[len("worker:"):])
     tasks.append(str(row.get("subject", "")).split(":", 1)[0])
