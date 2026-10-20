@@ -101,7 +101,7 @@ A broken hook must never deny every shell tool call.
 - With `--cursor`, warn instead writes `{"permission":"allow","user_message":"[persistent-cd] warn reason"}` to stdout and keeps stderr empty.
 - In `deny` mode, the original output is unchanged: exit 2 and `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] reason"}` on stderr, plus `{"decision":"deny","reason":"[persistent-cd] reason"}` on stdout for Grok unless `--claude` suppresses stdout.
 - With `--cursor`, deny instead returns exit 0 with `{"permission":"deny","user_message":"[persistent-cd] reason"}` on stdout and stderr empty, because Cursor reads the permission object rather than the exit status.
-- Claude's stdout stays empty in `deny` mode.
+- Claude's stdout stays empty in `deny` mode because Claude ignores a PreToolUse deny when stdout is nonempty.
 - Codex blocks on exit 2 and displays stderr.
 - OpenCode throws only when the checker exits 2.
 - Pi, pi-signed, and omp return `{block: true}` only when the checker exits 2.
