@@ -1351,7 +1351,8 @@ for (const [shape, fake] of [['private-key', '-----BEGIN PRIVATE KEY-----'], ['p
 const prose = ['task-specific-guidelines', 'risk-based-assessment', 'disk-backed-storage-layer', 'task-local-logs-and-evidence',
   'Bearer authentication-scheme', 'password = process.env.DATABASE_PASSWORD', 'password: must-be-at-least-sixteen',
   'prefix-ghp_FAKECREDENTIALFORTESTSONLY123456', 'task-AKIAFAKEFORTESTSONLY', 'inbox-xoxb-FAKECREDENTIALFORTESTS',
-  'http://localhost:3000?email=foo@bar.com', 'https://example.com:8080?contact=someone@example.com'].join('\n');
+  'http://localhost:3000?email=foo@bar.com', 'https://example.com:8080?contact=someone@example.com',
+  '{"endpoint":"http://localhost:3000","owner":"alice@example.com"}', 'url,http://host:8080,owner,bob@example.com'].join('\n');
 for (const host of ['omp', 'claude']) {
   before = sent().length;
   assert.equal(await call(host, report + '\n' + prose), undefined, `${host}: benign prose in a budget-limited write must be admitted`);
