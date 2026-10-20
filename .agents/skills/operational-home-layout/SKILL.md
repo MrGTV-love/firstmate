@@ -65,7 +65,8 @@ data/                personal fleet records; LOCAL, gitignored as a whole
   pipeline-spend.jsonl  optional per-task no-mistakes pipeline spend, written only when config/pipeline-spend is present; bin/fm-pipeline-spend.sh owns the schema
 projects/            cloned repos; gitignored; read-only except under hard rule 1's concrete captain-approved project operation exception
 state/               runtime records and signals; gitignored
-  <id>.status        append-only wake events, not current-state truth; bin/fm-status-decision-lib.sh owns line parsing and bin/fm-status-record-lib.sh owns emission metadata
+  <id>.status        append-only wake events, not current-state truth; bin/fm-status-decision-lib.sh owns line parsing and bin/fm-status-record-lib.sh owns emission metadata; append only through bin/fm-status-append.sh, which bounds its size (docs/configuration.md "Status log size bounds")
+  .status-cap-alerted.<name>  per-file marker holding the identity, path and size at which a status log or sidecar last raised the over-cap wake; written by bin/fm-status-cap-guard.sh mark, retired by bin/fm-status-cap-lib.sh once the file is gone, replaced or back under the cap, and safe to delete (that file then alarms again)
   <id>.turn-ended    touched by turn-end hooks
   <id>.progress      touched for observed native-harness activity inside one Pi turn; bin/fm-busy-event.sh owns its generation binding and bin/fm-watch.sh reads it beside turn-ended for the busy-age bound only, never as a completed turn
   <id>.busy-state <id>.busy-gen   semantic busy-state record (one line, atomically replaced) and its per-incarnation gen sidecar; bin/fm-busy-event.sh is the only writer and bin/fm-busy-lib.sh owns the record format and classification; arming again replaces the previous incarnation so late events carrying its gen are rejected as stale; removed by retire and teardown
