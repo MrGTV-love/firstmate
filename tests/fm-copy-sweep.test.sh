@@ -272,7 +272,7 @@ test_live_nested_copies_are_named_once_with_age_and_left_untouched() {
   FM_COPY_SWEEP_NOW=1893456000 run_sweep check
   [ "$RC" = 0 ] || fail "live nested check failed: $OUT"
   [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] || fail "check emitted more than one notification: $OUT"
-  assert_contains "$OUT" 'nested copies=2, oldest 2:' 'check must count both live copies even with budgets off'
+  assert_contains "$OUT" 'nested copies=2, 2 shown' 'check must count both live copies even with budgets off'
   assert_contains "$OUT" "$(copy_path locked-live) (task=outer-task age=3600s source=lock)" 'check did not name the locked live copy'
   assert_contains "$OUT" "$(copy_path unlocked-live) (task=outer-task age=86400s source=directory)" 'check did not name the unlocked live copy'
   assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path locked-live)" 'record did not keep the notified live copy'
@@ -284,7 +284,7 @@ test_live_nested_copies_are_named_once_with_age_and_left_untouched() {
   FM_COPY_SWEEP_NOW=1893456002 run_sweep check
   [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] || fail "budget and live facts emitted separate notifications: $OUT"
   assert_contains "$OUT" 'over its budget' 'budget facts were lost'
-  assert_contains "$OUT" 'nested copies=3, oldest 3:' 'the new live copy did not raise one aggregated fact'
+  assert_contains "$OUT" 'nested copies=3, 3 shown' 'the new live copy did not raise one aggregated fact'
   assert_contains "$OUT" "$(copy_path added-live)" 'the new live copy was not named'
   take_snapshots after locked-live unlocked-live
   assert_untouched locked-live unlocked-live
@@ -315,7 +315,7 @@ test_a_registered_copy_whose_directory_is_gone_is_not_named_live() {
   fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
   printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
   run_sweep check
-  assert_contains "$OUT" 'nested copies=1, oldest 1:' 'the count included a copy that is not on disk'
+  assert_contains "$OUT" 'nested copies=1, 1 shown' 'the count included a copy that is not on disk'
   assert_contains "$OUT" "$(copy_path present) (task=outer-task" 'the copy on disk was not named'
   assert_not_contains "$OUT" "$(copy_path vanished)" 'a copy that is not on disk was named as live'
   assert_not_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path vanished)" 'the record kept a copy that is not on disk'
@@ -341,7 +341,7 @@ test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report() {
   [ "$RC" = 0 ] || fail "check failed: $OUT"
   wake_line=$OUT
   [ "$(printf '%s\n' "$wake_line" | wc -l | tr -d ' ')" = 1 ] || fail "the live copies were not one aggregated line: $wake_line"
-  assert_contains "$wake_line" 'nested copies=7, oldest 5:' 'the wake did not carry the count and the bound'
+  assert_contains "$wake_line" 'nested copies=7, 5 shown (new first, then oldest):' 'the wake did not carry the count and the bound'
   for i in 1 2 3 4 5; do
     assert_contains "$wake_line" "$(copy_path "n$i") (task=outer-task age=" "the wake left out oldest copy n$i"
   done
@@ -349,6 +349,35 @@ test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report() {
   assert_not_contains "$wake_line" "$(copy_path n7)" 'the wake named a copy beyond the oldest five'
   assert_contains "$wake_line" 'the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh' 'the wake did not point at the report line'
   pass 'the wake carries the count, the oldest five live copies and a pointer to the report, as one line'
+}
+
+test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded() {
+  local i
+  make_world live-new-first
+  for i in 1 2 3 4 5 6; do
+    add_copy "n$i"
+    TZ=UTC touch -t "$(printf '20291231%02d00' $((i - 1)))" "$(copy_path "n$i")"
+  done
+  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
+  printf 'default-pool off\ndefault-container off\ninterval 0\n' > "$HOMED/config/copy-budget"
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep check
+  assert_contains "$OUT" 'nested copies=6, 5 shown (new first, then oldest):' 'the first run did not wake on the backlog'
+  add_copy fresh
+  TZ=UTC touch -t 202912312359 "$(copy_path fresh)"
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep check
+  [ "$RC" = 0 ] || fail "check failed: $OUT"
+  [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] || fail "the new copy was not one aggregated line: $OUT"
+  assert_contains "$OUT" 'nested copies=7, 5 shown (new first, then oldest):' 'the wake did not carry the count and the bound'
+  assert_contains "$OUT" "$(copy_path fresh) (task=outer-task age=60s source=directory)" 'the new youngest copy that caused the wake was not named'
+  assert_equals 5 "$(printf '%s' "$OUT" | grep -o '(task=outer-task' | wc -l | tr -d ' ')" 'the wake named more or fewer than five copies'
+  for i in 1 2 3 4; do
+    assert_contains "$OUT" "$(copy_path "n$i") (task=outer-task age=" "the wake left out oldest copy n$i after the new one"
+  done
+  assert_not_contains "$OUT" "$(copy_path n5)" 'the wake named a copy beyond the new one and the oldest four'
+  assert_not_contains "$OUT" "$(copy_path n6)" 'the wake named a copy beyond the new one and the oldest four'
+  FM_COPY_SWEEP_NOW=1893456000 run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "a second sweep with no new copy repeated the fact: $OUT"
+  pass 'a new youngest copy is named first, the wake names five copies in all, and an unchanged set stays silent'
 }
 
 test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact() {
@@ -1226,6 +1255,7 @@ run_case test_live_nested_copies_are_named_once_with_age_and_left_untouched
 run_case test_a_lock_probe_cut_by_the_time_bound_reads_unknown_never_directory
 run_case test_a_registered_copy_whose_directory_is_gone_is_not_named_live
 run_case test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report
+run_case test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded
 run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy

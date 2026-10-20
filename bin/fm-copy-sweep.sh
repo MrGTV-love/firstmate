@@ -61,7 +61,7 @@
 # HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
 # `git worktree remove`, so calling it live or orphaned would mislead.
 # Independently of class and byte budgets, one HELD-LIVE-TASK report line names
-# every nested copy on disk overlapping a ship/scout record's current or prior
+# every nested copy on disk strictly inside a ship/scout record's current or prior
 # copy inside its registering clone, with its absolute path, owning task, and
 # age in seconds from the lock mtime (source=lock) or, when unlocked, the
 # directory mtime (source=directory). A lock state that cannot be read, such as
@@ -70,9 +70,9 @@
 # still in custody; teardown removes closed records. This check only reports,
 # including locked copies, and never releases anything. The report prints the
 # whole line. `check` and `--apply` put one bounded part of it in their one
-# aggregated wake, even below the byte budget: the count, the oldest five copies,
-# and a pointer to the report line. A copy with no live owning record is left to
-# the existing reap path.
+# aggregated wake, even below the byte budget: the count, five copies in all (new
+# copies first, then the oldest), and a pointer to the report line. A copy with no
+# live owning record is left to the existing reap path.
 #
 # --apply removes only REAPABLE-PROVEN copies, one at a time, deepest path first,
 # each re-proved just before its own removal, by a plain `git worktree remove`
@@ -1096,15 +1096,21 @@ live_nested_report() {
     "$(printf '%s' "$LIVE_NESTED_ROWS" | live_nested_entries "$LIVE_NESTED_COUNT")"
 }
 
-# The wake's part of it: the count, the oldest few copies, and where the rest is.
+# The wake's part of it: the count, a few copies (those the record has not named
+# yet first, then the oldest), and where the rest is.
 LIVE_WAKE_COPIES=5
 live_nested_wake() {
   local shown=$LIVE_NESTED_COUNT
   [ "$LIVE_NESTED_COUNT" -gt 0 ] || return 0
   [ "$shown" -le "$LIVE_WAKE_COPIES" ] || shown=$LIVE_WAKE_COPIES
-  printf 'HELD-LIVE-TASK nested copies=%s, oldest %s: %s; the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh' \
+  printf 'HELD-LIVE-TASK nested copies=%s, %s shown (new first, then oldest): %s; the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh' \
     "$LIVE_NESTED_COUNT" "$shown" \
-    "$(printf '%s' "$LIVE_NESTED_ROWS" | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2 | live_nested_entries "$shown")"
+    "$(printf '%s' "$LIVE_NESTED_ROWS" | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2 \
+      | RECORDED="$REC_LIVE" awk -F '\t' '
+          BEGIN { n = split(ENVIRON["RECORDED"], r, "\n"); for (i = 1; i <= n; i++) if (r[i] != "") known[r[i]] = 1 }
+          NF { if ($2 in known) old[++o] = $0; else print }
+          END { for (i = 1; i <= o; i++) print old[i] }' \
+      | live_nested_entries "$shown")"
 }
 
 # Raises the one wake. `check` prints the line for the watcher to turn into a
