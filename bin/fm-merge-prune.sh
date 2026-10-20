@@ -52,12 +52,16 @@
 # treehouse-reap-clean, that the copy is a Treehouse pool slot of the task's
 # project (the repo's one test, fm_treehouse_pool_slot: the pool's
 # treehouse-state.json beside it and the project's git directory shared), and
-# that it and every nested copy has no changed or untracked file, holds no stash
+# that it and every nested copy has no changed or untracked file (the untracked
+# directory of a nested copy is not counted in the status of the copy that holds
+# it: each nested copy is proved on its own), holds no stash
 # entry of its own work, has no commit reachable from its HEAD (its own
 # checked-out branch) missing from every remote (or from the merged PR's head),
 # for the task's own copy leaves out nothing the merged PR omits (its HEAD is in
 # the PR's head, or the default branch carries its content),
-# holds only scratch or preserved ignored files (under .claude and .opencode only
+# holds only scratch or preserved ignored files (the disposable entries of
+# teardown's own list, scripts/hooks/_conformance_manifest.json included; under
+# .claude and .opencode only
 # Firstmate's own hook files and clones are scratch, and the search for nested
 # copies enters dependency and environment trees), and has no process inside. For a
 # linked worktree of the project the commit and stash proofs read only that
@@ -507,13 +511,15 @@ proof_scope() {  # <copy> <project>
 }
 
 # Prove one copy and everything nested in it; sets FM_MP_VERDICT/REASON on failure.
+# The nested copies are found first: each is proved on its own, so the status of
+# the copy that holds it does not count its untracked directory (fm_mp_prove_git).
 # The nofetch mode reuses what the earlier fetching pass left (fm_mp_prove_git).
 prove_all() {  # <real-copy> <pr-number> [nofetch]
   local real=$1 pr=$2 mode=${3:-fetch} n project
   project=$(fm_meta_get "$META" project)
+  fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
   fm_mp_prove_git "$real" "$pr" "$mode" "$(proof_scope "$real" "$project")" || { record_verdict "$real"; return 1; }
   fm_mp_prove_ignored "$real" || { record_verdict "$real"; return 1; }
-  fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
   if [ "${#FM_MP_NESTED[@]}" -gt 0 ]; then
     for n in "${FM_MP_NESTED[@]}"; do
       fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }

@@ -56,7 +56,9 @@ trap cleanup_workers EXIT
 # make_world builds one isolated world and sets W, HOME_DIR, STATE, DATA, POOL,
 # ORIGIN and COPY (the task's pool copy: <pool root>/pool1/1/repo, a linked
 # worktree of the task's project, the clone $W/project, with the pool's
-# treehouse-state.json at <pool root>/pool1).
+# treehouse-state.json at <pool root>/pool1). The project ignores .claude/
+# unless IGNORE_CLAUDE=0 is set, which leaves a clone under .claude/worktrees
+# visible to `git status` as an untracked directory.
 make_world() {
   local seed
   WN=$((WN + 1))
@@ -74,7 +76,8 @@ make_world() {
   seed="$W/seed"
   git clone -q "$ORIGIN" "$seed" 2>/dev/null
   git -C "$seed" checkout -q -b main
-  printf '%s\n' '.venv/' 'node_modules/' '__pycache__/' '.DS_Store' '.claude/' '.tac/' '.mypy_cache/' '*.local' > "$seed/.gitignore"
+  printf '%s\n' '.venv/' 'node_modules/' '__pycache__/' '.DS_Store' '.tac/' '.mypy_cache/' '*.local' > "$seed/.gitignore"
+  [ "${IGNORE_CLAUDE:-1}" = 0 ] || printf '%s\n' '.claude/' >> "$seed/.gitignore"
   printf 'readme\n' > "$seed/README.md"
   git -C "$seed" add -A
   git -C "$seed" commit -q -m base
@@ -593,6 +596,132 @@ scn_clean_nested_copy_goes_with_the_slot() {
   [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a clean pushed nested copy kept the slot: $(rec_field t1 reason)" || return 1
   find "$DATA/t1/merge-prune-preserved" -path '*/nested-.claude__worktrees__n1/.claude/bug-evidence/e.json' | grep -q . \
     || why "the nested copy's preserve-list record was not preserved" || return 1
+  return 0
+}
+
+# A project that does not ignore .claude/ shows a nested clone to `git status`
+# as one untracked directory of the outer copy. That line is not the outer
+# copy's own work: the clone is proved on its own. Any other untracked file is.
+scn_unignored_nested_clone_goes_with_the_slot() {
+  local n
+  IGNORE_CLAUDE=0 make_world
+  make_nested .claude/worktrees/n1
+  make_nested .claude/worktrees/n1/sub/n2
+  n="$COPY/.claude/worktrees/n1"
+  printf '.claude/\n' >> "$(git -C "$n" rev-parse --path-format=absolute --git-path info/exclude)"
+  mkdir -p "$n/.claude/bug-evidence"
+  printf 'nested-evidence\n' > "$n/.claude/bug-evidence/e.json"
+  [ "$(git -C "$COPY" status --porcelain --untracked-files=all)" = '?? .claude/worktrees/n1/' ] || why "the fixture's outer copy does not show the clone as one untracked directory: $(git -C "$COPY" status --porcelain --untracked-files=all)" || return 1
+  [ "$(git -C "$n" status --porcelain --untracked-files=all)" = '?? sub/n2/' ] || why "the fixture's nested copy does not show its own clone as one untracked directory: $(git -C "$n" status --porcelain --untracked-files=all)" || return 1
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a clean pushed nested clone that .gitignore does not cover kept the slot: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "a clean nested clone raised a wake" || return 1
+  find "$DATA/t1/merge-prune-preserved" -path '*/nested-.claude__worktrees__n1/.claude/bug-evidence/e.json' | grep -q . \
+    || why "the nested clone's own proofs did not run: its preserve-list record was not preserved" || return 1
+  return 0
+}
+
+# The nested clone's line is skipped and nothing else: an untracked file beside
+# it keeps the copy, and the wake names that file, not the clone.
+scn_unignored_nested_clone_does_not_hide_an_untracked_file() {
+  local first
+  IGNORE_CLAUDE=0 make_world
+  make_nested .claude/worktrees/n1
+  printf 'only here\n' > "$COPY/.claude/worktrees/notes.txt"
+  first=$(git -C "$COPY" status --porcelain --untracked-files=all | sed -n 1p)
+  [ "$first" = '?? .claude/worktrees/n1/' ] || why "the fixture does not list the clone first: $first" || return 1
+  go
+  [ -e "$COPY/.claude/worktrees/notes.txt" ] && [ "$(destroy_calls)" = 0 ] || why "an untracked file beside a nested clone was removed" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although an untracked file was left" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'worktrees/notes.txt' || why "the wake does not name the untracked file: $(cat "$STATE/.wake-queue")" || return 1
+  return 0
+}
+
+scn_unignored_nested_clone_with_unpushed_work_is_kept() {
+  IGNORE_CLAUDE=0 make_world
+  make_nested .claude/worktrees/n1
+  printf 'orphan\n' > "$COPY/.claude/worktrees/n1/orphan.txt"
+  git -C "$COPY/.claude/worktrees/n1" add orphan.txt
+  git -C "$COPY/.claude/worktrees/n1" commit -q -m "unpushed in nested"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "an unpushed commit in a nested clone that .gitignore does not cover did not keep the slot" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although the nested clone holds unpushed work" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY/.claude/worktrees/n1" "$STATE/.wake-queue" | grep -q 'commit(s) on no remote' || why "the wake does not name the nested clone and its unpushed commit: $(cat "$STATE/.wake-queue")" || return 1
+  return 0
+}
+
+# The prune must judge an ignored entry the way bin/fm-teardown-nested-lib.sh
+# does: for each entry below, the prune's classifier (fm_mp_prove_ignored) and
+# teardown's own (teardown_preservable_ignored) must agree on whether it blocks
+# removal, so a name that one list learns and the other lacks fails here. Each
+# entry is the only ignored thing of its own throwaway repo; a trailing slash is
+# a directory holding one file. Other entries under .claude and .opencode are
+# left out on purpose: the prune is stricter there
+# (scn_unique_data_under_claude_or_opencode_is_kept).
+IGNORED_ENTRIES_BOTH_PASS=(
+  .venv/ venv/ node_modules/ __pycache__/ .pytest_cache/ .ruff_cache/ .mypy_cache/
+  .next/ graphify-out/ .import_linter_cache/ pkg/__pycache__/ a/b/node_modules/
+  .DS_Store .fm-grok-turnend .fm-kimi-turnend tsconfig.tsbuildinfo sub/.DS_Store
+  .tac/tmp/ .tac/uv-cache/
+  .claude/settings.local.json .opencode/plugins/fm-busy-state.js
+  scripts/hooks/_conformance_manifest.json
+)
+IGNORED_ENTRIES_BOTH_BLOCK=(
+  build/ data/unique.bin precious.local .tac/state.json
+  scripts/hooks/other.json scripts/hooks/_conformance_manifest.json.bak
+  scripts/_conformance_manifest.json sub/scripts/hooks/_conformance_manifest.json
+)
+
+make_ignored_entry_repo() {  # <dir> <entry>
+  local d=$1 entry=$2 file dir
+  file=${entry%/}
+  git init -q "$d"
+  : > "$d/top.keep"
+  dir=$file
+  while dir=$(dirname "$dir"); [ "$dir" != . ]; do
+    mkdir -p "$d/$dir"
+    : > "$d/$dir/tracked.keep"
+  done
+  git -C "$d" add -f -A
+  git -C "$d" commit -q -m seed
+  printf '/%s\n' "$entry" > "$d/.git/info/exclude"
+  if [ "$file" != "$entry" ]; then
+    mkdir -p "$d/$file"
+    : > "$d/$file/x"
+  else
+    mkdir -p "$d/$(dirname "$file")"
+    : > "$d/$file"
+  fi
+}
+
+teardown_ignored_verdict() {  # <real-copy>: passes | blocks
+  local out
+  out=$(bash -c 'set -u; . "$1/fm-teardown-nested-lib.sh" && teardown_preservable_ignored "$2"' _ "$ROOT/bin" "$1" 2>/dev/null) || { printf 'error'; return 0; }
+  if [ -z "$out" ]; then printf 'passes'; else printf 'blocks'; fi
+}
+
+prune_ignored_verdict() {  # <real-copy>: passes | blocks
+  bash -c 'set -u; . "$1/fm-merge-prune-lib.sh"; if fm_mp_prove_ignored "$2" >/dev/null 2>&1; then printf passes; else printf blocks; fi' _ "$BIN_DIR" "$1" 2>/dev/null
+}
+
+scn_ignored_entries_get_teardowns_verdict() {
+  local entry d real want got n=0 passes=0 blocks=0
+  make_world
+  for entry in "${IGNORED_ENTRIES_BOTH_PASS[@]}" "${IGNORED_ENTRIES_BOTH_BLOCK[@]}"; do
+    n=$((n + 1))
+    d="$W/parity/r$n"
+    mkdir -p "$d"
+    make_ignored_entry_repo "$d" "$entry"
+    real=$(cd "$d" && pwd -P)
+    [ -n "$(git -C "$real" ls-files -o -i --exclude-standard --directory)" ] || why "the fixture holds no ignored entry for $entry" || return 1
+    want=$(teardown_ignored_verdict "$real")
+    got=$(prune_ignored_verdict "$real")
+    case "$want" in passes) passes=$((passes + 1)) ;; blocks) blocks=$((blocks + 1)) ;; *) why "teardown's classifier could not be run for $entry" || return 1 ;; esac
+    [ "$got" = "$want" ] || why "for the ignored entry $entry teardown says $want and the prune says ${got:-nothing}" || return 1
+  done
+  [ "$passes" -gt 0 ] && [ "$blocks" -gt 0 ] || why "the entries do not cover both verdicts ($passes pass, $blocks block)" || return 1
   return 0
 }
 
@@ -1183,7 +1312,9 @@ scn_failing_stash_listing_is_retried() { scn_failed_read_keeps_the_copy fail-sta
 
 # A subtree that cannot be read cannot be searched for nested copies (find fails
 # in a scratch directory the search enters), and a .claude directory that cannot
-# be listed cannot be classified. Neither counts as finding nothing.
+# be listed cannot be classified. Neither counts as finding nothing. The search
+# for nested copies runs first and reads every directory, so an unreadable
+# .claude fails there; the listing failure is made by a stand-in `ls` instead.
 scn_unreadable_subtree_keeps_the_copy() {  # <relative directory> <text the record must name>
   make_world
   mkdir -p "$COPY/$1"
@@ -1197,7 +1328,25 @@ scn_unreadable_subtree_keeps_the_copy() {  # <relative directory> <text the reco
   return 0
 }
 scn_unreadable_scratch_subtree_keeps_the_copy() { scn_unreadable_subtree_keeps_the_copy .mypy_cache/sub 'cannot search'; }
-scn_unreadable_claude_directory_keeps_the_copy() { scn_unreadable_subtree_keeps_the_copy .claude 'cannot list .claude'; }
+scn_unreadable_claude_directory_keeps_the_copy() {
+  make_world
+  mkdir -p "$COPY/.claude/sub"
+  printf '#!/usr/bin/env bash\nREAL_LS=%q\nSTANDIN_DIR=%q\n' "$(command -v ls)" "$W" > "$W/bin/ls"
+  cat >> "$W/bin/ls" <<'SH'
+case " $* " in
+  *" -A "*/.claude" "*) [ ! -e "$STANDIN_DIR/fail-claude-ls" ] || { echo "ls: simulated listing failure" >&2; exit 1; } ;;
+esac
+exec "$REAL_LS" "$@"
+SH
+  chmod +x "$W/bin/ls"
+  : > "$W/fail-claude-ls"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy was removed although .claude cannot be listed" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although .claude cannot be listed" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  rec_field t1 reason | grep -q 'cannot list .claude' || why "the record does not name 'cannot list .claude': $(rec_field t1 reason)" || return 1
+  return 0
+}
 
 # A nested copy that is an independent clone has its own branches and stashes,
 # which removing it destroys. It is clean, on main and pushed, so a HEAD-only
@@ -1559,6 +1708,10 @@ test_fallback_keeps_a_stash() { assert_scenario scn_stash_is_kept "a stash entry
 test_fallback_keeps_a_live_process() { assert_scenario scn_live_process_is_kept "a live process inside keeps the copy with exactly one wake"; }
 test_fallback_nested_unpushed_commit_keeps_the_slot() { assert_scenario scn_nested_unpushed_commit_keeps_the_slot "an unpushed commit in a NESTED copy keeps the whole slot"; }
 test_fallback_removes_a_clean_nested_copy_with_the_slot() { assert_scenario scn_clean_nested_copy_goes_with_the_slot "a clean pushed orphan nested copy goes with its slot, its preserve-list records preserved"; }
+test_fallback_removes_an_unignored_clean_nested_clone_with_the_slot() { assert_scenario scn_unignored_nested_clone_goes_with_the_slot "a clean pushed nested clone that the project's .gitignore does not cover, and a clone inside it, go with the slot: the clones are not untracked files of the copy that holds them, and their own proofs ran"; }
+test_fallback_keeps_an_untracked_file_beside_an_unignored_nested_clone() { assert_scenario scn_unignored_nested_clone_does_not_hide_an_untracked_file "an untracked file beside a nested clone still keeps the copy with one wake naming that file"; }
+test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work() { assert_scenario scn_unignored_nested_clone_with_unpushed_work_is_kept "a nested clone that the project's .gitignore does not cover, with an unpushed commit, keeps the slot with one wake naming the clone"; }
+test_fallback_judges_ignored_entries_like_teardown() { assert_scenario scn_ignored_entries_get_teardowns_verdict "the prune and bin/fm-teardown-nested-lib.sh agree on whether each ignored entry blocks removal"; }
 test_fallback_keeps_unique_ignored_files() { assert_scenario scn_unique_ignored_file_is_kept "a unique ignored file outside the preserve list and the scratch patterns keeps the copy"; }
 test_fallback_keeps_a_non_pool_copy() { assert_scenario scn_non_pool_copy_is_kept "a copy outside the pool is never destroyed"; }
 test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot() { assert_scenario scn_plain_git_tree_is_not_a_pool_copy "a plain git tree at <root>/a/b/c is not a pool copy: it is kept with one wake and nothing is stopped or destroyed"; }
@@ -1673,6 +1826,11 @@ test_unsafe_mutations_are_caught() {
 
   expect_caught no-nested-check $lib '    FM_MP_NESTED+=("$dir")' '    :' scn_nested_unpushed_commit_keeps_the_slot "nested-copy proof"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
+  expect_caught every-claude-untracked-line-skipped $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'grep -v -- "^?? .claude/"' scn_unignored_nested_clone_does_not_hide_an_untracked_file "skipping only a nested copy's own untracked line"
+  expect_caught nested-clone-not-proved-once-its-line-is-skipped $orch '      fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '      :' scn_unignored_nested_clone_with_unpushed_work_is_kept "own git proof of a nested clone whose untracked line is skipped"
+  expect_caught conformance-manifest-by-path-suffix $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    *scripts/hooks/_conformance_manifest.json) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "exact path of the conformance manifest"
+  expect_caught conformance-manifest-by-name-prefix $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    scripts/hooks/_conformance_manifest.json*) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "exact name of the conformance manifest"
+  expect_caught scratch-list-adds-a-name-teardown-lacks $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo|build) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
   expect_caught no-pool-slot-check $orch '  if ! real=$(fm_mp_real "$wt") || ! fm_treehouse_pool_slot "$project" "$real"; then' '  if ! real=$(fm_mp_real "$wt"); then' scn_plain_git_tree_is_not_a_pool_copy "pool-slot proof"
   expect_caught no-pool-slot-check-outside-the-pool $orch '  if ! real=$(fm_mp_real "$wt") || ! fm_treehouse_pool_slot "$project" "$real"; then' '  if ! real=$(fm_mp_real "$wt"); then' scn_non_pool_copy_is_kept "pool-slot proof (outside the pool)"
   expect_caught no-second-classification $orch '  if ! reapable; then
@@ -1736,6 +1894,9 @@ test_over_strict_mutations_are_caught() {
   expect_caught no-scratch-names $lib '  if fm_mp_scratch_name "$name"; then' '  if false; then' scn_scratch_copy_is_removed "scratch patterns"
   expect_caught no-claude-scratch $lib '    .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;' '    .opencode/plugins/fm-busy-state.js) return 0 ;;' scn_scratch_copy_is_removed ".claude hook-file rule"
   expect_caught no-tac-scratch $lib '    .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;' '    .tac/NEVER) return 0 ;;' scn_scratch_copy_is_removed ".tac scratch rule"
+  expect_caught nested-clone-line-counts $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'cat' scn_unignored_nested_clone_goes_with_the_slot "skipping a nested copy's untracked directory"
+  expect_caught no-conformance-manifest-scratch $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    scripts/hooks/NEVER) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "conformance manifest rule"
+  expect_caught scratch-list-drops-a-name-teardown-has $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
   expect_caught nofetch-forgets-pr-head $lib '    [ -z "$prn" ] || prsha=$FM_MP_PR_HEAD' '    :' scn_pr_head_proves_a_squash_merged_commit "reuse of the merged PR head"
@@ -2046,6 +2207,10 @@ ALL_TESTS=(
   test_fallback_keeps_a_live_process
   test_fallback_nested_unpushed_commit_keeps_the_slot
   test_fallback_removes_a_clean_nested_copy_with_the_slot
+  test_fallback_removes_an_unignored_clean_nested_clone_with_the_slot
+  test_fallback_keeps_an_untracked_file_beside_an_unignored_nested_clone
+  test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work
+  test_fallback_judges_ignored_entries_like_teardown
   test_fallback_keeps_unique_ignored_files
   test_fallback_keeps_a_non_pool_copy
   test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot
