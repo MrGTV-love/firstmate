@@ -1,0 +1,18 @@
+=== PRE-FIX CODE, shape=state-cache ===
+not ok - bundle-state-state-cache: the preservation bundle was deleted
+exit=
+=== PRE-FIX CODE, shape=state-cache-alias ===
+not ok - bundle-state-state-cache-alias: the preservation bundle was deleted
+exit=
+=== PRE-FIX CODE, shape=state-cache-symlink ===
+ok - a bundle under the state removal root, or a symlink into it, never counts as preservation
+exit=
+=== FIXED CODE, shape=state-cache ===
+ok - a bundle under the state removal root, or a symlink into it, never counts as preservation
+exit=
+=== FIXED CODE, shape=state-cache-alias ===
+ok - a bundle under the state removal root, or a symlink into it, never counts as preservation
+exit=
+=== FIXED CODE, shape=state-cache-symlink ===
+ok - a bundle under the state removal root, or a symlink into it, never counts as preservation
+exit=

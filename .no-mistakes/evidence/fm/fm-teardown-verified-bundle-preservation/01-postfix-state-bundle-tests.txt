@@ -1,0 +1,4 @@
+ok - ordinary teardown removes a copy with one or two unpublished tips preserved in a verified recorded bundle
+ok - a bundle under the state removal root, or a symlink into it, never counts as preservation
+ok - a bundle that holds a structurally invalid commit never counts as preservation
+nice -n 20 bash tests/fm-teardown.test.sh     8.70s user 16.63s system 76% cpu 33.137 total

@@ -1,0 +1,2 @@
+=== MUTANT: fsck gate replaced by true ===
+not ok - bundle-malformed-commit: a bundle holding a malformed commit must refuse: expected exit 1, got 0

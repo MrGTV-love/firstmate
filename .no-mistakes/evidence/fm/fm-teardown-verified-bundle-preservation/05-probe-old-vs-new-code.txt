@@ -1,0 +1,29 @@
+Live probe: the real bin/fm-teardown.sh, run by tests/fm-teardown.test.sh's own harness
+(real git repos, real bundles, stubbed tmux/treehouse/gh), once per bundle location.
+OLD = bin/fm-teardown.sh + bin/fm-teardown-nested-lib.sh from 4c82f10cb^ (before the fix).
+NEW = target commit 71029f5eb. Each run used a throwaway copy of the repo outside the worktree.
+Columns: rc = teardown exit code; the four states are checked after the run.
+Probe code was a temporary scratch addition, not part of the branch; the scratch copy is deleted.
+
+shape                      OLD                                                            NEW
+-------------------------  -------------------------------------------------------------  -------------------------------------------------------------
+external (control)         rc=0 copy removed, bundle kept                                 rc=0 copy removed, bundle kept
+state-cache                rc=1 copy kept, BUNDLE DELETED ("not a regular file" at final  rc=1 copy+bundle+record+task meta all kept,
+                           custody: first proof accepted it, state cache was then         "bundle is inside task state <state dir>"
+                           removed whole)
+state-cache-alias          rc=1 copy kept, BUNDLE DELETED (same)                          rc=1 all kept, "bundle is inside task state <state dir>"
+(parent symlink)
+state-cache-leaf-symlink   rc=1 all kept, "bundle is not a regular nonsymlink file"       rc=1 all kept, "bundle is not a regular nonsymlink file"
+                           (negative control, same before and after)                      (same)
+state-other-cache          rc=0 ACCEPTED, copy removed                                    rc=1 all kept, "bundle is inside task state"
+(.nm-read-cache-other-task)
+state-subdir               rc=0 ACCEPTED, copy removed                                    rc=1 all kept, "bundle is inside task state"
+(state/archive/deep)
+state-toplevel             rc=0 ACCEPTED, copy removed                                    rc=1 all kept, "bundle is inside task state"
+(state/work.bundle)
+state-symlinked-root       rc=1 "state directory is not a real directory" (unrelated      rc=1 same unrelated refusal; shape not reachable
+                           state-root guard)
+own-copy                   rc=1 all kept, "bundle is inside copy <copy>"                  rc=1 all kept, "bundle is inside copy <copy>"
+sibling-prefix             rc=0 copy removed, bundle kept                                 rc=0 copy removed, bundle kept
+(<case>/state-archive/)                                                                   (no over-match on a name that only shares the prefix)
+force-state-cache          rc=0 copy removed (--force --drop-file path)                   rc=0 copy removed (--force handling unchanged)
