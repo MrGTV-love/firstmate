@@ -1,0 +1,32 @@
+ok - a held copy keeps its unique ignored files in place: nothing of it is copied, moved or removed, and the record has one line
+ok - a task whose own copy landed closes beside a foreign copy with commits on no remote, which stays byte-identical, with the slot still reserved
+ok - each held foreign copy gets one record line with UTC time, closing task, slot, copy and its exact reason
+ok - a held close removes the task's own nested copy, through the driver when it is locked, and leaves the slot, its lease and claim and the held foreign copy alone
+ok - a held close refuses, with nothing removed, when an own nested copy holds a separate repository or another project's worktree
+ok - a submodule of the task's own repository does not stop a held close
+ok - a foreign copy inside the own nested copy is never held or swept away: the close refuses and every copy, the slot, its lease and claim stay as they were
+ok - an ordinary close whose slot gains a copy holding unique ignored files during the project-lock wait refuses with nothing removed
+ok - a stale-lock cleanup refuses when the slot gained a copy holding unique ignored files, instead of turning the close into a held close
+ok - a held close reserves a plain-get slot under a durable lease before it removes anything and leaves the held copy byte-identical
+ok - a held close refuses before it removes anything when the slot cannot be durably leased, and says why
+ok - a held close lists every held copy, says the slot is reserved under a durable lease and stays claimed, and promises no cleanup that does not exist
+ok - a held close refused by a later step leaves its one record line, and the close that completes does not repeat it
+ok - a held close whose record cannot be written refuses with nothing removed, and the rerun closes with one line
+ok - a --legacy-record close beside a held foreign copy still lists the held copy and says the slot return is deferred
+ok - a dirty or unlanded own copy still refuses exactly as before when a foreign copy would be held, and nothing changes
+ok - a foreign copy that is also dirty, named by another record, or running a process still refuses the whole close
+ok - a copy held for ignored files that is listed among refusals is typed copy-ignored-files and asked about those files, not about a landing
+ok - a copy not held because a process of the closing task runs in it, or launched its lock, is refused naming that process, and nothing is signalled or removed
+ok - a foreign copy whose landing could not be checked is refused with nothing removed and no record line, and a rerun releases a landed copy and holds an unlanded one
+ok - a failure after the task record and own copies are gone still leaves the held notice and one record line, and the foreign copy untouched
+ok - --force waives nothing: it never holds a foreign copy and still refuses
+ok - a slot with no foreign copy closes and returns exactly as before and writes no held-copy record
+ok - an own landed copy beside a foreign copy with only a unique ignored file closes, the foreign copy is kept byte-identical, treehouse return --force is not called, and the record has one line
+ok - the next step for a copy held for ignored files says to review and save them, and names no removal
+ok - held-copy notices and the record show control characters as ?, and the printed command quotes the copy path so it pastes back unchanged
+ok - a forced close preserves a foreign copy's unique ignored file with its SHA-256 and releases the copy, as the held-copy rule never applies to it
+ok - a foreign copy inside the task's own nested copy keeps its unique ignored file preserved and is released with it, never refused for that file
+ok - a rerun adds no second record line for a held copy whose ignored file name holds a backslash followed by a letter
+ok - durable .tac state holds a foreign copy untouched, while regenerable .tac/tmp is never the reason
+ok - a foreign copy whose ignored files cannot be listed is refused, never held and never treated as having nothing to keep
+EXIT=0

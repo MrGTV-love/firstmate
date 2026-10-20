@@ -1,0 +1,79 @@
+
+### S1 landed task closes beside a clean foreign copy whose only blocker is a unique ignored file (plain-get slot)
+pool before: {"name":"1","leased":null,"lease_holder":null}
+--- exit=0
+--- stdout:
+/Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project
+🌳 Worktree returned to pool.
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.KD0JkG/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.KD0JkG
+🌳 Leased worktree 1 at ~/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project. Run 'treehouse return ~/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project' to release it.
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-lab.KD0JkG/data/task-x1/nested-copy-preserved/157f4a14b9c0aecad2c7eb217b340d7d527497057e1146c618309a3a06bb20c9
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project
+pool after : {"name":"1","leased":null,"lease_holder":null}
+CHECK PASS: exit 0
+CHECK PASS: no REFUSED line
+CHECK PASS: task record removed
+CHECK PASS: backlog item is done
+CHECK PASS: foreign copy byte-identical
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project/.claude/worktrees/fc-one': No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M5BGXW5YY43YYE22GWDGR36G/live-lab.sh: line 133: cd: /Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project/.claude/worktrees/fc-one: No such file or directory
+find: ./fm-fm-spawn-provision-existing-slot+32d18ed9638d50514e9addd50c8538c51c70ca1f6ec9ee5c4740b80228aa2a7d: No such file or directory
+xargs: shasum: terminated with signal 13; aborting
+CHECK FAIL: foreign copy fingerprint unchanged
+cat: /Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project/.claude/worktrees/fc-one/unique.dat: No such file or directory
+CHECK FAIL: ignored file still there with same bytes
+CHECK FAIL: no preserved copy made
+CHECK FAIL: foreign copy still registered
+CHECK PASS: slot not returned (dir present)
+CHECK FAIL: slot durably leased now
+CHECK FAIL: output says slot return is deferred
+CHECK FAIL: output names the held copy
+CHECK PASS: output gives no removal command for ignored copy
+/Users/charlesabrooker/.no-mistakes/evidence/01M5BGXW5YY43YYE22GWDGR36G/live-scenarios.sh: line 9: /Users/charlesabrooker/tmp/fm-lab.KD0JkG/data/held-foreign-copies.log: No such file or directory
+CHECK FAIL: record has exactly one line
+--- held-foreign-copies.log:
+
+### S1b rerun after the close: no task record, foreign copy untouched
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.KD0JkG
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.KD0JkG/state/task-x1.meta
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project/.claude/worktrees/fc-one': No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M5BGXW5YY43YYE22GWDGR36G/live-lab.sh: line 133: cd: /Users/charlesabrooker/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project/.claude/worktrees/fc-one: No such file or directory
+xargs: shasum: terminated with signal 13; aborting
+CHECK FAIL: foreign copy still unchanged after rerun
+/Users/charlesabrooker/.no-mistakes/evidence/01M5BGXW5YY43YYE22GWDGR36G/live-scenarios.sh: line 9: /Users/charlesabrooker/tmp/fm-lab.KD0JkG/data/held-foreign-copies.log: No such file or directory
+CHECK FAIL: record unchanged after rerun
+--- real treehouse status:
+base  main  (repository default)
+1     available    ~/tmp/fm-lab.KD0JkG/pool/.treehouse/project-98cf40/1/project  (detached)
+
+### S2 landed task closes beside a foreign copy holding commits on no remote (durably leased slot)
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.iyXcXz
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-landed missing=foreign copy /Users/charlesabrooker/tmp/fm-lab.iyXcXz/pool/.treehouse/project-6b7b9f/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-lab.iyXcXz/pool/.treehouse/project-6b7b9f/1/project: its HEAD ac0211e2d094 is not proved landed.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.iyXcXz/pool/.treehouse/project-6b7b9f/1/project/.claude/worktrees/fc-one (its HEAD ac0211e2d094 is not proved landed)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab.iyXcXz/pool/.treehouse/project-6b7b9f/1/project contains registered copy /Users/charlesabrooker/tmp/fm-lab.iyXcXz/pool/.treehouse/project-6b7b9f/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab.iyXcXz/pool/.treehouse/project-6b7b9f/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-lab.iyXcXz/pool/.treehouse/project-6b7b9f/1/project, never by forcing the removal). Re-run this teardown afterwards.
+CHECK FAIL: exit 0
+CHECK FAIL: no REFUSED line
+CHECK FAIL: task record removed
+CHECK FAIL: backlog item is done
+CHECK PASS: foreign copy fingerprint unchanged
+ac0211e2d0943451f65f8cee66beaf6d2c8bff8a
+CHECK PASS: foreign branch still exists
+CHECK PASS: foreign commit still only in the copy
+CHECK PASS: lease unchanged (already durable)
+CHECK FAIL: output names HEAD-not-landed reason
+CHECK FAIL: output tells owner how to list the commits
+/Users/charlesabrooker/.no-mistakes/evidence/01M5BGXW5YY43YYE22GWDGR36G/live-scenarios.sh: line 9: /Users/charlesabrooker/tmp/fm-lab.iyXcXz/data/held-foreign-copies.log: No such file or directory
+CHECK FAIL: record has exactly one line
+--- held-foreign-copies.log:
+
+TOTAL CHECK FAILURES: 17

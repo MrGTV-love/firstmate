@@ -1,0 +1,99 @@
+
+### S1 landed task closes beside a clean foreign copy whose only blocker is a unique ignored file (plain-get slot)
+pool before: {"name":"1","leased":null,"lease_holder":null}
+--- exit=0
+--- stdout:
+/Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project
+notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+notice: held foreign copy /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project: it holds ignored files that exist nowhere else: unique.dat.
+notice: next step for the owner of /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project/.claude/worktrees/fc-one: review its ignored files with git -C /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project/.claude/worktrees/fc-one status --ignored and save the ones you need, with any commits only it holds (git -C /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project/.claude/worktrees/fc-one log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with (cd /Users/charlesabrooker/tmp/fm-lab.iPzePK/work/project && treehouse return /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project --if-lease-holder task-x1 </dev/null).
+notice: pool slot /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it.
+notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.iPzePK/data/held-foreign-copies.log.
+teardown task-x1 complete (window firstmate:fm-task-x1; the task's own work is landed and its record is closed, but pool slot /Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.iPzePK/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.iPzePK
+🌳 Leased worktree 1 at ~/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project. Run 'treehouse return ~/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project' to release it.
+pool after : {"name":"1","leased":true,"lease_holder":"task-x1"}
+CHECK PASS: exit 0
+CHECK PASS: no REFUSED line
+CHECK PASS: task record removed
+CHECK PASS: backlog item is done
+CHECK PASS: foreign copy byte-identical
+CHECK PASS: foreign copy fingerprint unchanged
+CHECK PASS: ignored file still there with same bytes
+CHECK PASS: no preserved copy made
+CHECK PASS: foreign copy still registered
+CHECK PASS: slot not returned (dir present)
+CHECK PASS: slot durably leased now
+CHECK PASS: output says slot return is deferred
+CHECK PASS: output names the held copy
+CHECK PASS: output gives no removal command for ignored copy
+CHECK PASS: record has exactly one line
+--- held-foreign-copies.log:
+2026-10-20T06:30:48Z^Itask-x1^I/Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project^I/Users/charlesabrooker/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project/.claude/worktrees/fc-one^Iit holds ignored files that exist nowhere else: unique.dat$
+
+### S1b rerun after the close: no task record, foreign copy untouched
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.iPzePK
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.iPzePK/state/task-x1.meta
+CHECK PASS: foreign copy still unchanged after rerun
+CHECK PASS: record unchanged after rerun
+--- real treehouse status:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.iPzePK/pool/.treehouse/project-3681d7/1/project  (detached)  (held by task-x1)
+
+### S2 landed task closes beside a foreign copy holding commits on no remote (durably leased slot)
+--- exit=0
+--- stdout:
+notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+notice: held foreign copy /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project: its HEAD 4f76a5493b00 is not proved landed.
+notice: next step for the owner of /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project/.claude/worktrees/fc-one: list the commits only it holds with git -C /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project/.claude/worktrees/fc-one log --oneline HEAD --not --remotes, land them, remove the copy with git -C /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project worktree remove /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project/.claude/worktrees/fc-one (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project/.claude/worktrees/fc-one --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd /Users/charlesabrooker/tmp/fm-lab.tLUqg5/work/project && treehouse return /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project --if-lease-holder task-x1 </dev/null).
+notice: pool slot /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and never a copy locked by Vernant's creation lock or held for ignored files.
+notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.tLUqg5/data/held-foreign-copies.log.
+teardown task-x1 complete (window firstmate:fm-task-x1; the task's own work is landed and its record is closed, but pool slot /Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.tLUqg5/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tLUqg5
+CHECK PASS: exit 0
+CHECK PASS: no REFUSED line
+CHECK PASS: task record removed
+CHECK PASS: backlog item is done
+CHECK PASS: foreign copy fingerprint unchanged
+4f76a5493b007a4eb611a84f3ad965b174df8bb4
+CHECK PASS: foreign branch still exists
+CHECK PASS: foreign commit still only in the copy
+CHECK PASS: lease unchanged (already durable)
+CHECK PASS: output names HEAD-not-landed reason
+CHECK PASS: output tells owner how to list the commits
+CHECK PASS: record has exactly one line
+--- held-foreign-copies.log:
+2026-10-20T06:31:00Z^Itask-x1^I/Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project^I/Users/charlesabrooker/tmp/fm-lab.tLUqg5/pool/.treehouse/project-6ebc1e/1/project/.claude/worktrees/fc-one^Iits HEAD 4f76a5493b00 is not proved landed$
+
+### S3 two foreign copies of both hold classes: both stay, both listed
+--- exit=0
+--- stdout:
+notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+notice: held foreign copy /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-ign stays in pool slot /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project: it holds ignored files that exist nowhere else: unique.dat.
+notice: next step for the owner of /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-ign: review its ignored files with git -C /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-ign status --ignored and save the ones you need, with any commits only it holds (git -C /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-ign log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with (cd /Users/charlesabrooker/tmp/fm-lab.rOwZYc/work/project && treehouse return /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project --if-lease-holder task-x1 </dev/null).
+notice: held foreign copy /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-unl stays in pool slot /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project: its HEAD 1c3e8cc0eedf is not proved landed.
+notice: next step for the owner of /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-unl: list the commits only it holds with git -C /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-unl log --oneline HEAD --not --remotes, land them, remove the copy with git -C /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project worktree remove /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-unl (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-unl --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd /Users/charlesabrooker/tmp/fm-lab.rOwZYc/work/project && treehouse return /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project --if-lease-holder task-x1 </dev/null).
+notice: pool slot /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and never a copy locked by Vernant's creation lock or held for ignored files.
+notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.rOwZYc/data/held-foreign-copies.log.
+teardown task-x1 complete (window firstmate:fm-task-x1; the task's own work is landed and its record is closed, but pool slot /Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.rOwZYc/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rOwZYc
+CHECK PASS: exit 0
+CHECK PASS: ignored-class copy unchanged
+CHECK PASS: commits-class copy unchanged
+CHECK PASS: record has two lines
+CHECK PASS: five tab fields per line
+CHECK PASS: backlog item is done
+--- held-foreign-copies.log:
+2026-10-20T06:31:18Z^Itask-x1^I/Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project^I/Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-ign^Iit holds ignored files that exist nowhere else: unique.dat$
+2026-10-20T06:31:18Z^Itask-x1^I/Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project^I/Users/charlesabrooker/tmp/fm-lab.rOwZYc/pool/.treehouse/project-9372c7/1/project/.claude/worktrees/fc-unl^Iits HEAD 1c3e8cc0eedf is not proved landed$
+
+TOTAL CHECK FAILURES: 0

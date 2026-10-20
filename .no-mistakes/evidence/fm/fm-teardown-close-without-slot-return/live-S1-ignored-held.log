@@ -1,0 +1,49 @@
+
+### S1 landed task closes beside a clean foreign copy whose only blocker is a unique ignored file (plain-get slot)
+pool before: {"name":"1","leased":null,"lease_holder":null}
+--- exit=0
+--- stdout:
+/Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project
+notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+notice: held foreign copy /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project: it holds ignored files that exist nowhere else: unique.dat.
+notice: next step for the owner of /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project/.claude/worktrees/fc-one: review its ignored files with git -C /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project/.claude/worktrees/fc-one status --ignored and save the ones you need, with any commits only it holds (git -C /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project/.claude/worktrees/fc-one log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with (cd /Users/charlesabrooker/tmp/fm-lab.R5JoTK/work/project && treehouse return /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project --if-lease-holder task-x1 </dev/null).
+notice: pool slot /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it.
+notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.R5JoTK/data/held-foreign-copies.log.
+teardown task-x1 complete (window firstmate:fm-task-x1; the task's own work is landed and its record is closed, but pool slot /Users/charlesabrooker/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.R5JoTK/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.R5JoTK
+🌳 Leased worktree 1 at ~/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project. Run 'treehouse return ~/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project' to release it.
+pool after : {"name":"1","leased":true,"lease_holder":"task-x1"}
+CHECK PASS: exit 0
+CHECK PASS: no REFUSED line
+CHECK PASS: task record removed
+CHECK PASS: backlog item is done
+CHECK PASS: foreign copy byte-identical
+CHECK PASS: foreign copy fingerprint unchanged
+CHECK PASS: ignored file still there with same bytes
+CHECK PASS: no preserved copy made
+CHECK PASS: foreign copy still registered
+CHECK PASS: slot not returned (dir present)
+CHECK PASS: slot durably leased now
+CHECK PASS: output says slot return is deferred
+CHECK PASS: output names the held copy
+CHECK PASS: output gives no removal command for ignored copy
+CHECK PASS: record has exactly one line
+--- held-foreign-copies.log:
+cat: illegal option -- A
+usage: cat [-belnstuv] [file ...]
+
+### S1b rerun after the close: no task record, foreign copy untouched
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.R5JoTK
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.R5JoTK/state/task-x1.meta
+CHECK PASS: foreign copy still unchanged after rerun
+CHECK PASS: record unchanged after rerun
+--- real treehouse status:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.R5JoTK/pool/.treehouse/project-219a1e/1/project  (detached)  (held by task-x1)
+
+TOTAL CHECK FAILURES: 0

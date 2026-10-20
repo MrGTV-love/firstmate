@@ -1,0 +1,61 @@
+
+### S4 ADVERSARIAL: the task's own work is NOT landed; a held-class foreign copy must not excuse it
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.kimS0t
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+e1ddf62 unlanded task work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+CHECK PASS: close refused (non-zero)
+CHECK PASS: task record still present
+CHECK PASS: backlog still in flight
+CHECK PASS: slot still present
+CHECK PASS: foreign copy unchanged
+CHECK PASS: no held record written
+CHECK PASS: own unlanded commit still in slot
+
+### S5 ADVERSARIAL: a foreign copy with an untracked (unsaved) file is not holdable; whole close refuses
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.p7lqKh
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=copy-preserved missing=foreign copy /Users/charlesabrooker/tmp/fm-lab.p7lqKh/pool/.treehouse/project-a3fddc/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-lab.p7lqKh/pool/.treehouse/project-a3fddc/1/project: it has uncommitted or untracked-unignored changes.
+human-only-exit: What verified landing or retained ownership covers /Users/charlesabrooker/tmp/fm-lab.p7lqKh/pool/.treehouse/project-a3fddc/1/project/.claude/worktrees/fc-one (it has uncommitted or untracked-unignored changes)? Keep this copy until that evidence exists; no discard is authorized.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab.p7lqKh/pool/.treehouse/project-a3fddc/1/project contains registered copy /Users/charlesabrooker/tmp/fm-lab.p7lqKh/pool/.treehouse/project-a3fddc/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab.p7lqKh/pool/.treehouse/project-a3fddc/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-lab.p7lqKh/pool/.treehouse/project-a3fddc/1/project, never by forcing the removal). Re-run this teardown afterwards.
+CHECK PASS: close refused (non-zero)
+CHECK PASS: task record still present
+CHECK PASS: foreign copy unchanged
+CHECK PASS: untracked file still there
+CHECK PASS: no held record written
+
+### S6 ADVERSARIAL: a process outside the teardown runs inside the foreign copy; it is not held and not signalled
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.nX6yvX
+REFUSED: guard=FM-TEARDOWN-PRESERVATION rule=process-cwd-owner missing=foreign copy /Users/charlesabrooker/tmp/fm-lab.nX6yvX/pool/.treehouse/project-271027/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-lab.nX6yvX/pool/.treehouse/project-271027/1/project: process 65263 is running in it.
+human-only-exit: Which task or person owns process 65263, which is running in /Users/charlesabrooker/tmp/fm-lab.nX6yvX/pool/.treehouse/project-271027/1/project/.claude/worktrees/fc-one? Stop it or tell me it is yours.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab.nX6yvX/pool/.treehouse/project-271027/1/project contains registered copy /Users/charlesabrooker/tmp/fm-lab.nX6yvX/pool/.treehouse/project-271027/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab.nX6yvX/pool/.treehouse/project-271027/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-lab.nX6yvX/pool/.treehouse/project-271027/1/project, never by forcing the removal). Re-run this teardown afterwards.
+CHECK PASS: close refused (non-zero)
+CHECK PASS: task record still present
+CHECK FAIL: refusal names the process pid
+CHECK PASS: outside process was not signalled (alive)
+CHECK PASS: foreign copy unchanged
+CHECK PASS: no held record written
+
+### S7 ADVERSARIAL: --force never holds a foreign copy with commits on no remote
+--- exit=1
+--- stdout:
+--- stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.BgTNpl
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+CHECK PASS: forced close refused (non-zero)
+CHECK PASS: task record still present
+CHECK PASS: foreign copy unchanged
+CHECK PASS: no held record written
+
+TOTAL CHECK FAILURES: 1
