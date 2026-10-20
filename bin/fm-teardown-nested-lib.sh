@@ -393,7 +393,8 @@ teardown_bundle_external() {  # <copy> <bundle>
 }
 
 # A bundle must restore on its own: fetch every recorded tip into a fresh empty
-# repository that holds none of the copy's objects, then require connected history.
+# repository that holds none of the copy's objects, then require it to pass
+# git fsck --strict.
 # A success is remembered for this process by bundle digest, object format and
 # recorded tips, so the repeated proofs of one teardown restore it once.
 TEARDOWN_BUNDLE_RESTORED=
