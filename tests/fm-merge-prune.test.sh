@@ -1275,6 +1275,123 @@ SH
   return 0
 }
 
+# An independent clone with a commit on no remote, inside a directory that
+# holds dependencies or an environment: the search for nested copies enters it,
+# and the commit keeps the whole slot with one wake.
+scn_clone_inside_a_scratch_directory_keeps_the_slot() {
+  local dir
+  for dir in .venv node_modules; do
+    make_world
+    make_nested "$dir/src/pkg"
+    printf 'local only\n' > "$COPY/$dir/src/pkg/local.txt"
+    git -C "$COPY/$dir/src/pkg" add local.txt
+    git -C "$COPY/$dir/src/pkg" commit -q -m "unpushed under $dir"
+    go
+    [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "an unpushed commit in a clone under $dir did not keep the slot" || return 1
+    [ "$(wake_count)" = 1 ] || why "under $dir: want exactly one wake, got $(wake_count)" || return 1
+    grep -F "$COPY/$dir/src/pkg" "$STATE/.wake-queue" | grep -q 'commit(s) on no remote' || why "under $dir: the wake does not name the nested copy" || return 1
+  done
+  return 0
+}
+
+# Ignored data under .claude or .opencode that is neither Firstmate's own hook
+# file, a nested clone, nor on the preserve list is unique: the copy stays with
+# one wake. The hook files and a nested clone do not keep it.
+scn_unique_data_under_claude_or_opencode_is_kept() {
+  local dir
+  for dir in .claude .opencode; do
+    make_world
+    printf '%s/\n' "$dir" >> "$(git -C "$COPY" rev-parse --path-format=absolute --git-path info/exclude)"
+    mkdir -p "$COPY/$dir/private"
+    printf 'only here\n' > "$COPY/$dir/private/unique.bin"
+    go
+    [ -e "$COPY/$dir/private/unique.bin" ] && [ "$(destroy_calls)" = 0 ] || why "unique data under $dir/private was removed" || return 1
+    [ "$(wake_count)" = 1 ] || why "under $dir: want exactly one wake, got $(wake_count)" || return 1
+    grep -F "$COPY" "$STATE/.wake-queue" | grep -q "$dir/private" || why "under $dir: the wake does not name the data" || return 1
+  done
+  make_world
+  printf '.opencode/\n' >> "$(git -C "$COPY" rev-parse --path-format=absolute --git-path info/exclude)"
+  mkdir -p "$COPY/.opencode/plugins" "$COPY/.claude/worktrees"
+  printf 'x\n' > "$COPY/.opencode/plugins/fm-busy-state.js"
+  make_nested .claude/worktrees/n1
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the hook files and a clean nested clone kept the copy: $(rec_field t1 reason)" || return 1
+  return 0
+}
+
+# A process probe that fails proves nothing about who holds the copy open. Real
+# lsof exits 1 with no output and no message when nothing is open (measured on
+# this Mac, also when something is), so that answer still passes.
+scn_failed_process_probe_keeps_the_copy() {
+  local variant
+  for variant in exit2 message; do
+    make_world
+    start_inside "$COPY" ""
+    case "$variant" in
+      exit2) printf '#!/usr/bin/env bash\nexit 2\n' > "$W/bin/lsof" ;;
+      message) printf '#!/usr/bin/env bash\necho "lsof: WARNING: could not read the copy" >&2\nexit 1\n' > "$W/bin/lsof" ;;
+    esac
+    chmod +x "$W/bin/lsof"
+    go
+    [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a failed process probe ($variant) did not keep the copy" || return 1
+    [ "$(rec_field t1 state)" = pending ] || why "a failed process probe ($variant) was not a retry: $(cat "$STATE/t1.merge-prune")" || return 1
+    [ "$(rec_field t1 reason)" != "" ] && grep -q 'process check' "$STATE/t1.merge-prune" || why "the record does not say the process check failed" || return 1
+  done
+  make_world
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$W/bin/lsof"
+  chmod +x "$W/bin/lsof"
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a silent exit 1 with nothing open kept the copy: $(rec_field t1 reason)" || return 1
+  return 0
+}
+
+# A slot claim that names this task id under another Firstmate home belongs to
+# that home's task, not this one.
+scn_slot_claimed_by_the_same_task_id_of_another_home_is_kept() {
+  make_world
+  printf 'task=t1\nhome=%s/other-home\n' "$W" > "$POOL/pool1/1/.fm-slot-owner"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a slot claimed by the same task id of another home was destroyed" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'other-home' || why "the wake does not name the other home" || return 1
+  make_world
+  printf 'task=t1\n' > "$POOL/pool1/1/.fm-slot-owner"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a slot claim that names no home was destroyed" || return 1
+  return 0
+}
+
+# The wake is what tells a person a copy stays. It is recorded as sent only
+# when it was appended: a failed append leaves the record unsent, so the next
+# attempt raises it, and a repaired queue then gets exactly one.
+scn_failed_wake_append_is_not_recorded_as_sent() {
+  make_world
+  printf 'only here\n' > "$COPY/precious.local"
+  mkdir "$STATE/.wake-queue"
+  go
+  [ -e "$COPY/precious.local" ] && [ "$(destroy_calls)" = 0 ] || why "the unique file was removed" || return 1
+  [ "$(rec_field t1 wake_sent)" = 0 ] || why "a failed wake append was recorded as sent: $(cat "$STATE/t1.merge-prune")" || return 1
+  rmdir "$STATE/.wake-queue"
+  set_rec t1 next_at 0
+  prune run t1 >/dev/null 2>&1
+  [ "$(wake_count)" = 1 ] || why "after the queue was repaired want exactly one wake, got $(wake_count)" || return 1
+  set_rec t1 next_at 0
+  prune run t1 >/dev/null 2>&1
+  [ "$(wake_count)" = 1 ] || why "a later attempt raised another wake: $(wake_count)" || return 1
+  make_world
+  printf 'lock\n' > "$W/stub.mode"
+  prune arm t1 >/dev/null 2>&1
+  set_rec t1 attempts 23
+  mkdir "$STATE/.wake-queue"
+  prune run t1 --now >/dev/null 2>&1
+  [ "$(rec_field t1 wake_sent)" = 0 ] || why "a failed attempt-limit wake append was recorded as sent: $(cat "$STATE/t1.merge-prune")" || return 1
+  rmdir "$STATE/.wake-queue"
+  set_rec t1 next_at 0
+  prune run t1 --now >/dev/null 2>&1
+  [ "$(wake_count)" = 1 ] || why "after the queue was repaired the attempt-limit wake count is $(wake_count)" || return 1
+  return 0
+}
+
 # --- 1. arming ----------------------------------------------------------------
 
 test_arm_needs_a_verified_merge() {
@@ -1473,6 +1590,11 @@ test_fallback_keeps_a_pushed_but_unmerged_copy() { assert_scenario scn_pushed_bu
 test_fallback_ignores_other_tasks_work_in_a_linked_slot() { assert_scenario scn_linked_slot_ignores_other_tasks_work "in a linked worktree slot, another task's local-only commit and stash do not keep the copy"; }
 test_fallback_keeps_a_linked_slot_with_its_own_unpushed_commit() { assert_scenario scn_linked_slot_own_unpushed_commit_is_kept "in a linked worktree slot, the copy's own unpushed commit keeps it"; }
 test_fallback_keeps_a_linked_slot_with_a_stash_of_its_own_branch() { assert_scenario scn_linked_slot_own_branch_stash_is_kept "in a linked worktree slot, a stash made on the copy's branch keeps it"; }
+test_fallback_keeps_a_clone_inside_a_scratch_directory_with_an_unpushed_commit() { assert_scenario scn_clone_inside_a_scratch_directory_keeps_the_slot "an independent clone under .venv or node_modules with a commit on no remote keeps the whole slot with one wake"; }
+test_fallback_keeps_unique_data_under_claude_and_opencode() { assert_scenario scn_unique_data_under_claude_or_opencode_is_kept "ignored data under .claude or .opencode that is not a hook file, a nested clone or on the preserve list keeps the copy with one wake"; }
+test_fallback_keeps_the_copy_when_the_process_probe_fails() { assert_scenario scn_failed_process_probe_keeps_the_copy "a process probe that exits with an error, or prints a message, keeps the copy and retries; a silent exit 1 with nothing open does not"; }
+test_fallback_keeps_a_slot_claimed_by_the_same_task_id_of_another_home() { assert_scenario scn_slot_claimed_by_the_same_task_id_of_another_home_is_kept "a slot claim that names this task id under another home, or no home, is never destroyed"; }
+test_failed_wake_append_is_not_recorded_as_sent() { assert_scenario scn_failed_wake_append_is_not_recorded_as_sent "a wake that could not be appended is not recorded as sent, and the repaired queue gets exactly one"; }
 test_fallback_keeps_a_detached_linked_slot_with_a_stash() { assert_scenario scn_linked_detached_slot_keeps_every_stash "a detached linked worktree slot keeps the copy while any stash exists"; }
 test_fallback_keeps_the_copy_of_a_github_enterprise_pr() { assert_scenario scn_enterprise_pr_keeps_the_copy "a GitHub Enterprise PR keeps the copy with one wake and no fallback"; }
 test_fallback_keeps_the_copy_of_a_forgejo_pr() { assert_scenario scn_forgejo_pr_keeps_the_copy "a Forgejo PR keeps the copy with one wake and no fallback"; }
@@ -1541,6 +1663,12 @@ test_unsafe_mutations_are_caught() {
   expect_caught status-ignore-submodules-removed $lib 'status --porcelain --untracked-files=all --ignore-submodules=none' 'status --porcelain --untracked-files=all' scn_hidden_submodule_change_is_kept "dirty-file status flag --ignore-submodules=none"
   expect_caught no-unpushed-check $lib '  if [ "$unpushed" != 0 ]; then' '  if false; then' scn_unpushed_commit_is_kept "unpushed-commit proof"
   expect_caught no-stash-check $lib '  if [ "$stashes" != 0 ]; then' '  if false; then' scn_stash_is_kept "stash proof"
+  expect_caught scratch-dirs-not-searched $lib '    -path "$copy/.git" -prune -o' '    \( -path "$copy/.git" -o -name node_modules -o -name .venv -o -name venv -o -name __pycache__ \) -prune -o' scn_clone_inside_a_scratch_directory_keeps_the_slot "search of dependency and environment trees"
+  expect_caught claude-wildcard-is-scratch $lib '    .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;' '    .claude/*|.opencode/*) return 0 ;;' scn_unique_data_under_claude_or_opencode_is_kept "unique data under .claude or .opencode"
+  expect_caught failed-probe-is-all-clear $lib '  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then' '  if false; then' scn_failed_process_probe_keeps_the_copy "failed process probe"
+  expect_caught claim-of-another-home-passes fm-merge-prune.sh '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! same_home "$FM_TREEHOUSE_SLOT_OWNER_HOME"; then' '  if false; then' scn_slot_claimed_by_the_same_task_id_of_another_home_is_kept "home check of the slot claim"
+  expect_caught failed-wake-is-sent fm-merge-prune.sh '  if fm_wake_append check "merge-prune:$ID" "$1"; then' '  fm_wake_append check "merge-prune:$ID" "$1" || true
+  if true; then' scn_failed_wake_append_is_not_recorded_as_sent "recording a wake as sent only when appended"
   expect_caught no-process-check $lib "  out=\$(printf '%s\\n' \"\$out\" | sort -u | tr '\\n' ' ')" '  out=' scn_live_process_is_kept "live-process proof"
 
   expect_caught no-nested-check $lib '    FM_MP_NESTED+=("$dir")' '    :' scn_nested_unpushed_commit_keeps_the_slot "nested-copy proof"
@@ -1598,7 +1726,7 @@ test_unsafe_mutations_are_caught() {
   expect_caught exit-accepted-with-a-busy-record $reap '  [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "retired-busy-record rule"
   expect_caught no-slot-owner-check $orch '    mine|absent) ;;' '    mine|absent|other) ;;' scn_reassigned_slot_is_never_destroyed "slot-owner re-read"
   expect_caught no-project-lock $orch '  fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1 || rc=$?' '  :' scn_project_lock_busy_backs_off "project lock"
-  expect_caught wake-every-time $orch '  if [ "$R_WAKE" = 0 ]; then' '  if true; then' scn_changed_file_is_kept "one-wake rule"
+  expect_caught wake-every-time $orch '  [ "$R_WAKE" = 0 ] || return 0' '  :' scn_changed_file_is_kept "one-wake rule"
   pass "mutation proof (unsafe direction): breaking any safety proof makes its keep case fail"
 }
 
@@ -1606,7 +1734,7 @@ test_unsafe_mutations_are_caught() {
 test_over_strict_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
   expect_caught no-scratch-names $lib '  if fm_mp_scratch_name "$name"; then' '  if false; then' scn_scratch_copy_is_removed "scratch patterns"
-  expect_caught no-claude-scratch $lib '    .claude/*|.opencode|.opencode/*) return 0 ;;' '    .opencode|.opencode/*) return 0 ;;' scn_scratch_copy_is_removed ".claude scratch rule"
+  expect_caught no-claude-scratch $lib '    .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;' '    .opencode/plugins/fm-busy-state.js) return 0 ;;' scn_scratch_copy_is_removed ".claude hook-file rule"
   expect_caught no-tac-scratch $lib '    .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;' '    .tac/NEVER) return 0 ;;' scn_scratch_copy_is_removed ".tac scratch rule"
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
@@ -1629,6 +1757,9 @@ test_over_strict_mutations_are_caught() {
   fi
 ' '' scn_pr_head_alone_proves_a_commit_the_default_branch_lacks "merged-PR-head landing rule"
   expect_caught landed-proof-needs-the-default-branch $lib '    && [ "${merged%%$'"'"'\n'"'"'*}" = "$tree" ]; then' '    && false; then' scn_squash_merged_copy_after_the_default_branch_moved_on "default-branch content landing rule"
+  expect_caught probe-error-on-silent-exit-1 $lib '  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then' '  if [ -z "$out" ] && [ "$rc" -gt 0 ]; then' scn_failed_process_probe_keeps_the_copy "silent exit 1 means nothing is open"
+  expect_caught every-claim-is-another-home fm-merge-prune.sh '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! same_home "$FM_TREEHOUSE_SLOT_OWNER_HOME"; then' '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ]; then' scn_scratch_copy_is_removed "own-home slot claim"
+  expect_caught clone-under-claude-worktrees-kept $lib '      if [ -e "$copy/$rel/.git" ]; then' '      if false; then' scn_unique_data_under_claude_or_opencode_is_kept "clone under .claude/worktrees"
   expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
   pass "mutation proof (over-strict direction): tightening any permission makes its removal case fail"
 }
@@ -1965,6 +2096,11 @@ ALL_TESTS=(
   test_deliberately_exited_worker_reads_as_stopped_only_for_the_prune
   test_fallback_exempts_nothing_when_the_pane_is_unreadable
   test_fallback_never_destroys_a_reassigned_slot
+  test_fallback_keeps_a_clone_inside_a_scratch_directory_with_an_unpushed_commit
+  test_fallback_keeps_unique_data_under_claude_and_opencode
+  test_fallback_keeps_the_copy_when_the_process_probe_fails
+  test_fallback_keeps_a_slot_claimed_by_the_same_task_id_of_another_home
+  test_failed_wake_append_is_not_recorded_as_sent
   test_fallback_backs_off_while_the_project_lock_is_held
   test_fallback_removes_a_copy_whose_preserve_paths_are_empty
   test_e2e_merge_prunes_the_copy_with_the_real_teardown

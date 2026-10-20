@@ -102,7 +102,7 @@ fm_mp_real() {  # <path> -> physical path on stdout
 
 # Paths of copies nested strictly inside <copy>: any directory below it that
 # holds its own .git, other than a tracked submodule. Dependency and
-# environment trees are not searched.
+# environment trees are searched too: a clone there holds work like any other.
 fm_mp_find_nested() {  # <real-copy>; fills FM_MP_NESTED; 1 when a read failed
   local copy=$1 gitpath dir sub gitlinks found
   FM_MP_NESTED=()
@@ -111,7 +111,7 @@ fm_mp_find_nested() {  # <real-copy>; fills FM_MP_NESTED; 1 when a read failed
     return 1
   fi
   if ! found=$(set -o pipefail; find "$copy" \
-    \( -path "$copy/.git" -o -name node_modules -o -name .venv -o -name venv -o -name __pycache__ \) -prune -o \
+    -path "$copy/.git" -prune -o \
     -name .git -prune -print0 2>/dev/null | tr '\0' '\n'); then
     fm_mp_verdict keep "cannot search $copy for nested copies"
     return 1
@@ -295,7 +295,7 @@ fm_mp_classify_entry() {  # <real-copy> <relative-path>
       esac
       return 0
       ;;
-    .claude|.tac)
+    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)
       if [ -d "$copy/$rel" ]; then
         if ! children=$(ls -A "$copy/$rel" 2>/dev/null); then
           fm_mp_verdict keep "cannot list $rel in $copy"
@@ -311,7 +311,14 @@ EOF
       fi
       ;;
     .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;
-    .claude/*|.opencode|.opencode/*) return 0 ;;
+    # Firstmate's own hook files, and a clone under .claude/worktrees, which the
+    # search for nested copies proves on its own.
+    .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;
+    .claude/worktrees/*)
+      if [ -e "$copy/$rel/.git" ]; then
+        return 0
+      fi
+      ;;
   esac
   if fm_mp_scratch_name "$name"; then
     return 0
@@ -327,15 +334,29 @@ EOF
 # The one idle pane shell that passes is left in FM_MP_PANE_SHELL for the caller
 # to end; a second one keeps the copy.
 fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
-  local copy=$1 pane=${2:-} out rc=0 kept pid
+  local copy=$1 pane=${2:-} out rc=0 kept pid errfile err
   FM_MP_PANE_SHELL=
   if ! command -v lsof >/dev/null 2>&1; then
     fm_mp_verdict keep "cannot prove no process uses $copy: lsof is not installed"
     return 1
   fi
-  out=$(fm_run_timed "$(fm_mp_limit merge-prune.lsof 90)" lsof +D "$copy" -t 2>/dev/null </dev/null) || rc=$?
+  if ! errfile=$(mktemp "${TMPDIR:-/tmp}/fm-mp-lsof.XXXXXX" 2>/dev/null); then
+    fm_mp_verdict transient "process check of $copy could not record its messages"
+    return 1
+  fi
+  out=$(fm_run_timed "$(fm_mp_limit merge-prune.lsof 90)" lsof +D "$copy" -t 2>"$errfile" </dev/null) || rc=$?
+  err=$(sed -n 1p "$errfile" 2>/dev/null | tr -d '\r' | cut -c1-120)
+  rm -f "$errfile"
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
     fm_mp_verdict transient "process check of $copy timed out"
+    return 1
+  fi
+  # lsof exits 1 with no output and no message when nothing is open (it also
+  # does so when something is, so the exit status alone proves nothing). An
+  # error exit or a message with no pid listed is a probe that failed, which
+  # cannot show that no process holds the copy.
+  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then
+    fm_mp_verdict transient "process check of $copy failed (exit $rc${err:+: $err})"
     return 1
   fi
   out=$(printf '%s\n' "$out" | sort -u | tr '\n' ' ')

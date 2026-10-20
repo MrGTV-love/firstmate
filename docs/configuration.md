@@ -715,13 +715,16 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - Git reports no changed or untracked file, and every untracked file and every changed submodule counts, whatever `status.showUntrackedFiles` or `diff.ignoreSubmodules` says.
 - The copy holds no stash entry of its own work: for a linked worktree of the project, a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
 - A nested copy that is an independent clone, with its own git directory, shares nothing with the project, so every stash it holds keeps it.
+- The search for nested copies enters dependency and environment trees too (`.venv`, `venv`, `node_modules`, `__pycache__`), because a clone there holds work like any other.
 - No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; for a linked worktree, other branches of the project are other work and are not read.
 - For a nested copy that is an independent clone, every local branch that is not on a remote also keeps it, because removing the clone destroys that branch.
 - The task's own copy holds nothing the merged pull request leaves out: its HEAD is in the merged pull request's head (fetched before the locks), or the default branch already carries its content, which is what a squash merge leaves; a commit that is only pushed, such as a follow-up commit after the merge, is not landed and keeps the copy.
 - Every ignored file is scratch, a symlink, or on the preserve list.
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
-Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, Firstmate's turn-end hook files, and anything ignored under `.claude` or `.opencode`.
+Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, and Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`).
+A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
+Any other ignored entry under `.claude` or `.opencode` is unique work.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
 Those are copied to `data/<id>/merge-prune-preserved/<time>/` with SHA-256 checksums, and the copy is verified, before anything is removed.
 An ignored file that is neither scratch nor preserved is unique work, so the copy stays.
@@ -733,11 +736,13 @@ The pane's own shell is never ended, so a bare pane shell inside the copy keeps 
 On any other backend nothing is ignored.
 The fallback never sends SIGKILL, never closes the pane (it stays open on its outer shell), and waits up to `FM_MERGE_PRUNE_EXIT_WAIT` seconds for the shell to go; a shell that does not go keeps the copy.
 Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included.
+A process check that fails, by an error exit or a message with no process listed, proves nothing: the copy stays and the attempt is retried.
+The silent exit 1 that `lsof` gives for a copy nothing holds open is not a failure.
 The task's Treehouse project lock is held from the worker stop to the destroy.
 The finished-session check is asked again once that lock is held, right before the worker is stopped.
 A worker that was steered or became busy since the first answer backs off, and nothing is stopped, signalled, or destroyed.
 The proof that is repeated while that lock and the task control lock are held makes no fetch and reuses the remote refs fetched before them, so a hung remote never holds either lock.
-The slot's owner claim is read again right before the signal: a slot that another task has claimed, or whose claim cannot be read, stays untouched.
+The slot's owner claim is read again right before the signal: a slot that another task has claimed, whose claim cannot be read, or whose claim for this task id names another home or no home, stays untouched.
 When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
 That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` is present, and its last status event is `done`.
 The ordinary finished-session sweep keeps its classification unchanged.
@@ -749,6 +754,7 @@ That covers the ignored-file listing, the stash listing, the listing of a `.clau
 Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged, which the fallback proves itself before it stops anything (ending the pane's idle shell returns the slot to the pool, reset to the default branch, so `treehouse destroy` would no longer see it as unmerged), or a destroy that fails.
 It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
+The wake is recorded as sent only after the wake queue took it, so a failed append is raised again by the next attempt.
 Each outcome is one line in `data/<id>/merge-prune.log`; the prune never writes to the task's status file.
 The hourly `treehouse prune --all --yes` safety net is unchanged, and the fallback does not alter what teardown itself preserves or refuses: it acts only after teardown has refused.
 `bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.

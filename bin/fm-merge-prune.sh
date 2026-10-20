@@ -57,7 +57,9 @@
 # checked-out branch) missing from every remote (or from the merged PR's head),
 # for the task's own copy leaves out nothing the merged PR omits (its HEAD is in
 # the PR's head, or the default branch carries its content),
-# holds only scratch or preserved ignored files, and has no process inside. For a
+# holds only scratch or preserved ignored files (under .claude and .opencode only
+# Firstmate's own hook files and clones are scratch, and the search for nested
+# copies enters dependency and environment trees), and has no process inside. For a
 # linked worktree of the project the commit and stash proofs read only that
 # copy's work (never the project's other branches or other tasks' stashes); a
 # nested copy that is an independent clone, with its own git directory, is proved
@@ -81,9 +83,10 @@
 # project lock is held, right before the worker is stopped: a worker that was
 # steered or became busy since the first answer backs off, and nothing is
 # stopped, signalled or destroyed. A proof read that fails (the ignored-file
-# listing, the stash listing, the search for nested copies) never counts as
-# finding nothing. The slot-owner claim is read again right before the signal,
-# and a slot claimed by another task is left alone. The preserve-list
+# listing, the stash listing, the search for nested copies, an error from the
+# process check) never counts as finding nothing. The slot-owner claim is read again right before the signal,
+# and a slot claimed by another task, or for this task id by another home, is
+# left alone. The preserve-list
 # files are copied to data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
 # `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
 # call the reaper makes; --include-unlanded, --include-in-use and --force are
@@ -93,7 +96,7 @@
 # state/<id>.control-exit is present and its last status event is `done`.
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
-# naming the copy and the reason. A retained copy is retried silently every six
+# naming the copy and the reason (recorded as sent only once the queue took it). A retained copy is retried silently every six
 # hours in case the cause cleared. The hourly `treehouse prune --all --yes`
 # safety net is not duplicated.
 #
@@ -265,6 +268,15 @@ EOF
   [ "$seen" = 1 ]
 }
 
+same_home() {  # <home-from-a-slot-claim>: whether it is this home
+  local claimed=$1 mine
+  [ -n "$claimed" ] || return 1
+  [ "$claimed" != "$FM_HOME" ] || return 0
+  mine=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || return 1
+  claimed=$(cd "$claimed" 2>/dev/null && pwd -P) || return 1
+  [ "$claimed" = "$mine" ]
+}
+
 TD_OUT=
 TD_RC=0
 run_teardown() {
@@ -289,12 +301,22 @@ backoff() {  # <detail>: a transient outcome, silent until the attempt limit
   R_STATE=pending
   R_REASON=$1
   R_NEXT=$((NOW + delay))
+  if [ "$R_ATTEMPTS" -ge "$WAKE_AFTER_ATTEMPTS" ]; then
+    raise_wake "check: merge-prune $ID still not pruned after $R_ATTEMPTS attempts: $(clean_detail "$1")"
+  fi
   rec_save "$ID" || true
   log_line "retry in ${delay}s (attempt $R_ATTEMPTS): $1"
-  if [ "$R_ATTEMPTS" -ge "$WAKE_AFTER_ATTEMPTS" ] && [ "$R_WAKE" = 0 ]; then
+}
+
+# The one wake of a task. It is recorded as sent only after the queue took it, so
+# a failed append is raised again by the next attempt and never lost; a crash
+# between the append and the record can repeat it once.
+raise_wake() {  # <text>
+  [ "$R_WAKE" = 0 ] || return 0
+  if fm_wake_append check "merge-prune:$ID" "$1"; then
     R_WAKE=1
-    rec_save "$ID" || true
-    fm_wake_append check "merge-prune:$ID" "check: merge-prune $ID still not pruned after $R_ATTEMPTS attempts: $(clean_detail "$1")" || true
+  else
+    log_line "wake could not be appended; the next attempt raises it again"
   fi
 }
 
@@ -307,13 +329,8 @@ retain() {  # <copy> <reason>
   R_REASON=$reason
   R_COPY=$copy
   R_NEXT=$((NOW + RETAINED_RETRY))
-  if [ "$R_WAKE" = 0 ]; then
-    R_WAKE=1
-    rec_save "$ID" || true
-    fm_wake_append check "merge-prune:$ID" "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")" || true
-  else
-    rec_save "$ID" || true
-  fi
+  raise_wake "check: merge-prune kept $copy for $ID: $(clean_detail "$reason")"
+  rec_save "$ID" || true
   if [ "$changed" = 1 ]; then
     log_line "retained $copy: $reason"
   fi
@@ -427,6 +444,14 @@ fallback_remove() {  # <real-copy> <pr-number>
     done
   done
   fm_treehouse_slot_owner_state "$real" "$ID"
+  # A claim that names this task id is this task's only when it also names this
+  # home: the same id can belong to a task of another home, and a claim with no
+  # home proves nothing.
+  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! same_home "$FM_TREEHOUSE_SLOT_OWNER_HOME"; then
+    fm_lock_release "$LOCK_CONTROL" || true
+    retain "$real" "the pool slot is claimed for task $ID by ${FM_TREEHOUSE_SLOT_OWNER_HOME:-no home}, not by this home"
+    return 1
+  fi
   case "$FM_TREEHOUSE_SLOT_OWNER" in
     mine|absent) ;;
     other)
