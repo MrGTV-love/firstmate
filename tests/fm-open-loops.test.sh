@@ -2099,6 +2099,42 @@ inbox(home, '005.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
 assert ack(boundary).returncode == 0
 
+# PR URLs do not encode the owning task; provenance selects its inbox in both delivery locations.
+for handled in (False, True):
+    home, ledger, row, call, ok, drain, ack = case(
+        'pr-steer-' + str(handled), category='open_pr', subject=PR, owner='firstmate',
+        source=dict(task='worker'))
+    _, boundary = drain()
+    args = [code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence']
+    foreign = home / 'state/another-task.inbox/001.msg'
+    foreign.parent.mkdir()
+    foreign.write_text(inbox(home, '001.msg').read_text())
+    (home / 'state/worker.inbox/001.msg').unlink()
+    refused = call(*args, '001.msg')
+    assert refused.returncode == 1 and 'task inbox' in refused.stdout, refused
+    inbox(home, '002.msg', handled=handled, offset=-60)
+    refused = call(*args, '002.msg')
+    assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
+    inbox(home, '003.msg', handled=handled, offset=1)
+    ok(*args, '003.msg')
+    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+    assert action['kind'] == 'steered' and action['evidence'] == '003.msg', action
+    assert ack(boundary).returncode == 0
+    reused = call(*args, '003.msg')
+    assert reused.returncode == 1 and 'new delivery' in reused.stdout, reused
+print('PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement', flush=True)
+
+# A damaged ledger row whose source is not an object still steers through its owner.
+for index, damaged in enumerate(('a string', None, ['worker'], 7)):
+    home, ledger, row, call, ok, drain, ack = case('damaged-source-' + str(index), source=damaged)
+    _, boundary = drain()
+    inbox(home, '001.msg', offset=1)
+    ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '001.msg')
+    action = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+    assert action['kind'] == 'steered' and action['evidence'] == '001.msg', (damaged, action)
+    assert ack(boundary).returncode == 0
+print('PASS: a steer on a row with a non-object source falls back to its owner inbox', flush=True)
+
 # Steering evidence is judged against the acting actor's own presentation, not another actor's later one.
 home, ledger, row, call, ok, drain, ack = case('actors')
 assert loops_as(home, 'main', '--present-overdue').returncode == 0
