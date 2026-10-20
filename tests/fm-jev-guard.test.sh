@@ -1029,13 +1029,16 @@ assert.equal(rows(1)[0].decision, 'flag');
 
 // A payload that no complete set of pieces can cover is refused before anything is sent, never screened as a prefix.
 before = sent().length;
-for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repeat(MAX_CHUNKS * 8192 - 1000)]) {
+const report = 'x'.repeat(396924);
+assert.equal(Buffer.byteLength(report, 'utf8'), 396924);
+for (const content of [report, 'é'.repeat(MAX_CHUNKS * 8192 - 1000)]) {
   const tooBig = await write(content);
   assert.equal(tooBig.block, true);
   assert.match(tooBig.reason, /RequestTooLargeError/);
   assert.match(tooBig.reason, /guard=FM-JEV-SIZE rule=complete-screening-budget/);
   for (const budget of [MAX_CHUNKS, MAX_REQUEST_BYTES, CHUNK_OVERLAP_BYTES]) assert.ok(tooBig.reason.includes(String(budget)));
   assert.match(tooBig.reason, /same write tool.*separate files.*below 150,000 characters/);
+  assert.match(tooBig.reason, /in the task\x27s own data directory/);
   assert.doesNotMatch(tooBig.reason, /same call once more/, 'size failure must not prescribe a useless identical retry');
   [row] = rows(1);
   assert.equal(row.error_type, 'RequestTooLargeError');
@@ -1064,13 +1067,17 @@ for (const r of sizeEvents) {
 assert.equal(JSON.stringify(sizeEvents).includes(home), false, 'bridge must not retain input paths');
 // Execute the supported route through the same write guard, then materialize
 // each admitted part as the host would. No oversized prefix is admitted.
-for (let n = 0; n < 2; n++) {
-  const content = `part-${n}\n` + 'x'.repeat(149000);
-  const patch = await handlers.tool_call({ toolName: 'write', input: { path: `report-part-${n}.txt`, content } }, ctx);
-  assert.equal(patch, undefined, 'bounded benign report part should complete');
-  writeFileSync(`${process.env.WT}/report-part-${n}.txt`, content);
-  assert.equal(readFileSync(`${process.env.WT}/report-part-${n}.txt`, 'utf8'), content);
+let restored = '';
+for (let offset = 0, n = 0; offset < report.length; offset += 149999, n++) {
+  const content = report.slice(offset, offset + 149999);
+  const path = `${process.env.TASK_DATA}/report-part-${n}.txt`;
+  assert.ok(content.length < 150000);
+  const patch = await handlers.tool_call({ toolName: 'write', input: { path, content } }, ctx);
+  assert.equal(patch, undefined, 'bounded benign report part should complete in the task data directory');
+  writeFileSync(path, content);
+  restored += readFileSync(path, 'utf8');
 }
+assert.equal(restored, report, 'the supported route must preserve the entire refused report');
 // Optional friction storage cannot change admission or replace mandatory Jev audit.
 const { renameSync, mkdirSync } = await import('node:fs');
 renameSync(frictionPath, `${frictionPath}.saved`);
@@ -1168,6 +1175,8 @@ test_claude_oversize() {
     | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1) \
     || fail 'Claude size refusal changed its hook exit contract'
   denied "$out" || fail 'Claude admitted an uncoverable payload'
+  jq -e '.hookSpecificOutput.permissionDecisionReason | contains("same write tool") and contains("separate files in the task\u0027s own data directory") and contains("below 150,000 characters") and (contains("same call once more") | not)' <<<"$out" >/dev/null \
+    || fail 'Claude hook lost the supported report write route'
   jq -e '.hookSpecificOutput.permissionDecisionReason | contains("guard=FM-JEV-SIZE rule=complete-screening-budget")' <<<"$out" >/dev/null \
     || fail 'Claude hook lost the typed size refusal'
   [ "$(requests)" = "$before" ] || fail 'Claude sent an uncoverable prefix'
