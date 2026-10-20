@@ -1,0 +1,3 @@
+deny-mode vs base: total=384 byte-identical=384 differing=0 (of identical, exit-2 denies=135)
+head default silent-allow: total=222 silent-exit0=222
+/tmp/fm-cdg-driver/diff-base-head.sh  45.19s user 44.88s system 62% cpu 2:25.03 total

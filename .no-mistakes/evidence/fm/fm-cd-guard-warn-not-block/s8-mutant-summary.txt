@@ -1,0 +1,22 @@
+== diff vs real: m1-reason
+policy diff lines: 2
+checker diff lines: 0
+== diff vs real: m2-cursor-renderer
+policy diff lines: 0
+checker diff lines: 2
+== diff vs real: m3-claude-renderer
+policy diff lines: 0
+checker diff lines: 2
+== diff vs real: m4-grok-renderer
+policy diff lines: 0
+checker diff lines: 2
+### real exit=0  ok-lines=18  not-ok=0
+### m1-reason exit=1  ok-lines=2  not-ok=1
+not ok - B01 via codex deny output differs from the original captured bytes
+### m2-cursor-renderer exit=1  ok-lines=3  not-ok=1
+not ok - B01 via cursor deny output differs from the original captured bytes
+### m3-claude-renderer exit=1  ok-lines=2  not-ok=1
+not ok - B01 via codex deny output differs from the original captured bytes
+### m4-grok-renderer exit=1  ok-lines=2  not-ok=1
+not ok - B01 via codex deny must preserve the Grok object
+/tmp/fm-cdg-driver/mutants.sh  120.70s user 141.16s system 183% cpu 2:23.07 total

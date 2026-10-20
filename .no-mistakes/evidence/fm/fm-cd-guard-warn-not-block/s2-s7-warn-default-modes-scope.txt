@@ -1,0 +1,63 @@
+=== S2 default mode, Claude form, bare 'cd projects/foo' ===
+--- claude default
+rc=0
+stdout: {"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr: 
+CHECK ok: no permissionDecision, git -C hint present, additionalContext==systemMessage
+CHECK ok: stderr empty
+=== S3 default mode, Cursor form ===
+--- cursor default
+rc=0
+stdout: {"permission":"allow","user_message":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr: 
+=== S3b default mode, Codex/Grok/CLI forms ===
+--- codex default
+rc=0
+stdout: {"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr: 
+--- grok default
+rc=0
+stdout: {"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr: 
+--- opencode/pi default
+rc=0
+stdout: {"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr: 
+=== S7 mode variable: unset / warn / deny / DENY / block / empty ===
+mode=[__unset__] rc=0 stdout_bytes=1000 stderr_bytes=0 kind=WARN
+mode=[warn] rc=0 stdout_bytes=1000 stderr_bytes=0 kind=WARN
+mode=[deny] rc=2 stdout_bytes=0 stderr_bytes=465 kind=DENY
+mode=[DENY] rc=0 stdout_bytes=1000 stderr_bytes=0 kind=WARN
+mode=[block] rc=0 stdout_bytes=1000 stderr_bytes=0 kind=WARN
+mode=[] rc=0 stdout_bytes=1000 stderr_bytes=0 kind=WARN
+=== S4 exemptions stay silent (default + deny, claude + cursor) ===
+[cat foo | cd bar]           mode=warn claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[cat foo | cd bar]           mode=deny claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[cd projects/foo | cat]      mode=warn claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[cd projects/foo | cat]      mode=deny claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[(cd projects/foo && pwd)]   mode=warn claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[(cd projects/foo && pwd)]   mode=deny claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[env cd projects/foo]        mode=warn claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[env cd projects/foo]        mode=deny claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[cd "projects/foo]           mode=warn claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[cd "projects/foo]           mode=deny claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[git -C projects/foo status] mode=warn claude rc=0 bytes=0 | cursor rc=0 bytes=0
+[git -C projects/foo status] mode=deny claude rc=0 bytes=0 | cursor rc=0 bytes=0
+=== S5 empty / malformed stdin ===
+mode=warn --claude input=[] rc=0 bytes=0
+mode=warn --claude input=[not json at all] rc=0 bytes=0
+mode=warn --claude input=[{"tool_input":] rc=0 bytes=0
+mode=warn --cursor input=[] rc=0 bytes=0
+mode=warn --cursor input=[not json at all] rc=0 bytes=0
+mode=warn --cursor input=[{"tool_input":] rc=0 bytes=0
+mode=deny --claude input=[] rc=0 bytes=0
+mode=deny --claude input=[not json at all] rc=0 bytes=0
+mode=deny --claude input=[{"tool_input":] rc=0 bytes=0
+mode=deny --cursor input=[] rc=0 bytes=0
+mode=deny --cursor input=[not json at all] rc=0 bytes=0
+mode=deny --cursor input=[{"tool_input":] rc=0 bytes=0
+=== S6 scope: linked worktree + non-firstmate repo inert in both modes ===
+wt     mode=warn rc=0 bytes=0
+wt     mode=deny rc=0 bytes=0
+notfm  mode=warn rc=0 bytes=0
+notfm  mode=deny rc=0 bytes=0
