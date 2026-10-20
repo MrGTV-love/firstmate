@@ -69,11 +69,11 @@
 # a probe cut by `check`'s time bound, reads source=unknown and age=unknown, never
 # the directory of a copy that may be locked. A record's presence means it is
 # still in custody; teardown removes closed records. This check only reports,
-# including locked copies, and never releases anything. The report prints the
-# whole line. `check` and `--apply` put one bounded part of it in their one
-# aggregated wake, even below the byte budget: the count, five copies in all (new
-# copies first, then the oldest), and a pointer to the report line. A copy with no
-# live owning record is left to the existing reap path.
+# including locked copies, and never releases anything. Only the report, a run
+# with no flag, prints the whole line. `check` and `--apply` put one bounded part
+# of it in their one aggregated wake, even below the byte budget: the count, five
+# copies in all (new copies first, then the oldest), and a pointer to the no-flag
+# run. A copy with no live owning record is left to the existing reap path.
 #
 # --apply removes only REAPABLE-PROVEN copies, one at a time, deepest path first,
 # each re-proved just before its own removal, by a plain `git worktree remove`
@@ -1105,7 +1105,7 @@ live_nested_wake() {
   local shown=$LIVE_NESTED_COUNT
   [ "$LIVE_NESTED_COUNT" -gt 0 ] || return 0
   [ "$shown" -le "$LIVE_WAKE_COPIES" ] || shown=$LIVE_WAKE_COPIES
-  printf 'HELD-LIVE-TASK nested copies=%s, %s shown (new first, then oldest): %s; the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh' \
+  printf 'HELD-LIVE-TASK nested copies=%s, %s shown (new first, then oldest): %s; run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line' \
     "$LIVE_NESTED_COUNT" "$shown" \
     "$(printf '%s' "$LIVE_NESTED_ROWS" | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2 \
       | RECORDED="$REC_LIVE" awk -F '\t' '

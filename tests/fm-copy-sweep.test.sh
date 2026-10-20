@@ -347,7 +347,7 @@ test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report() {
   done
   assert_not_contains "$wake_line" "$(copy_path n6)" 'the wake named a copy beyond the oldest five'
   assert_not_contains "$wake_line" "$(copy_path n7)" 'the wake named a copy beyond the oldest five'
-  assert_contains "$wake_line" 'the full list is the HELD-LIVE-TASK line of bin/fm-copy-sweep.sh' 'the wake did not point at the report line'
+  assert_contains "$wake_line" 'run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line' 'the wake did not point at the no-flag report'
   pass 'the wake carries the count, the oldest five live copies and a pointer to the report, as one line'
 }
 
