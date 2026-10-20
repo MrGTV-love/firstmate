@@ -20,6 +20,9 @@
 # The receipt binds the terminal observation to the canonical registration and
 # lets a restart finish fixed-path removal without executing state-file bytes.
 
+# shellcheck source=bin/fm-file-identity-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-file-identity-lib.sh"
+
 # The kernel name, read once per process: the file-stat helpers below run on
 # every supervision cycle, and each used to start a uname process per call.
 # A function-only form follows because a runner started with exported functions
@@ -786,9 +789,10 @@ fm_pr_poll_registration_device_shifted() {  # <state> <id> <template>
   check_identity=$(fm_pr_file_identity "$state/$id.check.sh") || return 1
   recorded_device=${FM_PR_REG_DATA_IDENTITY%%:*}
   [ "${FM_PR_REG_CHECK_IDENTITY%%:*}" = "$recorded_device" ] || return 1
-  [ "$recorded_device" != "$state_device" ] || return 1
-  [ "$data_identity" = "$state_device:${FM_PR_REG_DATA_IDENTITY#*:}" ] || return 1
-  [ "$check_identity" = "$state_device:${FM_PR_REG_CHECK_IDENTITY#*:}" ] || return 1
+  fm_file_identity_device_shifted "$FM_PR_REG_DATA_IDENTITY" "$data_identity" || return 1
+  fm_file_identity_device_shifted "$FM_PR_REG_CHECK_IDENTITY" "$check_identity" || return 1
+  [ "${data_identity%%:*}" = "$state_device" ] || return 1
+  [ "${check_identity%%:*}" = "$state_device" ] || return 1
   FM_PR_POLL_REARM_DATA_IDENTITY=$data_identity
   FM_PR_POLL_REARM_CHECK_IDENTITY=$check_identity
 }

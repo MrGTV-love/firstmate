@@ -422,7 +422,7 @@ make_isolated_bin() {  # <name> <register-exit-code>
   local name=$1 code=$2 bin
   bin="$TMP_ROOT/$name/bin"
   mkdir -p "$bin"
-  cp "$ROOT/bin/fm-startup-growth-check.sh" "$ROOT/bin/fm-pr-lib.sh" \
+  cp "$ROOT/bin/fm-startup-growth-check.sh" "$ROOT/bin/fm-pr-lib.sh" "$ROOT/bin/fm-file-identity-lib.sh" \
     "$ROOT/bin/fm-startup-memory-budget-lib.sh" "$ROOT/bin/fm-line-cap-lib.sh" \
     "$ROOT/bin/fm-check-lib.sh" "$ROOT/bin/fm-startup-memory-budget.sh" "$bin/"
   if [ "$code" = 0 ]; then

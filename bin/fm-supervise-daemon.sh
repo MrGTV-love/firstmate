@@ -356,7 +356,7 @@ _collapse_newlines() {  # <text>
 # them exactly as before; the away launcher reuses the identical resolution to
 # pass the captain pane in as FM_SUPERVISOR_TARGET.
 
-# --- classification helpers (PURE: no side effects, testable) ---------------
+# --- classification helpers (device-marker adoption is explicit) -----------
 # last_status_line, status_is_captain_relevant, window_to_task, and the
 # status-span reader come from bin/fm-classify-lib.sh (sourced above),
 # the single classifier shared with bin/fm-watch.sh. The decision-string wrappers
@@ -373,6 +373,7 @@ classify_signal() {  # <reason-after-colon> <state>
     case "$f" in *.status) ;; *) continue ;; esac
     [ -e "$f" ] || [ -L "$f" ] || continue
     task=$(basename "$f"); task="${task%.status}"
+    status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$f" || true
     record=$(status_span_first_actionable_record "$f" \
       "$(status_seen_offset "$state" "$task")")
     rc=$?
@@ -1352,6 +1353,7 @@ housekeeping() {  # <state>
       [ -e "$f" ] || [ -L "$f" ] || continue
       [ "$f" = "$exclude" ] && continue
       task=$(basename "$f"); task="${task%.status}"
+      status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$f" || true
       record=$(status_span_first_actionable_record "$f" \
         "$(status_seen_offset "$state" "$task")")
       rc=$?
@@ -1570,6 +1572,7 @@ handle_wake() {  # <reason> <state>
               case "$arg" in *" ("*) stale_detail="${arg#*" ("}"; arg="${arg%% \(*}" ;; esac
               task=$(window_to_task "$arg" "$state")
               if [ -n "$task" ]; then
+                status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$state/$task.status" || true
                 span_record=$(status_span_first_actionable_record "$state/$task.status" \
                   "$(status_seen_offset "$state" "$task")")
                 span_rc=$?

@@ -2,6 +2,9 @@
 
 _FM_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd 2>/dev/null)" || _FM_CLASSIFY_LIB_DIR="."
 
+# shellcheck source=bin/fm-file-identity-lib.sh
+. "$_FM_CLASSIFY_LIB_DIR/fm-file-identity-lib.sh"
+
 # Read the kernel name once at source time, not per status metadata lookup.
 # This also serves stdout helpers called through $(), where a lazy cache would
 # not persist. Reuse fm-wake-lib.sh's _FM_UNAME when already loaded; either value
@@ -321,6 +324,69 @@ status_presentation_marker_parse() {
   STATUS_PRESENTATION_REPORTED=$reported
   STATUS_PRESENTATION_CLASSIFIED=$classified
 }
+# Split an r1 signature on NUL bytes, not on the substring "00" (a hex
+# substring can cross a byte boundary). Decode only identity; the other five
+# fields stay byte-exact hex, so path/access/type changes cannot be adopted.
+_status_reported_identity_into() {  # <signature> <identity-out> <other-fields-out>
+  local __fm_ri_hex=${1#r1:} __fm_ri_pair __fm_ri_field=0 __fm_ri_esc='' __fm_ri_other=''
+  case "$1" in r1:*) ;; *) return 1 ;; esac
+  case "$__fm_ri_hex" in ''|*[!0-9a-f]*) return 1 ;; esac
+  [ "$((${#__fm_ri_hex} % 2))" -eq 0 ] || return 1
+  while [ -n "$__fm_ri_hex" ]; do
+    __fm_ri_pair=${__fm_ri_hex:0:2}; __fm_ri_hex=${__fm_ri_hex:2}
+    if [ "$__fm_ri_pair" = 00 ]; then
+      __fm_ri_field=$((__fm_ri_field + 1))
+      __fm_ri_other="${__fm_ri_other}00"
+    elif [ "$__fm_ri_field" -eq 1 ]; then
+      __fm_ri_esc="${__fm_ri_esc}\\x${__fm_ri_pair}"
+    else
+      __fm_ri_other="${__fm_ri_other}${__fm_ri_pair}"
+    fi
+  done
+  [ "$__fm_ri_field" -eq 5 ] || return 1
+  printf -v "$2" '%b' "$__fm_ri_esc"
+  printf -v "$3" '%s' "$__fm_ri_other"
+}
+
+# Explicit migration, separate from the pure marker readers below. Adopt only
+# a device-only change with the same strong inode+birth identity and all five
+# other observed fields unchanged. Never advance a classified offset or turn a
+# reported-but-unclassified state into a classified one. Revalidate the file
+# and marker immediately before atomic publication; failure leaves detection
+# conservative. Both signal and heartbeat scans call this before using a marker.
+status_presentation_marker_adopt_device() {  # <marker> <status-file> [current-signature]
+  local marker=$1 file=$2 current=${3-} raw old_ident new_ident old_other new_other classified offset fresh tmp
+  [ -f "$marker" ] && [ -r "$marker" ] && [ ! -L "$marker" ] || return 1
+  { IFS= read -r -d '' raw || :; } 2>/dev/null < "$marker" || return 1
+  while [ "${raw%$'\n'}" != "$raw" ]; do raw=${raw%$'\n'}; done
+  status_presentation_marker_parse "$raw" || return 1
+  [ -n "$current" ] || current=$(status_observed_signature "$file") || return 1
+  [ "$STATUS_PRESENTATION_REPORTED" != "$current" ] || return 0
+  classified=$STATUS_PRESENTATION_CLASSIFIED
+  _status_reported_identity_into "$STATUS_PRESENTATION_REPORTED" old_ident old_other || return 1
+  _status_reported_identity_into "$current" new_ident new_other || return 1
+  [ "$old_other" = "$new_other" ] || return 1
+  case "$old_ident" in strong:*:*:?*) ;; *) return 1 ;; esac
+  case "$new_ident" in strong:*:*:?*) ;; *) return 1 ;; esac
+  fm_file_identity_device_shifted "${old_ident#strong:}" "${new_ident#strong:}" || return 1
+  if [ "$classified" != - ]; then
+    [ "${classified#*@}" = "$old_ident" ] || return 1
+    offset=${classified%%@*}
+    fresh=$(_fm_status_file_size "$file") || return 1
+    [ "$offset" -le "$fresh" ] || return 1
+    classified="${offset}@${new_ident}"
+  fi
+  fresh=$(status_observed_signature "$file") || return 1
+  [ "$fresh" = "$current" ] || return 1
+  [ "$(cat "$marker" 2>/dev/null)" = "$raw" ] || return 1
+  tmp=$(mktemp "$marker.device.XXXXXX") || return 1
+  if ! printf 'v2\t%s\t%s' "$current" "$classified" > "$tmp" \
+    || ! mv -f "$tmp" "$marker"; then
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
 status_presentation_marker_reported_matches() {
   local raw
   # Read the marker with the shell's own read, not a cat process: this runs for

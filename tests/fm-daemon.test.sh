@@ -2343,6 +2343,34 @@ test_classify_signal_dedup_against_scan() {
   pass "classify_signal dedupes against the catch-all scan seen marker"
 }
 
+test_classify_signal_device_shift_dedup() (
+  local dir state reader out i
+  dir=$(make_supercase signal-device-shift); state="$dir/state"; reader="$dir/identity-reader"
+  cat > "$reader" <<'SH'
+#!/usr/bin/env bash
+IFS= read -r identity < "${1%.status}.identity" || exit 1
+printf '%s' "$identity"
+SH
+  chmod +x "$reader"
+  local FM_STATUS_IDENTITY_READER="$reader"
+  export FM_STATUS_IDENTITY_READER
+  printf 'done: already delivered\n' > "$state/task.status"
+  printf 'strong:16777232:123:2026-10-09 12:34:56\n' > "$state/task.identity"
+  mark_status_seen "$state" task "$(log_size "$state/task.status")" "$(_fm_open_decisions_file_ident "$state/task.status")" \
+    || fail "could not prime daemon identity"
+  printf 'strong:16777233:123:2026-10-09 12:34:56\n' > "$state/task.identity"
+  for i in 1 2; do
+    out=$(classify_signal "$state/task.status" "$state")
+    case "$out" in self\|*) ;; *) fail "daemon re-signalled a device-only shift on pass $i: $out" ;; esac
+    [ "$(status_seen_offset "$state" task)" = "$(log_size "$state/task.status")" ] \
+      || fail "daemon did not persist the migrated classified endpoint"
+  done
+  printf 'done: new result\n' >> "$state/task.status"
+  out=$(classify_signal "$state/task.status" "$state")
+  case "$out" in escalate\|*'new result'*) ;; *) fail "daemon swallowed growth after migration: $out" ;; esac
+  pass "daemon migrates device-only status identity without repeating an old result or swallowing growth"
+)
+
 test_classify_stale_dedup_against_signal() {
   # If the signal path already escalated a status (seen marker matches),
   # classify_stale must self-handle to avoid a duplicate in the digest.
@@ -3422,6 +3450,7 @@ test_tmux_composer_state_bordered_and_agent_rows_are_empty
 test_tmux_composer_state_requires_matching_box_borders
 test_pane_input_pending_preserves_bright_placeholder_like_draft
 test_classify_signal_dedup_against_scan
+test_classify_signal_device_shift_dedup
 test_classify_signal_skips_turn_end_markers
 test_classify_signal_survives_a_later_routine_append
 test_classification_commits_its_captured_endpoint

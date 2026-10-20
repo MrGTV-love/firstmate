@@ -56,7 +56,7 @@ cp "$ROOT/bin/fm-remote-job-lib.sh" "$ROOT/bin/fm-remote-job-worker.sh" \
   "$ROOT/bin/fm-composer-lib.sh" "$ROOT/bin/fm-cursor-lib.sh" \
   "$ROOT/bin/fm-classify-lib.sh" "$ROOT/bin/fm-status-record-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" \
   "$ROOT/bin/fm-status-decision-lib.sh" "$ROOT/bin/fm-status-event-lib.sh" \
-  "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-utc-lib.sh" \
+  "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-file-identity-lib.sh" "$ROOT/bin/fm-utc-lib.sh" \
   "$ROOT/bin/fm-ff-lib.sh" "$ROOT/bin/fm-secondmate-registry-lib.sh" \
   "$ROOT/bin/fm-session-launch-policy-lib.sh" "$ROOT/bin/fm-config-inherit-lib.sh" \
   "$ROOT/bin/fm-startup-memory-budget-lib.sh" "$ROOT/bin/fm-role-lib.sh" \
