@@ -446,9 +446,12 @@ status_event_json() {  # <observed-status-log> [<contract-path>]
     '{path:$path,present:$present,kind:"event_history",last_event:{state:$verb,note:$note,raw:$raw,age_seconds:$age}}'
 }
 
-# Stream matching lines through a one-line tail, retaining bounded log memory.
-# Assign in the caller's shell; status lines name the current PR first by
-# convention, regardless of the event verb.
+# Which URL counts as current is the `pr` rule in this file's header. Stream
+# matching lines through a one-line tail so memory stays bounded by one line,
+# not the log. LC_ALL=C and `-a` keep both greps byte-wise: a log holding bytes
+# invalid in the caller's locale, or a NUL byte, would otherwise stop the match
+# early or print "Binary file ... matches" in place of the line.
+# Assign in the caller's shell.
 current_pr_url_in_file_to() {  # <file> <out-var>
   local selected=''
   local pattern='https?://[^[:space:])"]+/pull/[0-9]+'
