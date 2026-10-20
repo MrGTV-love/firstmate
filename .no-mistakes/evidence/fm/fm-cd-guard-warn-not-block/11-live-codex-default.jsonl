@@ -1,0 +1,16 @@
+{"type":"thread.started","thread_id":"01a15687-897a-7c10-a1af-63343d92a110"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  session-flags: `projects.\"/Users/charlesabrooker/tmp/fm-cdguard-live.8iuA3s/new\"` is ignored."}}
+{"type":"item.completed","item":{"id":"item_1","type":"error","message":"Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  session-flags: `projects.\"/Users/charlesabrooker/tmp/fm-cdguard-live.8iuA3s/new\"` is ignored."}}
+{"type":"turn.started"}
+{"type":"error","message":"Reconnecting... 2/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"Reconnecting... 3/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"Reconnecting... 4/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"Reconnecting... 5/5 (workspace routing discovery unauthorized (401))"}
+{"type":"item.completed","item":{"id":"item_2","type":"error","message":"Falling back from WebSockets to HTTPS transport. workspace routing discovery unauthorized (401)"}}
+{"type":"error","message":"Reconnecting... 1/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"Reconnecting... 2/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"Reconnecting... 3/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"Reconnecting... 4/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"Reconnecting... 5/5 (workspace routing discovery unauthorized (401))"}
+{"type":"error","message":"workspace routing discovery unauthorized (401)"}
+{"type":"turn.failed","error":{"message":"workspace routing discovery unauthorized (401)"}}

@@ -1,0 +1,2 @@
+codex hooks.json command | mode=<unset> exit=0 stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-leve stderr=
+codex hooks.json command | mode=deny exit=2 stdout={"decision":"deny","reason":"[persistent-cd] a persistent top-level directory change in the primary firstmate  stderr={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-

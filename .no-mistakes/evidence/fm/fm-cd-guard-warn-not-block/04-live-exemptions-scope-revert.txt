@@ -1,0 +1,61 @@
+=== S4: default-mode silent exemptions (CLAUDE entry; expect exit=0, empty stdout+stderr) ===
+cat foo | cd bar                   exit=0 stdout= stderr=
+cd projects/foo | cat              exit=0 stdout= stderr=
+(cd projects/foo && pwd)           exit=0 stdout= stderr=
+env cd projects/foo                exit=0 stdout= stderr=
+cd "projects/foo                   exit=0 stdout= stderr=
+echo 'cd x'                        exit=0 stdout= stderr=
+git -C projects/foo status         exit=0 stdout= stderr=
+=== S4b: empty / malformed stdin, default+deny, claude+cursor ===
+mode=unset --claude payload=[]     exit=0 stdout= stderr=
+mode=unset --claude payload=[   ]  exit=0 stdout= stderr=
+mode=unset --claude payload=[not json] exit=0 stdout= stderr=
+mode=unset --claude payload=[{"tool_input":] exit=0 stdout= stderr=
+mode=unset --claude payload=[{}]   exit=0 stdout= stderr=
+mode=unset --claude payload=[{"tool_input":{"command":""}}] exit=0 stdout= stderr=
+mode=unset --claude payload=[[1,2]] exit=0 stdout= stderr=
+mode=unset --cursor payload=[]     exit=0 stdout= stderr=
+mode=unset --cursor payload=[   ]  exit=0 stdout= stderr=
+mode=unset --cursor payload=[not json] exit=0 stdout= stderr=
+mode=unset --cursor payload=[{"tool_input":] exit=0 stdout= stderr=
+mode=unset --cursor payload=[{}]   exit=0 stdout= stderr=
+mode=unset --cursor payload=[{"tool_input":{"command":""}}] exit=0 stdout= stderr=
+mode=unset --cursor payload=[[1,2]] exit=0 stdout= stderr=
+mode=deny --claude payload=[]      exit=0 stdout= stderr=
+mode=deny --claude payload=[   ]   exit=0 stdout= stderr=
+mode=deny --claude payload=[not json] exit=0 stdout= stderr=
+mode=deny --claude payload=[{"tool_input":] exit=0 stdout= stderr=
+mode=deny --claude payload=[{}]    exit=0 stdout= stderr=
+mode=deny --claude payload=[{"tool_input":{"command":""}}] exit=0 stdout= stderr=
+mode=deny --claude payload=[[1,2]] exit=0 stdout= stderr=
+mode=deny --cursor payload=[]      exit=0 stdout= stderr=
+mode=deny --cursor payload=[   ]   exit=0 stdout= stderr=
+mode=deny --cursor payload=[not json] exit=0 stdout= stderr=
+mode=deny --cursor payload=[{"tool_input":] exit=0 stdout= stderr=
+mode=deny --cursor payload=[{}]    exit=0 stdout= stderr=
+mode=deny --cursor payload=[{"tool_input":{"command":""}}] exit=0 stdout= stderr=
+mode=deny --cursor payload=[[1,2]] exit=0 stdout= stderr=
+=== S5: scope - gate worktree (linked worktree, real repo) must be inert, both modes ===
+/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git/worktrees/01M5B3C8Q8CW23XHX8E9J05SQE
+/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git
+gate-worktree mode=unset           exit=0 stdout= stderr=
+gate-worktree mode=deny            exit=0 stdout= stderr=
+linked-worktree mode=unset         exit=0 stdout= stderr=
+linked-worktree mode=deny          exit=0 stdout= stderr=
+non-firstmate-repo (no AGENTS.md)  exit=0 stdout= stderr=
+=== S6: FM_CD_GUARD_MODE values (revert is one variable) ===
+FM_CD_GUARD_MODE=[unset] -> exit=0 stdout_len=1000 stderr_len=0 stdout_has_permissionDecision=0 stderr_has_deny=0
+FM_CD_GUARD_MODE=[warn] -> exit=0 stdout_len=1000 stderr_len=0 stdout_has_permissionDecision=0 stderr_has_deny=0
+FM_CD_GUARD_MODE=[deny] -> exit=2 stdout_len=0 stderr_len=465 stdout_has_permissionDecision=0 stderr_has_deny=1
+FM_CD_GUARD_MODE=[DENY] -> exit=0 stdout_len=1000 stderr_len=0 stdout_has_permissionDecision=0 stderr_has_deny=0
+FM_CD_GUARD_MODE=[Deny] -> exit=0 stdout_len=1000 stderr_len=0 stdout_has_permissionDecision=0 stderr_has_deny=0
+FM_CD_GUARD_MODE=[block] -> exit=0 stdout_len=1000 stderr_len=0 stdout_has_permissionDecision=0 stderr_has_deny=0
+FM_CD_GUARD_MODE=[] -> exit=0 stdout_len=1000 stderr_len=0 stdout_has_permissionDecision=0 stderr_has_deny=0
+FM_CD_GUARD_MODE=[ deny] -> exit=0 stdout_len=1000 stderr_len=0 stdout_has_permissionDecision=0 stderr_has_deny=0
+=== S6b: policy CLI direct ===
+node:1: command not found: _nvm_lazy_load
+warn	persistent-cd	a persistent top-level directory change in the primary firstmate checkout already ran, so the shell i
+node:1: command not found: _nvm_lazy_load
+deny	persistent-cd	a persistent top-level directory change in the primary firstmate checkout is blocked; it would move t
+node:1: command not found: _nvm_lazy_load
+allow

@@ -1,0 +1,4 @@
+mode=<unset> cmd=[cd projects/foo] -> ALLOWED (no throw)
+mode=<unset> cmd=[(cd projects/foo && pwd)] -> ALLOWED (no throw)
+mode=deny cmd=[cd projects/foo] -> THROWN: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-
+mode=deny cmd=[(cd projects/foo && pwd)] -> ALLOWED (no throw)

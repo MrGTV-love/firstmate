@@ -1,0 +1,141 @@
+DIFF B01 codex: cd projects/foo
+DIFF B01 claude: cd projects/foo
+DIFF B01 grok: cd projects/foo
+DIFF B01 opencode: cd projects/foo
+DIFF B01 cursor: cd projects/foo
+DIFF B02 codex: cd ..
+DIFF B02 claude: cd ..
+DIFF B02 grok: cd ..
+DIFF B02 opencode: cd ..
+DIFF B02 cursor: cd ..
+DIFF B03 codex: cd
+DIFF B03 claude: cd
+DIFF B03 grok: cd
+DIFF B03 opencode: cd
+DIFF B03 cursor: cd
+DIFF B04 codex: cd -
+DIFF B04 claude: cd -
+DIFF B04 grok: cd -
+DIFF B04 opencode: cd -
+DIFF B04 cursor: cd -
+DIFF B05 codex: cd /abs/path
+DIFF B05 claude: cd /abs/path
+DIFF B05 grok: cd /abs/path
+DIFF B05 opencode: cd /abs/path
+DIFF B05 cursor: cd /abs/path
+DIFF B06 codex: pushd projects/foo
+DIFF B06 claude: pushd projects/foo
+DIFF B06 grok: pushd projects/foo
+DIFF B06 opencode: pushd projects/foo
+DIFF B06 cursor: pushd projects/foo
+DIFF B07 codex: popd
+DIFF B07 claude: popd
+DIFF B07 grok: popd
+DIFF B07 opencode: popd
+DIFF B07 cursor: popd
+DIFF B08 codex: X=1 cd projects/foo
+DIFF B08 claude: X=1 cd projects/foo
+DIFF B08 grok: X=1 cd projects/foo
+DIFF B08 opencode: X=1 cd projects/foo
+DIFF B08 cursor: X=1 cd projects/foo
+DIFF B09 codex: cd projects/foo && tasks-axi add x
+DIFF B09 claude: cd projects/foo && tasks-axi add x
+DIFF B09 grok: cd projects/foo && tasks-axi add x
+DIFF B09 opencode: cd projects/foo && tasks-axi add x
+DIFF B09 cursor: cd projects/foo && tasks-axi add x
+DIFF B10 codex: echo before; cd projects/foo
+DIFF B10 claude: echo before; cd projects/foo
+DIFF B10 grok: echo before; cd projects/foo
+DIFF B10 opencode: echo before; cd projects/foo
+DIFF B10 cursor: echo before; cd projects/foo
+DIFF B11 codex: true && cd projects/foo
+DIFF B11 claude: true && cd projects/foo
+DIFF B11 grok: true && cd projects/foo
+DIFF B11 opencode: true && cd projects/foo
+DIFF B11 cursor: true && cd projects/foo
+DIFF B12 codex: tasks-axi done x || cd projects/foo
+DIFF B12 claude: tasks-axi done x || cd projects/foo
+DIFF B12 grok: tasks-axi done x || cd projects/foo
+DIFF B12 opencode: tasks-axi done x || cd projects/foo
+DIFF B12 cursor: tasks-axi done x || cd projects/foo
+DIFF B13 codex: cd "projects/foo"
+DIFF B13 claude: cd "projects/foo"
+DIFF B13 grok: cd "projects/foo"
+DIFF B13 opencode: cd "projects/foo"
+DIFF B13 cursor: cd "projects/foo"
+DIFF B14 codex: "cd" projects/foo
+DIFF B14 claude: "cd" projects/foo
+DIFF B14 grok: "cd" projects/foo
+DIFF B14 opencode: "cd" projects/foo
+DIFF B14 cursor: "cd" projects/foo
+DIFF B15 codex: sleep 1 & cd projects/foo
+DIFF B15 claude: sleep 1 & cd projects/foo
+DIFF B15 grok: sleep 1 & cd projects/foo
+DIFF B15 opencode: sleep 1 & cd projects/foo
+DIFF B15 cursor: sleep 1 & cd projects/foo
+DIFF B16 codex: command cd projects/foo
+DIFF B16 claude: command cd projects/foo
+DIFF B16 grok: command cd projects/foo
+DIFF B16 opencode: command cd projects/foo
+DIFF B16 cursor: command cd projects/foo
+DIFF B17 codex: cd projects/foo >/dev/null
+DIFF B17 claude: cd projects/foo >/dev/null
+DIFF B17 grok: cd projects/foo >/dev/null
+DIFF B17 opencode: cd projects/foo >/dev/null
+DIFF B17 cursor: cd projects/foo >/dev/null
+DIFF B18 codex: cd projects/foo
+echo done
+DIFF B18 claude: cd projects/foo
+echo done
+DIFF B18 grok: cd projects/foo
+echo done
+DIFF B18 opencode: cd projects/foo
+echo done
+DIFF B18 cursor: cd projects/foo
+echo done
+DIFF B19 codex: $'\143d' projects/foo
+DIFF B19 claude: $'\143d' projects/foo
+DIFF B19 grok: $'\143d' projects/foo
+DIFF B19 opencode: $'\143d' projects/foo
+DIFF B19 cursor: $'\143d' projects/foo
+DIFF B20 codex: c'd' projects/foo
+DIFF B20 claude: c'd' projects/foo
+DIFF B20 grok: c'd' projects/foo
+DIFF B20 opencode: c'd' projects/foo
+DIFF B20 cursor: c'd' projects/foo
+DIFF B21 codex: c"d" projects/foo
+DIFF B21 claude: c"d" projects/foo
+DIFF B21 grok: c"d" projects/foo
+DIFF B21 opencode: c"d" projects/foo
+DIFF B21 cursor: c"d" projects/foo
+DIFF B22 codex: c\d projects/foo
+DIFF B22 claude: c\d projects/foo
+DIFF B22 grok: c\d projects/foo
+DIFF B22 opencode: c\d projects/foo
+DIFF B22 cursor: c\d projects/foo
+DIFF B23 codex: builtin cd projects/foo
+DIFF B23 claude: builtin cd projects/foo
+DIFF B23 grok: builtin cd projects/foo
+DIFF B23 opencode: builtin cd projects/foo
+DIFF B23 cursor: builtin cd projects/foo
+DIFF B24 codex: command builtin cd projects/foo
+DIFF B24 claude: command builtin cd projects/foo
+DIFF B24 grok: command builtin cd projects/foo
+DIFF B24 opencode: command builtin cd projects/foo
+DIFF B24 cursor: command builtin cd projects/foo
+DIFF B25 codex: builtin command cd projects/foo
+DIFF B25 claude: builtin command cd projects/foo
+DIFF B25 grok: builtin command cd projects/foo
+DIFF B25 opencode: builtin command cd projects/foo
+DIFF B25 cursor: builtin command cd projects/foo
+DIFF B26 codex: command -p cd projects/foo
+DIFF B26 claude: command -p cd projects/foo
+DIFF B26 grok: command -p cd projects/foo
+DIFF B26 opencode: command -p cd projects/foo
+DIFF B26 cursor: command -p cd projects/foo
+DIFF B27 codex: command -- cd projects/foo
+DIFF B27 claude: command -- cd projects/foo
+DIFF B27 grok: command -- cd projects/foo
+DIFF B27 opencode: command -- cd projects/foo
+DIFF B27 cursor: command -- cd projects/foo
+compared=320 byte-diffs=135

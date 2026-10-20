@@ -1,0 +1,52 @@
+=== S1: default mode, persistent cd (NEW code) ===
+### claude-stdin | mode=<unset> | cmd=cd projects/foo
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr=
+
+### codex-stdin | mode=<unset> | cmd=cd projects/foo && tasks-axi add x
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr=
+
+### grok-stdin | mode=<unset> | cmd=cd projects/foo
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr=
+
+### cursor-stdin | mode=<unset> | cmd=cd projects/foo
+exit=0
+stdout={"permission":"allow","user_message":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr=
+
+=== S3: deny mode (NEW) vs base (BASE, mode irrelevant) ===
+### NEW-claude-deny | mode=deny | cmd=cd projects/foo
+exit=2
+stdout=
+stderr={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+
+### BASE-claude | mode=<unset> | cmd=cd projects/foo
+exit=2
+stdout=
+stderr={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+
+### NEW-grok-deny | mode=deny | cmd=cd projects/foo
+exit=2
+stdout={"decision":"deny","reason":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+
+### BASE-grok | mode=<unset> | cmd=cd projects/foo
+exit=2
+stdout={"decision":"deny","reason":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+
+### NEW-cursor-deny | mode=deny | cmd=cd projects/foo
+exit=0
+stdout={"permission":"deny","user_message":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr=
+
+### BASE-cursor | mode=<unset> | cmd=cd projects/foo
+exit=0
+stdout={"permission":"deny","user_message":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+stderr=
+

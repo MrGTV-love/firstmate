@@ -1,0 +1,2 @@
+ 185 classified=allow exit=0 stderr-empty stdout-empty
+ 135 classified=deny exit=0 stderr-empty stdout-valid-json
