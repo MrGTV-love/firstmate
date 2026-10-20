@@ -1,0 +1,8 @@
+baseline file after startup:
+81070
+sha256:4dedf4026c7601eae668b4eea676f9fabbbf559e77b011511d91825757411f09
+ok - startup recorded the base-commit AGENTS.md hash as the session baseline
+ok - control: base AGENTS.md on disk -> compact emits no refresh and no direct-edit paragraph
+ok - changed AGENTS.md -> compact emits the refresh with the direct-edit paragraph and the section 1 exception
+full AGENTS.md (52105 bytes) is a contiguous block after the refresh header
+ok - refresh body is the complete branch AGENTS.md, byte-identical

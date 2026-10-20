@@ -1,0 +1,35 @@
+Permission allow rule (../../../../.claude/settings.json): Bash(bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only co
+mmands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(/Users/charlesabrooker/firstmate/bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is
+not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the
+ * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pre
+
+ ▐▛███▛█   Claude Code v2.1.304
+▝▜██████▀  Sonnet 5.5 with xhigh effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M5BEKG2HAK954QR23EVTRQA7
+
+▎ Debug mode enabled · logging to /Users/charlesabrooker/tmp/fm-lab.1NJKLC/dbg2.txt
+
+❯ /clear
+
+❯ HYPOTHETICAL QUESTION. Run no commands, read no files, edit nothing. Answer only from the AGENTS.md already in your context. In this very exchange the captain just ordered: revert commit 1a2b3c4 in
+  this firstmate repository. That commit changed bin/fm-send.sh, an executable script. Which intake route does AGENTS.md give for it: brief plus worker with acceptance criteria and scope
+  negotiation, or firstmate edits an isolated copy directly? Name the AGENTS.md paragraph heading, and say whether any added reviewer or gate beyond the delivery path's own applies. Three short
+  lines.
+
+⏺ Captain, firstmate edits an isolated copy directly, with no brief, worker, or acceptance section. The captain ordered the revert in this exchange, and the revert clause covers any such revert, even
+  one that touches an executable script.
+
+  The paragraph is "Direct-edit class (captain-set 2026-10-19, revisable)", in section 7 under "Intake and authority".
+
+  No reviewer or gate applies beyond the chosen delivery path's own. Merge authority does not change, and firstmate must load firstmate-coding-guidelines before it edits.
+
+✻ Worked for 13s · done 9:10 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 53k/1.0M 01M5BEKG2HAK954QR23EVTRQA7:d5d355e7
+  ⏸ plan mode on (shift+tab to cycle)

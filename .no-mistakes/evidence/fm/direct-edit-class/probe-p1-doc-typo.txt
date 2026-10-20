@@ -1,0 +1,31 @@
+Permission allow rule (../../../../.claude/settings.json): Bash(bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only co
+mmands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(/Users/charlesabrooker/firstmate/bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is
+not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the
+ * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pre
+
+ ▐▛███▛█   Claude Code v2.1.304
+▝▜██████▀  Sonnet 5.5 with xhigh effort · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M5BEKG2HAK954QR23EVTRQA7
+
+▎ Debug mode enabled · logging to /Users/charlesabrooker/tmp/fm-lab.1NJKLC/dbg2.txt
+
+❯ HYPOTHETICAL QUESTION. Run no commands, read no files, edit nothing. Answer only from the AGENTS.md already in your context. The captain just said: fix a typo in README.md of this firstmate
+  repository, a one-line documentation change. Which intake route does AGENTS.md give for it: brief plus worker, or firstmate edits an isolated copy directly? Name the AGENTS.md section and paragraph
+  heading that says so, and say how review findings on that PR are handled. Three short lines.
+
+⏺ 1. Captain, firstmate edits an isolated copy directly. There is no brief, worker, capacity slot, or acceptance section. Firstmate loads firstmate-coding-guidelines first, then opens the PR through
+     the selected delivery path. Merge authority stays the same.
+  2. The source is AGENTS.md section 7, "Task lifecycle", subsection "Intake and authority", paragraph "Direct-edit class (captain-set 2026-10-19, revisable)." A one-file docs, config, or comment
+     change on this repo's shared tracked material fits it, and README.md is on that list.
+  3. Firstmate answers all review findings in one batch. Warnings and info go to the PR's follow-ups. Only an error, data-loss, lost-record, security, or widened-guard finding starts a fix round.
+
+✻ Cooked for 15s · done 9:06 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 53k/1.0M 01M5BEKG2HAK954QR23EVTRQA7:178c0641
+  ⏸ plan mode on (shift+tab to cycle)
