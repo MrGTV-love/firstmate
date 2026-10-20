@@ -351,68 +351,6 @@ test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report() {
   pass 'the wake carries the count, the oldest five live copies and a pointer to the report, as one line'
 }
 
-test_an_unreadable_clone_keeps_the_record_so_recovery_does_not_wake_again() {
-  make_budget_world unread-record 4 4 4
-  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
-  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  run_sweep check
-  assert_contains "$OUT" "container $SLOT is over its budget: 12.00 GiB against 5 GiB" 'the first run did not wake on the budget'
-  assert_contains "$OUT" 'nested copies=3, oldest 3:' 'the first run did not name the live copies'
-  FAKE_GIT_FAIL_LIST=1 run_sweep check
-  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "a run that could not read the clone woke: $OUT"
-  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "container:$SLOT" 'an unreadable clone dropped the standing budget from the record'
-  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path c1)" 'an unreadable clone dropped a live copy from the record'
-  run_sweep check
-  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "recovery from an unreadable clone woke again for an unchanged world: $OUT"
-  pass 'a clone that cannot be read keeps the recorded budgets and live copies, so recovery stays quiet'
-}
-
-test_a_persistently_unavailable_home_does_not_freeze_the_record() {
-  make_budget_world ghost-home 4 4 4
-  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
-  printf -- '- ghost - ghost (home: %s; scope: fixture; projects: P; added 2026-10-08)\n' "$W/missing-home" > "$HOMED/data/secondmates.md"
-  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  run_sweep
-  assert_contains "$OUT" 'a local home was not read' 'the fixture did not leave a local home unread'
-  run_sweep check
-  assert_contains "$OUT" "container $SLOT is over its budget: 12.00 GiB against 5 GiB" 'the first overrun did not wake'
-  assert_contains "$OUT" 'nested copies=3, oldest 3:' 'the first run did not name the live copies'
-  set_sizes 1 1 1
-  run_sweep check
-  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "dropping under the budget woke: $OUT"
-  assert_no_grep "over" "$HOMED/state/copy-sweep.record" 'an unavailable home kept a budget that a full read of its container proved back under'
-  git -C "$SLOT" worktree remove --force "$(copy_path c3)"
-  run_sweep check
-  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "removing a live copy woke: $OUT"
-  assert_no_grep "$(copy_path c3)" "$HOMED/state/copy-sweep.record" 'an unavailable home kept a live copy that a full read of its clone proved gone'
-  git -C "$SLOT" worktree add -q -b fm/c3-again "$(copy_path c3)"
-  run_sweep check
-  assert_contains "$OUT" 'nested copies=3, oldest 3:' 'a live copy recreated at a removed path did not wake again'
-  set_sizes 2 2 2
-  run_sweep check
-  assert_contains "$OUT" "container $SLOT is over its budget: 6.00 GiB against 5 GiB" 'going over again beside an unavailable home did not wake again'
-  pass 'a local home that stays unavailable holds nothing it cannot account for: a budget that drops under and goes over wakes again, and a recreated live copy wakes again'
-}
-
-test_an_unparseable_pool_state_keeps_only_the_record_under_that_pool() {
-  make_budget_world unparsed-pool 4 4 4
-  fm_write_meta "$HOMED/state/outer-task.meta" "worktree=$SLOT" "kind=ship"
-  printf 'pool pool1 5\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  run_sweep check
-  assert_contains "$OUT" "pool $TH/pool1 is over its budget: 12.00 GiB against 5 GiB" 'the first overrun did not wake the pool'
-  cp "$TH/pool1/treehouse-state.json" "$W/state-good.json"
-  printf 'not json\n' > "$TH/pool1/treehouse-state.json"
-  run_sweep check
-  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "a run that could not read the pool woke: $OUT"
-  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "pool:$TH/pool1" 'an unreadable pool dropped its standing budget from the record'
-  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "container:$SLOT" 'an unreadable pool dropped a standing container budget under it'
-  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "$(copy_path c1)" 'an unreadable pool dropped a live copy under it'
-  cp "$W/state-good.json" "$TH/pool1/treehouse-state.json"
-  run_sweep check
-  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "recovery from an unreadable pool woke again for an unchanged world: $OUT"
-  pass 'a pool whose state cannot be parsed keeps the recorded budgets and live copies under it, so recovery stays quiet'
-}
-
 test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact() {
   local proj copy
   make_world closed-nested
@@ -1285,9 +1223,6 @@ run_case test_live_nested_copies_are_named_once_with_age_and_left_untouched
 run_case test_a_lock_probe_cut_by_the_time_bound_reads_unknown_never_directory
 run_case test_a_registered_copy_whose_directory_is_gone_is_not_named_live
 run_case test_the_wake_names_the_oldest_five_live_copies_and_points_at_the_report
-run_case test_an_unreadable_clone_keeps_the_record_so_recovery_does_not_wake_again
-run_case test_a_persistently_unavailable_home_does_not_freeze_the_record
-run_case test_an_unparseable_pool_state_keeps_only_the_record_under_that_pool
 run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy

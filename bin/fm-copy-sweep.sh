@@ -116,11 +116,7 @@
 # The live-copy fact wakes once per change of the named set, not once per poll;
 # state/copy-sweep.record keeps that set beside the budget memory, so an
 # unchanged set stays silent in `check` and `--apply` while every report still
-# prints it. A cut scan keeps every recorded path and budget, because it cannot
-# prove any gone or back under. A scan that could not read a pool or a clone keeps
-# only the recorded paths and budgets that lie in it, and one that could not read a
-# local home keeps those no enumerated clone accounts for; whatever a scan did
-# read clears, so a budget that drops under and goes over again wakes again.
+# prints it. A cut scan keeps a recorded path because it cannot prove it gone.
 #
 # `arm` writes state/copy-sweep.check.sh and binds its bytes with
 # fm-check-register.sh, so the existing watcher runs `check` on its normal
@@ -346,28 +342,8 @@ NOTES=
 SCAN_MODE=
 ROWS=
 
-# Sources the scan could not read. A recorded budget or live copy under one stays
-# recorded, because nothing this run saw can prove it gone. A source with no known
-# root, such as a local home, also holds every recorded entry that no clone this
-# run enumerated accounts for. Everything a scan did read clears normally.
-UNREAD_ROOTS=
-UNREAD_ANY=0
-note_unread() {  # <root, or empty when unknown> <note>
-  UNREAD_ANY=1
-  [ -z "$1" ] || UNREAD_ROOTS="$UNREAD_ROOTS$1"$'\n'
-  NOTES="$NOTES$2"$'\n'
-}
-
-# True when a recorded entry at <path> may lie in a source this run did not read.
-unread_covers() {  # <path>
-  local root
-  [ "$UNREAD_ANY" = 1 ] || return 1
-  while IFS= read -r root; do
-    [ -n "$root" ] || continue
-    ! fm_task_copy_paths_overlap "$1" "$root" || return 0
-  done <<< "$UNREAD_ROOTS"
-  ! printf '%s' "$CLONES" | awk -F '\t' -v p="$1" '
-    $1 == p || $2 == p || $3 == p || index(p, $3 "/") == 1 { found = 1 } END { exit !found }'
+add_note() {
+  NOTES="$NOTES$1"$'\n'
 }
 
 clone_seen() {  # <canonical-clone>
@@ -415,11 +391,9 @@ enumerate_clones() {
   local -a state_dirs
   CLONES=
   NOTES=
-  UNREAD_ROOTS=
-  UNREAD_ANY=0
   fm_local_firstmate_state_dirs "$STATE" tolerant
   for entry in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
-    note_unread "" "a local home was not read: $entry"
+    add_note "a local home was not read: $entry"
   done
   read_live_task_copies
   state_dirs=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
@@ -427,11 +401,11 @@ enumerate_clones() {
     [ -f "$state" ] && [ ! -L "$state" ] || continue
     pool_dir=$(fm_task_copy_canonical_dir "${state%/*}") || continue
     if ! command -v jq >/dev/null 2>&1; then
-      note_unread "$pool_dir" "pool $pool_dir was not read: jq is not installed"
+      add_note "pool $pool_dir was not read: jq is not installed"
       continue
     fi
     if ! entry=$(jq -r '.worktrees[]? | .path // empty' "$state" 2>/dev/null); then
-      note_unread "$pool_dir" "pool $pool_dir was not read: its Treehouse state cannot be parsed"
+      add_note "pool $pool_dir was not read: its Treehouse state cannot be parsed"
       continue
     fi
     while IFS= read -r path; do
@@ -803,7 +777,7 @@ record_live_nested_copy() {  # <copy> <clone>
 scan_clone() {  # <pool> <container> <clone>
   local pool=$1 container=$2 clone=$3 copy nested
   if ! nested=$(list_nested "$clone"); then
-    note_unread "$clone" "clone $clone was not read: its registered worktrees cannot be listed"
+    add_note "clone $clone was not read: its registered worktrees cannot be listed"
     return 0
   fi
   # A dedicated descriptor keeps every command inside the loop off its input.
@@ -1005,19 +979,15 @@ evaluate_skip() {  # <now>
 }
 
 # One wake per change of the live copy set, never one per poll. A copy stays
-# named in the report while it exists, and its record entry survives a cut scan
-# and a source the scan could not read, which cannot prove it gone.
+# named in the report while it exists, and its record entry survives a cut scan,
+# which cannot prove it gone.
 evaluate_live_fact() {
-  local path kept=
+  local path
   LIVE_NESTED_FACT_NEW=0
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    if [ "$SCAN_CUT" = 1 ] || unread_covers "$path"; then
-      kept="$kept$path"$'\n'
-    fi
-  done <<< "$REC_LIVE"
-  LIVE_RECORD_NEW=$(printf '%s\n%s\n' "$(printf '%s' "$LIVE_NESTED_ROWS" | awk -F '\t' 'NF { print $2 }')" "$kept" \
-    | sed '/^$/d' | LC_ALL=C sort -u)
+  LIVE_RECORD_NEW=$(printf '%s' "$LIVE_NESTED_ROWS" | awk -F '\t' 'NF { print $2 }' | LC_ALL=C sort -u)
+  if [ "$SCAN_CUT" = 1 ] && [ -n "$REC_LIVE" ]; then
+    LIVE_RECORD_NEW=$(printf '%s\n%s\n' "$REC_LIVE" "$LIVE_RECORD_NEW" | sed '/^$/d' | LC_ALL=C sort -u)
+  fi
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     printf '%s' "$REC_LIVE" | grep -qxF "$path" && continue
@@ -1072,10 +1042,9 @@ write_atomic() {  # <destination> <content>
 }
 
 # Publishes the record: the budgets over now, plus the recorded ones this run
-# could not prove back under. A budget with an unmeasured copy is one, on a cut
-# run every recorded budget is, because a cut scan sees only part of any of them,
-# and so is one that lies in a source the run could not read. A run that read a
-# budget's whole source clears it.
+# could not prove back under. A budget with an unmeasured copy is one, and on a
+# cut run every recorded budget is, because a cut scan sees only part of any of
+# them. Only a complete run clears a standing budget.
 write_record() {  # <last-scan> <error>
   local key content
   content="$RECORD_SCHEMA_LINE"$'\n'
@@ -1087,7 +1056,7 @@ write_record() {  # <last-scan> <error>
   while IFS= read -r key; do
     case "$key" in pool:*|container:*) ;; *) continue ;; esac
     printf '%s' "$OVER_NOW" | grep -qxF "$key" && continue
-    if [ "$SCAN_CUT" = 1 ] || printf '%s' "$UNKNOWN_NOW" | grep -qxF "$key" || unread_covers "${key#*:}"; then
+    if [ "$SCAN_CUT" = 1 ] || printf '%s' "$UNKNOWN_NOW" | grep -qxF "$key"; then
       content="$content"$'over\t'"$key"$'\n'
     fi
   done <<< "$REC_OVER"
