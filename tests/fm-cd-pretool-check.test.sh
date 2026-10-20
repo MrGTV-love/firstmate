@@ -149,6 +149,16 @@ matrix_case A37 allow 'cd "projects/foo'
 MATRIX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-cd-policy-matrix.XXXXXX")
 FM_TEST_CLEANUP_DIRS+=("$MATRIX_TMP")
 
+# Golden wire output captured from the original deny renderers before the warn
+# change. Compare files so whitespace, escaping, and the final newline are part
+# of the compatibility contract, not just the parsed JSON values.
+cat > "$MATRIX_TMP/deny-claude.golden" <<'EOF'
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+EOF
+cat > "$MATRIX_TMP/deny-cursor.golden" <<'EOF'
+{"permission":"deny","user_message":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+EOF
+
 run_matrix_entry() {
   local id=$1 expected=$2 entry=$3 cmd=$4 mode=$5 payload out_file err_file rc
   out_file="$MATRIX_TMP/$id-$entry-$mode.out"
@@ -199,17 +209,11 @@ run_matrix_entry() {
   if [ "$mode" = deny ]; then
     if [ "$entry" = cursor ]; then
       [ ! -s "$err_file" ] || fail "$id via cursor must leave stderr empty"
-      jq -e '
-        .permission == "deny" and
-        (.user_message | contains("[persistent-cd]") and contains("git -C") and contains("is blocked")) and
-        (keys == ["permission", "user_message"])
-      ' "$out_file" >/dev/null 2>&1 || fail "$id via cursor lacks its deny correction object"
+      cmp -s "$MATRIX_TMP/deny-cursor.golden" "$out_file" \
+        || fail "$id via cursor deny output differs from the original captured bytes"
     else
-      jq -e '
-        .hookSpecificOutput == {hookEventName:"PreToolUse",permissionDecision:"deny"} and
-        (.systemMessage | contains("[persistent-cd]") and contains("git -C") and contains("is blocked")) and
-        (keys == ["hookSpecificOutput", "systemMessage"])
-      ' "$err_file" >/dev/null 2>&1 || fail "$id via $entry lacks its deny correction object"
+      cmp -s "$MATRIX_TMP/deny-claude.golden" "$err_file" \
+        || fail "$id via $entry deny output differs from the original captured bytes"
       if [ "$entry" = claude ]; then
         [ ! -s "$out_file" ] || fail "$id via claude deny must leave stdout empty"
       else
