@@ -212,12 +212,13 @@
 # each such process running in the copy, waits a bounded time, and sends no KILL,
 # and one still alive refuses the release, named by its pid, while a process
 # that is not teardown's own is never signalled and refuses at once, named by its
-# pid; it is a clean worktree root, and each ignored file it holds is
-# regenerable machinery (a copy holding any other ignored file is held, below,
-# never released; the task's own locked copy instead has such files copied with
-# their SHA-256 into the task's data directory before removal); and its work is
-# landed by the existing landed-work rule. A copy whose work is not proved landed stays, with the reason written,
-# and refuses the close unless the held-copy rule below applies.
+# pid; it is a clean worktree root, and each ignored file it holds is either
+# regenerable machinery or copied with its SHA-256 into the task's data
+# directory before removal (a foreign copy that holds any other ignored file is
+# held instead, below, wherever the held-copy rule applies); and its work is
+# landed by the existing landed-work rule. A copy whose work is not proved
+# landed stays, with the reason written, and refuses the close unless the
+# held-copy rule below applies.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
