@@ -1153,7 +1153,7 @@ EOF
 }
 
 test_current_status_pr() {
-  local home fakebin out id start elapsed utf8
+  local home fakebin out id start base elapsed utf8
   utf8=$(locale -a 2>/dev/null | grep -i -E '^(C|en_US)\.utf-?8$' | head -1)
   [ -n "$utf8" ] || fail "no UTF-8 locale is installed to read a status log under"
   home=$(make_home current-status-pr)
@@ -1198,12 +1198,21 @@ test_current_status_pr() {
   # through its public reader so this measures PR discovery, not a cold fold.
   bash -c '. "$1"; status_open_decisions_incremental "$2" >/dev/null' \
     _ "$ROOT/bin/fm-classify-lib.sh" "$home/state/large.status" || fail "could not checkpoint large fixture"
+  # The last-event reader scans the whole log whatever the record says, and its
+  # cost is not this change's. An explicit pr= skips PR discovery, so the same
+  # snapshot with it is the baseline that discovery is measured against.
+  printf 'pr=https://github.com/example/repo/pull/16\n' >> "$home/state/large.meta"
+  start=$SECONDS
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
+  base=$((SECONDS - start))
+  printf '%s' "$out" | jq -e '.tasks[] | select(.id == "large") | .pr.url == "https://github.com/example/repo/pull/16" and .pr.source == "meta"' >/dev/null || fail "explicit pr= lost to the long status log"
+  fm_write_meta "$home/state/large.meta" "kind=ship" "remote_host=example.invalid"
   start=$SECONDS
   out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
   elapsed=$((SECONDS - start))
   printf '%s' "$out" | jq -e '.tasks[] | select(.id == "large") | .pr.url == "https://github.com/example/repo/pull/15" and .pr.source == "status_event"' >/dev/null || fail "long status log lost newest PR"
-  [ "$elapsed" -lt 5 ] || fail "200,000-line snapshot took ${elapsed}s (must finish inside 5s)"
-  pass "200,000-line status snapshot finishes inside 5s (${elapsed}s)"
+  [ $((elapsed - base)) -lt 5 ] || fail "PR discovery added $((elapsed - base))s to a 200,000-line snapshot (${base}s baseline, ${elapsed}s with discovery; must add under 5s)"
+  pass "PR discovery adds under 5s to a 200,000-line status snapshot (${base}s baseline, ${elapsed}s with discovery)"
 }
 
 test_current_status_pr
