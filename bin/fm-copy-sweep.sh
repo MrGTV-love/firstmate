@@ -113,10 +113,10 @@
 # memory; --apply raises the wake itself through the wake queue, `check` prints
 # the line and the watcher turns it into the same `check:` wake.
 #
-# The live-copy fact wakes once per change of the named set, not once per poll;
-# state/copy-sweep.record keeps that set beside the budget memory, so an
-# unchanged set stays silent in `check` and `--apply` while every report still
-# prints it. A cut scan keeps a recorded path because it cannot prove it gone.
+# The live-copy fact wakes once when a copy joins the named set, not once per poll,
+# and a copy leaving it is silent. state/copy-sweep.record keeps that set beside
+# the budget memory, so an unchanged set stays silent in `check` and `--apply`
+# while every report still prints it. A cut scan keeps a recorded path because it cannot prove it gone.
 #
 # `arm` writes state/copy-sweep.check.sh and binds its bytes with
 # fm-check-register.sh, so the existing watcher runs `check` on its normal
@@ -978,7 +978,7 @@ evaluate_skip() {  # <now>
   WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$SKIP_LINE on $SKIP_RUNS_NOW runs in a row"
 }
 
-# One wake per change of the live copy set, never one per poll. A copy stays
+# One wake when a copy joins the live copy set, never one per poll. A copy stays
 # named in the report while it exists, and its record entry survives a cut scan,
 # which cannot prove it gone.
 evaluate_live_fact() {

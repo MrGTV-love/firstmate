@@ -363,8 +363,11 @@ test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact() {
   run_sweep check
   assert_contains "$OUT" "$copy (task=owner age=" 'live home-project copy was not named'
   rm "$HOMED/state/owner.meta"
-  printf 'done: task closed\n' > "$HOMED/state/owner.status"
-  fm_write_meta "$HOMED/state/mate.meta" "home=$HOMED" 'kind=secondmate'
+  run_sweep
+  assert_not_contains "$OUT" 'HELD-LIVE-TASK nested copies=' 'a closed owner still named a live copy'
+  fm_write_meta "$HOMED/state/mate.meta" "worktree=$proj" "home=$HOMED" 'kind=secondmate'
+  run_sweep
+  assert_not_contains "$OUT" 'HELD-LIVE-TASK nested copies=' 'a secondmate record naming the project was taken for a live task'
   run_sweep check
   [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "closed owner or secondmate home raised a live fact: $OUT"
   [ -d "$copy" ] || fail 'closed copy was removed by the live check'
