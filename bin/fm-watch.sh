@@ -2558,15 +2558,20 @@ event_wait_or_sleep() {
 # Ready-PR registration belongs with housekeeping repairs, not the backed-off
 # heartbeat: a missed supervisor command must not keep capacity occupied. The
 # helper owns the scan and refusal memory; detach forge reads like the existing
-# repair sweeps so a slow forge cannot stall supervision.
+# repair sweeps so a slow forge cannot stall supervision. The pass runs under a
+# hard limit (fm-timeout-lib.sh) and, like the other detached sweeps, outlives a
+# watcher that exits on a wake; a hung forge call dies with its pass, the
+# single-flight guards clear, and the next tick registers the ready ships.
 PR_READY_RECONCILE_PID=
+PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
+case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
 pr_ready_reconcile_tick() {
   if [ -n "$PR_READY_RECONCILE_PID" ]; then
     kill -0 "$PR_READY_RECONCILE_PID" 2>/dev/null && return 0
     wait "$PR_READY_RECONCILE_PID" 2>/dev/null || true
   fi
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" </dev/null >&2 &
+  ( fm_run_timed "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" ) </dev/null >&2 &
   PR_READY_RECONCILE_PID=$!
 }
 
