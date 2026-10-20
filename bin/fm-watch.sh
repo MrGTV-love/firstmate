@@ -2555,6 +2555,21 @@ event_wait_or_sleep() {
   esac
 }
 
+# Ready-PR registration belongs with housekeeping repairs, not the backed-off
+# heartbeat: a missed supervisor command must not keep capacity occupied. The
+# helper owns the bounded rotating scan and refusal memory; detach forge reads
+# like the existing repair sweeps so a slow forge cannot stall supervision.
+PR_READY_RECONCILE_PID=
+pr_ready_reconcile_tick() {
+  if [ -n "$PR_READY_RECONCILE_PID" ]; then
+    kill -0 "$PR_READY_RECONCILE_PID" 2>/dev/null && return 0
+    wait "$PR_READY_RECONCILE_PID" 2>/dev/null || true
+  fi
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" </dev/null >&2 &
+  PR_READY_RECONCILE_PID=$!
+}
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -3578,6 +3593,9 @@ while :; do
   fi
 
   watcher_beat force
+  # Start the bounded repair before a ready-status notification can exit this
+  # cycle; it must not require the supervisor to re-arm us before registering.
+  pr_ready_reconcile_tick
 
   [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
   watcher_beat
