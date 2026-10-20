@@ -1360,6 +1360,36 @@ SH
   pass "worktree whose content already landed in the default branch is torn down (content fallback)"
 }
 
+# bin/fm-pr-ready-reconcile.sh keeps one refusal marker per task; teardown must
+# retire the torn-down task's marker and leave every other task's untouched.
+test_teardown_removes_pr_ready_refusal_marker() {
+  local case_dir rc cache
+  case_dir=$(make_case pr-ready-refusal)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  land_on_origin_main "$case_dir" feature.txt hello
+  cat > "$case_dir/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  cache="$case_dir/state/.pr-ready-reconcile"
+  mkdir -p "$cache"
+  printf 'registration refused\n' > "$cache/task-x1.refused"
+  printf 'registration refused\n' > "$cache/task-other.refused"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "pr-ready-refusal: teardown should succeed"
+  assert_absent "$case_dir/state/task-x1.meta" "pr-ready-refusal: teardown left task metadata"
+  assert_absent "$cache/task-x1.refused" "pr-ready-refusal: teardown left the task's refusal marker"
+  assert_present "$cache/task-other.refused" "pr-ready-refusal: teardown removed another task's refusal marker"
+  pass "teardown removes the task's PR-ready refusal marker and no other task's"
+}
+
 # A task recording base_branch= landed when its content reached that branch, not
 # the default branch: a squash merge into the base branch is the landing.
 test_content_fallback_uses_recorded_base_branch() {
@@ -2626,6 +2656,7 @@ test_pipeline_input_refuses_when_the_run_table_lacks_the_input_column
 test_pr_check_does_not_refresh_stale_pr_head
 test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows
+test_teardown_removes_pr_ready_refusal_marker
 test_content_fallback_uses_recorded_base_branch
 test_content_fallback_refreshes_stale_origin_ref
 test_dirty_worktree_refuses
