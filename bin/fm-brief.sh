@@ -683,7 +683,7 @@ IFS= read -r -d '' SHARED_INFRA_RULE <<'EOF' || true
      get/return/remove/prune, the equivalent operations on any other worktree provider or runtime
      backend, and `git worktree add|remove|move|prune`. A slot that looks unused is not evidence
      that it is free, and returning your own worktree is firstmate's job at cleanup, not yours.
-   The task copy is the isolation: do not create a second worktree inside it.
+   The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.
    If you genuinely need a second checkout, another slot, or the daemon touched, append
    `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
 EOF

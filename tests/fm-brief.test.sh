@@ -1530,7 +1530,7 @@ test_worker_role_scope
 # one shared string so the ship and scout copies cannot drift apart.
 test_crewmate_scaffolds_forbid_pool_administration() {
   local home id brief mode ship_rule scout_rule
-  local isolation_rule='The task copy is the isolation: do not create a second worktree inside it.'
+  local isolation_rule='The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.'
   home="$TMP_ROOT/pool-admin-home"
   mkdir -p "$home/data"
 
