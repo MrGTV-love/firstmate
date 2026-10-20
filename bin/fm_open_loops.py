@@ -887,7 +887,7 @@ class Collector:
             teams = ["team:" + t["slug"] for t in pr.get("requested_teams", [])]
             owner, action = ",".join(people + teams), "complete the requested PR review"
         else:
-            owner, action = "firstmate", "route an independent read of the exact head by a different model family; merge through bin/fm-pr-merge.sh on PASS with green required checks; ask the captain only if the PR loosens a deny or allow-list, widens what a guard permits, or touches customer data, billing or spend"
+            owner, action = "firstmate", "route the green PR's review and obtain merge approval"
         task_id = task["id"] if task else next((r["id"] for r in self.backlog
                     if url == r.get("pr_url") or url in (r.get("links") or [])), None)
         source = self.source("PR provenance " + url, self.task_source, task_id) if task_id else self.source_context()

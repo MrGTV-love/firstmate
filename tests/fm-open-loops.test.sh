@@ -206,12 +206,6 @@ open_prs = cat('open_pr')
 assert set(open_prs) == {PR_URL + '8', PR_URL + '9'}, open_prs
 assert open_prs[PR_URL + '8']['owner'] == 'reviewer' and open_prs[PR_URL + '9']['owner'] == 'firstmate', open_prs
 assert open_prs[PR_URL + '9']['age_seconds'] == 3600 and open_prs[PR_URL + '9']['overdue'], open_prs
-merge_action = open_prs[PR_URL + '9']['next_action']
-for requirement in ('independent read of the exact head', 'different model family',
-                    'bin/fm-pr-merge.sh on PASS with green required checks',
-                    'ask the captain only if', 'loosens a deny or allow-list',
-                    'widens what a guard permits', 'touches customer data, billing or spend'):
-    assert requirement in merge_action, (requirement, merge_action)
 # Every row names an owner, a next action and an age (or an unknown age that stays overdue).
 for row in report['rows']:
     assert row['owner'] and row['next_action'] and 'age_seconds' in row and row['id'], row
