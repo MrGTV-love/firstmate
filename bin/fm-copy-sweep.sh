@@ -116,11 +116,12 @@
 # library's of its own staging directory under data/), never a hand unlock, never
 # a Treehouse call. A removal that fails after its plan was allowed, or that git
 # refuses, leaves the copy and is reported with the refusal text, and the run
-# exits 1; it is not retried in that run. The sweep prints that refusal itself:
-# a preservation that fails, a lock that is no longer Vernant's, or a driver that
-# refuses is one line ending in the driver's own words or a human-only question,
-# never a completing command, because the release id is no teardown task id and
-# bin/fm-teardown.sh would reject a command built from it. Each REMOVED line reports "copy X GiB,
+# exits 1; it is not retried in that run. The sweep prints that refusal itself,
+# as one REFUSED line: a preservation that fails ends in a human-only question, a
+# lock that is no longer Vernant's says the next run proves the copy again, and a
+# driver that refuses ends in the driver's own words. None names a completing
+# command, because the release id is no teardown task id and bin/fm-teardown.sh
+# would reject a command built from it. Each REMOVED line reports "copy X GiB,
 # preserved Y GiB, net freed Z GiB" (the copy's size less the bytes it preserved;
 # a size that was not measured shows "-" and "unmeasured"), and the run ends with
 # one line "freed X GiB measured, N copies unmeasured". Each removal appends one
