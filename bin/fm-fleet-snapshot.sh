@@ -62,9 +62,9 @@
 #     fm-status-record-lib.sh owns the optional emission-time field, and only the
 #     age derived from it is published here. A future event time leaves that age
 #     unknown rather than clamped to zero.
-#     pr prefers metadata unchanged; absent metadata, the latest ready/done/green
-#     status event carrying a pull URL wins over incidental mentions. With no
-#     such event, the last pull URL anywhere in the log is the fallback.
+#     pr prefers metadata unchanged; absent metadata, use the first pull URL
+#     on the last log line carrying one, regardless of event verb. Status lines
+#     name the current PR first by convention; incidental mentions can win.
 #     hints.open_decisions is the keyed open-decision set returned by
 #     fm-status-decision-lib.sh's authoritative status_open_decisions fold and reconciled
 #     against current_state; hints.pending_decision and hints.blocked_event are
@@ -446,49 +446,16 @@ status_event_json() {  # <observed-status-log> [<contract-path>]
     '{path:$path,present:$present,kind:"event_history",last_event:{state:$verb,note:$note,raw:$raw,age_seconds:$age}}'
 }
 
-# Stream URL-bearing lines only; reuse the status parser for stamped/correlated
-# verbs. A ready event outranks later incidental mentions, including pr= tokens
-# in its note. Preserve the last URL as the fallback when no ready event has one.
-current_pr_url_scan_to() {  # <out-var> <ready-found-var>; lines on stdin
-  local line rest candidate latest='' ready='' parsed_verb unstamped
-  local pattern='https?://[^[:space:])"]+/pull/[0-9]+'
-  while IFS= read -r line || [ -n "$line" ]; do
-    rest=$line
-    candidate=''
-    while [[ $rest =~ $pattern ]]; do
-      candidate=${BASH_REMATCH[0]}
-      rest=${rest#*"$candidate"}
-    done
-    [ -n "$candidate" ] || continue
-    latest=$candidate
-    status_line_verb "$line" parsed_verb
-    case "$parsed_verb" in
-      done|ready|green) ready=$candidate ;;
-      *)
-        # As in the shared legacy-event reader, readiness tokens count only
-        # outside recognized progress/failure verbs and match without case bias.
-        if ! _fm_status_verb_recognized "$parsed_verb"; then
-          _fm_status_unstamped "$line" unstamped
-          if _fm_classify_matches "$unstamped" '^[[:space:]]*(PR ready|checks green)([[:space:]:]|$)'; then
-            ready=$candidate
-          fi
-        fi
-        ;;
-    esac
-  done
-  printf -v "$1" '%s' "${ready:-$latest}"
-  printf -v "$2" '%s' "$ready"
-}
-
-# Keep assignments in the caller's shell. Normally the existing event window
-# contains a ready PR; otherwise stream the full file through grep, never storing
-# the log in memory or making bash parse every line of a runaway log.
+# Stream matching lines through a one-line tail, retaining bounded log memory.
+# Assign in the caller's shell; status lines name the current PR first by
+# convention, regardless of the event verb.
 current_pr_url_in_file_to() {  # <file> <out-var>
-  local selected='' ready_url=''
+  local line selected=''
+  local pattern='https?://[^[:space:])"]+/pull/[0-9]+'
   if [ -f "$1" ]; then
-    current_pr_url_scan_to selected ready_url < <(tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES" "$1" 2>/dev/null)
-    if [ -z "$ready_url" ]; then
-      current_pr_url_scan_to selected ready_url < <(grep -E '/pull/[0-9]+' "$1" 2>/dev/null)
+    IFS= read -r line < <(grep -E "$pattern" "$1" 2>/dev/null | tail -n 1) || :
+    if [[ $line =~ $pattern ]]; then
+      selected=${BASH_REMATCH[0]}
     fi
   fi
   printf -v "$2" '%s' "$selected"
