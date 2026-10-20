@@ -348,39 +348,63 @@ _status_reported_identity_into() {  # <signature> <identity-out> <other-fields-o
   printf -v "$3" '%s' "$__fm_ri_other"
 }
 
-# Explicit migration, separate from the pure marker readers below. Adopt only
-# a device-only change with the same strong inode+birth identity and all five
-# other observed fields unchanged. Never advance a classified offset or turn a
-# reported-but-unclassified state into a classified one. Revalidate the file
+# A strong identity (device:inode:birth) that differs from another only in its
+# device number. A weak identity, which lacks a birth time, never qualifies.
+_fm_status_ident_device_shifted() {  # <recorded-identity> <current-identity>
+  case "$1" in strong:*:*:?*) ;; *) return 1 ;; esac
+  case "$2" in strong:*:*:?*) ;; *) return 1 ;; esac
+  fm_file_identity_device_shifted "${1#strong:}" "${2#strong:}"
+}
+
+# Explicit migration, separate from the pure marker readers below. The marker's
+# classified position migrates whenever its strong inode+birth are unchanged and
+# its offset is within the file: the offset is kept, so a log that grew past it
+# reads only the new bytes. The reported signature migrates only when every
+# other observed field is also unchanged; a grown or otherwise changed log keeps
+# its old signature and signals once. Never advance a classified offset or turn
+# a reported-but-unclassified state into a classified one. Revalidate the file
 # and marker immediately before atomic publication; failure leaves detection
-# conservative. Both signal and heartbeat scans call this before using a marker.
+# conservative. A marker whose reported signature already equals the current one
+# is left alone. Every scan that reads a marker calls this first.
 status_presentation_marker_adopt_device() {  # <marker> <status-file> [current-signature]
-  local marker=$1 file=$2 current=${3-} raw old_ident new_ident old_other new_other classified offset fresh tmp
+  local marker=$1 file=$2 current=${3-} raw reported classified old_ident new_ident old_other new_other
+  local new_reported new_classified offset fresh fresh_ident='' fresh_size='' tmp
   [ -f "$marker" ] && [ -r "$marker" ] && [ ! -L "$marker" ] || return 1
   { IFS= read -r -d '' raw || :; } 2>/dev/null < "$marker" || return 1
   while [ "${raw%$'\n'}" != "$raw" ]; do raw=${raw%$'\n'}; done
   status_presentation_marker_parse "$raw" || return 1
-  [ -n "$current" ] || current=$(status_observed_signature "$file") || return 1
-  [ "$STATUS_PRESENTATION_REPORTED" != "$current" ] || return 0
+  reported=$STATUS_PRESENTATION_REPORTED
   classified=$STATUS_PRESENTATION_CLASSIFIED
-  _status_reported_identity_into "$STATUS_PRESENTATION_REPORTED" old_ident old_other || return 1
+  [ -n "$current" ] || current=$(status_observed_signature "$file") || return 1
+  [ "$reported" != "$current" ] || return 0
   _status_reported_identity_into "$current" new_ident new_other || return 1
-  [ "$old_other" = "$new_other" ] || return 1
-  case "$old_ident" in strong:*:*:?*) ;; *) return 1 ;; esac
-  case "$new_ident" in strong:*:*:?*) ;; *) return 1 ;; esac
-  fm_file_identity_device_shifted "${old_ident#strong:}" "${new_ident#strong:}" || return 1
-  if [ "$classified" != - ]; then
-    [ "${classified#*@}" = "$old_ident" ] || return 1
-    offset=${classified%%@*}
-    fresh=$(_fm_status_file_size "$file") || return 1
-    [ "$offset" -le "$fresh" ] || return 1
-    classified="${offset}@${new_ident}"
+  new_reported=$reported
+  new_classified=$classified
+  if _status_reported_identity_into "$reported" old_ident old_other \
+    && [ "$old_other" = "$new_other" ] \
+    && _fm_status_ident_device_shifted "$old_ident" "$new_ident"; then
+    new_reported=$current
   fi
-  fresh=$(status_observed_signature "$file") || return 1
-  [ "$fresh" = "$current" ] || return 1
+  if [ "$classified" != - ]; then
+    offset=${classified%%@*}
+    if _fm_status_ident_device_shifted "${classified#*@}" "$new_ident"; then
+      new_classified="${offset}@${new_ident}"
+    fi
+  fi
+  [ "$new_reported" != "$reported" ] || [ "$new_classified" != "$classified" ] || return 0
+  if [ "$new_reported" != "$reported" ]; then
+    fresh=$(status_observed_signature "$file") && [ "$fresh" = "$current" ] || new_reported=$reported
+  fi
+  if [ "$new_classified" != "$classified" ]; then
+    _fm_open_decisions_file_ident "$file" fresh_ident fresh_size || fresh_ident=
+    fresh_size=${fresh_size//[[:space:]]/}
+    case "$fresh_size" in ''|*[!0-9]*) fresh_size=-1 ;; esac
+    { [ "$fresh_ident" = "$new_ident" ] && [ "$offset" -le "$fresh_size" ]; } || new_classified=$classified
+  fi
+  [ "$new_reported" != "$reported" ] || [ "$new_classified" != "$classified" ] || return 1
   [ "$(cat "$marker" 2>/dev/null)" = "$raw" ] || return 1
   tmp=$(mktemp "$marker.device.XXXXXX") || return 1
-  if ! printf 'v2\t%s\t%s' "$current" "$classified" > "$tmp" \
+  if ! printf 'v2\t%s\t%s' "$new_reported" "$new_classified" > "$tmp" \
     || ! mv -f "$tmp" "$marker"; then
     rm -f "$tmp"
     return 1

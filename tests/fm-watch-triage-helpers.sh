@@ -8014,6 +8014,77 @@ test_status_identity_replacement_still_signals() (
   pass "changed inode, birth, device plus inode, weak identity, growth, and mode still signal once"
 )
 
+# The marker lags the log: classified through byte 1000 on the old device, while
+# the log is now 1100 bytes on the new one. Only the 100 appended bytes may be
+# classified; the historical done line before byte 1000 must not wake again.
+test_status_device_shift_lagging_log_reads_only_new_bytes() (
+  local dir state out pid prefix padding
+  dir=$(watch_identity_fixture device-shift-lag); state="$dir/state"; out="$dir/watch.out"
+  cat > "$dir/span-reader" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$2" >> "$FM_STATE_OVERRIDE/.test-span-starts"
+exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; read($f, my $b, $ARGV[2]) == $ARGV[2] or exit 1; print $b or exit 1' "$@"
+SH
+  chmod +x "$dir/span-reader"
+  local FM_STATUS_IDENTITY_READER="$dir/identity-reader" FM_STATUS_SPAN_READER="$dir/span-reader"
+  export FM_STATUS_IDENTITY_READER FM_STATUS_SPAN_READER
+  prefix='done: already delivered '
+  printf -v padding '%0*d' $((999 - ${#prefix})) 0
+  printf '%s%s\n' "$prefix" "$padding" > "$state/task.status"
+  [ "$(size_of "$state/task.status")" = 1000 ] || fail "the primed log is not 1000 bytes"
+  prime_watch_identity "$state" task 'strong:16777232:123:2026-10-09 12:34:56'
+  printf '%s\n' 'strong:16777233:123:2026-10-09 12:34:56' > "$state/task.identity"
+  prefix='done: appended across reboot '
+  printf -v padding '%0*d' $((99 - ${#prefix})) 0
+  printf '%s%s\n' "$prefix" "$padding" >> "$state/task.status"
+  [ "$(size_of "$state/task.status")" = 1100 ] || fail "the grown log is not 1100 bytes"
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  wait_for_exit "$pid" 150 || { reap "$pid"; fail "growth on a lagging log did not signal"; }
+  [ "$(awk -F '\t' '$3 == "signal" { n++ } END { print n+0 }' "$state/.wake-queue")" = 1 ] \
+    || fail "growth on a lagging log did not signal exactly once"
+  [ -s "$state/.test-span-starts" ] && [ "$(sort -u "$state/.test-span-starts")" = 1000 ] \
+    || fail "a lagging log was reclassified from before its classified offset: $(sort -u "$state/.test-span-starts" | tr '\n' ' ')"
+  [ "$(status_presentation_marker_offset "$state/.seen-task_status" "$state/task.status")" = 1100 ] \
+    || fail "the lagging log's classified endpoint was not committed on the new device"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the growth wake"
+  : > "$state/.test-span-starts"
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the acknowledged growth signalled again"; }
+  [ ! -s "$state/.wake-queue" ] && [ ! -s "$state/.test-span-starts" ] \
+    || { reap "$pid"; fail "the acknowledged growth was classified or queued again"; }
+  reap "$pid"
+  pass "a log that lags its marker across a device shift reads only its new bytes and signals once"
+)
+
+# This home's own appended bytes stay owned across a remount: the owned-append
+# ledger names the old device, and the unchanged inode and birth still prove it
+# is the same log.
+test_status_device_shift_keeps_owned_appends() (
+  local dir state out pid before after
+  dir=$(watch_identity_fixture device-shift-owned); state="$dir/state"; out="$dir/watch.out"
+  local FM_STATUS_IDENTITY_READER="$dir/identity-reader"
+  export FM_STATUS_IDENTITY_READER
+  printf 'done: already delivered\n' > "$state/task.status"
+  prime_watch_identity "$state" task 'strong:16777232:123:2026-10-09 12:34:56'
+  before=$(size_of "$state/task.status")
+  printf 'resolved [key=k1]: answered: closed by this home\n' >> "$state/task.status"
+  after=$(size_of "$state/task.status")
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"; . "$2"; status_home_appends_record "$3" "$4" "$5"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-status-wake-lib.sh" "$state/task.status" "$before" "$after" \
+    || fail "could not record the owned append"
+  printf '%s\n' 'strong:16777233:123:2026-10-09 12:34:56' > "$state/task.identity"
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "an owned append woke the watcher after a device shift"; }
+  [ ! -s "$state/.wake-queue" ] && [ ! -s "$out" ] \
+    || { reap "$pid"; fail "an owned append was queued after a device shift"; }
+  reap "$pid"
+  pass "owned appends recorded before a device shift stay owned and do not wake"
+)
+
 test_signal_rescan_deduplicates_pending() (
   local dir state out pid i expected actual
   dir=$(make_case pending-eight); state="$dir/state"; out="$dir/watch.out"
@@ -8101,6 +8172,8 @@ SH
 test_watch_device_shift_regressions() {
   test_status_device_shift_does_not_resignal
   test_status_identity_replacement_still_signals
+  test_status_device_shift_lagging_log_reads_only_new_bytes
+  test_status_device_shift_keeps_owned_appends
   test_signal_rescan_deduplicates_pending
   test_long_status_scan_keeps_beacon_fresh
 }
