@@ -1,0 +1,18 @@
+=== NEW code, checkpointed fold (as production drains do) ===
+elapsed=3s lines=  200002 checkpoint=yes
+{"id":"large","url":"https://github.com/example/repo/pull/15","source":"status_event"}
+=== OLD code, checkpointed fold ===
+elapsed=9s lines=  200002 checkpoint=yes
+{"id":"large","url":"https://github.com/example/repo/pull/14","source":"status_event"}
+=== NEW code, COLD (no checkpoint) ===
+elapsed=28s lines=  200002 checkpoint=no
+{"id":"large","url":"https://github.com/example/repo/pull/15","source":"status_event"}
+=== OLD code, COLD (no checkpoint), same 200k fixture ===
+elapsed=32s lines=  200002 checkpoint=no
+{"id":"large","url":"https://github.com/example/repo/pull/14","source":"status_event"}
+=== NEW code, checkpointed, repeat ===
+elapsed=3s lines=  200002 checkpoint=yes
+{"id":"large","url":"https://github.com/example/repo/pull/15","source":"status_event"}
+=== OLD code, checkpointed, repeat ===
+elapsed=3s lines=  200002 checkpoint=yes
+{"id":"large","url":"https://github.com/example/repo/pull/14","source":"status_event"}

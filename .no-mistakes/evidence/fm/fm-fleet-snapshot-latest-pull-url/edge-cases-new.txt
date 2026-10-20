@@ -1,0 +1,4 @@
+=== new code under /bin/bash ===
+jq: parse error: Invalid numeric literal at line 1, column 3
+=== new code under /bin/bash ===
+jq: parse error: Invalid numeric literal at line 1, column 3

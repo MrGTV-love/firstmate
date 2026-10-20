@@ -1,0 +1,27 @@
+=== OLD code (base 03bff4bce), withdrawn+replaced task ===
+exit=0
+{"schema":"fm-open-loops.v1","complete":false,"coverage_rows":[{"subject":"ledger degraded","evidence":"PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)"}]}
+forge requests:
+/repos/example/repo/pulls/1
+/repos/example/repo/pulls?state=open&per_page=100
+
+=== NEW code (change), withdrawn+replaced task ===
+exit=0
+{"schema":"fm-open-loops.v1","complete":true,"coverage_rows":[]}
+forge requests:
+/repos/example/repo/pulls/2
+/repos/example/repo/pulls?state=open&per_page=100
+
+=== OLD code, control (log names only pull/2) ===
+exit=0
+{"schema":"fm-open-loops.v1","complete":true,"coverage_rows":[]}
+forge requests:
+/repos/example/repo/pulls/2
+/repos/example/repo/pulls?state=open&per_page=100
+
+=== NEW code, control (log names only pull/2) ===
+exit=0
+{"schema":"fm-open-loops.v1","complete":true,"coverage_rows":[]}
+forge requests:
+/repos/example/repo/pulls/2
+/repos/example/repo/pulls?state=open&per_page=100

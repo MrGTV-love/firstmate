@@ -1,0 +1,16 @@
+=== new code under /bin/bash (3.2.57), UTF-8 locale ===
+{"id":"blank-tail","url":"https://github.com/example/repo/pull/110","source":"status_event"}
+{"id":"crlf","url":"https://github.com/example/repo/pull/61","source":"status_event"}
+{"id":"empty-file","url":null,"source":"absent"}
+{"id":"huge-line","url":"https://github.com/example/repo/pull/100","source":"status_event"}
+{"id":"quoted","url":"https://github.com/example/repo/pull/90","source":"status_event"}
+{"id":"tabbed","url":"https://github.com/example/repo/pull/80","source":"status_event"}
+chmod: /Users/charlesabrooker/tmp/fm-lab.JZV0UB/state/unreadable.status: No such file or directory
+=== OLD code, same fixtures, for comparison ===
+{"id":"blank-tail","url":"https://github.com/example/repo/pull/110","source":"status_event"}
+{"id":"crlf","url":"https://github.com/example/repo/pull/60","source":"status_event"}
+{"id":"empty-file","url":null,"source":"absent"}
+{"id":"huge-line","url":"https://github.com/example/repo/pull/100","source":"status_event"}
+{"id":"quoted","url":"https://github.com/example/repo/pull/90","source":"status_event"}
+{"id":"tabbed","url":"https://github.com/example/repo/pull/80","source":"status_event"}
+chmod: /Users/charlesabrooker/tmp/fm-lab.JZV0UB/state/unreadable.status: No such file or directory

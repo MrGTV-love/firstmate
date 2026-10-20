@@ -1,0 +1,29 @@
+=== OLD code (base), withdrawn+replaced task ===
+exit=0
+{"schema":"fm-open-loops.v1","complete":false,"coverage_rows":[{"subject":"ledger degraded","evidence":"PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)"}]}
+forge requests:
+/repos/example/repo/pulls/1
+/repos/example/repo/pulls?state=open&per_page=100
+heartbeat exit=0
+published state/open-loops.json complete=false overdue_rows=1
+--- present-overdue:
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "158ef329f7f3280d479090ac","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+check-actions exit=1 (1 means acknowledgement is refused: an overdue row has no recorded action)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "158ef329f7f3280d479090ac","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)",false
+
+=== NEW code (change), withdrawn+replaced task ===
+exit=0
+{"schema":"fm-open-loops.v1","complete":true,"coverage_rows":[]}
+forge requests:
+/repos/example/repo/pulls/2
+/repos/example/repo/pulls?state=open&per_page=100
+heartbeat exit=0
+published state/open-loops.json complete=true overdue_rows=0
+--- present-overdue:
+check-actions exit=0 (1 means acknowledgement is refused: an overdue row has no recorded action)

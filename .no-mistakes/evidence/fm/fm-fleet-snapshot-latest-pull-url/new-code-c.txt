@@ -1,0 +1,13 @@
+=== NEW code (C locale) ===
+{"id":"absent","url":null,"source":"absent"}
+{"id":"explicit","url":"https://github.com/example/repo/pull/8","source":"meta"}
+{"id":"gitlabish","url":"https://gitlab.example.com/g/p/-/pull/50","source":"status_event"}
+{"id":"invalid-bytes","url":"https://github.com/example/repo/pull/11","source":"status_event"}
+{"id":"no-newline","url":"https://github.com/example/repo/pull/31","source":"status_event"}
+{"id":"nofile","url":null,"source":"absent"}
+{"id":"nul-byte","url":"https://github.com/example/repo/pull/13","source":"status_event"}
+{"id":"paren-url","url":"https://github.com/example/repo/pull/40","source":"status_event"}
+{"id":"replacement","url":"https://github.com/example/repo/pull/2","source":"status_event"}
+{"id":"replacement-decision","url":"https://github.com/example/repo/pull/2","source":"status_event"}
+{"id":"replacement-sameline","url":"https://github.com/example/repo/pull/2","source":"status_event"}
+{"id":"trailing-nourl","url":"https://github.com/example/repo/pull/21","source":"status_event"}
