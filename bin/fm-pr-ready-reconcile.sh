@@ -13,8 +13,9 @@
 # draft, restored tool, transient forge failure or finished pipeline registers
 # without manual action. fm-pr-check.sh keeps its own authority for the named
 # head. fm-teardown.sh removes the task's marker.
-# The watcher runs this single-flight pass detached from its housekeeping tick;
-# forge delays must not stop supervision. This script never merges, steers, or
+# The watcher runs this single-flight pass detached from its housekeeping tick
+# under a hard time limit, so a hung forge call cannot stop supervision or hold
+# every later registration behind it. This script never merges, steers, or
 # writes a status log, and fm-pr-check.sh remains the only pr= writer.
 set -eu
 

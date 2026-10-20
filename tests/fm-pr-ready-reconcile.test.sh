@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Automatic PR handoff: real registration, capacity release, bounded status
-# reads, whole-fleet admission, and ten-minute refusal age-out in an isolated home.
+# reads, whole-fleet admission, ten-minute refusal age-out, and a hard pass time
+# limit in an isolated home.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -36,6 +37,11 @@ printf '%s\n' "$*" >> "$FM_READY_CASE/gh.calls"
 [ ! -f "$FM_READY_CASE/unreadable-forge" ] || exit 1
 case "$*" in
   *'--json isDraft'*)
+    if [ -f "$FM_READY_CASE/hang-once" ]; then
+      rm -f "$FM_READY_CASE/hang-once"
+      printf '%s\n' "$$" > "$FM_READY_CASE/hung.pid"
+      exec sleep 600
+    fi
     if [ -f "$FM_READY_CASE/draft" ]; then printf '{"isDraft":true}\n';
     else printf '{"isDraft":false}\n'; fi ;;
   *'--json headRefOid'*)
@@ -69,6 +75,23 @@ run_pass() {
   FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
     FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" \
     PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" 2>&1
+}
+
+start_watcher() {  # [VAR=value...]
+  env FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
+    FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" \
+    FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=999999 \
+    FM_CHECK_INTERVAL=999999 FM_IDLE_REAP_INTERVAL=0 FM_TYPESAFE_HEALTH_INTERVAL=0 \
+    FM_LAVISH_AUTO_RETIRE_INTERVAL=0 PATH="$FAKEBIN:$PATH" "$@" \
+    bash "$ROOT/bin/fm-watch.sh" > "$CASE/housekeeping.out" 2>&1 &
+  watch_pid=$!
+  fm_test_track_watcher_state "$CASE/home/state"
+}
+
+stop_watcher() {
+  kill -TERM "$watch_pid" 2>/dev/null || true
+  wait "$watch_pid" 2>/dev/null || true
+  out=$(cat "$CASE/housekeeping.out")
 }
 
 occupancy() {
@@ -248,23 +271,45 @@ make_case housekeeping
 write_ship ready
 fm_fake_exit0 "$FAKEBIN" tmux
 status_before=$(shasum -a 256 "$CASE/home/state/ready.status")
-FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
-  FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" \
-  FM_BACKEND=tmux FM_POLL=1 FM_SIGNAL_GRACE=0 FM_HEARTBEAT=999999 \
-  FM_CHECK_INTERVAL=999999 FM_IDLE_REAP_INTERVAL=0 FM_TYPESAFE_HEALTH_INTERVAL=0 \
-  FM_LAVISH_AUTO_RETIRE_INTERVAL=0 PATH="$FAKEBIN:$PATH" \
-  bash "$ROOT/bin/fm-watch.sh" > "$CASE/housekeeping.out" 2>&1 &
-watch_pid=$!
-fm_test_track_watcher_state "$CASE/home/state"
+start_watcher
 for ((i=0; i<600; i++)); do
   grep -q '^pr=' "$CASE/home/state/ready.meta" \
     && [ -f "$CASE/home/state/ready.check.sh" ] \
     && [ ! -d "$CASE/home/state/.pr-ready-reconcile/lock" ] && break
   sleep 0.1
 done
-kill -TERM "$watch_pid" 2>/dev/null || true
-wait "$watch_pid" 2>/dev/null || true
-out=$(cat "$CASE/housekeeping.out")
+stop_watcher
 assert_registered ready
 [ "$status_before" = "$(shasum -a 256 "$CASE/home/state/ready.status")" ] || fail 'housekeeping edited worker status'
 pass 'real watcher registers ready PR before notification exit, without supervisor action or status edits'
+
+# A forge call that never returns must die with its pass, so a re-armed
+# watcher's next tick can register the ready ship instead of every ship holding
+# its place behind a pass that never ends. The watcher exits on the ready wake;
+# the bounded pass outlives it, exactly as in production.
+make_case hung-forge
+write_ship ready
+fm_fake_exit0 "$FAKEBIN" tmux
+: > "$CASE/hang-once"
+start_watcher FM_PR_READY_RECONCILE_TIMEOUT=2
+for ((i=0; i<300; i++)); do [ -s "$CASE/hung.pid" ] && break; sleep 0.1; done
+[ -s "$CASE/hung.pid" ] || { stop_watcher; fail 'registration pass never reached the hung forge call'; }
+hung_pid=$(cat "$CASE/hung.pid")
+for ((i=0; i<300; i++)); do kill -0 "$hung_pid" 2>/dev/null || break; sleep 0.1; done
+if kill -0 "$hung_pid" 2>/dev/null; then
+  kill -KILL "$hung_pid" 2>/dev/null || true
+  stop_watcher
+  fail 'hung forge call outlived the pass limit'
+fi
+stop_watcher
+assert_unregistered ready
+start_watcher FM_PR_READY_RECONCILE_TIMEOUT=2
+for ((i=0; i<600; i++)); do
+  grep -q '^pr=' "$CASE/home/state/ready.meta" \
+    && [ -f "$CASE/home/state/ready.check.sh" ] \
+    && [ ! -d "$CASE/home/state/.pr-ready-reconcile/lock" ] && break
+  sleep 0.1
+done
+stop_watcher
+assert_registered ready
+pass 'hung forge call is killed at the pass limit and the next watcher tick registers the ready ship'
