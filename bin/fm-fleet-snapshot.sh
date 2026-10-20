@@ -452,7 +452,7 @@ status_event_json() {  # <observed-status-log> [<contract-path>]
 # verbs. A ready event outranks later incidental mentions, including pr= tokens
 # in its note. Preserve the last URL as the fallback when no ready event has one.
 current_pr_url_scan_to() {  # <out-var> <ready-found-var>; lines on stdin
-  local line rest candidate latest='' ready='' parsed_verb
+  local line rest candidate latest='' ready='' parsed_verb unstamped
   local pattern='https?://[^[:space:])"]+/pull/[0-9]+'
   while IFS= read -r line || [ -n "$line" ]; do
     rest=$line
@@ -465,7 +465,17 @@ current_pr_url_scan_to() {  # <out-var> <ready-found-var>; lines on stdin
     latest=$candidate
     status_line_verb "$line" parsed_verb
     case "$parsed_verb" in
-      done|ready|green|"PR ready"|"checks green") ready=$candidate ;;
+      done|ready|green) ready=$candidate ;;
+      *)
+        # As in the shared legacy-event reader, readiness tokens count only
+        # outside recognized progress/failure verbs and match without case bias.
+        if ! _fm_status_verb_recognized "$parsed_verb"; then
+          _fm_status_unstamped "$line" unstamped
+          if _fm_classify_matches "$unstamped" '^[[:space:]]*(PR ready|checks green)([[:space:]:]|$)'; then
+            ready=$candidate
+          fi
+        fi
+        ;;
     esac
   done
   printf -v "$1" '%s' "${ready:-$latest}"

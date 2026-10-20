@@ -1156,7 +1156,7 @@ test_current_status_pr() {
   local home fakebin out id start elapsed
   home=$(make_home current-status-pr)
   fakebin=$(make_fakebin "$home")
-  for id in replacement single fallback absent explicit legacy old-ready; do
+  for id in replacement single fallback absent explicit legacy old-ready bare-ready upper-ready; do
     fm_write_meta "$home/state/$id.meta" "kind=ship" "remote_host=example.invalid"
   done
   printf 'done [at=1]: PR https://github.com/example/repo/pull/1 checks green\ndone corr=0123456789abcdef [at=2]: pr=https://github.com/example/repo/pull/2 checks green\nworking: compare https://github.com/example/repo/pull/3\n' > "$home/state/replacement.status"
@@ -1166,6 +1166,8 @@ test_current_status_pr() {
   printf 'pr=https://github.com/example/repo/pull/8\n' >> "$home/state/explicit.meta"
   printf 'done: https://github.com/example/repo/pull/9\n' > "$home/state/explicit.status"
   printf 'PR ready: https://github.com/example/repo/pull/10\nchecks green [at=2]: pr=https://github.com/example/repo/pull/11\nfailed: https://github.com/example/repo/pull/12\n' > "$home/state/legacy.status"
+  printf 'PR ready https://github.com/example/repo/pull/16\nworking: compare https://github.com/example/repo/pull/17\n' > "$home/state/bare-ready.status"
+  printf 'PR READY https://github.com/example/repo/pull/18\nworking: PR ready https://github.com/example/repo/pull/19\n' > "$home/state/upper-ready.status"
   printf 'done: https://github.com/example/repo/pull/13\n' > "$home/state/old-ready.status"
   printf '%s\n' {1..250} >> "$home/state/old-ready.status"
   printf 'working: https://github.com/example/repo/pull/14\n' >> "$home/state/old-ready.status"
@@ -1179,10 +1181,12 @@ test_current_status_pr() {
       and .explicit == {url:"https://github.com/example/repo/pull/8",source:"meta"}
       and .legacy == {url:"https://github.com/example/repo/pull/11",source:"status_event"}
       and .["old-ready"] == {url:"https://github.com/example/repo/pull/13",source:"status_event"}
+      and .["bare-ready"] == {url:"https://github.com/example/repo/pull/16",source:"status_event"}
+      and .["upper-ready"] == {url:"https://github.com/example/repo/pull/18",source:"status_event"}
   ' >/dev/null || fail "current PR selection or explicit metadata precedence wrong"
   pass "snapshot selects newest ready PR, last-URL fallback, absent URL, and explicit metadata precedence"
 
-  for id in replacement single fallback absent explicit legacy old-ready; do
+  for id in replacement single fallback absent explicit legacy old-ready bare-ready upper-ready; do
     rm "$home/state/$id.meta" "$home/state/$id.status"
   done
   fm_write_meta "$home/state/large.meta" "kind=ship" "remote_host=example.invalid"
