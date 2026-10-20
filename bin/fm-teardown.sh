@@ -212,10 +212,11 @@
 # each such process running in the copy, waits a bounded time, and sends no KILL,
 # and one still alive refuses the release, named by its pid, while a process
 # that is not teardown's own is never signalled and refuses at once, named by its
-# pid; it is a clean worktree root, and each ignored file it holds is either
-# regenerable machinery or copied with its SHA-256 into the task's data
-# directory before removal; and its work is landed by the existing landed-work
-# rule. A copy whose work is not proved landed stays, with the reason written,
+# pid; it is a clean worktree root, and each ignored file it holds is
+# regenerable machinery (a copy holding any other ignored file is held, below,
+# never released; the task's own locked copy instead has such files copied with
+# their SHA-256 into the task's data directory before removal); and its work is
+# landed by the existing landed-work rule. A copy whose work is not proved landed stays, with the reason written,
 # and refuses the close unless the held-copy rule below applies.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
@@ -244,20 +245,22 @@
 # copy, refuses as before; --force never waives these proofs. The by-hand route
 # is in docs/agent-control.md.
 # Held copies. A foreign copy that is clean, owned by no record, process or live
-# launcher, and held back only by a HEAD that is not proved landed does not stop
-# the close of a task whose own copy
+# launcher, and held back only by ignored files that exist nowhere else or by a
+# HEAD that is not proved landed does not stop the close of a task whose own copy
 # passed the landed-work proof (bin/fm-teardown-nested-lib.sh owns the rule).
-# The task closes: its backlog item goes to Done, its record and
-# runtime state go, and only its own nested copies the proof covers are removed.
-# The pool slot is reserved under a durable lease exactly as an ordinary return
-# reserves it, but it is not returned, and no foreign copy is touched; a slot
-# that cannot be proved durably leased refuses the close before anything is
-# removed. Each held copy is named in the output and appended to
-# data/held-foreign-copies.log once the task record and the task's own nested
-# copies are gone, before the backlog close. --force never holds a
-# copy, nor does retiring a secondmate home, a copy inside the task's own nested
-# copy is never held, and a copy that is dirty, owned, or has a process in it
-# (this teardown's own included) still refuses. docs/agent-control.md owns the
+# The task closes: its backlog item goes to Done, its record and runtime state go,
+# and only its own nested copies the proof covers are removed; an own nested copy
+# that holds another Git repository or linked worktree refuses instead, since no
+# ref would keep that repository's commits. The pool slot is reserved under a
+# durable lease exactly as an ordinary return reserves it, but it is not
+# returned, and no foreign copy is touched; a slot that cannot be proved durably
+# leased refuses the close before anything is removed. Each held copy is appended
+# to data/held-foreign-copies.log, once, after every proof has passed and before
+# anything is removed; a record that cannot be written refuses the close. The
+# output names each held copy and the next step for its owner. --force never
+# holds a copy, nor does retiring a secondmate home, a copy inside the task's own
+# nested copy is never held, and a copy that is dirty, owned, or has a process in
+# it (this teardown's own included) still refuses. docs/agent-control.md owns the
 # rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
@@ -661,6 +664,7 @@ for _teardown_source in \
   fm-wake-lib.sh \
   fm-project-lock-lib.sh \
   fm-path-lib.sh \
+  fm-refuse-lib.sh \
   fm-teardown-nested-lib.sh \
   fm-lease-lib.sh
 do
@@ -731,6 +735,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-refuse-lib.sh
+. "$SCRIPT_DIR/fm-refuse-lib.sh"
 # shellcheck source=bin/fm-teardown-nested-lib.sh
 . "$SCRIPT_DIR/fm-teardown-nested-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
@@ -747,6 +753,7 @@ if [ "$FORCE" = --force ] && [ "$(fm_lease_actor)" = branch ]; then
   exit "$FM_LEASE_REFUSE_EXIT"
 fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
+teardown_friction_outcome retried
 
 # The pool slot of <project> that encloses a record's current copy without
 # being it: the slot that strictly contains the copy or, once the copy is gone,
@@ -2308,13 +2315,19 @@ pr_is_merged() {
   fi
   [ -n "$target" ] || return 1
   if fm_pr_url_parse "$target" && [ "$FM_PR_PROVIDER" = forgejo ]; then
-    fm_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
+    fm_pr_forgejo_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || {
+      TEARDOWN_LANDED_UNASKED="the forge record of $target could not be read"
+      return 1
+    }
     [ "$FM_PR_RECORD_MERGED" = true ] || return 1
     head=$FM_PR_RECORD_HEAD
     fm_pr_head_valid "$head" || return 1
     resolved_url=$FM_PR_URL
   else
-    view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || return 1
+    view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || {
+      TEARDOWN_LANDED_UNASKED="gh pr view $target failed (exit $?)"
+      return 1
+    }
     state=${view%%$'\t'*}
     remainder=${view#*$'\t'}
     [ "$state" != "$view" ] || return 1
@@ -2327,7 +2340,10 @@ pr_is_merged() {
     esac
   fi
   [ -n "$head" ] || return 1
-  ensure_commit_object "$target" "$head" || return 1
+  ensure_commit_object "$target" "$head" || {
+    TEARDOWN_LANDED_UNASKED="the merged head of $target could not be fetched"
+    return 1
+  }
   current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
   if git -C "$dir" merge-base --is-ancestor "$current" "$head" 2>/dev/null; then
     landed=1
@@ -2353,9 +2369,17 @@ pr_is_merged() {
 # refuses for a fresh proof on retry rather than doing network work under it.
 TEARDOWN_LANDED_DIRS=()
 TEARDOWN_LANDED_HEADS=()
+# Why a failed proof could not ask the question (forge, fetch, HEAD or content
+# comparison), empty when it answered "not landed". A reader that types
+# refusals must not count an unasked proof as a policy refusal.
+TEARDOWN_LANDED_UNASKED=
 work_is_landed() {
   local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
-  head=$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null) || return 1
+  TEARDOWN_LANDED_UNASKED=
+  head=$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null) || {
+    TEARDOWN_LANDED_UNASKED="HEAD of $dir cannot be resolved"
+    return 1
+  }
   TEARDOWN_UNPROVEN_COMMITS=
   TEARDOWN_PIPELINE_INPUT_REASON=
   for i in "${!TEARDOWN_LANDED_DIRS[@]}"; do
@@ -2365,6 +2389,7 @@ work_is_landed() {
   done
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] && [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
     echo "REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof" >&2
+    TEARDOWN_LANDED_UNASKED="HEAD changed to ${head:0:12} after its landing proof; retry for a fresh proof"
     return 1
   fi
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
@@ -2389,7 +2414,9 @@ work_is_landed_proof() {
     fi
   fi
   pr_is_merged "$branch" && return 0
-  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"
+  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref" && return 0
+  [ -z "$FM_TASK_COPY_UNASKED" ] || TEARDOWN_LANDED_UNASKED=${TEARDOWN_LANDED_UNASKED:-$FM_TASK_COPY_UNASKED}
+  return 1
 }
 
 # Archive cleanup needs its own stricter proof, not the pipeline-input exception:
@@ -2711,11 +2738,20 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
     done
     [ "$known" = 0 ] || continue
     refused=1
-    echo "REFUSED: pool slot $slot contains registered copy $copy that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." >&2
+    known=0
+    for allowed in ${TEARDOWN_REFUSED_COPIES[@]+"${TEARDOWN_REFUSED_COPIES[@]}"}; do
+      [ "$copy" != "$allowed" ] || known=1
+    done
+    if [ "$known" = 1 ]; then
+      echo "REFUSED: pool slot $slot contains registered copy $(fm_refuse_text "$copy") that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." >&2
+    else
+      FM_FRICTION_REVISION_FILE="$SCRIPT_DIR/fm-teardown.sh" \
+        teardown_refuse_copy registered-copy-proven "pool slot $slot contains registered copy $copy that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." "$copy"
+    fi
   done < "$inventory"
   rm -f "$inventory"
   if [ "$refused" = 1 ]; then
-    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from $slot, never by forcing the removal). Re-run this teardown afterwards." >&2
+    echo "Keep each listed copy and its records. For each one, run the completing-command or answer the human-only-exit question printed with its REFUSED line above, or, where an error: line was printed instead, fix what that line names and re-run; --force does not waive these proofs. Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from $slot, never by forcing the removal). Re-run this teardown afterwards." >&2
     return 1
   fi
 }
@@ -4082,30 +4118,36 @@ teardown_reprove_same_route() {
   fi
 }
 
-# Names the held foreign copies and appends them to the held-copy record, once
-# the task record and the task's own nested copies are gone, which no rerun can
-# bring back, and before the backlog close and the later steps that can still
-# fail. Whatever completion line is printed later, these lines were already
-# printed. A record that cannot be written is a warning, never a refusal: the
-# close already happened.
+# Names the held foreign copies, once the task record and the task's own nested
+# copies are gone, which no rerun can bring back, and before the backlog close
+# and the later steps that can still fail. Whatever completion line is printed
+# later, these lines were already printed. The held-copy record was written
+# before anything was removed (teardown_held_copies_record_or_refuse).
 teardown_held_copies_report() {
   local entry copy record="$DATA/held-foreign-copies.log" slot=$TEARDOWN_HELD_SLOT holder
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_task_copy_pool_slot_held "$slot" >/dev/null 2>&1 || true
   holder=${FM_TASK_COPY_SLOT_HOLDER:-<the lease holder that treehouse status shows for the slot>}
-  echo "notice: the slot return is deferred: the foreign copies listed below hold commits that are not proved landed, and teardown never deletes, moves or rewrites a foreign copy."
+  echo "notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy."
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
     copy=${entry%%$'\t'*}
     echo "notice: held foreign copy $copy stays in pool slot $slot: ${entry#*$'\t'}."
     echo "notice: next step for the owner of $copy: list the commits only it holds with git -C '$copy' log --oneline HEAD --not --remotes, land them, remove the copy with git -C '$slot' worktree remove '$copy' (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree '$copy' --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd '$PROJ' && treehouse return '$slot' --if-lease-holder '$holder' </dev/null)."
   done
   echo "notice: pool slot $slot is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, or once its HEAD is landed."
-  if teardown_held_copies_record; then
-    echo "notice: each held copy is also listed in $record."
-  else
-    echo "warning: could not write the held-copy record $record; the held copies listed above are the only trace of them."
-  fi
+  echo "notice: each held copy is also listed in $record."
+}
+
+# Writes the held-copy record before anything is removed, and refuses the close
+# when it cannot, so a close that happened never lacks its inventory. A line
+# already there for the same copy is not repeated.
+teardown_held_copies_record_or_refuse() {
+  [ -n "$TEARDOWN_HELD_SLOT" ] || return 0
+  teardown_owns_worktree || return 0
+  teardown_held_copies_record && return 0
+  echo "REFUSED: the held-copy record $DATA/held-foreign-copies.log could not be written, and a held close never closes without its inventory of the foreign copies it leaves; nothing was removed." >&2
+  return 1
 }
 teardown_slot_peers_detect() {  # <slot>
   local slot=$1 target state_dir other_meta line names_slot
@@ -4311,6 +4353,10 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
           && [ "$TEARDOWN_FOREIGN_REFUSED" = 0 ]; then
         TEARDOWN_HELD_SLOT=$TEARDOWN_RETURN_SLOT
         TEARDOWN_FOREIGN_COPIES=()
+        # The held close removes the own nested copies with whatever they hold,
+        # and the registered-copy check that would see a separate repository there
+        # is not asked, so it is asked here.
+        teardown_own_nested_other_repos || return 1
       elif [ -n "$TEARDOWN_RETURN_SLOT" ]; then
         require_registered_slot_copies "$ID" "$TEARDOWN_RETURN_SLOT" \
           ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
@@ -5778,6 +5824,7 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
 fi
+[ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
 elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
@@ -6184,6 +6231,7 @@ if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ]; then
   fm_backlog_ledger_closed "$STATE" "$CONFIG" "$ID" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"
 fi
 rm -f "$STATE/$ID.teardown-return-pending"
+[ "$TEARDOWN_POOL_SLOT_LOST" != 0 ] || teardown_friction_outcome completed
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true

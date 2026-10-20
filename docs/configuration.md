@@ -101,6 +101,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
+- The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
@@ -113,6 +114,59 @@ Each effective `FM_HOME` contains private operational directories.
 `projects/` holds local project clones.
 Firstmate reads these clones, but changes them only through the narrow guarded and concrete captain-approved exceptions in `AGENTS.md`.
 Untracked files and directories whose names begin with `scratchpad` are also gitignored, so temporary scratch does not make porcelain-based secondmate sync guards treat a home as dirty.
+
+### Friction ledger
+
+The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev size refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
+It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
+Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
+A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
+Git's own refusal is decided from the copy itself before the attempt (modified or untracked files, a modules directory in its git directory even after a submodule deinit, or an initialized submodule, which are Git's own conditions) together with Git's fatal exit status 128, never from Git's message text, so neither the user's locale nor a delete failure such as EACCES or EBUSY can change what is counted.
+A copy that is not a Git worktree root, has a HEAD that cannot be resolved, or meets a preservation anchor naming another commit stays that way until someone decides, so teardown refuses it as `copy-worktree-root`, `copy-head-resolved` or `copy-anchor-commit` with a human-only question.
+Each rule asks one question, worded the same at every site that refuses it; a rule about a process or a creation-lock launcher names its pid.
+Every field the envelope prints shows any control character, newline included, as `?`, so a copy path, lock reason or tool message cannot add a `completing-command:` or `human-only-exit:` line of its own.
+The shell [refusal envelope](../bin/fm-refuse-lib.sh) prints `REFUSED: guard=<stable-id> rule=<predicate-id> missing=<actual missing proof>`, followed by `completing-command: <supported command>` or a literal `human-only-exit: <new question>` line.
+The caller retains its existing exit code; a telemetry failure never adds a refusal, changes that code, or changes hook JSON or the Claude Stop exit-2 contract.
+The teardown completing command re-enters its existing proof and automatic ignored-byte preservation path without force after readable source and writable preservation storage are restored.
+It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, and one teardown process keeps one operation across all its refusals, so a refusal, a refusal on retry and the later success are one operation; a human-only exit prints no command and carries none.
+A forced or legacy-record teardown prints a human-only exit for that refusal instead, because the printed command carries no force or legacy flags and so could not complete that run; the owner re-runs it with the owner's own flags.
+Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
+Jev's size message names the existing request/overlap budget and same-write-tool report-splitting route without changing screening or admission.
+A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; on Claude a tool result is advisory only, so an oversized result there is neither printed as `REFUSED` nor counted.
+
+The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
+Only an explicit absolute `FM_HOME` selects the ledger; cwd and `FM_STATE_OVERRIDE` do not redirect it.
+The `fm-friction.v1` schema has exactly these fields:
+
+```json
+{"schema":"fm-friction.v1","event_id":"unique-event","at":"2026-10-18T00:00:00.000Z","guard_id":"stable-owner","rule_id":"specific-predicate","guard_revision":"unknown","task_id":"unknown","actor":"unknown","execution_kind":"live","subject":{"kind":"nested-copy","identity":"unknown","head":"unknown"},"attempt_id":"one-attempt","operation_id":"one-intended-action","episode_id":"one-continuous-block","outcome":"blocked","reason":"typed-reason","exit_printed":true,"exit_kind":"machine","proof_digest":"unknown","theater":"unknown","new_information":"unknown","first_block_at":"2026-10-18T00:00:00.000Z","elapsed_ms":null,"adjudication":"unknown"}
+```
+
+Identifiers, `actor`, `reason`, `subject.kind` and `new_information` are bounded typed tokens, never free-form descriptions.
+Source revision, task identity, subject identity/content head and accepted-proof identity are `sha256:<64 lowercase hex>` digests or `unknown`.
+The shell constructor hashes subject and task context and the enforcing source file, leaving unobserved head/proof identity unknown.
+`at` and non-null `first_block_at` are UTC timestamps ending in `Z`; `elapsed_ms` is a nonnegative integer measurement or null, never an inferred duration.
+`outcome` is `blocked`, `worked-around`, `bypassed`, `retried`, `retry-succeeded`, `completed`, `abandoned` or `escalated`.
+`execution_kind` is `live` or `test`; `exit_kind` is `machine`, `human-only` or `none`, with boolean `exit_printed` true exactly when an exit is printed.
+`theater` is `yes`, `no` or `unknown`; `adjudication` is `legitimate-false-block`, `harm-caught`, `policy-changed` or `unknown`.
+The pilot leaves adjudication, theater and fact delta unknown rather than inventing evidence.
+A retry is a new attempt/event under the same operation/episode, so a retry that is refused again is another `blocked` event; a terminal event appends its measured elapsed time without rewriting the blocked event.
+The writer's `outcome` interface appends a follow-up only for the `FM_FRICTION_OPERATION_ID` it is given, only when that operation already holds a blocked event for the same guard, task and subject, and a terminal outcome (`retry-succeeded`, `completed`, `abandoned`) at most once; elapsed time runs from the first block.
+Teardown records `retried` when a run starts with such an operation, `retry-succeeded` when it removes a copy that was refused, and `completed` when the teardown finishes without a lost slot.
+No site observes `abandoned`, `worked-around`, `bypassed` or `escalated`, so none is recorded; Jev's size bridge sees only the refusal, because a split write is a different action, so it records no outcome.
+`FM_FRICTION_EVENT_ID`, `FM_FRICTION_ATTEMPT_ID`, `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` supply existing correlation identities when available; otherwise the constructor generates a fresh event/attempt identity, without guessing continuity across invocations.
+`FM_FRICTION_EXECUTION_KIND=test` separates fixtures, and `FM_FRICTION_ACTOR` supplies a known typed role; absent actor information remains unknown.
+Commands, completing questions, tool output, credentials, raw paths and customer content are never ledger fields.
+
+Records are bounded to 8,192 encoded bytes and published with one append operation under an exclusive local file lock, with bounded contention handling.
+A repeated `event_id` is recognized without appending again, independently of notification deduplication.
+History is append-only and is never automatically rotated, truncated or deleted.
+A short/crashed append leaves its existing bytes intact; subsequent writes diagnose the incomplete history rather than appending to a corrupt tail or looping on it.
+A complete line that fails the schema is diagnosed the same way, as invalid history, never as a fault of the new event.
+Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
+An omitted event remains missing evidence, not a guarded-operation failure.
+The optional friction writer is separate from Jev's existing mandatory audit: that audit's `AuditUnavailableError` behavior is unchanged.
+[`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references
 
@@ -1842,7 +1896,9 @@ A recorded rule still contains the task's profile when typed resolution raised i
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
-OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fallback.yml`, with exact model-and-effort chains, preventing ambient chains from weakening the task.
+OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fallback.yml`, with exact model-and-effort chains, preventing ambient chains from weakening the task; `fm-spawn.sh --fixed-family` empties those chains for a scout task, including an independent review reader, so a provider error stops the reader instead of switching its model family.
+Ships, secondmates, and raw launch commands are refused, and the guarantee ends when the scout is promoted to a ship.
+The flag does not change dispatch-time selection; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the flag mechanics, including the recorded posture, relaunch inheritance, and the notice other harnesses print.
 Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.
 The tracked session overlay `.omp/fm-session-overlay.yml` chains `openai-codex/gpt-6.1-sol` to direct `deepseek/deepseek-v4-flash:high` for every omp launch, so a Sol session moves to the stand-in on any eligible provider error, a quota-out included, and `retry.fallbackRevertPolicy: cooldown-expiry` returns it to Sol once the suppression window ends.
 A worker's per-task chain replaces that entry for its own model, and is empty when the rule names no eligible native stand-in.
@@ -2304,6 +2360,7 @@ An edit without a string `path` and `new_string`, including a model-variant over
 A policy block (shell and write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
+A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.
 On Claude, review notices arrive as added context next to the unchanged output.
 The current [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; this integration intentionally does not use that capability without installed-host verification.
 Advisory context is not evidence that Claude was prevented from seeing or acting on the original output.

@@ -106,6 +106,9 @@ SH
   ln -s "$ROOT/bin/fm-task-copy-lib.sh" "$fake/bin/fm-task-copy-lib.sh"
   # fm-teardown-nested-lib.sh: teardown sources it to release foreign nested copies.
   ln -s "$ROOT/bin/fm-teardown-nested-lib.sh" "$fake/bin/fm-teardown-nested-lib.sh"
+  # fm-refuse-lib.sh and the friction writer it runs: teardown requires the typed refusal envelope.
+  ln -s "$ROOT/bin/fm-refuse-lib.sh" "$fake/bin/fm-refuse-lib.sh"
+  ln -s "$ROOT/bin/fm-friction-ledger.py" "$fake/bin/fm-friction-ledger.py"
   # Receiver-wake retirement sources the pending-reply library, which in turn
   # requires the marker helper even for this ordinary-task teardown fixture.
   ln -s "$ROOT/bin/fm-pending-reply-lib.sh" "$fake/bin/fm-pending-reply-lib.sh"

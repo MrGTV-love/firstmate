@@ -558,6 +558,101 @@ JSON
   pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
 }
 
+test_spawn_fixed_family_contract() {
+  local posture rec id out status overlay expected
+  for posture in default fixed; do
+    id="omp-family-$posture"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    printf '%s\n' '{"rules":[{"when":"review","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+    local -a args=()
+    [ "$posture" != fixed ] || args+=(--fixed-family)
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+      "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 ${args[@]+"${args[@]}"})
+    status=$?
+    expect_code 0 "$status" "$posture family scout launch: $out"
+    overlay="$HOME_DIR/state/$id.omp-fallback.yml"
+    if [ "$posture" = default ]; then
+      expected="$CASE_DIR/prechange-overlay.json"
+      jq -n '{modelRoles:{smol:"openai-codex/gpt-6.1-sol",tiny:"openai-codex/gpt-6.1-sol"},
+        find:{enabled:"off"},retry:{modelFallback:true,fallbackChains:{default:[],
+          "openai-codex/gpt-6.1-sol":["deepseek/deepseek-v4-flash:high"],
+          "openai-codex/gpt-6.1-sol:high":["deepseek/deepseek-v4-flash:high"],
+          "deepseek/deepseek-v4-flash":[],"deepseek/deepseek-v4-flash:high":[]}}}' > "$expected"
+      cmp -s "$expected" "$overlay" || fail "default fallback overlay differs from pre-change bytes: $(cat "$overlay")"
+      assert_no_grep 'fixed_family=' "$HOME_DIR/state/$id.meta" "ordinary scouts must not acquire fixed-family posture"
+      pass "default fallback overlay matches pre-change bytes"
+    else
+      assert_equals '{"default":[],"openai-codex/gpt-6.1-sol":[],"openai-codex/gpt-6.1-sol:high":[]}' \
+        "$(jq -c .retry.fallbackChains "$overlay")" "fixed-family must empty default, model and effort chains"
+      assert_grep 'fixed_family=on' "$HOME_DIR/state/$id.meta" "fixed-family posture must be durable"
+      out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" \
+        --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1)
+      expect_code 0 $? "fixed-family relaunch should inherit the posture: $out"
+      assert_equals '{"default":[],"openai-codex/gpt-6.1-sol":[],"openai-codex/gpt-6.1-sol:high":[]}' \
+        "$(jq -c .retry.fallbackChains "$overlay")" "relaunch must retain empty model and effort chains"
+      assert_grep 'fixed_family=on' "$HOME_DIR/state/$id.meta" "relaunch must retain fixed-family posture"
+      out=$(FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" \
+        FM_DATA_OVERRIDE="$HOME_DIR/data" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
+        "$ROOT/bin/fm-promote.sh" "$id" --mode local-only --yolo off 2>&1)
+      expect_code 0 $? "promoting a fixed-family scout should succeed: $out"
+      assert_grep 'kind=ship' "$HOME_DIR/state/$id.meta" "promotion must make the task a ship"
+      assert_no_grep 'fixed_family=' "$HOME_DIR/state/$id.meta" "a ship must not keep the scout-only fixed-family posture"
+      out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" \
+        --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1)
+      expect_code 0 $? "a promoted fixed-family scout must stay relaunchable: $out"
+      assert_equals '["deepseek/deepseek-v4-flash:high"]' \
+        "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6.1-sol:high"]' "$overlay")" "a promoted ship relaunches with ordinary chains"
+    fi
+  done
+  pass "fixed-family empties native chains, survives relaunch, and is dropped on promotion"
+}
+
+test_spawn_fixed_family_scope() {
+  local kind rec id out status
+  for kind in ship secondmate; do
+    id="omp-family-$kind"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    local -a args=()
+    if [ "$kind" = ship ]; then args+=(--mode no-mistakes --yolo off); else args+=(--secondmate); fi
+    out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+      "$id" "$PROJ_DIR" --harness omp --fixed-family "${args[@]}" 2>&1)
+    status=$?
+    expect_code 1 "$status" "fixed-family must refuse $kind: $out"
+    assert_contains "$out" '--fixed-family applies only to scout tasks' "refusal must explain the task-kind boundary"
+    assert_absent "$HOME_DIR/state/$id.meta" "refused task must not publish metadata"
+    assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "refused task must not emit an overlay"
+    [ ! -s "$LAUNCH_LOG" ] || fail "fixed-family $kind reached launch"
+  done
+  id="family-claude"
+  rec=$(make_spawn_case "$id" claude "$id")
+  read_case_record "$rec"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness claude --fixed-family 2>&1)
+  expect_code 0 $? "other harnesses must accept fixed-family as a no-op: $out"
+  assert_contains "$out" '--fixed-family has no effect on harness' "other harnesses need a plain no-op note"
+  assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "other harnesses must not receive an omp overlay"
+  id="family-raw"
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" 'omp --auto-approve' --fixed-family 2>&1)
+  expect_code 1 $? "a raw launch must not claim a fixed family: $out"
+  assert_contains "$out" '--fixed-family requires a canonical omp launch' "raw launches need a plain refusal reason"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused raw launch must publish no record"
+  assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "a refused raw launch must emit no overlay"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw fixed-family launch reached launch"
+  pass "fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op"
+}
+
+test_spawn_fixed_family() {
+  test_spawn_fixed_family_contract
+  test_spawn_fixed_family_scope
+}
+
 test_spawn_native_fallback_preserves_destination_order() {
   local rec id out status ordering expected
   for ordering in cross-first native-first restricted; do
@@ -4111,6 +4206,7 @@ test_watch_lifecycle_deadline_diagnostics() {
   pass "omp shutdown, arm and host readiness, and unready retirement each log one expiry"
 }
 
+test_spawn_fixed_family
 test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
