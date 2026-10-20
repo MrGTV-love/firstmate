@@ -1,0 +1,17 @@
+copy-sweep: mode=report containers=1 copies=6
+REAPABLE-DRIVER	0.19 GiB	/private/tmp/fm-sweep-live/w1/th/pool1/1/repo/.claude/worktrees/dead-big	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 38478 is gone
+REAPABLE-DRIVER	0.00 GiB	/private/tmp/fm-sweep-live/w1/th/pool1/1/repo/.claude/worktrees/dead-refused	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 38755 is gone
+HELD-UNPUSHED	0.00 GiB	/private/tmp/fm-sweep-live/w1/th/pool1/1/repo/.claude/worktrees/dead-unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+HELD-LOCKED	0.00 GiB	/private/tmp/fm-sweep-live/w1/th/pool1/1/repo/.claude/worktrees/foreign	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	/private/tmp/fm-sweep-live/w1/th/pool1/1/repo/.claude/worktrees/live	worktree lock: vernant-session-active owner=launcher:39054 launcher=39054 (launcher 39054 is alive or its start cannot be proved)
+REAPABLE-PROVEN	0.00 GiB	/private/tmp/fm-sweep-live/w1/th/pool1/1/repo/.claude/worktrees/plain	clean, no process, no record, HEAD contained in a remote branch
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=2
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /private/tmp/fm-sweep-live/w1/th/pool1: 0.19 GiB of 60 GiB, ok
+budget container /private/tmp/fm-sweep-live/w1/th/pool1/1/repo: 0.19 GiB of 20 GiB, ok
+rc=0

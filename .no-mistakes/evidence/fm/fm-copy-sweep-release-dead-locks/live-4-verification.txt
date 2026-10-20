@@ -1,0 +1,29 @@
+# Live drive: bin/fm-copy-sweep.sh --apply on a disposable world (real git worktrees, real du/nice/lsof, stand-in Vernant driver)
+
+## Run 1 driver calls (plan then execute; refused copy planned only)
+(see live-2-apply-mixed-world.txt; closeout calls were:)
+<slot>|--cleanup-worktree <slot>/.claude/worktrees/dead-refused
+<slot>|--cleanup-worktree <slot>/.claude/worktrees/dead-big
+<slot>|--cleanup-worktree <slot>/.claude/worktrees/dead-big --execute-cleanup
+
+## Preserved ignored file (dead-big) before release
+data/copy-sweep.log
+data/copy-sweep/20261019T234035Z.28634-5ad8d900ee8242ef063121f01b9474a2342494f4/nested-copy-preserved/b21ceae567d5d26088ca60280c20e186f978ada41f6decf99e21a3e8db32ccf8/channel-outbox-7.log
+data/copy-sweep/20261019T234035Z.28634-5ad8d900ee8242ef063121f01b9474a2342494f4/nested-copy-preserved/b21ceae567d5d26088ca60280c20e186f978ada41f6decf99e21a3e8db32ccf8/copy-path
+data/copy-sweep/20261019T234035Z.28634-5ad8d900ee8242ef063121f01b9474a2342494f4/nested-copy-preserved/b21ceae567d5d26088ca60280c20e186f978ada41f6decf99e21a3e8db32ccf8/SHA256SUMS
+content: unique outbox record
+SHA256SUMS: 276fea441da5006def934ddcdc7eea66b17268663e1089cdecac5fa3237b76f9  channel-outbox-7.log
+
+## data/copy-sweep.log
+2026-10-19T23:40:37Z	removed	/private<slot>/.claude/worktrees/plain	clone=/private<slot>	head=31b142666182d8c1b2efc00e862e629a14c63bc8	branch=fm/plain	kib=12	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-19T23:40:47Z	removed	/private<slot>/.claude/worktrees/dead-big	clone=/private<slot>	head=5ad8d900ee8242ef063121f01b9474a2342494f4	branch=fm/dead-big	kib=196624	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 38478 is gone
+2026-10-19T23:43:35Z	removed	/private<slot>/.claude/worktrees/live	clone=/private<slot>	head=4c886023b1cff98e1509e5cd505a6302f243a64c	branch=fm/live	kib=12	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 39054 is gone
+
+## Final registered worktrees
+/private<slot>                                 f3a77ee [main]
+/private<slot>/.claude/worktrees/dead-refused  bddb3c9 [fm/dead-refused] locked
+/private<slot>/.claude/worktrees/dead-unpushed ad3d1ca [fm/dead-unpushed] locked
+/private<slot>/.claude/worktrees/exec-refused  49c7c40 [fm/exec-refused] locked
+/private<slot>/.claude/worktrees/foreign       aa405ab [fm/foreign] locked
+
+## git calls with a force flag in run 2: 0

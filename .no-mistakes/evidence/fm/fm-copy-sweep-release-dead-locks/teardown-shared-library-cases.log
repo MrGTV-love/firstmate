@@ -1,0 +1,6 @@
+ok - a landed copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing
+ok - a live lock launcher outside the task keeps a locked own copy and is named by pid
+ok - a locked own copy's unique ignored file is preserved with its SHA-256 and the copy is released
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place
+rc=0

@@ -1,0 +1,85 @@
+=== test_report_lists_every_copy_and_changes_nothing
+ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
+ok - fm-copy-sweep
+--- rc=0 test_report_lists_every_copy_and_changes_nothing
+=== test_apply_removes_only_the_reapable_copy
+ok - apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent
+ok - fm-copy-sweep
+--- rc=0 test_apply_removes_only_the_reapable_copy
+=== test_recycled_launcher_lock_is_released_by_the_driver
+ok - a locked copy whose launcher pid is recycled is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - fm-copy-sweep
+--- rc=0 test_recycled_launcher_lock_is_released_by_the_driver
+=== test_dead_launcher_lock_is_released_by_the_driver
+ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - fm-copy-sweep
+--- rc=0 test_dead_launcher_lock_is_released_by_the_driver
+=== test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
+ok - a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it
+ok - fm-copy-sweep
+--- rc=0 test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
+=== test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
+ok - a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code
+ok - fm-copy-sweep
+--- rc=0 test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
+=== test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
+ok - a copy whose ignored files cannot be preserved stays locked and registered, the sweep's own FAILED line ends in a human-only question with no command and no friction event, and the run exits 1
+ok - fm-copy-sweep
+--- rc=0 test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
+=== test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
+ok - a copy whose creation lock became someone else's after its plan stays locked, is not released by the driver, and is reported as the sweep's own refusal
+ok - fm-copy-sweep
+--- rc=0 test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
+=== test_unproved_plan_verdicts_hold_the_copy
+ok - an empty, malformed, missing, false-with-text or garbage-literal plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, leave no driver process running, and exit 0
+ok - fm-copy-sweep
+--- rc=0 test_unproved_plan_verdicts_hold_the_copy
+=== test_a_bare_allowed_literal_plan_releases_the_copy
+ok - a plan whose whole answer is allowed=true releases the copy
+ok - fm-copy-sweep
+--- rc=0 test_a_bare_allowed_literal_plan_releases_the_copy
+=== test_a_zero_padded_plan_timeout_is_read_as_decimal
+ok - a zero-padded plan bound is decimal: 08 holds a hung plan at 8s and 08 or 09 releases a copy whose plan allows it
+ok - fm-copy-sweep
+--- rc=0 test_a_zero_padded_plan_timeout_is_read_as_decimal
+=== test_a_sweep_stopped_during_a_plan_stops_the_hung_driver
+ok - a sweep stopped while its plan hangs stops the driver and its child too
+ok - fm-copy-sweep
+--- rc=0 test_a_sweep_stopped_during_a_plan_stops_the_hung_driver
+=== test_two_sweeps_of_one_path_keep_both_preserved_directories
+ok - two sweeps of the same copy path keep both preserved directories
+ok - fm-copy-sweep
+--- rc=0 test_two_sweeps_of_one_path_keep_both_preserved_directories
+=== test_a_removal_with_no_measured_size_says_so
+ok - a removal whose size was not measured shows - and unmeasured, and the closing total counts it
+ok - fm-copy-sweep
+--- rc=0 test_a_removal_with_no_measured_size_says_so
+=== test_locked_copy_with_an_unpushed_equivalence_is_still_held
+ok - a locked copy with an unpushed but content-equivalent commit is held, and the driver never runs
+ok - fm-copy-sweep
+--- rc=0 test_locked_copy_with_an_unpushed_equivalence_is_still_held
+=== test_live_foreign_or_unreleasable_locks_are_kept
+ok - a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched
+ok - fm-copy-sweep
+--- rc=0 test_live_foreign_or_unreleasable_locks_are_kept
+=== test_failing_remove_leaves_the_copy_and_is_never_forced
+--- rc=143 test_failing_remove_leaves_the_copy_and_is_never_forced
+=== test_nothing_is_forced_deleted_cleaned_or_returned
+ok - apply never forces, cleans, unlocks, recursively deletes or calls treehouse
+ok - fm-copy-sweep
+--- rc=0 test_nothing_is_forced_deleted_cleaned_or_returned
+=== test_ignored_files_that_exist_nowhere_else_hold_a_copy
+ok - a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy
+ok - fm-copy-sweep
+--- rc=0 test_ignored_files_that_exist_nowhere_else_hold_a_copy
+=== test_check_never_removes
+ok - check is report-only
+ok - fm-copy-sweep
+--- rc=0 test_check_never_removes
+=== test_help_and_bad_calls
+ok - help carries the hourly command and bad calls are refused
+ok - fm-copy-sweep
+--- rc=0 test_help_and_bad_calls
+ALL-DONE
+ok - a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once
+ok - fm-copy-sweep
