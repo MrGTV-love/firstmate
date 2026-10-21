@@ -43,6 +43,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 SCRATCH=$(mktemp "$CACHE/pass.XXXXXX")
+# measured: value=600 date=2026-10-20 host=Mac-Studio.local margin=40 (ten minutes is forty default 15-second watcher ticks; real-time live run at a 1-second tick: refusal at +1s, zero forge reads through +600s, retry registered at +603s, 3 forge reads in total)
 REFUSAL_RETRY_SECS=600
 
 # Metadata is read once, without sourcing worker-controlled bytes.
