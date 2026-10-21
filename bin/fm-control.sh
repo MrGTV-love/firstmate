@@ -6,33 +6,6 @@
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
 #        fm-control.sh <task-id> adopt
-# adopt repairs only a local Herdr omp session record under the task's control
-# and metadata locks. Only the lock-owning main Firstmate may run it: a worker,
-# the supervision branch, or a session that does not own the home lock is
-# refused, as for authorize-continuation and reassociate. It requires (1) consistent window/herdr_pane_id and an
-# existing worktree and pane, (2) one foreground PID resolved by the launch-proof
-# owner that classifies as an agent process, (3) that PID's kernel cwd inside this task's unique deepest recorded
-# worktree, (4) no other local task claiming the pane, and (5) an existing
-# session record with the same nonempty spawn_gen as metadata, and a live PID
-# that does not carry a launch pin for another generation. It preserves
-# task_session_file (or uses the pane's omp session-file reference if absent),
-# requires that file and the live reference to identify the same persisted
-# file. When the record already names that live PID, its current-session
-# activation must be nonempty and identify that file: the extension's empty
-# unproven mark and contradictory activation evidence both refuse, even when
-# Herdr still registers the task file. Only a record whose process is gone is
-# repaired: a record naming any live process is the omp extension's to
-# maintain, and is refused unchanged. It writes version=1, the unchanged
-# spawn_gen, live pid, task_session_file, and current_session_file by setting
-# the record aside, comparing it with the bytes the proofs were gathered from,
-# and linking the new record without replacing, so a record the extension
-# publishes meanwhile is kept. A refusal names the missing proof.
-# It never unlocks a session, touches project files, starts/stops an agent,
-# or sends lifecycle input. This widens lifecycle authorization: a repaired
-# record can authorize a restored omp without the launch environment pin,
-# only while the launch-proof owner can recheck all adoption proofs and the
-# same live PID and session file. Ordinary empty/invalid session records still
-# refuse; other harnesses and backends retain their existing proof rules.
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -89,6 +62,38 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
+# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
+# under the task's control and metadata locks. The lock-owning main Firstmate
+# alone may run it: a worker, the supervision branch, or a session that does
+# not own the home lock is refused, as for authorize-continuation and
+# reassociate. It refuses, naming the missing proof, unless all of these hold:
+#   (1) window and herdr_pane_id agree, and the worktree and pane exist;
+#   (2) the launch-proof owner resolves one foreground PID that classifies as
+#       an agent process;
+#   (3) that PID's kernel cwd is inside this task's recorded worktree and is
+#       not inside another task's worktree that is as deep or deeper;
+#   (4) no other local task claims the pane;
+#   (5) the existing record has the same nonempty spawn_gen as the metadata,
+#       and the live PID does not carry a launch pin for another generation.
+# The preserved task_session_file (or the pane's omp session-file reference
+# when the field is absent) must identify the same persisted file as that
+# reference. Only a record whose process is gone is repaired. A record naming
+# the live PID or any other live process is the omp extension's to maintain
+# and is refused unchanged, including the extension's empty unproven mark and
+# an activation naming another file, even when Herdr still registers the task
+# file. The repair writes version=1, the unchanged spawn_gen, the live pid,
+# task_session_file, and current_session_file by setting the record aside,
+# comparing it with the bytes the proofs were gathered from, and linking the
+# new record without replacing, so a record the extension publishes meanwhile
+# is kept. It never unlocks a session, touches project files, starts or stops
+# an agent, or sends lifecycle input.
+# This widens lifecycle authorization: a repaired record can authorize a
+# restored omp without the launch environment pin, only while the launch-proof
+# owner can recheck all adoption proofs and the same live PID and session
+# file. Ordinary empty or invalid session records still refuse, and other
+# harnesses and backends keep their existing proof rules.
+# docs/agent-control.md "Repairing a restored omp session record" owns the
+# operator contract and the residual risk of an unpinned adopted process.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.

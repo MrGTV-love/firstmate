@@ -767,7 +767,7 @@ Disabling `session.resume_agents_on_restore` would also disable restoration of u
 The supported 0.9.x interface has no verified per-pane switch or custom resume-argv registration; Herdr documents custom resume commands as a 0.10.0 addition ([upstream support contract](https://raw.githubusercontent.com/herdrdev/herdr/v0.9.3/docs/next/website/src/content/docs/add-herdr-support.mdx)).
 Changing a user's global configuration is therefore not the scoped repair.
 
-The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's extension-recorded current-session proof; bare native restores remain unmanaged and inspection-only.
+The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's extension-recorded current-session proof; bare native restores remain unmanaged and inspection-only unless the explicit [omp session-record repair](agent-control.md#repairing-a-restored-omp-session-record) authorizes them.
 The [runtime verification record](verification/runtime-backends.md) owns captured composer evidence and the current native-restoration preservation guard.
 
 ### Stale agent registrations
