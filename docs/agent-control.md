@@ -177,6 +177,7 @@ The [control script header](../bin/fm-control.sh) owns the five required proofs,
 The command writes only the session record, never unlocks a session, modifies a project, sends keys, or starts or stops an agent.
 It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
 A stale registration alone grants no authority.
+When the existing record's nonempty current-session activation for the same live PID identifies another file, adoption refuses without rewriting that evidence, even if Herdr still registers the original task file.
 Every refusal names the missing proof, and no refusal lowers the workspace or duplicate-pane requirements.
 
 **This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**

@@ -1555,6 +1555,27 @@ test_omp_adoption_generation_mismatch() {
   pass "omp adoption: record generation mismatch refused"
 }
 
+test_omp_adoption_current_session_contradiction() {
+  prepare_omp_adoption current-session-contradiction
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record out rc=0
+  record="$dir/home/state/$id.omp-session.json"
+  write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
+  jq --arg current "$dir/wt/personal-session.jsonl" --argjson pid "$(cat "$dir/fake/recovery-pid")" \
+    '.pid=$pid | .current_session_file=$current' "$record" > "$record.new" && mv "$record.new" "$record"
+  # The launch environment pin still matches, but the extension's same-PID
+  # activation names a personal file while Herdr retains the task registration.
+  printf old > "$dir/fake/recovery-spawn-gen"
+  out=$(run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "contradictory current-session proof already authorized interrupt: $out"
+  printf 'existing dialog snapshot\n' > "$dir/home/state/$id.composer-dialog"
+  assert_adoption_refused "$dir" "$id" 'current-session proof contradicts the registered task session for the live PID'
+  rc=0
+  out=$(run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adoption erased personal-session proof and authorized interrupt: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "contradictory activation must remain unauthorized"
+  pass "omp adoption: same-PID personal current session overrides stale task registration and remains refused"
+}
+
 test_omp_adoption_proof_boundaries() {
   local shape dir id record out rc
   for shape in missing-pane missing-worktree outside-cwd unreadable-cwd different-session missing-task-file ancestor-worktree alias-worktree unreadable-inventory; do
@@ -1620,6 +1641,7 @@ test_omp_adoption() {
   test_omp_adoption_duplicate_pane
   test_omp_adoption_ambiguous_foreground
   test_omp_adoption_generation_mismatch
+  test_omp_adoption_current_session_contradiction
   test_omp_adoption_proof_boundaries
 }
 

@@ -221,6 +221,14 @@ try:
 
     require(live.is_absolute() and live.is_file() and not any(ord(c) < 32 for c in str(live)),
             "session proof needs an existing absolute live session file")
+    current = old.get("current_session_file")
+    if old.get("pid") == pid and current is not None and current != "":
+        # The extension's activation for this exact live process outranks a
+        # registration Herdr may have retained from an earlier conversation.
+        require(isinstance(current, str) and current.startswith("/")
+                and not any(ord(c) < 32 for c in current)
+                and Path(current).is_file() and os.path.samefile(current, live),
+                "current-session proof contradicts the registered task session for the live PID; adoption needs agreeing current-session evidence")
     task = old.get("task_session_file")
     if task is None or task == "":
         task = str(live)
