@@ -53,7 +53,10 @@
 # .tac/tmp, .tac/uv-cache), .DS_Store, Firstmate's own hook files, and
 # scripts/hooks/_conformance_manifest.json: the disposable entries of
 # teardown_preservable_ignored in bin/fm-teardown-nested-lib.sh, which
-# tests/fm-merge-prune.test.sh holds to the same verdict. Under .claude and
+# tests/fm-merge-prune.test.sh holds to the same verdict, except one named
+# shape: when a project ignores the whole .tac/ directory, teardown preserves
+# its children other than tmp and uv-cache, and the prune counts rebuildable
+# cache children (.venv, node_modules) as scratch. Under .claude and
 # .opencode only the hook files and a clone (proved on its own) are scratch;
 # any other ignored entry there is unique, stricter than teardown. The preserve
 # list is .claude/bug-evidence (slot-specific closeout records) and

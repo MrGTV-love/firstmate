@@ -722,7 +722,7 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
 Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, and Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`).
-These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them.
+These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape: when a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch. Any other child of that `.tac/` still keeps the copy.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
 Any other ignored entry under `.claude` or `.opencode` is unique work.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
