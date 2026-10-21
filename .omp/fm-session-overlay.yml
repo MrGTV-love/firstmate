@@ -27,24 +27,11 @@ retry:
   # `confirm` pops a dialog when a usage window runs low; `auto` lets omp fall
   # through the fallback chain without a keystroke.
   usageReservePolicy: auto
-  # A Sol session whose provider fails moves at once to direct DeepSeek Flash,
-  # the approved stand-in, and never to an OpenRouter route. With both Codex
-  # accounts out there is no credential to rotate to, and without a chain omp
-  # stops at its wait cap instead (a usage window of several days exceeds
-  # retry.maxDelayMs) and the lane sits dead. The switch happens on any eligible
-  # provider error, not only on a quota-out. omp merges overlays key by key and
-  # replaces an array whole, so this entry replaces the global Sol chain and
-  # leaves every other chain as the operator set it. A worker's per-task
-  # overlay (state/<id>.omp-fallback.yml, bin/fm-spawn.sh) loads after this one
-  # and replaces the entry for the worker's own model. The session's live-model
-  # record (bin/fm-omp-live-model.ts) follows the session to the stand-in.
+  # DeepSeek runs through dsh-tui, not an omp fallback. Replace the former
+  # global Sol-to-DeepSeek chain without changing the operator's global config.
+  # A worker's later per-task overlay admits only declared native destinations;
+  # cross-harness dsh destinations are handled by launch/recovery.
   fallbackChains:
-    openai-codex/gpt-6.1-sol:
-      - deepseek/deepseek-v4-flash:high
-  # omp's own way back to the recorded model, for every chain including the Sol
-  # one above: the next prompt after the primary's suppression window ends
-  # restores it, so a Sol session that moved to Flash returns to Sol once its
-  # window is over.
-  # `never` would leave a session on its fallback until someone changes the
-  # model by hand.
+    openai-codex/gpt-6.1-sol: []
+  # Keep omp's native return behavior for permitted non-DeepSeek chains.
   fallbackRevertPolicy: cooldown-expiry

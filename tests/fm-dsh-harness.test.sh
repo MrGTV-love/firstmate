@@ -23,8 +23,7 @@ for model, provider, expected in [
     ('my-deepseek/model', '', 'omp'),
     ('deepseekish/model', '', 'omp')]:
     assert call('route', model, provider) == expected
-# dsh must run a DeepSeek model; explicit non-dsh harnesses may name a
-# DeepSeek stand-in, because routing is only a default.
+# DeepSeek is exclusive to dsh, including explicitly selected adapters.
 for model, provider in [('', ''), ('openai/gpt', '')]:
     call('check', 'dsh', model, provider, ok=False)
 call('check', 'dsh', 'deepseek/deepseek-v4-flash')
@@ -35,11 +34,18 @@ for model, provider in [('deepseek/a/b', ''), ('deepseek/ ', ''), ('deepseek/', 
     call('check', 'dsh', model, provider, ok=False)
 for harness in ('codex', 'pi', 'pi-signed', 'omp', 'claude'):
     call('check', harness, 'unchanged/model')
-    call('check', harness, 'deepseek/deepseek-v4-flash')
+    for model, provider in [('deepseek/deepseek-v4-flash', ''), ('v4', 'deepseek')]:
+        call('check', harness, model, provider, ok=False)
 fallback_profiles = tmp / 'fallback-profiles.json'
-fallback_profiles.write_text(json.dumps({'rules':[{'fallback':[{'harness':'omp','model':'deepseek/deepseek-v4-flash','effort':'high'}]}]}))
+fallback_profiles.write_text(json.dumps({'rules':[{'fallback':[{'harness':'dsh','model':'deepseek/deepseek-v4-flash','effort':'high'}]}]}))
 call('normalize', fallback_profiles, fallback_profiles)
-assert json.loads(fallback_profiles.read_text())['rules'][0]['fallback'][0]['model'] == 'deepseek/deepseek-v4-flash'
+assert json.loads(fallback_profiles.read_text())['rules'][0]['fallback'][0]['harness'] == 'dsh'
+for harness in ('omp', 'opencode'):
+    for model, provider in [('deepseek/deepseek-v4-flash', ''), ('v4', 'deepseek')]:
+        contradictory = {'rules': [{'use': {'harness': harness, 'model': model, 'provider': provider}}]}
+        fallback_profiles.write_text(json.dumps(contradictory))
+        call('normalize', fallback_profiles, fallback_profiles, ok=False)
+        assert json.loads(fallback_profiles.read_text()) == contradictory, 'refusal must not rewrite the profile'
 # A malformed model or provider is left for the rules validator to report, and
 # a model-less dsh profile is refused rather than normalized.
 malformed = tmp / 'malformed-profiles.json'

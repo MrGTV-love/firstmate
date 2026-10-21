@@ -18,8 +18,7 @@
 #   3. The launch clears foreign markers, selects the danger-full-access
 #      permission mode, and runs the worker under a private HOME that still
 #      names the operator's git config and no-mistakes home.
-#   4. config/session-launch-policy=omp-or-tc refuses a dsh launch with the
-#      policy's own message.
+#   4. config/session-launch-policy=omp-or-tc admits the dsh-tui DeepSeek adapter.
 #   5. The busy verdict follows the launch's own session log and the tmux
 #      liveness probe counts dsh as an agent.
 set -u
@@ -397,23 +396,66 @@ $foreign="*|"$foreign="*) fail "the launch must clear the inherited $foreign" ;;
   pass "fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME"
 }
 
-test_launch_policy_refuses_dsh() {
+test_launch_policy_admits_dsh() {
   local id=dsh-policy out status config
   make_dsh_case policy "$id"
   config="$HOME_DIR/config"
   printf 'omp-or-tc\n' > "$config/session-launch-policy"
   out=$(run_dsh_spawn "$id" --harness dsh --model "$DSH_MODEL" --scout 2>&1)
   status=$?
-  expect_code 1 "$status" "an enabled omp-or-tc policy must refuse a dsh launch: $out"
-  assert_contains "$out" "config/session-launch-policy=omp-or-tc refuses launch 'dsh'" "the refusal must be the policy's own message"
-  assert_contains "$out" "only the canonical omp adapter is currently supported under this policy" "the refusal must keep the policy's documented contract"
-  [ ! -s "$LAUNCH_LOG" ] || fail "a policy-refused dsh launch must record no launch: $(cat "$LAUNCH_LOG")"
-  assert_absent "$HOME_DIR/state/$id.meta" "a policy-refused dsh launch must publish no metadata"
-  fm_session_launch_policy_check "$config" omp 0 || fail "the policy must keep admitting the canonical omp adapter"
-  ! fm_session_launch_policy_check "$config" dsh 0 2>/dev/null || fail "the policy must refuse dsh"
-  rm -f "$config/session-launch-policy"
-  fm_session_launch_policy_check "$config" dsh 0 || fail "without the policy a dsh launch must stay admitted"
-  pass "fm-spawn: config/session-launch-policy=omp-or-tc refuses a dsh launch with the policy's own message"
+  expect_code 0 "$status" "the enabled policy must admit the dsh-tui DeepSeek adapter: $out"
+  assert_grep "harness=dsh" "$HOME_DIR/state/$id.meta" "the policy must not put DeepSeek back on omp"
+  assert_contains "$(cat "$LAUNCH_LOG")" "FM_DSH_HARNESS=dsh" "policy admission must launch dsh-tui"
+  fm_session_launch_policy_check "$config" omp 0 || fail "the policy must keep admitting omp"
+  ! fm_session_launch_policy_check "$config" dsh 1 2>/dev/null || fail "raw launches must stay refused"
+  ! fm_session_launch_policy_check "$config" claude 0 2>/dev/null || fail "the unrelated Claude policy must not change"
+  pass "fm-spawn: the restricted session policy admits canonical dsh-tui DeepSeek launches"
+}
+
+test_deepseek_cannot_launch_on_omp() {
+  local id=dsh-not-omp out status route
+  for route in explicit raw indexed; do
+    make_dsh_case "not-omp-$route" "$id"
+    case "$route" in
+      explicit) out=$(run_dsh_spawn "$id" --harness omp --model "$DSH_MODEL" --scout 2>&1) ;;
+      raw) out=$(run_dsh_spawn "$id" "omp --model $DSH_MODEL" --scout 2>&1) ;;
+      indexed)
+        printf '%s\n' '{"version":1,"roles":{"legacy":{"omp":{"model":"deepseek/deepseek-v4-flash"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+        out=$(run_dsh_spawn "$id" --harness omp --model role:legacy --scout 2>&1)
+        ;;
+    esac
+    status=$?
+    expect_code 1 "$status" "$route DeepSeek-through-omp must refuse: $out"
+    assert_contains "$out" "DeepSeek runs through dsh-tui, not omp" "refusal must name dsh-tui"
+    [ ! -s "$LAUNCH_LOG" ] || fail "a contradictory route must launch nothing"
+    assert_absent "$HOME_DIR/state/$id.meta" "a contradictory route must publish no task"
+  done
+  pass "fm-spawn: explicit, raw, and indexed DeepSeek-through-omp routes refuse before launch"
+}
+
+test_exhausted_omp_replaces_deepseek_harness() {
+  local id=dsh-replacement out status
+  make_dsh_case replacement "$id"
+  printf 'omp-or-tc\n' > "$HOME_DIR/config/session-launch-policy"
+  printf '%s\n' '{"rules":[{"when":"work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+  cat > "$FAKEBIN_DIR/omp" <<'SH'
+#!/bin/sh
+case "$1" in
+  usage) printf '{"reports":[{"provider":"openai-codex","fetchedAt":%s000,"metadata":{"meterStates":{"chat":{"allowed":false,"limitReached":true}}}}]}\n' "$(date +%s)" ;;
+  --version) printf 'omp/18.1.20\n' ;;
+  models) printf '{"models":[{"selector":"openai-codex/gpt-6.1-sol"}]}\n' ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$FAKEBIN_DIR/omp"
+  out=$(run_dsh_spawn "$id" --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 --scout 2>&1)
+  status=$?
+  expect_code 0 "$status" "the declared DeepSeek stand-in must replace omp with dsh: $out"
+  assert_grep "harness=dsh" "$HOME_DIR/state/$id.meta" "the replacement must record dsh"
+  assert_grep "model=$DSH_MODEL" "$HOME_DIR/state/$id.meta" "the replacement must record DeepSeek"
+  assert_contains "$(cat "$LAUNCH_LOG")" "FM_DSH_HARNESS=dsh" "the replacement must launch dsh-tui"
+  assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "the dsh replacement must not receive an omp native fallback chain"
+  pass "fm-spawn: exhausted omp replaces its declared DeepSeek stand-in with dsh-tui under the session policy"
 }
 
 test_detection_anchored_names_argv_and_marker_precedence
@@ -423,4 +465,6 @@ test_busy_classify_follows_the_launch_session_log
 test_deepseek_model_without_a_harness_routes_to_dsh
 test_explicit_harness_is_not_rerouted
 test_launch_environment
-test_launch_policy_refuses_dsh
+test_launch_policy_admits_dsh
+test_deepseek_cannot_launch_on_omp
+test_exhausted_omp_replaces_deepseek_harness

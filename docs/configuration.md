@@ -1307,8 +1307,9 @@ When pi-signed is selected, Firstmate preserves `FM_PI_HARNESS=pi-signed` and re
 Plain Pi launches set `FM_PI_HARNESS=pi`, so a signed primary's environment cannot relabel a plain Pi worker.
 When it is absent or contains `default`, crewmates mirror the firstmate's own harness.
 
-A crewmate or scout launch that names no harness and selects a `deepseek/` model runs on `dsh` instead of the `config/crew-harness` value, because `dsh` is the default DeepSeek runtime.
-An explicit harness, a raw launch command, and a secondmate are never re-routed, so an explicit non-`dsh` DeepSeek stand-in stays legal; [the dsh adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md#routing) owns the route and the `dsh` model admission.
+DeepSeek work runs through `dsh-tui` (`harness: dsh`), not omp or another parallel adapter.
+An implicit DeepSeek ship or scout launch selects dsh; an explicit contradictory adapter refuses before launch, and unsupported dsh secondmates refuse rather than retain omp.
+The [dsh adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md#routing) owns model/provider matching and admission.
 
 ### Choose the secondmate harness
 
@@ -1351,8 +1352,8 @@ Dirty edits outside those owners, wrong-branch homes, and preserved divergence r
 Local recovery converges this setting, verifies the tooling, and checks the resolved replacement against the effective child policy before stopping the old endpoint or consuming a recovery attempt.
 Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
 
-For worker and secondmate launches, this opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
-Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.
+For worker and secondmate launches, this opt-in permits supported native adapters, not provider-name matches.
+The canonical `omp` adapter remains admitted for non-DeepSeek work, and the canonical `dsh` adapter is admitted for DeepSeek workers; the verified native `tc run` launcher remains a prerequisite not yet implemented in this code root.
 A TeamClaude proxy wrapper that starts `claude` directly does not satisfy the literal `tc run` requirement and must not be treated as an allowed fallback.
 Opaque raw shell launch commands are refused, even when their first word is `omp`, because their eventual session executable cannot be established from that word.
 The `openai-codex` provider inside omp remains allowed; the restriction excludes the standalone Codex CLI, not its models or provider.
@@ -1811,10 +1812,7 @@ It does not change commit-attribution preferences.
     },
     "sonnet-grade": {
       "claude": { "model": "sonnet" },
-      "omp": {
-        "model": "anthropic/claude-sonnet-5-5",
-        "stand_in": "deepseek/deepseek-v4-flash"
-      }
+      "dsh": { "model": "deepseek/deepseek-v4-flash" }
     }
   },
   "retired": ["gpt-6-sol"]
@@ -2043,10 +2041,10 @@ Native Claude's default-account quota is not a TeamClaude proxy ledger, so a Tea
 Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
 
 Each fallback profile requires `harness`, `model`, and `effort`.
-An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
+An OMP fallback uses a concrete non-DeepSeek catalog selector; a dsh fallback uses a concrete DeepSeek model and the verified dsh-tui runtime; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 Every fallback destination must also satisfy the home's session launch policy.
 A bare `claude` executable or a shell alias is not proof of that route.
-For example, a rule may declare `"fallback": [{"harness": "omp", "model": "deepseek/deepseek-v4-flash", "effort": "high"}]`, using a concrete selector taken from `omp models --json`; these fields grant only the named stand-in, not a general downgrade.
+For example, a rule may declare `"fallback": [{"harness": "dsh", "model": "deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only that declared model stand-in, reached through dsh-tui rather than omp.
 The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
 Natural-language `why` text does not authorize an executable fallback.
 
@@ -2066,14 +2064,11 @@ OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fall
 Ships, secondmates, and raw launch commands are refused, and the guarantee ends when the scout is promoted to a ship.
 The flag does not change dispatch-time selection; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the flag mechanics, including the recorded posture, relaunch inheritance, and the notice other harnesses print.
 Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.
-The tracked session overlay `.omp/fm-session-overlay.yml` chains `openai-codex/gpt-6.1-sol` to direct `deepseek/deepseek-v4-flash:high` for every omp launch, so a Sol session moves to the stand-in on any eligible provider error, a quota-out included, and `retry.fallbackRevertPolicy: cooldown-expiry` returns it to Sol once the suppression window ends.
-A worker's per-task chain replaces that entry for its own model, and is empty when the rule names no eligible native stand-in.
-Dispatch-time selection and the overlay chain are separate mechanisms.
-Dispatch-time selection keeps the strongest-reasoning class, and a tight choice with no supported equal-class stand-in stops and is reported.
-The overlay chain is a run-time provider-error fallback inside one session, not a dispatch decision, and it is a standing exception to that rule for omp Sol sessions.
-Its destination is the direct `deepseek` provider only, never an API-billed router such as OpenRouter.
-A lane that fell back runs on a lower reasoning class until omp returns it to Sol when the suppression window ends, or until the lane is launched again.
-Narrowing the exception means editing the one chain key, `retry.fallbackChains."openai-codex/gpt-6.1-sol"`, in `.omp/fm-session-overlay.yml`.
+The tracked session overlay `.omp/fm-session-overlay.yml` empties the former Sol-to-DeepSeek native chain: DeepSeek requires a dsh-tui replacement.
+A worker's per-task chain replaces the entry for its own model and is empty when the rule names no eligible native stand-in.
+Native omp fallback cannot change a session into a dsh-tui session; a declared dsh stand-in is selected at launch on proven exhaustion or through the existing recovery path.
+Without a supported permitted replacement, the original provider error remains visible instead of silently serving DeepSeek through omp.
+The no-mistakes review-agent selector does not offer DeepSeek through omp either: dsh-tui has no verified review-agent transport, so that candidate is reported unavailable, not mapped to ACP or headless execution.
 Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
 An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Launch and successful replacement append the selected route to task status.

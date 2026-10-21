@@ -26,11 +26,9 @@ or unsupported data is unknown. With --since, anything recorded at or before
 POSITION is history: a turn must have started beyond it, or the state is
 unknown.
 route MODEL [PROVIDER] prints the default model-family adapter.
-check HARNESS MODEL [PROVIDER] refuses a dsh launch unless the model is a
-concrete DeepSeek id: the optional deepseek/ prefix, then a non-empty id with no
-slash or whitespace, which is exactly what prepare accepts. An explicit non-dsh
-harness may name a DeepSeek stand-in, because DeepSeek work routes to dsh only
-by default.
+check HARNESS MODEL [PROVIDER] requires dsh for DeepSeek and refuses dsh
+unless the model is a concrete DeepSeek id: a deepseek/ prefix (or provider
+deepseek), then a non-empty id with no slash or whitespace.
 """
 import argparse
 import json
@@ -52,6 +50,8 @@ def route(model, provider=""):
 
 def check(harness, model, provider=""):
     if harness != "dsh":
+        if route(model, provider) == "dsh":
+            raise ValueError("DeepSeek runs through dsh-tui, not " + harness + "; select --harness dsh")
         return
     bare = model.removeprefix("deepseek/")
     if not bare:
@@ -70,7 +70,7 @@ def normalize(value):
         model, provider = value.get("model", ""), value.get("provider", "")
         if "harness" in value and isinstance(model, str) and isinstance(provider, str):
             check(value["harness"], model, provider)
-            if provider == "deepseek" and model and not model.startswith("deepseek/"):
+            if value["harness"] == "dsh" and provider == "deepseek" and model and not model.startswith("deepseek/"):
                 value["model"] = "deepseek/" + model
         return value
     return value

@@ -28,10 +28,12 @@ The dsh template clears every foreign marker at its own boundary, and the omp te
 
 ## Routing
 
-`bin/fm-dsh.py route` prints the model-family default: provider `deepseek` or a `deepseek/` model prefix selects dsh, `claude*` selects claude, and everything else selects omp.
-`../../../bin/fm-spawn.sh` acts only on the DeepSeek answer, and only for a crewmate or scout with no explicit harness: it then switches to dsh. A secondmate, an explicit harness, and a raw launch are never re-routed.
-`bin/fm-dsh.py check` refuses a dsh launch unless the model is a concrete DeepSeek id (an optional `deepseek/` prefix, then a non-empty id with no `/` or whitespace), the shape `prepare` accepts, so a relaunch is refused before the running agent stops. An explicit omp, pi, or claude stand-in on a DeepSeek model stays legal.
-`../../../bin/fm-dispatch-resolve.sh` normalizes a provider-only DeepSeek profile to the canonical `deepseek/<id>` model before it is frozen, so the routing check sees one spelling; a profile whose model or provider is not a string is left for the rules validator to report.
+`bin/fm-dsh.py route` maps provider `deepseek` or a `deepseek/` model prefix to dsh; `claude*` maps to claude and everything else to omp, without changing non-DeepSeek dispatch.
+`../../../bin/fm-spawn.sh` selects dsh for an implicit DeepSeek ship or scout; contradictory explicit DeepSeek adapters refuse rather than keep omp as a parallel route.
+`bin/fm-dsh.py check` requires dsh for DeepSeek and requires a concrete model id (a `deepseek/` prefix, or an explicit `deepseek` provider, followed by a non-empty id with no `/` or whitespace).
+Relaunch checks that admission before stopping the running agent; unsupported dsh secondmates refuse rather than return DeepSeek to omp.
+`../../../bin/fm-dispatch-resolve.sh` normalizes provider-only models only for dsh profiles and rejects contradictory adapter/model profiles without rewriting them.
+Declared DeepSeek stand-ins are cross-harness dsh replacements, never native omp fallback-chain entries; the fallback schema and session-policy admission belong to [configuration](../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson).
 
 ## Launch posture
 

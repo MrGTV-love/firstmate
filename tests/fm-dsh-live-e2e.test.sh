@@ -35,6 +35,7 @@ mkdir -p "$HOME_ROOT/config" "$HOME_ROOT/state" "$HOME_ROOT/data" "$HOME_ROOT/pr
 printf 'manual\n' > "$HOME_ROOT/config/backlog-backend"
 printf 'herdr\n' > "$HOME_ROOT/config/runtime-backend"
 printf 'dsh\n' > "$HOME_ROOT/config/crew-harness"
+printf 'omp-or-tc\n' > "$HOME_ROOT/config/session-launch-policy"
 printf '| Project | Path | Mode | Yolo |\n| --- | --- | --- | --- |\n| dsh-lab | %s | local-only | off |\n' "$PROJECT" > "$HOME_ROOT/data/projects.md"
 cat > "$TASK/bin/herdr" <<EOF
 #!/usr/bin/env bash

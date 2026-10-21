@@ -1478,9 +1478,9 @@ test_quota_exhaustion_relaunches_only_a_permitted_route() {
     jq -n --arg model "$model" '{rules:[{when:"assigned work",
       use:{harness:"omp",model:$model,effort:"high",provider:"codex"},
       fallback:(if $model=="openai-codex/gpt-6-luna" then
-        [{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}] else [] end)},
+        [{harness:"omp",model:"lab/native-model",effort:"high"}] else [] end)},
       {when:"invalid stand-in",use:{harness:"omp",model:"openai-codex/gpt-6-astra",effort:"high"},
-       fallback:[{harness:"pi",model:"deepseek/deepseek-v4-flash",effort:"high"}]}]}' > "$dir/home/config/crew-dispatch.json"
+       fallback:[{harness:"pi",model:"lab/native-model",effort:"high"}]}]}' > "$dir/home/config/crew-dispatch.json"
     jq -n --argjson now "$(date +%s)" '{reports:[
       {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
       {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}
@@ -1490,7 +1490,7 @@ test_quota_exhaustion_relaunches_only_a_permitted_route() {
 case "$1" in
   --version) printf 'omp/18.1.20\n' ;;
   usage) cat "$FM_FAKE_DIR/../usage.json" ;;
-  models) printf '%s\n' '{"models":[{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"}]}' ;;
+  models) printf '%s\n' '{"models":[{"provider":"lab","id":"native-model","selector":"lab/native-model"}]}' ;;
   *) exit 0 ;;
 esac
 SH
@@ -1515,7 +1515,7 @@ SH
     assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "automatic replacement must preserve uncommitted work"
     if [ "$model" = openai-codex/gpt-6-luna ]; then
       assert_contains "$out" 'auto-relaunched after quota exhaustion' "an idle live OMP session must recover automatically"
-      assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
+      assert_equals lab/native-model "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
       assert_grep 'fallback relaunched' "$dir/home/state/$id.status" "the served route must be reported"
     else
@@ -1559,7 +1559,7 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
     add_ship_task "$dir" "$id" claude
     [ "$recorded" = none ] || printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
     mkdir -p "$dir/home/config"
-    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
     out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
     expect_code 0 "$rc" "a $recorded recorded rule with an ambiguous match must relaunch as before: $out"
     assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"

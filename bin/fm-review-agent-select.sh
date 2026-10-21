@@ -312,6 +312,7 @@ ASSESS_JQ='
 # any notice and returns 0. Mirrors the chosen-profile preflight of the resolver.
 preflight() {
   local h=$1 m=$2 account context=selected out rc
+  python3 "$SCRIPT_DIR/fm-dsh.py" check "$h" "$m" "${3:-}" 2>&1 || return 1
   if ! fm_session_launch_policy_check "$CONFIG" "$h" >"$TMP/policy.out" 2>&1; then
     printf 'session launch policy refuses harness %s\n' "$h"
     return 1
@@ -349,7 +350,7 @@ while IFS= read -r profile; do
   fi
   lane=$(jq -rn --arg h "$h" --arg m "$m" "$FM_QUOTA_ROW_JQ"'quota_lane($h; $m)')
   pre_rc=0
-  pre=$(preflight "$h" "$m") || pre_rc=$?
+  pre=$(preflight "$h" "$m" "$provider") || pre_rc=$?
   if [ "$pre_rc" -ne 0 ]; then
     cand=$(jq -cn --argjson c "$profile" --arg provider "$provider" --arg reason "$pre" \
       '{profile: $c, provider: (if $provider == "" then null else $provider end), tier: "primary",
@@ -375,7 +376,12 @@ if jq -e 'length > 0 and all(.[]; .exhausted == true)' <<<"$CANDIDATES" >/dev/nu
     [ -n "$profile" ] || continue
     h=$(jq -r .harness <<<"$profile")
     m=$(jq -r .model <<<"$profile")
-    if fm_dispatch_fallback_supported "$CONFIG" "$profile" "$CONFIG" >/dev/null 2>&1; then
+    if [ "$h" = dsh ]; then
+      cand=$(jq -cn --argjson c "$profile" \
+        '{profile: $c, provider: "deepseek", tier: "fallback", eligible: false, exhausted: false, unknown: false,
+          spendPriority: null, pct: null, scope: null, runway: null, uncertainty: [],
+          reason: "DeepSeek requires dsh-tui, which has no verified no-mistakes review-agent transport"}')
+    elif fm_dispatch_fallback_supported "$CONFIG" "$profile" "$CONFIG" >/dev/null 2>&1; then
       capacity=$(fm_dispatch_fallback_capacity "$profile")
       state=$(jq -r '.status // "unknown"' <<<"$capacity")
       if [ "$state" = exhausted ]; then

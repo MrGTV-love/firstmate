@@ -306,9 +306,9 @@
 #   operator's trust.json. Ordinary Pi worker launches never receive --approve.
 #   A missing selected executable refuses before endpoint creation, and pi-signed
 #   never falls back to pi.
-#   A crewmate/scout spawn with no harness arg and a deepseek/ model launches on
-#   dsh instead of the resolved crew harness; an explicit harness, a raw launch,
-#   and a secondmate are never re-routed. The dsh adapter reference
+#   DeepSeek runs through dsh-tui, not omp. An implicit ship/scout route selects
+#   dsh; a contradictory explicit harness refuses. A secondmate cannot use dsh
+#   until its primary supervision protocol is verified. The dsh adapter reference
 #   (.agents/skills/harness-adapters/references/harness/dsh.md) owns the route,
 #   and launch_template's dsh case documents the private HOME it launches under.
 #   config/session-launch-policy can restrict even explicit launches; its schema
@@ -341,12 +341,10 @@
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
 #   policy for the one session only (--auto-approve alone owns approval,
-#   forcing tools.approvalMode: yolo for the session). It also chains the Sol
-#   model to direct DeepSeek Flash, so a Sol session whose provider fails, a
-#   usage window that is out included, moves to the stand-in at once (a worker's
-#   per-task state/<id>.omp-fallback.yml replaces that entry for its own model),
-#   and it pins omp's own return to the recorded model once the primary serves
-#   again.
+#   forcing tools.approvalMode: yolo for the session). The old Sol-to-DeepSeek
+#   native chain is empty: DeepSeek requires a dsh-tui replacement, never an
+#   in-process omp fallback. A worker's per-task state/<id>.omp-fallback.yml
+#   replaces the entry for its own model.
 #   Each session publishes the model it is serving through
 #   bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
 #   secondmate from the home's tracked extension), and bin/fm-crew-state.sh
@@ -3246,6 +3244,14 @@ else
   MODEL_INDEXED=0
 fi
 
+if [ "$RAW_LAUNCH" = 0 ]; then
+  if [ -z "$ARG3" ] && fm_control_harness_supports_kind dsh "$KIND" && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
+    HARNESS=dsh
+    LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
+  fi
+  python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || exit 1
+fi
+
 # Do not let dispatch fallback selection turn a forbidden explicit route into
 # an apparently accepted spawn. The final launch check also covers a stand-in.
 if [ "$HARNESS" = omp ]; then
@@ -3278,11 +3284,7 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
     fi
   fi
 fi
-if [ "$RAW_LAUNCH" = 0 ] && fm_control_harness_supports_kind dsh "$KIND"; then
-  if [ -z "$ARG3" ] && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
-    HARNESS=dsh
-    LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
-  fi
+if [ "$RAW_LAUNCH" = 0 ]; then
   python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || exit 1
 fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1

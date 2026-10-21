@@ -14,7 +14,7 @@ cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
   usage) cat "$OMP_USAGE_FIXTURE" ;;
-  models) printf '%s\n' '{"models":[{"selector":"deepseek/deepseek-v4-flash"}]}' ;;
+  models) printf '%s\n' '{"models":[{"selector":"lab/native-model"}]}' ;;
   *) exit 2 ;;
 esac
 SH
@@ -69,7 +69,7 @@ assert_equals null "$(jq -r '.bestAccountHeadroom' <<<"$out")" "unknown applicab
 pass "pool capacity preserves serving, missing-account, freshness, and saved-reset semantics"
 
 primary='{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}'
-allowed='[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]'
+allowed='[{"harness":"omp","model":"lab/native-model","effort":"high"}]'
 jq -n --argjson use "$primary" --argjson fallback "$allowed" '{rules:[{when:"easy work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high)
 write_pool 98
@@ -81,7 +81,7 @@ jq '.reports[1].metadata={source:"ratelimit-headers"} |
 out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/headers.json")")
 assert_equals usable "$(jq -r .status <<<"$out")" "native successful-response warnings do not authorize paid model fallback from zero percent"
 out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" "$allowed")
-assert_equals deepseek/deepseek-v4-flash "$(jq -r .profile.model <<<"$out")" "whole-pool exhaustion selects the permitted Luna stand-in"
+assert_equals lab/native-model "$(jq -r .profile.model <<<"$out")" "whole-pool exhaustion selects the permitted Luna stand-in"
 assert_equals true "$(jq -r .switched <<<"$out")" "selection reports a model switch"
 assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "unknown fallback quota is disclosed, never invented"
 if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$primary" '[]' > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
@@ -123,7 +123,7 @@ assert_equals '{"rule":"","fallback":[]}' "$set" "a recorded rule never contains
 pass "matrix fallback retains per-rule permission and strongest-model boundaries"
 
 cat > "$TMP_ROOT/config/model-index.json" <<'JSON'
-{"version":1,"roles":{"sonnet-grade":{"omp":{"model":"openai-codex/gpt-6-luna","stand_in":"deepseek/deepseek-v4-flash"}}},"retired":[]}
+{"version":1,"roles":{"sonnet-grade":{"omp":{"model":"openai-codex/gpt-6-luna","stand_in":"lab/native-model"}}},"retired":[]}
 JSON
 for use in '{"harness":"omp","role":"sonnet-grade"}' \
   '[{"harness":"omp","role":"sonnet-grade","stand_in":true}]' \
@@ -131,7 +131,7 @@ for use in '{"harness":"omp","role":"sonnet-grade"}' \
   jq -n --argjson use "$use" --argjson fallback "$allowed" \
     '{rules:[{when:"work",use:$use,fallback:$fallback}],default:$use,default_fallback:$fallback}' > "$TMP_ROOT/config/crew-dispatch.json"
   model=$(jq -r 'if type == "array" then .[0] else . end |
-    if .stand_in then "deepseek/deepseek-v4-flash"
+    if .stand_in then "lab/native-model"
     elif .role then "openai-codex/gpt-6-luna" else "default" end' <<<"$use")
   for rule in rule_1 default ''; do
     set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" "$rule" omp "$model" default) || fail "resolved profile lookup refused $use"
@@ -142,7 +142,7 @@ for use in '{"harness":"omp","role":"sonnet-grade"}' \
 done
 pass "fallback lookup resolves primary and stand-in roles and normalizes omitted axes"
 
-for retired in deepseek/deepseek-v4-flash deepseek-v4-flash; do
+for retired in lab/native-model native-model; do
   jq --arg retired "$retired" '.retired=[$retired]' "$TMP_ROOT/config/model-index.json" > "$TMP_ROOT/retired-index.json"
   mv "$TMP_ROOT/retired-index.json" "$TMP_ROOT/config/model-index.json"
   if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp default default > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
@@ -155,29 +155,29 @@ done
 jq '.retired=["qwen3:8b"]' "$TMP_ROOT/config/model-index.json" > "$TMP_ROOT/retired-index.json"
 mv "$TMP_ROOT/retired-index.json" "$TMP_ROOT/config/model-index.json"
 jq -n --argjson use "$primary" '{rules:[
-    {when:"easy work",use:$use,fallback:[{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}]},
+    {when:"easy work",use:$use,fallback:[{harness:"omp",model:"lab/native-model",effort:"high"}]},
     {when:"unconfigured",use:{harness:"omp",role:"missing-role"}},
     {when:"strong work",use:{harness:"omp",model:"openai-codex/gpt-6.1-sol",effort:"high"},
      fallback:[{harness:"omp",model:"ollama/qwen3:8b",effort:"high"}]}]}' > "$TMP_ROOT/config/crew-dispatch.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6-luna high) || fail "a stale unrelated rule must not block the lookup"
 assert_equals rule_1 "$(jq -r .rule <<<"$set")" "the matched rule survives stale unrelated rules"
-assert_equals deepseek/deepseek-v4-flash "$(jq -r '.fallback[0].model' <<<"$set")" "the matched rule keeps its own stand-in"
+assert_equals lab/native-model "$(jq -r '.fallback[0].model' <<<"$set")" "the matched rule keeps its own stand-in"
 if fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6.1-sol high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "a matched rule with a retired stand-in must refuse"
 fi
 rm "$TMP_ROOT/config/model-index.json"
 jq -n --argjson use "$primary" '{rules:[
-    {when:"easy work",use:$use,fallback:[{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}]},
+    {when:"easy work",use:$use,fallback:[{harness:"omp",model:"lab/native-model",effort:"high"}]},
     {when:"strong work",use:{harness:"omp",model:"openai-codex/gpt-6.1-sol",effort:"high"},
      fallback:[{harness:"codex",model:"gpt-6.1-sol",effort:"ultra"}]}]}' > "$TMP_ROOT/config/crew-dispatch.json"
 for rule in '' rule_1; do
   set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" "$rule" omp openai-codex/gpt-6-luna high) || fail "an invalid unrelated fallback must not block the lookup"
-  assert_equals deepseek/deepseek-v4-flash "$(jq -r '.fallback[0].model' <<<"$set")" "the matched rule keeps its stand-in beside an invalid unrelated rule"
+  assert_equals lab/native-model "$(jq -r '.fallback[0].model' <<<"$set")" "the matched rule keeps its stand-in beside an invalid unrelated rule"
 done
 if fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6.1-sol high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "a matched rule with an invalid fallback must refuse"
 fi
-assert_contains "$(cat "$TMP_ROOT/error")" "fallback must be an array of explicit OMP profiles" "the matched invalid fallback keeps its error"
+assert_contains "$(cat "$TMP_ROOT/error")" "fallback must be an array of explicit OMP, dsh DeepSeek" "the matched invalid fallback keeps its error"
 pass "retirement and fallback schema apply to matched lists and direct fallback selection, not unrelated rules"
 
 cat > "$QUOTA_FIXTURE" <<'JSON'
@@ -206,7 +206,32 @@ assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "the current TeamCla
 rm "$TMP_ROOT/config/claude-launcher"
 out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$(jq -c '.[0] | del(.requires)' <<<"$team")" "$(jq -c '. + '"$allowed" <<<"$team")") \
   || fail "a former TeamClaude stand-in without the launcher must move to its next permitted stand-in"
-assert_equals deepseek/deepseek-v4-flash "$(jq -r .profile.model <<<"$out")" "without the TeamClaude launcher the native row is exhausted, so the next stand-in serves"
+assert_equals lab/native-model "$(jq -r .profile.model <<<"$out")" "without the TeamClaude launcher the native row is exhausted, so the next stand-in serves"
 assert_equals true "$(jq -r .switched <<<"$out")" "without the TeamClaude launcher the current Claude profile is not reported as unknown"
 pass "capacity does not conflate native Claude quota with a TeamClaude stand-in"
+
+# DeepSeek is a dsh-tui replacement, never a second omp provider route.
+cat > "$FAKEBIN/dsh-tui" <<'SH'
+#!/bin/sh
+printf '@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)\nprofile: 0.16.1  fake\n'
+SH
+cat > "$FAKEBIN/dsh" <<'SH'
+#!/bin/sh
+printf '0.2.0-rc.2\n'
+SH
+chmod +x "$FAKEBIN/dsh-tui" "$FAKEBIN/dsh"
+deepseek='[{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"high"}]'
+printf 'omp-or-tc\n' > "$TMP_ROOT/config/session-launch-policy"
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$deepseek" '{"status":"exhausted"}') \
+  || fail "an exhausted primary must admit its declared dsh replacement"
+assert_equals dsh "$(jq -r .profile.harness <<<"$out")" "DeepSeek must be reached through dsh-tui"
+assert_equals deepseek/deepseek-v4-flash "$(jq -r .profile.model <<<"$out")" "the replacement keeps the declared model"
+if fm_dispatch_fallback_supported "$TMP_ROOT/config" '{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}' 2>/dev/null; then
+  fail "the former omp DeepSeek route must not remain supported"
+fi
+printf '#!/bin/sh\nprintf \"unsupported-version\\n\"\n' > "$FAKEBIN/dsh"
+if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$deepseek" '{"status":"exhausted"}' > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+  fail "an unavailable verified dsh runtime must not fall back to omp"
+fi
+pass "DeepSeek replacements require dsh-tui under the session policy and never fall back to omp"
 printf '# all fm-dispatch-capacity tests passed\n'

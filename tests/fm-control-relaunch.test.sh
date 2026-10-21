@@ -105,8 +105,7 @@ SH
   [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "$case_name refusal sent lifecycle or launch input"
   cmp -s "$dir/prior.meta" "$dir/home/state/dsh-route.meta" || fail "$case_name refusal changed task metadata"
   assert_absent "$dir/home/state/dsh-route.control-relaunch" "$case_name refusal must precede the relaunch transaction"
-  # An explicit omp/pi stand-in on a DeepSeek model is legal: DeepSeek routes to
-  # dsh only by default, so the relaunch must be admitted and record the route.
+  # A contradictory explicit omp route must refuse before stopping the agent.
   dir=$(new_case dsh-route-stand-in dsh-route)
   add_ship_task "$dir" dsh-route claude
   cat > "$dir/fakebin/omp" <<'SH'
@@ -122,15 +121,15 @@ fi
 exit 0
 SH
   chmod +x "$dir/fakebin/omp"
+  cp "$dir/home/state/dsh-route.meta" "$dir/prior.meta"
   out=$(run_control "$dir" dsh-route relaunch --harness omp --model deepseek/deepseek-v4-flash --note "preserve current agent"); rc=$?
-  expect_code 0 "$rc" "an explicit DeepSeek stand-in relaunch should be admitted: $out"
-  assert_contains "$out" "relaunched dsh-route harness=omp" \
-    "the stand-in relaunch should report the new harness"
-  [ "$(meta_field "$dir" dsh-route harness)" = omp ] \
-    || fail "the stand-in relaunch should record harness=omp"
-  [ "$(meta_field "$dir" dsh-route model)" = deepseek/deepseek-v4-flash ] \
-    || fail "the stand-in relaunch should record the DeepSeek model"
-  pass "fm-control relaunch: dsh-without-model refuses pre-stop and explicit DeepSeek stand-ins are admitted"
+  expect_code 1 "$rc" "DeepSeek through omp must refuse: $out"
+  assert_contains "$out" "DeepSeek runs through dsh-tui, not omp" "refusal must name the replacement adapter"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "DeepSeek refusal stopped the original agent"
+  [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "DeepSeek refusal sent lifecycle input"
+  cmp -s "$dir/prior.meta" "$dir/home/state/dsh-route.meta" || fail "DeepSeek refusal changed metadata"
+  assert_absent "$dir/home/state/dsh-route.control-relaunch" "DeepSeek refusal must precede the transaction"
+  pass "fm-control relaunch: missing dsh models and DeepSeek-through-omp refuse before stopping"
 }
 
 test_relaunch_omp_billing_admission_preserves_running_agents() {

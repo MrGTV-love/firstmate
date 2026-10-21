@@ -153,7 +153,7 @@ case "$1" in
       cat "$PI_CODING_AGENT_DIR/catalog.json"
       exit 0
     fi
-    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
+    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"lab","id":"native-model","selector":"lab/native-model"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
   usage)
     if [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
@@ -329,7 +329,7 @@ test_no_helpers_launch_contract() {
   read_case_record "$rec"
   mkdir -p "$HOME_DIR/config"
   cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
-{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"low","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"low","provider":"codex"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]}]}
 JSON
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
     --harness omp --model openai-codex/gpt-6-luna --dispatch-rule rule_1 --omp-no-helpers)
@@ -532,7 +532,7 @@ test_spawn_retains_pooled_capacity_and_declared_stand_ins() {
   read_case_record "$rec"
   mkdir -p "$HOME_DIR/config"
   cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
-{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]}]}
 JSON
   jq -n --argjson now "$(date +%s)" '{reports:[
     {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
@@ -547,13 +547,13 @@ JSON
   id='omp-fallback-q2'
   mkdir -p "$HOME_DIR/config"
   cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
-{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]}]}
 JSON
   jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$CASE_DIR/usage.json"
   out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
   status=$?
   expect_code 0 "$status" "whole-pool exhaustion must select the permitted Luna stand-in: $out"
-  assert_grep 'model=deepseek/deepseek-v4-flash' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
+  assert_grep 'model=lab/native-model' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
   assert_grep 'fallback launched' "$HOME_DIR/state/$id.status" "the changed serving route must be reported"
   pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
 }
@@ -564,7 +564,7 @@ test_spawn_fixed_family_contract() {
     id="omp-family-$posture"
     rec=$(make_spawn_case "$id" omp "$id")
     read_case_record "$rec"
-    printf '%s\n' '{"rules":[{"when":"review","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+    printf '%s\n' '{"rules":[{"when":"review","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
     jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
       metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
     local -a args=()
@@ -578,9 +578,9 @@ test_spawn_fixed_family_contract() {
       expected="$CASE_DIR/prechange-overlay.json"
       jq -n '{modelRoles:{smol:"openai-codex/gpt-6.1-sol",tiny:"openai-codex/gpt-6.1-sol"},
         find:{enabled:"off"},retry:{modelFallback:true,fallbackChains:{default:[],
-          "openai-codex/gpt-6.1-sol":["deepseek/deepseek-v4-flash:high"],
-          "openai-codex/gpt-6.1-sol:high":["deepseek/deepseek-v4-flash:high"],
-          "deepseek/deepseek-v4-flash":[],"deepseek/deepseek-v4-flash:high":[]}}}' > "$expected"
+          "openai-codex/gpt-6.1-sol":["lab/native-model:high"],
+          "openai-codex/gpt-6.1-sol:high":["lab/native-model:high"],
+          "lab/native-model":[],"lab/native-model:high":[]}}}' > "$expected"
       cmp -s "$expected" "$overlay" || fail "default fallback overlay differs from pre-change bytes: $(cat "$overlay")"
       assert_no_grep 'fixed_family=' "$HOME_DIR/state/$id.meta" "ordinary scouts must not acquire fixed-family posture"
       pass "default fallback overlay matches pre-change bytes"
@@ -603,7 +603,7 @@ test_spawn_fixed_family_contract() {
       out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" \
         --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1)
       expect_code 0 $? "a promoted fixed-family scout must stay relaunchable: $out"
-      assert_equals '["deepseek/deepseek-v4-flash:high"]' \
+      assert_equals '["lab/native-model:high"]' \
         "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6.1-sol:high"]' "$overlay")" "a promoted ship relaunches with ordinary chains"
     fi
   done
@@ -663,7 +663,7 @@ test_spawn_native_fallback_preserves_destination_order() {
     printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
     fm_test_fake_teamclaude "$FAKEBIN_DIR"
     jq -n --arg order "$ordering" '
-      {harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"} as $native |
+      {harness:"omp",model:"lab/native-model",effort:"high"} as $native |
       {harness:"claude",model:"claude-opus-5-5[1m]",effort:"high",requires:"teamclaude"} as $cross |
       {harness:"omp",model:"ollama/qwen3:8b",effort:"high"} as $last |
       {rules:[{when:"work",use:{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high"},
@@ -677,7 +677,7 @@ test_spawn_native_fallback_preserves_destination_order() {
     out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
     status=$?
     expect_code 0 "$status" "ordered native fallback launch: $out"
-    expected='["deepseek/deepseek-v4-flash:high"]'
+    expected='["lab/native-model:high"]'
     [ "$ordering" != cross-first ] || expected='[]'
     assert_equals "$expected" "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6-luna:high"]' "$HOME_DIR/state/$id.omp-fallback.yml")" \
       "native fallback stops at the first supported cross-harness destination"
@@ -688,7 +688,7 @@ test_spawn_native_fallback_preserves_destination_order() {
       status=$?
       expect_code 0 "$status" "restricted exhaustion must select the allowed native destination: $out"
       assert_grep 'harness=omp' "$HOME_DIR/state/$id-empty.meta" "fallback must not bypass launch policy"
-      assert_grep 'model=deepseek/deepseek-v4-flash' "$HOME_DIR/state/$id-empty.meta" "fallback uses the next policy-eligible destination"
+      assert_grep 'model=lab/native-model' "$HOME_DIR/state/$id-empty.meta" "fallback uses the next policy-eligible destination"
     fi
   done
   pass "native chains preserve fallback order and shared launch policy"
@@ -701,8 +701,8 @@ test_spawn_rejects_retired_fallbacks_before_publication() {
     rec=$(make_spawn_case "$id" omp "$id")
     read_case_record "$rec"
     mkdir -p "$HOME_DIR/config"
-    printf '%s\n' '{"version":1,"roles":{},"retired":["deepseek-v4-flash"]}' > "$HOME_DIR/config/model-index.json"
-    printf '%s\n' '{"rules":[{"when":"work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+    printf '%s\n' '{"version":1,"roles":{},"retired":["native-model"]}' > "$HOME_DIR/config/model-index.json"
+    printf '%s\n' '{"rules":[{"when":"work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
     jq -n --arg state "$capacity" --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
       metadata:{meterStates:{chat:{allowed:($state=="usable"),limitReached:($state=="exhausted")}}}}]}' > "$CASE_DIR/usage.json"
     out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
@@ -761,8 +761,8 @@ test_spawn_ignores_stale_unrelated_rules() {
   rec=$(make_spawn_case "$id" omp "$id")
   read_case_record "$rec"
   mkdir -p "$HOME_DIR/config"
-  printf '%s\n' '{"version":1,"roles":{},"retired":["deepseek-v4-flash"]}' > "$HOME_DIR/config/model-index.json"
-  printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}},{"when":"unconfigured","use":{"harness":"omp","role":"missing-role"}},{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6-astra","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"ultra"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+  printf '%s\n' '{"version":1,"roles":{},"retired":["native-model"]}' > "$HOME_DIR/config/model-index.json"
+  printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}},{"when":"unconfigured","use":{"harness":"omp","role":"missing-role"}},{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6-astra","effort":"high"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"ultra"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
   jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
     metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
   out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high)
@@ -1500,10 +1500,9 @@ test_secondmate_config_pinned_model_is_validated() {
 }
 
 test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh() {
-  # DeepSeek work routes to dsh only by default for a crewmate or scout. A
-  # secondmate has no dsh adapter, so a configured or requested omp stand-in on
-  # a DeepSeek model must launch on omp, and only an explicit dsh pin refuses.
-  local world home fakebin launchlog out status launch via
+  # dsh has no secondmate protocol. DeepSeek must refuse rather than escape
+  # that unsupported boundary through the former omp route.
+  local world home fakebin launchlog out status via
   local -a extra
   for via in config model dsh; do
     extra=()
@@ -1540,14 +1539,12 @@ test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh() {
       [ ! -s "$launchlog" ] || fail "a refused dsh secondmate must record no launch: $(cat "$launchlog")"
       continue
     fi
-    expect_code 0 "$status" "a $via-selected omp DeepSeek secondmate must not be rerouted to dsh: $out"
-    assert_grep "harness=omp" "$world/home/state/sm.meta" "the $via-selected DeepSeek secondmate must stay on omp"
-    assert_grep "model=deepseek/deepseek-v4-flash" "$world/home/state/sm.meta" "the $via-selected DeepSeek model must be recorded"
-    launch=$(cat "$launchlog")
-    assert_contains "$launch" "FM_OMP_HARNESS=omp" "the $via-selected DeepSeek secondmate must launch on omp: $launch"
-    assert_not_contains "$launch" "FM_DSH_HARNESS=dsh" "a secondmate must never launch on dsh: $launch"
+    expect_code 1 "$status" "a $via-selected DeepSeek secondmate must not fall back to omp: $out"
+    assert_contains "$out" "DeepSeek runs through dsh-tui, not omp" "the refusal must name the adapter cutover"
+    assert_absent "$world/home/state/sm.meta" "a refused DeepSeek secondmate must publish no metadata"
+    [ ! -s "$launchlog" ] || fail "a refused DeepSeek secondmate must launch nothing"
   done
-  pass "fm-spawn: a DeepSeek model never reroutes a secondmate to dsh, and only an explicit dsh pin refuses"
+  pass "fm-spawn: unsupported DeepSeek secondmates refuse rather than retain omp"
 }
 
 # --- 3. Busy state -------------------------------------------------------------

@@ -40,7 +40,7 @@ The optional claude-bridge extension runs a nested executable literally named `c
 [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns session posture, worker-only memory scope, and the invariant that the captain's own configuration is never written.
 OMP 18.6.1 natively rotates pooled credentials on `usage_limit_reached`; native rotation also applies to review processes launched with extensions disabled.
 Workers enable usage-aware selection without a generic percentage reserve or reset wait, and a later per-task overlay, `state/<id>.omp-fallback.yml`, supplies only the selected rule's exact model-and-effort fallback chain.
-Inspect pooled headroom through `bin/fm-dispatch-capacity.sh`, not quota-axi's single Codex account; the schema, the tracked session overlay's Sol-to-DeepSeek-Flash chain, and supported cross-harness stand-ins belong to `docs/configuration.md`.
+Inspect pooled headroom through `bin/fm-dispatch-capacity.sh`, not quota-axi's single Codex account; the schema and supported cross-harness stand-ins belong to `docs/configuration.md`, while [dsh routing](dsh.md#routing) owns the replacement of omp for DeepSeek.
 
 ## Extension loading
 
