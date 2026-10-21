@@ -197,7 +197,9 @@
 # forced Treehouse return of a Git directory (pool slot or not), its Git
 # worktree registrations must contain no nested
 # copy outside this task's individually proven copies; otherwise teardown
-# refuses, even with --force, and names each such copy. If an active record
+# refuses, even with --force, and names each such copy, except that without
+# --force a copy the held-copy rule below leaves standing does not refuse the
+# close. If an active record
 # owns that copy's work, reassociate that task to it first. A nested copy that
 # no record of this task names is a foreign copy (Vernant's
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
@@ -212,8 +214,11 @@
 # that is not teardown's own is never signalled and refuses at once, named by its
 # pid; it is a clean worktree root, and each ignored file it holds is either
 # regenerable machinery or copied with its SHA-256 into the task's data
-# directory before removal; and its work is landed by the existing landed-work
-# rule. A copy whose work is not proved landed stays, with the reason written.
+# directory before removal (a foreign copy that holds any other ignored file is
+# held instead, below, wherever the held-copy rule applies); and its work is
+# landed by the existing landed-work rule. A copy whose work is not proved
+# landed stays, with the reason written, and refuses the close unless the
+# held-copy rule below applies.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -237,8 +242,28 @@
 # like a foreign copy, after the clean and landed proof and the same ignored-file,
 # record, process and launcher proofs; an own copy that is not locked is removed
 # as before.
-# Every other case, including a half-removed copy, refuses as before; --force
-# never waives these proofs. The by-hand route is in docs/agent-control.md.
+# Apart from the held-copy rule below, every other case, including a half-removed
+# copy, refuses as before; --force never waives these proofs. The by-hand route
+# is in docs/agent-control.md.
+# Held copies. A foreign copy that is clean, owned by no record, process or live
+# launcher, and held back only by ignored files that exist nowhere else or by a
+# HEAD that is not proved landed does not stop the close of a task whose own copy
+# passed the landed-work proof (bin/fm-teardown-nested-lib.sh owns the rule).
+# The task closes: its backlog item goes to Done, its record and runtime state go,
+# and only its own nested copies the proof covers are removed; an own nested copy
+# that holds another Git repository or linked worktree refuses instead, since no
+# ref would keep that repository's commits. The pool slot is reserved under a
+# durable lease exactly as an ordinary return reserves it, but it is not
+# returned, and no foreign copy is touched; a slot that cannot be proved durably
+# leased refuses the close before anything is removed. Each held copy is appended
+# to data/held-foreign-copies.log, once, after every proof has passed and before
+# anything is removed; a record that cannot be written refuses the close. The
+# output names each held copy and the next step for its owner. --force never
+# holds a copy, nor does retiring a secondmate home, a copy inside the task's own
+# nested copy is never held, and a copy that is dirty, owned, or has a process in
+# it (this teardown's own included) still refuses. A copy the hold does not apply
+# to that holds unique ignored files has them preserved and is released like any
+# other proved copy. docs/agent-control.md owns the rule.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -4068,6 +4093,79 @@ TEARDOWN_PROOF_OUTCOME="nothing was changed - not even with --force"
 TEARDOWN_PEER_SLOT=
 TEARDOWN_PEER_IDS=()
 TEARDOWN_PEER_HOMES=()
+
+# Held slots. A task whose own copy passed the landed-work proof closes even when
+# foreign copies in its slot hold commits that exist nowhere else or ignored
+# files that exist nowhere else
+# (bin/fm-teardown-nested-lib.sh owns which copies are held). The slot is
+# reserved under a durable lease exactly as an ordinary return reserves it, but
+# never returned; its claim and every foreign copy stay exactly as they were, and
+# only the task's own nested copies the proof covers go. A held close that cannot
+# prove that durable lease refuses before it removes anything. teardown_nested_slot
+# sets TEARDOWN_HELD_SLOT to that slot while all of this holds and recomputes it
+# at each reprove.
+TEARDOWN_HELD_SLOT=
+# Reproves the slot and refuses when the route it was on changed meanwhile: a
+# held close never turns into a slot return, and an ordinary one never into a
+# held close, between the proof and the removal.
+teardown_reprove_same_route() {
+  local was=$TEARDOWN_HELD_SLOT
+  teardown_nested_slot reprove || return 1
+  if [ -n "$was" ] && [ -z "$TEARDOWN_HELD_SLOT" ]; then
+    echo "REFUSED: the foreign copies held in pool slot $was changed since they were proved, so the held close no longer applies. $TEARDOWN_PROOF_OUTCOME." >&2
+    return 1
+  fi
+  if [ -z "$was" ] && [ -n "$TEARDOWN_HELD_SLOT" ]; then
+    echo "REFUSED: a foreign copy in pool slot $TEARDOWN_HELD_SLOT changed since the slot was proved, so the slot is not returned. $TEARDOWN_PROOF_OUTCOME." >&2
+    return 1
+  fi
+}
+
+# Names the held foreign copies, once the task record and the task's own nested
+# copies are gone, which no rerun can bring back, and before the backlog close
+# and the later steps that can still fail. Whatever completion line is printed
+# later, these lines were already printed. The held-copy record was written
+# before anything was removed (teardown_held_copies_record_or_refuse).
+teardown_held_copies_report() {
+  local i entry copy copy_q record="$DATA/held-foreign-copies.log" slot=$TEARDOWN_HELD_SLOT slot_q proj_q holder_q return_cmd sweep=
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$slot" >/dev/null 2>&1 || true
+  slot_q=$(printf '%q' "$slot")
+  proj_q=$(printf '%q' "$PROJ")
+  if [ -n "${FM_TASK_COPY_SLOT_HOLDER:-}" ]; then
+    holder_q=$(printf '%q' "$FM_TASK_COPY_SLOT_HOLDER")
+  else
+    holder_q="'<the lease holder that treehouse status shows for the slot>'"
+  fi
+  return_cmd="(cd $proj_q && treehouse return $slot_q --if-lease-holder $holder_q </dev/null)"
+  echo "notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy."
+  for i in "${!TEARDOWN_FOREIGN_HELD[@]}"; do
+    entry=${TEARDOWN_FOREIGN_HELD[$i]}
+    copy=${entry%%$'\t'*}
+    copy_q=$(printf '%q' "$copy")
+    [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" != commits ] || sweep="; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and never a copy locked by Vernant's creation lock or held for ignored files"
+    echo "notice: held foreign copy $(fm_refuse_text "$copy") stays in pool slot $(fm_refuse_text "$slot"): $(fm_refuse_text "${entry#*$'\t'}")."
+    if [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" = ignored ]; then
+      echo "notice: next step for the owner of $(fm_refuse_text "$copy"): review its ignored files with git -C $copy_q status --ignored and save the ones you need, with any commits only it holds (git -C $copy_q log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with $return_cmd."
+    else
+      echo "notice: next step for the owner of $(fm_refuse_text "$copy"): list the commits only it holds with git -C $copy_q log --oneline HEAD --not --remotes, land them, remove the copy with git -C $slot_q worktree remove $copy_q (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree $copy_q --execute-cleanup, run from the slot), and when no copy is left in the slot return it with $return_cmd."
+    fi
+  done
+  echo "notice: pool slot $slot is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it$sweep."
+  echo "notice: each held copy is also listed in $record."
+}
+
+# Writes the held-copy record before anything is removed, and refuses the close
+# when it cannot, so a close that happened never lacks its inventory. A line
+# already there for the same copy is not repeated.
+teardown_held_copies_record_or_refuse() {
+  [ -n "$TEARDOWN_HELD_SLOT" ] || return 0
+  teardown_owns_worktree || return 0
+  teardown_held_copies_record && return 0
+  echo "REFUSED: the held-copy record $DATA/held-foreign-copies.log could not be written, and a held close never closes without its inventory of the foreign copies it leaves; nothing was removed." >&2
+  return 1
+}
 teardown_slot_peers_detect() {  # <slot>
   local slot=$1 target state_dir other_meta line names_slot
   TEARDOWN_PEER_IDS=()
@@ -4161,7 +4259,7 @@ teardown_own_copy_disposable() {  # <canonical-copy>
 # already removed by then.
 teardown_nested_slot_reprove_after_lock() {
   TEARDOWN_PROOF_OUTCOME="the slot was not returned, but earlier cleanup steps already ran, including removing its nested and foreign copies; --force does not waive this proof"
-  teardown_nested_slot reprove
+  teardown_reprove_same_route
 }
 
 teardown_nested_slot() {  # prove | landed | retire | reprove | return
@@ -4173,6 +4271,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       TEARDOWN_PEER_SLOT=
       TEARDOWN_PEER_IDS=()
       TEARDOWN_PEER_HOMES=()
+      TEARDOWN_HELD_SLOT=
       if [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
         TEARDOWN_ENCLOSING_SLOT=
         return 0
@@ -4262,11 +4361,24 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         fi
       fi
       # Foreign copies the library proves are allowed here; an unprovable one is
-      # named by the library and refused by the custody check below.
+      # named by the library and refused by the custody check below. When every
+      # refused one is a held copy, the slot is not returned, no foreign copy is
+      # released, and the custody check is not asked to approve a return.
+      TEARDOWN_HELD_SLOT=
       [ -z "$TEARDOWN_RETURN_SLOT" ] || teardown_foreign_copies_prove "$TEARDOWN_RETURN_SLOT"
-      [ -z "$TEARDOWN_RETURN_SLOT" ] || require_registered_slot_copies "$ID" "$TEARDOWN_RETURN_SLOT" \
-        ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
-        ${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"} || return 1
+      if [ -n "$TEARDOWN_RETURN_SLOT" ] && [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] \
+          && [ "$TEARDOWN_FOREIGN_REFUSED" = 0 ]; then
+        TEARDOWN_HELD_SLOT=$TEARDOWN_RETURN_SLOT
+        TEARDOWN_FOREIGN_COPIES=()
+        # The held close removes the own nested copies with whatever they hold,
+        # and the registered-copy check that would see a separate repository there
+        # is not asked, so it is asked here.
+        teardown_own_nested_other_repos || return 1
+      elif [ -n "$TEARDOWN_RETURN_SLOT" ]; then
+        require_registered_slot_copies "$ID" "$TEARDOWN_RETURN_SLOT" \
+          ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
+          ${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"} || return 1
+      fi
       for copy in ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
         [ -d "$copy" ] || [ "$copy" = "$TEARDOWN_RETURN_SLOT" ] || continue
         teardown_own_copy_disposable "$copy" || return 1
@@ -4292,20 +4404,21 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       reap_task_worktree_processes worktree "${swept[@]}" "$TASK_TMP" || exit 1
       ;;
     return)
-      if [ -n "$TEARDOWN_PEER_SLOT" ]; then
-        # Only this task's own copy goes; the slot, its lease and every peer's
-        # copy stay, and the claim moves to a peer when it was this task's.
+      if [ -n "$TEARDOWN_PEER_SLOT" ] || [ -n "$TEARDOWN_HELD_SLOT" ]; then
+        # Only this task's own copy goes; the slot and every peer's or held
+        # foreign copy stay, and the claim moves to a peer when it was this
+        # task's. A held slot keeps its claim as it stands.
         TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
-        teardown_nested_slot reprove || exit 1
+        teardown_reprove_same_route || exit 1
         [ ! -d "$WT" ] || require_worktree_teardown_safety
         teardown_own_locked_copies_release || exit 1
-        teardown_remove_own_nested_copies "from pool slot $TEARDOWN_PEER_SLOT, which other tasks still work in"
-        teardown_peer_claim_handoff
+        teardown_remove_own_nested_copies "from pool slot ${TEARDOWN_PEER_SLOT:-$TEARDOWN_HELD_SLOT}, which keeps copies that are not this task's"
+        [ -z "$TEARDOWN_PEER_SLOT" ] || teardown_peer_claim_handoff
         return 0
       fi
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then
         TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
-        teardown_nested_slot reprove || exit 1
+        teardown_reprove_same_route || exit 1
       fi
       # Foreign copies are released before anything else is removed, each proved
       # again first; a refusal leaves the slot as it is.
@@ -5694,7 +5807,11 @@ fi
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
 # Every refusal above leaves the slot as it found it. Reserve it under fresh
-# project custody only now, immediately before the first destructive step.
+# project custody only now, immediately before the first destructive step. A peer
+# slot is never reserved, because nothing slot-wide is returned. A held slot is
+# reserved the same way and must end up durably leased, because it is never
+# returned and a later treehouse get could otherwise reset it over the foreign
+# copies it holds.
 if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?
   if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
@@ -5710,7 +5827,11 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$T
   fi
   if [ -n "$TEARDOWN_RESERVED_SLOT" ]; then
     require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RESERVED_SLOT" || exit 1
-    teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" || exit 1
+    if ! teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" \
+        || { [ -n "$TEARDOWN_HELD_SLOT" ] && [ "$TEARDOWN_SLOT_CUSTODY" != lease ]; }; then
+      [ -z "$TEARDOWN_HELD_SLOT" ] || echo "REFUSED: pool slot $TEARDOWN_RESERVED_SLOT could not be durably leased, and a held close never leaves a pool slot without a durable lease, since a later treehouse get could reset it over the foreign copies it holds; nothing was removed." >&2
+      exit 1
+    fi
     teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
@@ -5720,6 +5841,7 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
 fi
+[ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
 elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
@@ -5909,7 +6031,7 @@ elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
   if [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
     TEARDOWN_DEFERRED_POOL_CLEANUP=shared
   fi
-elif [ "$KIND" != secondmate ] && [ -n "$TEARDOWN_PEER_SLOT" ]; then
+elif [ "$KIND" != secondmate ] && { [ -n "$TEARDOWN_PEER_SLOT" ] || [ -n "$TEARDOWN_HELD_SLOT" ]; }; then
   if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ]; then
     TEARDOWN_DEFERRED_POOL_CLEANUP=peers
   else
@@ -6036,7 +6158,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   teardown_mark_return_pending "${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-$TEARDOWN_SHARED_SLOT}}" || exit 1
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ] || [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = peers ]; then
     TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
-    teardown_nested_slot reprove || exit 1
+    teardown_reprove_same_route || exit 1
     teardown_foreign_copies_release || exit 1
     [ ! -d "$WT" ] || require_worktree_teardown_safety
     teardown_own_locked_copies_release || exit 1
@@ -6083,6 +6205,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   TEARDOWN_META_REMOVED=1
   teardown_release_project_lock || exit 1
 fi
+[ -z "$TEARDOWN_HELD_SLOT" ] || ! teardown_owns_worktree || teardown_held_copies_report
 # The record is gone, so the backlog must not still show this task in flight
 # when teardown reports success. Still under this task's meta lock, so a steer
 # racing the same id stays serialized exactly as it was before. A captain-held
@@ -6141,6 +6264,8 @@ elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}; shared pool slot $TEARDOWN_SHARED_SLOT and every copy inside it left untouched; only this task's own slot claim, if present, released)"
+elif [ -n "$TEARDOWN_HELD_SLOT" ] && teardown_owns_worktree; then
+  echo "teardown $ID complete (window ${T:-none}; the task's own work is landed and its record is closed, but pool slot $TEARDOWN_HELD_SLOT is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)"
 elif [ -n "$TEARDOWN_PEER_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed; pool slot $TEARDOWN_PEER_SLOT left in place, since task ${TEARDOWN_PEER_IDS[*]} still works in it)"
 elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && teardown_owns_worktree; then
