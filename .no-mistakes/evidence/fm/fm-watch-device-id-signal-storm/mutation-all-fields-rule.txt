@@ -1,0 +1,6 @@
+### MUTANT (classified migrates only when all reported fields equal): FM_TEST_ONLY=test_status_device_shift_lagging_log_reads_only_new_bytes bash tests/fm-watch-triage.test.sh
+not ok - a lagging log was reclassified from before its classified offset: 0 
+rc=
+### RESTORED HEAD
+ok - a log that lags its marker across a device shift reads only its new bytes and signals once
+rc=

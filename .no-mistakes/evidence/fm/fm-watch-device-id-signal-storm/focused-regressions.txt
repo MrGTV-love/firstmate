@@ -1,0 +1,41 @@
+### FM_TEST_ONLY=test_status_device_shift_does_not_resignal bash tests/fm-watch-triage.test.sh
+tests/fm-watch-triage-helpers.sh: line 49: 40805 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - device-only shift migrates seen and heartbeat markers; two passes enqueue no wake
+tests/fm-watch-triage-helpers.sh: line 49: 95345 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - a log that grows after device migration signals once
+rc=0 secs=30
+### FM_TEST_ONLY=test_status_identity_replacement_still_signals bash tests/fm-watch-triage.test.sh
+ok - changed inode, birth, device plus inode, weak identity, growth, and mode still signal once
+rc=0 secs=35
+### FM_TEST_ONLY=test_status_device_shift_lagging_log_reads_only_new_bytes bash tests/fm-watch-triage.test.sh
+tests/fm-watch-triage-helpers.sh: line 49: 65349 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - a log that lags its marker across a device shift reads only its new bytes and signals once
+rc=0 secs=22
+### FM_TEST_ONLY=test_status_device_shift_keeps_owned_appends bash tests/fm-watch-triage.test.sh
+tests/fm-watch-triage-helpers.sh: line 49: 29952 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - owned appends recorded before a device shift stay owned and do not wake
+rc=0 secs=21
+### FM_TEST_ONLY=test_status_marker_adoption_follows_each_field_device bash tests/fm-watch-triage.test.sh
+ok - adoption leaves a same-device lag alone and migrates each field whose device differs
+rc=0 secs=9
+### FM_TEST_ONLY=test_signal_rescan_deduplicates_pending bash tests/fm-watch-triage.test.sh
+ok - eight pending files produce eight rows, retaining the newest between-scan state
+rc=0 secs=22
+### FM_TEST_ONLY=test_long_status_scan_keeps_beacon_fresh bash tests/fm-watch-triage.test.sh
+ok - slow 1.6 MB log classification commits its endpoint and refreshes the beacon within WATCHER_STALE_GRACE=3
+rc=0 secs=26
+### FM_TEST_ONLY=test_vanished_status_log_is_a_quiet_empty_span bash tests/fm-watch-triage.test.sh
+ok - a status log that vanishes before its span is read is a quiet empty span in both scans
+rc=0 secs=11
+### FM_TEST_ONLY=test_quiet_signal_scan_costs_one_stat_per_log bash tests/fm-supervision-fork-budget.test.sh
+ok - a quiet scan of 12 status logs enters 17 subshells (bound 40)
+rc=0
+### FM_TEST_ONLY=test_lagging_marker_scan_costs_no_signature_decode bash tests/fm-supervision-fork-budget.test.sh
+ok - lagging heartbeat markers add 936 commands (bound 1800) and keep the scan at 17 subshells (bound 40)
+rc=0
+### FM_TEST_ONLY=test_quiet_heartbeat_scan_starts_no_owned_capture bash tests/fm-supervision-fork-budget.test.sh
+ok - a quiet heartbeat scan of 12 status logs starts no owned capture; one unread log starts one
+rc=0
+### FM_TEST_ONLY=test_heartbeat_marker_path_matches_the_tr_pipeline bash tests/fm-supervision-fork-budget.test.sh
+ok - the heartbeat marker path is byte-identical to the tr pipeline for every task id shape
+rc=0

@@ -1,0 +1,215 @@
+### bash tests/fm-supervision-events.test.sh
+ok - handle_push_transition: a blocked crew enqueues a stale wake naming its window and wakes the supervisor
+ok - handle_push_transition: enqueue failure cannot commit the Herdr dedupe marker
+ok - handle_push_transition: a declared-pause crew is absorbed (no fast wake), left to the poll loop's long cadence
+ok - handle_push_transition: a captain-held crew is absorbed (no fast wake), left to the poll loop's long cadence
+ok - handle_push_transition: a device-shifted heartbeat marker keeps its classified offset
+ok - event_wait_or_sleep: herdr windows go on the event pane list, but kind=secondmate endpoints are excluded
+ok - event_wait_or_sleep: one cached capability probe owns validation across bounded waits
+ok - event_wait_or_sleep: a home with no push-capable window is inert (sleeps POLL, never touches the event path)
+ok - event_wait_or_sleep: consecutive event-path failures disable the fast-path and revert to pure polling (fail-closed)
+ok - reboot recovery: full sweeps report every unreadable task; bounded inspections rotate one task without lifecycle input
+ok - reboot recovery: independent outcomes survive queue deduplication and every completed attempt cools down its successor
+not ok - term recovery subprocess tree did not start
+not ok - recovery owned-subtree assertions failed
+rc= secs=36
+### bash tests/fm-pr-check-security.test.sh
+ok - raw-byte parser accepts canonical URLs and rejects the complete adversarial matrix
+ok - GitLab merge requests are followed on any instance and never wake falsely
+ok - Forgejo poll reads one pull request by number through tea api and wakes only on merged true
+ok - Forgejo login match parses tea's JSON in every line shape, in the helper and the static poll
+ok - the Gerrit watch wakes only on an explicit merged status and never on submittability
+ok - Gerrit arming records no patch set revision and the merge path refuses to submit
+ok - Gerrit arming accepts a published HEAD only by the change's current patch set tree
+ok - a no-mistakes Gerrit ready report requires the pipeline's fixes recovered into the published copy
+ok - validated merged polls notify once and retire before the next watcher cycle
+ok - a repeat identical merged poll for an already-notified task is absorbed, never queued as a main-blocking row
+ok - a failed upward merge report keeps its poll armed for repair and retry
+ok - staged self-merge and poll interleavings are never silent
+ok - queued merges retain their away authority after captain return
+ok - poll distinguishes attended authorization from external landing
+ok - accepted merge authority refuses rebound task metadata
+ok - accepted merge authority persists under the lifecycle lock
+ok - teardown cannot race merged-poll authority consumption
+ok - poll retirement preserves a replacement authority record
+ok - a merge detected by the poll is reported upward from a secondmate home exactly once
+ok - a different merged PR for the same task gets its own first notification
+ok - a merged poll on a persistent secondmate retires silently: no outcome, marker, or wake, and every lifecycle artifact preserved
+ok - queue, receipt, and every fixed-path removal crash point recover without loss or repeated execution
+ok - open/red, closed-unmerged, malformed, and forge errors remain armed until an exact merged transition
+ok - replacement, nonterminal, tampered, and custom results receive no deletion authority
+ok - queue failure and untrusted receipts preserve canonical poll evidence
+ok - GitHub and GitLab exact merged results share one retirement path
+ok - PR and teardown entrypoints reject invalid arguments before every side effect
+ok - arming refuses a draft pull request, naming it, and arms a ready or unreadable one
+ok - fm-pr-check refuses to record a PR or arm a merge watch on a secondmate record
+ok - fm-pr-check refuses to register a PR whose named head is only in the worker copy
+ok - fm-pr-check refuses a direct-PR registration while a later commit is only in the copy
+ok - fm-pr-check registration refuses a multi-PR task's local-only head; only a merge call judges the PR's head
+ok - registration revalidates worktree and branch before metadata and poll publication for every forge
+ok - valid direct and merge flows record exact metadata and reject multiline head metadata
+ok - rejected metacharacter bytes remain inert at generation and watcher time
+ok - static poll is silent except for one merged line and remains watcher-bounded
+ok - interrupted atomic preparation cleans private temporaries and publishes nothing
+ok - concurrent watchers observe only complete private poll publications
+ok - poll publication paths refuse symlinks and directories
+ok - live poll and custom-check artifacts require private single-link files
+ok - a poll armed before a volume renumber is re-recorded under the control lock and keeps detecting merges
+ok - a renumbered registration is never re-recorded around a tampered artifact: swapped-check altered-check swapped-sidecar altered-sidecar altered-template-hash wrong-mode hardlinked-check split-device (foreign-device not exercisable on Darwin), or a pending retirement
+ok - direct re-arm publication waits without replacing an armed poll
+ok - device re-record publication waits without rewriting its registration
+ok - post-rename poll validation faults revoke both names and allow a clean retry
+ok - bootstrap does not rewrite unauthenticated checks or emit retired migration diagnostics
+ok - watcher signals promptly stop custom checks and clean private state
+ok - returned custom check descendants are drained on installed and fallback timeout paths
+ok - teardown removes safe poll artifacts and refuses directory-shaped check files without traversal
+rc= secs=504
+### bash tests/fm-daemon.test.sh
+ok - fm-afk-start.sh fails before daemon startup when the afk flag cannot be written
+ok - fm-afk-start.sh ignores stale pidfile-only live pids
+ok - fm-afk-start.sh reclaims stale daemon locks whose live pid identity no longer matches
+ok - supervise daemon state root is scoped by FM_HOME
+ok - routine signal self-handles
+ok - captain-relevant status verbs escalate
+ok - check + unknown escalate; heartbeat self-handles
+ok - a delivered unknown wake is acknowledged once per away session; a new one and ordinary escalations still fire
+ok - a failed unknown-wake acknowledgement write does not re-inject a delivered digest
+ok - transient stale self-handles and records a persistence marker
+ok - enriched stale wedges bypass status absorption except under a declared wait, without disturbing busy workers
+ok - an enriched wedge under a declared wait uses the pause cadence and restores wedge detection on resume
+ok - stale + terminal status escalates immediately
+ok - stale escalation and current wait cadence remain independent
+ok - paused reasons with captain phrases remain pause-classified
+ok - a foreign resolved line keeps a pause, while the worker's own resolved line retracts it
+ok - a captain-held transfer classifies as pause, not as a wedge candidate
+ok - handle_wake on a paused stale records a pause marker, drops the wedge marker, and does not escalate
+ok - handle_wake records a declared pause from a routine signal for long-cadence rechecks
+ok - a terminal signal clears pause and stale tracking across both supervisors
+ok - housekeeping migrates a normal-watcher's declared pause into daemon tracking
+ok - housekeeping clears an already-resumed watcher pause across both supervisors
+ok - housekeeping seeds pause tracking from status without a watcher marker
+ok - persistent stale escalates after threshold and clears its marker
+ok - resumed (busy) stale clears its marker without escalating
+ok - housekeeping re-surfaces a stale declared pause on the long cadence and resets its window
+ok - housekeeping re-surfaces a forgotten captain hold on the long cadence and resets its window
+ok - housekeeping silences a captain hold only under an away record, never under quiet mode's
+ok - a busy pane cannot gate the pause clear once its crew's status no longer declares the wait
+ok - housekeeping matures a busy pane's declared-wait window into exactly one recheck per window
+ok - housekeeping bounds a distant declared time, defers to a near one, and rechecks a passed one at once
+ok - housekeeping clears a paused marker once the crew is no longer declaring the pause
+ok - housekeeping clears the pause marker once a captain hold is answered
+ok - housekeeping moves an existing stale marker to pause before wedge escalation
+ok - housekeeping moves a captain hold's existing stale marker to pause before wedge escalation
+ok - housekeeping clears tracking when a crew leaves pause
+ok - persistent herdr stale resolves the target from metadata and escalates
+ok - herdr idle busy-footer stale clears through capture corroboration
+ok - resumed herdr stale clears through backend-aware busy state
+ok - persistent Orca stale resolves the terminal from metadata
+ok - multiple escalations flush as a single batched digest
+ok - batch flush measures max-delay from the first append, not the last
+ok - catch-all scan escalates a missed terminal once, not twice
+ok - handle_wake routes routine->self and captain->escalate
+ok - a decision-owned queued row escalates once as the decision, then suppresses until the status changes
+ok - a captain-held decision-owned row is self-handled without escalation, now and on repeat
+ok - INJECT_SKIP forces self-handle, bypassing captain-relevant classification
+ok - is_wake_reason distinguishes watcher wake reasons from singleton-status stdout
+ok - terminal-stale escalate removes its marker so housekeeping does not re-escalate
+ok - captain signal escalate marks seen so the catch-all scan does not re-fire
+ok - _collapse_newlines replaces newlines with literal separator
+ok - afk flag absent: daemon does not inject, buffer preserved
+ok - busy-guard defers injection when supervisor pane is busy
+ok - working omp empty boxes defer afk injection; idle omp boxes submit the retained digest
+ok - marker detection: marker -> stay afk, no marker -> exit afk
+ok - /afk invocation is exempt from afk exit (no self-cancel)
+ok - should_exit_afk returns false when afk is not active
+ok - strip_injection_marker removes the sentinel marker cleanly
+ok - a marker-preserving primary still receives the typed U+2063 away-supervisor envelope and no record
+ok - record-backed doorbell: only a doorbell naming this home's own record stays afk; a bare ASCII label, a missing record, and another home's record exit
+ok - pane_input_pending detects partial input on the cursor line
+ok - pane_input_pending: a blank unidentified cursor row defers (strict container-proof rule)
+ok - pane_input_pending: only proven empty agent prompts pass
+ok - fm_tmux_composer_state: a bare shell prompt ($/%/#/>) reads unknown, never empty (dead-shell injection safety)
+ok - fm_tmux_composer_state: a bordered composer box and bare agent glyphs (❯/›) still read empty
+ok - fm_tmux_composer_state: only matching edge borders form a composer box
+ok - pane_input_pending preserves bright placeholder-like drafts in styled captures
+ok - classify_signal dedupes against the catch-all scan seen marker
+ok - daemon migrates device-only status identity without repeating an old result or swallowing growth
+ok - turn-end markers stay routine while mixed actionable status batches escalate
+ok - an actionable event is escalated to an away captain despite later routine appends
+ok - the daemon commits exactly the endpoint captured by classification
+ok - a stale wake escalates a blocker hidden by later progress
+ok - a stale span read failure surfaces without advancing its marker
+ok - a recreated status rejects the old captured identity
+ok - an unverifiable status identity surfaces without advancing markers
+ok - a status read failure surfaces without advancing the daemon suppressor
+ok - catch-all routine scans advance before later actionable appends
+ok - failed escalation writes retain durable wakes and classification positions
+ok - away mode escalates each overdue row once per digest, records the receipt, and acknowledges
+ok - stuck inbox escalation reaches supervision in away mode and survives buffering failure
+ok - stuck inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - write inbox escalation reaches supervision in away mode and survives buffering failure
+ok - write inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - reset inbox escalation reaches supervision in away mode and survives buffering failure
+ok - reset inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - inbox dispatch preserves ordinary stale, busy-turn, and other doorbell routing
+ok - catch-all markers advance only after escalation buffering succeeds
+ok - classification failure retains the complete durable wake batch
+ok - missing-status stale wakes remain ordinary and acknowledgeable
+ok - transient unreadable signals recover without advancing their position
+ok - daemon catch-all reclassifies permission-recovered status content
+ok - a permanent classification failure is reported, acknowledged, and never advances its position
+ok - the away-mode catch-all scan surfaces a masked event once
+ok - classify_stale dedupes against the signal path seen marker
+ok - AFK nonterminal working:+merged keeps wedge aging and re-escalates at bound
+ok - genuine done: and merge-check events still escalate
+ok - pane_input_pending: an idle bordered composer is NOT pending (afk-invx-i5)
+ok - pane_input_pending: text inside a bordered composer is still pending
+ok - submit-ACK confirms a submit when the composer returns to a bordered-empty box
+ok - submit-ACK reports pending on a persistently swallowed Enter (type-once)
+ok - max-defer on an empty stuck pane types once, alarms, and preserves the buffer
+ok - max-defer flushes and clears the buffer on an empty bordered pane
+ok - max-defer on a pending composer alarms without typing
+ok - normal flush clears a stale wedge marker
+ok - an oversized buffered digest is delivered bounded, with the full text kept durable
+ok - a digest past its byte budget counts the omitted events and keeps them in the full text
+ok - an initial-send failure logs its stage, bytes, and stderr, and the wedge alarm names it
+ok - an Enter-confirmation failure logs its own stage and byte count
+ok - a bounded digest's full-text file survives a failure after typing, and a deferral writes none
+ok - below MAX_DEFER: no inject, no alarm, buffer preserved
+ok - max-defer does not flush or alarm while afk is inactive
+ok - library mode: sourcing the daemon defaults FM_WEDGE_ALARM_EXEC to discard (no test can fire a real notification)
+ok - wake helpers replace inherited notifier overrides with the safe recorder
+ok - the discard seam suppresses every notifier, including command: (fires nothing)
+ok - direct notifier helpers honor the discard seam, including command:
+ok - osascript channel routes through the notifier seam with the summary (never a real notification)
+ok - herdr channel routes through the notifier seam with the summary (never a real notification)
+ok - command channel runs the captain command with the summary on $1 and on stdin
+ok - command channel failures redact configured commands while logging their exit status
+ok - unknown channel directives are redacted while the alarm keeps running
+ok - off disables every active alert regardless of directive position (marker and tmux flash are unaffected)
+ok - auto resolves to the macOS osascript notifier on Darwin (default-on)
+ok - auto on a non-macOS platform selects no built-in OS channel (the marker or a configured command carries it)
+ok - config/wedge-alarm selects every configured channel and skips comment and blank lines
+ok - a failing channel logs and falls back to the next channel, never crashing the alarm
+ok - a hung notifier is bounded, logged, and falls through to the next channel
+ok - a backgrounded command notifier remains bounded until its process group is reaped
+ok - a hung notifier override is bounded, logged, and proceeds to the next channel
+ok - daemon shutdown stops and reaps the active notifier process group
+ok - inject_wedge_alarm writes the marker AND emits the active alert even with no tmux status-line (herdr backend)
+ok - in-process wedge throttle prevents alert spam when the marker cannot persist
+ok - fm-send returns 3 with a non-error no-resend warning when confirmation stays pending
+ok - fm-send exits non-zero when initial text send fails
+ok - fm-send exits non-zero unless delivery is proven empty
+ok - discover_supervisor_backend: override > TMUX_PANE > HERDR_ENV+HERDR_PANE_ID > tmux fallback
+ok - discover_supervisor_target: override > TMUX_PANE > herdr '<session>:<pane-id>' composition > firstmate:0 fallback
+ok - pane_is_busy: herdr native busy_state='busy' short-circuits without a capture fallback
+ok - primary busy guard isolates rendered signatures by detected harness
+ok - pane_is_busy: omitted backend defaults to tmux for Grok's isolated fallback
+ok - pane_input_pending: dispatches through fm_backend_composer_state for backend=herdr
+ok - inject_msg: herdr busy-guard defers before ever attempting a submit
+ok - inject_msg: herdr composer-guard defers before ever attempting a submit
+ok - inject_msg: herdr pane-gone check defers before any busy/composer/submit call
+ok - inject_msg: dispatches busy-guard/composer-guard/submit through the herdr backend and succeeds on a confirmed empty composer
+ok - inject_msg: defers on a dead-shell/unreadable composer (unknown), never typing the escalation into a shell
+ok - inject_msg: unrecognized composer states defer by default
+rc= secs=122
