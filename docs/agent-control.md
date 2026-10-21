@@ -174,9 +174,12 @@ The command writes only the session record, never unlocks a session, modifies a 
 It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
 A stale registration alone grants no authority.
 The resolved foreground process must also classify as an agent process, so a registration that outlives its agent cannot make another program in the worktree a lifecycle target.
-When the existing record already names the same live PID, its current-session activation must be nonempty and identify the registered task file.
-An empty activation is the omp extension's own unproven mark, written on shutdown, before a switch, or after a failed start, and an activation naming another file is a different conversation.
-Adoption refuses both without rewriting that evidence, even if Herdr still registers the original task file; a record naming a different PID is the repair target.
+An empty activation in a record naming the live PID is the omp extension's own unproven mark, written on shutdown, before a switch, or after a failed start, and an activation naming another file is a different conversation.
+Adoption refuses both without rewriting that evidence, even if Herdr still registers the original task file.
+Only a record whose process is gone is the repair target: a record naming any live process, including the resolved foreground PID with a healthy activation, is refused unchanged, because the extension of a live process rewrites its record by rename and without the control locks.
+A recorded PID that an unrelated live process has since reused is refused the same way.
+Publication is conditional on that record staying as it was proved: the record is set aside, compared with the bytes the proofs were gathered from, and replaced only through a link that never overwrites.
+A record the extension publishes meanwhile is kept, and the adoption refuses.
 Every refusal names the missing proof, and no refusal lowers the workspace or duplicate-pane requirements.
 
 **This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**
