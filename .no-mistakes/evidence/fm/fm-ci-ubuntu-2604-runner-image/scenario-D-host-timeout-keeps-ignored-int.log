@@ -1,0 +1,4 @@
+### Scenario D: a host 'timeout' (stand-in) that keeps inherited-ignored INT; caller ignores INT; bound 1s
+### PATH has the stub timeout first, then perl. Old script prefers timeout; new script prefers perl.
+base: exit=137 cleanup-marker=MISSING
+new: exit=124 cleanup-marker=interrupted

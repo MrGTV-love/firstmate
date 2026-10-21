@@ -1,0 +1,30 @@
+FM_TEST_BEGIN 2026-10-21T20:31:01Z tests/fm-busy-adapter-wiring.test.sh family=standalone expected_gate_skip=none
+ok - a claude secondmate spawn arms the busy contract the stall gate can see, and Stop does not wake the parent
+ok - a raw claude, pi, pi-signed, or omp secondmate launch writes no busy wiring and classifies unknown
+ok - a claude secondmate's Stop guard records busy on a blocked Stop and idle on an allowed one, in any hook order, and a rewake turn reopens busy
+ok - a claude secondmate whose home guard predates .fm-busy-stop keeps the Stop idle hook
+ok - a claude secondmate spawn leaves an existing settings.local.json untouched
+ok - a pi secondmate loads the busy extension beside its primary extensions and does not emit a parent turn-end
+ok - an omp secondmate names only the out-of-home busy extension and does not emit a parent turn-end
+ok - an opencode secondmate plugin closes the parent busy record without a parent turn-end
+ok - codex and grok secondmates stay on their existing verdicts and do not emit a parent turn-end
+ok - pi extension reports agent_start busy, settles idle only via ctx.isIdle(), and keeps turn_end a notification
+ok - pi extension awaits agent_settled before the next agent_start without a test delay
+ok - pi extension events from a superseded incarnation are rejected as stale
+ok - kimi and grok install no unverified semantic wiring and classify through their own gates
+ok - opencode plugin classifies from session.status, scoped to the latched worker session
+ok - claude hooks open on UserPromptSubmit and close on Stop, StopFailure, and SessionEnd
+ok - claude Stop rejects only exit 2 and closes accepted, failed, and timed-out turns before the host deadline
+ok - claude hook events from a superseded incarnation are rejected without breaking the hook
+ok - gemini hooks open on BeforeAgent and close on AfterAgent and a repeated SessionEnd
+ok - gemini hook events from a superseded incarnation are rejected without breaking the hook
+ok - raw gemini launch remains unwired and classifies unknown
+ok - gemini is refused as a secondmate because it has no primary supervision protocol
+ok - codex classifies unknown until a semantic source is verified, never idle or footer-matched
+all fm-busy-adapter-wiring tests passed
+FM_TEST_END 2026-10-21T20:33:31Z tests/fm-busy-adapter-wiring.test.sh exit=0 duration_ms=150455 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FT8PPW62321AFAFP5AC358/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=150900
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=150455 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-busy-adapter-wiring.test.sh duration_ms=150455
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FT8PPW62321AFAFP5AC358/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

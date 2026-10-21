@@ -1,0 +1,6 @@
+### Scenario E1: Pi types test, tsc absent from PATH (npm present) -> the reported gate-skip
+skip: Pi extension typecheck prerequisite not found: tsc
+exit=0
+### Scenario E2: tsc + Pi installed globally the way the workflow now installs them (disposable prefix /Users/charlesabrooker/tmp/fm-ck.YfO5LN/npmg)
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.3.0
+exit=0

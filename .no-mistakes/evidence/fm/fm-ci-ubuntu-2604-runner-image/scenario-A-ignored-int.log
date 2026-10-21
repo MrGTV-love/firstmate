@@ -1,0 +1,3 @@
+### Scenario A: caller passes SIGINT ignored; bound is 1s; watcher traps INT to write a cleanup marker
+base: exit=124 cleanup-marker=interrupted
+new: exit=124 cleanup-marker=interrupted

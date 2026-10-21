@@ -1,0 +1,11 @@
+### Scenario A2: same, but only perl is on PATH (no timeout/gtimeout), caller ignores INT, bound 1s
+base: exit=124 cleanup-marker=MISSING
+new: exit=124 cleanup-marker=interrupted
+
+### Scenario B: watcher path has a space (perl-only PATH)
+base: exit=2 out=[] err=[exec failed: No such file or directory]
+new: exit=0 out=[signal: spaced.status] err=[]
+
+### Scenario C: watcher killed by SIGKILL before the bound (perl-only PATH): exit should be 137, not 0/quiet
+base: exit=0 out=[]
+new: exit=137 out=[]
