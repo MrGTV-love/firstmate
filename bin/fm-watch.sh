@@ -300,7 +300,7 @@ WATCHER_DOWNTIME_MARKER="$STATE/.watcher-down"
 # watcher mid-cycle. Detect the platform once and pick the right form.
 # On Darwin, call /usr/bin/stat rather than PATH-resolved stat so GNU coreutils
 # cannot shadow the BSD `-f` syntax.
-if [ "$(uname)" = Darwin ]; then
+if [ "$_FM_UNAME" = Darwin ]; then
   stat_mtime() { /usr/bin/stat -f %m "$1" 2>/dev/null; }        # epoch seconds of mtime
 else
   stat_mtime() { stat -c %Y "$1" 2>/dev/null; }
@@ -2213,31 +2213,59 @@ FM_CHECK_OUTPUT=
 FM_CHECK_RESULT=
 FM_CHECK_STATUS=0
 FM_CHECK_SIGNAL_PENDING=
+FM_CHECK_WAIT_FD=
+FM_CHECK_WAIT_WRITER=
+FM_CHECK_WAIT_FIFO=
 
 fm_check_output_cleanup() {
+  if [ -n "$FM_CHECK_WAIT_FD" ]; then
+    eval "exec $FM_CHECK_WAIT_FD<&-"
+    FM_CHECK_WAIT_FD=
+  fi
+  if [ -n "$FM_CHECK_WAIT_WRITER" ]; then
+    eval "exec $FM_CHECK_WAIT_WRITER>&-"
+    FM_CHECK_WAIT_WRITER=
+  fi
+  [ -z "$FM_CHECK_WAIT_FIFO" ] || rm -f -- "$FM_CHECK_WAIT_FIFO"
+  FM_CHECK_WAIT_FIFO=
   [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT"
   FM_CHECK_OUTPUT=
 }
 
+# Bash 3.2 has neither wait -n nor fractional read timeouts. EOF on a private
+# pipe wakes the main shell as soon as the check closes its inherited writer.
+# Open read/write first so neither side can block at open, then keep a separate
+# reader for the parent. Unlink immediately so interrupted waits leave no FIFO.
+fm_check_wait_open() {
+  _fm_wake_require_timeout
+  FM_CHECK_WAIT_WRITER=$(fm_timeout_free_fd 20) || return 1
+  FM_CHECK_WAIT_FD=$(fm_timeout_free_fd $((FM_CHECK_WAIT_WRITER + 1))) || return 1
+  FM_CHECK_WAIT_FIFO="$FM_CHECK_OUTPUT.wait"
+  mkfifo -m 600 "$FM_CHECK_WAIT_FIFO" || return 1
+  eval "exec $FM_CHECK_WAIT_WRITER<>\"\$FM_CHECK_WAIT_FIFO\" $FM_CHECK_WAIT_FD<\"\$FM_CHECK_WAIT_FIFO\"" || return 1
+  rm -f -- "$FM_CHECK_WAIT_FIFO" || return 1
+  FM_CHECK_WAIT_FIFO=
+}
+
+# Keep the existing hundredth-second stop polls and their bounds, but spend one
+# process for the entire wait rather than launching sleep on every poll. Perl is
+# already required by the portable check timeout controller.
+fm_check_group_wait() {  # <pgid> <polls>
+  kill -0 -- "-$1" 2>/dev/null || return 0
+  perl -e 'my ($group, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, -$group); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
+}
+
 fm_active_check_stop() {
-  local pid=${FM_ACTIVE_CHECK_PID:-} pgid=${FM_ACTIVE_CHECK_PGID:-} i
+  local pid=${FM_ACTIVE_CHECK_PID:-} pgid=${FM_ACTIVE_CHECK_PGID:-}
   local stop_polls=$((FM_ACTIVE_CHECK_GRACE * 100 + 20))
   [ -n "$pid" ] || [ -n "$pgid" ] || return 0
   [ -z "$pgid" ] || kill -TERM -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
-  i=0
-  while [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null && [ "$i" -lt "$stop_polls" ]; do
-    sleep 0.01
-    i=$((i + 1))
-  done
+  [ -z "$pgid" ] || fm_check_group_wait "$pgid" "$stop_polls" || true
   [ -z "$pgid" ] || kill -KILL -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -KILL "$pid" 2>/dev/null || true
   [ -z "$pid" ] || wait "$pid" 2>/dev/null || true
-  i=0
-  while [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null && [ "$i" -lt 100 ]; do
-    sleep 0.01
-    i=$((i + 1))
-  done
+  [ -z "$pgid" ] || fm_check_group_wait "$pgid" 100 || return 1
   if [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null; then
     return 1
   fi
@@ -2269,13 +2297,14 @@ run_check_capture() {
 }
 
 run_owned_capture() {
-  local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started
+  local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started completion
   shift 3
   fm_check_output_cleanup
   FM_CHECK_RESULT=
   FM_CHECK_STATUS=0
   FM_CHECK_OUTPUT=$(mktemp "$STATE/.fm-check-output.XXXXXX") || return 1
   chmod 0600 "$FM_CHECK_OUTPUT" || { fm_check_output_cleanup; return 1; }
+  fm_check_wait_open || { fm_check_output_cleanup; return 1; }
   FM_CHECK_SIGNAL_PENDING=
   # Defer stop signals only until the check's process group is recorded for
   # watcher_cleanup. Keep command substitutions out of this window: bash 5.2
@@ -2284,6 +2313,7 @@ run_owned_capture() {
   set -m
   check_started=$SECONDS
   (
+    eval "exec $FM_CHECK_WAIT_FD<&-"
     if [ "$capture_stderr" = discard ]; then
       "$@" 2>/dev/null
     else
@@ -2294,6 +2324,8 @@ run_owned_capture() {
   FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
   FM_ACTIVE_CHECK_GRACE=$capture_grace
   set +m
+  eval "exec $FM_CHECK_WAIT_WRITER>&-"
+  FM_CHECK_WAIT_WRITER=
   watcher_stop_signals
   [ -z "$FM_CHECK_SIGNAL_PENDING" ] || exit 1
   pgid=$(ps -o pgid= -p "$FM_ACTIVE_CHECK_PID" 2>/dev/null | tr -d '[:space:]')
@@ -2302,8 +2334,10 @@ run_owned_capture() {
     fm_check_output_cleanup
     return 1
   fi
-  # Also enforce the deadline here in case the check's timeout controller stops
-  # responding. Poll briefly; watcher_beat throttles its own writes.
+  # Also enforce the same deadline if the timeout controller stops responding.
+  # EOF wakes read immediately. A descendant may retain its writer after the
+  # leader exits, so also recheck that leader once per second using a timed
+  # read, without spawning a timer on each tick.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat
     if [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then
@@ -2311,7 +2345,9 @@ run_owned_capture() {
       fm_active_check_stop || return 1
       break
     fi
-    sleep 0.1
+    # shellcheck disable=SC2034 # Only EOF or the timeout matters, not pipe contents.
+    # measured: value=1 date=2026-10-21 host=Mac-Studio.local margin=1 - the Bash 3.2 FIFO probe times out at 1s without starting a timer process. This is a liveness poll, not a check deadline.
+    IFS= read -r -t 1 -u "$FM_CHECK_WAIT_FD" completion || true
   done
   if [ -n "$FM_ACTIVE_CHECK_PID" ]; then
     wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || FM_CHECK_STATUS=$?

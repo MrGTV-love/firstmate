@@ -519,6 +519,8 @@ The default 300-second grace is unchanged.
 Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
 The main shell enforces each capture deadline even if its timeout controller stops responding.
+It observes check completion through a private pipe using Bash's timed read, waking immediately on pipe closure and rechecking the leader once per second if a descendant retains the writer, instead of starting a sleep process on each poll tick.
+Group cleanup retains its existing grace and stop bounds, with one process per bounded wait rather than one per stop poll.
 Home-summary publication runs separately so its inventory-sized work does not delay the main poll.
 The [process-event operating contract](configuration.md#process-to-event-sources-stateprocevent) owns background source reconciliation and queued-result delivery.
 The [pending-reply library](../bin/fm-pending-reply-lib.sh) owns retained-reply scanning and escalation-close retries.

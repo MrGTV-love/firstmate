@@ -278,6 +278,58 @@ test_check_timeout_configuration_and_launch_allowance() {
   pass "decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers"
 }
 
+test_check_wait_has_no_per_tick_processes() {
+  local dir state fakebin
+  dir=$(make_case check-wait-processes)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  cat > "$fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+[ "$PPID" != "$FM_TEST_WAIT_PID" ] || printf '%s\n' "$*" >> "$FM_TEST_WAIT_LAUNCHES"
+exec /bin/sleep "$@"
+SH
+  chmod +x "$fakebin/sleep"
+  cat > "$state/controller-check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/controller-child-pid"
+sleep 60
+printf must-not-complete
+SH
+  PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_TEST_WAIT_LAUNCHES="$dir/poll-launches" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      export FM_TEST_WAIT_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      run_owned_capture 10 0 discard bash -c "sleep 4; printf check-finished; exit 7" || exit 21
+      [ "$FM_CHECK_RESULT" = check-finished ] || exit 22
+      [ "$FM_CHECK_STATUS" = 7 ] || exit 23
+      [ ! -s "$FM_TEST_WAIT_LAUNCHES" ] || exit 24
+      deadline_started=$SECONDS
+      run_owned_capture 2 0 discard bash -c '\''printf "%s\\n" "$$" > "$FM_STATE_OVERRIDE/stopped-pid"; trap "" TERM; kill -STOP "$$"; printf must-not-complete'\'' || exit 25
+      deadline_elapsed=$((SECONDS - deadline_started))
+      [ "$deadline_elapsed" -ge 3 ] && [ "$deadline_elapsed" -lt 10 ] || exit 35
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 26
+      IFS= read -r stopped_pid < "$STATE/stopped-pid"
+      ! kill -0 "$stopped_pid" 2>/dev/null || exit 27
+      run_owned_capture 10 0 discard bash -c '\''sleep 60 & printf "%s\\n" "$!" > "$FM_STATE_OVERRIDE/descendant-pid"; printf leader-finished'\'' || exit 28
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = leader-finished ] || exit 29
+      IFS= read -r descendant_pid < "$STATE/descendant-pid"
+      ! kill -0 "$descendant_pid" 2>/dev/null || exit 30
+      [ ! -s "$FM_TEST_WAIT_LAUNCHES" ] || exit 31
+      CHECK_TIMEOUT=120
+      for FM_CHECK_FORCE_FALLBACK in 0 1; do
+        FM_CHECK_OWNED_GROUP=1 run_owned_capture 2 0 discard run_check_process "$STATE/controller-check.sh" || exit 32
+        [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 33
+        IFS= read -r controller_child_pid < "$STATE/controller-child-pid"
+        ! kill -0 "$controller_child_pid" 2>/dev/null || exit 34
+      done
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "bounded check lost output/status or launched poll sleeps: $(cat "$dir/capture.err" "$dir/poll-launches" 2>/dev/null)"
+  pass "bounded check returns output and failure status without launching per-tick sleep processes"
+}
+
 test_slow_check_beats_but_stopped_poll_goes_stale() {
   local dir state fakebin pid i age
   dir=$(make_case slow-check-beacon)
@@ -1765,6 +1817,7 @@ test_msys_pid_identity_uses_proc
 test_stale_watch_lock_reclaimed
 test_stale_watch_reclaim_publishes_before_clear
 test_live_stale_watch_lock_is_actionable
+test_check_wait_has_no_per_tick_processes
 test_slow_check_beats_but_stopped_poll_goes_stale
 test_check_timeout_configuration_and_launch_allowance
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
