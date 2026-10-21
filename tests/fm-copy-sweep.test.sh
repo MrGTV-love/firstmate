@@ -1000,7 +1000,7 @@ test_task_record_appearing_during_plan_prevents_release() {
   install_driver "$SLOT" "$W"
   admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
   before=$(shasum -a 256 "$admin/locked")
-  printf 'printf "worktree=%%s\\nkind=ship\\n" "$1" > %q\n' "$HOMED/state/new-owner.meta" > "$W/plan-hook"
+  printf "printf \"worktree=%%s\\\\nkind=ship\\\\n\" \"\$1\" > %q\n" "$HOMED/state/new-owner.meta" > "$W/plan-hook"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 1 ] || fail "a changed proof was not reported: $OUT"
   assert_contains "$OUT" "new-owner's active record" "post-plan owner was not named"
