@@ -7,11 +7,8 @@
 # a supervision-host home the supervision session's new and unprocessed
 # outcomes (BRANCH OUTCOMES), then assert liveness.
 # Overdue open-work rows (OVERDUE, STANDING) are presented first, and
-# acknowledgement refuses while a presented row lacks a valid action receipt.
-# Reads and refused acknowledgements preserve actions on unchanged rows; only successful
-# acknowledgement closes a handling turn. Unbound firstmate escalation/steer receipts
-# stand for a fixed four hours, but reviewed-green PRs still require action each turn.
-# docs/configuration.md "Open-work ledger" owns that gate and receipt invalidation.
+# acknowledgement refuses while a presented row lacks a valid action receipt;
+# docs/configuration.md "Open-work ledger" owns that gate, receipt standing, and invalidation.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.

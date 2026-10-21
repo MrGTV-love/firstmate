@@ -27,11 +27,8 @@
 # requirements; rows under a standing receipt or already answered this turn are listed after them and print
 # nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
-# Reads (--present-overdue, --check-actions, drain) and refused acknowledgements do not
-# invalidate evidence for an unchanged obligation. Successful acknowledgement alone closes
-# the handling turn via --complete-actions (internal wake-drain integration).
-# Unbound firstmate escalations and steers stand for a fixed four hours, never
-# longer than the row stays unchanged; reviewed-green PRs never stand.
+# --complete-actions closes this actor's handling turn; fm-wake-drain.sh runs it after a successful
+# acknowledgement (internal integration, not for direct use).
 # --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
