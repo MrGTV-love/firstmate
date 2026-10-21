@@ -1,0 +1,66 @@
+
+=== T1 record path is a directory -> config problem reported, no exceptions ===
+--- bootstrap:
+OMP_API_BILLING: cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file; retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== T2 record is a symlink to an unreadable file -> config problem reported, no exceptions ===
+--- bootstrap:
+OMP_API_BILLING: cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file; retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== T3 dangling symlink record -> config problem reported, no exceptions ===
+--- bootstrap:
+OMP_API_BILLING: cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file; retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== T4 tab-separated, trailing space and CRLF line endings -> still approved (documented separators) ===
+--- bootstrap:
+(no OMP_API_BILLING lines)
+--- doctor:
+check omp-api-billing=skip: no active global omp configuration findings
+
+=== T5 inline comment on a record line -> line 1 invalid, all exceptions invalidated ===
+--- bootstrap:
+OMP_API_BILLING: cannot inspect omp approvals: omp-approved-fallback-chains line 1 is invalid; see docs/configuration.md
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: cannot inspect omp approvals: omp-approved-fallback-chains line 1 is invalid; see docs/configuration.md; retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== T6 wildcard record -> invalid, nothing exempted ===
+--- bootstrap:
+OMP_API_BILLING: cannot inspect omp approvals: omp-approved-fallback-chains line 1 is invalid; see docs/configuration.md
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: cannot inspect omp approvals: omp-approved-fallback-chains line 1 is invalid; see docs/configuration.md; retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== T7 recorded entry with an extra (duplicate) target -> that entry stays flagged ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== T8 padded selector variants of recorded routes -> padded entry stays flagged ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+(done; lab removed on exit)

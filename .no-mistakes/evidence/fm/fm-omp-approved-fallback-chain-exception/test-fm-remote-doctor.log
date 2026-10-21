@@ -1,0 +1,38 @@
+FM_TEST_BEGIN 2026-10-21T07:34:22Z tests/fm-remote-doctor.test.sh family=secondmate expected_gate_skip=none
+ok - remote doctor flags API-billed omp roles and fallback routes without changing config or printing secrets
+ok - a missing herdr CLI is a human gap that --fix never claims to close
+ok - an absent launch agent is a fixable gap and the read-only run changes nothing
+ok - --fix installs the dedicated fm-remote launch agent without touching default
+ok - --fix is idempotent once the host is ready
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+check omp-api-billing=skip: no active global omp configuration findings
+check omp-api-billing=human: retry.fallbackChains target[2][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[2][1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[3][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+ok - recorded fallback chain makes a ready host usable but never bypasses other chains, GPT or openai route findings
+check omp-api-billing=skip: no active global omp configuration findings
+ok - a first-time seed passes omp-api-billing from the code root record and refuses without one
+ok - a loaded and running launch agent must match the complete owned contract
+ok - a failed reload leaves stale effective launch-agent state unready
+ok - a launch agent outside the Aqua session scope is rewritten in place
+ok - launchd failures are reported and delayed server readiness is awaited
+ok - missing Python is a prerequisite rather than a server repair
+ok - launch-agent Python gates plist, loaded-job, and server repairs independently of doctor Python
+ok - readiness does not enter a missing-Python repair loop
+ok - a session served outside the Aqua login session is fixable and --fix retakes it through launchd
+ok - human gaps are reported with their operator step and never claimed as fixed
+ok - a bash Directory Services login shell is rendered with -l -c
+ok - custom Directory Services shell paths remain valid plist arguments
+ok - shell resolution bounds Directory Services and uses executable SHELL and POSIX fallbacks
+ok - repeated repair reuses one resolved login shell and remains a no-op
+ok - a non-darwin host skips launch agents and starts its herdr server directly
+ok - linux requires Python before admitting or repairing running and stopped servers
+ok - a python3 that resolves but cannot run is a reader prerequisite gap
+ok - --fix creates only owned version-manager wrappers and never clobbers an operator file
+ok - doctor refreshes stale worker identity before probing tools
+ok - the entrypoint symlink is recreated when absent and never overwritten when operator-owned
+FM_TEST_END 2026-10-21T07:35:11Z tests/fm-remote-doctor.test.sh exit=0 duration_ms=48665 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5DYNQNAK5X5J9AHVAG18XEQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=49008
+FM_TEST_SUMMARY_FAMILY family=secondmate count=1 duration_ms=48665 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-remote-doctor.test.sh duration_ms=48665
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5DYNQNAK5X5J9AHVAG18XEQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0

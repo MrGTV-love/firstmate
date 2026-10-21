@@ -1,0 +1,124 @@
+
+=== S1 real two-entry chain, NO approval record ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S2 same chain + two-line record in the home config ===
+--- bootstrap:
+(no OMP_API_BILLING lines)
+--- doctor:
+check omp-api-billing=skip: no active global omp configuration findings
+config + record bytes unchanged by both consumers: yes
+
+=== S3 adversarial: add a THIRD unrecorded entry ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains key[2] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[2][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains key[2] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[2][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S4 adversarial: old one-line three-route record against the real two-entry shape ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S5 adversarial: merged single entry (sol -> mimo, haiku) with the two-line record ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[0][1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[0][1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S6a adversarial: GPT-named OpenRouter route listed in record stays flagged ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S6b adversarial: openai/* route + modelRoles OpenRouter route stay flagged; openai/ in record is malformed ===
+--- bootstrap:
+OMP_API_BILLING: cannot inspect omp approvals: omp-approved-fallback-chains line 1 is invalid; see docs/configuration.md
+OMP_API_BILLING: modelRoles.default uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openai/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: cannot inspect omp approvals: omp-approved-fallback-chains line 1 is invalid; see docs/configuration.md; modelRoles.default uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[0][0] uses openai/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S6c adversarial: valid record + modelRoles OpenRouter route (record must not exempt a role) ===
+--- bootstrap:
+OMP_API_BILLING: modelRoles.default uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: modelRoles.default uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S6d adversarial: case change of an approved route stays flagged ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S7 malformed record: valid line first, bad line 3 -> no exceptions, line number only, contents not echoed ===
+--- bootstrap:
+OMP_API_BILLING: cannot inspect omp approvals: omp-approved-fallback-chains line 3 is invalid; see docs/configuration.md
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: cannot inspect omp approvals: omp-approved-fallback-chains line 3 is invalid; see docs/configuration.md; retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+record contents not echoed: yes
+
+=== S8 review-6: NO omp config.yml + invalid approval record stays silent ===
+--- bootstrap:
+(no OMP_API_BILLING lines)
+--- doctor:
+check omp-api-billing=skip: no active global omp configuration findings
+
+=== S8b same, with ruby absent from PATH (shared function only) ===
+output=[]
+
+=== S9a code-root fallback: home has no record, code root has the two-line record ===
+--- bootstrap:
+(no OMP_API_BILLING lines)
+--- doctor:
+check omp-api-billing=skip: no active global omp configuration findings
+
+=== S9b home record wins even when empty (files never merged): code root record ignored ===
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+
+=== S10 FM_CONFIG_OVERRIDE selects the record directory ===
+--- bootstrap:
+(no OMP_API_BILLING lines)
+--- doctor:
+check omp-api-billing=skip: no active global omp configuration findings
+
+=== S10b OMP_PROFILE selects the config that is checked ===
+profile selected, no record:
+--- bootstrap:
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+--- doctor:
+check omp-api-billing=human: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead; retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+profile selected, record present:
+--- bootstrap:
+(no OMP_API_BILLING lines)
+--- doctor:
+check omp-api-billing=skip: no active global omp configuration findings
+no profile (clean default config):
+--- bootstrap:
+(no OMP_API_BILLING lines)
+--- doctor:
+check omp-api-billing=skip: no active global omp configuration findings
+(done; lab removed on exit)
