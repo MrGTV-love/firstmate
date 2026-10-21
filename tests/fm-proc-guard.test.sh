@@ -129,7 +129,10 @@ assert any(re.search(r"bash\+", e["chain"]) and e["count"] >= 59 for e in c["by_
 deepest = c["deepest_chains"]
 assert 1 <= len(deepest) <= 5, len(deepest)
 top = deepest[0]
-assert "sleep" in top["leaf"]["executable"] and top["leaf"]["script"] == "", top["leaf"]
+# The leaf runs the suite's own stand-in (a compiled spinner, or the host sleep
+# it symlinks when no compiler exists), so its executable carries either the
+# suite's sleep name or the stand-in's binary name, by the same kernel rule above.
+assert re.search(r"sleep|standin", top["leaf"]["executable"]) and top["leaf"]["script"] == "", top["leaf"]
 runs = [int(n) for n in re.findall(r"bash\(x(\d+)\)", top["chain"])]
 assert runs and max(runs) >= 60, top["chain"]
 assert top["run_length"] >= 60 and top["depth"] >= 61, top
