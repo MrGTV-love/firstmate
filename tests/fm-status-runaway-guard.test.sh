@@ -386,6 +386,190 @@ test_a_lingering_signal_does_not_hold_back_the_over_cap_stop() {
   pass "the watcher checks the cap during the status-signal linger, so the over-cap stop is the first wake and waits for no ack or re-arm"
 }
 
+# The incident's writer shape on a held descriptor: five-byte lines. The writer opens the log,
+# waits for a gate file, appends <burst> units of 100 lines at once and then <round> units every
+# second for up to 60 rounds, under a hard file-size limit. It builds its unit before it opens the
+# log and writes only with shell builtins, so no forked child of it ever holds the log open.
+start_gated_tiny_writer() {  # <shell> <status-file> <gate-file> <pid-file> <burst-units> <round-units>
+  (
+    ulimit -f "$HARD_LIMIT_BLOCKS"
+    "$1" -c '
+      printf -v unit "text\n%.0s" {1..100}
+      exec 9>>"$1"
+      while [ ! -e "$2" ]; do sleep 0.1 9>&-; done
+      for ((k = 0; k < $3; k++)); do printf "%s" "$unit" >&9; done
+      i=0
+      while [ "$i" -lt 60 ]; do
+        i=$((i + 1))
+        for ((k = 0; k < $4; k++)); do printf "%s" "$unit" >&9; done
+        sleep 1 9>&-
+      done
+    ' _ "$2" "$3" "$5" "$6" &
+    printf '%s\n' "$!" > "$4"
+    wait "$!" 2>/dev/null
+  ) &
+}
+
+# A reader for the watcher's FM_STATUS_SPAN_READER seam. It returns exactly the bytes asked for.
+# The first time it is asked for the log named in FM_TEST_GATE_LOG it opens the writer's gate and
+# holds the read until the log is larger than FM_TEST_GATE_SIZE, so the log passes the cap after the
+# watcher has chosen to classify it and before it classifies, whatever the speed of the host.
+make_gating_span_reader() {  # <path>
+  cat > "$1" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "$FM_TEST_GATE_LOG" ]; then
+  : > "$FM_TEST_GATE"
+  waited=0
+  while [ "$(perl -e 'print -s $ARGV[0]' "$1")" -le "$FM_TEST_GATE_SIZE" ] && [ "$waited" -lt 400 ]; do
+    sleep 0.05
+    waited=$((waited + 1))
+  done
+fi
+exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; defined(read $f, my $b, $ARGV[2]) or exit 1; print $b or exit 1' "$1" "$2" "$3"
+SH
+  chmod +x "$1"
+}
+
+test_a_cap_crossing_after_the_span_is_captured_is_stopped_before_the_signal_wake_exits() {
+  local dir state status out omp wpid watch_pid reader cap=2048
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case short-span); state="$dir/state"; status="$state/short.status"; out="$dir/watch.out"
+  omp=$(make_named_shell "$dir" omp)
+  reader="$dir/gating-span-reader"
+  make_gating_span_reader "$reader"
+  # Forty five-byte lines are unread when the watcher classifies the log, and its poll is 60 s, so
+  # the classification is far shorter than one poll and only the check just before the signal wake
+  # can see what happens next: the writer passes the 2048 byte cap once the watcher holds its span,
+  # before it classifies it.
+  perl -e 'print "text\n" x 40' > "$status"
+  start_gated_tiny_writer "$omp" "$status" "$dir/gate" "$dir/writer.pid" 4 1
+  wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
+  wpid=$(cat "$dir/writer.pid")
+  watch_cap "$state" "$out" FM_POLL=60 FM_STATUS_CAP_BYTES=$cap FM_STATUS_SPAN_READER="$reader" \
+    FM_TEST_GATE_LOG="$status" FM_TEST_GATE="$dir/gate" FM_TEST_GATE_SIZE=$cap
+  watch_pid=$!
+  wait_for_exit "$watch_pid" 600 || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never woke: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  grep -q 'check: status-log-over-cap' "$out" \
+    || { kill -9 "$wpid" 2>/dev/null; fail "the status signal woke the watcher without a check of the cap that its log had passed: $(cat "$out")"; }
+  grep -q "stopped pid $wpid (omp) with SIGSTOP" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "the wake does not say the writer was stopped: $(cat "$out")"; }
+  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$wpid"))"; }
+  awk -F'\t' '$3 == "signal" { found = 1 } END { exit !found }' "$state/.wake-queue" \
+    || { kill -9 "$wpid" 2>/dev/null; fail "the status signal was not queued with the over-cap wake: $(cat "$state/.wake-queue")"; }
+  kill -CONT "$wpid" 2>/dev/null; kill -9 "$wpid" 2>/dev/null
+  pass "a log that passes the cap while the watcher classifies a short signaled span is checked before the signal wake exits, and its writer is stopped"
+}
+
+# Shared by the signal case and the heartbeat case below. 20000 five-byte lines are unread (100000
+# bytes, under the cap) and the watcher classifies them one at a time in the shell, at 1.5 to 5 ms
+# each: 30 s on a fast host, far longer on a loaded one. The writer passes the cap once the watcher
+# holds the span. The stop must come from a check inside the classification, within a few polls,
+# not from the end of it, so the case waits 20 s for it while the watcher is still classifying.
+# With <seeded> 1 the log is recorded as already seen, so only the heartbeat scan reads it.
+stop_a_writer_during_a_long_classification() {  # <case> <seeded: 0|1> <watch env...>
+  local name=$1 seeded=$2 dir state status out omp wpid watch_pid reader cap=131072 deadline rows writer_state stopped=0
+  shift 2
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case "$name"); state="$dir/state"; status="$state/$name.status"; out="$dir/watch.out"
+  omp=$(make_named_shell "$dir" omp)
+  reader="$dir/gating-span-reader"
+  make_gating_span_reader "$reader"
+  perl -e 'print "text\n" x 20000' > "$status"
+  if [ "$seeded" -eq 1 ]; then
+    FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1/fm-wake-lib.sh"
+      . "$1/fm-classify-lib.sh"
+      fm_wake_signal_sig_to sig "$2" || exit 1
+      fm_wake_status_reported_commit "$3" "$2" "$sig" || exit 1
+      fm_wake_status_seen_commit "$3" "$2" "$(wc -c < "$2" | tr -d " ")" "$(_fm_open_decisions_file_ident "$2")" || exit 1
+    ' _ "$ROOT/bin" "$status" "$state" || fail "could not record the log as already seen"
+  fi
+  start_gated_tiny_writer "$omp" "$status" "$dir/gate" "$dir/writer.pid" 65 1
+  wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
+  wpid=$(cat "$dir/writer.pid")
+  watch_cap "$state" "$out" FM_STATUS_CAP_BYTES=$cap FM_STATUS_SPAN_READER="$reader" \
+    FM_TEST_GATE_LOG="$status" FM_TEST_GATE="$dir/gate" FM_TEST_GATE_SIZE=$cap "$@"
+  watch_pid=$!
+  deadline=$((SECONDS + 90))
+  while [ ! -e "$dir/gate" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
+  [ -e "$dir/gate" ] || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never began to classify the log: $(cat "$out.err" 2>/dev/null)"; }
+  deadline=$((SECONDS + 20))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    rows=$(queue_rows_for "$state")
+    if [ "$(state_letter "$wpid")" = T ] && [ "${rows:-0}" -ge 1 ]; then stopped=1; break; fi
+    sleep 0.2
+  done
+  writer_state=$(state_letter "$wpid")
+  is_live_non_zombie "$watch_pid" || { kill -9 "$wpid" 2>/dev/null; fail "the watcher exited before the classification ended: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  kill -9 "$wpid" 2>/dev/null
+  reap "$watch_pid"
+  [ "$stopped" -eq 1 ] || fail "the writer was not stopped, and the over-cap wake not queued, within 20 s of the watcher capturing a 20000 line span that the writer then pushed past the cap (writer state ${writer_state:-gone})"
+}
+
+test_a_long_classification_checks_the_cap_every_poll() {
+  stop_a_writer_during_a_long_classification long-span 0 || return $?
+  pass "the watcher checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the classification is stopped long before the classification ends"
+}
+
+test_the_heartbeat_scan_checks_the_cap_every_poll() {
+  stop_a_writer_during_a_long_classification long-heartbeat 1 FM_HEARTBEAT=1 || return $?
+  pass "the heartbeat scan checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the scan is stopped long before the scan ends"
+}
+
+test_the_span_classifier_calls_its_tick_for_every_line_it_walks() {
+  local dir status ticks out plain ticked
+  dir=$(make_case classifier-tick); status="$dir/state/tick.status"; ticks="$dir/ticks"
+  # 31 routine lines, one keyed decision that is still open (so the classifier folds the span to
+  # find out whether it is), and 3 more routine lines: 35 lines, walked once by the classifier and
+  # once more by the fold.
+  {
+    perl -e 'print "working: routine line $_\n" for 1 .. 31'
+    printf 'needs-decision [key=q1]: which option?\n'
+    perl -e 'print "working: routine line $_\n" for 32 .. 34'
+  } > "$status"
+  : > "$ticks"
+  out=$(bash -c '
+    . "$1/fm-classify-lib.sh"
+    ticks=$3
+    count_tick() { printf "x\n" >> "$ticks"; }
+    plain=$(status_span_first_actionable_record "$2" 0; printf "|%s" "$?")
+    ticked=$(status_span_first_actionable_record "$2" 0 "" "" count_tick; printf "|%s" "$?")
+    printf "%s\n%s\n" "$plain" "$ticked"
+  ' _ "$ROOT/bin" "$status" "$ticks") || fail "the classifier run failed: $out"
+  plain=$(printf '%s\n' "$out" | sed -n '1p')
+  ticked=$(printf '%s\n' "$out" | sed -n '2p')
+  [ "$plain" = "$ticked" ] || fail "a tick changed the classification: '$plain' vs '$ticked'"
+  case "$plain" in *'needs-decision [key=q1]'*'|0') ;; *) fail "the classifier did not report the open decision: $plain" ;; esac
+  [ "$(wc -l < "$ticks" | tr -d ' ')" -ge 70 ] \
+    || fail "the tick ran $(wc -l < "$ticks" | tr -d ' ') times for a 35 line span walked twice, not once per line in each walk"
+  pass "the span classifier calls its tick once per line in its own walk and in the decision fold, and the tick changes nothing it reports"
+}
+
+test_guard_says_unknown_when_lsof_is_missing_or_timed_out() {
+  local dir state status scan_env out fakebin
+  dir=$(make_case lsof-state); state="$dir/state"; status="$state/lonely.status"; fakebin="$dir/fakebin"
+  head -c 300000 /dev/zero | tr '\0' 'x' > "$status"
+  printf '\n' >> "$status"
+  scan_env=(env FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=262144)
+
+  # An lsof that is not installed never looked: the writer is unknown, not absent.
+  out=$("${scan_env[@]}" FM_STATUS_CAP_LSOF="$dir/no-such-lsof" "$GUARD" scan) || fail "the guard scan failed without lsof"
+  case "$out" in *'writer=unknown (lsof not available)'*'stopped nothing'*) ;; *) fail "a missing lsof was not reported as unknown: $out" ;; esac
+  case "$out" in *'none found'*) fail "a missing lsof was reported as no writer found: $out" ;; esac
+
+  # An lsof that did not finish inside its bound reports the status the bound uses: 124.
+  printf '#!/bin/sh\nexit 124\n' > "$fakebin/lsof"
+  chmod +x "$fakebin/lsof"
+  out=$("${scan_env[@]}" FM_STATUS_CAP_LSOF="$fakebin/lsof" "$GUARD" scan) || fail "the guard scan failed when lsof timed out"
+  case "$out" in *'writer=unknown (lsof timed out)'*'stopped nothing'*) ;; *) fail "a timed-out lsof was not reported as unknown: $out" ;; esac
+  case "$out" in *'none found'*) fail "a timed-out lsof was reported as no writer found: $out" ;; esac
+
+  # An lsof that ran and listed nothing exits 1, and that still means none found.
+  printf '#!/bin/sh\nexit 1\n' > "$fakebin/lsof"
+  out=$("${scan_env[@]}" FM_STATUS_CAP_LSOF="$fakebin/lsof" "$GUARD" scan) || fail "the guard scan failed when lsof listed nothing"
+  case "$out" in *'writer=none found (lsof listed no process holding it open for writing)'*'stopped nothing'*) ;; *) fail "an lsof that listed nothing was not reported as none found: $out" ;; esac
+  pass "the guard reports a missing or timed-out lsof as an unknown writer, and an lsof that ran and listed nothing as none found"
+}
+
 test_non_omp_and_missing_writers_wake_but_stop_nothing() {
   local dir state status out shell wpid watch_pid
   command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
@@ -841,6 +1025,11 @@ tests=(
   test_a_resumed_writer_is_woken_for_and_stopped_again
   test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped
   test_a_lingering_signal_does_not_hold_back_the_over_cap_stop
+  test_a_cap_crossing_after_the_span_is_captured_is_stopped_before_the_signal_wake_exits
+  test_a_long_classification_checks_the_cap_every_poll
+  test_the_heartbeat_scan_checks_the_cap_every_poll
+  test_the_span_classifier_calls_its_tick_for_every_line_it_walks
+  test_guard_says_unknown_when_lsof_is_missing_or_timed_out
   test_non_omp_and_missing_writers_wake_but_stop_nothing
   test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth
   test_readers_stay_bounded_on_a_two_gib_log

@@ -2476,9 +2476,9 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
 # beacon through run_owned_capture, including a slow span reader or decision
 # fold. A failed/stalled read remains unclassified and surfaces conservatively
 # instead of committing a partial endpoint.
-watcher_status_span_output() {
+watcher_status_span_output() {  # <file> <offset> [tick-command]
   local span_record='' span_needs=0 span_rc
-  status_span_first_actionable_record "$1" "$2" span_record span_needs
+  status_span_first_actionable_record "$1" "$2" span_record span_needs "${3-}"
   span_rc=$?
   printf '%s\n%s\n.' "$span_needs" "$span_record"
   return "$span_rc"
@@ -2500,16 +2500,16 @@ watcher_status_span_idle() {  # <file> <offset>
   [ "$2" -ge "$idle_size" ]
 }
 
-watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out]
+watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out] [tick-command]
   local span_capture span_rc
   printf -v "$3" '%s' ''
   [ -z "${4-}" ] || printf -v "$4" '%s' 0
   if watcher_status_span_idle "$1" "$2"; then
-    status_span_first_actionable_record "$1" "$2" "$3" "${4-}"
+    status_span_first_actionable_record "$1" "$2" "$3" "${4-}" "${5-}"
     return
   fi
   FM_STATUS_CAPTURE_SCRATCH="$(_fm_status_span_scratch "$1").span"
-  FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
+  FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" "${5-}" \
     || { watcher_status_span_cleanup; return 2; }
   span_rc=$FM_CHECK_STATUS
   watcher_status_span_cleanup
@@ -2552,7 +2552,7 @@ signal_files_actionable() {  # <status-file> ...
     task=$(basename "$f"); task="${task%.status}"
     record=''; needs_decision=0
     watcher_status_span "$f" \
-      "$(fm_wake_signal_seen_size "$STATE" "$f")" record needs_decision
+      "$(fm_wake_signal_seen_size "$STATE" "$f")" record needs_decision status_cap_span_tick
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
@@ -2620,7 +2620,7 @@ heartbeat_scan_finds_actionable() {
     status_heartbeat_seen_marker_path_to marker "$STATE" "$task"
     status_presentation_marker_adopt_device "$marker" "$f" || true
     record=''
-    watcher_status_span "$f" "$(hb_surfaced_offset "$task")" record
+    watcher_status_span "$f" "$(hb_surfaced_offset "$task")" record '' status_cap_span_tick
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
@@ -3110,9 +3110,18 @@ lavish_auto_retire_tick() {
 # one cap since its marker, so a resumed writer is caught again and an unchanged
 # file never wakes twice. The wake is queued before the marker is written, so a
 # failed append is retried on the next poll instead of being lost. It runs at the top
-# of each loop and after each poll-sized slice of the signal linger (signal_grace_linger).
+# of each loop, after each poll-sized slice of the signal linger (signal_grace_linger),
+# after each poll-sized slice of the classification of a log's unread span
+# (status_cap_span_tick), and just before a signal wake exits (signal_phase).
+STATUS_CAP_TICK_AT=0
+STATUS_CAP_SLICE=1
+case "$POLL" in
+  ''|*[!0-9]*) ;;
+  *) [ "$((10#$POLL))" -lt 1 ] || STATUS_CAP_SLICE=$((10#$POLL)) ;;
+esac
 status_cap_tick() {
   local rows records reason='' ident path size text keys='' key
+  STATUS_CAP_TICK_AT=$SECONDS
   rows=$(fm_status_cap_unalerted "$STATE") || return 0
   [ -n "$rows" ] || return 0
   records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
@@ -3139,6 +3148,19 @@ EOF
   # the supervisor would hear of a stop that has already happened a grace late.
   SIGNAL_PHASE_NO_LINGER=1
   wake "$reason"
+}
+
+# The classifiers loop over a log's unread lines in the shell, 2.7 to 5 ms a line, and call
+# this once per line: a span of 32,768 lines holds the watcher for 88 s or more, and a
+# runaway writer that starts during it would otherwise run unchecked until the loop ends.
+# It looks at the size cap when a poll has passed since the last look. The caller must run
+# in the watcher's own shell, not in a command substitution: a stop here exits the watcher.
+# It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
+# because the stop appends a row under that same lock.
+status_cap_span_tick() {
+  [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || return 0
+  [ $((SECONDS - STATUS_CAP_TICK_AT)) -lt "$STATUS_CAP_SLICE" ] || status_cap_tick
+  return 0
 }
 
 # Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
@@ -3843,6 +3865,7 @@ EOF
       signal_phase_note_deferred_prelude
       signal_phase_note_queued "$files"
       [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
+      status_cap_tick
       wake "$reason"
     else
       while IFS=$(printf '\t') read -r sf sig f; do
@@ -3871,6 +3894,7 @@ EOF
         signal_phase_note_deferred_prelude
         signal_phase_note_queued "$files"
         [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
+        status_cap_tick
         wake "$reason"
       fi
       triage_log "absorbed benign $reason"
