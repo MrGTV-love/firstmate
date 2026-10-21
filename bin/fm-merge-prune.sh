@@ -22,7 +22,8 @@
 # Transient refusals retry on later sweeps with backoff (60s, doubling to 3600s)
 # and stay silent: the task lease or project lock is held by another actor
 # (FM_LEASE_REFUSE_EXIT, FM_PROJECT_LOCK_BUSY_EXIT), a teardown that outlasts its
-# 600-second limit, an admission refusal (the worker is not finished yet), and a
+# 600-second limit, an admission refusal (the worker is not finished yet), a
+# landing proof that went stale (the copy's HEAD moved while teardown ran), and a
 # lifecycle action already running. One wake is raised if a task is still not
 # pruned after 24 attempts.
 #
@@ -62,8 +63,9 @@
 # holds only scratch or preserved ignored files (the disposable entries of
 # teardown's own list, scripts/hooks/_conformance_manifest.json included; under
 # .claude and .opencode only
-# Firstmate's own hook files and clones are scratch, and the search for nested
-# copies enters dependency and environment trees), and has no process inside. For a
+# Firstmate's own hook files, clones and scratch names are scratch, and the
+# search for nested copies enters dependency and environment trees), and has no
+# process inside. For a
 # linked worktree of the project the commit and stash proofs read only that
 # copy's work (never the project's other branches or other tasks' stashes); a
 # nested copy that is an independent clone, with its own git directory, is proved
