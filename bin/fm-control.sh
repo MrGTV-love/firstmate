@@ -13,7 +13,8 @@
 # existing worktree and pane, (2) one foreground PID resolved by the launch-proof
 # owner that classifies as an agent process, (3) that PID's kernel cwd inside this task's unique deepest recorded
 # worktree, (4) no other local task claiming the pane, and (5) an existing
-# session record with the same nonempty spawn_gen as metadata. It preserves
+# session record with the same nonempty spawn_gen as metadata, and a live PID
+# that does not carry a launch pin for another generation. It preserves
 # task_session_file (or uses the pane's omp session-file reference if absent),
 # requires that file and the live reference to identify the same persisted
 # file. When the record already names that live PID, its current-session
