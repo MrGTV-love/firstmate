@@ -14,7 +14,9 @@
 # session record with the same nonempty spawn_gen as metadata. It preserves
 # task_session_file (or uses the pane's omp session-file reference if absent),
 # requires that file and the live reference to identify the same persisted
-# file, and atomically writes version=1, the unchanged spawn_gen, live pid,
+# file. A nonempty current-session activation for that same live PID must
+# also identify that file; contradictory activation evidence refuses even when
+# Herdr still registers the task file. It atomically writes version=1, the unchanged spawn_gen, live pid,
 # task_session_file, and current_session_file. A refusal names the missing proof.
 # It never unlocks a session, touches project files, starts/stops an agent,
 # or sends lifecycle input. This widens lifecycle authorization: a repaired
