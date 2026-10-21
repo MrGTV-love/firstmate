@@ -1935,10 +1935,10 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   budget=$(printf '%s\n' "$out" | sed -n 's/.*serial_budget_ms=\([0-9][0-9]*\).*/\1/p')
   [ -n "$max" ] && [ -n "$budget" ] \
     || fail "coverage summary must carry serial packing and budget: $out"
-  [ "$budget" -eq 1200000 ] || fail "serial packing target must stay at twenty minutes, got ${budget}ms"
+  [ "$budget" -eq 1500000 ] || fail "serial packing target must stay at twenty-five minutes, got ${budget}ms"
   [ "$max" -gt 0 ] && [ "$max" -le "$budget" ] \
     || fail "largest serial shard packs ${max}ms above the ${budget}ms target"
-  pass "coverage guard bounds the unmeasured share and serial packing within twenty minutes"
+  pass "coverage guard bounds the unmeasured share and serial packing within twenty-five minutes"
 }
 
 test_portable_serial_packing_budget_boundary() {
@@ -1946,17 +1946,17 @@ test_portable_serial_packing_budget_boundary() {
   tmp=$(fm_test_tmproot fm-test-run-packing-boundary)
   repo="$tmp/repo"
 
-  for weight in 1200000 1200001; do
+  for weight in 1500000 1500001; do
     shard_fixture_init "$repo" "$weight"
     out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
-    if [ "$weight" -eq 1200000 ]; then
+    if [ "$weight" -eq 1500000 ]; then
       expect_code 0 "$rc" "packing exactly at the budget must be accepted"
       assert_contains "$out" "FM_TEST_COVERAGE ok" "boundary coverage did not pass"
-      assert_contains "$out" "serial_max_ms=1200000" "fixture did not pack exactly at the budget"
-      assert_contains "$out" "serial_budget_ms=1200000" "fixture changed the packing budget"
+      assert_contains "$out" "serial_max_ms=1500000" "fixture did not pack exactly at the budget"
+      assert_contains "$out" "serial_budget_ms=1500000" "fixture changed the packing budget"
     else
       expect_code 1 "$rc" "packing one millisecond above the budget must be refused"
-      assert_contains "$out" "largest portable serial shard packs 1200001ms above the 1200000ms target" \
+      assert_contains "$out" "largest portable serial shard packs 1500001ms above the 1500000ms target" \
         "over-budget refusal did not explain the modeled excess"
       assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
     fi
