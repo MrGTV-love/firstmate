@@ -2117,8 +2117,9 @@ age_of() {  # seconds since file mtime; "due immediately" if missing
 # when the only bytes it grew past the classified offset are this home's own
 # bookkeeping appends; fm_wake_signal_seen_current (bin/fm-wake-lib.sh) owns that
 # rule and every other signature change still reads as unreported.
-# Prints one "<seen-file>\t<sig>\t<file>" line per changed file, migrating only
-# already-reported device-only identities before comparison.
+# Prints one "<seen-file>\t<sig>\t<file>" line per changed file. Each status log's
+# markers first pass through status_presentation_marker_adopt_device (the only
+# write here), which owns the device-only remount rule.
 # The caller records new reported state only after surfacing or intentional absorption,
 # and commits a status classification position only after a successful span read.
 scan_signals() {
@@ -2570,8 +2571,8 @@ EOF
 # surfaced to firstmate (.hb-surfaced-<task>). It walks every log rather than only
 # those whose LAST line looks captain-relevant, because the event this backstop
 # most needs to catch is precisely one a later routine append has already moved
-# past. Apart from adopting already-reported device-only identities, detection
-# leaves progress unchanged: the caller enqueues first, then marks surfaced.
+# past. Apart from the device-only marker adoption (status_presentation_marker_adopt_device),
+# detection leaves progress unchanged: the caller enqueues first, then marks surfaced.
 # Because every captain-relevant signal/stale already marks itself surfaced when
 # it wakes firstmate, this normally finds nothing and the heartbeat
 # is absorbed; it surfaces only an event the per-wake path absorbed by mistake -

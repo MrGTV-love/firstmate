@@ -13,13 +13,8 @@
 # failure kind, so a readability change is a new state that triggers another read.
 # A missing, malformed, identity-mismatched, or past-end classified position reads
 # from byte 0, preferring a bounded duplicate over a lost event.
-# A scan may first call status_presentation_marker_adopt_device (status I/O
-# owner) to atomically migrate a device-only remount. The classified position
-# migrates on equal strong inode and birth with its offset kept; the reported
-# signature migrates only when every other reported field is equal too, so a
-# log that grew signals once and reads only its new bytes. Weak identities never
-# qualify. Marker readers remain pure, and migration never advances the
-# classified endpoint.
+# Marker readers stay pure. A device-only remount is migrated by the scan calling
+# status_presentation_marker_adopt_device first; bin/fm-status-io-lib.sh owns that rule.
 
 # The event owner supplies decision folding and status I/O transitively.
 # shellcheck source=bin/fm-status-event-lib.sh
