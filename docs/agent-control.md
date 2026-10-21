@@ -173,6 +173,7 @@ Drafts, busy state, task instructions, profile axes, charters, child records, an
 ### Repairing a restored omp session record
 
 Run `FM_HOME=<home> bash bin/fm-control.sh <task-id> adopt` to repair a local Herdr omp session record after a restart.
+Only the actual lock-owning main Firstmate may run it: a worker, the supervision branch in any posture, or a session that does not own the home's lock is refused without changing the record, under the same rule as `authorize-continuation` and `reassociate`.
 The [control script header](../bin/fm-control.sh) owns the five required proofs, exact fields, locks, atomic publication, and refusal contract; [the launch-proof library](../bin/fm-launch-proof-lib.sh) owns pane and foreground-process attribution.
 The command writes only the session record, never unlocks a session, modifies a project, sends keys, or starts or stops an agent.
 It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
@@ -219,8 +220,8 @@ Every Herdr replacement must have matching managed-launch proof, including curre
 The normal failed-launch and published-record reconciliation rules below still apply.
 
 The omp task record binds its initial session pathname once per launch generation and updates the active pathname and PID synchronously on session activation or switch, including before JSONL persistence under an existing canonical session directory; managed authority still requires persisted task and active files identifying the same file.
-The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation; missing, invalid, or personal-session proof refuses lifecycle action.
-Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
+The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation, proved by the live environment pin or by the guarded [adoption route](#repairing-a-restored-omp-session-record); missing, invalid, or personal-session proof refuses lifecycle action.
+Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged unless repaired by `adopt`.
 Cancelled or rolled-back switches and branches restore the predecessor proof only after omp's session transition settles and only if no newer transition or shutdown intervened.
 Every proof callback requires a unique registered top-level session sharing its context's session manager, and settled restoration rechecks that owner, so delegated or unregistered sessions cannot mutate the parent proof without relying on a context agent field.
 The proof installer uses the live registry exposed by omp's extension API rather than importing an on-disk SDK package.
