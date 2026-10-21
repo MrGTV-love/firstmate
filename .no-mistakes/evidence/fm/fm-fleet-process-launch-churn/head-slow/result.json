@@ -1,0 +1,23 @@
+{
+  "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578",
+  "scenario": "slow",
+  "noperl": false,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.zgxlwx",
+  "watcher_pid": 88141,
+  "window_seconds": 60,
+  "max_beacon_age_seconds": 14.7,
+  "window_all": {
+    "total": 4,
+    "commands": {
+      "touch": 4
+    }
+  },
+  "window_direct_children_of_watcher": {
+    "total": 4,
+    "commands": {
+      "touch": 4
+    }
+  },
+  "watcher_alive_after_window": true,
+  "stderr_tail": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578/bin/fm-watch.sh: line 2254: 92765 Terminated: 15          ( eval \"exec $FM_CHECK_WAIT_FD<&-\"; if [ \"$capture_stderr\" = discard ]; then\n    \"$@\" 2> /dev/null;\nelse\n    \"$@\" 2>&1;\nfi ) > \"$FM_CHECK_OUTPUT\"\n"
+}

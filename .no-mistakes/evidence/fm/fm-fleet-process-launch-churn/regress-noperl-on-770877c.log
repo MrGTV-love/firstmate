@@ -1,0 +1,10 @@
+FM_TEST_BEGIN 2026-10-21T21:23:25Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+not ok - group cleanup without perl lost its bound or launched poll sleeps (status 24): /Users/charlesabrooker/tmp/fm-mid.mR2HE2/bin/fm-watch.sh: line 2255: perl: command not found
+_: line 12: /Users/charlesabrooker/tmp/fm-watcher-lock-tests.MLoBpS/group-cleanup-no-perl/wait-launches: No such file or directory
+FM_TEST_END 2026-10-21T21:23:41Z tests/fm-watcher-lock.test.sh exit=1 duration_ms=15957 gate_skip=false
+ledger: "/Users/charlesabrooker/tmp/fm-mid.mR2HE2/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=17288
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=15957 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=15957
+ledger: "/Users/charlesabrooker/tmp/fm-mid.mR2HE2/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

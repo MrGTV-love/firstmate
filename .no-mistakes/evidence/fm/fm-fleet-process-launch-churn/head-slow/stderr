@@ -1,0 +1,5 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578/bin/fm-watch.sh: line 2254: 92765 Terminated: 15          ( eval "exec $FM_CHECK_WAIT_FD<&-"; if [ "$capture_stderr" = discard ]; then
+    "$@" 2> /dev/null;
+else
+    "$@" 2>&1;
+fi ) > "$FM_CHECK_OUTPUT"

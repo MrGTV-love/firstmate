@@ -1,0 +1,26 @@
+{
+  "repo": "/Users/charlesabrooker/tmp/fm-base.vdGmwH",
+  "scenario": "slow",
+  "noperl": false,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.ntUyi9",
+  "watcher_pid": 48596,
+  "window_seconds": 60,
+  "max_beacon_age_seconds": 14.94,
+  "window_all": {
+    "total": 251,
+    "commands": {
+      "sleep": 246,
+      "touch": 4,
+      "tr": 1
+    }
+  },
+  "window_direct_children_of_watcher": {
+    "total": 249,
+    "commands": {
+      "sleep": 245,
+      "touch": 4
+    }
+  },
+  "watcher_alive_after_window": true,
+  "stderr_tail": "/Users/charlesabrooker/tmp/fm-base.vdGmwH/bin/fm-watch.sh: line 2222: 55593 Terminated: 15          ( if [ \"$capture_stderr\" = discard ]; then\n    \"$@\" 2> /dev/null;\nelse\n    \"$@\" 2>&1;\nfi ) > \"$FM_CHECK_OUTPUT\"\n"
+}

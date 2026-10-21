@@ -1,0 +1,28 @@
+{
+  "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578",
+  "scenario": "descendant",
+  "noperl": true,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.j1ph3O",
+  "watcher_pid": 17705,
+  "watcher_exit_status": 0,
+  "check_finish_to_watcher_exit_seconds": 3.895,
+  "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.j1ph3O/state/descendant.check.sh: leader-finished\n",
+  "window_direct_children_of_watcher": {
+    "total": 48,
+    "commands": {
+      "basename": 1,
+      "chmod": 2,
+      "date": 2,
+      "ln": 4,
+      "mktemp": 1,
+      "mv": 3,
+      "rm": 13,
+      "rmdir": 5,
+      "sh": 14,
+      "sleep": 2,
+      "touch": 1
+    }
+  },
+  "term_ignoring_descendant_alive_after_exit": false,
+  "stderr_tail": ""
+}

@@ -1,0 +1,27 @@
+{
+  "repo": "/Users/charlesabrooker/tmp/fm-base.vdGmwH",
+  "scenario": "complete",
+  "noperl": false,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.Q5ipaU",
+  "watcher_pid": 57763,
+  "watcher_exit_status": 0,
+  "check_finish_to_watcher_exit_seconds": 0.876,
+  "stdout": "check: /Users/charlesabrooker/tmp/fm-lab.Q5ipaU/state/complete.check.sh: check-output-ok\n",
+  "window_direct_children_of_watcher": {
+    "total": 67,
+    "commands": {
+      "basename": 1,
+      "chmod": 2,
+      "date": 2,
+      "ln": 4,
+      "mktemp": 1,
+      "mv": 3,
+      "rm": 13,
+      "rmdir": 5,
+      "sh": 14,
+      "sleep": 21,
+      "touch": 1
+    }
+  },
+  "stderr_tail": ""
+}

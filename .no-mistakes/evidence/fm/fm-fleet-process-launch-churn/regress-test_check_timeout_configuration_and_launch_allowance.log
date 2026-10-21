@@ -1,0 +1,9 @@
+FM_TEST_BEGIN 2026-10-21T21:21:24Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers
+FM_TEST_END 2026-10-21T21:22:26Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=61542 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=62222
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=61542 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watcher-lock.test.sh duration_ms=61542
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

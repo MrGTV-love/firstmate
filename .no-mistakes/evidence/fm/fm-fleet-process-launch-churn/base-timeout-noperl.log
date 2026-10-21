@@ -1,0 +1,26 @@
+{
+  "repo": "/Users/charlesabrooker/tmp/fm-base.vdGmwH",
+  "scenario": "timeout",
+  "noperl": true,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.kTNFDA",
+  "watcher_pid": 14449,
+  "check_timeout_seconds": 3,
+  "check_pid_gone_after_seconds": 5.39,
+  "check_children_left": [],
+  "watcher_alive_30s_after_check_start": true,
+  "max_beacon_age_seconds": 15.17,
+  "window_direct_children_of_watcher": {
+    "total": 74,
+    "commands": {
+      "date": 4,
+      "ln": 2,
+      "mv": 11,
+      "rm": 10,
+      "rmdir": 2,
+      "sh": 6,
+      "sleep": 35,
+      "touch": 4
+    }
+  },
+  "stderr_tail": ""
+}

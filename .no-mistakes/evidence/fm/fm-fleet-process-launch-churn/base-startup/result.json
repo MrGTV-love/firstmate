@@ -1,0 +1,28 @@
+{
+  "repo": "/Users/charlesabrooker/tmp/fm-base.vdGmwH",
+  "scenario": "startup",
+  "noperl": false,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.EbLMWe",
+  "watcher_pid": 29876,
+  "startup_seconds": 1.61,
+  "startup_launches": {
+    "total": 106,
+    "commands": {
+      "cat": 15,
+      "date": 4,
+      "dirname": 22,
+      "jq": 1,
+      "ln": 5,
+      "mkdir": 3,
+      "mktemp": 5,
+      "ps": 1,
+      "readlink": 18,
+      "rm": 10,
+      "rmdir": 4,
+      "sh": 14,
+      "touch": 1,
+      "uname": 3
+    }
+  },
+  "stderr_tail": ""
+}

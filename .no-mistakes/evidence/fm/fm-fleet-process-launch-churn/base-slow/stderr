@@ -1,0 +1,5 @@
+/Users/charlesabrooker/tmp/fm-base.vdGmwH/bin/fm-watch.sh: line 2222: 55593 Terminated: 15          ( if [ "$capture_stderr" = discard ]; then
+    "$@" 2> /dev/null;
+else
+    "$@" 2>&1;
+fi ) > "$FM_CHECK_OUTPUT"

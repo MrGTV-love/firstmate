@@ -1,0 +1,27 @@
+{
+  "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578",
+  "scenario": "timeout",
+  "noperl": false,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.CJRlbJ",
+  "watcher_pid": 46641,
+  "check_timeout_seconds": 3,
+  "check_pid_gone_after_seconds": 6.26,
+  "check_children_left": [],
+  "watcher_alive_30s_after_check_start": true,
+  "max_beacon_age_seconds": 15.12,
+  "window_direct_children_of_watcher": {
+    "total": 42,
+    "commands": {
+      "date": 4,
+      "ln": 2,
+      "mv": 11,
+      "perl": 1,
+      "rm": 10,
+      "rmdir": 2,
+      "sh": 6,
+      "sleep": 2,
+      "touch": 4
+    }
+  },
+  "stderr_tail": ""
+}

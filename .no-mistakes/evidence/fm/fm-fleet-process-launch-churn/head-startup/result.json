@@ -1,0 +1,27 @@
+{
+  "repo": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5G0S3R4VMTQN34BF17T6578",
+  "scenario": "startup",
+  "noperl": false,
+  "lab": "/Users/charlesabrooker/tmp/fm-lab.Dlpfhb",
+  "watcher_pid": 39876,
+  "startup_seconds": 1.134,
+  "startup_launches": {
+    "total": 79,
+    "commands": {
+      "cat": 15,
+      "date": 2,
+      "dirname": 1,
+      "ln": 5,
+      "mkdir": 3,
+      "mktemp": 5,
+      "ps": 1,
+      "readlink": 18,
+      "rm": 8,
+      "rmdir": 4,
+      "sh": 14,
+      "touch": 1,
+      "uname": 2
+    }
+  },
+  "stderr_tail": ""
+}
