@@ -277,6 +277,23 @@ fm_task_copy_same_repository() {  # <path> <project>
   [ "$path_common" = "$proj_common" ]
 }
 
+# Prints the canonical path of every worktree <canonical-clone> has registered
+# strictly inside itself, one per line. A registered copy whose directory is
+# gone keeps its raw path. Fails when the registration list cannot be read, so a
+# caller never takes an unreadable list for an empty one.
+fm_task_copy_registered_nested() {  # <canonical-clone>
+  local clone=$1 field path canon
+  while IFS= read -r -d '' field; do
+    case "$field" in
+      registration-list-unreadable) return 1 ;;
+      'worktree '*) path=${field#worktree } ;;
+      *) continue ;;
+    esac
+    canon=$(fm_task_copy_canonical_dir "$path") || canon=$path
+    case "$canon" in "$clone"/*) printf '%s\n' "$canon" ;; esac
+  done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null || printf '\0registration-list-unreadable\0')
+}
+
 # The local copies a task record names, one "<field> <path>" line each: the
 # last worktree= and home= values (the values every reader of those fields
 # uses) and every prior_worktree= line.

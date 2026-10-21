@@ -59,7 +59,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
 | [`fm-proc-budget.sh`](../bin/fm-proc-budget.sh) | Bound a command tree's process growth; its header owns the budget contract |
-| [`fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) | Find, size and remove provably stale nested task copies, and wake once when their bytes pass a budget ([configuration](configuration.md#nested-task-copy-sweep-configcopy-budget)); its header owns the classes and proofs |
+| [`fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) | Find, size and remove provably stale nested task copies, and wake once when their bytes pass a budget or a nested copy sits inside a live task's copy ([configuration](configuration.md#nested-task-copy-sweep-configcopy-budget)); its header owns the classes and proofs |
 | `fm-load-report.sh`      | Record host load and judge it with pipeline agent durations ([recipe](cpu-pass-pool.md#judging-the-pool)) |
 | `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
 | `fm-proc-guard.sh`       | Count the user's processes against the per-user limit and write one process census when a pile-up holds ([framework](host-guards.md)) |

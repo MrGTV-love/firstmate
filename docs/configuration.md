@@ -107,7 +107,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
-- The nested-copy sweep's size cache `state/copy-sweep.sizes` and budget record `state/copy-sweep.record`, owned by `bin/fm-copy-sweep.sh`.
+- The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
 
@@ -1816,9 +1816,12 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 A task copy is nested when a clone registers it strictly inside its own directory, such as `<clone>/.claude/worktrees/<name>`.
 `treehouse prune` works on whole pool slots and does not see these copies, and a teardown only removes its own task's.
 Left alone, they pile up: each holds a full checkout, often 2 to 4 GiB, and nothing else bounds their total.
-[`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) is the one mechanism that finds them, sizes them, removes the provably stale ones, and raises a single wake when the bytes they hold pass a budget.
+[`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) is the one mechanism that finds them, sizes them, removes the provably stale ones, and raises one aggregated wake when the bytes they hold pass a budget or when a nested copy sits inside the copy of a live ship or scout task.
+The second trigger is a named fact, not a budget breach: it names the copy's path, owning task and age, fires once when a copy joins the named set (a copy leaving it is silent), and only reports.
+The wake line carries the count and five copies in all, new copies first and then the oldest, with a pointer to the no-flag run that prints the full line.
+No budget gates it, so it still fires when both budgets are `off`.
 The script header owns what the sweep reads, its classes, the proofs behind `--apply`, and every case it holds back.
-It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, and how `check` stays inside the watcher's timeout.
+It also owns sizing and the size cache, the load guard and its skip-streak wake, the budget wake and its record, the live-copy fact and its record, and how `check` stays inside the watcher's timeout.
 `bin/fm-copy-sweep.sh --help` prints that header.
 The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
 
@@ -1830,7 +1833,7 @@ Firstmate installs no scheduler for `--apply`; run this one line from the host's
 bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
 ```
 
-`bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake.
+`bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake and the live-copy fact.
 `bin/fm-copy-sweep.sh disarm` removes the binding.
 The script header owns how much of the host one `check` covers per poll, what a cut run records, and why the hourly `--apply` is the only run certain to cover every clone.
 

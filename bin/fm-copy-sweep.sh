@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # fm-copy-sweep.sh - find, size and remove provably stale nested task copies, and
-# wake once when the bytes they hold pass a budget.
+# wake once when the bytes they hold pass a budget or when a nested copy sits
+# inside a live task's copy.
 #
 # Usage:
 #   fm-copy-sweep.sh                report every nested copy; change nothing
 #   fm-copy-sweep.sh --apply        also remove the REAPABLE-PROVEN copies
 #   fm-copy-sweep.sh check          the watcher's periodic entry (report only)
 #   fm-copy-sweep.sh arm            bind `check` to the existing watcher cadence
-#   fm-copy-sweep.sh disarm         remove that binding and the budget record
+#   fm-copy-sweep.sh disarm         remove that binding and the record (budgets and live copies)
 #   fm-copy-sweep.sh --help
 #
 # Hourly hygiene job, one line (bounded by the process budget, never forced):
@@ -59,6 +60,20 @@
 #                      bin/fm-teardown.sh uses), no process inside, no record.
 # HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
 # `git worktree remove`, so calling it live or orphaned would mislead.
+# Independently of class and byte budgets, one HELD-LIVE-TASK report line names
+# every nested copy on disk strictly inside a ship/scout record's current or prior
+# copy, where that copy is the registering clone itself (a pool slot) or lies
+# inside it, with its absolute path, owning task, and age in seconds from the
+# lock mtime (source=lock) or, when unlocked, the directory mtime
+# (source=directory). A lock state that cannot be read, such as
+# a probe cut by `check`'s time bound, reads source=unknown and age=unknown, never
+# the directory of a copy that may be locked. A record's presence means it is
+# still in custody; teardown removes closed records. This check only reports,
+# including locked copies, and never releases anything. Only the report, a run
+# with no flag, prints the whole line. `check` and `--apply` put one bounded part
+# of it in their one aggregated wake, even below the byte budget: the count, five
+# copies in all (new copies first, then the oldest), and a pointer to the no-flag
+# run. A copy with no live owning record is left to the existing reap path.
 #
 # --apply removes only REAPABLE-PROVEN copies, one at a time, deepest path first,
 # each re-proved just before its own removal, by a plain `git worktree remove`
@@ -68,7 +83,7 @@
 # to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
 # in the same run is removed by the next run; a second run otherwise finds
 # nothing left to remove. Report mode (no flag) reads the size cache and writes
-# nothing; `check` writes only the size cache and the budget record.
+# nothing; `check` writes only the size cache and the record (budgets and live copies).
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
 # only hold a copy back, never release one.
@@ -98,6 +113,12 @@
 # drops under and goes over again wakes again. state/copy-sweep.record holds that
 # memory; --apply raises the wake itself through the wake queue, `check` prints
 # the line and the watcher turns it into the same `check:` wake.
+#
+# The live-copy fact wakes once when a copy joins the named set, not once per poll,
+# and a copy leaving it is silent. state/copy-sweep.record keeps that set beside
+# the budget memory, so an unchanged set stays silent in `check` and `--apply`
+# while every report still prints it. A cut scan keeps a recorded path because
+# it cannot prove it gone.
 #
 # `arm` writes state/copy-sweep.check.sh and binds its bytes with
 # fm-check-register.sh, so the existing watcher runs `check` on its normal
@@ -345,10 +366,39 @@ emit_clone() {  # <pool> <container> <clone>
   scan_clone "$1" "$2" "$3" </dev/null
 }
 
+# Read the same local task records as classification, once per run rather than
+# once per nested copy. Secondmate homes are not task copies.
+LIVE_TASK_COPIES=
+read_live_task_copies() {
+  local state_dir meta kind field path line
+  LIVE_TASK_COPIES=
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    for meta in "$state_dir"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      scan_out_of_time && return
+      kind=$(fm_meta_get "$meta" kind)
+      case "${kind:-ship}" in ship|scout) ;; *) continue ;; esac
+      while IFS= read -r line; do
+        field=${line%% *}
+        case "$field" in worktree|prior_worktree) ;; *) continue ;; esac
+        path=$(fm_task_copy_canonical_dir "${line#* }") || continue
+        LIVE_TASK_COPIES="$LIVE_TASK_COPIES$path"$'\t'"${meta##*/}"$'\n'
+      done < <(fm_task_copy_record_paths "$meta")
+    done
+  done
+}
+
 enumerate_clones() {
   local state pool_dir path clone state_dir home entry top
+  local -a state_dirs
   CLONES=
   NOTES=
+  fm_local_firstmate_state_dirs "$STATE" tolerant
+  for entry in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
+    add_note "a local home was not read: $entry"
+  done
+  read_live_task_copies
+  state_dirs=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
   for state in "$TREEHOUSE_ROOT"/*/treehouse-state.json; do
     [ -f "$state" ] && [ ! -L "$state" ] || continue
     pool_dir=$(fm_task_copy_canonical_dir "${state%/*}") || continue
@@ -370,11 +420,7 @@ enumerate_clones() {
       emit_clone "$pool_dir" "$clone" "$clone"
     done <<< "$entry"
   done
-  fm_local_firstmate_state_dirs "$STATE" tolerant
-  for entry in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
-    add_note "a local home was not read: $entry"
-  done
-  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+  for state_dir in "${state_dirs[@]}"; do
     home=$(fm_task_copy_canonical_dir "${state_dir%/*}") || continue
     for path in "$home"/projects/*; do
       [ -d "$path" ] || continue
@@ -388,15 +434,10 @@ enumerate_clones() {
   done
 }
 
-# Prints the canonical path of every worktree <clone> has registered strictly
-# inside itself. A registered copy whose directory is gone keeps its raw path.
+# The registered worktrees strictly inside <clone>; bin/fm-task-copy-lib.sh owns
+# the enumeration.
 list_nested() {  # <clone>
-  local clone=$1 field path canon
-  while IFS= read -r -d '' field; do
-    case "$field" in 'worktree '*) path=${field#worktree } ;; *) continue ;; esac
-    canon=$(fm_task_copy_canonical_dir "$path") || canon=$path
-    case "$canon" in "$clone"/*) printf '%s\n' "$canon" ;; esac
-  done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null)
+  fm_task_copy_registered_nested "$1"
 }
 
 # --- bounded commands --------------------------------------------------------
@@ -703,11 +744,50 @@ net_sizes() {
     }'
 }
 
+# One "age-in-seconds<TAB>copy<TAB>task<TAB>age<TAB>source" line per live copy,
+# the first field -1 when the age is unknown.
+LIVE_NESTED_ROWS=
+LIVE_NESTED_COUNT=0
+LIVE_NESTED_FACT_NEW=0
+LIVE_RECORD_NEW=
+
+# A named fact, independent of the removal classifier (locks take precedence
+# there). The enclosing clone is already proved by list_nested; only custody
+# comes from records, never from a process-table guess or a directory walker.
+# The age is the lock's when the copy is locked and the directory's when it is
+# not; a lock state the probe could not read leaves source and age unknown
+# rather than naming the directory of a copy that may be locked.
+record_live_nested_copy() {  # <copy> <clone>
+  local copy=$1 clone=$2 owner stamp='' secs=-1 age=unknown source=unknown rc=0
+  [ -d "$copy" ] || return 0
+  owner=$(printf '%s' "$LIVE_TASK_COPIES" | awk -F '\t' -v c="$copy" -v root="$clone" '
+    ($1 == root || index($1, root "/") == 1) && index(c, $1 "/") == 1 { print $2; exit }')
+  [ -n "$owner" ] || return 0
+  teardown_copy_lock_file "$copy" || rc=$?
+  case "$rc" in
+    0) stamp=$(file_mtime "$TEARDOWN_FOREIGN_LOCK_FILE") || stamp=; source=lock ;;
+    1) stamp=$(file_mtime "$copy") || stamp=; source=directory ;;
+  esac
+  case "$stamp" in
+    ''|*[!0-9]*) ;;
+    *) secs=$((CACHE_NOW - stamp)); [ "$secs" -ge 0 ] || secs=0; age=${secs}s ;;
+  esac
+  LIVE_NESTED_COUNT=$((LIVE_NESTED_COUNT + 1))
+  LIVE_NESTED_ROWS="$LIVE_NESTED_ROWS$secs"$'\t'"$copy"$'\t'"${owner%.meta}"$'\t'"$age"$'\t'"$source"$'\n'
+}
+
 scan_clone() {  # <pool> <container> <clone>
-  local pool=$1 container=$2 clone=$3 copy
+  local pool=$1 container=$2 clone=$3 copy nested
+  if ! nested=$(list_nested "$clone"); then
+    add_note "clone $clone was not read: its registered worktrees cannot be listed"
+    return 0
+  fi
   # A dedicated descriptor keeps every command inside the loop off its input.
   while IFS= read -r copy <&4; do
     [ -n "$copy" ] || continue
+    CLASSIFY_BOUNDED=1
+    record_live_nested_copy "$copy" "$clone"
+    CLASSIFY_BOUNDED=0
     if [ "$SCAN_MODE" = check ]; then
       CLASS=UNCLASSIFIED
       REASON="check does not classify; run bin/fm-copy-sweep.sh for the class"
@@ -716,7 +796,7 @@ scan_clone() {  # <pool> <container> <clone>
     fi
     measure_copy "$copy"
     ROWS="$ROWS$container"$'\t'"$pool"$'\t'"$clone"$'\t'"$copy"$'\t'"$CLASS"$'\t'"${SIZE_KIB:--}"$'\t'"$(printf '%s' "$REASON" | tr '\t\n' '  ')"$'\n'
-  done 4< <(list_nested "$clone" | LC_ALL=C sort -u)
+  done 4< <(printf '%s\n' "$nested" | LC_ALL=C sort -u)
 }
 
 scan() {  # <mode>
@@ -725,6 +805,9 @@ scan() {  # <mode>
   SCAN_CUT=0
   SCAN_MODE=$1
   ROWS=
+  LIVE_NESTED_ROWS=
+  LIVE_NESTED_COUNT=0
+  LIVE_NESTED_FACT_NEW=0
   # check measures every copy but classifies only the ones it names in a wake,
   # so its time goes to the sizes the budget needs.
   [ "$1" = check ] || scan_processes
@@ -897,6 +980,24 @@ evaluate_skip() {  # <now>
   WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$SKIP_LINE on $SKIP_RUNS_NOW runs in a row"
 }
 
+# One wake when a copy joins the live copy set, never one per poll. A copy stays
+# named in the report while it exists, and its record entry survives a cut scan,
+# which cannot prove it gone.
+evaluate_live_fact() {
+  local path
+  LIVE_NESTED_FACT_NEW=0
+  LIVE_RECORD_NEW=$(printf '%s' "$LIVE_NESTED_ROWS" | awk -F '\t' 'NF { print $2 }' | LC_ALL=C sort -u)
+  if [ "$SCAN_CUT" = 1 ] && [ -n "$REC_LIVE" ]; then
+    LIVE_RECORD_NEW=$(printf '%s\n%s\n' "$REC_LIVE" "$LIVE_RECORD_NEW" | sed '/^$/d' | LC_ALL=C sort -u)
+  fi
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    printf '%s' "$REC_LIVE" | grep -qxF "$path" && continue
+    LIVE_NESTED_FACT_NEW=1
+    return 0
+  done <<< "$LIVE_RECORD_NEW"
+}
+
 # --- the record and the cache ------------------------------------------------
 
 REC_LAST_SCAN=
@@ -905,6 +1006,7 @@ REC_ERROR=
 REC_SKIP_RUNS=
 REC_SKIP_AT=
 REC_SKIP_LINE=
+REC_LIVE=
 
 record_usable() {
   local line
@@ -920,6 +1022,7 @@ read_record() {
   REC_SKIP_RUNS=
   REC_SKIP_AT=
   REC_SKIP_LINE=
+  REC_LIVE=
   record_usable || return 0
   REC_LAST_SCAN=$(awk -F '\t' '$1 == "last_scan" { print $2; exit }' "$RECORD")
   REC_OVER=$(awk -F '\t' '$1 == "over" { print $2 }' "$RECORD")
@@ -927,6 +1030,7 @@ read_record() {
   REC_SKIP_RUNS=$(awk -F '\t' '$1 == "skip" { print $2; exit }' "$RECORD")
   REC_SKIP_AT=$(awk -F '\t' '$1 == "skip" { print $3; exit }' "$RECORD")
   REC_SKIP_LINE=$(awk -F '\t' '$1 == "skip" { print $4; exit }' "$RECORD")
+  REC_LIVE=$(awk -F '\t' '$1 == "live" { print $2 }' "$RECORD")
 }
 
 write_atomic() {  # <destination> <content>
@@ -958,6 +1062,10 @@ write_record() {  # <last-scan> <error>
       content="$content"$'over\t'"$key"$'\n'
     fi
   done <<< "$REC_OVER"
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    content="$content"$'live\t'"$key"$'\n'
+  done <<< "$LIVE_RECORD_NEW"
   [ -z "$SKIP_RUNS_NOW" ] || content="$content"$'skip\t'"$SKIP_RUNS_NOW"$'\t'"$SKIP_COUNTED_NOW"$'\t'"$SKIP_LINE"$'\n'
   [ -z "$2" ] || content="$content"$'error\t'"$2"$'\n'
   write_atomic "$RECORD" "$content"
@@ -976,13 +1084,50 @@ write_cache() {
   write_atomic "$SIZE_CACHE" "$CACHE_NEW$keep"
 }
 
+# "<copy> (task=<id> age=<age> source=<source>)" per live copy, "; " joined, for
+# the first <limit> rows on stdin.
+live_nested_entries() {  # <limit>
+  awk -F '\t' -v limit="$1" '
+    NF { if (++n > limit) exit; printf "%s%s (task=%s age=%s source=%s)", sep, $2, $3, $4, $5; sep = "; " }'
+}
+
+# The full report line: every live copy, in scan order.
+live_nested_report() {
+  [ "$LIVE_NESTED_COUNT" -gt 0 ] || return 0
+  printf 'HELD-LIVE-TASK nested copies=%s: %s' "$LIVE_NESTED_COUNT" \
+    "$(printf '%s' "$LIVE_NESTED_ROWS" | live_nested_entries "$LIVE_NESTED_COUNT")"
+}
+
+# The wake's part of it: the count, a few copies (those the record has not named
+# yet first, then the oldest), and where the rest is.
+LIVE_WAKE_COPIES=5
+live_nested_wake() {
+  local shown=$LIVE_NESTED_COUNT
+  [ "$LIVE_NESTED_COUNT" -gt 0 ] || return 0
+  [ "$shown" -le "$LIVE_WAKE_COPIES" ] || shown=$LIVE_WAKE_COPIES
+  printf 'HELD-LIVE-TASK nested copies=%s, %s shown (new first, then oldest): %s; run bin/fm-copy-sweep.sh with no flag for the full HELD-LIVE-TASK line' \
+    "$LIVE_NESTED_COUNT" "$shown" \
+    "$(printf '%s' "$LIVE_NESTED_ROWS" | LC_ALL=C sort -t "$(printf '\t')" -k1,1nr -k2,2 \
+      | RECORDED="$REC_LIVE" awk -F '\t' '
+          BEGIN { n = split(ENVIRON["RECORDED"], r, "\n"); for (i = 1; i <= n; i++) if (r[i] != "") known[r[i]] = 1 }
+          NF { if ($2 in known) old[++o] = $0; else print }
+          END { for (i = 1; i <= o; i++) print old[i] }' \
+      | live_nested_entries "$shown")"
+}
+
 # Raises the one wake. `check` prints the line for the watcher to turn into a
-# wake; every other mode appends the same `check:` wake itself.
+# wake; every other mode appends the same `check:` wake itself. Budget details
+# retain their cap; the live-copy fact stays one bounded part of the same line.
 raise_wake() {  # <mode>
-  local line
-  [ -n "$WAKE_PARTS" ] || return 0
-  fm_cap_line_var "copy-sweep: $WAKE_PARTS" "$MAX_LINE"
-  line=$FM_LINE_CAP_LINE
+  local line='copy-sweep:'
+  [ -n "$WAKE_PARTS" ] || { [ "$LIVE_NESTED_COUNT" -gt 0 ] && [ "$LIVE_NESTED_FACT_NEW" = 1 ]; } || return 0
+  if [ -n "$WAKE_PARTS" ]; then
+    fm_cap_line_var "copy-sweep: $WAKE_PARTS" "$MAX_LINE"
+    line=$FM_LINE_CAP_LINE
+  fi
+  if [ "$LIVE_NESTED_COUNT" -gt 0 ] && [ "$LIVE_NESTED_FACT_NEW" = 1 ]; then
+    line="$line $(live_nested_wake)"
+  fi
   if [ "$1" = check ]; then
     printf '%s\n' "$line"
   else
@@ -999,6 +1144,9 @@ print_report() {  # <mode>
     "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { c[$1] = 1 } END { n = 0; for (k in c) n++; print n }')" \
     "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++ } END { print n + 0 }')"
   [ -z "$SKIP_LINE" ] || printf 'copy-sweep: %s\n' "$SKIP_LINE"
+  if [ "$1" = report ] && [ "$LIVE_NESTED_COUNT" -gt 0 ]; then
+    printf 'copy-sweep: %s\n' "$(live_nested_report)"
+  fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy class kib reason <<< "$line"
@@ -1131,6 +1279,7 @@ run_sweep() {  # report|apply|check
         SKIP_LINE=$REC_SKIP_LINE
         SKIP_RUNS_NOW=$REC_SKIP_RUNS
         SKIP_COUNTED_NOW=$REC_SKIP_AT
+        LIVE_RECORD_NEW=$REC_LIVE
         write_record "$REC_LAST_SCAN" "$CONFIG_ERROR" || true
       fi
       return 0
@@ -1168,6 +1317,7 @@ run_sweep() {  # report|apply|check
   APPLY=0
   [ "$mode" != apply ] || APPLY=1
   scan "$mode"
+  [ "$mode" = report ] || evaluate_live_fact
   REMOVAL_REPORT=
   if [ "$mode" = apply ]; then
     apply_removals
@@ -1178,7 +1328,7 @@ run_sweep() {  # report|apply|check
   if [ "$mode" != report ]; then
     write_cache || { echo "fm-copy-sweep: could not write $SIZE_CACHE" >&2; rc=1; }
     if ! raise_wake "$mode"; then
-      echo "fm-copy-sweep: could not raise the budget wake; the record was left so the next run raises it" >&2
+      echo "fm-copy-sweep: could not raise the notification; the record was left so the next run raises it" >&2
       return 1
     fi
     if [ "$SCAN_CUT" = 1 ]; then

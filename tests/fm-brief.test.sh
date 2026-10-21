@@ -1530,6 +1530,7 @@ test_worker_role_scope
 # one shared string so the ship and scout copies cannot drift apart.
 test_crewmate_scaffolds_forbid_pool_administration() {
   local home id brief mode ship_rule scout_rule
+  local isolation_rule='The task copy is the isolation: do not create a second worktree inside it; a project flow requiring its own task worktree must create it outside the slot.'
   home="$TMP_ROOT/pool-admin-home"
   mkdir -p "$home/data"
 
@@ -1538,6 +1539,7 @@ test_crewmate_scaffolds_forbid_pool_administration() {
     FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
       || fail "fm-brief.sh --mode $mode exited non-zero"
     brief="$home/data/$id/brief.md"
+    assert_grep "$isolation_rule" "$brief" "$mode ship brief permits a second isolation layer"
     assert_grep "worktree pool" "$brief" \
       "$mode ship brief did not name the shared worktree pool"
     assert_grep "create, remove, return, prune, move, or reassign" "$brief" \
@@ -1559,6 +1561,7 @@ test_crewmate_scaffolds_forbid_pool_administration() {
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-pool-scout alpha --scout >/dev/null 2>&1 \
     || fail "fm-brief.sh --scout exited non-zero"
   brief="$home/data/brief-pool-scout/brief.md"
+  assert_grep "$isolation_rule" "$brief" "scout brief permits a second isolation layer"
   assert_grep "worktree pool" "$brief" "scout brief did not name the shared worktree pool"
   # shellcheck disable=SC2016 # Literal backticks and braces must remain unexpanded.
   assert_grep 'blocked [at=<epoch>]: {what you need}' "$brief" "scout brief gave the prohibition no exit"
