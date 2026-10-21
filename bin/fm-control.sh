@@ -7,7 +7,9 @@
 #        fm-control.sh <task-id> stay
 #        fm-control.sh <task-id> adopt
 # adopt repairs only a local Herdr omp session record under the task's control
-# and metadata locks. It requires (1) consistent window/herdr_pane_id and an
+# and metadata locks. Only the lock-owning main Firstmate may run it: a worker,
+# the supervision branch, or a session that does not own the home lock is
+# refused, as for authorize-continuation and reassociate. It requires (1) consistent window/herdr_pane_id and an
 # existing worktree and pane, (2) one foreground PID resolved by the launch-proof
 # owner that classifies as an agent process, (3) that PID's kernel cwd inside this task's unique deepest recorded
 # worktree, (4) no other local task claiming the pane, and (5) an existing
@@ -1385,6 +1387,13 @@ if [ "$BACKEND" = herdr ]; then
 fi
 
 if [ "$VERB" = adopt ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot adopt a session record"
+  fm_lease_forbid_branch "session record adoption (fm-control)"
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "session record adoption requires the actual lock-owning main Firstmate"
   [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
     || die "adopt needs a local Herdr omp task; no session record was changed"
   CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
