@@ -1190,14 +1190,13 @@ EOF
 FM_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/fm-config-push.sh" \
   > "$TMP_ROOT/config-concurrent-first.out" 2>&1 &
 config_first=$!
-inherit_wait=0
+inherit_deadline=$((SECONDS + 120))
 while [ ! -f "$TMP_ROOT/inherit.entered" ]; do
   kill -0 "$config_first" 2>/dev/null || fail "first inheritance transaction exited before its blocked write"
-  inherit_wait=$((inherit_wait + 1))
-  # Match the earlier spawn/inheritance wait: a loaded portable runner can
-  # spend several seconds in the remote entrypoint before reaching this write.
-  [ "$inherit_wait" -le 1500 ] || fail "first inheritance transaction never reached its blocked write"
-  sleep 0.02
+  # Wall clock for the same reason as the earlier wait: this bounds host speed,
+  # not a property, and 1500 turns of a 0.02s sleep was not enough under load.
+  [ "$SECONDS" -lt "$inherit_deadline" ] || fail "first inheritance transaction never reached its blocked write"
+  sleep 0.05
 done
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
@@ -1690,14 +1689,13 @@ rm -f "$TMUX_STATE" "$TMP_ROOT/launch.entered" "$TMP_ROOT/launch.release"
 FM_FAKE_SSH_MODE=launch-block remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-retirement.out" 2>&1 &
 spawn_retirement_pid=$!
-launch_wait=0
-# The respawn performs readiness and inheritance jobs before launch, so allow
-# the same 30-second loaded-runner bound as the earlier blocked worker path.
+launch_deadline=$((SECONDS + 120))
+# The respawn performs readiness and inheritance jobs before launch; bound the
+# wait in wall clock for the same reason as the other blocked writes above.
 while [ ! -f "$TMP_ROOT/launch.entered" ]; do
   kill -0 "$spawn_retirement_pid" 2>/dev/null || fail "remote respawn exited before its blocked launch"
-  launch_wait=$((launch_wait + 1))
-  [ "$launch_wait" -le 1500 ] || fail "remote respawn never reached its blocked launch"
-  sleep 0.02
+  [ "$SECONDS" -lt "$launch_deadline" ] || fail "remote respawn never reached its blocked launch"
+  sleep 0.05
 done
 cp "$PARENT/state/ios.meta" "$TMP_ROOT/respawn-blocked.meta"
 cp "$PARENT/data/secondmates.md" "$TMP_ROOT/respawn-blocked.registry"

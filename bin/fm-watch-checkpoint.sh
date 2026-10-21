@@ -101,7 +101,9 @@ run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...
       }
       $timed_out = 1;
       kill $signal, -$pid;
-      alarm($kill_after) if $kill_after;
+      # Always re-arm, even with no explicit KILL grace: a child that cannot
+      # install its INT trap would otherwise be waited on forever.
+      alarm($kill_after > 0 ? $kill_after : 2);
     };
     alarm $seconds;
     while (1) {
