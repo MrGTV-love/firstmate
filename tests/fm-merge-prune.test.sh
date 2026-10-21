@@ -659,7 +659,9 @@ scn_unignored_nested_clone_with_unpushed_work_is_kept() {
 # entry is the only ignored thing of its own throwaway repo; a trailing slash is
 # a directory holding one file. Other entries under .claude and .opencode are
 # left out on purpose: the prune is stricter there
-# (scn_unique_data_under_claude_or_opencode_is_kept).
+# (scn_unique_data_under_claude_or_opencode_is_kept). A wholly ignored .tac/ is
+# the one shape where the prune is looser
+# (scn_wholly_ignored_tac_caches_are_the_named_exception).
 IGNORED_ENTRIES_BOTH_PASS=(
   .venv/ venv/ node_modules/ __pycache__/ .pytest_cache/ .ruff_cache/ .mypy_cache/
   .next/ graphify-out/ .import_linter_cache/ pkg/__pycache__/ a/b/node_modules/
@@ -722,6 +724,31 @@ scn_ignored_entries_get_teardowns_verdict() {
     [ "$got" = "$want" ] || why "for the ignored entry $entry teardown says $want and the prune says ${got:-nothing}" || return 1
   done
   [ "$passes" -gt 0 ] && [ "$blocks" -gt 0 ] || why "the entries do not cover both verdicts ($passes pass, $blocks block)" || return 1
+  return 0
+}
+
+# The one named shape where the prune and teardown differ on purpose. A project
+# that ignores the whole .tac/ directory lists it as one entry. Teardown
+# preserves every child except tmp and uv-cache; the prune opens .tac and counts
+# a rebuildable cache child (.venv, node_modules) as scratch. Any other child
+# of that .tac/ still blocks both.
+scn_wholly_ignored_tac_caches_are_the_named_exception() {
+  local d real
+  make_world
+  d="$W/parity/tac-caches"
+  mkdir -p "$d"
+  make_ignored_entry_repo "$d" ".tac/"
+  rm -f "$d/.tac/x"
+  mkdir -p "$d/.tac/.venv" "$d/.tac/node_modules"
+  : > "$d/.tac/.venv/x"
+  : > "$d/.tac/node_modules/x"
+  real=$(cd "$d" && pwd -P)
+  [ "$(git -C "$real" ls-files -o -i --exclude-standard --directory)" = ".tac/" ] || why "the fixture does not list the whole .tac/ directory as one ignored entry" || return 1
+  [ "$(teardown_ignored_verdict "$real")" = blocks ] || why "teardown no longer preserves the caches of a wholly ignored .tac/; retire this named exception" || return 1
+  [ "$(prune_ignored_verdict "$real")" = passes ] || why "the prune does not count .venv and node_modules under a wholly ignored .tac/ as scratch" || return 1
+  : > "$d/.tac/state.json"
+  [ "$(teardown_ignored_verdict "$real")" = blocks ] || why "teardown passes a wholly ignored .tac/ that holds state.json" || return 1
+  [ "$(prune_ignored_verdict "$real")" = blocks ] || why "the exception hides .tac/state.json beside the caches" || return 1
   return 0
 }
 
@@ -1712,6 +1739,7 @@ test_fallback_removes_an_unignored_clean_nested_clone_with_the_slot() { assert_s
 test_fallback_keeps_an_untracked_file_beside_an_unignored_nested_clone() { assert_scenario scn_unignored_nested_clone_does_not_hide_an_untracked_file "an untracked file beside a nested clone still keeps the copy with one wake naming that file"; }
 test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work() { assert_scenario scn_unignored_nested_clone_with_unpushed_work_is_kept "a nested clone that the project's .gitignore does not cover, with an unpushed commit, keeps the slot with one wake naming the clone"; }
 test_fallback_judges_ignored_entries_like_teardown() { assert_scenario scn_ignored_entries_get_teardowns_verdict "the prune and bin/fm-teardown-nested-lib.sh agree on whether each ignored entry blocks removal"; }
+test_fallback_counts_the_caches_of_a_wholly_ignored_tac_as_scratch() { assert_scenario scn_wholly_ignored_tac_caches_are_the_named_exception "the one named difference from teardown: a wholly ignored .tac/ holding .venv and node_modules passes the prune and blocks teardown, and state.json beside them still blocks both"; }
 test_fallback_keeps_unique_ignored_files() { assert_scenario scn_unique_ignored_file_is_kept "a unique ignored file outside the preserve list and the scratch patterns keeps the copy"; }
 test_fallback_keeps_a_non_pool_copy() { assert_scenario scn_non_pool_copy_is_kept "a copy outside the pool is never destroyed"; }
 test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot() { assert_scenario scn_plain_git_tree_is_not_a_pool_copy "a plain git tree at <root>/a/b/c is not a pool copy: it is kept with one wake and nothing is stopped or destroyed"; }
@@ -1826,6 +1854,7 @@ test_unsafe_mutations_are_caught() {
 
   expect_caught no-nested-check $lib '    FM_MP_NESTED+=("$dir")' '    :' scn_nested_unpushed_commit_keeps_the_slot "nested-copy proof"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
+  expect_caught opened-directory-children-unchecked $lib '          fm_mp_classify_entry "$copy" "$rel/$child" || return 1' '          fm_mp_classify_entry "$copy" "$rel/$child" || true' scn_wholly_ignored_tac_caches_are_the_named_exception "proof of each child of an opened ignored directory"
   expect_caught every-claude-untracked-line-skipped $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'grep -v -- "^?? .claude/"' scn_unignored_nested_clone_does_not_hide_an_untracked_file "skipping only a nested copy's own untracked line"
   expect_caught nested-clone-not-proved-once-its-line-is-skipped $orch '      fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '      :' scn_unignored_nested_clone_with_unpushed_work_is_kept "own git proof of a nested clone whose untracked line is skipped"
   expect_caught conformance-manifest-by-path-suffix $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    *scripts/hooks/_conformance_manifest.json) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "exact path of the conformance manifest"
@@ -1897,6 +1926,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught nested-clone-line-counts $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'cat' scn_unignored_nested_clone_goes_with_the_slot "skipping a nested copy's untracked directory"
   expect_caught no-conformance-manifest-scratch $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    scripts/hooks/NEVER) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "conformance manifest rule"
   expect_caught scratch-list-drops-a-name-teardown-has $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
+  expect_caught wholly-ignored-tac-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins)' scn_wholly_ignored_tac_caches_are_the_named_exception "opening a wholly ignored .tac/ one level at a time"
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
   expect_caught nofetch-forgets-pr-head $lib '    [ -z "$prn" ] || prsha=$FM_MP_PR_HEAD' '    :' scn_pr_head_proves_a_squash_merged_commit "reuse of the merged PR head"
@@ -2211,6 +2241,7 @@ ALL_TESTS=(
   test_fallback_keeps_an_untracked_file_beside_an_unignored_nested_clone
   test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work
   test_fallback_judges_ignored_entries_like_teardown
+  test_fallback_counts_the_caches_of_a_wholly_ignored_tac_as_scratch
   test_fallback_keeps_unique_ignored_files
   test_fallback_keeps_a_non_pool_copy
   test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot
