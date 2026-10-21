@@ -5,6 +5,23 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
+#        fm-control.sh <task-id> adopt
+# adopt repairs only a local Herdr omp session record under the task's control
+# and metadata locks. It requires (1) consistent window/herdr_pane_id and an
+# existing worktree and pane, (2) one foreground PID resolved by the launch-proof
+# owner, (3) that PID's kernel cwd inside this task's unique deepest recorded
+# worktree, (4) no other local task claiming the pane, and (5) an existing
+# session record with the same nonempty spawn_gen as metadata. It preserves
+# task_session_file (or uses the pane's omp session-file reference if absent),
+# requires that file and the live reference to identify the same persisted
+# file, and atomically writes version=1, the unchanged spawn_gen, live pid,
+# task_session_file, and current_session_file. A refusal names the missing proof.
+# It never unlocks a session, touches project files, starts/stops an agent,
+# or sends lifecycle input. This widens lifecycle authorization: a repaired
+# record can authorize a restored omp without the launch environment pin,
+# only while the launch-proof owner can recheck all adoption proofs and the
+# same live PID and session file. Ordinary empty/invalid session records still
+# refuse; other harnesses and backends retain their existing proof rules.
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -524,7 +541,13 @@ CONTROL_LOCK_HELD=1
 # EXIT trap, so the parent has to hold the path the trap removes. Set it
 # only once the lock is held: a process that loses the lock runs the same
 # trap, and would remove the file the lock holder is reading.
-FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
+if [ "$VERB" = adopt ]; then
+  # Adoption never reads or writes the composer; do not remove an existing
+  # dialog snapshot through the shared lifecycle cleanup trap.
+  FM_COMPOSER_DIALOG_SINK=
+else
+  FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
+fi
 META="$STATE/$ID.meta"
 if [ ! -f "$META" ]; then
   case "$RAW_ID" in
@@ -1349,6 +1372,33 @@ if [ "$BACKEND" = herdr ]; then
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
   fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
+if [ "$VERB" = adopt ]; then
+  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
+    || die "adopt needs a local Herdr omp task; no session record was changed"
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  adoption_prior=$(cat "$STATE/$ID.omp-session.json" 2>/dev/null) \
+    || die "adopt needs an existing readable session record with the metadata spawn_gen"
+  adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
+    || die "adopt needs a writable session-record directory"
+  printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
+    || die "adopt could not stage the session record; original record preserved"
+  # Refuse a changing foreground, session registration, generation, or task
+  # record rather than publishing a proof gathered for a different activation.
+  adoption_recheck=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  [ "$adoption_record" = "$adoption_recheck" ] \
+    && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
+    || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
+    || die "adopt could not publish the session record; original record preserved"
+  CONTROL_META_TMP=
+  printf 'adopted: %s\n' "$ID"
+  exit 0
 fi
 
 # --- shared helpers ---------------------------------------------------------

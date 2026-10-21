@@ -133,6 +133,11 @@ SH
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
+  [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
+  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
+  exit 0
+fi
 encode_cwd() {
   local path=$1
   path=${path//\\/\\\\}
@@ -4109,6 +4114,11 @@ case "${1:-} ${2:-}" in
     fi
     exit 0 ;;
   'pane process-info')
+    if [ -f "$D/adoption-ambiguous" ]; then
+      jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+        '{result:{type:"pane_process_info",process_info:{pane_id:$pane,foreground_processes:[{pid:2000000000,name:"omp"},{pid:2000000001,name:"omp"}]}}}'
+      exit 0
+    fi
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/herdr-agent-live" ]; then
         pid=2000000000
@@ -6486,11 +6496,174 @@ SH
   pass "supervised OMP recovery enforces the typed route class and effort on stand-ins"
 }
 
+# Adoption fixtures reuse the existing fake Herdr process/registration model;
+# only the kernel cwd reader is additional, and no live server is contacted.
+prepare_omp_adoption() { # <case-name>
+  recovery_case_or_skip "adoption-$1" "adoption-$1" || fail "adoption needs jq"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID meta
+  meta="$dir/home/state/$id.meta"
+  while IFS= read -r line; do
+    case "$line" in harness=*) printf 'harness=omp\n' ;; *) printf '%s\n' "$line" ;; esac
+  done < "$meta" > "$meta.new"
+  mv "$meta.new" "$meta"
+  printf 'spawn_gen=old\nlaunch_proof=env-v1\n' >> "$meta"
+  printf 'existing dialog snapshot\n' > "$dir/home/state/$id.composer-dialog"
+  rm -f "$dir/fake/herdr-stopped"
+  printf '%s' "$id" > "$dir/fake/recovery-case-id"
+  : > "$dir/fake/herdr-agent-live"
+  : > "$dir/fake/recovery-spawn-gen"
+  printf 2000000000 > "$dir/fake/recovery-pid"
+  printf '%s' "$dir/wt/recorded-session.jsonl" > "$dir/fake/recovery-session-ref"
+  mkdir -p "$dir/wt/subdirectory"
+  printf '%s' "$dir/wt/subdirectory" > "$dir/fake/adoption-cwd"
+  write_recovery_native_launch "$dir" "$dir/home" "$id" ship
+  jq -nc --arg task "$dir/wt/recorded-session.jsonl" \
+    '{version:1,spawn_gen:"old",pid:19,task_session_file:$task,current_session_file:""}' \
+    > "$dir/home/state/$id.omp-session.json"
+}
+
+assert_adoption_refused() { # <case-dir> <id> <named-proof>
+  local dir=$1 id=$2 expected=$3 before out rc=0
+  before=$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/state/$id.omp-session.json" \
+    "$dir/home/data/$id/brief.md" "$dir/wt/recorded-session.jsonl")
+  out=$(run_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "unsafe adoption succeeded: $out"
+  assert_contains "$out" "$expected" "adoption must name the missing proof"
+  assert_equals 'existing dialog snapshot' "$(cat "$dir/home/state/$id.composer-dialog")" "adoption must preserve existing dialog state"
+  assert_equals "$before" "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/state/$id.omp-session.json" \
+    "$dir/home/data/$id/brief.md" "$dir/wt/recorded-session.jsonl")" "refusal must preserve record and task files"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "adoption must not deliver lifecycle input"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'server ' "adoption must not start a server"
+}
+
+test_omp_adoption_matching_workspace() {
+  prepare_omp_adoption matching
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0 meta_before
+  meta_before=$(cat "$dir/home/state/$id.meta")
+  out=$(run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "broken pre-adoption record authorized interrupt: $out"
+  # The preceding refused interrupt owns and removes its dialog snapshot.
+  printf 'existing dialog snapshot\n' > "$dir/home/state/$id.composer-dialog"
+  out=$(run_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
+  assert_equals 'existing dialog snapshot' "$(cat "$dir/home/state/$id.composer-dialog")" "successful adoption must preserve existing dialog state"
+  assert_contains "$out" "adopted: $id" "adoption reports its exact task"
+  jq -e --arg task "$dir/wt/recorded-session.jsonl" \
+    '. == {version:1,spawn_gen:"old",pid:2000000000,task_session_file:$task,current_session_file:$task}' \
+    "$dir/home/state/$id.omp-session.json" >/dev/null || fail "adoption did not preserve the task file and generation with live values"
+  assert_equals "$meta_before" "$(cat "$dir/home/state/$id.meta")" "adoption never changes metadata"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "successful adoption sends no lifecycle input"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "repaired record must allow fake interrupt: $out"
+  assert_contains "$out" "interrupt-delivered $id" "previously refused task becomes controllable"
+  pass "omp adoption: matching workspace adopted and fake interrupt works without a launch env pin"
+}
+
+test_omp_adoption_foreign_workspace() {
+  prepare_omp_adoption foreign
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  printf 'worktree=%s\n' "$dir/wt/subdirectory" > "$dir/home/state/foreign.meta"
+  assert_adoption_refused "$dir" "$id" 'unique deepest match; cwd belongs to foreign'
+  pass "omp adoption: workspace of another task refused, including a deeper nested worktree"
+}
+
+test_omp_adoption_duplicate_pane() {
+  prepare_omp_adoption duplicate
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  printf 'window=fmlab:%%7\nworktree=%s\nremote_host=\n' "$dir" > "$dir/home/state/duplicate.meta"
+  assert_adoption_refused "$dir" "$id" 'unique-claim proof'
+  pass "omp adoption: two metas claiming one pane refused"
+}
+
+test_omp_adoption_ambiguous_foreground() {
+  prepare_omp_adoption ambiguous
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  : > "$dir/fake/adoption-ambiguous"
+  assert_adoption_refused "$dir" "$id" 'foreground proof needs one uniquely resolved live process'
+  pass "omp adoption: ambiguous foreground refused"
+}
+
+test_omp_adoption_generation_mismatch() {
+  prepare_omp_adoption generation
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record
+  record="$dir/home/state/$id.omp-session.json"
+  jq '.spawn_gen="different"' "$record" > "$record.new" && mv "$record.new" "$record"
+  assert_adoption_refused "$dir" "$id" 'existing record spawn_gen to equal metadata spawn_gen'
+  pass "omp adoption: record generation mismatch refused"
+}
+
+test_omp_adoption_proof_boundaries() {
+  local shape dir id record out rc
+  for shape in missing-pane missing-worktree outside-cwd unreadable-cwd different-session missing-task-file ancestor-worktree alias-worktree unreadable-inventory; do
+    prepare_omp_adoption "$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    case "$shape" in
+      missing-pane)
+        printf '%%8' > "$dir/fake/herdr-pane"
+        assert_adoption_refused "$dir" "$id" 'endpoint proof needs the recorded pane' ;;
+      missing-worktree)
+        # A physically missing workspace cannot become authority through its pathname.
+        while IFS= read -r line; do
+          case "$line" in worktree=*) printf 'worktree=%s\n' "$dir/gone" ;; *) printf '%s\n' "$line" ;; esac
+        done < "$dir/home/state/$id.meta" > "$dir/home/state/$id.meta.new"
+        mv "$dir/home/state/$id.meta.new" "$dir/home/state/$id.meta"
+        assert_adoption_refused "$dir" "$id" 'workspace proof needs an existing absolute worktree' ;;
+      outside-cwd)
+        printf '%s' "$dir" > "$dir/fake/adoption-cwd"
+        assert_adoption_refused "$dir" "$id" "foreground cwd inside this task's recorded worktree" ;;
+      unreadable-cwd)
+        : > "$dir/fake/adoption-cwd-unreadable"
+        assert_adoption_refused "$dir" "$id" 'kernel cwd proof' ;;
+      different-session)
+        printf '{}\n' > "$dir/personal.jsonl"
+        printf '%s' "$dir/personal.jsonl" > "$dir/fake/recovery-session-ref"
+        assert_adoption_refused "$dir" "$id" 'live session file to identify the preserved task session' ;;
+      unreadable-inventory)
+        if [ "$(id -u)" != 0 ]; then
+          (
+            trap 'chmod 700 "$dir/home/state"' EXIT
+            chmod 300 "$dir/home/state"
+            assert_adoption_refused "$dir" "$id" 'unique-claim proof needs a readable complete inventory'
+          ) || fail "unreadable claim inventory did not refuse safely"
+        fi ;;
+      alias-worktree)
+        ln -s "$dir/wt" "$dir/alias"
+        printf 'worktree=%s\n' "$dir/alias" > "$dir/home/state/alias.meta"
+        assert_adoption_refused "$dir" "$id" 'unique deepest match' ;;
+      missing-task-file|ancestor-worktree)
+        if [ "$shape" = missing-task-file ]; then
+          jq 'del(.task_session_file)' "$record" > "$record.new" && mv "$record.new" "$record"
+        else
+          printf 'worktree=%s\n' "$dir" > "$dir/home/state/parent.meta"
+        fi
+        out=$(run_control "$dir" "$id" adopt) || fail "safe boundary $shape refused: $out"
+        jq -e --arg file "$dir/wt/recorded-session.jsonl" \
+          '.task_session_file==$file and .current_session_file==$file and .spawn_gen=="old"' "$record" >/dev/null \
+          || fail "safe boundary $shape wrote wrong session identity"
+        # A repair never licenses an agent once its workspace loses ownership.
+        printf 'worktree=%s\n' "$dir/wt/subdirectory" > "$dir/home/state/new-owner.meta"
+        rc=0
+        out=$(run_control "$dir" "$id" interrupt) || rc=$?
+        [ "$rc" -ne 0 ] || fail "adopted record authorized a now-foreign workspace: $out"
+        assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "lost workspace proof must send nothing" ;;
+    esac
+  done
+  pass "omp adoption: pane, workspace, session-file identity, aliases, and ongoing authorization boundaries"
+}
+
+test_omp_adoption() {
+  test_omp_adoption_matching_workspace
+  test_omp_adoption_foreign_workspace
+  test_omp_adoption_duplicate_pane
+  test_omp_adoption_ambiguous_foreground
+  test_omp_adoption_generation_mismatch
+  test_omp_adoption_proof_boundaries
+}
+
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
   exit "$?"
 fi
 
+test_omp_adoption
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
 test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once
 test_bounded_reboot_recovery_advances_after_interrupted_inspection
