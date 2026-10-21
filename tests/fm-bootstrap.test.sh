@@ -317,7 +317,43 @@ YAML
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 PI_CODING_AGENT_DIR='' OMP_PROFILE=billing-test "$ROOT/bin/fm-bootstrap.sh" 2>&1)
   assert_contains "$out" 'OMP_API_BILLING: cannot inspect omp configuration' "invalid YAML must not claim a clean configuration"
   assert_not_contains "$out" 'do-not-print-this-credential' "parser exception exposed configuration content"
-  pass "bootstrap reports API-billed omp roles and fallback keys/targets locally without model calls, secrets or config writes"
+
+  cat > "$config" <<'YAML'
+retry:
+  fallbackChains:
+    openai-codex/gpt-6.1-sol:
+      - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
+      - openrouter/anthropic/claude-haiku-5.5
+YAML
+  cp "$config" "$case_dir/before.yml"
+  for phase in absent present; do
+    if [ "$phase" = present ]; then
+      cat > "$case_dir/home/config/omp-approved-fallback-chains" <<'APPROVAL'
+# 2026-10-20 captain approval
+openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro
+openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
+APPROVAL
+      cp "$case_dir/home/config/omp-approved-fallback-chains" "$case_dir/approval-before"
+    fi
+    out=$(PATH="$fakebin:$BASE_PATH" HOME="$case_dir/user" FM_HOME="$case_dir/home" \
+      FM_ROOT_OVERRIDE="$case_dir/home" FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_TEST_OMP_CALLS="$case_dir/omp-calls" \
+      PI_CODING_AGENT_DIR='' OMP_PROFILE=billing-test "$ROOT/bin/fm-bootstrap.sh" 2>&1)
+    if [ "$phase" = present ]; then
+      assert_not_contains "$out" 'OMP_API_BILLING:' "bootstrap must honor the exact recorded fallback approval"
+      cmp -s "$case_dir/home/config/omp-approved-fallback-chains" "$case_dir/approval-before" || fail "bootstrap changed approval records"
+      printf 'bootstrap approval present: no OMP_API_BILLING lines\n'
+    else
+      for field in 'target[0][0]' 'key[1]' 'target[1][0]'; do
+        assert_contains "$out" "OMP_API_BILLING: retry.fallbackChains $field" "bootstrap must flag unrecorded fallback approval"
+      done
+      printf '%s\n' "$out" | grep '^OMP_API_BILLING:'
+    fi
+    cmp -s "$config" "$case_dir/before.yml" || fail "approval diagnostics changed omp config"
+    assert_absent "$case_dir/omp-calls" "approval diagnostic invoked omp"
+  done
+  pass "bootstrap reports API-billed omp roles and fallback keys/targets locally and honors only recorded fallback approvals without writes"
 }
 
 test_bootstrap_reporting() {

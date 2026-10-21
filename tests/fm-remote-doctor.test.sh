@@ -17,6 +17,8 @@ command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (the herdr adapter p
 command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found (plistlib parses the owned launch-agent contract)"; exit 0; }
 
 TMP_ROOT=$(fm_test_tmproot fm-remote-doctor)
+# The worker may carry its real omp agent directory; every case uses CASE_HOME.
+export PI_CODING_AGENT_DIR='' OMP_PROFILE='' FM_CONFIG_OVERRIDE=''
 LABEL=dev.firstmate.herdr.fm-remote
 INTERACTIVE_LABEL=dev.firstmate.herdr
 mkdir -p "$TMP_ROOT"
@@ -518,6 +520,88 @@ assert_not_contains "$DOCTOR_OUT" 'fix launchagent-loaded=applied:' "a second --
 [ ! -s "$CASE_LAUNCHCTL_LOG" ] || assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" bootstrap \
   "a second --fix re-bootstrapped a loaded launch agent"
 pass "--fix is idempotent once the host is ready"
+
+# --- recorded omp fallback approval removes only that readiness gap ---------
+
+mkdir -p "$CASE_HOME/.omp/agent" "$CASE_PROJECT_HOME/config"
+cat > "$CASE_HOME/.omp/agent/config.yml" <<'YAML'
+retry:
+  fallbackChains:
+    openai-codex/gpt-6.1-sol:
+      - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
+      - openrouter/anthropic/claude-haiku-5.5
+YAML
+cp "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/approved-before.yml"
+EMPTY_ROOT="$CASE_DIR/empty-code-root"
+mkdir -p "$EMPTY_ROOT/bin" "$EMPTY_ROOT/config"
+FM_ROOT_OVERRIDE="$EMPTY_ROOT" PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "unapproved fallback chain must prevent readiness"
+for field in 'target[0][0]' 'key[1]' 'target[1][0]'; do
+  assert_contains "$DOCTOR_OUT" "$field" "paid route $field missing from readiness gap"
+done
+printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
+cat > "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" <<'APPROVAL'
+# 2026-10-20 captain approval
+openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro
+openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
+APPROVAL
+cp "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" "$CASE_DIR/approval-before"
+PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
+expect_code 0 "$DOCTOR_RC" "recorded exact fallback chain must leave the host ready"
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=skip:' "approved fallback check must report no findings"
+printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
+cmp -s "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/approved-before.yml" || fail "doctor modified approved omp config"
+cmp -s "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" "$CASE_DIR/approval-before" || fail "doctor modified approval records"
+cat >> "$CASE_HOME/.omp/agent/config.yml" <<'YAML'
+    openai-codex/gpt-6.1-terra:
+      - openrouter/xiaomi/mimo-v2.6-pro
+      - openrouter/unapproved/model
+    openai-codex/gpt-6.1-luna:
+      - openrouter/openai/gpt-6.1-sol
+YAML
+cat >> "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" <<'APPROVAL'
+openai-codex/gpt-6.1-luna openrouter/openai/gpt-6.1-sol
+APPROVAL
+PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
+expect_code 1 "$DOCTOR_RC" "unapproved and GPT fallback routes must still prevent readiness"
+for field in 'target[2][0]' 'target[2][1]' 'target[3][0]'; do
+  assert_contains "$DOCTOR_OUT" "$field" "doctor must retain forbidden-route finding $field"
+done
+for field in 'target[0]' 'key[1]' 'target[1]'; do
+  assert_not_contains "$DOCTOR_OUT" "$field" "the approved entries must not be diagnosed alongside forbidden routes: $field"
+done
+printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
+pass "recorded fallback chain makes a ready host usable but never bypasses other chains, GPT or openai route findings"
+
+# --- a first-time seed finds the record in the remote code root --------------
+# The seed runs this check before the home exists, so the code root's own
+# config/ is the only place a record can already be.
+
+new_case Linux with-herdr no-gui
+SEED_ROOT="$CASE_DIR/seed-code-root"
+CASE_PROJECT_HOME="$CASE_DIR/not-yet-seeded-home"
+mkdir -p "$SEED_ROOT/bin" "$SEED_ROOT/config" "$CASE_HOME/.omp/agent"
+cat > "$CASE_HOME/.omp/agent/config.yml" <<'YAML'
+retry:
+  fallbackChains:
+    openai-codex/gpt-6.1-sol:
+      - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
+      - openrouter/anthropic/claude-haiku-5.5
+YAML
+FM_ROOT_OVERRIDE="$SEED_ROOT" doctor
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "a first-time seed with no record anywhere must stay refused"
+printf '# 2026-10-20 captain approval\n%s\n%s\n' 'openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro' \
+  'openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5' > "$SEED_ROOT/config/omp-approved-fallback-chains"
+FM_ROOT_OVERRIDE="$SEED_ROOT" doctor
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=skip:' "the code root record must clear the first-time seed gap"
+printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
+printf 'openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro\n' > "$SEED_ROOT/config/omp-approved-fallback-chains"
+FM_ROOT_OVERRIDE="$SEED_ROOT" doctor
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "the code root record must honor only the entries it records"
+[ ! -e "$CASE_PROJECT_HOME" ] || fail "doctor created the not-yet-seeded home"
+pass "a first-time seed passes omp-api-billing from the code root record and refuses without one"
 
 # --- a loaded, running launch agent with contract drift is repaired ----------
 

@@ -41,8 +41,16 @@ fm_omp_api_billing_route_check() {
 # Neither omp Settings nor a provider is invoked; no config changes.
 # Missing config is silent; an existing unreadable config is diagnostic, not a
 # clean bill of health. Output is shared by bootstrap and remote doctor.
+# Approval records: docs/configuration.md "OMP fallback approvals" owns the
+# schema, scope and readers; this diagnostic only reads them.
 fm_omp_api_billing_config_diagnostics() {
   local agent_dir=${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}
+  local code_root=${FM_ROOT_OVERRIDE:-${FM_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}
+  local config_dir=${FM_CONFIG_OVERRIDE:-${FM_HOME:-$code_root}/config}
+  local approvals="$config_dir/omp-approved-fallback-chains"
+  if [ ! -e "$approvals" ] && [ ! -L "$approvals" ]; then
+    approvals="$code_root/config/omp-approved-fallback-chains"
+  fi
   if [ -n "${OMP_PROFILE:-}" ]; then
     agent_dir="$HOME/.omp/profiles/$OMP_PROFILE/agent"
   fi
@@ -52,6 +60,30 @@ fm_omp_api_billing_config_diagnostics() {
     return 0
   }
   ruby -ryaml -e '
+approved = []
+approval_file = ARGV.fetch(1)
+if File.exist?(approval_file) || File.symlink?(approval_file)
+  begin
+    raise IOError unless File.file?(approval_file) && File.readable?(approval_file)
+    route = %r{(?:openai-codex|openrouter)/[A-Za-z0-9][A-Za-z0-9._:/-]*}
+    record = /\A(#{route}(?:[ \t]+#{route})*)[ \t]*\r?\n?\z/
+    invalid = false
+    File.foreach(approval_file, encoding: Encoding::BINARY).with_index(1) do |line, number|
+      next if line.strip.empty? || line.lstrip.start_with?("#")
+      match = record.match(line)
+      unless match
+        puts "cannot inspect omp approvals: omp-approved-fallback-chains line #{number} is invalid; see docs/configuration.md"
+        invalid = true
+        next
+      end
+      approved << match[1].split(/[ \t]+/)
+    end
+    approved.clear if invalid
+  rescue StandardError
+    approved.clear
+    puts "cannot inspect omp approvals: omp-approved-fallback-chains must be a readable regular file"
+  end
+end
 begin
   config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
   config = {} if config.nil?
@@ -62,12 +94,14 @@ begin
   chains = retry_config.fetch("fallbackChains", {})
   raise TypeError unless chains.is_a?(Hash)
   findings = []
-  report = lambda do |field, value|
+  report = lambda do |field, value, approved_chain = false|
     next unless value.is_a?(String)
-    provider = value.partition("/").first.strip.downcase
-    if value.include?("/") && %w[openai openrouter].include?(provider)
-      findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
-    end
+    provider, _, model = value.partition("/")
+    provider = provider.strip.downcase
+    next unless value.include?("/") && %w[openai openrouter].include?(provider)
+    gpt = model.strip.match?(/(?:\A|\/)gpt/i) || model.strip.downcase.start_with?("openai/")
+    next if approved_chain && provider == "openrouter" && !gpt
+    findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
   end
   %w[default vision tiny].each do |role|
     value = roles[role]
@@ -76,14 +110,15 @@ begin
   end
   chains.each_with_index do |(key, targets), index|
     raise TypeError unless targets.is_a?(Array)
-    report.call("retry.fallbackChains key[#{index}]", key)
-    targets.each_with_index { |target, slot| report.call("retry.fallbackChains target[#{index}][#{slot}]", target) }
+    approved_chain = approved.include?([key, *targets])
+    report.call("retry.fallbackChains key[#{index}]", key, approved_chain)
+    targets.each_with_index { |target, slot| report.call("retry.fallbackChains target[#{index}][#{slot}]", target, approved_chain) }
   end
   puts findings
 rescue StandardError
   puts "cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration"
 end
-' "$agent_dir/config.yml" 2>/dev/null || echo "cannot inspect omp configuration: Ruby YAML check failed"
+' "$agent_dir/config.yml" "$approvals" 2>/dev/null || echo "cannot inspect omp configuration: Ruby YAML check failed"
 }
 
 # fm_api_key_guard_launch_env_config <config-dir>
