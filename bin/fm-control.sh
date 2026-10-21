@@ -86,12 +86,13 @@
 # reference. Publication also needs a positively readable live environment
 # without a usable launch pin; a matching or different pin and unreadable
 # probing refuse before staging or capture. Only a record whose process is
-# gone is repaired. A record naming the live PID or any other live process is the omp extension's to maintain
-# and is refused unchanged, including the extension's empty unproven mark and
-# an activation naming another file, even when Herdr still registers the task
-# file. The repair writes version=1, the unchanged spawn_gen, the live pid,
-# task_session_file, and current_session_file by setting the record aside,
-# comparing it with the bytes the proofs were gathered from, and linking the
+# gone is repaired. A record naming the live PID or any other live process is
+# the omp extension's to maintain and is refused unchanged, including the
+# extension's empty unproven mark and an activation naming another file, even
+# when Herdr still registers the task file. The repair writes version=1, the
+# unchanged spawn_gen, the live pid, task_session_file, and
+# current_session_file by setting the record aside, comparing it with the
+# bytes the proofs were gathered from, and linking the
 # new record without replacing, so a record the extension publishes meanwhile
 # is kept. It never unlocks a session, touches project files, starts or stops
 # an agent, or sends lifecycle input.
