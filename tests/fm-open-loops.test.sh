@@ -3239,15 +3239,72 @@ try:
         ack(boundary)
     print('PASS: firstmate escalation and steer stand for four hours, then require action', flush=True)
 
-    (home / 'config/open-loops.json').write_text(json.dumps(dict(receipt_interval_seconds=120)))
+    # An action recorded since the current presentation answers it however long the handling turn lasts.
     publish([rows[0]])
     _, boundary = drain()
     act('row-0')
+    clock += 5 * 3600
+    call(loops, '--check-actions')
     ack(boundary)
-    clock += 120
-    _, boundary = drain()
-    assert ack(boundary, good=False).returncode == 1
-    print('PASS: configured standing interval is honored', flush=True)
+    print('PASS: a recorded action answers its own turn at any age', flush=True)
+
+    # A heartbeat that changes only a stalled worker's elapsed-time counters changes no obligation.
+    stalled = dict(rows[0], category='stalled_worker', subject='job', owner='worker:job',
+                   next_action='follow up on the recorded wait and recover the worker')
+    def heartbeat(seconds, wait='lint still producing output'):
+        record = stored()
+        record['rows'][0]['evidence'] = (f'{wait}; {seconds}s without progress; step age {seconds}s;'
+                                         f' declaration age {seconds}s')
+        ledger.write_text(json.dumps(record))
+    recheck_at = lambda seconds: dt.datetime.fromtimestamp(clock + seconds, dt.timezone.utc).isoformat()
+    for kind in ('escalated', 'steered', 'deferred'):
+        publish([stalled])
+        heartbeat(3600)
+        _, boundary = drain()
+        if kind == 'steered':
+            delivery = home / 'state/job.inbox/001.msg'
+            delivery.parent.mkdir(exist_ok=True)
+            delivery.write_text(f'schema=fm-task-inbox.v1\nat={dt.datetime.fromtimestamp(clock, dt.timezone.utc).isoformat()}\n--\nfollow up\n')
+        if kind == 'deferred':
+            call(loops, 'action', 'row-0', 'deferred', '--evidence', 'lint still producing output',
+                 '--recheck', recheck_at(3600))
+        else:
+            act('row-0', kind, '001.msg' if kind == 'steered' else 'reported decision')
+        clock += 600
+        heartbeat(4200)
+        call(loops, '--check-actions')
+        if kind == 'escalated':
+            heartbeat(4200, wait='lint failed: 3 errors')
+            assert call(loops, '--check-actions', good=False).returncode == 1, 'a changed wait is a changed obligation'
+            heartbeat(4200)
+            call(loops, '--check-actions')
+        ack(boundary)
+        if kind == 'deferred':
+            clock += 600
+            heartbeat(4800)
+            result = call(drain_cli)
+            assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, result
+            call(loops, '--check-actions')
+            heartbeat(4800, wait='lint failed: 3 errors')
+            result, boundary = drain()
+            assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1
+    print('PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do', flush=True)
+
+    # A malformed or unsupported config file never blocks a presentation, a check or an acknowledgement.
+    for text in ('{"age_limits_seconds": {', json.dumps(dict(receipt_interval_seconds=120))):
+        (home / 'config/open-loops.json').write_text(text)
+        publish([rows[0]])
+        presented = call(loops, '--present-overdue')
+        assert 'row-0' in presented.stdout, presented
+        result, boundary = drain()
+        assert 'row-0' in result.stdout and 'error' not in result.stderr, result
+        assert call(loops, '--check-actions', good=False).returncode == 1
+        act('row-0')
+        call(loops, '--check-actions')
+        call(loops, '--report')
+        ack(boundary)
+    (home / 'config/open-loops.json').unlink()
+    print('PASS: an unreadable config file never blocks the receipt gate', flush=True)
 
     # The repeated-deferral refusal cannot be covered by an earlier standing escalation.
     publish([rows[0]])

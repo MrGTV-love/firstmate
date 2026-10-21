@@ -806,6 +806,8 @@ Notification cooldown markers are committed only after durable wake publication 
 Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt follow in a `STANDING` block, and a drain whose only overdue rows stand prints neither block and opens no handling episode.
 `bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no valid action recorded after its action requirement opened; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
 Reads (`drain`, `--present-overdue`, and `--check-actions`) preserve recorded actions while the row's category, subject, owner, next action, and evidence remain unchanged and its receipt has not expired or lost its bound proof.
+The elapsed-time counters in a stalled worker's evidence (`Ns without progress`, `step age Ns`, `declaration age Ns`) grow with every heartbeat and never count as a change; any other evidence change does.
+An action recorded since the row's current presentation answers it at any age; the four-hour bound below applies only to standing across handling turns.
 A refused acknowledgement is a read-only check, never a new presentation; only successful acknowledgement through every row the actor presented closes its handling turn.
 A partial acknowledgement preserves the turn's receipts for its remaining rows.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
@@ -821,7 +823,7 @@ Escalation evidence is free text: no receipt is checked against the forge or aga
 A deferral's recheck time must be in the future and at most 24 hours ahead.
 Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible` and its prior receipt `requires_followup`, and requires steering, merging, or escalation before acknowledgement, even if that prior receipt otherwise stood.
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
-A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
+A first deferral stands until its recheck time, except on a `review_pass_not_merged` row or after the row's category, subject, owner, next action, or evidence changes.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
 An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to one task still held for the captain, and also ends when that one hold is answered, released, blocked on an unresolved task, or held again.
 A row owned by a worker or a reviewer never takes a hold binding; its escalation answers only the turn it followed.
@@ -830,7 +832,7 @@ The first of these that is currently held binds: the explicit `--hold TASK_ID`, 
 Task ids written in the evidence never bind.
 `--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
 An explicit `--hold` is refused when its task is not held for the captain, when the action is not `escalated`, or when the row cannot take a binding.
-An unbound escalation or steer on any firstmate-owned row stands until its category, subject, owner, next action, or evidence changes, or `receipt_interval_seconds` elapses from the action time (default 14400 seconds, four hours), whichever comes first, except for `review_pass_not_merged`.
+An unbound escalation or steer on any firstmate-owned row stands until its category, subject, owner, next action, or evidence changes, or four hours (14400 seconds, fixed) elapse from the action time, whichever comes first, except for `review_pass_not_merged`.
 This bounded standing also applies when an optional hold could not be verified; an explicit unverifiable `--hold` still refuses.
 A bound hold ending or becoming unreadable restores the action requirement immediately rather than falling back to the time-based receipt.
 When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
@@ -879,14 +881,12 @@ Create the optional local `config/open-loops.json` to override the limits:
 ```json
 {
   "age_limits_seconds": { "silent_report": 900, "stalled_worker": 3600, "unlanded_commit": 86400 },
-  "receipt_interval_seconds": 14400,
   "command_timeout_seconds": 60,
   "review_lanes": { "owner/repository": ["independent-review"] }
 }
 ```
 
 Age limits are non-negative integer seconds for the categories above.
-`receipt_interval_seconds` must be a positive integer number of seconds; it bounds unchanged, unbound firstmate escalation and steer receipts, not captain holds or dependency waits.
 `review_lanes` optionally maps case-insensitive GitHub `owner/repository` names to nonempty lists of local review task ids; no project-specific names or verdict sources are hard-coded.
 For each configured lane, the latest logical status event mentioning the exact PR URL must contain `PASS`, the full live head SHA, and a nonfuture numeric `[at=...]` timestamp; a FAIL or REJECTED event, a stale head, or the implementation task's own verdict cannot qualify.
 The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
