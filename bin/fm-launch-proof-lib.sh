@@ -4,8 +4,9 @@
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
 # For omp, a matching pin also requires current-session proof. Explicit adopt
 # can repair a record that names another PID, never the live PID's own unproven
-# mark; without a pin, every adoption proof is rechecked
-# before the repaired live PID and session-file identity authorize lifecycle.
+# mark, nor a live PID pinned to another generation; without a pin, every
+# adoption proof is rechecked before the repaired live PID and session-file
+# identity authorize lifecycle.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action
 # for a proven record; a legacy record keeps its pre-proof attribution rule.
@@ -31,6 +32,17 @@ fm_launch_proof_pid() { # <pid> <spawn-gen> -> managed|unmanaged|unknown
   else
     printf unmanaged
   fi
+}
+
+# Succeeds only when a readable environment carries a nonempty pin for another
+# generation: that process belongs to a different launch. An absent, empty, or
+# unreadable pin names no other launch. Prints nothing.
+fm_launch_proof_pid_pinned_elsewhere() { # <pid> <spawn-gen>
+  local pid=$1 gen=$2 environment pinned
+  environment=$(fm_remote_herdr_process_env "$pid") || return 1
+  printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' || return 1
+  pinned=$(printf '%s\n' "$environment" | sed -n 's/^FM_SPAWN_GEN=//p')
+  [ -n "$pinned" ] && [ "$pinned" != "$gen" ]
 }
 
 fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
@@ -108,6 +120,9 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
     && [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$pid")" = agent ] || {
     echo 'adopt refused: process proof needs the resolved foreground process to be a readable agent process' >&2; return 1;
   }
+  if fm_launch_proof_pid_pinned_elsewhere "$pid" "$(fm_meta_get "$meta" spawn_gen)"; then
+    echo 'adopt refused: generation proof needs the live process not to be pinned to another launch generation' >&2; return 1
+  fi
   reference=$(fm_backend_herdr_pane_agent_session_ref "$session" "$pane") || {
     echo 'adopt refused: session proof needs a readable omp session-file registration on the recorded pane' >&2; return 1;
   }
