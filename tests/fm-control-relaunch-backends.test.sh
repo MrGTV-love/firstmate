@@ -1472,12 +1472,14 @@ prepare_omp_adoption() { # <case-name>
   done < "$meta" > "$meta.new"
   mv "$meta.new" "$meta"
   printf 'spawn_gen=old\nlaunch_proof=env-v1\n' >> "$meta"
-  printf 'existing dialog snapshot\n' > "$dir/home/state/$id.composer-dialog"
   rm -f "$dir/fake/herdr-stopped"
   printf '%s' "$id" > "$dir/fake/recovery-case-id"
   : > "$dir/fake/herdr-agent-live"
   : > "$dir/fake/recovery-spawn-gen"
   printf 2000000000 > "$dir/fake/recovery-pid"
+  printf 2000000000 > "$dir/fake/holder-pid"
+  printf omp > "$dir/fake/holder-comm"
+  printf omp > "$dir/fake/holder-args"
   printf '%s' "$dir/wt/recorded-session.jsonl" > "$dir/fake/recovery-session-ref"
   mkdir -p "$dir/wt/subdirectory"
   printf '%s' "$dir/wt/subdirectory" > "$dir/fake/adoption-cwd"
@@ -1494,7 +1496,6 @@ assert_adoption_refused() { # <case-dir> <id> <named-proof>
   out=$(run_control "$dir" "$id" adopt) || rc=$?
   [ "$rc" -ne 0 ] || fail "unsafe adoption succeeded: $out"
   assert_contains "$out" "$expected" "adoption must name the missing proof"
-  assert_equals 'existing dialog snapshot' "$(cat "$dir/home/state/$id.composer-dialog")" "adoption must preserve existing dialog state"
   assert_equals "$before" "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/state/$id.omp-session.json" \
     "$dir/home/data/$id/brief.md" "$dir/wt/recorded-session.jsonl")" "refusal must preserve record and task files"
   assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "adoption must not deliver lifecycle input"
@@ -1507,10 +1508,7 @@ test_omp_adoption_matching_workspace() {
   meta_before=$(cat "$dir/home/state/$id.meta")
   out=$(run_control "$dir" "$id" interrupt) || rc=$?
   [ "$rc" -ne 0 ] || fail "broken pre-adoption record authorized interrupt: $out"
-  # The preceding refused interrupt owns and removes its dialog snapshot.
-  printf 'existing dialog snapshot\n' > "$dir/home/state/$id.composer-dialog"
   out=$(run_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
-  assert_equals 'existing dialog snapshot' "$(cat "$dir/home/state/$id.composer-dialog")" "successful adoption must preserve existing dialog state"
   assert_contains "$out" "adopted: $id" "adoption reports its exact task"
   jq -e --arg task "$dir/wt/recorded-session.jsonl" \
     '. == {version:1,spawn_gen:"old",pid:2000000000,task_session_file:$task,current_session_file:$task}' \
@@ -1567,13 +1565,31 @@ test_omp_adoption_current_session_contradiction() {
   printf old > "$dir/fake/recovery-spawn-gen"
   out=$(run_control "$dir" "$id" interrupt) || rc=$?
   [ "$rc" -ne 0 ] || fail "contradictory current-session proof already authorized interrupt: $out"
-  printf 'existing dialog snapshot\n' > "$dir/home/state/$id.composer-dialog"
   assert_adoption_refused "$dir" "$id" 'current-session proof contradicts the registered task session for the live PID'
   rc=0
   out=$(run_control "$dir" "$id" interrupt) || rc=$?
   [ "$rc" -ne 0 ] || fail "adoption erased personal-session proof and authorized interrupt: $out"
   assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "contradictory activation must remain unauthorized"
   pass "omp adoption: same-PID personal current session overrides stale task registration and remains refused"
+}
+
+test_omp_adoption_non_agent_process() {
+  prepare_omp_adoption non-agent
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
+  : > "$dir/fake/recovery-foreign-foreground"
+  printf python3 > "$dir/fake/holder-comm"
+  printf 'python3 -c input()' > "$dir/fake/holder-args"
+  assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable agent process'
+  rm -f "$dir/fake/recovery-foreign-foreground"
+  printf omp > "$dir/fake/holder-comm"
+  printf omp > "$dir/fake/holder-args"
+  out=$(run_control "$dir" "$id" adopt) || fail "agent process must adopt: $out"
+  printf python3 > "$dir/fake/holder-comm"
+  printf 'python3 -c input()' > "$dir/fake/holder-args"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input once the process stopped being an agent: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a non-agent process must receive no lifecycle input"
+  pass "omp adoption: non-agent foreground process refused at adoption and at the lifecycle recheck"
 }
 
 test_omp_adoption_proof_boundaries() {
@@ -1642,6 +1658,7 @@ test_omp_adoption() {
   test_omp_adoption_ambiguous_foreground
   test_omp_adoption_generation_mismatch
   test_omp_adoption_current_session_contradiction
+  test_omp_adoption_non_agent_process
   test_omp_adoption_proof_boundaries
 }
 

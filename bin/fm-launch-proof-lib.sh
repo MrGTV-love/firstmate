@@ -87,7 +87,7 @@ fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
 # session reference supplies a file candidate, never authority on its own.
 # All five adoption checks live here so lifecycle readers can recheck them too.
 fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
-  local meta=$1 target session pane pid reference
+  local meta=$1 target session pane pid reference comm args
   target=$(fm_backend_meta_exact_value "$meta" window) || {
     echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;
   }
@@ -98,6 +98,14 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
   fi
   pid=$(fm_launch_proof_herdr_pid "$meta") || {
     echo 'adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane' >&2; return 1;
+  }
+  # A lingering registration must not turn whatever now runs in the worktree
+  # into a lifecycle target: the resolved process itself has to be an agent.
+  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
+    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) \
+    && [ -n "$comm" ] && [ -n "$args" ] \
+    && [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$pid")" = agent ] || {
+    echo 'adopt refused: process proof needs the resolved foreground process to be a readable agent process' >&2; return 1;
   }
   reference=$(fm_backend_herdr_pane_agent_session_ref "$session" "$pane") || {
     echo 'adopt refused: session proof needs a readable omp session-file registration on the recorded pane' >&2; return 1;
