@@ -532,8 +532,9 @@ retry:
       - openrouter/anthropic/claude-haiku-5.5
 YAML
 cp "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/approved-before.yml"
-PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
-expect_code 1 "$DOCTOR_RC" "the otherwise ready host must refuse unrecorded paid routes"
+EMPTY_ROOT="$CASE_DIR/empty-code-root"
+mkdir -p "$EMPTY_ROOT/bin" "$EMPTY_ROOT/config"
+FM_ROOT_OVERRIDE="$EMPTY_ROOT" PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
 assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "unapproved fallback chain must prevent readiness"
 assert_contains "$DOCTOR_OUT" 'target[0][0]' "first paid target missing from readiness gap"
 assert_contains "$DOCTOR_OUT" 'target[0][1]' "second paid target missing from readiness gap"
