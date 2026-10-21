@@ -23,7 +23,8 @@
 # Default: reconcile this home, TOON output. --json prints fm-open-loops.v1 for
 # reconciliation or the check-in result object for --check-in.
 # --present-overdue presents every overdue row that still needs an action first and records this actor's action
-# requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
+# requirements; rows under a standing receipt or already answered this turn are listed after them and print
+# nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
 # Reads (--present-overdue, --check-actions, drain) and refused acknowledgements do not
 # invalidate evidence for an unchanged obligation. Successful acknowledgement alone closes

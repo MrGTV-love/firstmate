@@ -1462,7 +1462,7 @@ def action_answers(action, row, required, now, waits):
     kind = action.get("kind")
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    if kind == "waiting" or action.get("hold"):
+    if kind == "waiting":
         return receipt_stands(action, row, now, waits)
     return True
 
@@ -1552,16 +1552,17 @@ def ledger_action(args, state, now):
     pending = controls["presentations"].setdefault(actor, {})
     if args.present_overdue:
         needing, standing = [], []
+        completed = controls.get("completed", {}).get(actor, -1)
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
-            if receipt_stands(action, row, now, waits):
+            current = ident in pending and pending[ident] >= completed
+            if current and action_answers(action, row, pending[ident], now, waits) \
+                    or receipt_stands(action, row, now, waits):
                 standing.append(row)
                 continue
             needing.append(row)
-            if ident not in pending or pending[ident] < controls.get("completed", {}).get(actor, -1) or (
-                    action.get("sequence", 0) > pending[ident]
-                    and not action_answers(action, row, pending[ident], now, waits)):
+            if not current or action.get("sequence", 0) > pending[ident]:
                 pending[ident] = controls["sequence"]
                 stamps.setdefault(actor, {})[ident] = now
         write_ledger(state, report, receipt=True)
@@ -1572,7 +1573,8 @@ def ledger_action(args, state, now):
             print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
                   " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]"
                   " [--prerequisite <row-id> | --prerequisite-task <task-id>]"
-                  " [--hold <captain-held-task-id>]")
+                  " [--hold <captain-held-task-id>]"
+                  " or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)")
         return 0
     if args.complete_actions:
         # Only a successful wake acknowledgement closes this actor's handling turn.
@@ -1583,8 +1585,8 @@ def ledger_action(args, state, now):
     if args.check_actions:
         missing = [row for ident, row in by_id.items()
                    if (ident in pending and not (
-                       receipt_stands(actions.get(ident, {}), row, now, waits)
-                       or action_answers(actions.get(ident, {}), row, pending[ident], now, waits)))
+                       action_answers(actions.get(ident, {}), row, pending[ident], now, waits)
+                       or receipt_stands(actions.get(ident, {}), row, now, waits)))
                    or (actions.get(ident, {}).get("kind") == "waiting"
                        and not receipt_stands(actions[ident], row, now, waits))]
         if missing:
@@ -1712,10 +1714,6 @@ def record_action(args, state, now, report, waits, waits_error):
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
     elif args.recheck and args.kind != "waiting":
         raise ValueError("--recheck is only valid for deferred or waiting actions")
-    if args.kind == "deferred":
-        for marked in stamps.values():
-            if ident in marked:
-                marked[ident] = now
     hold, parked, unverified = None, False, ""
     if args.hold and args.kind != "escalated":
         raise ValueError("--hold is only valid for escalated actions")
@@ -1734,6 +1732,10 @@ def record_action(args, state, now, report, waits, waits_error):
             unverified = waits_error or "standing evidence unavailable"
     elif args.hold:
         raise ValueError("only a firstmate-owned open_pr, unanswered_question or unlanded_commit row can wait on a hold")
+    if args.kind == "deferred":
+        for marked in stamps.values():
+            if ident in marked:
+                marked[ident] = now
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=old.get("deferrals", 0)

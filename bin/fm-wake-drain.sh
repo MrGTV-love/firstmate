@@ -1003,7 +1003,8 @@ if [ -n "$ACK_THROUGH" ]; then
   fi
   # A partial acknowledgement is still the same handling turn. Keep its receipts
   # until every presented row is consumed, before another drain can take the lock.
-  if [ "$RECOVERY_ACK_MOVED" = false ] && [ "$PRESENTED_MAX" -le "$ACK_THROUGH" ]; then
+  if [ "$RECOVERY_ACK_MOVED" = false ] && [ "$PRESENTED_MAX" -le "$ACK_THROUGH" ] \
+    && { [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; }; then
     "$SCRIPT_DIR/fm-open-loops.sh" --complete-actions || exit 1
   fi
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"

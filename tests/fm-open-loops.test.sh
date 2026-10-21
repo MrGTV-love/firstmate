@@ -3155,7 +3155,8 @@ def batch(items):
 
 try:
     publish(rows)
-    _, boundary = drain()
+    presented, boundary = drain()
+    assert 'action --batch' in presented.stdout, 'the overdue help names the batch form'
     # Each failed batch row reports its own result without rolling back valid actions.
     runs = home / 'snapshot-runs'
     runs.unlink(missing_ok=True)
@@ -3332,6 +3333,65 @@ try:
     _, boundary = drain()
     assert ack(boundary, good=False).returncode == 1
     print('PASS: reviewed PRs keep their next-turn action requirement', flush=True)
+
+    # A refused batch line leaves no presentation change behind for a valid sibling to persist.
+    publish([rows[0], rows[1]])
+    _, boundary = drain()
+    prior = stored()['handling']['presented_at']['main']['row-0']
+    clock += 60
+    result = batch([dict(row_id='row-0', kind='deferred', evidence='short wait', hold='job',
+                         recheck=dt.datetime.fromtimestamp(clock + 600, dt.timezone.utc).isoformat()),
+                    dict(row_id='row-1', kind='escalated', evidence='reported decision')])
+    assert result.returncode == 1 and '"refused"' in result.stdout and '"recorded"' in result.stdout, result
+    assert stored()['handling']['presented_at']['main']['row-0'] == prior, 'a refused line must not restamp its row'
+    assert 'row-0' not in stored()['handling']['actions']
+    act('row-0')
+    ack(boundary)
+    print('PASS: a refused batch line leaks no state into its siblings', flush=True)
+
+    # A hold-bound escalation answers its own turn by sequence, even if the hold ends or the backlog breaks.
+    backlog = home / 'data/backlog.md'
+    held = ('## In flight\n- [ ] job - Recover the run (repo: firstmate) (kind: ship) (hold: exact run recovery)'
+            ' (hold-kind: captain)\n  Captain hold set: '
+            + dt.datetime.fromtimestamp(clock - 7200, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            + '\n\n## Queued\n\n## Done\n')
+    empty = backlog.read_text()
+    for label, change in (('answered', lambda: backlog.write_text(
+                               held.replace('- [ ] job', '- [x] job').replace('## In flight', '## Done', 1))),
+                          ('unreadable', lambda: (backlog.unlink(), backlog.symlink_to(home / 'missing-backlog')))):
+        backlog.write_text(held)
+        publish([rows[0]])
+        _, boundary = drain()
+        recorded = act('row-0')
+        assert 'standing: captain hold job' in recorded.stdout, (label, recorded)
+        prior = stored()['handling']['presented_at']['main']['row-0']
+        change()
+        runs.unlink(missing_ok=True)
+        clock += 60
+        result, boundary = drain()
+        assert 'row-0' not in result.stdout, (label, result.stdout)
+        call(loops, '--check-actions')
+        assert not runs.exists(), (label, 'a same-turn answer reads no backlog snapshot')
+        assert stored()['handling']['presented_at']['main']['row-0'] == prior, (label, 'no restamp')
+        ack(boundary)
+        result, boundary = drain()
+        assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1, (label, 'next turn needs action')
+        act('row-0')
+        ack(boundary)
+        backlog.unlink()
+        backlog.write_text(empty)
+    print('PASS: a hold-bound escalation answers its own turn without a backlog read', flush=True)
+
+    # A home with no ledger acknowledges its wakes without starting the ledger receipt command.
+    home = world / 'ledgerless'
+    for directory in ('state', 'config', 'data', 'projects'):
+        (home / directory).mkdir(parents=True)
+    (home / 'data/backlog.md').write_text(empty)
+    call('bash', '-c', '. "$1"; fm_wake_append check "$2" "check: $2"', '_', code / 'bin/fm-wake-lib.sh', 'plain')
+    _, boundary = drain()
+    ack(boundary)
+    assert not (home / 'state/.open-loops.lock').exists(), 'acknowledgement without a ledger must not touch it'
+    print('PASS: a home without a ledger acknowledges without the receipt command', flush=True)
 finally:
     shutil.rmtree(world)
 PY
