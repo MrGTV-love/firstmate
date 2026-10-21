@@ -6,9 +6,11 @@
 #          exits 0.
 #          Silent = all good.
 #          OMP_API_BILLING lines report API-billed omp default, vision, tiny or
-#          fallback-chain references, or an existing config that cannot be read.
+#          fallback-chain references that no recorded approval covers, or an
+#          existing config or approval record that cannot be read.
 #          bin/fm-api-key-guard-lib.sh owns the active-global-config YAML check;
 #          it never calls models, emits credentials or changes omp configuration.
+#          docs/configuration.md "OMP fallback approvals" owns the approval record.
 #          Lines: "MISSING: <tool> (install: <command>)",
 #                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; install: <command>) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
