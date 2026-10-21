@@ -140,8 +140,13 @@ class Collector:
     def load_config(self):
         path = self.config / "open-loops.json"
         config = json.loads(path.read_text()) if path.exists() else {}
-        if not isinstance(config, dict) or set(config) - {"age_limits_seconds", "command_timeout_seconds", "review_lanes"}:
-            raise ValueError("open-loops configuration supports age_limits_seconds, command_timeout_seconds and review_lanes")
+        if not isinstance(config, dict) or set(config) - {
+                "age_limits_seconds", "command_timeout_seconds", "review_lanes", "receipt_interval_seconds"}:
+            raise ValueError("open-loops configuration supports age_limits_seconds, command_timeout_seconds, "
+                             "review_lanes and receipt_interval_seconds")
+        self.receipt_interval = config.get("receipt_interval_seconds", 4 * 60 * 60)
+        if type(self.receipt_interval) is not int or self.receipt_interval <= 0:
+            raise ValueError("receipt_interval_seconds must be positive integer seconds")
         self.review_lanes = config.get("review_lanes", {})
         if not isinstance(self.review_lanes, dict) or any(
                 not isinstance(slug, str) or not re.fullmatch(r"[^/\s]+/[^/\s]+", slug)
@@ -1170,6 +1175,8 @@ def read_ledger(state):
                 type(handling.get("sequence")) is not int
                 or not isinstance(handling.get("actions"), dict) or not isinstance(handling.get("presentations"), dict)
                 or not isinstance(handling.get("presented_at", {}), dict)
+                or not isinstance(handling.get("completed", {}), dict)
+                or any(type(v) is not int for v in handling.get("completed", {}).values())
                 or any(not isinstance(v, dict) for v in handling.get("presented_at", {}).values())
                 or any(not isinstance(v, dict) for v in [*handling["actions"].values(),
                                                          *handling["presentations"].values()])):
@@ -1428,21 +1435,39 @@ class WaitVerifier:
             return False  # unreadable or changed evidence never buys standing acknowledgement
 
 
-def receipt_stands(action, row, now, waits=None):
-    """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
+def receipt_stands(action, row, now, waits, interval):
+    """Standing evidence answers later turns, but never a changed obligation or a reviewed-green PR."""
     kind = action.get("kind")
-    if row.get("category") == "review_pass_not_merged":
+    if row.get("category") == "review_pass_not_merged" or action.get("requires_followup") \
+            or action.get("digest") != row_digest(row):
         return False
     if kind == "waiting":
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
     if kind == "escalated" and row.get("owner") == "captain":
-        return action.get("digest") == row_digest(row)  # only the captain can move it; stands until the row changes
-    if kind == "escalated":
-        # A firstmate-owned row parked behind a live captain hold waits on the same single mover.
+        return True  # only the captain can move it; stands until the row changes
+    if kind == "escalated" and action.get("hold"):
+        # A bound hold ending must not fall back to a time-based receipt.
         return waits is not None and waits.hold_stands(action, row)
+    if kind in ("escalated", "steered") and row.get("owner") == "firstmate":
+        return 0 <= now - action.get("at_epoch", 0) < interval
     return False
+
+
+def action_answers(action, row, required, now, waits, interval):
+    """Read-only validation: a presentation is not an invalidation event."""
+    if action.get("sequence", 0) <= required or action.get("requires_followup") \
+            or action.get("digest") != row_digest(row):
+        return False
+    kind = action.get("kind")
+    if kind == "deferred":
+        return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
+    if kind == "waiting" or action.get("hold") or (
+            row.get("owner") == "firstmate" and kind in ("escalated", "steered")
+            and row.get("category") != "review_pass_not_merged"):
+        return receipt_stands(action, row, now, waits, interval)
+    return True
 
 
 def steer_record_epoch(state, row, record):
@@ -1490,6 +1515,8 @@ def ledger_action(args, state, now):
     except (OSError, ValueError) as error:
         if args.command == "action" or args.report:
             raise
+        if args.complete_actions:
+            return 0  # the acknowledgement check already printed the repair diagnostic
         print(f"error: open-loops ledger unreadable ({str(error)[:120]}); this drain is not gated on overdue rows."
               f" Repair: rm {state / 'open-loops.json'} (the next heartbeat rebuilds it)", file=sys.stderr)
         return 0
@@ -1498,6 +1525,8 @@ def ledger_action(args, state, now):
             raise ValueError("no published ledger; run bin/fm-open-loops.sh --heartbeat first")
         return 0
     if args.present_overdue and not overdue_rows(report, now):
+        return 0
+    if args.complete_actions and "handling" not in report:
         return 0
     controls = report.setdefault("handling", dict(sequence=0, presentations={}, presented_at={}, actions={}))
     stamps = controls.setdefault("presented_at", {})
@@ -1508,10 +1537,12 @@ def ledger_action(args, state, now):
     by_id = {r["id"]: r for r in rows}
     actions = controls["actions"]
     waits, waits_error = None, ""
+    home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_ROOT_OVERRIDE") or BIN.parent).resolve()
+    interval = Collector(home, now).receipt_interval
     recorded = getattr(args, "kind", None)
     pending_waits = any(a.get("kind") == "waiting" or a.get("hold") for a in actions.values())
     parks = recorded == "escalated" and getattr(args, "row_id", None) in by_id and parkable(by_id[args.row_id])
-    if recorded == "waiting" or pending_waits or parks:
+    if recorded == "waiting" or pending_waits or parks or getattr(args, "batch", None):
         try:
             waits = WaitVerifier(report, state, now)
         except SOURCE_ERRORS as error:
@@ -1529,11 +1560,13 @@ def ledger_action(args, state, now):
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
-            if receipt_stands(action, row, now, waits):
+            if receipt_stands(action, row, now, waits, interval):
                 standing.append(row)
                 continue
             needing.append(row)
-            if ident not in pending or action.get("sequence", 0) > pending[ident]:
+            if ident not in pending or pending[ident] < controls.get("completed", {}).get(actor, -1) or (
+                    action.get("sequence", 0) > pending[ident]
+                    and not action_answers(action, row, pending[ident], now, waits, interval)):
                 pending[ident] = controls["sequence"]
                 stamps.setdefault(actor, {})[ident] = now
         write_ledger(state, report, receipt=True)
@@ -1546,13 +1579,19 @@ def ledger_action(args, state, now):
                   " [--prerequisite <row-id> | --prerequisite-task <task-id>]"
                   " [--hold <captain-held-task-id>]")
         return 0
+    if args.complete_actions:
+        # Only a successful wake acknowledgement closes this actor's handling turn.
+        # Receipts stay available to other actors and to later standing checks.
+        controls.setdefault("completed", {})[actor] = controls["sequence"]
+        write_ledger(state, report, receipt=True)
+        return 0
     if args.check_actions:
         missing = [row for ident, row in by_id.items()
-                   if (ident in pending and (actions.get(ident, {}).get("sequence", 0) <= pending[ident]
-                       or (actions.get(ident, {}).get("kind") == "deferred"
-                           and actions[ident].get("recheck_epoch", 0) <= now)))
+                   if (ident in pending and not (
+                       receipt_stands(actions.get(ident, {}), row, now, waits, interval)
+                       or action_answers(actions.get(ident, {}), row, pending[ident], now, waits, interval)))
                    or (actions.get(ident, {}).get("kind") == "waiting"
-                       and not receipt_stands(actions[ident], row, now, waits))]
+                       and not receipt_stands(actions[ident], row, now, waits, interval))]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
@@ -1563,6 +1602,56 @@ def ledger_action(args, state, now):
         print("complete: " + str(report.get("complete", False)).lower())
         print(render_overdue(rows) if rows else "OVERDUE: none")
         return 0
+    if args.batch:
+        return record_batch(args.batch, state, now, report, waits, waits_error, interval)
+    message = record_action(args, state, now, report, waits, waits_error, interval)
+    print("action: " + json.dumps(args.row_id) + "\nkind: " + args.kind)
+    if message:
+        print("standing: " + message)
+    return 0
+
+
+def record_batch(path, state, now, report, waits, waits_error, interval):
+    """JSONL input; each row commits independently under one lock and one cached backlog read."""
+    defaults = dict(row_id=None, kind=None, evidence=None, recheck=None, hold=None,
+                    prerequisite=None, prerequisite_task=None)
+    stream = sys.stdin if path == "-" else open(path)
+    results = []
+    try:
+        for line, text in enumerate(stream, 1):
+            ident, kind = "", ""
+            try:
+                record = json.loads(text)
+                if not isinstance(record, dict) or set(record) - set(defaults):
+                    raise ValueError("batch row must be an action object with known fields only")
+                ident, kind = (value if isinstance(value, str) else ""
+                               for value in (record.get("row_id", ""), record.get("kind", "")))
+                if any(not isinstance(value, str) for value in record.values()):
+                    raise ValueError("batch action fields must be strings")
+                if not ident or kind not in ("steered", "merged", "escalated", "deferred", "waiting"):
+                    raise ValueError("row_id and a valid action kind are required")
+                if record.get("prerequisite") and record.get("prerequisite_task"):
+                    raise ValueError("select only one prerequisite option")
+                args = argparse.Namespace(**(defaults | record))
+                message = record_action(args, state, now, report, waits, waits_error, interval)
+                results.append((line, ident, kind, "recorded", message))
+            except SOURCE_ERRORS as error:
+                results.append((line, ident, kind, "refused", str(error)))
+    finally:
+        if stream is not sys.stdin:
+            stream.close()
+    print(f"results[{len(results)}]{{line,id,kind,result,message}}:")
+    for result in results:
+        print("  " + ",".join(json.dumps(value) for value in result))
+    return int(any(result[3] == "refused" for result in results))
+
+
+def record_action(args, state, now, report, waits, waits_error, interval):
+    """The single-row and batch forms use identical evidence validation and shared snapshot state."""
+    controls = report["handling"]
+    stamps, actions = controls["presented_at"], controls["actions"]
+    actor = os.environ.get("FM_SUPERVISION_ACTOR") or "main"
+    by_id = {row["id"]: row for row in overdue_rows(report, now)}
     if args.row_id not in by_id:
         raise ValueError("row is not currently overdue in the published ledger")
     ident = args.row_id
@@ -1593,6 +1682,8 @@ def ledger_action(args, state, now):
         boundary = stamps.get(actor, {}).get(ident)
         if boundary is None:
             boundary = min((marked[ident] for marked in stamps.values() if ident in marked), default=now)
+        if waits is None:
+            raise ValueError("waiting evidence unavailable: " + waits_error)
         binding = waits.binding(by_id[ident], args.prerequisite, args.prerequisite_task, args.evidence, boundary)
         if args.prerequisite_task:
             delivery = f"waiting:{args.prerequisite_task}:{args.evidence}"
@@ -1608,6 +1699,7 @@ def ledger_action(args, state, now):
     if args.kind == "deferred":
         if old.get("deferrals", 0):
             old["captain_visible"] = True
+            old["requires_followup"] = True
             actions[ident] = old
             for row in report["rows"]:
                 if row["id"] == ident:
@@ -1661,18 +1753,16 @@ def ledger_action(args, state, now):
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
     write_ledger(state, report, receipt=True)
-    print("action: " + json.dumps(ident) + "\nkind: " + args.kind)
-    if parked:
-        if hold:
-            print("standing: captain hold " + hold["task"] + "; stands until this row changes"
-                  " or that hold is answered or released")
-        elif unverified:
-            print(f"standing: no; the captain hold could not be verified ({unverified}), so this receipt answers only"
-                  " the turn it followed (record it again once the backlog is readable)")
-        else:
-            print("standing: no; no task held for the captain was named, so this receipt answers only the turn it"
-                  " followed (name the hold with --hold TASK_ID)")
-    return 0
+    message = ""
+    if hold:
+        message = ("captain hold " + hold["task"] + "; stands until this row changes"
+                   " or that hold is answered or released")
+    elif by_id[ident].get("owner") == "firstmate" and args.kind in ("escalated", "steered") \
+            and by_id[ident].get("category") != "review_pass_not_merged":
+        message = f"unchanged row; re-present after {interval} seconds"
+        if parked and unverified:
+            message += f"; captain hold could not be verified ({unverified})"
+    return message
 
 
 class CliParser(argparse.ArgumentParser):
@@ -1690,11 +1780,14 @@ def main():
     modes.add_argument("--present-overdue", action="store_true", help="present and require actions before wake acknowledgement")
     modes.add_argument("--check-actions", action="store_true", help="refuse acknowledgement with unactioned presented rows")
     modes.add_argument("--report", action="store_true", help="report all overdue rows with current ages without collecting")
+    modes.add_argument("--complete-actions", action="store_true",
+                       help="close this actor's handling turn after successful wake acknowledgement")
     commands = parser.add_subparsers(dest="command")
     action = commands.add_parser("action", help="record an action on a presented overdue row")
-    action.add_argument("row_id")
-    action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred", "waiting"))
-    action.add_argument("--evidence", required=True, help="delivery id, PR URL, escalation, deferral or dependency reason")
+    action.add_argument("row_id", nargs="?")
+    action.add_argument("kind", nargs="?", choices=("steered", "merged", "escalated", "deferred", "waiting"))
+    action.add_argument("--batch", metavar="JSONL_FILE", help="one action object per line; - reads stdin")
+    action.add_argument("--evidence", help="delivery id, PR URL, escalation, deferral or dependency reason")
     action.add_argument("--recheck", help="future UTC ISO time (deferred or waiting)")
     action.add_argument("--hold", metavar="TASK_ID",
                         help="task held for the captain that this escalation waits on (escalated only)")
@@ -1702,8 +1795,15 @@ def main():
     dependency.add_argument("--prerequisite", help="exact same-task unanswered-question row id (waiting only)")
     dependency.add_argument("--prerequisite-task", help="distinct routed ship or scout task id (waiting only)")
     args = parser.parse_args()
-    receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report
-    if args.command == "action" and (args.present_overdue or args.check_actions or args.report):
+    receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report or args.complete_actions
+    if args.command == "action":
+        if args.batch:
+            if any(getattr(args, key) for key in ("row_id", "kind", "evidence", "recheck", "hold",
+                                                  "prerequisite", "prerequisite_task")):
+                parser.error("--batch cannot be combined with single-row action arguments")
+        elif not args.row_id or not args.kind or not args.evidence:
+            parser.error("action requires row_id, kind and --evidence, or --batch JSONL_FILE")
+    if args.command == "action" and (args.present_overdue or args.check_actions or args.report or args.complete_actions):
         parser.error("action cannot be combined with presentation, acknowledgement or report modes")
     if receipt_mode and (args.heartbeat or args.json or args.check_in):
         parser.error("receipt and report commands cannot collect or publish a heartbeat")
