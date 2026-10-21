@@ -1592,6 +1592,20 @@ test_omp_adoption_non_agent_process() {
   pass "omp adoption: non-agent foreground process refused at adoption and at the lifecycle recheck"
 }
 
+test_omp_adoption_unreadable_environment() {
+  prepare_omp_adoption unreadable-environment
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
+  out=$(run_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
+  : > "$dir/fake/recovery-env-unreadable"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input over an unreadable launch environment: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "an unreadable launch environment must receive no lifecycle input"
+  rm -f "$dir/fake/recovery-env-unreadable"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "readable environment must restore the repaired authorization: $out"
+  assert_contains "$out" "interrupt-delivered $id" "repaired record controls the task once the environment is readable"
+  pass "omp adoption: unreadable launch environment stays unknown and is not promoted to managed"
+}
+
 test_omp_adoption_proof_boundaries() {
   local shape dir id record out rc
   for shape in missing-pane missing-worktree outside-cwd unreadable-cwd different-session missing-task-file ancestor-worktree alias-worktree unreadable-inventory; do
@@ -1659,6 +1673,7 @@ test_omp_adoption() {
   test_omp_adoption_generation_mismatch
   test_omp_adoption_current_session_contradiction
   test_omp_adoption_non_agent_process
+  test_omp_adoption_unreadable_environment
   test_omp_adoption_proof_boundaries
 }
 
