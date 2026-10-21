@@ -1,0 +1,14 @@
+### mutation: loose-url-scan
+### file: bin/fm-pr-ready-reconcile.sh
+### diff:
+-  url=$(fm_dod_pr_url_from_done_note "$note") && fm_pr_url_parse "$url" || return 0
++  url=$(printf "%s\n" "$note" | grep -oE "https://[^ ]+/pull/[0-9]+" | head -n 1) && fm_pr_url_parse "$url" || return 0
+### running: bash tests/fm-pr-ready-reconcile.test.sh
+ok - refusal skips the task before any forge call for ten minutes, then registers once the cause healed at the same head
+ok - ready PR records pr/head, arms merge poll, releases exactly one place; second pass changes nothing
+ok - direct-PR ready ship registers; scouts, secondmates, local-only, progress and draft waits are skipped
+ok - newest ready signal wins over an older PR and survives later resolution notes
+ok - the declared PR registers even when the note names another PR after it
+not ok - ready unexpectedly registered
+### test exit status: 1
+restored bin/fm-pr-ready-reconcile.sh

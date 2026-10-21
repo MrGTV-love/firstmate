@@ -1,0 +1,16 @@
+### mutation: remove-pass-time-limit
+### file: bin/fm-watch.sh
+### diff:
+-  ( fm_run_timed "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
++  ( env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+### running: bash tests/fm-pr-ready-reconcile.test.sh
+ok - draft is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreachable is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreadable-forge is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - 200,000-line log uses only its bounded tail; old ready outside tail is ignored and new ready registers within 60s
+ok - one pass registers every ready ship however many task records exist
+ok - unreadable task record and log each report once without stopping the pass
+ok - real watcher registers ready PR before notification exit, without supervisor action or status edits
+not ok - hung forge call outlived the pass limit
+### test exit status: 1
+restored bin/fm-watch.sh

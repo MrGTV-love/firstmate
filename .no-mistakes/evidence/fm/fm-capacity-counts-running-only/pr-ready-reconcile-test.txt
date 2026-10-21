@@ -1,0 +1,15 @@
+ok - refusal skips the task before any forge call for ten minutes, then registers once the cause healed at the same head
+ok - ready PR records pr/head, arms merge poll, releases exactly one place; second pass changes nothing
+ok - direct-PR ready ship registers; scouts, secondmates, local-only, progress and draft waits are skipped
+ok - newest ready signal wins over an older PR and survives later resolution notes
+ok - the declared PR registers even when the note names another PR after it
+ok - a note that does not open with PR <url> registers no PR, least of all an unrelated leading one
+ok - draft is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreachable is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreadable-forge is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - 200,000-line log uses only its bounded tail; old ready outside tail is ignored and new ready registers within 60s
+ok - one pass registers every ready ship however many task records exist
+ok - unreadable task record and log each report once without stopping the pass
+ok - real watcher registers ready PR before notification exit, without supervisor action or status edits
+ok - hung forge call is killed at the pass limit and the next watcher tick registers the ready ship
+bash tests/fm-pr-ready-reconcile.test.sh  8.97s user 16.76s system 76% cpu 33.755 total

@@ -1,0 +1,25 @@
+
+== T real 10-minute age-out: draft PR refused, then ready at the SAME head; no clock or mtime edits anywhere
+PASS: refusal marker written at +1s
+pr-ready: ship-g: registration refused: error: https://github.com/example/proj/pull/107 is a draft pull request; a draft cannot be merged, s
+forge calls for PR 107 at refusal: 1
+t+000s forge calls for 107: 1 registered: no
+t+060s forge calls for 107: 1 registered: no
+t+120s forge calls for 107: 1 registered: no
+t+181s forge calls for 107: 1 registered: no
+t+240s forge calls for 107: 1 registered: no
+t+300s forge calls for 107: 1 registered: no
+t+360s forge calls for 107: 1 registered: no
+t+420s forge calls for 107: 1 registered: no
+t+480s forge calls for 107: 1 registered: no
+t+540s forge calls for 107: 1 registered: no
+t+600s forge calls for 107: 1 registered: no
+registered after 603s from the refusal
+forge calls for PR 107 in total: 3 (refusal pass made 1)
+PASS: registered at +603s: not before 600s, within one tick of the interval
+PASS: no forge call during the 10 minutes; only the retry's own 2 calls (draft read + head read) after age-out
+PASS: pr= recorded
+PASS: worker copy HEAD never moved
+
+== RESULT: 0 failure(s)
+rc=0

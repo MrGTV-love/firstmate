@@ -1,0 +1,9 @@
+### mutation: remove-age-out
+### file: bin/fm-pr-ready-reconcile.sh
+### diff:
+-    [ "$age" -lt 0 ] || [ "$age" -ge "$REFUSAL_RETRY_SECS" ] || return 0
++    return 0
+### running: bash tests/fm-pr-ready-reconcile.test.sh
+not ok - ready PR not recorded: 
+### test exit status: 1
+restored bin/fm-pr-ready-reconcile.sh

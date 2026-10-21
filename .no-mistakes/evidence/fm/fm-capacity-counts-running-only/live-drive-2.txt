@@ -1,0 +1,110 @@
+
+== S1 happy path: real watcher registers ready PRs; capacity frees exactly one per ready ship; skips non-eligible records
+proj 4
+occupancy before: 5 (local-e, scout-d, ship-a, ship-b, ship-c)
+--- real fm-spawn.sh while the project is full (cap 4, 5 occupants)
+spawn rc=75
+deferred: project proj admits 4 worker(s) at once on this machine (/Users/charlesabrooker/tmp/fm-lab.g5xCTb/config/project-capacity) and 5 already hold a place (local-e, scout-d, ship-a, ship-b, ship-c); task new-task was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or 
+PASS: ship-a and ship-c recorded pr= with no supervisor action
+occupancy after: 3 (local-e, scout-d, ship-b)
+--- ship-a.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.g5xCTb/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.g5xCTb/wt/ship-a
+branch=fm/ship-a
+pr=https://github.com/example/proj/pull/101
+pr_head=da543b5a976f3f3cb667a21713625d82047b016c
+PASS: ship-a merge poll armed (ship-a.check.sh)
+PASS: ship-a pr_head = forge head
+--- ship-c.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.g5xCTb/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.g5xCTb/wt/ship-c
+branch=fm/ship-c
+pr=https://github.com/example/proj/pull/103
+pr_head=da543b5a976f3f3cb667a21713625d82047b016c
+PASS: ship-c merge poll armed (ship-c.check.sh)
+PASS: ship-c pr_head = forge head
+PASS: ship-b left alone
+PASS: scout-d left alone
+PASS: local-e left alone
+PASS: mate-f left alone
+PASS: occupancy fell by exactly the 2 registered ships (5 -> 3)
+--- real fm-spawn.sh after registration (cap 4, 3 occupants): must NOT print deferred
+spawn rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.g5xCTb
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: task new-task has no brief at inaccessible data path /Users/charlesabrooker/tmp/fm-lab.g5xCTb/data/new-task/brief.md
+PASS: spawn no longer deferred (rc=1 is its later brief check, not capacity)
+--- watcher output
+pr-ready: ship-a: registered https://github.com/example/proj/pull/101
+pr-ready: ship-c: registered https://github.com/example/proj/pull/103
+signal: /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/local-e.status /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/mate-f.status /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/scout-d.status /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/
+
+== S1b idempotence: repeated passes change nothing and do not call the forge for registered ships
+PASS: 3 more passes: registrations byte-identical
+PASS: 3 more passes: zero forge calls
+PASS: 3 more passes: silent
+
+== S2 refusal: draft PR is refused once, skipped before any forge call inside 10 min, retried after, registers at the SAME head
+pr-ready: ship-g: registration refused: error: https://github.com/example/proj/pull/107 is a draft pull request; a draft cannot be merged, so merge monitoring would wait for an event that cannot occur - mark it ready for review and arm again, or declare a wait
+PASS: draft refused with a printed reason
+PASS: draft left unregistered (no pr=)
+PASS: refusal marker written
+PASS: 9-minute-old marker: silent pass
+PASS: 9-minute-old marker: zero forge calls
+PASS: 9-minute-old marker: still unregistered
+pr-ready: ship-g: registered https://github.com/example/proj/pull/107
+PASS: 11-minute-old marker: retried and registered with no manual step
+PASS: marker removed after registration
+PASS: worker copy HEAD never moved (same head throughout)
+
+== S3 strict PR reader: only the PR declared as 'PR <url>' registers
+PASS: leading unrelated PR URL: nothing registered
+PASS: leading unrelated PR URL: no forge call
+PASS: declared PR 195 registered, 180 ignored
+
+== S4 unreadable inputs do not stop other records
+pr-ready: ship-j: unreadable task record; skipped
+pr-ready: ship-k: unreadable status log; skipped
+pr-ready: ship-l: registered https://github.com/example/proj/pull/112
+PASS: ship-l registered despite unreadable ship-j.meta and ship-k.status
+PASS: unreadable record reported
+PASS: unreadable log reported
+
+== S5 bounded tail: 200,000-line log, old ready line outside the tail is ignored; fresh ready line registers
+PASS: old ready line outside the tail ignored (0s pass over 200,000 lines)
+PASS: fresh ready line at the end registers (1s)
+
+== S6 hung forge call: killed at the pass limit, lock released, next tick registers (real watcher, limit 3s)
+PASS: pass reached the hung forge call (pid 88313)
+PASS: hung forge call killed after 3s (limit 3s + tick)
+FAIL: ship-n never registered after the hang
+--- diagnostics: watcher alive? yes
+--- lock dir:
+total 0
+drwx------   2 charlesabrooker  staff    64 Oct 20 19:48 .
+drwxr-xr-x  77 charlesabrooker  staff  2464 Oct 20 19:49 ..
+--- gh.calls tail:
+pr view https://github.com/example/proj/pull/195 --json headRefOid -q .headRefOid
+pr view https://github.com/example/proj/pull/112 --json isDraft
+pr view https://github.com/example/proj/pull/112 --json headRefOid -q .headRefOid
+pr view https://github.com/example/proj/pull/113 --json isDraft
+pr view https://github.com/example/proj/pull/113 --json headRefOid -q .headRefOid
+pr view https://github.com/example/proj/pull/114 --json isDraft
+--- watch.out tail:
+pr-ready: ship-a: registered https://github.com/example/proj/pull/101
+pr-ready: ship-c: registered https://github.com/example/proj/pull/103
+signal: /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/local-e.status /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/mate-f.status /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/scout-d.status /Users/charlesabrooker/tmp/fm-lab.g5xCTb/state/
+
+== S7 teardown removes the task's refusal marker (real fm-teardown.sh on a lab task)
+teardown rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.g5xCTb
+REFUSED: task ship-b has a missing, empty, or ambiguous window endpoint; preserving task state.
+NOTE: teardown refused to remove ship-b record (see output above)
+NOTE: ship-b marker still present
+PASS: another task's marker untouched
+
+== RESULT: 1 failure(s)

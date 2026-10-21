@@ -1,0 +1,15 @@
+### mutation: reintroduce-eight-record-cap
+### file: bin/fm-pr-ready-reconcile.sh
+### diff:
++  CAPN=$((${CAPN:-0}+1)); [ "$CAPN" -lt 8 ] || break
+### running: bash tests/fm-pr-ready-reconcile.test.sh
+not ok - i PR not recorded: pr-ready: a: registered https://github.com/example/project/pull/42
+pr-ready: b: registered https://github.com/example/project/pull/42
+pr-ready: c: registered https://github.com/example/project/pull/42
+pr-ready: d: registered https://github.com/example/project/pull/42
+pr-ready: e: registered https://github.com/example/project/pull/42
+pr-ready: f: registered https://github.com/example/project/pull/42
+pr-ready: g: registered https://github.com/example/project/pull/42
+pr-ready: h: registered https://github.com/example/project/pull/42
+### test exit status: 1
+restored bin/fm-pr-ready-reconcile.sh
