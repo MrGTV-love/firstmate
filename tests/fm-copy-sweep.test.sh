@@ -557,7 +557,11 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   make_budget_world cut 10 10 10
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   # The first du finishes inside the bound; the second is cut by it; the third never starts.
-  FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check
+  # The bound is FM_CHECK_TIMEOUT less five seconds, 4, and a du is given it less
+  # the whole seconds elapsed, so a 2.4 second du always fits the 3 or 4 seconds
+  # left to the first and never the 2 or fewer left to the second, whatever part
+  # of a second the run starts in.
+  FAKE_DU_SLEEP=2.4 FM_CHECK_TIMEOUT=9 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
   assert_contains "$OUT" "is over its budget: 10.00 GiB against 5 GiB" "a lower bound already over the budget should wake"
   assert_contains "$OUT" "2 copies unmeasured" "the wake did not disclose the unmeasured copies"
@@ -565,7 +569,7 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   [ "$(du_calls)" = 1 ] || fail "a du that could not finish inside the bound was counted, or one ran past it: $(du_calls) completed"
   make_budget_world cutquiet 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check
+  FAKE_DU_SLEEP=2.4 FM_CHECK_TIMEOUT=9 run_sweep check
   [ -z "$OUT" ] || fail "a cut scan that proved nothing over still woke: $OUT"
   pass "a scan cut at its time bound wakes only on bytes it measured and records no completed scan"
 }
