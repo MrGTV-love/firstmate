@@ -372,21 +372,24 @@ fm_brief_task_dod_file() {  # <brief>
 }
 
 fm_brief_out_of_scope() {  # <brief>
-  local spec scope
-  spec=$(fm_brief_task_heading_body "$1" "## Firstmate spec")
-  scope=$(fm_brief_heading_parse - '### Out of scope' body <<<"$spec")
-  if [ -n "$(printf '%s' "$scope" | tr -d '[:space:]')" ]; then
-    printf '%s\n' "$scope"
-  else
-    # Unfenced mode ignores quoted examples of the legacy paragraph marker.
-    fm_brief_heading_parse - "## Firstmate spec" unfenced-body <<<"## Firstmate spec
-$spec" | awk '
+  local task
+  task=$(fm_brief_heading_body "$1" "# Task")
+  fm_brief_heading_parse - '### Out of scope' body <<<"$task"
+  # Unfenced mode ignores quoted examples of the legacy paragraph marker.
+  fm_brief_heading_parse - "# Task" unfenced-body <<<"# Task
+$task" | awk '
+      /^#/ {
+        level = match($0, /[^#]/) - 1
+        if ($0 == "### Out of scope") in_scope = 1
+        else if (level <= 3) in_scope = 0
+        emit = 0
+        next
+      }
+      in_scope { next }
       /^Out of scope:/ { emit = 1 }
-      emit && /^[[:space:]]*$/ { exit }
-      emit && /^#/ { exit }
+      /^[[:space:]]*$/ { emit = 0 }
       emit { print }
     '
-  fi
 }
 
 fm_brief_verification_plan() {  # <brief>
@@ -471,6 +474,12 @@ EOF
   printf '%s\n' "$1"
 }
 
+# Succeed when text has a line other than blank lines and ATX headings, so a
+# scaffolded subheading alone never counts as content.
+fm_brief_text_has_content() {  # <text>
+  printf '%s\n' "$1" | grep -Evq '^ {0,3}#{1,6}([[:space:]]|$)|^[[:space:]]*$'
+}
+
 # Accept the current two-subsection contract only when both bodies have content;
 # briefs predating that contract remain valid when their # Task body has content.
 fm_brief_task_content_valid() {  # <file>
@@ -482,12 +491,12 @@ fm_brief_task_content_valid() {  # <file>
     [ "$has_intent" -eq 1 ] && [ "$has_spec" -eq 1 ] || return 1
     intent=$(fm_brief_task_heading_body "$file" "## Captain's intent")
     spec=$(fm_brief_task_heading_body "$file" "## Firstmate spec")
-    [ -n "$(printf '%s' "$intent" | tr -d '[:space:]')" ] || return 1
-    [ -n "$(printf '%s' "$spec" | tr -d '[:space:]')" ] || return 1
+    fm_brief_text_has_content "$intent" || return 1
+    fm_brief_text_has_content "$spec" || return 1
     return 0
   fi
   task=$(fm_brief_heading_body "$file" "# Task")
-  [ -n "$(printf '%s' "$task" | tr -d '[:space:]')" ]
+  fm_brief_text_has_content "$task"
 }
 
 # Print the first `## Captain's intent` body line that opens with an operator
