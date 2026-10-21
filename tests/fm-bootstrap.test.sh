@@ -323,6 +323,7 @@ retry:
   fallbackChains:
     openai-codex/gpt-6.1-sol:
       - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
       - openrouter/anthropic/claude-haiku-5.5
 YAML
   cp "$config" "$case_dir/before.yml"
@@ -330,7 +331,8 @@ YAML
     if [ "$phase" = present ]; then
       cat > "$case_dir/home/config/omp-approved-fallback-chains" <<'APPROVAL'
 # 2026-10-20 captain approval
-openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
+openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro
+openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
 APPROVAL
       cp "$case_dir/home/config/omp-approved-fallback-chains" "$case_dir/approval-before"
     fi
@@ -343,7 +345,7 @@ APPROVAL
       cmp -s "$case_dir/home/config/omp-approved-fallback-chains" "$case_dir/approval-before" || fail "bootstrap changed approval records"
       printf 'bootstrap approval present: no OMP_API_BILLING lines\n'
     else
-      for field in 'target[0][0]' 'target[0][1]'; do
+      for field in 'target[0][0]' 'key[1]' 'target[1][0]'; do
         assert_contains "$out" "OMP_API_BILLING: retry.fallbackChains $field" "bootstrap must flag unrecorded fallback approval"
       done
       printf '%s\n' "$out" | grep '^OMP_API_BILLING:'

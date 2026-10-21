@@ -1290,20 +1290,35 @@ A first-time remote home seed runs its readiness check before the home exists, s
 One record there covers the host account, which matches omp's one global configuration per account.
 A home's own file wins whenever it exists, even when it is empty or malformed; the two files are never merged.
 
-Each nonblank, noncomment line records one approved chain: its ordered routes, separated by spaces or tabs, starting with the `retry.fallbackChains` key and followed by its targets in order.
+Each nonblank, noncomment line records one approved `retry.fallbackChains` entry: the entry's key followed by its targets in order, separated by spaces or tabs.
+One line approves exactly one entry; a chain that omp stores as several entries needs one line per entry.
 Each route must begin with lowercase `openai-codex/` or `openrouter/`, followed by an ASCII alphanumeric character and then only ASCII alphanumerics, `.`, `_`, `:`, `/`, or `-`; wildcards and comma-separated patterns are not approvals.
 Blank lines and lines whose first nonwhitespace character is `#` are allowed, and a `#` line is the place for the approval date and source; inline comments are not.
-For example, the approved chain Sol, then mimo, then haiku:
+
+The approved chain Sol, then mimo, then haiku is stored by omp as two entries:
+
+```yaml
+retry:
+  fallbackChains:
+    openai-codex/gpt-6.1-sol:
+      - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
+      - openrouter/anthropic/claude-haiku-5.5
+```
+
+It is recorded as two lines, one per entry:
 
 ```text
 # 2026-10-20 captain approval: paid OpenRouter fallbacks behind the GPT subscription route
-openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
+openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro
+openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
 ```
 
-The `openrouter/*` key and targets of a `retry.fallbackChains` entry are exempt only when the entry's key followed by its targets equals a recorded chain exactly: same routes, same order, same case, no selector padding, no added or removed target.
-The same route in another chain, in `modelRoles`, or in any changed form of the approved chain stays flagged.
-All `openai/*` references, OpenRouter's `openai/` model namespace, and OpenRouter model path segments beginning with `gpt` (case-insensitive) remain flagged even inside a recorded chain.
-`openai-codex/*` already uses the subscription route and needs no billing exception; it appears in the record only to name the whole chain.
+The `openrouter/*` key and targets of a `retry.fallbackChains` entry are exempt only when the entry's key followed by its targets equals one recorded line exactly: same routes, same order, same case, no selector padding, no added or removed target.
+A line never approves part of an entry or a combination of entries, so an entry that merges the two above into one key with two targets is a different entry and stays flagged until it has its own line.
+The same route in another entry, in `modelRoles`, or in any changed form of a recorded entry stays flagged.
+All `openai/*` references, OpenRouter's `openai/` model namespace, and OpenRouter model path segments beginning with `gpt` (case-insensitive) remain flagged even inside a recorded entry.
+`openai-codex/*` already uses the subscription route and needs no billing exception; it appears in a record line only to name the entry's key.
 A missing approval file grants no exceptions, and an approval file is read only when the active global omp `config.yml` exists; with no omp configuration the diagnostic stays silent whatever the approval file holds.
 An unreadable or nonregular file reports a configuration problem, and a malformed line reports its line number without its contents; either invalidates all exceptions from that file while unapproved API references are still reported.
 These approvals do not relax explicit worker-launch or relaunch billing-route admission.

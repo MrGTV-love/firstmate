@@ -12,7 +12,8 @@ TMP_ROOT=$(fm_test_tmproot fm-api-key-guard-lib)
 mkdir -p "$TMP_ROOT/agent"
 
 CODE_ROOT="$TMP_ROOT/code-root"
-SOL_CHAIN='openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5'
+SOL_ENTRY='openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro'
+MIMO_ENTRY='openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5'
 
 billing_diagnostics() {
   HOME="$TMP_ROOT" FM_HOME="${CASE_FM_HOME:-$TMP_ROOT}" FM_ROOT_OVERRIDE="$CODE_ROOT" FM_CONFIG_OVERRIDE='' \
@@ -26,6 +27,7 @@ retry:
   fallbackChains:
     openai-codex/gpt-6.1-sol:
       - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
       - openrouter/anthropic/claude-haiku-5.5
 YAML
 }
@@ -105,38 +107,50 @@ test_recorded_fallback_approvals() {
   write_sol_config
   before=$(cksum "$config")
   out=$(billing_diagnostics)
-  assert_contains "$out" 'target[0][0] uses openrouter/*' "unrecorded approval must not exempt the first paid target"
-  assert_contains "$out" 'target[0][1] uses openrouter/*' "unrecorded approval must not exempt the second paid target"
+  for field in 'target[0][0]' 'key[1]' 'target[1][0]'; do
+    assert_contains "$out" "$field uses openrouter/*" "unrecorded approval must not exempt $field"
+  done
   printf 'approval absent:\n%s\n' "$out"
-  printf '# 2026-10-20 captain approval\n%s\n' "$SOL_CHAIN" > "$approval"
+  printf '# 2026-10-20 captain approval\n%s\n%s\n' "$SOL_ENTRY" "$MIMO_ENTRY" > "$approval"
   approval_before=$(cksum "$approval")
   out=$(billing_diagnostics)
-  [ -z "$out" ] || fail "the exactly approved fallback chain must pass: $out"
+  [ -z "$out" ] || fail "the exactly approved two-entry chain must pass: $out"
   [ "$(cksum "$config")" = "$before" ] || fail "approval diagnostics modified omp config"
   [ "$(cksum "$approval")" = "$approval_before" ] || fail "approval diagnostics modified the approval record"
   printf 'approval present: no billing findings\n'
-  printf '%s\r\n' "$SOL_CHAIN" > "$approval"
+  printf '%s\r\n%s\r\n' "$SOL_ENTRY" "$MIMO_ENTRY" > "$approval"
   out=$(billing_diagnostics)
   [ -z "$out" ] || fail "a CRLF approval record must still match: $out"
+  printf '%s\n' "$SOL_ENTRY" > "$approval"
+  out=$(billing_diagnostics)
+  assert_not_contains "$out" 'target[0][0]' "a recorded entry must stay exempt without its neighbour"
+  assert_contains "$out" 'key[1] uses' "an unrecorded second entry must stay flagged"
+  assert_contains "$out" 'target[1][0] uses' "an unrecorded second entry must stay flagged"
+  printf '%s\n' "$MIMO_ENTRY" > "$approval"
+  out=$(billing_diagnostics)
+  assert_contains "$out" 'target[0][0] uses' "an unrecorded first entry must stay flagged"
+  assert_not_contains "$out" 'key[1]' "a recorded entry must stay exempt without its neighbour"
+  assert_not_contains "$out" 'target[1][0]' "a recorded entry must stay exempt without its neighbour"
+  printf '%s\n%s\n' "$SOL_ENTRY" "$MIMO_ENTRY" > "$approval"
   out=$(CASE_FM_HOME="$TMP_ROOT/another-home" billing_diagnostics)
   assert_contains "$out" 'target[0][0] uses' "one home must not borrow another home's approval"
   out=$(HOME="$TMP_ROOT" FM_HOME="$TMP_ROOT/another-home" FM_CONFIG_OVERRIDE="$TMP_ROOT/config" \
     FM_ROOT_OVERRIDE="$CODE_ROOT" PI_CODING_AGENT_DIR="$TMP_ROOT/agent" OMP_PROFILE='' fm_omp_api_billing_config_diagnostics)
   [ -z "$out" ] || fail "an explicit config-directory override must select its recorded approvals: $out"
 
-  printf 'openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5\n' > "$approval"
   local variant
   for variant in \
-    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/anthropic/claude-haiku-5.5, openrouter/xiaomi/mimo-v2.6-pro]' \
-    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/xiaomi/mimo-v2.6-pro]' \
-    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/xiaomi/mimo-v2.6-pro, openrouter/anthropic/claude-haiku-5.5, openrouter/extra/model]' \
-    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-terra: [openrouter/xiaomi/mimo-v2.6-pro, openrouter/anthropic/claude-haiku-5.5]' \
-    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/xiaomi/mimo-v2.6-pro, " openrouter/anthropic/claude-haiku-5.5 "]' \
-    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/xiaomi/mimo-v2.6-pro, "openrouter/anthropic/claude-haiku-5.5:high"]' \
-    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/xiaomi/mimo-v2.6-pro, OpenRouter/anthropic/claude-haiku-5.5]'; do
+    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/xiaomi/mimo-v2.6-pro, openrouter/anthropic/claude-haiku-5.5]' \
+    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/anthropic/claude-haiku-5.5]' \
+    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [openrouter/xiaomi/mimo-v2.6-pro, openrouter/extra/model]' \
+    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-terra: [openrouter/xiaomi/mimo-v2.6-pro]' \
+    $'retry:\n  fallbackChains:\n    openrouter/anthropic/claude-haiku-5.5: [openrouter/xiaomi/mimo-v2.6-pro]' \
+    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [" openrouter/xiaomi/mimo-v2.6-pro "]' \
+    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: ["openrouter/xiaomi/mimo-v2.6-pro:high"]' \
+    $'retry:\n  fallbackChains:\n    openai-codex/gpt-6.1-sol: [OpenRouter/xiaomi/mimo-v2.6-pro]'; do
     printf '%s\n' "$variant" > "$config"
     out=$(billing_diagnostics)
-    assert_contains "$out" 'target[0][' "a changed chain must not inherit the recorded approval: $variant"
+    assert_contains "$out" 'target[0][0] uses' "a changed entry must not inherit the recorded approval: $variant"
   done
 
   cat > "$config" <<'YAML'
@@ -147,6 +161,7 @@ retry:
   fallbackChains:
     openai-codex/gpt-6.1-sol:
       - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
       - openrouter/anthropic/claude-haiku-5.5
     default:
       - openrouter/anthropic/claude-haiku-5.5
@@ -154,31 +169,32 @@ retry:
       - openrouter/xiaomi/mimo-v2.6-pro
 YAML
   out=$(billing_diagnostics)
-  assert_not_contains "$out" 'target[0][' "the recorded chain itself stays exempt beside other chains"
+  for field in 'target[0][' 'key[1]' 'target[1][' 'key[2]'; do
+    assert_not_contains "$out" "$field" "the recorded entries stay exempt beside unrecorded entries: $field"
+  done
   assert_contains "$out" 'modelRoles.default uses' "a recorded route used as a model role must stay flagged"
   assert_contains "$out" 'modelRoles.vision uses' "a recorded route used as a model role must stay flagged"
-  assert_contains "$out" 'target[1][0] uses' "the same route in a different chain must stay flagged"
-  assert_contains "$out" 'key[2] uses' "the same route as another chain key must stay flagged"
-  assert_contains "$out" 'target[2][0] uses' "the same route under another chain key must stay flagged"
+  assert_contains "$out" 'target[2][0] uses' "a third unrecorded entry holding a recorded route must stay flagged"
+  assert_contains "$out" 'key[3] uses' "a recorded route as the key of an unrecorded entry must stay flagged"
+  assert_contains "$out" 'target[3][0] uses' "a recorded route under an unrecorded key must stay flagged"
 
-  printf 'openai-codex/gpt-6.1-sol openrouter/openai/gpt-6.1-sol openrouter/vendor/GPT-6-mini openrouter/openai/o3\n' > "$approval"
+  printf '%s\n%s\n%s\n' 'openai-codex/gpt-6.1-sol openrouter/openai/gpt-6.1-sol' \
+    'openai-codex/gpt-6.1-luna openrouter/vendor/GPT-6-mini' 'openai-codex/gpt-6.1-terra openrouter/openai/o3' > "$approval"
   cat > "$config" <<'YAML'
 modelRoles:
   tiny: openai/gpt-6.1-sol
 retry:
   fallbackChains:
-    openai-codex/gpt-6.1-sol:
-      - openrouter/openai/gpt-6.1-sol
-      - openrouter/vendor/GPT-6-mini
-      - openrouter/openai/o3
-    openai/gpt-6.1-sol:
-      - openai/gpt-6.1-sol
+    openai-codex/gpt-6.1-sol: [openrouter/openai/gpt-6.1-sol]
+    openai-codex/gpt-6.1-luna: [openrouter/vendor/GPT-6-mini]
+    openai-codex/gpt-6.1-terra: [openrouter/openai/o3]
+    openai/gpt-6.1-sol: [openai/gpt-6.1-sol]
 YAML
   out=$(billing_diagnostics)
-  for field in modelRoles.tiny 'target[0][0]' 'target[0][1]' 'target[0][2]' 'key[1]' 'target[1][0]'; do
-    assert_contains "$out" "$field uses" "a recorded chain must not hide GPT or openai routes: $field"
+  for field in modelRoles.tiny 'target[0][0]' 'target[1][0]' 'target[2][0]' 'key[3]' 'target[3][0]'; do
+    assert_contains "$out" "$field uses" "a recorded entry must not hide GPT or openai routes: $field"
   done
-  printf '%s\n' "$SOL_CHAIN" > "$approval"
+  printf '%s\n%s\n' "$SOL_ENTRY" "$MIMO_ENTRY" > "$approval"
   cat > "$config" <<'YAML'
 retry:
   fallbackChains:
@@ -187,11 +203,11 @@ retry:
       - openrouter/unapproved/private-model-canary
 YAML
   out=$(billing_diagnostics)
-  assert_contains "$out" 'target[0][0] uses' "an unrecorded chain must flag every paid route in it"
-  assert_contains "$out" 'target[0][1] uses' "an unrecorded chain must flag every paid route in it"
+  assert_contains "$out" 'target[0][0] uses' "an unrecorded entry must flag every paid route in it"
+  assert_contains "$out" 'target[0][1] uses' "an unrecorded entry must flag every paid route in it"
   assert_not_contains "$out" canary "approval diagnostics must not expose arbitrary model ids"
   rm "$approval"
-  pass "recorded fallback chains are exact and chain-scoped; other chains, roles, GPT and openai stay flagged"
+  pass "recorded fallback entries are exact and entry-scoped; other entries, roles, GPT and openai stay flagged"
 }
 
 test_code_root_approval_for_first_time_seed() {
@@ -201,15 +217,17 @@ test_code_root_approval_for_first_time_seed() {
   rm -f "$TMP_ROOT/config/omp-approved-fallback-chains"
   mkdir -p "$CODE_ROOT/config"
   out=$(CASE_FM_HOME="$TMP_ROOT/absent-home" billing_diagnostics)
-  assert_contains "$out" 'target[0][0] uses openrouter/*' "a first-time seed with no record anywhere must stay refused"
-  assert_contains "$out" 'target[0][1] uses openrouter/*' "a first-time seed with no record anywhere must stay refused"
-  printf '%s\n' "$SOL_CHAIN" > "$root_approval"
+  for field in 'target[0][0]' 'key[1]' 'target[1][0]'; do
+    assert_contains "$out" "$field uses openrouter/*" "a first-time seed with no record anywhere must stay refused: $field"
+  done
+  printf '%s\n%s\n' "$SOL_ENTRY" "$MIMO_ENTRY" > "$root_approval"
   out=$(CASE_FM_HOME="$TMP_ROOT/absent-home" billing_diagnostics)
   [ -z "$out" ] || fail "a first-time seed must honor the code root record: $out"
-  printf 'openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro\n' > "$root_approval"
+  printf '%s\n' "$SOL_ENTRY" > "$root_approval"
   out=$(CASE_FM_HOME="$TMP_ROOT/absent-home" billing_diagnostics)
-  assert_contains "$out" 'target[0][0] uses' "the code root record must honor only the exact recorded chain"
-  printf '%s\n' "$SOL_CHAIN" > "$root_approval"
+  assert_not_contains "$out" 'target[0][0]' "the code root record must honor the entries it records"
+  assert_contains "$out" 'target[1][0] uses' "the code root record must honor only the exact recorded entries"
+  printf '%s\n%s\n' "$SOL_ENTRY" "$MIMO_ENTRY" > "$root_approval"
 
   mkdir -p "$TMP_ROOT/absent-home/config"
   printf 'openai-codex/gpt-6.1-sol openrouter/other/model\n' > "$home_approval"
@@ -223,7 +241,7 @@ test_code_root_approval_for_first_time_seed() {
   out=$(CASE_FM_HOME="$TMP_ROOT/absent-home" billing_diagnostics)
   assert_contains "$out" 'target[0][0] uses' "an existing empty home record must not fall back"
   rm -rf "$TMP_ROOT/absent-home" "$CODE_ROOT"
-  pass "a first-time seed reads the code root record only when the home has none, and honors only the recorded chain"
+  pass "a first-time seed reads the code root record only when the home has none, and honors only the recorded entries"
 }
 
 test_invalid_approval_records() {

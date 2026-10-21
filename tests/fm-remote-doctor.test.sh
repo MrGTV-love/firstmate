@@ -529,6 +529,7 @@ retry:
   fallbackChains:
     openai-codex/gpt-6.1-sol:
       - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
       - openrouter/anthropic/claude-haiku-5.5
 YAML
 cp "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/approved-before.yml"
@@ -536,12 +537,14 @@ EMPTY_ROOT="$CASE_DIR/empty-code-root"
 mkdir -p "$EMPTY_ROOT/bin" "$EMPTY_ROOT/config"
 FM_ROOT_OVERRIDE="$EMPTY_ROOT" PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
 assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "unapproved fallback chain must prevent readiness"
-assert_contains "$DOCTOR_OUT" 'target[0][0]' "first paid target missing from readiness gap"
-assert_contains "$DOCTOR_OUT" 'target[0][1]' "second paid target missing from readiness gap"
+for field in 'target[0][0]' 'key[1]' 'target[1][0]'; do
+  assert_contains "$DOCTOR_OUT" "$field" "paid route $field missing from readiness gap"
+done
 printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
 cat > "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" <<'APPROVAL'
 # 2026-10-20 captain approval
-openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
+openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro
+openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
 APPROVAL
 cp "$CASE_PROJECT_HOME/config/omp-approved-fallback-chains" "$CASE_DIR/approval-before"
 PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
@@ -562,10 +565,12 @@ openai-codex/gpt-6.1-luna openrouter/openai/gpt-6.1-sol
 APPROVAL
 PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
 expect_code 1 "$DOCTOR_RC" "unapproved and GPT fallback routes must still prevent readiness"
-for field in 'target[1][0]' 'target[1][1]' 'target[2][0]'; do
+for field in 'target[2][0]' 'target[2][1]' 'target[3][0]'; do
   assert_contains "$DOCTOR_OUT" "$field" "doctor must retain forbidden-route finding $field"
 done
-assert_not_contains "$DOCTOR_OUT" 'target[0]' "the approved chain must not be diagnosed alongside forbidden routes"
+for field in 'target[0]' 'key[1]' 'target[1]'; do
+  assert_not_contains "$DOCTOR_OUT" "$field" "the approved entries must not be diagnosed alongside forbidden routes: $field"
+done
 printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
 pass "recorded fallback chain makes a ready host usable but never bypasses other chains, GPT or openai route findings"
 
@@ -582,18 +587,19 @@ retry:
   fallbackChains:
     openai-codex/gpt-6.1-sol:
       - openrouter/xiaomi/mimo-v2.6-pro
+    openrouter/xiaomi/mimo-v2.6-pro:
       - openrouter/anthropic/claude-haiku-5.5
 YAML
 FM_ROOT_OVERRIDE="$SEED_ROOT" doctor
 assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "a first-time seed with no record anywhere must stay refused"
-printf '# 2026-10-20 captain approval\nopenai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5\n' \
-  > "$SEED_ROOT/config/omp-approved-fallback-chains"
+printf '# 2026-10-20 captain approval\n%s\n%s\n' 'openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro' \
+  'openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5' > "$SEED_ROOT/config/omp-approved-fallback-chains"
 FM_ROOT_OVERRIDE="$SEED_ROOT" doctor
 assert_contains "$DOCTOR_OUT" 'check omp-api-billing=skip:' "the code root record must clear the first-time seed gap"
 printf '%s\n' "$DOCTOR_OUT" | grep '^check omp-api-billing='
 printf 'openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro\n' > "$SEED_ROOT/config/omp-approved-fallback-chains"
 FM_ROOT_OVERRIDE="$SEED_ROOT" doctor
-assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "the code root record must honor only the exact recorded chain"
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "the code root record must honor only the entries it records"
 [ ! -e "$CASE_PROJECT_HOME" ] || fail "doctor created the not-yet-seeded home"
 pass "a first-time seed passes omp-api-billing from the code root record and refuses without one"
 
