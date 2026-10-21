@@ -66,9 +66,14 @@ path=${*: -1}
 mkdir -p "$FAKE_DU_ACTIVE"
 : > "$FAKE_DU_ACTIVE/$$"
 find "$FAKE_DU_ACTIVE" -type f | wc -l | tr -d ' ' >> "$FAKE_DU_LOG.conc"
-# FAKE_DU_HANG_AFTER=<n>: every du after the n-th never finishes on its own.
-[ "$(wc -l < "$FAKE_DU_LOG.conc" | tr -d ' ')" -le "${FAKE_DU_HANG_AFTER:-999999}" ] || exec sleep 600
-sleep 0.05
+# FAKE_DU_HANG_AFTER=<n>: finish the first n calls at once, then hang past the bound.
+if [ -n "${FAKE_DU_HANG_AFTER:-}" ]; then
+  finished=0
+  [ ! -f "$FAKE_DU_LOG" ] || finished=$(wc -l < "$FAKE_DU_LOG" | tr -d ' ')
+  [ "$finished" -lt "$FAKE_DU_HANG_AFTER" ] || sleep 30
+else
+  sleep 0.05
+fi
 rm -f "$FAKE_DU_ACTIVE/$$"
 printf '%s\n' "$path" >> "$FAKE_DU_LOG"
 kib=$(awk -F '\t' -v p="$path" '$1 == p { print $2 }' "$FAKE_DU_TABLE")
@@ -1775,9 +1780,8 @@ test_apply_raises_the_wake_through_the_queue_once() {
 test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   make_budget_world cut 10 10 10
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  # The first du finishes inside the bound; the second is cut by it; the third never starts.
-  # The second hangs until the bound kills it, so no whole-second rounding of
-  # the bound can let it finish.
+  # The first du finishes at once; the second hangs past the bound at every
+  # sub-second phase of its whole-second deadline; the third never starts.
   FAKE_DU_HANG_AFTER=1 FM_CHECK_TIMEOUT=8 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
   assert_contains "$OUT" "is over its budget: 10.00 GiB against 5 GiB" "a lower bound already over the budget should wake"
