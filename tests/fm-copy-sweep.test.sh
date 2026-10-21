@@ -839,6 +839,58 @@ test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released() {
   pass "a copy whose creation lock became someone else's after its plan stays locked, is not released by the driver, and is reported as the sweep's own refusal"
 }
 
+test_ownership_or_lock_change_during_preservation_prevents_release() {
+  local shape admin before real_cp line
+  real_cp=$(command -v cp)
+  for shape in owner lock; do
+    make_locked_copy_case "preserve-change-$shape" dead
+    install_driver "$SLOT" "$W"
+    printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+    admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+    if [ "$shape" = owner ]; then
+      printf 'printf "worktree=%%s\\nkind=ship\\n" %q > %q\n' "$(copy_path locked)" "$HOMED/state/late-owner.meta" > "$W/cp-hook"
+    else
+      printf 'printf "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=999999\\n" > %q\n' "$admin/locked" > "$W/cp-hook"
+    fi
+    cat > "$FAKEBIN/cp" <<SH
+#!/usr/bin/env bash
+if [ ! -e "$W/cp-hook-ran" ]; then
+  : > "$W/cp-hook-ran"
+  bash "$W/cp-hook"
+fi
+exec "$real_cp" "\$@"
+SH
+    chmod +x "$FAKEBIN/cp"
+    before=$(shasum -a 256 "$admin/locked")
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ -e "$W/cp-hook-ran" ] || fail "$shape: preservation never copied, so the proof after it was not exercised"
+    [ "$RC" = 1 ] || fail "$shape: a change during preservation should exit 1, got $RC: $OUT"
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
+      || fail "$shape: the change during preservation was not reported as FAILED: $OUT"
+    assert_contains "$line" "the copy was left" "$shape: the FAILED line did not say the copy was left"
+    if [ "$shape" = owner ]; then
+      assert_contains "$line" "late-owner's active record" "the task record that appeared during preservation was not named"
+      assert_contains "$line" "no longer proven" "the FAILED line did not say the copy is no longer proven"
+      assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the sweep changed the lock of a copy a task claimed"
+    else
+      assert_contains "$line" "changed HEAD or creation-lock bytes" "the lock that replaced the original during preservation was not detected"
+      assert_equals 'vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=999999' "$(cat "$admin/locked")" \
+        "the sweep changed the lock that replaced the original"
+    fi
+    assert_not_contains "$OUT" "REMOVED" "$shape: a copy that changed during preservation was reported removed"
+    registered locked || fail "$shape: a copy that changed during preservation is no longer registered"
+    [ -f "$admin/locked" ] || fail "$shape: a copy that changed during preservation lost its lock"
+    assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "$shape: the ignored file changed"
+    assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
+      "$shape: the driver was asked for more than its plan"
+    assert_equals 0 "$(find "$HOMED/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ')" \
+      "$shape: a retention receipt was written for a release that never ran"
+    [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "$shape: a copy that changed during preservation was logged as removed"
+  done
+  pass "a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt"
+}
+
 test_retained_ignored_payload_is_kept_once_without_growth() {
   local admin before first n
   make_locked_copy_case retained-ignored dead
@@ -2035,6 +2087,7 @@ run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_wh
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 run_case test_a_failed_preservation_leaves_no_staging_directory
 run_case test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
+run_case test_ownership_or_lock_change_during_preservation_prevents_release
 run_case test_unproved_plan_verdicts_hold_the_copy
 run_case test_a_bare_allowed_literal_plan_releases_the_copy
 run_case test_a_zero_padded_plan_timeout_is_read_as_decimal
