@@ -1960,8 +1960,36 @@ test_api_key_refusal_carries_the_billing_repair() {
   pass "the API-key guard refusal prints the env-u relaunch and the deliberate opt-in"
 }
 
+# Run the generated command against a filled brief. This proves the worker can
+# produce the actual separate file input rather than only seeing a flag name.
+test_generated_verification_plan_command() {
+  local home="$TMP_ROOT/plan-command-home" id=plan-command brief content command plan token
+  mkdir -p "$home/data"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" project --mode no-mistakes >/dev/null \
+    || fail 'plan-command scaffold failed'
+  brief="$home/data/$id/brief.md"
+  content=$(cat "$brief")
+  content=${content//'{TASK}'/'Fix the badge refresh.'}
+  content=${content//'{FIRSTMATE_SPEC}'/'Keep the renderer. Out of scope is recorded below.'}
+  content=${content//'### Out of scope'/$'### Out of scope\n- Do not redesign the dashboard.'}
+  for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+    content=${content//"$token"/'The badge updates after refresh.'}
+  done
+  printf '%s\n' "$content" > "$brief"
+  command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$brief")
+  [ -n "$command" ] || fail 'no generated plan-build command'
+  bash -c "$command" || fail 'generated plan-build command failed'
+  plan="$home/data/$id/verification-plan.md"
+  assert_grep 'The badge updates after refresh.' "$plan" 'generated plan omitted task DoD'
+  assert_grep 'Do not redesign the dashboard.' "$plan" 'generated plan omitted exclusions'
+  assert_no_grep 'Keep the renderer.' "$plan" 'generated plan leaked unrelated Firstmate build constraints'
+  assert_grep "--verification-plan $plan" "$brief" 'worker cannot pass the generated file to no-mistakes'
+  pass 'fm-brief: generated verification-plan command creates the separate input with criteria and exclusions'
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
+test_generated_verification_plan_command
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs
 test_forge_selection_renders_correct_cli

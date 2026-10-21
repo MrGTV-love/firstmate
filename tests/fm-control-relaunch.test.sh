@@ -2147,10 +2147,11 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
 
 # The task Definition of Done check belongs to a fresh spawn. A relaunch of a
 # scaffolded brief whose placeholders are still there, whose DoD file has moved,
-# or that predates the section is neither refused nor warned about.
+# or that predates the section is neither refused nor warned about. A preserved
+# pointer-only intent is also exempt from the fresh concrete-ask minimum.
 test_relaunch_never_runs_the_task_definition_of_done_check() {
   local variant dir id home brief out
-  for variant in placeholders moved-file legacy; do
+  for variant in placeholders moved-file legacy pointer-only; do
     id="rl-dod-$variant"
     dir=$(new_case "dodrelaunch-$variant" "$id")
     home="$dir/home"
@@ -2165,6 +2166,15 @@ test_relaunch_never_runs_the_task_definition_of_done_check() {
         sed 's/{TASK}/Exercise the relaunch./; s/{FIRSTMATE_SPEC}/Keep the task whole./' \
           "$brief" > "$brief.filled"
         mv "$brief.filled" "$brief"
+        if [ "$variant" = pointer-only ]; then
+          cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+See report.md.
+## Firstmate spec
+Preserve the already-dispatched task.
+EOF
+        fi
         if [ "$variant" = moved-file ]; then
           awk -v line="DoD file: $dir/moved-away.md" '{ print } $0 == "## Definition Of Done (task)" { print line }' \
             "$brief" > "$brief.filled"
@@ -2190,6 +2200,7 @@ test_relaunch_never_runs_the_task_definition_of_done_check() {
       || fail "$variant: the relaunch should succeed: $out"
     assert_contains "$out" "spawned $id" "$variant: the relaunch did not complete"
     assert_not_contains "$out" "Definition Of Done" "$variant: the relaunch ran the task Definition of Done check"
+    assert_not_contains "$out" 'has no concrete ask' "$variant: the relaunch re-judged existing intent"
   done
   pass "fm-spawn --relaunch: the task Definition of Done check and its missing-section warning belong to a fresh spawn only"
 }
@@ -5401,6 +5412,45 @@ add_teamclaude_secondmate() {
   printf '%s' "$smhome" > "$dir/fake/cwd"
 }
 
+test_concrete_ask_admission_completes_fresh_spawns() {
+  local kind id dir home project wt fakebin out
+  local args=()
+  for kind in ship scout; do
+    id="ask-admitted-$kind"
+    dir="$TMP_ROOT/$id"
+    home="$dir/home" project="$dir/project" wt="$dir/wt"
+    fakebin=$(fm_test_make_spawn_fakebin "$dir/tools" codex gh-axi)
+    fm_test_spawn_home "$home" codex
+    fm_git_worktree "$project" "$wt" "task-$id"
+    fm_test_spawn_brief "$home" "$id" 'Fix the badge refresh without redesigning the dashboard.'
+    if [ "$kind" = ship ]; then args=(--mode direct-PR --yolo off); else args=(--scout); fi
+    out=$(FM_BACKEND=tmux FM_FAKE_LAUNCH_LOG="$dir/launch.log" \
+      fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$project" --harness codex "${args[@]}") \
+      || fail "$kind: substantive ask did not complete spawn: $out"
+    assert_contains "$out" "spawned $id" "$kind: no completed launch was reported"
+    assert_grep "kind=$kind" "$home/state/$id.meta" "$kind: launched task lost its kind"
+  done
+  pass 'fm-spawn: substantive ship/scout asks complete launch with isolated fake runtime state'
+}
+
+# A charter is not a fresh project task and must not be judged as one.
+test_fresh_charter_bypasses_concrete_ask_check() {
+  local dir id=charter-ask home smhome out
+  dir=$(new_case charter-ask "$id")
+  home="$dir/home"
+  smhome="$dir/$id-home"
+  add_teamclaude_secondmate "$dir" "$id"
+  rm "$home/state/$id.meta"
+  : > "$dir/fake/windows"
+  printf 'See report.md.\n' > "$smhome/data/charter.md"
+  out=$(run_spawn "$dir" "$id" "$smhome" --secondmate --harness claude) \
+    || fail "fresh charter must bypass concrete-ask check: $out"
+  assert_contains "$out" "spawned $id" 'fresh charter never launched'
+  assert_not_contains "$out" 'has no concrete ask' 'charter was treated as a project intent'
+  assert_grep 'kind=secondmate' "$home/state/$id.meta" 'charter launch lost its supervisor kind'
+  pass 'fm-spawn: fresh secondmate charters bypass the concrete-ask minimum'
+}
+
 test_teamclaude_reaches_secondmate_respawn_on_both_backends() {
   local dir id out rc
   dir=$(new_case tc-tmux-secondmate tc7)
@@ -6517,6 +6567,12 @@ SH
   pass "supervised OMP recovery enforces the typed route class and effort on stand-ins"
 }
 
+test_concrete_ask_lifecycle_boundaries() {
+  test_relaunch_never_runs_the_task_definition_of_done_check
+  test_concrete_ask_admission_completes_fresh_spawns
+  test_fresh_charter_bypasses_concrete_ask_check
+}
+
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
   exit "$?"
@@ -6779,6 +6835,8 @@ test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it
 test_relaunch_moves_a_drifted_item_back_in_flight
 test_teamclaude_reaches_tmux_relaunch_paths
 test_teamclaude_reaches_herdr_relaunch_paths
+test_concrete_ask_admission_completes_fresh_spawns
+test_fresh_charter_bypasses_concrete_ask_check
 test_teamclaude_reaches_secondmate_respawn_on_both_backends
 test_teamclaude_reaches_fresh_herdr_spawns
 test_teamclaude_refusal_lands_before_the_old_agent_stops
