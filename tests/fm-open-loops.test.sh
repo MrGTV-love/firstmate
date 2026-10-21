@@ -3291,6 +3291,34 @@ try:
             assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1
     print('PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do', flush=True)
 
+    # A timer the worker's own pane paints, in any unit and shape, is elapsed time too.
+    def retime(timer, work='Running lint…'):
+        record = stored()
+        record['rows'][0]['evidence'] = f'{work} ({timer} · esc to interrupt); 3600s without progress'
+        ledger.write_text(json.dumps(record))
+    for kind in ('escalated', 'deferred'):
+        for first, second in (('45s', '46s'), ('3m 12s', '3m 13s'), ('1h 2m', '1h 3m'), ('59m 59s', '1h 0m 0s')):
+            publish([stalled])
+            retime(first)
+            _, boundary = drain()
+            if kind == 'deferred':
+                call(loops, 'action', 'row-0', 'deferred', '--evidence', 'lint still producing output',
+                     '--recheck', recheck_at(3600))
+            else:
+                act('row-0')
+            stamped = stored()['handling']['presented_at']['main']['row-0']
+            clock += 60
+            retime(second)
+            call(loops, '--check-actions')
+            drain()
+            assert stored()['handling']['presented_at']['main']['row-0'] == stamped, (kind, first, second)
+            call(loops, '--check-actions')
+            retime(second, work='Running tests…')
+            assert call(loops, '--check-actions', good=False).returncode == 1, (kind, first, 'a changed task is a change')
+            retime(second)
+            ack(boundary)
+    print('PASS: a pane timer in any unit changes no obligation; a different task still does', flush=True)
+
     # A malformed or unsupported config file never blocks a presentation, a check or an acknowledgement.
     for text in ('{"age_limits_seconds": {', json.dumps(dict(receipt_interval_seconds=120))):
         (home / 'config/open-loops.json').write_text(text)

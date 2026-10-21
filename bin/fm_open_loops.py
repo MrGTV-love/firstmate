@@ -34,7 +34,7 @@ RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "star
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
 RECEIPT_SECONDS = 4 * 60 * 60  # policy: how long an unchanged firstmate escalation or steer stands
-ELAPSED_AGE = re.compile(r"\b(?:step age|declaration age) \d+s|\b\d+s without progress")
+ELAPSED_TIME = re.compile(r"\b\d+(?:[.]\d+)?[hms](?: ?\d+(?:[.]\d+)?[hms])*\b")
 # Categories a captain decision can park: the same set a dependency wait may bind.
 CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
@@ -1220,7 +1220,7 @@ def row_digest(row):
     # separately compares its full collected source and authoritative dependency.
     fields = [row.get(f) for f in ("category", "subject", "owner", "next_action", "evidence")]
     if row.get("category") == "stalled_worker" and isinstance(fields[-1], str):
-        fields[-1] = ELAPSED_AGE.sub("<age>", fields[-1])  # a heartbeat's growing age is not a changed obligation
+        fields[-1] = ELAPSED_TIME.sub("<age>", fields[-1])  # a heartbeat's growing age is not a changed obligation
     return hashlib.sha256(json.dumps(fields).encode()).hexdigest()[:24]
 
 
