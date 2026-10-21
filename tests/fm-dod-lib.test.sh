@@ -68,6 +68,100 @@ EOF
   pass "unfenced DoD-file directives after fenced examples remain authoritative"
 }
 
+# Exercise the executable plan interface, including nested criteria and fenced
+# examples, rather than asserting the library's implementation text.
+test_verification_plan_keeps_criteria_separate_from_intent() {
+  local brief="$TMP_ROOT/plan-brief.md" plan criteria="$TMP_ROOT/plan-criteria.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the stale badge.
+## Firstmate spec
+Firstmate-only build constraints must not become intent or review criteria.
+### Out of scope
+- Do not redesign the dashboard.
+### Implementation
+Keep the existing renderer.
+# Definition of done
+## Definition Of Done (task)
+The badge updates after a refresh.
+### Mandatory items
+- A failed refresh retains the last known value.
+## How You're Graded
+This grading prose is not a criterion.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail "could not build verification plan"
+  assert_contains "$plan" 'The badge updates after a refresh.' 'plan lost task criteria'
+  assert_contains "$plan" 'A failed refresh retains the last known value.' 'plan lost nested criteria'
+  assert_contains "$plan" 'Do not redesign the dashboard.' 'plan lost the exclusions'
+  assert_not_contains "$plan" 'Keep the existing renderer.' 'plan included unrelated build instructions'
+  assert_not_contains "$plan" 'Firstmate-only build constraints' 'plan included mixed Firstmate specification'
+  assert_not_contains "$plan" 'This grading prose' 'plan included the grading section'
+  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
+
+  printf '# Task\nLegacy task.\n' > "$brief"
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy plan crashed'
+  assert_contains "$plan" 'Task Definition Of Done: absent' 'legacy plan concealed absent criteria'
+  assert_contains "$plan" 'Out-of-scope list: absent' 'legacy plan concealed absent exclusions'
+
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+## Firstmate spec
+Keep the existing renderer.
+Out of scope: Do not redesign the dashboard.
+- Do not change billing.
+
+Other build constraints must not become exclusions.
+### Out of scope
+# Setup
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy exclusion paragraph failed'
+  assert_contains "$plan" 'Do not redesign the dashboard.' 'legacy scope paragraph was dropped'
+  assert_contains "$plan" 'Do not change billing.' 'legacy scope list was dropped'
+  assert_not_contains "$plan" 'Other build constraints' 'legacy scope paragraph consumed unrelated build constraints'
+  assert_contains "$plan" 'Task Definition Of Done: absent' 'missing DoD with exclusions was concealed'
+
+  printf 'A failed refresh retains the last known value.\n' > "$criteria"
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+\`\`\`text
+DoD file: $TMP_ROOT/not-a-directive.md
+\`\`\`
+DoD file: $criteria
+{DOD_MANDATORY_ITEMS}
+## How You're Graded
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'external criteria plan failed'
+  assert_contains "$plan" "A failed refresh retains the last known value." 'plan passed only a DoD-file pointer'
+  assert_not_contains "$plan" '{DOD_MANDATORY_ITEMS}' 'external criteria did not replace scaffold placeholders'
+  assert_contains "$plan" 'Out-of-scope list: absent' 'a brief with DoD but no exclusions concealed the omission'
+  rm "$criteria"
+  if plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'missing external criteria silently emitted a plan'
+  fi
+  assert_contains "$plan" "$criteria" 'missing criteria error did not name the missing file'
+  pass 'verification plans carry actual criteria, exclusions and rubric without broadening intent'
+}
+
+test_verification_plan_requires_its_shared_rubric() {
+  local isolated="$TMP_ROOT/isolated-code" brief="$TMP_ROOT/legacy-plan.md" out
+  mkdir -p "$isolated"
+  cp -R "$ROOT/bin" "$isolated/bin"
+  printf '# Task\nLegacy task.\n' > "$brief"
+  if out=$(bash "$isolated/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'plan succeeded without the shared rubric'
+  fi
+  assert_contains "$out" 'shared review rubric is not a readable file' 'missing rubric error was not actionable'
+  assert_contains "$out" "$isolated/docs/review-rubric.md" 'missing rubric error did not name its owner'
+  pass 'missing shared rubric refuses verification-plan construction'
+}
+
+test_verification_plan_keeps_criteria_separate_from_intent
+test_verification_plan_requires_its_shared_rubric
+
 test_scout_done_is_not_gated() {
   local repo wt
   repo="$TMP_ROOT/scout-repo"

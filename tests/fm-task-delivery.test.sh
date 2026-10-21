@@ -1084,6 +1084,67 @@ EOF
   pass "fm-spawn/fm-promote: leftover Task placeholders are refused until both subsections are filled"
 }
 
+test_fresh_spawn_requires_a_concrete_ask() {
+  local rec home proj fakebin kind id body out rc n=0
+  local args=()
+  rec=$(make_home concrete-ask)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout; do
+    for body in '' $'### Context\n<!-- report pointer only -->' '/tmp/report.md' 'See report.md.' 'https://example.test/report' '[report](https://example.test/report)'; do
+      n=$((n + 1))
+      id="ask-$kind-$n"
+      write_brief "$home" "$id" direct-PR
+      cat > "$home/data/$id/brief.md" <<EOF
+# Task
+## Captain's intent
+$body
+## Firstmate spec
+Keep the investigation bounded.
+EOF
+      if [ "$kind" = ship ]; then args=(--mode direct-PR --yolo off); else args=(--scout); fi
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}"); rc=$?
+      [ "$rc" -ne 0 ] || fail "$kind: empty/pointer-only intent was admitted"
+      if [ -n "$body" ]; then
+        assert_contains "$out" 'has no concrete ask' "$kind: wrong refusal for pointer/comment-only intent"
+      fi
+      assert_contains "$out" 'write the requested change or investigation and the substance' 'refusal omitted the accepted proof'
+      assert_contains "$out" 'rerun fm-spawn.sh to complete dispatch' 'refusal omitted the completing action'
+      assert_absent "$home/data/$id/launch-brief.md" 'refused ask was handed to a worker'
+      assert_absent "$home/state/$id.meta" 'refused ask created task state'
+    done
+    id="ask-$kind-good"
+    write_brief "$home" "$id" direct-PR
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+<!-- Context is optional. --> Fix the badge after refresh.
+See report.md.
+## Firstmate spec
+Keep unrelated redesign out of scope.
+EOF
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_not_contains "$out" 'has no concrete ask' 'substantive ask plus reference was refused'
+    assert_present "$home/data/$id/launch-brief.md" 'substantive ask never reached launch rendering'
+    assert_grep "$ROOT/docs/review-rubric.md" "$home/data/$id/launch-brief.md" 'independent readers did not receive the single rubric owner'
+  done
+  # A marked pointer cannot be rescued by unmarked Firstmate build substance.
+  id=ask-legacy-pointer
+  write_brief "$home" "$id" direct-PR
+  cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+[captain] See report.md.
+Firstmate build instructions are not a substitute for the captain's ask.
+EOF
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" 'has no concrete ask' 'legacy build prose rescued a pointer-only ask'
+  assert_absent "$home/data/$id/launch-brief.md" 'legacy pointer-only ask reached a worker'
+  pass 'fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks'
+}
+
+test_fresh_spawn_requires_a_concrete_ask
+
 # Exercise the serialized input a worker is told to pass to no-mistakes, not
 # just the presence of words somewhere in its much larger launch brief.
 # No live model or pipeline is needed: spawn publishes this exact input before
