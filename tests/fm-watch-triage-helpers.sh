@@ -8083,6 +8083,52 @@ test_status_device_shift_keeps_owned_appends() (
   pass "owned appends recorded before a device shift stay owned and do not wake"
 )
 
+# Adoption must leave a marker that merely lags its log on the same device
+# untouched, and still migrate every field whose device differs from the log's.
+test_status_marker_adoption_follows_each_field_device() (
+  local dir state log marker old new size0 stale want case_name
+  dir=$(watch_identity_fixture adopt-fields); state="$dir/state"; log="$state/task.status"; marker="$state/.hb-surfaced-task"
+  local FM_STATUS_IDENTITY_READER="$dir/identity-reader"
+  export FM_STATUS_IDENTITY_READER
+  old='strong:16777232:123:2026-10-09 12:34:56'; new='strong:16777233:123:2026-10-09 12:34:56'
+  for case_name in same-device-lag device-only device-and-growth reported-new-lag-classified-old reported-old-classified-new; do
+    printf 'done: delivered\n' > "$log"
+    size0=$(size_of "$log")
+    prime_watch_identity "$state" task "$old"
+    stale=$(cat "$marker")
+    case "$case_name" in
+      same-device-lag)
+        printf 'working: more\n' >> "$log"
+        want=$stale
+        ;;
+      device-only)
+        printf '%s\n' "$new" > "$state/task.identity"
+        want=$(seen_sig "$log")
+        ;;
+      device-and-growth)
+        printf 'working: more\n' >> "$log"
+        printf '%s\n' "$new" > "$state/task.identity"
+        want=$(printf 'v2\t%s\t%s@%s' "$(printf '%s' "$stale" | cut -f2)" "$size0" "$new")
+        ;;
+      reported-new-lag-classified-old)
+        printf '%s\n' "$new" > "$state/task.identity"
+        printf 'v2\t%s\t%s@%s' "$(status_observed_signature "$log" "$size0" "$new")" "$size0" "$old" > "$marker"
+        printf 'working: more\n' >> "$log"
+        want=$(printf 'v2\t%s\t%s@%s' "$(status_observed_signature "$log" "$size0" "$new")" "$size0" "$new")
+        ;;
+      reported-old-classified-new)
+        printf '%s\n' "$new" > "$state/task.identity"
+        printf 'v2\t%s\t%s@%s' "$(printf '%s' "$stale" | cut -f2)" "$size0" "$new" > "$marker"
+        want=$(seen_sig "$log")
+        ;;
+    esac
+    status_presentation_marker_adopt_device "$marker" "$log" || true
+    [ "$(cat "$marker")" = "$want" ] \
+      || fail "$case_name: adoption left $(cat "$marker"), wanted $want"
+  done
+  pass "adoption leaves a same-device lag alone and migrates each field whose device differs"
+)
+
 test_signal_rescan_deduplicates_pending() (
   local dir state out pid i expected actual
   dir=$(make_case pending-eight); state="$dir/state"; out="$dir/watch.out"

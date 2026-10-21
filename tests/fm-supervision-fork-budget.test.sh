@@ -360,6 +360,97 @@ SH
   pass "a quiet scan of 12 status logs enters $count subshells (bound 40)"
 }
 
+# The heartbeat marker lags its log between heartbeats (it is rewritten only
+# then), so a quiet scan meets a lagging marker on nearly every log. A lagging
+# marker on an unchanged device must cost a handful of commands, not the
+# per-byte signature decode: the fixture pins a constant strong identity so the
+# result does not depend on the host file system recording birth times.
+test_lagging_marker_scan_costs_no_signature_decode() {
+  local dir="$TMP_ROOT/lagging" setup="$TMP_ROOT/lagging-setup.sh" script="$TMP_ROOT/lagging.sh" log="$TMP_ROOT/lagging.log" i out quiet lagging count
+  mkdir -p "$dir/state" "$dir/home"
+  i=0
+  while [ "$i" -lt 12 ]; do
+    i=$((i + 1))
+    printf 'working [at=%s]: step\n' "$i" > "$dir/state/task-$i.status"
+  done
+  cat > "$dir/identity-reader" <<'SH'
+#!/bin/sh
+printf 'strong:16777232:123:2026-10-09 12:34:56'
+SH
+  chmod +x "$dir/identity-reader"
+  cat > "$setup" <<'SH'
+root=$1 dir=$2
+export FM_STATE_OVERRIDE="$dir/state" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/home"
+export FM_STATUS_IDENTITY_READER="$dir/identity-reader"
+. "$root/bin/fm-watch.sh"
+STATE="$dir/state"
+mark_all() {  # also commit each heartbeat marker when asked
+  local f task hb size ident
+  for f in "$STATE"/*.status; do
+    fm_wake_status_mark_current "$STATE" "$f" || echo "mark failed: $f"
+    [ "${1-}" = heartbeat ] || continue
+    task=${f##*/}; task=${task%.status}
+    status_heartbeat_seen_marker_path_to hb "$STATE" "$task"
+    _fm_status_file_size "$f" size
+    _fm_open_decisions_file_ident "$f" ident
+    status_presentation_marker_commit "$hb" "$f" "$size" "$ident" || echo "heartbeat mark failed: $f"
+  done
+}
+grow_logs() {  # every log gains a line; only the seen marker follows it
+  local f
+  for f in "$STATE"/*.status; do printf 'working [at=9]: more\n' >> "$f"; done
+  mark_all
+}
+quiet_scan() {
+  local out
+  out=$(scan_signals)
+  [ -z "$out" ] || echo "the scan was not quiet: $out"
+}
+SH
+  cat > "$script" <<'SH'
+. "${0%/*}/lagging-setup.sh"
+mark_all heartbeat
+quiet_scan
+_FMB_COMMANDS=0
+set -T
+trap '_FMB_COMMANDS=$((_FMB_COMMANDS + 1))' DEBUG
+scan_signals > /dev/null
+trap - DEBUG
+quiet=$_FMB_COMMANDS
+grow_logs
+quiet_scan
+hb_before=$(cat "$STATE/.hb-surfaced-task-1")
+_FMB_COMMANDS=0
+trap '_FMB_COMMANDS=$((_FMB_COMMANDS + 1))' DEBUG
+scan_signals > /dev/null
+trap - DEBUG
+[ "$(cat "$STATE/.hb-surfaced-task-1")" = "$hb_before" ] || echo "the scan rewrote a lagging heartbeat marker on an unchanged device"
+printf '%s %s' "$quiet" "$_FMB_COMMANDS" > "$FMB_LOG"
+SH
+  : > "$log"
+  out=$(FMB_LOG="$log" "${BASH:-bash}" "$script" "$ROOT" "$dir" 2>&1) || fail "measured script failed: $out"
+  [ -z "$out" ] || fail "measured script printed: $out"
+  read -r quiet lagging < "$log"
+  # 12 logs: a bound of 150 commands per log over the current-marker scan. The
+  # per-byte decode this guards against added about 1100 per log.
+  [ "$((lagging - quiet))" -le $((12 * 150)) ] \
+    || fail "lagging heartbeat markers added $((lagging - quiet)) commands to a quiet scan of 12 logs; the bound is $((12 * 150))"
+  cat > "$script" <<'SH'
+. "${0%/*}/lagging-setup.sh"
+unset FM_STATUS_IDENTITY_READER
+mark_all heartbeat
+grow_logs
+quiet_scan
+. "$COUNTER"
+scan_signals > /dev/null
+trap - DEBUG
+SH
+  count=$(subshells_of "$script" "$dir")
+  [ "$count" -le 40 ] \
+    || fail "a quiet scan of 12 logs with lagging heartbeat markers entered $count subshells; the bound is 40"
+  pass "lagging heartbeat markers add $((lagging - quiet)) commands (bound $((12 * 150))) and keep the scan at $count subshells (bound 40)"
+}
+
 test_heartbeat_marker_path_matches_the_tr_pipeline() {
   local script="$TMP_ROOT/hb-path.sh"
   cat > "$script" <<'SH'
@@ -491,6 +582,7 @@ else
   test_toon_readers_match_the_pipelines_they_replace
   test_status_signature_matches_the_od_pipeline
   test_quiet_signal_scan_costs_one_stat_per_log
+  test_lagging_marker_scan_costs_no_signature_decode
   test_heartbeat_marker_path_matches_the_tr_pipeline
   test_recorded_windows_reads_each_task_without_a_subshell
   test_owner_watchdog_tick_subshell_budget
