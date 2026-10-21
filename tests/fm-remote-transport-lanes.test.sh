@@ -138,6 +138,38 @@ SEQ_EXPECTED=$(seq 1 20)
   || fail "concurrent sequence claims were not unique and monotonic: $SEQ_RESULTS"
 [ "$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = 20 ] \
   || fail "concurrent sequence allocations did not retain every durable claim"
+
+# Ubuntu 26.04 ships uutils coreutils, whose mkdir can report success for a
+# directory a concurrent caller created. Ownership must come from the claim's
+# exclusive owner marker, never from mkdir's exit status, or two callers take
+# one sequence number. This shim reproduces that platform behavior exactly.
+mkdir() {
+  local target=${!#} rc
+  command mkdir "$@" 2>/dev/null
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  case "$target" in
+    */.seq-claims/[0-9]*) [ -d "$target" ] && return 0 ;;
+  esac
+  return "$rc"
+}
+rm -rf -- "$STATE_ROOT/.seq-claims"
+fm_remote_job_prepare_state "$ACCOUNT_HOME" || fail "$FM_REMOTE_JOB_ERROR"
+rm -f -- "$STATE_ROOT/seq" "$TMP_ROOT"/seq-*
+SEQ_PIDS=()
+for i in $(seq 1 20); do
+  fm_remote_job_next_seq > "$TMP_ROOT/seq-$i" &
+  SEQ_PIDS+=("$!")
+done
+for pid in "${SEQ_PIDS[@]}"; do
+  wait "$pid" \
+    || fail "a concurrent allocator failed under a platform mkdir that reports success for an existing claim"
+done
+unset -f mkdir
+SEQ_RESULTS=$(cat "$TMP_ROOT"/seq-* | sort -n)
+[ "$SEQ_RESULTS" = "$SEQ_EXPECTED" ] \
+  || fail "a platform mkdir that reports success for an existing claim duplicated a sequence: $SEQ_RESULTS"
+
 mkdir "$STATE_ROOT/.seq-claims/999998" "$STATE_ROOT/.seq-claims/999999"
 touch -t 200001010000 "$STATE_ROOT/.seq-claims/999998"
 fm_remote_job_reap_stale "$ACCOUNT_HOME" || fail "sequence claim reaping failed"
