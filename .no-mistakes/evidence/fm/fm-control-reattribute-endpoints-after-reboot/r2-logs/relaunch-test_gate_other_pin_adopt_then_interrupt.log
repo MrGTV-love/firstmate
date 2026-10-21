@@ -1,0 +1,10 @@
+R2 pre-adopt interrupt rc=1: error: task rcv-9897-yDi61F-adoption-wrong-pin-r2 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+R2 adopt (pin=other) rc=1: adopt refused: generation proof needs the live process not to be pinned to another launch generation
+R2 record unchanged after refused adopt
+R2 post-refusal interrupt rc=1: error: task rcv-9897-yDi61F-adoption-wrong-pin-r2 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+R2 sends after refusal: 0
+R2 adopt (no pin) rc=0: adopted: rcv-9897-yDi61F-adoption-wrong-pin-r2
+R2 record: {"version": 1, "spawn_gen": "old", "pid": 2000000000, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.yDi61F/adoption-wrong-pin-r2-17702/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.yDi61F/adoption-wrong-pin-r2-17702/wt/recorded-session.jsonl"}
+R2 post-adopt interrupt (no pin) rc=0: interrupt-delivered rcv-9897-yDi61F-adoption-wrong-pin-r2 harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+R2 adopt (pin=old, matching) rc=0: adopted: rcv-9897-yDi61F-adoption-wrong-pin-r2
+R2 interrupt after foreign pin appears rc=1: error: task rcv-9897-yDi61F-adoption-wrong-pin-r2 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input

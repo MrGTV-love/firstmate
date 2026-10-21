@@ -1,0 +1,3 @@
+test_gate_real_kernel_cwd exit=0
+test_gate_idempotent_and_harness_scope exit=0
+stream C done

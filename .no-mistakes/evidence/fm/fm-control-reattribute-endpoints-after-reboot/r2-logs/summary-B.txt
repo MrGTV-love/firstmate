@@ -1,0 +1,8 @@
+test_omp_adoption_current_session_contradiction exit=0
+test_omp_adoption_unproven_same_pid exit=0
+test_omp_adoption_non_agent_process exit=0
+test_omp_adoption_unreadable_environment exit=0
+test_omp_adoption_caller_gate exit=0
+test_omp_adoption_proof_boundaries exit=0
+test_proven_task_lifecycle_remains_available exit=0
+stream B done

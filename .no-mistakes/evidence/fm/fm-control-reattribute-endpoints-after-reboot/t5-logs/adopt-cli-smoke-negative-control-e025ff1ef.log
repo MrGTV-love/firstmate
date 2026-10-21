@@ -1,0 +1,124 @@
+fatal: not a git repository (or any of the parent directories): .git
+=== SMOKE START 2026-10-21T10:57:46Z head= ===
+main (lock owner) pid=41679 comm=/bin/bash
+
+--- S1 matching workspace: refused before adopt, repaired by adopt, interrupt works with no keystroke ---
+record before: {"version":1,"spawn_gen":"s1792361978.6048.2927","pid":41712,"task_session_file":"/Users/charlesabrooker/tmp/fm-lab.fpi9fC/wt/session-task.jsonl","current_session_file":""}
+live pid 41714 comm=/Users/charlesabrooker/tmp/t5-runner.m4jVq2/bins/agent/omp cwd=/Users/charlesabrooker/tmp/fm-lab.fpi9fC/wt/sub
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fpi9fC
+error: task smoke-s1 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+ok - S1a interrupt refused before adopt (record names dead pid 41712, empty current)
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fpi9fC
+adopted: smoke-s1
+record after: {"version": 1, "spawn_gen": "s1792361978.6048.2927", "pid": 41714, "task_session_file": "/Users/charlesabrooker/tmp/fm-lab.fpi9fC/wt/session-task.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-lab.fpi9fC/wt/session-task.jsonl"}
+ok - S1b adopt writes exactly the five fields (live pid, same generation, task file, current=live file) and sends no input
+  (the process env carries no FM_SPAWN_GEN pin; the live reader must still authorize via the adoption route)
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fpi9fC
+interrupt-delivered smoke-s1 harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+  herdr calls that sent input: pane send-keys %7 escape --session fmlab|
+ok - S1c interrupt now delivers Escape to the recorded pane, no human keystroke
+  repeat adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fpi9fC
+adopted: smoke-s1
+NOT OK - S1d repeat adopt rc=0
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.fpi9fC
+error: task smoke-s1 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+ok - S1e repaired record stops authorizing when another process (pid 44905) takes the pane
+
+--- S2 workspace of another task (deeper worktree) refused ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Kn7uMa
+adopt refused: workspace proof needs this task to be the unique deepest match; cwd belongs to other-task
+ok - S2 adopt refused: process cwd belongs to the deeper recorded worktree of another task
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Kn7uMa
+error: task smoke-s2 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+ok - S2b interrupt still refused
+
+--- S3 two metas claim one pane ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SgcT9j
+adopt refused: unique-claim proof needs no other local task to claim this pane; claimed by rival
+ok - S3 adopt refused: unique-claim proof names the rival task
+
+--- S4 ambiguous foreground (two agent processes) ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yDab4L
+adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane
+ok - S4a adopt refused: two agent processes, no process-group leader
+  shell leader 50453 has agent children 50458 50460
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yDab4L
+adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane
+ok - S4b adopt refused: shell leader with two agent children is ambiguous
+
+--- S5 record generation differs from metadata ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LCN9Rv
+adopt refused: generation proof needs the existing record spawn_gen to equal metadata spawn_gen
+ok - S5 adopt refused: generation proof; nothing fabricated or unset
+ok - S5b record still carries its own generation
+
+--- S6 same live PID: extension's deliberate empty mark / personal activation ---
+(process env is launch-pinned to the recorded generation, as a real launched omp is)
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.92Sff6
+adopt refused: current-session proof for the live PID is empty or invalid, which the omp extension writes as unproven; adoption cannot overwrite it
+ok - S6a empty current for the live pinned pid refused (the extension's unproven mark)
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.92Sff6
+error: task smoke-s6 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+ok - S6b interrupt stays refused on the extension's unproven mark
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.92Sff6
+adopt refused: current-session proof contradicts the registered task session for the live PID; adoption needs agreeing current-session evidence
+ok - S6c personal current-session activation for the live pid refused
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.92Sff6
+error: task smoke-s6 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+ok - S6d interrupt refused while the personal conversation is active
+
+--- S7 callers: worker, supervision branch, non-owner ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.V2JUm1
+error: workers cannot adopt a session record
+ok - S7a worker (FM_TASK_ID set) refused
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.V2JUm1
+error: session record adoption (fm-control) refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)
+ok - S7b supervision branch refused
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.V2JUm1
+error: session record adoption requires the actual lock-owning main Firstmate
+ok - S7c session that does not own the home lock refused
+
+--- S8 live process pinned to another launch generation ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JNF3gw
+adopted: smoke-s8
+NOT OK - S8 adopt refused: generation proof names the other launch (rc=0 same-record=NO sends=0 out=fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JNF3gw
+adopted: smoke-s8)
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JNF3gw
+interrupt-delivered smoke-s8 harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+NOT OK - S8b interrupt stays refused (rc=0 sends=1 out=fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JNF3gw
+interrupt-delivered smoke-s8 harness=omp backend=herdr verified=agent-alive cancel=unconfirmed)
+
+--- S9 foreground is not an agent process ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.DKTqej
+adopt refused: process proof needs the resolved foreground process to be a readable agent process
+ok - S9 adopt refused: process proof needs an agent
+
+--- S10 process cwd outside the task worktree ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8itFdE
+adopt refused: workspace proof needs the foreground cwd inside this task's recorded worktree
+ok - S10 adopt refused: workspace proof (kernel cwd read by real lsof)
+
+--- S11 unreadable process environment stays unknown, then recovers ---
+  adopt (env unreadable)> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0GAY3c
+adopted: smoke-s11
+ok - S11a adopt proofs hold with an unreadable env (no pin visible)
+  interrupt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0GAY3c
+error: task smoke-s11 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+ok - S11b interrupt refused while the environment is unreadable (verdict unknown, not promoted)
+  interrupt (env readable again)> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.0GAY3c
+interrupt-delivered smoke-s11 harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+ok - S11c authorization returns once the env is readable
+
+--- S12 claude harness, missing record, missing meta spawn_gen ---
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.PBJbxZ
+error: adopt needs a local Herdr omp task; no session record was changed
+ok - S12a non-omp harness refused
+  adopt (no record)> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.PBJbxZ
+error: adopt needs an existing readable session record with the metadata spawn_gen
+ok - S12b missing record refused; none created
+  adopt> fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.PBJbxZ
+adopt refused: metadata proof needs one nonempty spawn_gen
+ok - S12c missing metadata spawn_gen refused; none fabricated
+ok - S12d metadata still lacks spawn_gen (not fabricated)
+
+=== SMOKE END pass=27 fail=3 ===

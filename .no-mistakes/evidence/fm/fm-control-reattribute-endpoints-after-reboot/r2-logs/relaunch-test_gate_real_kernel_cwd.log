@@ -1,0 +1,4 @@
+GATE real pid=95564 cwd=p95564 fcwd n/Users/charlesabrooker/tmp/fm-control-relaunch.ciiJlC/adoption-real-cwd-5257/wt/subdirectory 
+GATE real-cwd adopt rc=0: adopted: rcv-91258-ciiJlC-adoption-real-cwd
+GATE record: {"version": 1, "spawn_gen": "old", "pid": 95564, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ciiJlC/adoption-real-cwd-5257/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ciiJlC/adoption-real-cwd-5257/wt/recorded-session.jsonl"}
+GATE outside-worktree-real-cwd adopt rc=1: adopt refused: workspace proof needs the foreground cwd inside this task's recorded worktree

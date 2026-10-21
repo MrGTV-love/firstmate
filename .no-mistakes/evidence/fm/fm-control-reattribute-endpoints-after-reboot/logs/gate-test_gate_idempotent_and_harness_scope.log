@@ -1,0 +1,8 @@
+GATE first adopt rc=0: adopted: rcv-99656-PSPANG-adoption-idem
+GATE second adopt rc=0: adopted: rcv-99656-PSPANG-adoption-idem
+GATE idempotent: record byte-identical
+GATE claude-harness adopt rc=1: error: adopt needs a local Herdr omp task; no session record was changed
+GATE claude record unchanged
+GATE no-record adopt rc=1: error: adopt needs an existing readable session record with the metadata spawn_gen
+GATE no record fabricated
+GATE missing-meta-gen adopt rc=1: adopt refused: metadata proof needs one nonempty spawn_gen

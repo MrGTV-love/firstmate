@@ -1,0 +1,5 @@
+GATE pre-adopt interrupt rc=1: error: task rcv-16582-7vhJC8-adoption-wrong-pin cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+GATE adopt rc=0: adopted: rcv-16582-7vhJC8-adoption-wrong-pin
+GATE record: {"version": 1, "spawn_gen": "old", "pid": 2000000000, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.7vhJC8/adoption-wrong-pin-23064/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.7vhJC8/adoption-wrong-pin-23064/wt/recorded-session.jsonl"}
+GATE post-adopt interrupt rc=0: interrupt-delivered rcv-16582-7vhJC8-adoption-wrong-pin harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+GATE sends: 1

@@ -1,0 +1,2 @@
+not ok - adoption (live-record) succeeded over a concurrent extension write: adopted: rcv-79561-1xqD1e-adoption-race-live-record
+tests/lib.sh: line 377: 80965 Killed: 9               FM_SPAWN_GEN=old EXT="$dir/ext/fm-task-session.ts" STATE="$dir/home/state" TASK="$id" SESSION="$dir/wt/recorded-session.jsonl" node --experimental-strip-types --no-warnings "$dir/ext/driver.mjs" < "$dir/ext/commands" > "$dir/ext/acks" 2> "$dir/ext/errors"

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Private Herdr CLI for the adopt smoke. It answers only read calls and logs
+# every call. Its pane facts come from files in $FM_FAKE_DIR; the processes it
+# names are real. It never starts a server.
+set -u
+D=${FM_FAKE_DIR:?}
+printf '%s\n' "$*" >> "$D/herdr-log"
+case "${1:-} ${2:-}" in
+  'status --json'*|'status ')
+    printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":true}}\n'; exit 0 ;;
+esac
+[ "${1:-}" != status ] || { printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":true}}\n'; exit 0; }
+pane=$(cat "$D/pane")
+case "${1:-} ${2:-}" in
+  'pane get')
+    if [ "${3:-}" = "$pane" ] && [ ! -f "$D/pane-missing" ]; then
+      jq -cn --arg pane "$pane" --arg cwd "$(cat "$D/cwd")" '{result:{pane:{pane_id:$pane,foreground_cwd:$cwd}}}'
+    else
+      printf '{"error":{"code":"pane_not_found"}}\n'
+    fi
+    exit 0 ;;
+  'agent get')
+    ref=$(cat "$D/agent-ref")
+    jq -nc --arg ref "$ref" '{result:{agent:{agent:"omp",agent_status:"idle",agent_session:{kind:"path",value:$ref}}}}'
+    exit 0 ;;
+  'pane process-info')
+    cat "$D/procinfo"; exit 0 ;;
+  'pane read')
+    printf '╭── π > smoke╮\n╰─  ─╯\n'; exit 0 ;;
+esac
+exit 0

@@ -1,0 +1,8 @@
+test_omp_adoption_other_generation_pin exit=0
+test_gate_other_pin_adopt_then_interrupt exit=0
+test_omp_adoption_matching_workspace exit=0
+test_omp_adoption_foreign_workspace exit=0
+test_omp_adoption_duplicate_pane exit=0
+test_omp_adoption_ambiguous_foreground exit=0
+test_omp_adoption_generation_mismatch exit=0
+stream A done
