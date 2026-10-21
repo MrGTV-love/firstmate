@@ -2555,6 +2555,27 @@ event_wait_or_sleep() {
   esac
 }
 
+# Ready-PR registration belongs with housekeeping repairs, not the backed-off
+# heartbeat: a missed supervisor command must not keep capacity occupied. The
+# helper owns the scan and refusal memory; detach forge reads like the existing
+# repair sweeps so a slow forge cannot stall supervision. The pass runs under a
+# hard limit (fm-timeout-lib.sh) and, like the other detached sweeps, outlives a
+# watcher that exits on a wake; a hung forge call dies with its pass, the
+# single-flight guards clear, and the next tick registers the ready ships.
+PR_READY_RECONCILE_PID=
+PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
+# measured: value=120 date=2026-10-20 host=Mac-Studio.local margin=34 (one ship costs 3.51s: slowest live registration pass over a 200,000-line log 2s with a stand-in forge, plus slowest of three real gh isDraft reads 0.87s and of three real gh headRefOid reads 0.64s)
+case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
+pr_ready_reconcile_tick() {
+  if [ -n "$PR_READY_RECONCILE_PID" ]; then
+    kill -0 "$PR_READY_RECONCILE_PID" 2>/dev/null && return 0
+    wait "$PR_READY_RECONCILE_PID" 2>/dev/null || true
+  fi
+  ( fm_run_timed "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" ) </dev/null >&2 &
+  PR_READY_RECONCILE_PID=$!
+}
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -3578,6 +3599,9 @@ while :; do
   fi
 
   watcher_beat force
+  # Start the bounded repair before a ready-status notification can exit this
+  # cycle; it must not require the supervisor to re-arm us before registering.
+  pr_ready_reconcile_tick
 
   [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
   watcher_beat
