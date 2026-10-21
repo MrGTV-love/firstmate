@@ -2247,12 +2247,19 @@ fm_check_wait_open() {
   FM_CHECK_WAIT_FIFO=
 }
 
-# Keep the existing hundredth-second stop polls and their bounds, but spend one
-# process for the entire wait rather than launching sleep on every poll. Perl is
-# already required by the portable check timeout controller.
+# Keep the existing hundredth-second stop bounds, but spend one process for the
+# entire wait rather than launching sleep on every poll. Perl is optional when
+# timeout or gtimeout bounds the check, so a host without it waits out the same
+# bound with a single sleep.
 fm_check_group_wait() {  # <pgid> <polls>
+  local hundredths=$(($2 % 100))
   kill -0 -- "-$1" 2>/dev/null || return 0
-  perl -e 'my ($group, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, -$group); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
+  if command -v perl >/dev/null 2>&1; then
+    perl -e 'my ($group, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, -$group); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
+  else
+    [ "$hundredths" -ge 10 ] || hundredths=0$hundredths
+    sleep "$(($2 / 100)).$hundredths"
+  fi
 }
 
 fm_active_check_stop() {

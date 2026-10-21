@@ -10,7 +10,7 @@
 # notified policy keys after wake acknowledgement, without recovery accounting.
 
 # shellcheck source=bin/fm-config-inherit-lib.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-config-inherit-lib.sh"
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-config-inherit-lib.sh"
 
 fm_session_launch_policy_check() {  # <config-dir> <harness> [raw=0|1]
   local enabled harness=$2 raw=${3:-0}

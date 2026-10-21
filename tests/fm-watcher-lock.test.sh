@@ -330,6 +330,56 @@ SH
   pass "bounded check returns output and failure status without launching per-tick sleep processes"
 }
 
+test_group_cleanup_without_perl_uses_one_sleep_per_wait() {
+  local dir state fakebin nopath tool
+  dir=$(make_case group-cleanup-no-perl)
+  state="$dir/state"
+  fakebin="$dir/fakebin"
+  nopath="$dir/nopath"
+  mkdir -p "$nopath"
+  cat > "$fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+[ "$PPID" != "$FM_TEST_WAIT_PID" ] || printf '%s\n' "$*" >> "$FM_TEST_WAIT_LAUNCHES"
+exec /bin/sleep "$@"
+SH
+  chmod +x "$fakebin/sleep"
+  for tool in bash cat chmod date mkdir mkfifo mktemp mv ps rm stat touch tr uname; do
+    ln -s "$(command -v "$tool")" "$nopath/$tool"
+  done
+  cp "$fakebin/sleep" "$nopath/sleep"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_TEST_WAIT_LAUNCHES="$dir/wait-launches" \
+    bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      export FM_TEST_WAIT_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      PATH=$2
+      ! command -v perl >/dev/null 2>&1 || exit 20
+      run_owned_capture 10 0 discard bash -c '\''(trap "" TERM; exec /bin/sleep 60) & printf "%s\\n" "$!" > "$FM_STATE_OVERRIDE/descendant-pid"; printf leader-finished'\'' || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = leader-finished ] || exit 22
+      IFS= read -r descendant_pid < "$STATE/descendant-pid"
+      ! kill -0 "$descendant_pid" 2>/dev/null || exit 23
+      IFS= read -r first_wait < "$FM_TEST_WAIT_LAUNCHES" || exit 24
+      [ "$first_wait" = 0.20 ] || exit 25
+      launches=0
+      while IFS= read -r wait_bound; do
+        launches=$((launches + 1))
+        case "$wait_bound" in 0.20 | 1.00) ;; *) exit 26 ;; esac
+      done < "$FM_TEST_WAIT_LAUNCHES"
+      [ "$launches" -le 2 ] || exit 27
+      : > "$FM_TEST_WAIT_LAUNCHES"
+      run_owned_capture 2 0 discard bash -c '\''printf "%s\\n" "$$" > "$FM_STATE_OVERRIDE/stopped-pid"; trap "" TERM; kill -STOP "$$"; printf must-not-complete'\'' || exit 28
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 29
+      IFS= read -r stopped_pid < "$STATE/stopped-pid"
+      ! kill -0 "$stopped_pid" 2>/dev/null || exit 30
+      IFS= read -r first_wait < "$FM_TEST_WAIT_LAUNCHES" || exit 31
+      [ "$first_wait" = 0.20 ] || exit 32
+    ' _ "$WATCH" "$nopath" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "group cleanup without perl lost its bound or launched poll sleeps (status $?): $(cat "$dir/capture.err" "$dir/wait-launches" 2>/dev/null)"
+  pass "group cleanup without perl stops a TERM-ignoring descendant with one sleep per bounded wait"
+}
+
 test_slow_check_beats_but_stopped_poll_goes_stale() {
   local dir state fakebin pid i age
   dir=$(make_case slow-check-beacon)
@@ -1818,6 +1868,7 @@ test_stale_watch_lock_reclaimed
 test_stale_watch_reclaim_publishes_before_clear
 test_live_stale_watch_lock_is_actionable
 test_check_wait_has_no_per_tick_processes
+test_group_cleanup_without_perl_uses_one_sleep_per_wait
 test_slow_check_beats_but_stopped_poll_goes_stale
 test_check_timeout_configuration_and_launch_allowance
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
