@@ -6522,13 +6522,14 @@ prepare_omp_adoption() { # <case-name>
   jq -nc --arg task "$dir/wt/recorded-session.jsonl" \
     '{version:1,spawn_gen:"old",pid:19,task_session_file:$task,current_session_file:""}' \
     > "$dir/home/state/$id.omp-session.json"
+  make_continuation_owner_fixture "$dir"
 }
 
 assert_adoption_refused() { # <case-dir> <id> <named-proof>
   local dir=$1 id=$2 expected=$3 before out rc=0
   before=$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/state/$id.omp-session.json" \
     "$dir/home/data/$id/brief.md" "$dir/wt/recorded-session.jsonl")
-  out=$(run_control "$dir" "$id" adopt) || rc=$?
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
   [ "$rc" -ne 0 ] || fail "unsafe adoption succeeded: $out"
   assert_contains "$out" "$expected" "adoption must name the missing proof"
   assert_equals "$before" "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/state/$id.omp-session.json" \
@@ -6543,7 +6544,7 @@ test_omp_adoption_matching_workspace() {
   meta_before=$(cat "$dir/home/state/$id.meta")
   out=$(run_control "$dir" "$id" interrupt) || rc=$?
   [ "$rc" -ne 0 ] || fail "broken pre-adoption record authorized interrupt: $out"
-  out=$(run_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
   assert_contains "$out" "adopted: $id" "adoption reports its exact task"
   jq -e --arg task "$dir/wt/recorded-session.jsonl" \
     '. == {version:1,spawn_gen:"old",pid:2000000000,task_session_file:$task,current_session_file:$task}' \
@@ -6618,7 +6619,7 @@ test_omp_adoption_non_agent_process() {
   rm -f "$dir/fake/recovery-foreign-foreground"
   printf omp > "$dir/fake/holder-comm"
   printf omp > "$dir/fake/holder-args"
-  out=$(run_control "$dir" "$id" adopt) || fail "agent process must adopt: $out"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "agent process must adopt: $out"
   printf python3 > "$dir/fake/holder-comm"
   printf 'python3 -c input()' > "$dir/fake/holder-args"
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
@@ -6630,7 +6631,7 @@ test_omp_adoption_non_agent_process() {
 test_omp_adoption_unreadable_environment() {
   prepare_omp_adoption unreadable-environment
   local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
-  out=$(run_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
   : > "$dir/fake/recovery-env-unreadable"
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
   [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input over an unreadable launch environment: $out"
@@ -6639,6 +6640,16 @@ test_omp_adoption_unreadable_environment() {
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "readable environment must restore the repaired authorization: $out"
   assert_contains "$out" "interrupt-delivered $id" "repaired record controls the task once the environment is readable"
   pass "omp adoption: unreadable launch environment stays unknown and is not promoted to managed"
+}
+
+test_omp_adoption_caller_gate() {
+  prepare_omp_adoption caller-gate
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  FM_FAKE_TASK_ID=$id assert_adoption_refused "$dir" "$id" 'workers cannot adopt a session record'
+  FM_FAKE_ACTOR=branch assert_adoption_refused "$dir" "$id" 'the supervision branch never performs this action'
+  printf '1\n' > "$dir/home/state/.lock"
+  assert_adoption_refused "$dir" "$id" 'session record adoption requires the actual lock-owning main Firstmate'
+  pass "omp adoption: workers, the supervision branch, and a non-owning session are refused with the record unchanged"
 }
 
 test_omp_adoption_proof_boundaries() {
@@ -6685,7 +6696,7 @@ test_omp_adoption_proof_boundaries() {
         else
           printf 'worktree=%s\n' "$dir" > "$dir/home/state/parent.meta"
         fi
-        out=$(run_control "$dir" "$id" adopt) || fail "safe boundary $shape refused: $out"
+        out=$(run_continuation_control "$dir" "$id" adopt) || fail "safe boundary $shape refused: $out"
         jq -e --arg file "$dir/wt/recorded-session.jsonl" \
           '.task_session_file==$file and .current_session_file==$file and .spawn_gen=="old"' "$record" >/dev/null \
           || fail "safe boundary $shape wrote wrong session identity"
@@ -6709,6 +6720,7 @@ test_omp_adoption() {
   test_omp_adoption_current_session_contradiction
   test_omp_adoption_non_agent_process
   test_omp_adoption_unreadable_environment
+  test_omp_adoption_caller_gate
   test_omp_adoption_proof_boundaries
 }
 
