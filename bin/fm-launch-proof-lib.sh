@@ -44,6 +44,16 @@ fm_launch_proof_pid_pinned_elsewhere() { # <pid> <spawn-gen>
   [ -n "$pinned" ] && [ "$pinned" != "$gen" ]
 }
 
+# Publication eligibility is stricter than a lifecycle verdict: an unknown
+# environment must not let adoption hide the task anchor from a pinned writer.
+# Readers keep their existing managed/unmanaged/unknown contract. Prints nothing.
+fm_launch_proof_pid_unpinned() { # <pid>
+  local environment
+  environment=$(fm_remote_herdr_process_env "$1") || return 1
+  printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' || return 1
+  ! printf '%s\n' "$environment" | grep -Eq '^FM_SPAWN_GEN=.+$'
+}
+
 fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
   local meta=$1 target session pane info foreground pid
   local candidates ids='' name argv0 parents group

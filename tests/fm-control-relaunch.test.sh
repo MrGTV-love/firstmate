@@ -6650,7 +6650,10 @@ test_omp_adoption_non_agent_process() {
 test_omp_adoption_unreadable_environment() {
   prepare_omp_adoption unreadable-environment
   local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
-  out=$(run_continuation_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
+  : > "$dir/fake/recovery-env-unreadable"
+  assert_adoption_refused "$dir" "$id" 'launch-pin proof needs a positively readable environment without a usable launch pin'
+  rm -f "$dir/fake/recovery-env-unreadable"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "readable unpinned workspace must adopt: $out"
   : > "$dir/fake/recovery-env-unreadable"
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
   [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input over an unreadable launch environment: $out"
@@ -6782,19 +6785,24 @@ start_adoption_extension() { # <case-dir> <id> -> EXT_PROC_PID; fds 4 (commands)
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 const { createTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
-const manager = { getSessionFile: () => process.env.SESSION };
+let active = process.env.SESSION;
+const manager = { getSessionFile: () => active };
 const session = { sessionManager: manager, waitForSessionTransition: () => Promise.resolve() };
 const proof = createTaskSessionProof(process.env.STATE, process.env.TASK, { list: () => [{ kind: 'main', session }] });
 const ctx = { sessionManager: manager, ui: { notify() {} } };
 console.log(`ready ${process.pid}`);
 for await (const event of createInterface({ input: process.stdin })) {
   if (event === 'exit') process.exit(0);
-  try { proof[event](ctx); console.log(`ok ${event}`); } catch (error) { console.log(`error ${event} ${error.message}`); }
+  try {
+    if (event === 'personal') { active = process.env.PERSONAL; proof.start(ctx); }
+    else proof[event](ctx);
+    console.log(`ok ${event}`);
+  } catch (error) { console.log(`error ${event} ${error.message}`); }
 }
 JS
   mkfifo "$dir/ext/commands" "$dir/ext/acks"
   FM_SPAWN_GEN=old EXT="$dir/ext/fm-task-session.ts" STATE="$dir/home/state" TASK="$id" \
-    SESSION="$dir/wt/recorded-session.jsonl" \
+    SESSION="$dir/wt/recorded-session.jsonl" PERSONAL="$dir/wt/personal-session.jsonl" \
     node --experimental-strip-types --no-warnings "$dir/ext/driver.mjs" \
     < "$dir/ext/commands" > "$dir/ext/acks" 2> "$dir/ext/errors" &
   exec 4> "$dir/ext/commands" 5< "$dir/ext/acks"
@@ -6844,66 +6852,83 @@ SH
   printf '%s' "$op" > "$dir/fake/barrier-op"
 }
 
-test_omp_adoption_publication_race() {
-  local shape op dir id record line rc out reached
-  for shape in live-record dead-record-replacement dead-record-link; do
-    prepare_omp_adoption "race-$shape"
-    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
-    start_adoption_extension "$dir" "$id"
-    # The extension's own process is the launch-pinned live foreground process.
-    printf '%s' "$EXT_PROC_PID" > "$dir/fake/recovery-pid"
-    printf '%s' "$EXT_PROC_PID" > "$dir/fake/holder-pid"
-    printf old > "$dir/fake/recovery-spawn-gen"
-    # A live record is the extension's own healthy proof for this process.
-    [ "$shape" != live-record ] || extension_event start
-    op='mv'
-    [ "$shape" != dead-record-link ] || op='ln'
-    arm_adoption_barrier "$dir" "$id" "$op"
-    exec 6<> "$dir/fake/barrier-events"
-    (
-      rc=0
-      run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
-      printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
-    ) &
-    read -r line <&6
-    reached=0
-    if [ "$line" = "reached $op" ]; then
-      reached=1
-      # Adoption has made its last comparison and has not yet replaced the
-      # record: the extension publishes its start, then its deliberate unproven
-      # mark, exactly as session shutdown or a pending switch does.
-      extension_event start
-      extension_event shutdown
-      printf 'go\n' > "$dir/fake/barrier-resume"
-      read -r line <&6
-    fi
-    case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
-    out=$(cat "$dir/adopt.out")
-    exec 6>&-
-    [ "$shape" = live-record ] || [ "$reached" = 1 ] \
-      || fail "the dead-recorded-PID repair never reached publication: $out"
-    # Without the pause, the extension publishes its mark after the refusal.
-    [ "$shape" != live-record ] || [ "$reached" = 1 ] || extension_event shutdown
-    [ "$rc" -ne 0 ] || fail "adoption ($shape) succeeded over a concurrent extension write: $out"
-    jq -e --argjson pid "$EXT_PROC_PID" '.pid == $pid and .current_session_file == ""' "$record" >/dev/null \
-      || fail "adoption ($shape) overwrote the extension's newer unproven mark: $(cat "$record")"
-    # A record naming a live process is refused before anything is staged.
-    [ "$shape" != live-record ] || [ "$reached" = 0 ] \
-      || fail "adoption staged a replacement for a record naming a live process: $out"
-    assert_not_contains "$out" 'adopted:' "a refused adoption must not report success"
-    case "$shape" in
-      live-record) assert_contains "$out" 'record proof needs the recorded PID to be gone' "a live record must name its proof" ;;
-      *) assert_contains "$out" 'adopt needs the session record unchanged until publication' "a lost publication race must name its proof" ;;
-    esac
-    assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" \
-      "adoption ($shape) must leave no staged or captured record behind"
+test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
+  local shape=$1 dir id record line rc=0 out reached=0 before adopt_job absent=0
+  prepare_omp_adoption "personal-anchor-$shape"
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
+  start_adoption_extension "$dir" "$id"
+  # The extension genuinely holds a matching pin, even when the external
+  # observer cannot read its environment. Its predecessor record names a dead PID.
+  printf '%s' "$EXT_PROC_PID" > "$dir/fake/recovery-pid"
+  printf '%s' "$EXT_PROC_PID" > "$dir/fake/holder-pid"
+  printf old > "$dir/fake/recovery-spawn-gen"
+  [ "$shape" != unreadable ] || : > "$dir/fake/recovery-env-unreadable"
+  before=$(cat "$record")
+  arm_adoption_barrier "$dir" "$id" ln
+  exec 6<> "$dir/fake/barrier-events"
+  (
     rc=0
-    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
-    [ "$rc" -ne 0 ] || fail "adoption ($shape) restored authorization over the extension's unproven mark: $out"
-    assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the unproven mark must receive no lifecycle input"
+    run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
+    printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
+  ) &
+  adopt_job=$!
+  read -r line <&6
+  if [ "$line" = 'reached ln' ]; then
+    reached=1
+    # Before the fix this is the exact after-capture/before-link window.
+    # Activate a different persisted conversation through the REAL extension.
+    [ -e "$record" ] || absent=1
+    extension_event personal
+    printf 'go\n' > "$dir/fake/barrier-resume"
+    read -r line <&6
+  fi
+  case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
+  wait "$adopt_job"
+  out=$(cat "$dir/adopt.out")
+  exec 6>&-
+  if [ "$reached" = 0 ]; then
+    # The fixed path refuses before capture; the extension still sees T and
+    # preserves it as task_session_file when it subsequently activates S.
+    assert_equals "$before" "$(cat "$record")" "pin refusal must preserve the record before extension activation"
+    extension_event personal
+  fi
+  # Probe recovery must never turn a newly rebound personal anchor into managed.
+  rm -f "$dir/fake/recovery-env-unreadable"
+  local anchor_ok=0
+  jq -e --arg task "$dir/wt/recorded-session.jsonl" --arg personal "$dir/wt/personal-session.jsonl" \
+    --argjson pid "$EXT_PROC_PID" \
+    '.pid==$pid and .task_session_file==$task and .current_session_file==$personal' "$record" >/dev/null \
+    && anchor_ok=1
+  if [ "$anchor_ok" != 1 ]; then
     stop_adoption_extension
-  done
-  pass "omp adoption: a concurrent extension publication is never overwritten, before or after the record is set aside"
+    fail "adoption ($shape) rebound the task anchor to a personal session (capture reached=$reached, canonical absent=$absent): $(cat "$record")"
+  fi
+  [ "$rc" -ne 0 ] || fail "adoption ($shape) accepted a pinned or unreadable process: $out"
+  [ "$reached" = 0 ] || fail "adoption ($shape) reached capture/link for a process not proven unpinned: $out"
+  assert_contains "$out" 'launch-pin proof needs a positively readable environment without a usable launch pin' "pin refusal must name the required proof"
+  assert_not_contains "$out" 'adopted:' "a refused adoption must not report success"
+  assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" \
+    "a pin refusal must leave no staged or captured record"
+  rc=0
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  stop_adoption_extension
+  [ "$rc" -ne 0 ] || fail "adoption ($shape) authorized the personal conversation after probe recovery: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the personal session must receive no lifecycle input"
+  pass "omp adoption: $shape pin proof refuses before capture and preserves the task anchor across real personal activation"
+}
+
+test_omp_adoption_personal_session_anchor() {
+  test_omp_adoption_personal_session_anchor_case matching
+}
+
+test_omp_adoption_unreadable_personal_session_anchor() {
+  test_omp_adoption_personal_session_anchor_case unreadable
+}
+
+test_omp_adoption_publication_race() {
+  test_omp_adoption_personal_session_anchor
+  test_omp_adoption_unreadable_personal_session_anchor
 }
 
 test_omp_adoption() {
