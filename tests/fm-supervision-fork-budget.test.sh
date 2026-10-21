@@ -360,6 +360,23 @@ SH
   pass "a quiet scan of 12 status logs enters $count subshells (bound 40)"
 }
 
+test_heartbeat_marker_path_matches_the_tr_pipeline() {
+  local script="$TMP_ROOT/hb-path.sh"
+  cat > "$script" <<'SH'
+root=$1
+. "$root/bin/fm-classify-lib.sh"
+for task in task a.b x:y/z.w 'with space' trailing. .lead 'back\slash' '*' '[x]' 'café.id' $'tab\there' ''; do
+  want=$(printf '%s/.hb-surfaced-%s' /state "$(printf '%s' "$task" | tr ':/.' '___')")
+  got=$(status_heartbeat_seen_marker_path /state "$task")
+  [ "$want" = "$got" ] || printf 'marker path of %q: reference %q, helper %q\n' "$task" "$want" "$got"
+  status_heartbeat_seen_marker_path_to direct /state "$task"
+  [ "$want" = "$direct" ] || printf 'marker path _to of %q: reference %q, helper %q\n' "$task" "$want" "$direct"
+done
+SH
+  run_everywhere "heartbeat marker path" "$script"
+  pass "the heartbeat marker path is byte-identical to the tr pipeline for every task id shape"
+}
+
 test_recorded_windows_reads_each_task_without_a_subshell() {
   local dir="$TMP_ROOT/windows" script="$TMP_ROOT/windows.sh" i count
   mkdir -p "$dir/state" "$dir/home"
@@ -474,6 +491,7 @@ else
   test_toon_readers_match_the_pipelines_they_replace
   test_status_signature_matches_the_od_pipeline
   test_quiet_signal_scan_costs_one_stat_per_log
+  test_heartbeat_marker_path_matches_the_tr_pipeline
   test_recorded_windows_reads_each_task_without_a_subshell
   test_owner_watchdog_tick_subshell_budget
   test_state_root_checks_do_not_depend_on_ifs

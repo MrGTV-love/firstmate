@@ -502,8 +502,15 @@ status_signal_seen_marker_path() {  # <state> <task-id>
   printf '%s/.seen-%s' "$1" "$(printf '%s.status' "$2" | tr '.' '_')"
 }
 
+status_heartbeat_seen_marker_path_to() {  # <out-var> <state> <task-id>
+  local __fm_hb_task=$3 __fm_hb_chars='[:/.]'
+  printf -v "$1" '%s/.hb-surfaced-%s' "$2" "${__fm_hb_task//$__fm_hb_chars/_}"
+}
+
 status_heartbeat_seen_marker_path() {  # <state> <task-id>
-  printf '%s/.hb-surfaced-%s' "$1" "$(printf '%s' "$2" | tr ':/.' '___')"
+  local __fm_hb_path
+  status_heartbeat_seen_marker_path_to __fm_hb_path "$1" "$2"
+  printf '%s' "$__fm_hb_path"
 }
 
 status_daemon_seen_marker_path() {  # <state> <task-id>

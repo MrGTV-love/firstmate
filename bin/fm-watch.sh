@@ -2097,7 +2097,7 @@ age_of() {  # seconds since file mtime; "due immediately" if missing
 # The caller records new reported state only after surfacing or intentional absorption,
 # and commits a status classification position only after a successful span read.
 scan_signals() {
-  local f sig sf exclude task
+  local f sig sf hb exclude task
   # A remote mate's own parent channel is not a self-home task status log; the
   # home-shape-aware exclusion and its precedent live in
   # status_scan_parent_channel_exclude (fm-classify-lib.sh).
@@ -2114,7 +2114,8 @@ scan_signals() {
       *.status)
         status_presentation_marker_adopt_device "$sf" "$f" "$sig" || true
         task=${f##*/}; task=${task%.status}
-        status_presentation_marker_adopt_device "$(_hb_surfaced_path "$task")" "$f" "$sig" || true
+        status_heartbeat_seen_marker_path_to hb "$STATE" "$task"
+        status_presentation_marker_adopt_device "$hb" "$f" "$sig" || true
         fm_wake_signal_seen_current "$STATE" "$f" "$sig" && continue
         ;;
       *) [ "$sig" = "$(cat "$sf" 2>/dev/null)" ] && continue ;;
@@ -2381,7 +2382,7 @@ watcher_status_span_output() {
   local span_record='' span_needs=0 span_rc
   status_span_first_actionable_record "$1" "$2" span_record span_needs
   span_rc=$?
-  printf '%s\n%s' "$span_needs" "$span_record"
+  printf '%s\n%s\n.' "$span_needs" "$span_record"
   return "$span_rc"
 }
 
@@ -2402,6 +2403,8 @@ watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out]
   watcher_status_span_cleanup
   case "$span_rc" in 0|1) ;; *) return 2 ;; esac
   span_capture=$FM_CHECK_RESULT
+  case "$span_capture" in *$'\n.') ;; *) return 2 ;; esac
+  span_capture=${span_capture%$'\n.'}
   case "$span_capture" in *$'\n'*) ;; *) return 2 ;; esac
   printf -v "$3" '%s' "${span_capture#*$'\n'}"
   [ -z "${4-}" ] || printf -v "$4" '%s' "${span_capture%%$'\n'*}"
