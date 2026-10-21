@@ -180,7 +180,8 @@ The command writes only the session record, never unlocks a session, modifies a 
 It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
 A stale registration alone grants no authority.
 The resolved foreground process must also classify as an agent process, so a registration that outlives its agent cannot make another program in the worktree a lifecycle target.
-Only a record whose process is gone is the repair target.
+Only a record whose process is gone and whose resolved foreground process has a positively readable environment without a usable launch pin is a repair target.
+A matching or different usable pin, or an unreadable environment, refuses before staging or capturing the record, so an active pinned extension never observes a missing task anchor during repair.
 A record naming any live process is refused unchanged, because the extension of a live process rewrites its record by rename and without the control locks.
 That covers a healthy activation for the resolved foreground PID, the extension's own empty unproven mark (written on shutdown, before a switch, or after a failed start), an activation naming another file (a different conversation), and a recorded PID that an unrelated live process has since reused.
 Herdr still registering the original task file never overrides that evidence.
@@ -190,7 +191,8 @@ Every refusal names the missing proof, and no refusal lowers the workspace or du
 
 **This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**
 Lifecycle readers recheck the adoption proofs and the same live PID and session file before using that alternative authorization, so a workspace claimed by another task, a duplicate pane claim, or a changed generation still refuses even after a successful repair.
-A repaired record only replaces a readable environment that lacks the pin; an environment pinned to another launch generation belongs to a different launch and is refused at adoption and at every recheck, and an unreadable environment still reads `unknown` and authorizes nothing.
+Repair publication requires positively readable absence of a usable pin; unreadable evidence is not proof of an unpinned process and cannot authorize adoption.
+After a permitted repair, a newly unreadable environment still reads `unknown` and authorizes nothing, while a different launch-generation pin refuses the alternative authorization at every recheck.
 This is an explicit repair, not an automatic restart fix: the omp extension's launch-generation recovery and empty-session classification are unchanged.
 
 **Residual risk:** nothing watches which conversation an adopted process runs.
