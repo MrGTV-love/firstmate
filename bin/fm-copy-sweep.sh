@@ -106,7 +106,8 @@
 # boolean true. A non-zero exit, an empty, malformed or verdictless answer, text
 # that only mentions allowed=true (a bare allowed=true included), any other
 # value, or a timeout holds the copy as HELD-LOCKED with the driver's own words
-# (the first 600 characters, on one line), copies nothing, and is not a failure.
+# (its own "reason" first when the answer is one JSON document that has one, then
+# the first 600 characters, on one line), copies nothing, and is not a failure.
 # So does an allowed plan whose document reports ignored_payload_disposition=
 # archive_then_retain_tree: the driver archives a tree's unique ignored files and
 # then keeps the tree, so the sweep neither preserves them nor executes the driver.
@@ -1040,6 +1041,16 @@ plan_verdict_allows() {  # <driver output>
   printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
 }
 
+# The driver's own reason as "<reason>: " when its whole answer is one JSON
+# document with a non-empty string "reason", otherwise nothing. The driver prints
+# its keys sorted, so a long answer can cut off before its reason; this puts the
+# reason first. It is display text only and never grants or refuses anything.
+driver_reason_prefix() {  # <driver output>
+  local reason
+  reason=$(printf '%s' "$1" | jq -s -r 'if length == 1 and (.[0] | type == "object" and (.reason | type == "string") and .reason != "") then .[0].reason else empty end' 2>/dev/null) || return 0
+  [ -z "$reason" ] || printf '%s: ' "$(fm_refuse_text "${reason:0:600}")"
+}
+
 # True when the plan's one JSON document reports the driver's retain rule for a
 # tree that holds unique ignored files: the driver archives them and then keeps
 # the tree, so a release of it can never succeed.
@@ -1102,7 +1113,7 @@ driver_plan_allows() {  # <clone> <copy>
     return 1
   fi
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
-  PLAN_WHY=${PLAN_WHY:0:600}
+  PLAN_WHY="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")${PLAN_WHY:0:600}"
   if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_OUT"; then
     PLAN_WHY="its closeout driver would not release it (exit ${rc:-1}): ${PLAN_WHY:-no output}"
     return 1
@@ -1141,7 +1152,7 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
 # REFUSED line on stderr, because the library's envelope names a teardown command
 # built from the release id, which is no task id.
 teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words
   shown=$(fm_refuse_text "$copy")
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
   DATA=$DATA_DIR
@@ -1161,8 +1172,9 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   rc=0
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
-    record_driver_retention "$copy" "$7" "exit $rc: $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" || true
-    echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
+    words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
+    record_driver_retention "$copy" "$7" "exit $rc: $words" || true
+    echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words" >&2
     if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_OUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
       return 3
     fi

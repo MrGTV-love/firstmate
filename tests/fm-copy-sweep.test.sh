@@ -534,6 +534,10 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   echo '{"allowed": true}'
   exit 0
 fi
+if [ -e "$log/execute-output" ]; then
+  cat "$log/execute-output"
+  exit "\$(cat "$log/execute-exit" 2>/dev/null || printf 3)"
+fi
 if [ -e "$log/retain-ignored" ]; then
   echo '{"reason":"cleanup_ignored_payload_archived_tree_retained"}'
   exit 3
@@ -770,7 +774,7 @@ test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero() {
   pass "a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it"
 }
 
-test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text() {
+test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal() {
   local admin line
   make_locked_copy_case executerefused dead
   install_driver "$SLOT" "$W"
@@ -790,7 +794,44 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text(
   [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a refused copy was logged as removed"
   assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)"$'\n'"$SLOT|--cleanup-worktree $(copy_path locked) --execute-cleanup" \
     "$(cat "$W/closeout.log")" "the driver did not run once to plan and once to release"
-  pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's whole refusal and exit code"
+  pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code"
+}
+
+test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
+  local shape reason long line retained
+  for shape in kept failed; do
+    if [ "$shape" = kept ]; then reason=cleanup_ignored_payload_archived_tree_retained; else reason=cleanup_policy_not_allowed; fi
+    make_locked_copy_case "long-reason-$shape" dead
+    install_driver "$SLOT" "$W"
+    retained="$HOMED/data/copy-sweep/retained"
+    long=$(head -c 700 /dev/zero | tr '\0' x)
+    printf '{"allowed": false, "cleanup_command": ["%s", "TAIL-MARKER-NOT-SHOWN"], "reason": "%s"}\n' "$long" "$reason" > "$W/plan-output"
+    printf '3\n' > "$W/plan-exit"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$shape: a refused long plan failed the run ($RC): $OUT"
+    assert_class locked HELD-LOCKED
+    assert_contains "$OUT" "$reason: {\"allowed\": false" "$shape: the plan's reason did not come first"
+    assert_not_contains "$OUT" "TAIL-MARKER-NOT-SHOWN" "$shape: the plan's text was not capped"
+    rm -f "$W/plan-output" "$W/plan-exit"
+    printf '{"allowed": false, "cleanup_command": ["%s", "TAIL-MARKER-NOT-SHOWN"], "reason": "%s"}\n' "$long" "$reason" > "$W/execute-output"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    if [ "$shape" = kept ]; then
+      [ "$RC" = 0 ] || fail "$shape: a retained refusal failed the run ($RC): $OUT"
+      line=$(printf '%s\n' "$OUT" | grep -F "KEPT"$'\t'"$(copy_path locked)") || fail "$shape: the retention was not reported as KEPT: $OUT"
+    else
+      [ "$RC" = 1 ] || fail "$shape: a refused execute should exit 1, got $RC: $OUT"
+      line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") || fail "$shape: the refusal was not reported as FAILED: $OUT"
+    fi
+    assert_contains "$line" "(exit 3): $reason: {\"allowed\": false" "$shape: the execute reason did not come first"
+    assert_not_contains "$line" "TAIL-MARKER-NOT-SHOWN" "$shape: the execute text was not capped"
+    grep -rqF "exit 3: $reason: {\"allowed\": false" "$retained" || fail "$shape: the retention receipt lost the driver's reason"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$shape: the held rerun failed ($RC): $OUT"
+    assert_class locked HELD-LOCKED
+    assert_contains "$OUT" "driver retained this copy: exit 3: $reason: {" "$shape: the held reason lost the driver's reason"
+    registered locked || fail "$shape: the refused copy is no longer registered"
+  done
+  pass "a driver answer whose sorted keys put its reason past 600 characters still shows that reason first in the plan hold, the KEPT or FAILED line, the receipt and the later held reason"
 }
 
 test_a_failed_preservation_is_the_sweeps_own_human_only_refusal() {
@@ -2173,7 +2214,8 @@ run_case test_report_does_not_claim_unplanned_locks_are_reapable
 run_case test_driver_verdict_types_and_exit_status_are_not_permission
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_nothing
-run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
+run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal
+run_case test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 run_case test_a_failed_preservation_leaves_no_staging_directory
 run_case test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
