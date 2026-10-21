@@ -231,11 +231,15 @@ fm_status_cat() {  # <status-file> [<max-lines>]
   fm_status_read_exact "$f" 0 "$__fm_wc_size" "${2-}"
 }
 
-# 0 when a status sidecar (a fold cursor, the presentation manifest, the
-# home-appends ledger) is small enough to read whole: no larger than one tail
-# window. A sidecar past that is abnormal, so its reader treats it as absent and
-# rebuilds it from the log; the watcher guard (bin/fm-status-cap-guard.sh) raises
-# the alarm for it once it passes the cap.
+# 0 when a status sidecar (a fold cursor, the home-appends ledger) is small enough
+# to read whole: no larger than one tail window. A sidecar past that is abnormal, and
+# the readers answer it in two ways. The fold checkpoint parse
+# (_fm_open_decisions_checkpoint_parse) and the home-appends ranges read treat it as
+# absent and rebuild it from the log. status_open_decisions_cursor_offset fails closed
+# (status 1), as does _fm_read_file_into for a presentation manifest past the same
+# window, so the drain's presentation cursor reads fail until the sidecar is replaced.
+# The watcher guard (bin/fm-status-cap-guard.sh) raises the alarm for a sidecar once it
+# passes the cap.
 _fm_status_sidecar_fits() {  # <file>
   local __fm_sf_size __fm_sf_window
   _fm_status_file_size "$1" __fm_sf_size 2>/dev/null || return 1

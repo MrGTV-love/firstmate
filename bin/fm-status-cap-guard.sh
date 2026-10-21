@@ -23,8 +23,9 @@
 # omp process (the harness that produced the incident) it is stopped with SIGSTOP,
 # which a later `kill -CONT <pid>` undoes. Exactly the pids lsof reported as holding
 # the file open for writing and recognized as omp are signalled; any other writer,
-# or none found, is named and left alone. It never deletes, truncates or rewrites a
-# file.
+# none found, or no answer from lsof (not installed, or past its bound) is named and
+# left alone, and an absent answer is reported as unknown, never as none found. It
+# never deletes, truncates or rewrites a file.
 #
 # bin/fm-control.sh is the control plane for a task's agent, addressed by task id
 # and driving its endpoint; it has no verb for one process id, and the writer is a
@@ -56,6 +57,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 
 LSOF=${FM_STATUS_CAP_LSOF:-lsof}
+LSOF_AVAILABLE=1
+command -v "$LSOF" >/dev/null 2>&1 || LSOF_AVAILABLE=0
 # One second between the first lsof look and the second look for a log with no writer
 # found. It is a sampling interval, not a deadline, and a constant.
 # measured: value=1 date=2026-10-18 host=Mac-Studio.local margin=5 (one lsof look takes 0.20 to 0.23 s)
@@ -65,10 +68,14 @@ clean() { LC_ALL=C tr '\t\r\n' '   '; }
 
 # "<pid> <command>" for every process holding <file> open for writing, one per
 # line, read from lsof's machine-readable fields. The command is lsof's own name.
+# The status is 0 when lsof ran (it exits 1 when it lists nothing), 3 when there is
+# no lsof to run and 4 when it hit its bound, so an empty answer is never taken for
+# "no writer" when lsof did not look.
 find_writers() {  # <file>
-  local file=$1 out line pid='' cmd='' fd_mode
+  local file=$1 out line pid='' cmd='' fd_mode rc=0
+  [ "$LSOF_AVAILABLE" -eq 1 ] || return 3
   # measured: value=10 date=2026-10-18 host=Mac-Studio.local margin=45 (three lsof runs on a local file, slowest 0.23s)
-  out=$(fm_run_timed 10 "$LSOF" -nP -F pcfa -- "$file" 2>/dev/null) || :
+  out=$(fm_run_timed 10 "$LSOF" -nP -F pcfa -- "$file" 2>/dev/null) || rc=$?
   while IFS= read -r line; do
     case "$line" in
       p*) pid=${line#p}; cmd='' ;;
@@ -82,11 +89,16 @@ find_writers() {  # <file>
   done <<EOF
 $out
 EOF
+  ! fm_timed_out "$rc" || return 4
 }
 
 # One process can hold the log through several descriptors; list each pid once.
+# The status is find_writers'.
 unique_writers() {  # <file>
-  find_writers "$1" | awk '!seen[$1]++'
+  local out rc=0
+  out=$(find_writers "$1") || rc=$?
+  printf '%s\n' "$out" | awk 'NF && !seen[$1]++'
+  return "$rc"
 }
 
 # The executable base name of <pid>, from ps rather than lsof's truncated name.
@@ -165,11 +177,11 @@ rate_between() {  # <size-a> <time-a> <size-b> <time-b>
 # megabytes. Only a log with no writer found yet waits one sample for a second look.
 investigate() {  # <size> <ident> <path>
   local size=$1 ident=$2 path=$3 cap size_a size_b size_end time_a time_b rate writers pid cmd name start line reason
-  local writer_text='' action_text='' omp_found=0 seen_other=''
+  local writer_text='' action_text='' omp_found=0 seen_other='' lsof_rc=0
   fm_status_cap_bytes cap
   size_a=$(file_size "$path") || size_a=$size
   time_a=$(now_hires)
-  writers=$(unique_writers "$path")
+  writers=$(unique_writers "$path") || lsof_rc=$?
   size_b=$(file_size "$path") || size_b=$size_a
   time_b=$(now_hires)
   rate=$(rate_between "$size_a" "$time_a" "$size_b" "$time_b")
@@ -179,7 +191,8 @@ investigate() {  # <size> <ident> <path>
     # looks, so a log with such a writer can still end as none found: this guard stops
     # a writer that holds the log open, as the incident's did.
     sleep "$SAMPLE_SECS"
-    writers=$(unique_writers "$path")
+    lsof_rc=0
+    writers=$(unique_writers "$path") || lsof_rc=$?
     size_end=$(file_size "$path") || size_end=$size_b
     time_b=$(now_hires)
     rate=$(rate_between "$size_a" "$time_a" "$size_end" "$time_b")
@@ -187,7 +200,11 @@ investigate() {  # <size> <ident> <path>
   size_end=$(file_size "$path") || size_end=$size_b
   [ -n "$rate" ] || rate=unmeasured
   if [ -z "$writers" ]; then
-    writer_text='none found (lsof listed no process holding it open for writing)'
+    case "$lsof_rc" in
+      3) writer_text='unknown (lsof not available)' ;;
+      4) writer_text='unknown (lsof timed out)' ;;
+      *) writer_text='none found (lsof listed no process holding it open for writing)' ;;
+    esac
     action_text='stopped nothing'
   else
     while IFS=' ' read -r pid cmd; do

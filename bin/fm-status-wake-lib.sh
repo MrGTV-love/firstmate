@@ -512,13 +512,14 @@ $1
 EOF
 }
 
-_fm_status_open_decision_origins() {  # <status-text> <status-file> [<kind>]
+_fm_status_open_decision_origins() {  # <status-text> <status-file> <kind> <out-var> [<tick-command>]
   local text=$1 f=$2 line open='' after='' key verb note number=0 origins=''
-  local resolve held kind
+  local resolve held kind tick=${5-}
   kind=$(_fm_status_kind "$f" "${3:-}")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$tick" ] || "$tick"
     number=$((number + 1))
     _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" after
     [ -n "$after" ] || origins=''
@@ -546,12 +547,12 @@ _fm_status_open_decision_origins() {  # <status-text> <status-file> [<kind>]
   done <<STATUS_ORIGIN_SPAN
 $text
 STATUS_ORIGIN_SPAN
-  printf '%s' "$origins"
+  printf -v "$4" '%s' "$origins"
 }
 
-status_span_first_actionable_record() {  # <status-file> <start-offset> [record-var] [needs-decision-var]
-  local f=$1 start=${2:-0} output_var=${3-} needs_var=${4-} size ident cur_ident chunk result
-  local line verb key origins='' folded=0 rc=1 failed=0 line_number=0 live_line='' events='' _line _key _fm_span_needs_decision=0
+status_span_first_actionable_record() {  # <status-file> <start-offset> [record-var] [needs-decision-var] [tick-command]
+  local f=$1 start=${2:-0} output_var=${3-} needs_var=${4-} tick=${5-} size ident cur_ident chunk result
+  local line verb key decision_origins='' folded=0 rc=1 failed=0 line_number=0 live_line='' events='' _line _key _fm_span_needs_decision=0
   [ -e "$f" ] || { [ -L "$f" ] && return 2; return 1; }
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 2
   ident=$(_fm_open_decisions_file_ident "$f") || return 2
@@ -577,6 +578,7 @@ status_span_first_actionable_record() {  # <status-file> <start-offset> [record-
   cur_ident=$(_fm_open_decisions_file_ident "$f") || return 2
   [ "$cur_ident" = "$ident" ] || return 2
   while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$tick" ] || "$tick"
     line_number=$((line_number + 1))
     case "$line" in *[![:space:]]*) ;; *) continue ;; esac
     if status_is_captain_held "$line"; then
@@ -605,13 +607,13 @@ status_span_first_actionable_record() {  # <status-file> <start-offset> [record-
           continue
         }
         if [ "$folded" -eq 0 ]; then
-          origins=$(_fm_status_open_decision_origins "$chunk" "$f" "$(_fm_status_kind "$f")") || { failed=1; break; }
+          _fm_status_open_decision_origins "$chunk" "$f" "$(_fm_status_kind "$f")" decision_origins "$tick" || { failed=1; break; }
           folded=1
         fi
         live_line=$(while IFS=$'\t' read -r _key _line; do
           [ "$_key" = "$key" ] && { printf '%s' "$_line"; break; }
         done <<EOF
-$origins
+$decision_origins
 EOF
 )
         [ -n "$live_line" ] && [ "$line_number" -eq "$live_line" ] || continue

@@ -1143,6 +1143,7 @@ Each poll costs one stat over every `state/*.status` and the per-task cursor, le
 When one passes the cap, `bin/fm-status-cap-guard.sh` investigates it and the watcher raises a `check: status-log-over-cap` wake naming the file, its size, its growth rate and the writer process found by `lsof`.
 An omp writer is stopped with `SIGSTOP`, which `kill -CONT <pid>` undoes; the guard first checks that the process is still the one `lsof` named, is not itself or one of its ancestors, and signals exactly the listed writers that are omp.
 Any other writer, and a log with no writer found, is named and left alone.
+When `lsof` is not installed, or does not finish inside its 10 s bound, the wake says `writer=unknown (lsof not available)` or `writer=unknown (lsof timed out)` instead of `none found`, and nothing is stopped: `none found` means `lsof` ran and listed no process.
 The writer of 2026-10-18 was one `printf` whose format has no conversion and that has an extra argument, which the harness shell re-applied without end: it opened the log once and held it for its whole run.
 A shell loop that opens and closes the log on every append wrote 0.3 to 1 KB/s on 2026-10-19, so it cannot have written the 0.7 GB/s measured on 2026-10-18, and `lsof` lists a held descriptor.
 A process that opens and closes the log on every append is listed by only a small fraction of looks, so for it the guard can end on `none found`: it names the log and stops nothing.
@@ -1151,8 +1152,10 @@ The guard never deletes or rewrites a file.
 [`bin/fm-control.sh`](../bin/fm-control.sh) is addressed by task id and drives an endpoint, and has no verb for one process, so the one-process stop lives in the guard.
 
 For a foreign writer the guarantee is detection plus a stop of that one pid within one watcher poll.
-The check runs at the top of each poll, and again after each poll-sized slice of the status-signal linger.
-That second place matters because a runaway writer's first append is itself a status signal, the linger is 30 s (`FM_SIGNAL_GRACE`), and the wake it ends in exits the watcher before the next poll: a check that ran only at the top of the poll would reach the writer only after a drain, an ack and a re-arm.
+The check runs at the top of each poll, after each poll-sized slice of the status-signal linger, after each poll-sized slice (at least one second) of the watcher's classification of a signaled log's unread lines, and once more just before a status-signal wake exits.
+The linger matters because a runaway writer's first append is itself a status signal, the linger is 30 s (`FM_SIGNAL_GRACE`), and the wake it ends in exits the watcher before the next poll: a check that ran only at the top of the poll would reach the writer only after a drain, an ack and a re-arm.
+The classification matters for the same reason: it walks the unread lines one at a time in the shell, 2.7 to 5 ms a line, so a span of up to 32,768 lines holds the watcher for 88 s or more, and the signal wake it ends in exits without another poll.
+The heartbeat scan's classification takes the same slice check.
 The over-cap wake still delivers that pending status signal with it, but does not linger on it, so the stop is not reported a grace late.
 It is not a bound on size: the cap bounds the sanctioned writer only.
 How far a log passes the cap before the stop is the writer's growth rate times the poll interval.
@@ -1194,7 +1197,8 @@ The Pi branch dispatch (`.pi/extensions/lib/fm-branch-dispatch.ts`) reads a stat
 The fleet snapshot refuses to copy a log past the limit, names it, and observes the task without a status log.
 The fleet ledger captures at most the last 4 MiB and 256 lines of what a log grew since its saved offset, and records a `task.status.skipped` event for the rest.
 The drain holds its spans in memory rather than in scratch files beside the cursor, so a drain killed mid-read leaves nothing behind.
-A fold cursor, ledger or presentation manifest larger than one tail window is treated as absent and rebuilt from the log.
+A fold checkpoint or home-appends ledger larger than one tail window is treated as absent and rebuilt from the log.
+A presentation manifest larger than one tail window, and the legacy open-decisions cursor that seeds it, fail closed instead: the readers (`status_presentation_cursor_offset`, `status_outcome_backstop_cursor_offset`, `status_open_decisions_cursor_offset`) return status 1, so the wake drain fails until the file is replaced, and the watcher's over-cap wake names it only once it passes the cap.
 `tests/fm-status-runaway-guard.test.sh` is the regression entry point.
 
 ## Test slots per key (FM_TEST_KEY_SLOTS)
