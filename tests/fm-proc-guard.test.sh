@@ -17,8 +17,11 @@ mkdir -p "$STATE"
 # Everything this suite starts runs through a symlink under $LAB, so one pattern
 # names exactly this suite's processes and nothing else.
 ln -s "$(command -v bash)" "$LAB/bash"
-ln -s "$(command -v sleep)" "$LAB/nestsleep"
-ln -s "$(command -v sleep)" "$LAB/burstsleep"
+# A host sleep may dispatch on argv[0], so renaming it is not portable.
+# Keep real, suite-named native processes for both the census and its cleanup.
+STANDIN=$(fm_agent_standin "$LAB/standin") || fail "cannot create the process-tree stand-in"
+ln -s "$STANDIN" "$LAB/nestsleep"
+ln -s "$STANDIN" "$LAB/burstsleep"
 cat > "$LAB/nest.sh" <<'SH'
 #!/bin/sh
 # A self-recursive tree: every level waits for the next, the last level sleeps.

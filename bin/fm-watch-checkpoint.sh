@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Run one bounded foreground watcher checkpoint for harnesses that should not
 # rely on background-task completion to wake the model.
+# Prefers a Perl-owned process-group bound so inherited ignored signals cannot
+# bypass interruption or the watcher's cleanup grace on a different coreutils.
 #
 # SUPERVISION HOST. A home opted in with config/supervision-host
 # (docs/configuration.md "Supervision host" owns the gate;
@@ -77,17 +79,19 @@ trap 'rm -f "$OUT" "$ERR"' EXIT
 
 run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...>
   perl -e '
-    use POSIX qw(:sys_wait_h);
+    use POSIX qw(:sys_wait_h setpgid);
     my $seconds = shift;
     my $signal = shift;
     my $kill_after = shift;
     my $pid = fork;
     die "fork failed\n" unless defined $pid;
     if (!$pid) {
+      $SIG{$_} = "DEFAULT" for qw(ALRM HUP INT TERM);
       setpgrp(0, 0);
       exec @ARGV;
       die "exec failed: $!\n";
     }
+    setpgid($pid, $pid);
     my $timed_out = 0;
     local $SIG{ALRM} = sub {
       if ($timed_out) {
@@ -104,7 +108,7 @@ run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...
       my $waited = waitpid $pid, WNOHANG;
       if ($waited == $pid) {
         alarm 0;
-        exit($timed_out ? 124 : ($? >> 8));
+        exit($timed_out ? 124 : (($? & 127) ? 128 + ($? & 127) : $? >> 8));
       }
       select undef, undef, undef, 0.05;
     }
@@ -124,7 +128,12 @@ run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>
     [ "$cleanup_lock_bound" -gt "$kill_after" ] || cleanup_lock_bound=$kill_after
     kill_after=$cleanup_lock_bound
   fi
-  if command -v timeout >/dev/null 2>&1; then
+  # The checkpoint relies on INT reaching Bash and allowing EXIT cleanup before
+  # KILL. Own those dispositions and the grace instead of inheriting the host
+  # timeout implementation's handling of signals ignored by an async caller.
+  if command -v perl >/dev/null 2>&1; then
+    run_with_perl_timeout "$seconds" "$signal" "$kill_after" "$@"
+  elif command -v timeout >/dev/null 2>&1; then
     if [ "$kill_after" -gt 0 ]; then
       timeout --signal="$signal" --kill-after="${kill_after}s" "$seconds" "$@"
     else
@@ -137,7 +146,8 @@ run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>
       gtimeout --signal="$signal" "$seconds" "$@"
     fi
   else
-    run_with_perl_timeout "$seconds" "$signal" "$kill_after" "$@"
+    echo "checkpoint: none of perl, timeout, or gtimeout is available" >&2
+    return 127
   fi
 }
 

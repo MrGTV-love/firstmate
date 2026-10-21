@@ -90,6 +90,34 @@ PL
   pass "Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher"
 }
 
+# An async caller may pass SIGINT ignored. The bound must still interrupt the
+# watcher and let its cleanup run, not KILL it and strand the watcher lock.
+test_checkpoint_resets_an_inherited_ignored_interrupt() {
+  local home fallback_bin tool tool_path status
+  home=$(make_home ignored-interrupt)
+  fallback_bin="$home/fallback-bin"
+  mkdir -p "$home/root/bin" "$fallback_bin"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  for tool in bash dirname mktemp rm perl grep cat sleep; do
+    tool_path=$(command -v "$tool") || fail "could not locate $tool for the ignored-interrupt fixture"
+    ln -s "$tool_path" "$fallback_bin/$tool"
+  done
+  cat > "$home/root/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+trap 'printf "interrupted\n" > "$FM_HOME/cleanup-reached"; exit 0' INT
+sleep 20
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
+  status=0
+  PATH="$fallback_bin" FM_HOME="$home" perl -e '$SIG{INT} = "IGNORE"; exec @ARGV' \
+    "$home/root/bin/fm-watch-checkpoint.sh" --seconds 1 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 124 "$status" "inherited ignored interrupt checkpoint exit"
+  assert_contains "$(cat "$home/cleanup-reached" 2>/dev/null)" "interrupted" \
+    "the bound must deliver INT despite its caller ignoring it"
+  pass "a checkpoint restores ignored INT before launching its watcher"
+}
+
 test_announced_recovery_is_not_reannounced_by_next_checkpoint() {
   local home out err status marker
   home=$(make_home announced-recovery)
@@ -359,6 +387,7 @@ case "$(cat "$FM_HOME/host-kind")" in
     printf 'signal: demo.status\nsupervision-host: the away session could not take this wake: fixture; this wake is yours\n'
     ;;
   stood-down) printf 'supervision-host stood down: this session no longer owns supervision\n' ;;
+  killed) kill -KILL "$$" ;;
 esac
 SH
   chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-supervision-host.sh"
@@ -414,7 +443,11 @@ test_host_checkpoint_passes_a_handback_and_reports_a_stand_down() {
   run_host_checkpoint "$home" stood-down --seconds 5
   expect_code 1 "$STATUS" "a host that stood down is a failed checkpoint"
   assert_contains "$(cat "$home/out.txt")" "supervision-host stood down" "the stand-down must be shown"
-  pass "checkpoint: a handed-back wake passes through, and a host stand-down is a failure"
+  run_host_checkpoint "$home" killed --seconds 5
+  expect_code 137 "$STATUS" "a host killed before the bound must preserve its signal status"
+  assert_not_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake" \
+    "a killed host must not be reported as a quiet checkpoint"
+  pass "checkpoint: a handed-back wake passes through, and a host stand-down or signal death is a failure"
 }
 
 # The Codex owner stays file-gated: without config/supervision-host, or with
@@ -456,6 +489,7 @@ test_real_host_checkpoint_ends_quietly_at_its_bound() {
 
 test_quiet_checkpoint_exits_124_cleanly
 test_perl_timeout_fallback_honors_cleanup_bound_before_escalating
+test_checkpoint_resets_an_inherited_ignored_interrupt
 test_announced_recovery_is_not_reannounced_by_next_checkpoint
 test_never_announced_recovery_is_announced_once
 test_queue_append_during_checkpoint_still_resurfaces
