@@ -95,8 +95,7 @@
 # run. A copy with no live owning record is left to the existing reap path.
 #
 # --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
-# deepest path first, with at most max-removals attempts (default 10, configured
-# in config/copy-budget as an integer from 1 to 999999).
+# deepest path first.
 # Every ownership, process, cleanliness and remote-content proof is re-read
 # after the driver plan and after preservation, immediately before execution;
 # HEAD and the complete lock's SHA-256 must still match what the plan saw.
@@ -286,7 +285,6 @@ DEFAULT_POOL_GIB=60
 DEFAULT_CONTAINER_GIB=20
 SCAN_INTERVAL=3600
 CACHE_MAX_AGE=86400
-MAX_REMOVALS=10
 POOL_BUDGETS=
 CONTAINER_BUDGETS=
 CONFIG_ERROR=
@@ -335,9 +333,6 @@ load_config() {
       cache-max-age)
         if [ -n "$a" ] && [ -z "$b" ] && valid_number "$a"; then CACHE_MAX_AGE=$a
         else CONFIG_ERROR="config/copy-budget line $n: cache-max-age wants whole seconds"; return 1; fi ;;
-      max-removals)
-        if [ -n "$a" ] && [ -z "$b" ] && [[ $a =~ ^[1-9][0-9]{0,5}$ ]]; then MAX_REMOVALS=$a
-        else CONFIG_ERROR="config/copy-budget line $n: max-removals wants an integer from 1 to 999999"; return 1; fi ;;
       pool)
         if [ -n "$a" ] && [ -n "$b" ] && valid_gib "$b"; then POOL_BUDGETS="$POOL_BUDGETS$a"$'\t'"$b"$'\n'
         else CONFIG_ERROR="config/copy-budget line $n: pool wants a pool name or path and a GiB value or off"; return 1; fi ;;
@@ -1141,7 +1136,7 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
 # leaves the copy and is reported, never retried harder.
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
-  local release_id preserve_dir preserved net release_rc receipt lock_hash attempts=0
+  local release_id preserve_dir preserved net release_rc receipt lock_hash
   stamp=$(date -u +%Y%m%dT%H%M%SZ).$$
   read -r SCANNED_COUNT SCANNED_KIB SCANNED_UNMEASURED <<< "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++; if ($6 == "-") u++; else k += $6 } END { printf "%d %.0f %d\n", n, k, u }')"
   REMOVAL_REPORT=
@@ -1152,10 +1147,6 @@ apply_removals() {
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"
-    if [ "$attempts" -ge "$MAX_REMOVALS" ]; then
-      REMOVAL_REPORT="${REMOVAL_REPORT}LIMIT"$'\t'"max-removals=$MAX_REMOVALS reached; remaining copies stay for the next run"$'\n'
-      break
-    fi
     scan_processes
     classify "$copy" "$clone" "$pool" "$container"
     case "$CLASS" in
@@ -1187,7 +1178,6 @@ apply_removals() {
         continue
       }
       preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved/${receipt##*/}"
-      attempts=$((attempts + 1))
       release_rc=0
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
       if [ "$release_rc" = 3 ]; then
@@ -1202,7 +1192,6 @@ apply_removals() {
         continue
       fi
     else
-      attempts=$((attempts + 1))
       if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
         FAILED_COUNT=$((FAILED_COUNT + 1))
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'

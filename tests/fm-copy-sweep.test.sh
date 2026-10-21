@@ -789,6 +789,35 @@ test_a_failed_preservation_is_the_sweeps_own_human_only_refusal() {
   pass "a copy whose ignored files cannot be preserved stays locked and registered, the sweep's own FAILED line ends in a human-only question with no command and no friction event, and the run exits 1"
 }
 
+test_a_failed_preservation_leaves_no_staging_directory() {
+  local admin n real_cp
+  make_locked_copy_case stagefailed dead
+  install_driver "$SLOT" "$W"
+  printf 'good.dat\nunreadable.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'copied before the failure\n' > "$(copy_path locked)/good.dat"
+  printf 'cannot be copied\n' > "$(copy_path locked)/unreadable.dat"
+  real_cp=$(command -v cp)
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\ncase "$*" in *unreadable.dat*) exit 1 ;; esac\nexec %q "$@"\n' "$W/cp.log" "$real_cp" > "$FAKEBIN/cp"
+  chmod +x "$FAKEBIN/cp"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  for n in 1 2; do
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 1 ] || fail "failed preservation $n should exit 1, got $RC: $OUT"
+    assert_contains "$OUT" "could not be preserved" "run $n did not report the failed preservation"
+    assert_equals "$n" "$(grep -c 'good.dat' "$W/cp.log")" "run $n did not copy the readable file before it failed"
+    assert_equals "$n" "$(grep -c 'unreadable.dat' "$W/cp.log")" "run $n did not reach the unreadable file"
+    assert_equals 0 "$(find "$HOMED/data/copy-sweep" -name '.staging-*' 2>/dev/null | wc -l | tr -d ' ')" \
+      "failed preservation $n left a staging directory behind"
+  done
+  [ -e "$(copy_path locked)" ] || fail "a copy whose preservation failed was removed"
+  registered locked || fail "a copy whose preservation failed is no longer registered"
+  [ -f "$admin/locked" ] || fail "a copy whose preservation failed lost its lock"
+  assert_equals 'copied before the failure' "$(cat "$(copy_path locked)/good.dat")" "the readable ignored file changed"
+  assert_equals 'cannot be copied' "$(cat "$(copy_path locked)/unreadable.dat")" "the unreadable ignored file changed"
+  assert_not_contains "$(cat "$W/closeout.log")" "--execute-cleanup" "the driver executed after a failed preservation"
+  pass "a failed preservation removes the staging directory it built, so repeated failed sweeps leave no staging bytes behind"
+}
+
 test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released() {
   local admin line
   make_locked_copy_case relocked dead
@@ -835,28 +864,6 @@ test_retained_ignored_payload_is_kept_once_without_growth() {
   assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "retained copy was driven again"
   assert_equals 'unique retained bytes' "$(cat "$(copy_path locked)/unique.dat")" "retention lost source bytes"
   pass "exit-3 ignored-payload retention is KEPT, keeps its lock and source, and repeated sweeps neither preserve nor execute again"
-}
-
-test_removal_limit_and_one_summary() {
-  local n left
-  make_world removal-limit
-  for n in 01 02 03 04 05 06 07 08 09 10 11 12; do
-    add_copy "c$n"
-    printf '%s\t%s\n' "$(copy_path "c$n")" "$GIB" >> "$W/du-table"
-  done
-  run_sweep --apply
-  [ "$RC" = 0 ] || fail "bounded sweep failed: $OUT"
-  assert_equals 10 "$(printf '%s\n' "$OUT" | grep -c '^REMOVED')" "default removal limit was not ten"
-  assert_equals 1 "$(printf '%s\n' "$OUT" | grep -c '^copies=.* GiB=.* reaped=.* freed=')" "expected one accounting summary"
-  assert_contains "$OUT" 'copies=12 GiB=12.00 reaped=10 freed=10.00' "accounting did not include the original twelve copies"
-  registered c01 && registered c02 || fail "reverse path order did not retain the first two copies"
-  printf 'max-removals 1\n' > "$HOMED/config/copy-budget"
-  run_sweep --apply
-  [ "$RC" = 0 ] || fail "configured bounded sweep failed: $OUT"
-  registered c01 || fail "configured limit removed too many copies"
-  ! registered c02 || fail "configured limit did not remove the deepest-first next copy"
-  assert_contains "$OUT" 'copies=2 GiB=2.00 reaped=1 freed=1.00' "configured-limit accounting is wrong"
-  pass "each run respects default ten or configured removal limit, deepest-first, with one original-total and freed-GiB summary"
 }
 
 test_task_record_appearing_during_plan_prevents_release() {
@@ -2016,7 +2023,6 @@ run_case test_recycled_launcher_lock_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_uuid_owner_lock_is_released_by_the_driver
 run_case test_retained_ignored_payload_is_kept_once_without_growth
-run_case test_removal_limit_and_one_summary
 run_case test_task_record_appearing_during_plan_prevents_release
 run_case test_valid_lock_replacement_during_plan_prevents_release
 run_case test_multiline_and_unknown_owner_locks_are_held_byte_identical
@@ -2027,6 +2033,7 @@ run_case test_driver_verdict_types_and_exit_status_are_not_permission
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
+run_case test_a_failed_preservation_leaves_no_staging_directory
 run_case test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
 run_case test_unproved_plan_verdicts_hold_the_copy
 run_case test_a_bare_allowed_literal_plan_releases_the_copy

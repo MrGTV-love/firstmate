@@ -1957,8 +1957,6 @@ load-limit 90
 interval 3600
 # whole seconds before a cached size is measured again
 cache-max-age 86400
-# maximum removal attempts per --apply run (positive integer)
-max-removals 10
 ```
 
 A pool is a `<treehouse root>/<pool>` directory, named by its directory name or full path.

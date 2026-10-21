@@ -339,8 +339,9 @@ teardown_ignored_sha256() {  # [<path>]
 # SHA-256 in its SHA256SUMS. The new copy is built in a staging directory and
 # replaces an earlier preserve of the same copy only after every entry is copied
 # and hashed, so a failed run never costs the earlier one. Returns 1 when
-# anything cannot be listed, copied or hashed, and the caller then refuses the
-# copy rather than removing unpreserved content.
+# anything cannot be listed, copied or hashed, after removing the one staging
+# directory it built, and the caller then refuses the copy rather than removing
+# unpreserved content.
 teardown_preserve_ignored() {  # <copy>
   local copy=$1 root dest stage entries entry file hash
   entries=$(teardown_preservable_ignored "$copy") || return 1
@@ -350,22 +351,27 @@ teardown_preserve_ignored() {  # <copy>
   dest="$root/$hash"
   stage="$root/.staging-$hash"
   rm -rf "$stage" || return 1
-  mkdir -p "$stage" || return 1
-  printf '%s\n' "$copy" > "$stage/copy-path" || return 1
-  : > "$stage/SHA256SUMS" || return 1
-  while IFS= read -r entry; do
-    [ -n "$entry" ] || continue
-    case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
-    rm -rf "${stage:?}/$entry" || return 1
-    mkdir -p "$(dirname "$stage/$entry")" || return 1
-    cp -RPp "$copy/$entry" "$stage/$entry" || return 1
-  done <<< "$entries"
-  while IFS= read -r -d '' file; do
-    hash=$(teardown_ignored_sha256 "$file") || return 1
-    printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
-  done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
-  rm -rf "$dest" || return 1
-  mv "$stage" "$dest" || return 1
+  (
+    mkdir -p "$stage" || return 1
+    printf '%s\n' "$copy" > "$stage/copy-path" || return 1
+    : > "$stage/SHA256SUMS" || return 1
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
+      rm -rf "${stage:?}/$entry" || return 1
+      mkdir -p "$(dirname "$stage/$entry")" || return 1
+      cp -RPp "$copy/$entry" "$stage/$entry" || return 1
+    done <<< "$entries"
+    while IFS= read -r -d '' file; do
+      hash=$(teardown_ignored_sha256 "$file") || return 1
+      printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
+    done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
+    rm -rf "$dest" || return 1
+    mv "$stage" "$dest" || return 1
+  ) || {
+    rm -rf "$stage"
+    return 1
+  }
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
 }
 
