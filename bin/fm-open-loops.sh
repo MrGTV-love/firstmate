@@ -28,8 +28,8 @@
 # Reads (--present-overdue, --check-actions, drain) and refused acknowledgements do not
 # invalidate evidence for an unchanged obligation. Successful acknowledgement alone closes
 # the handling turn via --complete-actions (internal wake-drain integration).
-# Unbound firstmate escalations and steers stand for config/open-loops.json's
-# receipt_interval_seconds (default four hours); reviewed-green PRs never stand.
+# Unbound firstmate escalations and steers stand for a fixed four hours, never
+# longer than the row stays unchanged; reviewed-green PRs never stand.
 # --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,

@@ -10,8 +10,7 @@
 # acknowledgement refuses while a presented row lacks a valid action receipt.
 # Reads and refused acknowledgements preserve actions on unchanged rows; only successful
 # acknowledgement closes a handling turn. Unbound firstmate escalation/steer receipts
-# stand for config/open-loops.json receipt_interval_seconds (default four hours),
-# but reviewed-green PRs still require action each turn.
+# stand for a fixed four hours, but reviewed-green PRs still require action each turn.
 # docs/configuration.md "Open-work ledger" owns that gate and receipt invalidation.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
