@@ -83,8 +83,10 @@
 #       and the live PID does not carry a launch pin for another generation.
 # The preserved task_session_file (or the pane's omp session-file reference
 # when the field is absent) must identify the same persisted file as that
-# reference. Only a record whose process is gone is repaired. A record naming
-# the live PID or any other live process is the omp extension's to maintain
+# reference. Publication also needs a positively readable live environment
+# without a usable launch pin; a matching or different pin and unreadable
+# probing refuse before staging or capture. Only a record whose process is
+# gone is repaired. A record naming the live PID or any other live process is the omp extension's to maintain
 # and is refused unchanged, including the extension's empty unproven mark and
 # an activation naming another file, even when Herdr still registers the task
 # file. The repair writes version=1, the unchanged spawn_gen, the live pid,
@@ -1437,6 +1439,12 @@ if [ "$VERB" = adopt ]; then
     echo "adopt refused: record proof needs the recorded PID to be gone; $adoption_recorded_pid is a live process, so the omp extension owns this record and it was not changed" >&2
     exit 1
   fi
+  # Capture briefly removes the canonical task anchor. Only a positively
+  # readable unpinned process cannot run the extension's pinned publication
+  # path and rebind that missing anchor to a newly activated personal file.
+  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
+  fm_launch_proof_pid_unpinned "$adoption_pid" \
+    || die "adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates"
   CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
     || die "adopt needs a writable session-record directory"
   printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
