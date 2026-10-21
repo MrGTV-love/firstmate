@@ -1484,8 +1484,9 @@ prepare_omp_adoption() { # <case-name>
   mkdir -p "$dir/wt/subdirectory"
   printf '%s' "$dir/wt/subdirectory" > "$dir/fake/adoption-cwd"
   write_recovery_native_launch "$dir" "$dir/home" "$id" ship
+  # The recorded process is long gone; no host can hand this PID to a live one.
   jq -nc --arg task "$dir/wt/recorded-session.jsonl" \
-    '{version:1,spawn_gen:"old",pid:19,task_session_file:$task,current_session_file:""}' \
+    '{version:1,spawn_gen:"old",pid:2000000001,task_session_file:$task,current_session_file:""}' \
     > "$dir/home/state/$id.omp-session.json"
   make_continuation_owner_fixture "$dir"
 }
@@ -1714,6 +1715,162 @@ test_omp_adoption_proof_boundaries() {
   pass "omp adoption: pane, workspace, session-file identity, aliases, and ongoing authorization boundaries"
 }
 
+test_omp_adoption_live_recorded_pid() {
+  local shape dir id record
+  for shape in other-live-process resolved-live-process; do
+    prepare_omp_adoption "live-recorded-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    # A record naming a live process belongs to the omp extension running in
+    # it. The shell test process stands in for another live recorded PID, and
+    # the resolved PID with an agreeing current session is a healthy record.
+    case "$shape" in
+      other-live-process) jq --argjson pid "$$" '.pid=$pid' "$record" > "$record.new" ;;
+      resolved-live-process)
+        jq --argjson pid "$(cat "$dir/fake/recovery-pid")" '.pid=$pid | .current_session_file=.task_session_file' \
+          "$record" > "$record.new" ;;
+    esac
+    mv "$record.new" "$record"
+    assert_adoption_refused "$dir" "$id" 'record proof needs the recorded PID to be gone'
+  done
+  pass "omp adoption: a record naming a live process is the extension's to maintain and is refused unchanged"
+}
+
+# The real omp extension, not a model of it, runs as the live process the fake
+# Herdr resolves. Commands and acknowledgements travel over FIFOs and the
+# adoption pause is a FIFO rendezvous, so every interleaving is ordered by
+# messages and never by sleeps.
+start_adoption_extension() { # <case-dir> <id> -> EXT_PROC_PID; fds 4 (commands) and 5 (acks)
+  local dir=$1 id=$2 line
+  mkdir -p "$dir/ext"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$dir/ext/fm-task-session.ts"
+  cat > "$dir/ext/driver.mjs" <<'JS'
+import { createInterface } from 'node:readline';
+import { pathToFileURL } from 'node:url';
+const { createTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+const manager = { getSessionFile: () => process.env.SESSION };
+const session = { sessionManager: manager, waitForSessionTransition: () => Promise.resolve() };
+const proof = createTaskSessionProof(process.env.STATE, process.env.TASK, { list: () => [{ kind: 'main', session }] });
+const ctx = { sessionManager: manager, ui: { notify() {} } };
+console.log(`ready ${process.pid}`);
+for await (const event of createInterface({ input: process.stdin })) {
+  if (event === 'exit') process.exit(0);
+  try { proof[event](ctx); console.log(`ok ${event}`); } catch (error) { console.log(`error ${event} ${error.message}`); }
+}
+JS
+  mkfifo "$dir/ext/commands" "$dir/ext/acks"
+  FM_SPAWN_GEN=old EXT="$dir/ext/fm-task-session.ts" STATE="$dir/home/state" TASK="$id" \
+    SESSION="$dir/wt/recorded-session.jsonl" \
+    node --experimental-strip-types --no-warnings "$dir/ext/driver.mjs" \
+    < "$dir/ext/commands" > "$dir/ext/acks" 2> "$dir/ext/errors" &
+  exec 4> "$dir/ext/commands" 5< "$dir/ext/acks"
+  read -r line <&5
+  case "$line" in
+    'ready '*) EXT_PROC_PID=${line#ready } ;;
+    *) fail "the real omp extension process did not start: $line $(cat "$dir/ext/errors")" ;;
+  esac
+}
+
+extension_event() { # start|shutdown
+  local ack
+  printf '%s\n' "$1" >&4
+  read -r ack <&5
+  [ "$ack" = "ok $1" ] || fail "the real omp extension $1 failed: $ack"
+}
+
+stop_adoption_extension() {
+  printf 'exit\n' >&4
+  exec 4>&- 5<&-
+  wait "$EXT_PROC_PID" 2>/dev/null || true
+}
+
+# Wrap mv and ln: the first call naming the session record announces itself on
+# the events FIFO, then waits for the test to release it.
+arm_adoption_barrier() { # <case-dir> <id> <mv|ln>
+  local dir=$1 id=$2 op=$3 tool
+  mkfifo "$dir/fake/barrier-events" "$dir/fake/barrier-resume"
+  for tool in mv ln; do
+    cat > "$dir/fakebin/$tool" <<SH
+#!/usr/bin/env bash
+D=\$FM_FAKE_DIR
+if [ "\$(cat "\$D/barrier-op" 2>/dev/null)" = $tool ]; then
+  for arg in "\$@"; do
+    if [ "\${arg##*/}" = "$id.omp-session.json" ]; then
+      rm -f "\$D/barrier-op"
+      printf 'reached %s\n' $tool > "\$D/barrier-events"
+      read -r _ < "\$D/barrier-resume"
+      break
+    fi
+  done
+fi
+exec /bin/$tool "\$@"
+SH
+    chmod +x "$dir/fakebin/$tool"
+  done
+  printf '%s' "$op" > "$dir/fake/barrier-op"
+}
+
+test_omp_adoption_publication_race() {
+  local shape op dir id record line rc out reached
+  for shape in live-record dead-record-replacement dead-record-link; do
+    prepare_omp_adoption "race-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    start_adoption_extension "$dir" "$id"
+    # The extension's own process is the launch-pinned live foreground process.
+    printf '%s' "$EXT_PROC_PID" > "$dir/fake/recovery-pid"
+    printf '%s' "$EXT_PROC_PID" > "$dir/fake/holder-pid"
+    printf old > "$dir/fake/recovery-spawn-gen"
+    # A live record is the extension's own healthy proof for this process.
+    [ "$shape" != live-record ] || extension_event start
+    op=mv
+    [ "$shape" != dead-record-link ] || op=ln
+    arm_adoption_barrier "$dir" "$id" "$op"
+    exec 6<> "$dir/fake/barrier-events"
+    (
+      rc=0
+      run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
+      printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
+    ) &
+    read -r line <&6
+    reached=0
+    if [ "$line" = "reached $op" ]; then
+      reached=1
+      # Adoption has made its last comparison and has not yet replaced the
+      # record: the extension publishes its start, then its deliberate unproven
+      # mark, exactly as session shutdown or a pending switch does.
+      extension_event start
+      extension_event shutdown
+      printf 'go\n' > "$dir/fake/barrier-resume"
+      read -r line <&6
+    fi
+    case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
+    out=$(cat "$dir/adopt.out")
+    exec 6>&-
+    [ "$shape" = live-record ] || [ "$reached" = 1 ] \
+      || fail "the dead-recorded-PID repair never reached publication: $out"
+    # Without the pause, the extension publishes its mark after the refusal.
+    [ "$shape" != live-record ] || [ "$reached" = 1 ] || extension_event shutdown
+    [ "$rc" -ne 0 ] || fail "adoption ($shape) succeeded over a concurrent extension write: $out"
+    jq -e --argjson pid "$EXT_PROC_PID" '.pid == $pid and .current_session_file == ""' "$record" >/dev/null \
+      || fail "adoption ($shape) overwrote the extension's newer unproven mark: $(cat "$record")"
+    # A record naming a live process is refused before anything is staged.
+    [ "$shape" != live-record ] || [ "$reached" = 0 ] \
+      || fail "adoption staged a replacement for a record naming a live process: $out"
+    assert_not_contains "$out" 'adopted:' "a refused adoption must not report success"
+    case "$shape" in
+      live-record) assert_contains "$out" 'record proof needs the recorded PID to be gone' "a live record must name its proof" ;;
+      *) assert_contains "$out" 'adopt needs the session record unchanged until publication' "a lost publication race must name its proof" ;;
+    esac
+    assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" \
+      "adoption ($shape) must leave no staged or captured record behind"
+    rc=0
+    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+    [ "$rc" -ne 0 ] || fail "adoption ($shape) restored authorization over the extension's unproven mark: $out"
+    assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the unproven mark must receive no lifecycle input"
+    stop_adoption_extension
+  done
+  pass "omp adoption: a concurrent extension publication is never overwritten, before or after the record is set aside"
+}
+
 test_omp_adoption() {
   test_omp_adoption_matching_workspace
   test_omp_adoption_foreign_workspace
@@ -1727,6 +1884,8 @@ test_omp_adoption() {
   test_omp_adoption_other_generation_pin
   test_omp_adoption_caller_gate
   test_omp_adoption_proof_boundaries
+  test_omp_adoption_live_recorded_pid
+  test_omp_adoption_publication_race
 }
 
 test_quota_exhaustion_relaunches_only_a_permitted_route() {
