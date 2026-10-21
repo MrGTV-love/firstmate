@@ -622,6 +622,8 @@ A deterministic late-publication fixture acknowledges poll-discovered recovery a
 - Bounded and successor-linked lifecycle rows.
 - A SIGSTOP counterfactual that distinguishes a live PID from a stale beacon before classifying termination.
 - A single slow, deadline-bounded check keeps the strict watcher predicate healthy beyond grace, while stopping that same main poll makes its beacon stale even with its check child still alive.
+- A bounded check wait launches no sleep process per tick, and still returns the check's output and failure status, stops at its deadline, and removes a leftover descendant.
+- Group cleanup on a host without Perl stops a TERM-ignoring descendant with one sleep per bounded wait.
 
 `tests/fm-supervision-events.test.sh` covers recovery output/status transport and cooldown, plus real recovery command and descendant termination on PID-only owner TERM, owner death without cleanup, the inspection deadline, and an outer checkpoint deadline.
 Its TERM-resistant fixtures assert process survival before shutdown and disappearance afterward.
