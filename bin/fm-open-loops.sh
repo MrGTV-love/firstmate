@@ -4,6 +4,13 @@
 #        fm-open-loops.sh --present-overdue | --check-actions | --report
 #        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
 #        fm-open-loops.sh action ROW_ID escalated --evidence TEXT [--hold TASK_ID]
+#        fm-open-loops.sh action --batch JSONL_FILE   # - reads stdin
+# Batch input has one JSON object per line: row_id, kind, evidence, and optional
+# recheck, hold, prerequisite or prerequisite_task (same validation as the single-row form).
+# Example: {"row_id":"ROW_ID","kind":"escalated","evidence":"decision requested"}
+# A batch shares one cached fleet snapshot, including failed reads, across all actions.
+# Each input line produces one result row (line,id,kind,result,message); valid actions
+# persist even when siblings refuse. Any refusal exits 1; malformed CLI arguments exit 2.
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
@@ -18,6 +25,11 @@
 # --present-overdue presents every overdue row that still needs an action first and records this actor's action
 # requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
+# Reads (--present-overdue, --check-actions, drain) and refused acknowledgements do not
+# invalidate evidence for an unchanged obligation. Successful acknowledgement alone closes
+# the handling turn via --complete-actions (internal wake-drain integration).
+# Unbound firstmate escalations and steers stand for config/open-loops.json's
+# receipt_interval_seconds (default four hours); reviewed-green PRs never stand.
 # --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
