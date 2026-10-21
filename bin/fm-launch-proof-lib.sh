@@ -286,7 +286,7 @@ fm_launch_proof_herdr_verdict() { # <meta> <pid> -> managed|unmanaged|unknown
       printf '%s' "$refusal"
       return
     fi
-    if [ "$verdict" != managed ]; then
+    if [ "$verdict" = unmanaged ]; then
       # Adoption is a second authorization route, not a relaxed environment
       # comparison. A valid record alone still cannot license lifecycle input.
       adopted=$(fm_launch_proof_omp_adoption "$meta" 2>/dev/null) \
