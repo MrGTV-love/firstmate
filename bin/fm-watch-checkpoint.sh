@@ -79,7 +79,7 @@ trap 'rm -f "$OUT" "$ERR"' EXIT
 
 run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...>
   perl -e '
-    use POSIX qw(:sys_wait_h);
+    use POSIX qw(:sys_wait_h setpgid);
     my $seconds = shift;
     my $signal = shift;
     my $kill_after = shift;
@@ -94,6 +94,7 @@ run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...
       exec { $ARGV[0] } @ARGV;
       die "exec failed: $!\n";
     }
+    setpgid($pid, $pid);
     my $timed_out = 0;
     # Non-zero once the child has been signalled, so the re-armed alarm knows a
     # KILL escalation is already armed and which status to report.
@@ -163,7 +164,8 @@ run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>
   elif command -v gtimeout >/dev/null 2>&1; then
     gtimeout --signal="$signal" --kill-after="${kill_after}s" "$seconds" "$@"
   else
-    run_with_perl_timeout "$seconds" "$signal" "$kill_after" "$@"
+    echo "checkpoint: none of perl, timeout, or gtimeout is available" >&2
+    return 127
   fi
 }
 
