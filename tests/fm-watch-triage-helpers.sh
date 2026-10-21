@@ -8216,11 +8216,20 @@ SH
 # A crew log torn down after a scan listed it but before its span is read is an
 # empty span, not a classification failure: neither scan may queue a wake or
 # recreate a retired task's marker for it. The injected beacon hook removes the
-# log at exactly the point between the scan's existence check and the read.
+# log at exactly the point between the scan's existence check and the read; the
+# injected size reader removes one that still had bytes to read after the
+# owned capture was committed to, so the capture itself reports the empty span.
 test_vanished_status_log_is_a_quiet_empty_span() (
   local dir state script out size
   dir=$(make_case vanished-log); state="$dir/state"; script="$dir/vanish.sh"
   mkdir -p "$dir/home"
+  cat > "$state/size-then-remove" <<'SH'
+#!/bin/sh
+size=$(wc -c < "$1" | tr -d ' ') || exit 1
+rm -f "$1"
+printf '%s' "$size"
+SH
+  chmod +x "$state/size-then-remove"
   cat > "$script" <<'SH'
 root=$1 state=$2 home=$3
 export FM_STATE_OVERRIDE="$state" FM_HOME="$home" FM_ROOT_OVERRIDE="$home"
@@ -8234,6 +8243,9 @@ echo "live rc=$? needs=$nd end=${rec%%$'\t'*} size=$size"
 rm -f "$STATE/live.status"
 watcher_status_span "$STATE/gone.status" 0 rec nd
 echo "absent rc=$? needs=$nd record=[$rec]"
+printf 'done: delivered\n' > "$STATE/mid.status"
+FM_STATUS_SIZE_READER="$STATE/size-then-remove" watcher_status_span "$STATE/mid.status" 0 rec nd
+echo "mid-capture rc=$? needs=$nd record=[$rec]"
 watcher_beat() { rm -f "$STATE/gone.status"; }
 printf 'done: delivered\n' > "$STATE/gone.status"
 signal_files_actionable "$STATE/gone.status"
@@ -8246,6 +8258,7 @@ SH
   size=$(printf '%s\n' "$out" | sed -n 's/^live .* size=\([0-9]*\)$/\1/p')
   [ "$out" = "live rc=0 needs=1 end=$size size=$size
 absent rc=1 needs=0 record=[]
+mid-capture rc=1 needs=0 record=[]
 signal rc=1 endpoints=[]
 heartbeat rc=1 endpoints=[]" ] || fail "a vanished status log was not a quiet empty span: $out"
   [ ! -e "$state/.hb-surfaced-gone" ] && [ ! -e "$state/.seen-gone_status" ] \

@@ -360,15 +360,13 @@ SH
   pass "a quiet scan of 12 status logs enters $count subshells (bound 40)"
 }
 
-# The heartbeat marker lags its log between heartbeats (it is rewritten only
-# then), so a quiet scan meets a lagging marker on nearly every log. A lagging
-# marker on an unchanged device must cost a handful of commands, not the
-# per-byte signature decode: the fixture pins a constant strong identity so the
-# result does not depend on the host file system recording birth times.
-test_lagging_marker_scan_costs_no_signature_decode() {
-  local dir="$TMP_ROOT/lagging" setup="$TMP_ROOT/lagging-setup.sh" script="$TMP_ROOT/lagging.sh" log="$TMP_ROOT/lagging.log" i out quiet lagging count
+# Twelve quiet status logs under <dir>/state, plus the helpers the marker
+# budgets share. marker-setup.sh pins a constant strong identity, so a result
+# does not depend on the host file system recording birth times, and offers
+# mark_all, grow_logs and quiet_scan.
+write_marker_fixture() {  # <dir>
+  local dir=$1 i=0
   mkdir -p "$dir/state" "$dir/home"
-  i=0
   while [ "$i" -lt 12 ]; do
     i=$((i + 1))
     printf 'working [at=%s]: step\n' "$i" > "$dir/state/task-$i.status"
@@ -378,7 +376,7 @@ test_lagging_marker_scan_costs_no_signature_decode() {
 printf 'strong:16777232:123:2026-10-09 12:34:56'
 SH
   chmod +x "$dir/identity-reader"
-  cat > "$setup" <<'SH'
+  cat > "$TMP_ROOT/marker-setup.sh" <<'SH'
 root=$1 dir=$2
 export FM_STATE_OVERRIDE="$dir/state" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/home"
 export FM_STATUS_IDENTITY_READER="$dir/identity-reader"
@@ -407,8 +405,17 @@ quiet_scan() {
   [ -z "$out" ] || echo "the scan was not quiet: $out"
 }
 SH
+}
+
+# The heartbeat marker lags its log between heartbeats (it is rewritten only
+# then), so a quiet scan meets a lagging marker on nearly every log. A lagging
+# marker on an unchanged device must cost a handful of commands, not the
+# per-byte signature decode.
+test_lagging_marker_scan_costs_no_signature_decode() {
+  local dir="$TMP_ROOT/lagging" script="$TMP_ROOT/lagging.sh" log="$TMP_ROOT/lagging.log" out quiet lagging count
+  write_marker_fixture "$dir"
   cat > "$script" <<'SH'
-. "${0%/*}/lagging-setup.sh"
+. "${0%/*}/marker-setup.sh"
 mark_all heartbeat
 quiet_scan
 _FMB_COMMANDS=0
@@ -436,7 +443,7 @@ SH
   [ "$((lagging - quiet))" -le $((12 * 150)) ] \
     || fail "lagging heartbeat markers added $((lagging - quiet)) commands to a quiet scan of 12 logs; the bound is $((12 * 150))"
   cat > "$script" <<'SH'
-. "${0%/*}/lagging-setup.sh"
+. "${0%/*}/marker-setup.sh"
 unset FM_STATUS_IDENTITY_READER
 mark_all heartbeat
 grow_logs
@@ -449,6 +456,49 @@ SH
   [ "$count" -le 40 ] \
     || fail "a quiet scan of 12 logs with lagging heartbeat markers entered $count subshells; the bound is 40"
   pass "lagging heartbeat markers add $((lagging - quiet)) commands (bound $((12 * 150))) and keep the scan at $count subshells (bound 40)"
+}
+
+# The heartbeat backstop walks every status log, so a log with nothing past its
+# classified offset must be answered without the owned capture a real read
+# gets: each capture creates its output file with mktemp and costs about 200 ms,
+# so 38 quiet logs would block the poll shell for seconds every heartbeat. A
+# mktemp on PATH records those starts; a log with unread bytes is the control
+# that proves the capture still runs, and still finds nothing to wake for.
+test_quiet_heartbeat_scan_starts_no_owned_capture() {
+  local dir="$TMP_ROOT/hb-quiet" script="$TMP_ROOT/hb-quiet.sh" log="$TMP_ROOT/hb-quiet.log" out quiet unread
+  write_marker_fixture "$dir"
+  mkdir -p "$dir/shim"
+  cat > "$dir/shim/mktemp" <<SH
+#!/bin/sh
+printf x >> "\$FMB_MKTEMP_LOG"
+exec $(command -v mktemp) "\$@"
+SH
+  chmod +x "$dir/shim/mktemp"
+  cat > "$script" <<'SH'
+. "${0%/*}/marker-setup.sh"
+unset FM_STATUS_IDENTITY_READER
+mark_all heartbeat
+PATH="$dir/shim:$PATH"
+export FMB_MKTEMP_LOG="$dir/mktemp.log"
+captures() { wc -c < "$FMB_MKTEMP_LOG" | tr -d ' '; }
+: > "$FMB_MKTEMP_LOG"
+heartbeat_scan_finds_actionable
+rc=$?
+[ "$rc" -eq 1 ] || echo "a quiet heartbeat scan found work (rc=$rc): $FM_HEARTBEAT_SURFACE_ENDPOINTS"
+quiet=$(captures)
+printf 'working [at=9]: more\n' >> "$STATE/task-1.status"
+: > "$FMB_MKTEMP_LOG"
+heartbeat_scan_finds_actionable
+rc=$?
+[ "$rc" -eq 1 ] || echo "a heartbeat scan of one routine append found work (rc=$rc): $FM_HEARTBEAT_SURFACE_ENDPOINTS"
+printf '%s %s' "$quiet" "$(captures)" > "$FMB_LOG"
+SH
+  out=$(FMB_LOG="$log" "${BASH:-bash}" "$script" "$ROOT" "$dir" 2>&1) || fail "measured script failed: $out"
+  [ -z "$out" ] || fail "measured script printed: $out"
+  read -r quiet unread < "$log"
+  [ "$quiet" = 0 ] || fail "a quiet heartbeat scan of 12 status logs started $quiet owned captures; it needs none"
+  [ "$unread" = 1 ] || fail "a heartbeat scan with one unread log started $unread owned captures; it needs exactly one"
+  pass "a quiet heartbeat scan of 12 status logs starts no owned capture; one unread log starts one"
 }
 
 test_heartbeat_marker_path_matches_the_tr_pipeline() {
@@ -583,6 +633,7 @@ else
   test_status_signature_matches_the_od_pipeline
   test_quiet_signal_scan_costs_one_stat_per_log
   test_lagging_marker_scan_costs_no_signature_decode
+  test_quiet_heartbeat_scan_starts_no_owned_capture
   test_heartbeat_marker_path_matches_the_tr_pipeline
   test_recorded_windows_reads_each_task_without_a_subshell
   test_owner_watchdog_tick_subshell_budget
