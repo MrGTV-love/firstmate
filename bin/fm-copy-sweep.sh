@@ -124,11 +124,13 @@
 # data/copy-sweep/retained/<sha256 of the path> protects the copy from later
 # removal, even when the driver releases its lock but removal fails. Only a
 # successful, verified removal clears that receipt. A receipt records the lock's
-# SHA-256 and the copy's path and retains the copy while that lock, or no lock,
-# is there (the driver may have released it); the sweep never clears one to retry
-# a copy. A receipt whose path is gone, whose copy now has a different lock, or
-# that records no hash is stale: classification ignores it, report mode leaves it,
-# and --apply removes it and lists RECEIPT-CLEARED.
+# SHA-256, the copy's path and the copy's identity (the inode and birth time of its
+# own .git file) and retains that same copy while its lock matches, or while it has
+# no lock (the driver may have released it); the sweep never clears one to retry a
+# copy. A receipt whose path is gone, whose path now holds a different copy, whose
+# copy now has a different lock, or that records no hash or identity is stale:
+# classification ignores it, report mode leaves it, and --apply removes it and
+# lists RECEIPT-CLEARED.
 # Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
 # the run exits 0 and later runs neither preserve nor execute that copy again.
 # Other execution failures exit 1, record the driver's text, and retain the copy.
@@ -276,6 +278,19 @@ file_mtime() {
   else
     stat -c %Y "$1" 2>/dev/null
   fi
+}
+
+# The inode and birth time of the copy's own .git file, "<inode>:<birth>", or
+# failure when either cannot be read.
+copy_identity() {  # <copy>
+  local identity
+  if [ "$(uname)" = Darwin ]; then
+    identity=$(/usr/bin/stat -f %i:%B "$1/.git" 2>/dev/null) || return 1
+  else
+    identity=$(stat -c %i:%W "$1/.git" 2>/dev/null) || return 1
+  fi
+  [[ $identity =~ ^[0-9]+:[0-9]+$ ]] || return 1
+  printf '%s\n' "$identity"
 }
 
 gib_to_kib() {  # <GiB, may be decimal>
@@ -612,46 +627,53 @@ sweep_vernant_lock_pid() {  # <lock-file>
 # and then fail to remove its copy, or the sweep can stop while it runs. Never
 # let a later run reinterpret that partially completed release as an unlocked
 # copy that is safe to remove. Report mode only reads these receipts. A receipt
-# records the SHA-256 of the creation lock the driver was asked to release and the
-# copy's path.
+# records the SHA-256 of the creation lock the driver was asked to release, the
+# copy's path and the copy's identity (see copy_identity).
 retained_receipt() {  # <copy>
   local hash
   hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
   printf '%s/%s/retained/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
 }
 
-record_driver_retention() {  # <copy> <lock-sha256> <reason>
+record_driver_retention() {  # <copy> <lock-sha256> <identity> <reason>
   local dest tmp
   dest=$(retained_receipt "$1") || return 1
   mkdir -p "${dest%/*}" || return 1
   tmp=$(mktemp "${dest%/*}/.retained.XXXXXX") || return 1
-  if ! printf 'lock-sha256=%s\ncopy=%s\n%s\n' "$2" "$1" "$3" > "$tmp" || ! mv -- "$tmp" "$dest"; then
+  if ! printf 'lock-sha256=%s\ncopy=%s\nidentity=%s\n%s\n' "$2" "$1" "$3" "$4" > "$tmp" || ! mv -- "$tmp" "$dest"; then
     rm -f -- "$tmp"
     return 1
   fi
 }
 
 # True when a receipt no longer describes what is at its path: it records no lock
-# hash or path (an older receipt), its path is gone, or the copy there now has a
-# different creation lock. A copy with no lock stays protected, because the driver
-# may have released the lock and then failed to remove the copy. Sets
-# RECEIPT_STALE_COPY and RECEIPT_STALE_WHY. An unreadable receipt is not stale.
+# hash, path or copy identity (an older receipt), its path is gone, a different
+# copy is there, or the copy there has a different creation lock. The same copy
+# with no lock stays protected, because the driver may have released the lock and
+# then failed to remove the copy. Sets RECEIPT_STALE_COPY and RECEIPT_STALE_WHY.
+# A receipt or copy that cannot be read is not stale.
 RECEIPT_STALE_COPY=
 RECEIPT_STALE_WHY=
 receipt_is_stale() {  # <receipt>
-  local hash='' copy='' actual rc=0
+  local hash='' copy='' identity='' current actual rc=0
   RECEIPT_STALE_COPY=
   RECEIPT_STALE_WHY=
   [ -r "$1" ] || return 1
-  { IFS= read -r hash && IFS= read -r copy; } < "$1" || true
+  { IFS= read -r hash && IFS= read -r copy && IFS= read -r identity; } < "$1" || true
   case "$copy" in copy=/*) copy=${copy#copy=}; RECEIPT_STALE_COPY=$copy ;; *) copy= ;; esac
   case "$hash" in lock-sha256=*) hash=${hash#lock-sha256=} ;; *) hash= ;; esac
-  if [ -z "$copy" ] || ! [[ $hash =~ ^[0-9a-f]{64}$ ]]; then
-    RECEIPT_STALE_WHY="it records no lock hash and copy path"
+  case "$identity" in identity=*) identity=${identity#identity=} ;; *) identity= ;; esac
+  if [ -z "$copy" ] || ! [[ $hash =~ ^[0-9a-f]{64}$ ]] || ! [[ $identity =~ ^[0-9]+:[0-9]+$ ]]; then
+    RECEIPT_STALE_WHY="it records no lock hash, copy path and copy identity"
     return 0
   fi
   if [ ! -e "$copy" ] && [ ! -L "$copy" ]; then
     RECEIPT_STALE_WHY="its copy is gone"
+    return 0
+  fi
+  current=$(copy_identity "$copy") || return 1
+  if [ "$current" != "$identity" ]; then
+    RECEIPT_STALE_WHY="a different copy is now at its path"
     return 0
   fi
   teardown_copy_lock_file "$copy" || rc=$?
@@ -701,7 +723,7 @@ classify() {  # <copy> <clone> <pool> <container>
   }
   if { [ -e "$pending" ] || [ -L "$pending" ]; } && ! receipt_is_stale "$pending"; then
     CLASS=HELD-LOCKED
-    REASON="driver retained this copy: $(sed -n '3,$p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
+    REASON="driver retained this copy: $(sed -n '4,$p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
     return 0
   fi
   rc=0
@@ -1152,7 +1174,7 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
 # REFUSED line on stderr, because the library's envelope names a teardown command
 # built from the release id, which is no task id.
 teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity
   shown=$(fm_refuse_text "$copy")
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
   DATA=$DATA_DIR
@@ -1165,15 +1187,16 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
     return 1
   fi
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
-  record_driver_retention "$copy" "$7" "driver release incomplete; the copy remains protected even if its lock was released" || {
+  if ! identity=$(copy_identity "$copy") \
+    || ! record_driver_retention "$copy" "$7" "$identity" "driver release incomplete; the copy remains protected even if its lock was released"; then
     echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
     return 1
-  }
+  fi
   rc=0
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
     words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
-    record_driver_retention "$copy" "$7" "exit $rc: $words" || true
+    record_driver_retention "$copy" "$7" "$identity" "exit $rc: $words" || true
     echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words" >&2
     if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_OUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
       return 3

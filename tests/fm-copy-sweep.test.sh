@@ -1095,7 +1095,7 @@ test_failed_driver_removal_cannot_be_retried_as_unlocked() {
 
 test_a_stale_retention_receipt_does_not_hold_a_new_copy_at_the_same_path() {
   local shape second head pid retained
-  for shape in gone replaced; do
+  for shape in gone replaced unlocked; do
     make_locked_copy_case "stale-receipt-$shape" dead
     install_driver "$SLOT" "$W"
     printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
@@ -1108,17 +1108,20 @@ test_a_stale_retention_receipt_does_not_hold_a_new_copy_at_the_same_path() {
     assert_contains "$OUT" "KEPT"$'\t'"$(copy_path locked)" "$shape: the driver's retention was not reported"
     assert_equals 1 "$(find "$retained" -type f | wc -l | tr -d ' ')" "$shape: the retained copy has no single receipt"
     rm -f "$W/retain-ignored"
+    ln "$(copy_path locked)/.git" "$W/old-dot-git" || fail "$shape: fixture could not keep the old copy's .git inode"
     git -C "$SLOT" worktree unlock "$(copy_path locked)" || fail "$shape: fixture could not unlock the old copy"
     git -C "$SLOT" worktree remove "$(copy_path locked)" || fail "$shape: fixture could not remove the old copy"
-    if [ "$shape" = replaced ]; then
+    if [ "$shape" != gone ]; then
       second=$(copy_path locked)
       git -C "$SLOT" worktree add -q -b fm/locked-again "$second" "$head"
-      sleep 0.1 & pid=$!
-      wait "$pid" 2>/dev/null || true
-      git -C "$SLOT" worktree lock --reason "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=$pid" "$second"
+      if [ "$shape" = replaced ]; then
+        sleep 0.1 & pid=$!
+        wait "$pid" 2>/dev/null || true
+        git -C "$SLOT" worktree lock --reason "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=$pid" "$second"
+      fi
       FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
       [ "$RC" = 0 ] || fail "$shape: the report failed ($RC): $OUT"
-      assert_class locked PENDING-DRIVER
+      if [ "$shape" = replaced ]; then assert_class locked PENDING-DRIVER; else assert_class locked REAPABLE-PROVEN; fi
       assert_not_contains "$OUT" "driver retained this copy" "$shape: the old receipt still held the new copy"
     else
       FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
@@ -1129,12 +1132,12 @@ test_a_stale_retention_receipt_does_not_hold_a_new_copy_at_the_same_path() {
     [ "$RC" = 0 ] || fail "$shape: the apply failed ($RC): $OUT"
     assert_contains "$OUT" "RECEIPT-CLEARED"$'\t'"$(copy_path locked)" "$shape: the stale receipt removal was not listed"
     assert_equals 0 "$(find "$retained" -type f | wc -l | tr -d ' ')" "$shape: a stale receipt was left behind"
-    if [ "$shape" = replaced ]; then
-      assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "$shape: the new copy was not judged on its own proofs and released"
+    if [ "$shape" != gone ]; then
+      assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "$shape: the new copy was not judged on its own proofs and removed"
       [ ! -e "$(copy_path locked)" ] || fail "$shape: the new copy is still on disk"
     fi
   done
-  pass "a retention receipt whose copy is gone or whose lock differs is ignored by classification, left by report, and removed and listed by apply, so a new copy at that path is judged on its own proofs"
+  pass "a retention receipt whose copy is gone or whose path now holds a different copy, locked or not, is ignored by classification, left by report, and removed and listed by apply, so a new copy at that path is judged on its own proofs"
 }
 
 test_report_does_not_claim_unplanned_locks_are_reapable() {
