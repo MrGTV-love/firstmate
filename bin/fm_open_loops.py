@@ -1505,7 +1505,7 @@ def render_overdue(rows):
     return "\n".join(lines)
 
 
-def ledger_action(args, state, now):
+def ledger_action(args, state, now, batch=()):
     """Receipts and per-actor presentations share the ledger's short publication lock range."""
     try:
         report = read_ledger(state)
@@ -1600,7 +1600,7 @@ def ledger_action(args, state, now):
         print(render_overdue(rows) if rows else "OVERDUE: none")
         return 0
     if args.batch:
-        return record_batch(args.batch, state, now, report, waits, waits_error)
+        return record_batch(batch, state, now, report, waits, waits_error)
     message = record_action(args, state, now, report, waits, waits_error)
     print("action: " + json.dumps(args.row_id) + "\nkind: " + args.kind)
     if message:
@@ -1608,35 +1608,35 @@ def ledger_action(args, state, now):
     return 0
 
 
-def record_batch(path, state, now, report, waits, waits_error):
+def read_batch(path):
+    """The whole JSONL input as raw lines, read before any ledger lock so a slow producer never holds it."""
+    return (sys.stdin.buffer.read() if path == "-" else Path(path).read_bytes()).splitlines()
+
+
+def record_batch(lines, state, now, report, waits, waits_error):
     """JSONL input; each row commits independently under one lock and one cached backlog read."""
     defaults = dict(row_id=None, kind=None, evidence=None, recheck=None, hold=None,
                     prerequisite=None, prerequisite_task=None)
-    stream = sys.stdin if path == "-" else open(path)
     results = []
-    try:
-        for line, text in enumerate(stream, 1):
-            ident, kind = "", ""
-            try:
-                record = json.loads(text)
-                if not isinstance(record, dict) or set(record) - set(defaults):
-                    raise ValueError("batch row must be an action object with known fields only")
-                ident, kind = (value if isinstance(value, str) else ""
-                               for value in (record.get("row_id", ""), record.get("kind", "")))
-                if any(not isinstance(value, str) for value in record.values()):
-                    raise ValueError("batch action fields must be strings")
-                if not ident or kind not in ("steered", "merged", "escalated", "deferred", "waiting"):
-                    raise ValueError("row_id and a valid action kind are required")
-                if record.get("prerequisite") and record.get("prerequisite_task"):
-                    raise ValueError("select only one prerequisite option")
-                args = argparse.Namespace(**(defaults | record))
-                message = record_action(args, state, now, report, waits, waits_error)
-                results.append((line, ident, kind, "recorded", message))
-            except SOURCE_ERRORS as error:
-                results.append((line, ident, kind, "refused", str(error)))
-    finally:
-        if stream is not sys.stdin:
-            stream.close()
+    for line, text in enumerate(lines, 1):
+        ident, kind = "", ""
+        try:
+            record = json.loads(text.decode())
+            if not isinstance(record, dict) or set(record) - set(defaults):
+                raise ValueError("batch row must be an action object with known fields only")
+            ident, kind = (value if isinstance(value, str) else ""
+                           for value in (record.get("row_id", ""), record.get("kind", "")))
+            if any(not isinstance(value, str) for value in record.values()):
+                raise ValueError("batch action fields must be strings")
+            if not ident or kind not in ("steered", "merged", "escalated", "deferred", "waiting"):
+                raise ValueError("row_id and a valid action kind are required")
+            if record.get("prerequisite") and record.get("prerequisite_task"):
+                raise ValueError("select only one prerequisite option")
+            args = argparse.Namespace(**(defaults | record))
+            message = record_action(args, state, now, report, waits, waits_error)
+            results.append((line, ident, kind, "recorded", message))
+        except SOURCE_ERRORS as error:
+            results.append((line, ident, kind, "refused", str(error)))
     print(f"results[{len(results)}]{{line,id,kind,result,message}}:")
     for result in results:
         print("  " + ",".join(json.dumps(value) for value in result))
@@ -1809,6 +1809,7 @@ def main():
         return 1
     home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_ROOT_OVERRIDE") or BIN.parent).resolve()
     try:
+        batch = read_batch(args.batch) if args.command == "action" and args.batch else ()
         lock_dir = Path(os.environ.get("FM_STATE_OVERRIDE") or home / "state").resolve()
         lock_dir.mkdir(parents=True, exist_ok=True)
         lock_fd = os.open(lock_dir / ".open-loops.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -1817,7 +1818,7 @@ def main():
             # Byte 0 excludes concurrent collections; byte 1 serializes only
             # atomic publication and receipts on the same existing lock file.
             fcntl.lockf(lock_fd, fcntl.LOCK_EX, 1, 1)
-            return ledger_action(args, lock_dir, now)
+            return ledger_action(args, lock_dir, now, batch)
         try:
             fcntl.lockf(lock_fd, fcntl.LOCK_EX | (fcntl.LOCK_NB if args.heartbeat else 0), 1, 0)
         except (BlockingIOError, PermissionError):

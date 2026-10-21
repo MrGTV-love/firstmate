@@ -3126,13 +3126,16 @@ drain_cli = code / 'bin/fm-wake-drain.sh'
 def publish(items):
     ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now,
                                      home=str(home), complete=True, rows=items)))
-def call(binary, *args, good=True, input_text=None):
+def environment():
     env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home),
                FM_OPEN_LOOPS_NOW=str(clock), FM_TEST_SEAM='1', FM_TEST_HARNESS='codex',
                FM_SUPERVISION_ACTOR='main', FM_DURATION_FILE='off')
     for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
         env.pop(key, None)
-    result = subprocess.run([str(binary), *map(str,args)], env=env, text=True, capture_output=True, input=input_text)
+    return env
+def call(binary, *args, good=True, input_text=None):
+    result = subprocess.run([str(binary), *map(str,args)], env=environment(), text=True, capture_output=True,
+                            input=input_text)
     if good:
         assert result.returncode == 0, (args, result.stdout, result.stderr)
     return result
@@ -3420,6 +3423,44 @@ try:
     ack(boundary)
     assert not (home / 'state/.open-loops.lock').exists(), 'acknowledgement without a ledger must not touch it'
     print('PASS: a home without a ledger acknowledges without the receipt command', flush=True)
+
+    # A batch waiting on a slow producer holds no ledger lock: --report can feed the very batch it is piped into.
+    home = world / 'home'
+    fifo = home / 'actions.fifo'
+    os.mkfifo(fifo)
+    for source in ('stdin', 'file'):
+        publish(rows[:3])
+        _, boundary = drain()
+        command = [str(loops), 'action', '--batch', '-' if source == 'stdin' else str(fifo)]
+        with subprocess.Popen(command, env=environment(), text=True, stdin=subprocess.PIPE if source == 'stdin'
+                              else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as batcher:
+            time.sleep(1.5)
+            try:
+                report = subprocess.run([str(loops), '--report'], env=environment(), text=True,
+                                        capture_output=True, timeout=30)
+            except subprocess.TimeoutExpired:
+                if source == 'file':
+                    open(fifo, 'w').close()
+                raise AssertionError(f'a batch waiting on {source} must not hold the ledger lock')
+            ids = re.findall(r'^  "(row-\d+)"', report.stdout, re.M)
+            assert ids == ['row-0', 'row-1', 'row-2'], report
+            lines = ''.join(json.dumps(dict(row_id=ident, kind='escalated', evidence='reported decision')) + '\n'
+                            for ident in ids[:2])
+            if source == 'stdin':
+                out, err = batcher.communicate(lines, timeout=60)
+            else:
+                with open(fifo, 'w') as sink:
+                    sink.write(lines)
+                out, err = batcher.communicate(timeout=60)
+        assert batcher.returncode == 0 and out.count('"recorded"') == 2, (source, out, err)
+        assert set(stored()['handling']['actions']) == {'row-0', 'row-1'}, source
+        missing = call(loops, '--check-actions', good=False)
+        assert missing.returncode == 1 and 'row-2' in missing.stdout, (source, 'an unactioned row stays gated')
+        assert ack(boundary, good=False).returncode == 1, source
+        act('row-2')
+        call(loops, '--check-actions')
+        ack(boundary)
+    print('PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated', flush=True)
 finally:
     shutil.rmtree(world)
 PY
