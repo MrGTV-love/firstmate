@@ -1,0 +1,3 @@
+fm-launch-proof exit=0 seconds=19
+fm-control-reassociate exit=0 seconds=385
+fm-omp-harness exit=124 seconds=600

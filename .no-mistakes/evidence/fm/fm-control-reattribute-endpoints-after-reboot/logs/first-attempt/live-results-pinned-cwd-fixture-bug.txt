@@ -1,0 +1,26 @@
+NOTE  primary omp pid 6545 comm=omp in pane w2:p1
+NOTE  == main worker task: restored omp, no launch pin, dead-pid stale record ==
+NOTE  main: live pid 9089, Herdr registration for pane w1:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.vShuRZ/native-worker-session.jsonl
+PASS  S1 before adopt: interrupt on the restored, record-stale omp task is refused (rc=1)
+PASS  S2a adopt from a shell that is not the lock-owning primary is refused; record unchanged
+PASS  S2b adopt with FM_TASK_ID set (a worker) is refused; record unchanged
+PASS  S3a second task claiming the same pane: adopt refused naming the unique-claim proof; record unchanged
+PASS  S3b another task recording the same worktree: adopt refused naming the unique-deepest-match proof; record unchanged
+PASS  S3c record spawn_gen differs from metadata: adopt refused naming the generation proof; nothing fabricated
+NOTE  == pinned workers (adversarial) ==
+NOTE  pinned: live pid 17514, Herdr registration for pane w3:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.vShuRZ/native-pinned-session.jsonl
+FAIL  S4a matching pin refused :: rc=1 out=adopt refused: workspace proof needs the foreground cwd inside this task's recorded worktree
+NOTE  otherpin: live pid 20263, Herdr registration for pane w4:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.vShuRZ/native-otherpin-session.jsonl
+PASS  S4b real omp pinned to ANOTHER generation: adopt refused naming the generation proof; record unchanged
+NOTE  == happy path on the main task ==
+NOTE  adopt output: rc=0 adopted: reboot-fm-omp-reboot.vShuRZ
+PASS  S5 adopt by the real lock-owning primary rewrote the record to the live pid 9089 and live session file, same spawn_gen
+PASS  S5b adopt sent no input to the worker pane (screen byte-identical)
+PASS  S5c no staged or captured record files left behind
+PASS  S6a launch-proof verdict for the repaired task is managed (was unmanaged before)
+PASS  S6b fm-control interrupt on the previously refused omp task is delivered after adopt, no human keystroke: interrupt-delivered reboot-fm-omp-reboot.vShuRZ harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+PASS  S6c the worker omp is still alive after interrupt (adopt/interrupt never exit it)
+PASS  S7 repeat adopt on the repaired record is refused (recorded PID is live); record byte-identical
+PASS  S8 after another task records the same worktree, the repaired record no longer authorizes interrupt (rc=1)
+PASS  S9 reboot-fm-omp-reboot.vShuRZ-pinned (stale record, pinned worker, not adopted) stays refused for interrupt
+PASS  S9 reboot-fm-omp-reboot.vShuRZ-otherpin (stale record, pinned worker, not adopted) stays refused for interrupt

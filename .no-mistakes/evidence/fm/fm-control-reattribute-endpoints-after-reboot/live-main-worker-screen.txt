@@ -1,0 +1,31 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.12.4
+
+                       Tip: Bulk data to classify or triage? Say `jevify` in your message — the
+                         eval kernel's `judge()` processes the batch and you read only what it
+                                           flags — watch it glow as you type
+
+
+ FIRSTMATE_OP: v1 launch-brief: # Task
+
+ Captain's intent
+
+ This is an isolated lifecycle verification, not a project implementation.
+ Leave this isolated lifecycle fixture idle; no implementation is requested.
+
+ Firstmate spec
+
+ Do not inspect or modify files, delegate, supervise, or run any tools.
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.12.5 is available. Run: omp update
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ⬢ GPT-4.1 > 🌳 proj/wt > ⑂ reboot-fm-omp-reboot.Efi3pp ?1 ▶─0.7%─────────────────────────────────╎┃──────1M───╮
+╰─                                                                                                                   ─╯

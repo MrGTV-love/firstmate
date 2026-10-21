@@ -1,0 +1,36 @@
+installed omp integration to /Users/charlesabrooker/tmp/fm-omp-reboot.Efi3pp/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+NOTE  primary omp pid 84068 comm=omp in pane w2:p1
+NOTE  == main worker task: restored omp, no launch pin, dead-pid stale record ==
+NOTE  main: live pid 88057, Herdr registration for pane w1:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.Efi3pp/native-worker-session.jsonl
+PASS  S1 before adopt: interrupt on the restored, record-stale omp task is refused (rc=1)
+PASS  S2a adopt from a shell that is not the lock-owning primary is refused; record unchanged
+PASS  S2b adopt with FM_TASK_ID set (a worker) is refused; record unchanged
+PASS  S3a second task claiming the same pane: adopt refused naming the unique-claim proof; record unchanged
+PASS  S3b another task recording the same worktree: adopt refused naming the unique-deepest-match proof; record unchanged
+PASS  S3c record spawn_gen differs from metadata: adopt refused naming the generation proof; nothing fabricated
+NOTE  == pinned workers (adversarial) ==
+NOTE  pinned: live pid 99037, Herdr registration for pane w3:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.Efi3pp/native-pinned-session.jsonl
+PASS  S4a real omp carrying the MATCHING launch pin: adopt refused before capture (launch-pin proof); no staged/captured file; record unchanged
+NOTE  otherpin: live pid 3531, Herdr registration for pane w4:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.Efi3pp/native-otherpin-session.jsonl
+PASS  S4b real omp pinned to ANOTHER generation: adopt refused naming the generation proof; record unchanged
+NOTE  == happy path on the main task ==
+NOTE  adopt output: rc=0 adopted: reboot-fm-omp-reboot.Efi3pp
+PASS  S5 adopt by the real lock-owning primary rewrote the record to the live pid 88057 and live session file, same spawn_gen
+PASS  S5b adopt sent no input to the worker pane (screen identical apart from omp's own update banner; session file unchanged)
+PASS  S5c no staged or captured record files left behind
+PASS  S6a launch-proof verdict for the repaired task is managed (was unmanaged before)
+PASS  S6b fm-control interrupt on the previously refused omp task is delivered after adopt, no human keystroke: interrupt-delivered reboot-fm-omp-reboot.Efi3pp harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+PASS  S6c the worker omp is still alive after interrupt (adopt/interrupt never exit it)
+PASS  S7 repeat adopt on the repaired record is refused (recorded PID is live); record byte-identical
+PASS  S8 after another task records the same worktree, the repaired record no longer authorizes interrupt (rc=1)
+PASS  S9 reboot-fm-omp-reboot.Efi3pp-pinned (stale record, pinned worker, not adopted) stays refused for interrupt
+PASS  S9 reboot-fm-omp-reboot.Efi3pp-otherpin (stale record, pinned worker, not adopted) stays refused for interrupt
+Herdr lab runtime: {"client":{"version":"0.9.1","channel":"stable","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"remote_host_bridge":true,"remote_bridge_idle_timeout":true,"binary":"/Users/charlesabrooker/.local/bin/herdr","session":"fm-lab-omp-adopt-82336-8321"},"server":{"status":"running","running":true,"version":"0.9.1","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-adopt-82336-8321/herdr.sock","session":"fm-lab-omp-adopt-82336-8321","restart_needed":false,"server_binary_stale":false},"update":{"restart_needed":false,"server_binary_stale":false}}
+ok - live adopt scenarios all passed
+guarded teardown completed for session 'fm-lab-omp-adopt-82336-8321'; waiting for native child exit
+native child exit confirmed: pid=84068 start=Wed Oct 21 08:00:01 2026    
+native child exit confirmed: pid=88057 start=Wed Oct 21 08:00:04 2026    
+native child exit confirmed: pid=99037 start=Wed Oct 21 08:00:10 2026    
+native child exit confirmed: pid=3531 start=Wed Oct 21 08:00:13 2026    
+private fixture tree removed: /Users/charlesabrooker/tmp/fm-omp-reboot.Efi3pp
+driver exit=0

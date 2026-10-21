@@ -1,0 +1,36 @@
+installed omp integration to /Users/charlesabrooker/tmp/fm-omp-reboot.QuU7ry/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+NOTE  primary omp pid 35065 comm=omp in pane w2:p1
+NOTE  == main worker task: restored omp, no launch pin, dead-pid stale record ==
+NOTE  main: live pid 37350, Herdr registration for pane w1:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.QuU7ry/native-worker-session.jsonl
+PASS  S1 before adopt: interrupt on the restored, record-stale omp task is refused (rc=1)
+PASS  S2a adopt from a shell that is not the lock-owning primary is refused; record unchanged
+PASS  S2b adopt with FM_TASK_ID set (a worker) is refused; record unchanged
+FAIL  S3a duplicate pane refused :: rc=1 out=adopt refused: endpoint proof needs the recorded pane to exist and be readable
+FAIL  S3b shared worktree refused :: rc=1 out=adopt refused: endpoint proof needs the recorded pane to exist and be readable
+FAIL  S3c generation mismatch refused :: rc=1 out=adopt refused: endpoint proof needs the recorded pane to exist and be readable
+NOTE  == pinned workers (adversarial) ==
+NOTE  pinned: live pid 42957, Herdr registration for pane w3:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.QuU7ry/native-pinned-session.jsonl
+FAIL  S4a matching pin refused :: rc=1 out=adopt refused: endpoint proof needs the recorded pane to exist and be readable
+NOTE  otherpin: live pid 45846, Herdr registration for pane w4:p1 = omp	/Users/charlesabrooker/tmp/fm-omp-reboot.QuU7ry/native-otherpin-session.jsonl
+FAIL  S4b other-generation pin refused :: rc=1 out=adopt refused: endpoint proof needs the recorded pane to exist and be readable
+NOTE  == happy path on the main task ==
+NOTE  adopt output: rc=1 adopt refused: endpoint proof needs the recorded pane to exist and be readable
+FAIL  S5 adopt succeeds with the live values :: rc=1 out=adopt refused: endpoint proof needs the recorded pane to exist and be readable record={"version":1,"spawn_gen":"reboot-native","pid":2000000001,"task_session_file":"/Users/charlesabrooker/tmp/fm-omp-reboot.QuU7ry/native-worker-session.jsonl","current_session_file":""}
+PASS  S5b adopt sent no input to the worker pane (screen byte-identical)
+PASS  S5c no staged or captured record files left behind
+FAIL  S6a verdict managed :: verdict=unmanaged
+FAIL  S6b interrupt delivered :: rc=1 out=error: task reboot-fm-omp-reboot.QuU7ry cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+PASS  S6c the worker omp is still alive after interrupt (adopt/interrupt never exit it)
+FAIL  S7 repeat adopt refused :: rc=1 out=adopt refused: endpoint proof needs the recorded pane to exist and be readable
+PASS  S8 after another task records the same worktree, the repaired record no longer authorizes interrupt (rc=1)
+PASS  S9 reboot-fm-omp-reboot.QuU7ry-pinned (stale record, pinned worker, not adopted) stays refused for interrupt
+PASS  S9 reboot-fm-omp-reboot.QuU7ry-otherpin (stale record, pinned worker, not adopted) stays refused for interrupt
+Herdr lab runtime: {"client":{"version":"0.9.1","channel":"stable","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"remote_host_bridge":true,"remote_bridge_idle_timeout":true,"binary":"/Users/charlesabrooker/.local/bin/herdr","session":"fm-lab-omp-adopt-33829-26225"},"server":{"status":"running","running":true,"version":"0.9.1","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-adopt-33829-26225/herdr.sock","session":"fm-lab-omp-adopt-33829-26225","restart_needed":false,"server_binary_stale":false},"update":{"restart_needed":false,"server_binary_stale":false}}
+not ok - live adopt scenarios had failures (see /Users/charlesabrooker/.no-mistakes/evidence/01M5F7QXCMDY8X746T2JDG381G/live-results.txt)
+guarded teardown completed for session 'fm-lab-omp-adopt-33829-26225'; waiting for native child exit
+native child exit confirmed: pid=35065 start=Wed Oct 21 07:54:40 2026    
+native child exit confirmed: pid=37350 start=Wed Oct 21 07:54:43 2026    
+native child exit confirmed: pid=42957 start=Wed Oct 21 07:54:48 2026    
+native child exit confirmed: pid=45846 start=Wed Oct 21 07:54:51 2026    
+private fixture tree removed: /Users/charlesabrooker/tmp/fm-omp-reboot.QuU7ry
+driver exit=1

@@ -1,0 +1,15 @@
+test_omp_adoption_ambiguous_foreground exit=0 seconds=10
+test_omp_adoption_matching_workspace exit=0 seconds=12
+test_omp_adoption_foreign_workspace exit=0 seconds=14
+test_omp_adoption_unproven_same_pid exit=0 seconds=10
+test_omp_adoption_non_agent_process exit=0 seconds=10
+test_omp_adoption_current_session_contradiction exit=0 seconds=27
+test_omp_adoption_unreadable_environment exit=0 seconds=15
+test_omp_adoption_generation_mismatch exit=0 seconds=33
+test_omp_adoption_duplicate_pane exit=0 seconds=34
+test_omp_adoption_live_recorded_pid exit=0 seconds=10
+test_omp_adoption_other_generation_pin exit=0 seconds=21
+test_omp_adoption_unreadable_personal_session_anchor exit=0 seconds=10
+test_omp_adoption_caller_gate exit=0 seconds=28
+test_omp_adoption_personal_session_anchor exit=0 seconds=22
+test_omp_adoption_proof_boundaries exit=0 seconds=32
