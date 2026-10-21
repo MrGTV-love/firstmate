@@ -421,6 +421,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "docs/review-rubric.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": "docs/captain-hold-lifecycle.md",
       "audience": "maintainer-architecture"
     },
