@@ -149,6 +149,25 @@ wait_for() {  # <file> [tries]
   return 1
 }
 
+# The runner writes its marker twice at startup, each time truncating before it
+# writes the same PID, so a file that is merely nonempty can be empty again by
+# the time it is read. Validate the value actually read: only a complete numeric
+# line is a PID, and anything else keeps polling and ends in a nonzero status
+# with nothing printed, never an empty PID for the caller to use.
+runner_pid() {  # <runner-marker> [tries]
+  local f=$1 n=${2:-100} pid
+  for _ in $(seq 1 "$n"); do
+    if IFS= read -r pid 2>/dev/null < "$f"; then
+      case $pid in
+        ''|*[!0-9]*) ;;
+        *) printf '%s\n' "$pid"; return 0 ;;
+      esac
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
 # Arm now starts the listener, so a later start would poll again. Wait for the
 # capture that listener is already producing, and for its runner to release the
 # claim: the result lands before the runner publishes and exits, and a retire or
@@ -5160,9 +5179,8 @@ pe_register "$HRECREATED" lavish recreated-src -- \
 FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HRECREATED" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HRECREATED"
-wait_for "$HRECREATED/state/procevent/recreated-src.runner" \
+RECREATED_RUNNER_PID=$(runner_pid "$HRECREATED/state/procevent/recreated-src.runner") \
   || fail "the recreated-path fixture never launched its source"
-RECREATED_RUNNER_PID=$(cat "$HRECREATED/state/procevent/recreated-src.runner")
 mv "$HRECREATED/state" "$TMP_ROOT/recreated-owner-old-state"
 pe_register "$HRECREATED" lavish recreated-src -- \
   "$BLOCKER" "$RECREATED_TRIGGER" "replacement payload" >/dev/null \
@@ -5258,9 +5276,8 @@ FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 FM_HOME="$
     "$ROOT/bin/fm-procevent.sh" start detached-attached-src \
     > "$TMP_ROOT/detached-attached.out" 2>&1 &
 DETACHED_START_PID=$!
-wait_for "$HDETACHED/state/procevent/detached-attached-src.runner" \
+DETACHED_RUNNER_PID=$(runner_pid "$HDETACHED/state/procevent/detached-attached-src.runner") \
   || fail "the detachable foreground start never launched its source"
-DETACHED_RUNNER_PID=$(cat "$HDETACHED/state/procevent/detached-attached-src.runner")
 kill "$DETACHED_START_PID"
 wait "$DETACHED_START_PID" 2>/dev/null || true
 detached_deadline=$((SECONDS + 8))
@@ -5296,9 +5313,8 @@ PATH="$REUSED_GROUP_BIN:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-reused-group-
   FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HREUSED_GROUP" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HREUSED_GROUP"
-wait_for "$HREUSED_GROUP/state/procevent/reused-runner-group-src.runner" \
+REUSED_GROUP_RUNNER=$(runner_pid "$HREUSED_GROUP/state/procevent/reused-runner-group-src.runner") \
   || fail "the reused-group fixture runner did not start"
-REUSED_GROUP_RUNNER=$(cat "$HREUSED_GROUP/state/procevent/reused-runner-group-src.runner")
 touch "$REUSED_GROUP_MARKER"
 sleep 3
 kill -0 -"$REUSED_GROUP_RUNNER" 2>/dev/null \
@@ -5448,14 +5464,12 @@ orphan_pe "$HORPHAN" reconcile >/dev/null \
 orphan_pe "$HKEEP" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HKEEP"
 
-wait_for "$HORPHAN/state/procevent/orphan-src.runner" \
+ORPHAN_PID=$(runner_pid "$HORPHAN/state/procevent/orphan-src.runner") \
   || fail "the dead-owner listener never recorded its runner"
-wait_for "$HKEEP/state/procevent/keep-src.runner" \
+KEEP_PID=$(runner_pid "$HKEEP/state/procevent/keep-src.runner") \
   || fail "the live-owner listener never recorded its runner"
 wait_for "$TMP_ROOT/orphan-dead.descendant" \
   || fail "the dead-owner listener's child never spawned its own descendant"
-ORPHAN_PID=$(cat "$HORPHAN/state/procevent/orphan-src.runner")
-KEEP_PID=$(cat "$HKEEP/state/procevent/keep-src.runner")
 ORPHAN_DESCENDANT=$(cat "$TMP_ROOT/orphan-dead.descendant")
 
 # The reproduction condition itself: the listener is already an orphan in the
@@ -5577,9 +5591,8 @@ retry_pe register lavish retry-src -- "$ORPHAN_STUB" "$TMP_ROOT/stop-retry-marke
   || fail "fixture step failed: register retry-src"
 retry_pe reconcile >/dev/null \
   || fail "fixture step failed: reconcile retry_pe"
-wait_for "$RETRY_HOME/state/procevent/retry-src.runner" \
+RETRY_PID=$(runner_pid "$RETRY_HOME/state/procevent/retry-src.runner") \
   || fail "the retry listener never recorded its runner"
-RETRY_PID=$(cat "$RETRY_HOME/state/procevent/retry-src.runner")
 # Armed only now: the runner already proved its own process group at startup,
 # and arming earlier would fail that assertion instead of the stop under test.
 printf '%s\n' "$RETRY_PID" > "$RETRY_STATE/target"
@@ -5687,9 +5700,8 @@ PL
       pe "$HPROOF" start proof-src >"$HPROOF/start.log" 2>&1 &
   fi
   PROOF_START=$!
-  wait_for "$HPROOF/state/procevent/proof-src.runner" \
+  PROOF_PID=$(runner_pid "$HPROOF/state/procevent/proof-src.runner") \
     || fail "the signal-proof listener never recorded its runner"
-  PROOF_PID=$(cat "$HPROOF/state/procevent/proof-src.runner")
   wait_for "$PROOF_MARKER.child" || fail "the signal-proof child never started"
   PROOF_CHILD=$(cat "$PROOF_MARKER.child")
   [ "$(ps -o ppid= -p "$PROOF_CHILD" | tr -d '[:space:]')" = "$PROOF_PID" ] \
@@ -5758,7 +5770,8 @@ until [ -s "$HPGUARD/state/procevent/proof-guard-src.runner" ] \
   orphan_pe "$HPGUARD" reconcile >/dev/null 2>&1 || true
   sleep 0.25
 done
-GUARD_PID=$(cat "$HPGUARD/state/procevent/proof-guard-src.runner")
+GUARD_PID=$(runner_pid "$HPGUARD/state/procevent/proof-guard-src.runner") \
+  || fail "the guarded signal-proof listener never recorded its runner"
 GUARD_CHILD=$(cat "$TMP_ROOT/proof-guard.child")
 
 # Nothing refreshes this home's lease from here on, which is the whole input.
@@ -5884,11 +5897,10 @@ bound_pe register lavish bound-src -- "$QUIET_STUB" "$TMP_ROOT/guard-bound-marke
   || fail "fixture step failed: register bound-src"
 bound_pe reconcile >/dev/null \
   || fail "fixture step failed: reconcile bound_pe"
-wait_for "$HBOUND/state/procevent/bound-src.runner" \
+BOUND_PID=$(runner_pid "$HBOUND/state/procevent/bound-src.runner") \
   || fail "the bound fixture's listener never recorded its runner"
 wait_for "$TMP_ROOT/guard-bound-marker.descendant" \
   || fail "the bound fixture's listener never spawned its descendant"
-BOUND_PID=$(cat "$HBOUND/state/procevent/bound-src.runner")
 BOUND_DESCENDANT=$(cat "$TMP_ROOT/guard-bound-marker.descendant")
 # Elapsed is measured from the refresh the guard itself reads, not from a
 # wall-clock moment near it, so the fixture's own startup cost cannot be
@@ -6068,12 +6080,10 @@ debounce_pe register lavish debounce-src -- "$QUIET_STUB" "$TMP_ROOT/lease-debou
   || fail "fixture step failed: register debounce-src"
 debounce_pe reconcile >/dev/null \
   || fail "fixture step failed: reconcile debounce_pe"
-# The source starts after both startup writes to the runner marker. Reading
-# immediately after its first nonempty publication can race the second write's
-# truncation and capture an empty PID even though the runner stays alive.
 wait_for "$TMP_ROOT/lease-debounce-marker.descendant" \
   || fail "the debounce fixture's source never started"
-DEBOUNCE_PID=$(cat "$DEBOUNCE_HOME/state/procevent/debounce-src.runner")
+DEBOUNCE_PID=$(runner_pid "$DEBOUNCE_HOME/state/procevent/debounce-src.runner") \
+  || fail "the debounce fixture's listener never recorded its runner"
 # Armed only now. The guard proves the lease once before it reports ready, and
 # failing THAT read would refuse the runner outright instead of exercising the
 # debounce this case is about.
@@ -6104,9 +6114,8 @@ pe_register "$HPROMPT" lavish prompt-src -- "$QUIET_STUB" "$TMP_ROOT/prompt-stop
   || fail "fixture step failed: register prompt-src"
 pe "$HPROMPT" start prompt-src >"$TMP_ROOT/prompt-start.log" 2>&1 &
 PROMPT_START_PID=$!
-wait_for "$HPROMPT/state/procevent/prompt-src.runner" \
+PROMPT_PID=$(runner_pid "$HPROMPT/state/procevent/prompt-src.runner") \
   || fail "the promptly-stopping listener never recorded its runner"
-PROMPT_PID=$(cat "$HPROMPT/state/procevent/prompt-src.runner")
 wait_for "$TMP_ROOT/prompt-stop.descendant" \
   || fail "the promptly-stopping listener's child never spawned its own descendant"
 stop_window_ms() {
@@ -6143,9 +6152,8 @@ pe_register "$HCRASH" lavish crash-src -- "$QUIET_STUB" "$TMP_ROOT/crash-leader"
   || fail "fixture step failed: register crash-src"
 pe "$HCRASH" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HCRASH"
-wait_for "$HCRASH/state/procevent/crash-src.runner" \
+CRASH_PID=$(runner_pid "$HCRASH/state/procevent/crash-src.runner") \
   || fail "the crash-fixture listener never recorded its runner"
-CRASH_PID=$(cat "$HCRASH/state/procevent/crash-src.runner")
 wait_for "$TMP_ROOT/crash-leader.descendant" \
   || fail "the crash-fixture listener's child never spawned its own descendant"
 kill -KILL "$CRASH_PID" 2>/dev/null || fail "the crash fixture could not stop its own leader"
