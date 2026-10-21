@@ -5,7 +5,7 @@
 #
 # Usage:
 #   fm-copy-sweep.sh                report every nested copy; change nothing
-#   fm-copy-sweep.sh --apply        also remove the REAPABLE-PROVEN copies
+#   fm-copy-sweep.sh --apply        also remove proven copies through their supported route
 #   fm-copy-sweep.sh check          the watcher's periodic entry (report only)
 #   fm-copy-sweep.sh arm            bind `check` to the existing watcher cadence
 #   fm-copy-sweep.sh disarm         remove that binding and the record (budgets and live copies)
@@ -28,7 +28,7 @@
 #                      is no worktree root of that clone, or its git or lock state
 #                      cannot be read. Never touched; `git worktree prune` and
 #                      the owner are the repair.
-#   HELD-LOCKED        a worktree lock holds it and this sweep may not remove it.
+#   HELD-LOCKED        a worktree lock or driver-retention receipt protects it.
 #                      A lock that is not Vernant's exact creation-lock format,
 #                      or whose launcher may still be alive, stays here, as does
 #                      a Vernant-locked copy whose clone has no closeout driver
@@ -36,7 +36,8 @@
 #                      the only supported release and this sweep never unlocks
 #                      by hand. A REAPABLE-DRIVER copy whose driver plan refuses
 #                      it in --apply joins this class, with the driver's own
-#                      reason as its reason.
+#                      reason as its reason. A prior execute's receipt protects
+#                      even a copy the driver unlocked but could not remove.
 #   HELD-LIVE-TASK     an active task record in any local home names it (or a
 #                      path inside or around it, except a registered secondmate's
 #                      own home chain), a process has its working directory
@@ -68,16 +69,16 @@
 #                      inside, every local commit reachable from HEAD contained
 #                      in a remote branch (the content-in-default fallback does
 #                      not apply to a locked copy), plus Vernant's exact
-#                      creation lock whose launcher pid is gone or recycled.
-#                      The launcher test is bin/fm-teardown-nested-lib.sh's own
-#                      teardown_lock_launcher_may_be_live: a pid that started
-#                      after the lock file was written is recycled and owns
-#                      nothing, and a pid that started before it, still alive, is
-#                      the lock's launcher and keeps the copy locked. Only
-#                      Vernant's closeout driver releases it, and --apply first
-#                      asks that driver for its plan.
-# HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
-# `git worktree remove`, so calling it live or orphaned would mislead.
+#                      creation lock whose launcher pid is not running. A live
+#                      pid always holds the copy, including a recycled pid;
+#                      its start age and lock mtime are diagnostic only.
+#                      Only Vernant's closeout driver releases it, and --apply
+#                      first asks that driver for its plan.
+#   PENDING-DRIVER    report/check's name for that local-proof candidate:
+#                      the driver has not been asked, so removability is not
+#                      proved. Report/check never call the closeout driver.
+# HELD-LOCKED distinguishes lock/release custody from ordinary live ownership:
+# a retained execute cannot be bypassed merely because the lock is now absent.
 # Independently of class and byte budgets, one HELD-LIVE-TASK report line names
 # every nested copy on disk strictly inside a ship/scout record's current or prior
 # copy, where that copy is the registering clone itself (a pool slot) or lies
@@ -94,10 +95,14 @@
 # run. A copy with no live owning record is left to the existing reap path.
 #
 # --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
-# deepest path first, each re-proved just before its own removal. An unlocked
-# copy goes by a plain `git worktree remove` run from the parent clone. A locked
+# deepest path first, with at most max-removals attempts (default 10, configured
+# in config/copy-budget as an integer from 1 to 999999).
+# Every ownership, process, cleanliness and remote-content proof is re-read
+# after the driver plan and after preservation, immediately before execution;
+# HEAD and the complete lock's SHA-256 must still match what the plan saw.
+# An unlocked copy goes by a plain `git worktree remove` from the parent clone. A locked
 # one first gets the closeout driver's plan, run from that clone without
-# --execute-cleanup and before anything is copied or hashed. The plan must exit
+# --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
 # 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
 # boolean true, or is exactly the literal allowed=true. A non-zero exit, an empty,
 # malformed or verdictless answer, text that only mentions allowed=true, any other
@@ -108,27 +113,34 @@
 # process group of its own and the timeout kills that whole group, so neither the
 # driver nor anything it started outlives the sweep. A copy whose plan allows it
 # has its ignored entries preserved by the teardown library's own preservation,
-# its creation lock read again, and is then released and removed by the driver,
-# as bin/fm-teardown.sh does it. The preserved entries land in
-# data/copy-sweep/<run stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>,
-# so no later run or copy at the same path replaces them. Never a force flag,
-# never a recursive delete of a copy (the only recursive delete is the teardown
-# library's of its own staging directory under data/), never a hand unlock, never
-# a Treehouse call. A removal that fails after its plan was allowed, or that git
-# refuses, leaves the copy and is reported with the refusal text, and the run
-# exits 1; it is not retried in that run. The sweep prints that refusal itself,
-# as one REFUSED line: a preservation that fails ends in a human-only question, a
-# lock that is no longer Vernant's says the next run proves the copy again, and a
-# driver that refuses ends in the driver's own words. None names a completing
+# then released and removed by the driver as bin/fm-teardown.sh does it.
+# Preserved entries land in
+# data/copy-sweep/<run-stamp>-<HEAD>/nested-copy-preserved/<sha256 of the path>,
+# so a new copy at the same path and HEAD never replaces earlier preserved bytes.
+# Before executing the driver, a durable receipt under
+# data/copy-sweep/retained/<sha256 of the path> protects the copy from later
+# removal, even when the driver releases its lock but removal fails. Only a
+# successful, verified removal clears that receipt. Other receipts retain the
+# copy until its disposition is reconciled; the sweep never clears one to retry.
+# Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
+# the run exits 0 and later runs neither preserve nor execute that copy again.
+# Other execution failures exit 1, record the driver's text, and retain the copy.
+# Never a force flag, hand unlock, lock-file write, recursive deletion of a copy,
+# or Treehouse call. Only the preservation library cleans its own staging data.
+# The sweep prints its own REFUSED line: preservation failure ends in a human-only
+# question, changed proofs identify what no longer holds, and an execution refusal
+# ends in the driver's own words. None names a completing
 # command, because the release id is no teardown task id and bin/fm-teardown.sh
 # would reject a command built from it. Each REMOVED line reports "copy X GiB,
 # preserved Y GiB, net freed Z GiB" (the copy's size less the bytes it preserved;
-# a size that was not measured shows "-" and "unmeasured"), and the run ends with
-# one line "freed X GiB measured, N copies unmeasured". Each removal appends one
-# line to data/copy-sweep.log (append-only). An outer copy whose inner copy was
-# removed in the same run is removed by the next run; a second run otherwise
-# finds nothing left to remove. Report mode (no flag) reads the size cache and writes
-# nothing; `check` writes only the size cache and the record (budgets and live copies).
+# a size that was not measured shows "-" and "unmeasured"). One final accounting
+# line says "copies=<original total> GiB=<original measured total> reaped=<n>
+# freed=<measured net GiB>"; a separate sizes line discloses unmeasured copies,
+# so GiB/freed are lower bounds when sizing was skipped.
+# Each removal appends one line to data/copy-sweep.log (append-only).
+# An outer copy whose inner copy was removed in the same run is removed by the
+# next run. Report mode reads the cache and receipts and writes nothing;
+# `check` writes only the size cache and the record (budgets and live copies).
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
 # only hold a copy back, never release one.
@@ -274,6 +286,7 @@ DEFAULT_POOL_GIB=60
 DEFAULT_CONTAINER_GIB=20
 SCAN_INTERVAL=3600
 CACHE_MAX_AGE=86400
+MAX_REMOVALS=10
 POOL_BUDGETS=
 CONTAINER_BUDGETS=
 CONFIG_ERROR=
@@ -322,6 +335,9 @@ load_config() {
       cache-max-age)
         if [ -n "$a" ] && [ -z "$b" ] && valid_number "$a"; then CACHE_MAX_AGE=$a
         else CONFIG_ERROR="config/copy-budget line $n: cache-max-age wants whole seconds"; return 1; fi ;;
+      max-removals)
+        if [ -n "$a" ] && [ -z "$b" ] && [[ $a =~ ^[1-9][0-9]{0,5}$ ]]; then MAX_REMOVALS=$a
+        else CONFIG_ERROR="config/copy-budget line $n: max-removals wants an integer from 1 to 999999"; return 1; fi ;;
       pool)
         if [ -n "$a" ] && [ -n "$b" ] && valid_gib "$b"; then POOL_BUDGETS="$POOL_BUDGETS$a"$'\t'"$b"$'\n'
         else CONFIG_ERROR="config/copy-budget line $n: pool wants a pool name or path and a GiB value or off"; return 1; fi ;;
@@ -570,6 +586,49 @@ content_in_default() {  # <copy> <clone>
   [ "${merged_tree%%$'\n'*}" = "$default_tree" ]
 }
 
+# Read the whole lock, not just its first line. The only supported owner forms
+# are launcher:<same pid> and a UUID. One terminal newline is allowed; extra
+# lines, whitespace, owner text or a mismatched launcher owner are not Vernant's.
+sweep_vernant_lock_pid() {  # <lock-file>
+  local reason pid uuid='[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}'
+  reason=$(cat "$1" && printf '.') || return 1
+  reason=${reason%.}
+  reason=${reason%$'\n'}
+  # Bash cannot retain NUL bytes. Compare the original file before accepting
+  # its parsed text, so binary bytes cannot disappear into a valid lock reason.
+  if ! cmp -s "$1" <(printf '%s' "$reason") \
+    && ! cmp -s "$1" <(printf '%s\n' "$reason"); then
+    return 1
+  fi
+  pid=$(teardown_vernant_lock_pid "$reason") || return 1
+  if [ "$reason" != "vernant-session-active owner=launcher:$pid launcher=$pid" ] \
+    && ! [[ $reason =~ ^vernant-session-active\ owner=$uuid\ launcher=$pid$ ]]; then
+    return 1
+  fi
+  printf '%s\n' "$pid"
+}
+
+# A durable receipt is written before execute: the driver can remove a lock
+# and then fail to remove its copy, or the sweep can stop while it runs. Never
+# let a later run reinterpret that partially completed release as an unlocked
+# copy that is safe to remove. Report mode only reads these receipts.
+retained_receipt() {  # <copy>
+  local hash
+  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
+  printf '%s/%s/retained/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
+}
+
+record_driver_retention() {  # <copy> <reason>
+  local dest tmp
+  dest=$(retained_receipt "$1") || return 1
+  mkdir -p "${dest%/*}" || return 1
+  tmp=$(mktemp "${dest%/*}/.retained.XXXXXX") || return 1
+  if ! printf '%s\n' "$2" > "$tmp" || ! mv -- "$tmp" "$dest"; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
 # Sets CLASS and REASON for <copy>, registered by <clone> of <pool> and
 # <container>. A clone under a Firstmate home other than this one is judged as
 # that home would judge it.
@@ -603,21 +662,33 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="its HEAD cannot be resolved"
     return 0
   fi
+  pending=$(retained_receipt "$copy") || {
+    CLASS=HELD-LOCKED
+    REASON="its previous driver disposition cannot be checked"
+    return 0
+  }
+  if [ -e "$pending" ] || [ -L "$pending" ]; then
+    CLASS=HELD-LOCKED
+    REASON="driver retained this copy: $(cat "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
+    return 0
+  fi
   rc=0
   teardown_copy_lock_file "$copy" || rc=$?
   case "$rc" in
     0)
       CLASS=HELD-LOCKED
       REASON="worktree lock: ${TEARDOWN_FOREIGN_LOCK:-no reason given}"
-      if ! pid=$(teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK"); then
+      if ! pid=$(sweep_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK_FILE"); then
         REASON="$REASON (not the supported Vernant creation-lock format)"
         return 0
       fi
-      if teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
-        REASON="$REASON (launcher $pid is alive or its start cannot be proved)"
+      # The sweep never releases a lock naming a running pid, even when its
+      # start is newer than the lock. Teardown's recycled-pid policy is broader.
+      if ps -p "$pid" -o pid= >/dev/null 2>&1; then
+        REASON="$REASON (launcher $pid is alive; start age=$(teardown_pid_age_secs "$pid" || printf unknown)s; lock mtime=$(file_mtime "$TEARDOWN_FOREIGN_LOCK_FILE" || printf unknown))"
         return 0
       fi
-      REASON="$REASON (launcher $pid is gone or recycled; only Vernant's closeout driver releases it)"
+      REASON="$REASON (launcher $pid is gone; only Vernant's closeout driver releases it)"
       if [ ! -f "$clone/scripts/git-stability/closeout_pr.py" ] \
         || [ ! -x "${FM_TEARDOWN_VERNANT_PYTHON:-$clone/.venv/bin/python}" ]; then
         REASON="$REASON; closeout driver or interpreter unavailable"
@@ -718,6 +789,10 @@ classify() {  # <copy> <clone> <pool> <container>
     if [ "$locked" = 1 ]; then
       CLASS=REAPABLE-DRIVER
       REASON="clean, no process, no record, HEAD contained in a remote branch, Vernant launcher $launcher is gone"
+      if [ "$APPLY" != 1 ]; then
+        CLASS=PENDING-DRIVER
+        REASON="$REASON; driver verdict not checked in report mode, not yet proven removable"
+      fi
     else
       CLASS=REAPABLE-PROVEN
       REASON="clean, no process, no record, HEAD contained in a remote branch"
@@ -948,7 +1023,7 @@ stop_plan() {
 }
 
 # Asks Vernant's closeout driver, in plan mode, whether it would release <copy>,
-# before anything is copied or hashed. The copy stays unless the driver exits 0
+# before ignored payload is copied or hashed. The copy stays unless the driver exits 0
 # AND states allowed=true; a non-zero exit, silence, an unparsable verdict, or
 # no answer within the plan timeout (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by
 # default) all keep it, with PLAN_WHY holding the driver's own words. The plan
@@ -1000,17 +1075,37 @@ driver_plan_allows() {  # <clone> <copy>
   fi
 }
 
+# A driver plan and preservation can take time. Re-read every ownership,
+# liveness and content proof, and bind execution to exactly the HEAD and lock
+# bytes the plan saw. A changed valid Vernant lock is still a changed owner.
+release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha256>
+  local actual_head actual_lock
+  scan_processes
+  classify "$2" "$1" "$3" "$4"
+  if [ "$CLASS" != REAPABLE-DRIVER ]; then
+    echo "REFUSED: $2 is no longer proven after its plan: $CLASS, $REASON" >&2
+    return 1
+  fi
+  actual_head=$(git -C "$2" rev-parse HEAD 2>/dev/null) || return 1
+  actual_lock=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  if [ "$actual_head" != "$5" ] || [ "$actual_lock" != "$6" ]; then
+    echo "REFUSED: $2 changed HEAD or creation-lock bytes after its plan; it was not released." >&2
+    return 1
+  fi
+}
+
 # Preserves the ignored entries of a REAPABLE-DRIVER copy, then releases and
 # removes it through Vernant's own closeout driver, which is the only supported
 # release for its creation lock. The preservation lands under this sweep's data
-# directory in <release-id>, which holds the run stamp and the copy's HEAD, so a
-# later copy at the same path never replaces it. The teardown library owns the
-# preservation and the driver run; the refusals are the sweep's own, one REFUSED
-# line each on stderr, because the library's envelope names a teardown command
+# directory in <release-id>, keyed by run stamp and HEAD; the preservation helper
+# keys each copy by its path. Retained outcomes are never preserved again.
+# The library owns preservation and the driver run; the sweep prints its own
+# REFUSED line on stderr, because the library's envelope names a teardown command
 # built from the release id, which is no task id.
-teardown_driver_release() {  # <clone> <copy> <release-id>
+teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
   local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown
   shown=$(fm_refuse_text "$copy")
+  release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
   DATA=$DATA_DIR
   ID=$3
   teardown_preserve_ignored "$copy" || rc=$?
@@ -1020,16 +1115,19 @@ teardown_driver_release() {  # <clone> <copy> <release-id>
     echo "REFUSED: the ignored files of $shown could not be preserved in $DATA_DIR/$3/nested-copy-preserved; it was not removed. human-only-exit: Which owner-approved storage or disposition preserves them? The next sweep run tries again; no removal or forced cleanup is authorized." >&2
     return 1
   fi
-  rc=0
-  teardown_copy_lock_file "$copy" || rc=$?
-  if [ "$rc" != 0 ] || ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
-    echo "REFUSED: $shown is no longer locked by Vernant's exact creation lock; it was not removed. The next sweep run proves it again." >&2
+  release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
+  record_driver_retention "$copy" "driver release incomplete; the copy remains protected even if its lock was released" || {
+    echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
     return 1
-  fi
+  }
   rc=0
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
+    record_driver_retention "$copy" "exit $rc: $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" || true
     echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
+    if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_OUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
+      return 3
+    fi
     return 1
   fi
 }
@@ -1043,8 +1141,9 @@ teardown_driver_release() {  # <clone> <copy> <release-id>
 # leaves the copy and is reported, never retried harder.
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
-  local release_id preserve_dir preserved net
+  local release_id preserve_dir preserved net release_rc receipt lock_hash attempts=0
   stamp=$(date -u +%Y%m%dT%H%M%SZ).$$
+  read -r SCANNED_COUNT SCANNED_KIB SCANNED_UNMEASURED <<< "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++; if ($6 == "-") u++; else k += $6 } END { printf "%d %.0f %d\n", n, k, u }')"
   REMOVAL_REPORT=
   REMOVED_COUNT=0
   FAILED_COUNT=0
@@ -1053,6 +1152,10 @@ apply_removals() {
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"
+    if [ "$attempts" -ge "$MAX_REMOVALS" ]; then
+      REMOVAL_REPORT="${REMOVAL_REPORT}LIMIT"$'\t'"max-removals=$MAX_REMOVALS reached; remaining copies stay for the next run"$'\n'
+      break
+    fi
     scan_processes
     classify "$copy" "$clone" "$pool" "$container"
     case "$CLASS" in
@@ -1067,30 +1170,54 @@ apply_removals() {
     branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=detached
     preserve_dir=
     if [ "$CLASS" = REAPABLE-DRIVER ]; then
-      # The copy is Vernant-locked with a dead or recycled launcher. Its own
+      # The copy is Vernant-locked with a launcher pid that is not running. Its
       # driver is the only supported release: it unlocks and removes, after the
       # teardown library preserved every ignored entry it holds.
+      lock_hash=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || {
+        held="$held$copy"$'\t'"its creation-lock bytes could not be hashed"$'\n'
+        continue
+      }
       if ! driver_plan_allows "$clone" "$copy"; then
         held="$held$copy"$'\t'"$PLAN_WHY"$'\n'
         continue
       fi
       release_id="$CHECK_ID/$stamp-$head"
-      preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved"
-      if ! err=$(teardown_driver_release "$clone" "$copy" "$release_id" 2>&1); then
+      receipt=$(retained_receipt "$copy") || {
+        held="$held$copy"$'\t'"its preservation identity could not be hashed"$'\n'
+        continue
+      }
+      preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved/${receipt##*/}"
+      attempts=$((attempts + 1))
+      release_rc=0
+      err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
+      if [ "$release_rc" = 3 ]; then
+        held="$held$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
+        REMOVAL_REPORT="${REMOVAL_REPORT}KEPT"$'\t'"$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
+        continue
+      fi
+      if [ "$release_rc" != 0 ]; then
         FAILED_COUNT=$((FAILED_COUNT + 1))
         refusal=$(printf '%s\n' "$err" | sed -n '/^REFUSED:/,$p')
         REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"the copy was left: $(printf '%s' "${refusal:-$err}" | tr '\n\t' '  ')"$'\n'
         continue
       fi
-    elif ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
-      FAILED_COUNT=$((FAILED_COUNT + 1))
-      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'
-      continue
+    else
+      attempts=$((attempts + 1))
+      if ! err=$(git -C "$clone" worktree remove -- "$copy" 2>&1); then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"git worktree remove refused and the copy was left: $(printf '%s' "$err" | head -1)"$'\n'
+        continue
+      fi
     fi
     if [ -e "$copy" ] || [ -L "$copy" ] || list_nested "$clone" | grep -qxF "$copy"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
       REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after its removal"$'\n'
       continue
+    fi
+    receipt=$(retained_receipt "$copy") || receipt=
+    if [ -n "$receipt" ] && ! rm -f -- "$receipt"; then
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"removed but its retention receipt could not be cleared"$'\n'
     fi
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
     gone="$gone$copy"$'\n'
@@ -1415,7 +1542,7 @@ print_report() {  # <mode>
     printf 'note: %s\n' "$line"
   done <<< "$NOTES"
   [ "$SCAN_CUT" != 1 ] || printf 'note: the scan stopped at its time bound; unmeasured copies show ? GiB\n'
-  for class in REAPABLE-PROVEN REAPABLE-DRIVER HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
+  for class in REAPABLE-PROVEN REAPABLE-DRIVER PENDING-DRIVER HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
     count=$(printf '%s\n' "$COPIES" | awk -F '\t' -v c="$class" '$5 == c { n++ } END { print n + 0 }')
     printf 'summary: %s=%s\n' "$class" "$count"
   done
@@ -1424,7 +1551,8 @@ print_report() {  # <mode>
     printf '%s\n' "$line"
   done <<< "$BUDGET_REPORT"
   if [ "$1" = apply ]; then
-    printf 'freed %s GiB measured, %s copies unmeasured\n' "$(kib_to_gib "$FREED_KIB")" "$FREED_UNMEASURED"
+    printf 'sizes: %s scanned copies unmeasured, %s removed copies unmeasured\n' "$SCANNED_UNMEASURED" "$FREED_UNMEASURED"
+    printf 'copies=%s GiB=%s reaped=%s freed=%s\n' "$SCANNED_COUNT" "$(kib_to_gib "$SCANNED_KIB")" "$REMOVED_COUNT" "$(kib_to_gib "$FREED_KIB")"
   fi
 }
 

@@ -86,7 +86,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - The append-only held-copy record `held-foreign-copies.log`, written by `bin/fm-teardown.sh` once a task has closed beside foreign copies it leaves standing; it lists them and returns nothing, and [Agent control](agent-control.md)'s held-copy rule owns its fields.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
-- The nested-copy sweep's append-only removal log `data/copy-sweep.log`, produced by `bin/fm-copy-sweep.sh --apply`.
+- The nested-copy sweep's removal log `data/copy-sweep.log` and preservation and driver-retention receipts under `data/copy-sweep/`, owned by `bin/fm-copy-sweep.sh --apply`.
 - The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
 
 `state/` holds runtime records:
@@ -1957,6 +1957,8 @@ load-limit 90
 interval 3600
 # whole seconds before a cached size is measured again
 cache-max-age 86400
+# maximum removal attempts per --apply run (positive integer)
+max-removals 10
 ```
 
 A pool is a `<treehouse root>/<pool>` directory, named by its directory name or full path.

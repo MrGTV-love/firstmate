@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Behavioral coverage for bin/fm-copy-sweep.sh: the proof matrix, the report-only
 # default, the one-wake byte budget, the load guard and du limits, the lane-home
-# view, the release of a creation-locked copy whose launcher is gone or recycled
-# through Vernant's own closeout driver, and the refusal to force anything. Every world is a throwaway directory under a temp root with
+# view, the release of a creation-locked copy whose launcher is gone through
+# Vernant's own closeout driver, and the refusal to force anything.
+# Every world is a throwaway directory under a temp root with
 # real `git worktree add` copies; no real pool, home, state file or backlog is
 # read or written. FM_COPY_SWEEP_BIN points the suite at a mutant of the script
 # to prove each assertion can fail.
@@ -71,12 +72,16 @@ sleep 0.05
 rm -f "$FAKE_DU_ACTIVE/$$"
 printf '%s\n' "$path" >> "$FAKE_DU_LOG"
 kib=$(awk -F '\t' -v p="$path" '$1 == p { print $2 }' "$FAKE_DU_TABLE")
-case "$path" in */nested-copy-preserved) kib=${kib:-${FAKE_DU_PRESERVED_KIB:-}} ;; esac
+case "$path" in */nested-copy-preserved|*/nested-copy-preserved/*) kib=${kib:-${FAKE_DU_PRESERVED_KIB:-}} ;; esac
 printf '%s\t%s\n' "${kib:-100}" "$path"
 EOF
   cat > "$FAKEBIN/git" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FAKE_GIT_LOG"
+if [ "${FAKE_DRIVER:-0}" = 1 ]; then
+  printf '%s\n' "$*" >> "$FAKE_GIT_LOG.driver"
+else
+  printf '%s\n' "$*" >> "$FAKE_GIT_LOG"
+fi
 case " $* " in
   *" worktree list "*)
     [ -z "${FAKE_GIT_FAIL_LIST:-}" ] || exit 128
@@ -206,6 +211,11 @@ take_snapshots() {  # <suffix> <names...>
   shift
   for name in "$@"; do
     snap "$(copy_path "$name")" > "$W/snap-$name-$suffix"
+    local admin
+    admin=$(git -C "$(copy_path "$name")" rev-parse --absolute-git-dir 2>/dev/null) || admin=
+    if [ -n "$admin" ] && [ -f "$admin/locked" ]; then
+      shasum -a 256 "$admin/locked" >> "$W/snap-$name-$suffix"
+    fi
   done
 }
 
@@ -471,9 +481,17 @@ install_driver() {  # <slot> <log-dir>
   printf '%s\n' scripts/ .venv/ >> "$exclude"
   mkdir -p "$slot/scripts/git-stability"
   cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
+export FAKE_DRIVER=1
 printf '%s|%s\n' "\$PWD" "\$*" >> "$log/closeout.log"
 printf '%s\n' "\$\$" >> "$log/driver.pids"
 if [ "\${3:-}" != --execute-cleanup ]; then
+  if [ -e "$log/plan-output" ]; then
+    cat "$log/plan-output"
+    exit "\$(cat "$log/plan-exit" 2>/dev/null || printf 0)"
+  fi
+  if [ -e "$log/plan-hook" ]; then
+    bash "$log/plan-hook" "\$2" || exit 4
+  fi
   if [ -e "$log/refuse-plan" ]; then
     echo '{"allowed": false, "reason": "pull_request_not_merged"}'
     exit 3
@@ -516,6 +534,15 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   echo '{"allowed": true}'
   exit 0
 fi
+if [ -e "$log/retain-ignored" ]; then
+  echo '{"reason":"cleanup_ignored_payload_archived_tree_retained"}'
+  exit 3
+fi
+if [ -e "$log/fail-after-unlock" ]; then
+  git worktree unlock "\$2" || exit 4
+  echo 'injected removal failure after driver released the lock'
+  exit 4
+fi
 if [ -e "$log/refuse-execute" ]; then
   echo 'refused: pull request is not merged'
   echo 'next: wait for the merge'
@@ -542,16 +569,19 @@ make_locked_copy_case() {
   add_copy locked
   admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
   case "$mode" in
-    dead)
+    dead|uuid)
       sleep 0.1 & pid=$!
       wait "$pid" 2>/dev/null || true
-      git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" \
-        "$(copy_path locked)"
+      if [ "$mode" = uuid ]; then
+        git -C "$SLOT" worktree lock --reason "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=$pid" "$(copy_path locked)"
+      else
+        git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$(copy_path locked)"
+      fi
       ;;
     recycled|live)
-      # One running launcher pid. The recycled case backdates the lock file, so
-      # that pid started after it was written and owns nothing.
-      sleep 30 & pid=$!
+      # Keep the live process in the fixture root so fixture cleanup owns it,
+      # even when a regression exits before the case's explicit cleanup.
+      (cd "$W" && exec sleep 600) & pid=$!
       disown "$pid" 2>/dev/null || true
       LIVE_PID=$pid
       git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" \
@@ -590,7 +620,8 @@ assert_driver_release() {  # <name> <lock-mode>
   head=$(git -C "$(copy_path locked)" rev-parse HEAD)
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
   [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
-  assert_class locked REAPABLE-DRIVER
+  assert_class locked PENDING-DRIVER
+  assert_contains "$OUT" "not yet proven removable" "report overstated an unplanned driver candidate"
   assert_contains "$OUT" "launcher" "the report did not explain the dead launcher"
   [ -e "$(copy_path locked)" ] || fail "report mode removed the copy"
   assert_absent "$W/closeout.log" "report mode ran the closeout driver"
@@ -599,12 +630,14 @@ assert_driver_release() {  # <name> <lock-mode>
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "apply did not report the driver removal"
   assert_contains "$OUT" "copy 2.00 GiB, preserved 0.50 GiB, net freed 1.50 GiB" \
     "the removal line did not report the copy, preserved and net GiB"
-  assert_equals "freed 1.50 GiB measured, 0 copies unmeasured" "$(printf '%s\n' "$OUT" | tail -n 1)" \
+  assert_equals "copies=1 GiB=2.00 reaped=1 freed=1.50" "$(printf '%s\n' "$OUT" | tail -n 1)" \
     "the run did not end with the GiB it freed"
   [ ! -e "$(copy_path locked)" ] || fail "the driver did not remove the copy"
   ! registered locked || fail "the released copy is still registered"
-  git -C "$SLOT" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null \
-    || fail "the released copy's branch ref was lost"
+  assert_equals "$head" "$(git -C "$SLOT" rev-parse "refs/heads/$branch")" \
+    "the released copy's branch no longer preserves its exact commit"
+  assert_equals "$head" "$(git -C "$W/origin.git" rev-parse "refs/heads/$branch")" \
+    "the released copy's remote commit changed"
   [ -f "$W/closeout.log" ] || fail "the closeout driver was never run"
   plan="$SLOT|--cleanup-worktree $(copy_path locked)"
   execute="$plan --execute-cleanup"
@@ -624,6 +657,13 @@ assert_driver_release() {  # <name> <lock-mode>
   assert_contains "$(cat "$HOMED/data/copy-sweep.log")" "preserved_kib=$((GIB / 2))" \
     "the log line does not carry the preserved bytes"
   [ ! -e "$admin" ] || fail "the released copy's admin directory is still there"
+  if grep -Eq 'worktree (unlock|lock)|(--force|-ff?)( |$)|treehouse destroy' "$W/git.log"; then
+    fail "the sweep itself issued a forbidden release operation"
+  fi
+  if [ -f "$W/rm.log" ]; then
+    assert_no_grep "$admin/locked" "$W/rm.log" "the sweep deleted a lock file"
+  fi
+  assert_absent "$W/treehouse.log" "the sweep called Treehouse"
   if [ -n "$LIVE_PID" ]; then
     kill "$LIVE_PID" 2>/dev/null || true
     wait "$LIVE_PID" 2>/dev/null || true
@@ -631,14 +671,35 @@ assert_driver_release() {  # <name> <lock-mode>
   fi
 }
 
-test_recycled_launcher_lock_is_released_by_the_driver() {
-  assert_driver_release driver-recycled recycled
-  pass "a locked copy whose launcher pid is recycled is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported"
+test_recycled_launcher_lock_is_held() {
+  local admin before
+  make_locked_copy_case driver-recycled recycled
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  kill -0 "$LIVE_PID" 2>/dev/null || fail "the recycled-launcher fixture ended before its verdict"
+  kill "$LIVE_PID" 2>/dev/null || true
+  wait "$LIVE_PID" 2>/dev/null || true
+  [ "$RC" = 0 ] || fail "recycled launcher apply failed: $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "launcher $LIVE_PID is alive" "a live recycled pid was not named"
+  assert_contains "$OUT" "start age=" "the launcher's age was not reported"
+  assert_contains "$OUT" "lock mtime=" "the lock's mtime was not reported"
+  assert_absent "$W/closeout.log" "the driver ran for a live recycled pid"
+  registered locked || fail "the recycled-pid copy was unregistered"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the recycled lock changed"
+  pass "a live recycled launcher pid holds its copy and unchanged lock, with age and lock mtime reported"
 }
 
 test_dead_launcher_lock_is_released_by_the_driver() {
   assert_driver_release driver-dead dead
   pass "a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported"
+}
+
+test_uuid_owner_lock_is_released_by_the_driver() {
+  assert_driver_release driver-uuid uuid
+  pass "a dead-launcher UUID-owner creation lock uses the same supported driver release"
 }
 
 test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero() {
@@ -665,7 +726,7 @@ test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero() {
   [ -f "$admin/locked" ] || fail "a refused copy lost its lock"
   assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "the refused copy's ignored file changed"
   [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a refused copy was logged as removed"
-  assert_equals "freed 0.00 GiB measured, 0 copies unmeasured" "$(printf '%s\n' "$OUT" | tail -n 1)" \
+  assert_equals "copies=1 GiB=0.00 reaped=0 freed=0.00" "$(printf '%s\n' "$OUT" | tail -n 1)" \
     "the run did not end with its total"
   rm -f "$W/refuse-plan" "$W/closeout.log"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
@@ -738,7 +799,7 @@ test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released() {
   [ "$RC" = 1 ] || fail "a lock that changed after its plan should exit 1, got $RC: $OUT"
   line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
     || fail "the changed lock was not reported as FAILED: $OUT"
-  assert_contains "$line" "no longer locked by Vernant's exact creation lock" "the FAILED line did not name the changed lock"
+  assert_contains "$line" "not the supported Vernant creation-lock format" "the FAILED line did not name the changed lock"
   assert_not_contains "$OUT" "completing-command:" "a sweep refusal printed a command"
   assert_not_contains "$OUT" "REMOVED" "a copy whose lock changed was reported removed"
   [ -e "$(copy_path locked)" ] || fail "a copy whose lock changed was removed"
@@ -747,6 +808,202 @@ test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released() {
   assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
     "the driver was asked to release a copy whose lock was no longer Vernant's"
   pass "a copy whose creation lock became someone else's after its plan stays locked, is not released by the driver, and is reported as the sweep's own refusal"
+}
+
+test_retained_ignored_payload_is_kept_once_without_growth() {
+  local admin before first n
+  make_locked_copy_case retained-ignored dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'unique retained bytes\n' > "$(copy_path locked)/unique.dat"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  : > "$W/retain-ignored"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "a driver-retained ignored payload must not fail the sweep: $OUT"
+  assert_contains "$OUT" "KEPT"$'\t'"$(copy_path locked)" "retention was not reported as KEPT"
+  assert_contains "$OUT" "cleanup_ignored_payload_archived_tree_retained" "the driver's retention reason was lost"
+  first=$(snap "$HOMED/data/copy-sweep")
+  for n in 2 3; do
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "retained rerun $n failed: $OUT"
+    assert_class locked HELD-LOCKED
+    assert_equals "$first" "$(snap "$HOMED/data/copy-sweep")" "rerun $n changed or grew preservation"
+    assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "retention changed the lock"
+    registered locked || fail "retained copy was unregistered"
+  done
+  assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "retained copy was driven again"
+  assert_equals 'unique retained bytes' "$(cat "$(copy_path locked)/unique.dat")" "retention lost source bytes"
+  pass "exit-3 ignored-payload retention is KEPT, keeps its lock and source, and repeated sweeps neither preserve nor execute again"
+}
+
+test_removal_limit_and_one_summary() {
+  local n left
+  make_world removal-limit
+  for n in 01 02 03 04 05 06 07 08 09 10 11 12; do
+    add_copy "c$n"
+    printf '%s\t%s\n' "$(copy_path "c$n")" "$GIB" >> "$W/du-table"
+  done
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "bounded sweep failed: $OUT"
+  assert_equals 10 "$(printf '%s\n' "$OUT" | grep -c '^REMOVED')" "default removal limit was not ten"
+  assert_equals 1 "$(printf '%s\n' "$OUT" | grep -c '^copies=.* GiB=.* reaped=.* freed=')" "expected one accounting summary"
+  assert_contains "$OUT" 'copies=12 GiB=12.00 reaped=10 freed=10.00' "accounting did not include the original twelve copies"
+  registered c01 && registered c02 || fail "reverse path order did not retain the first two copies"
+  printf 'max-removals 1\n' > "$HOMED/config/copy-budget"
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "configured bounded sweep failed: $OUT"
+  registered c01 || fail "configured limit removed too many copies"
+  ! registered c02 || fail "configured limit did not remove the deepest-first next copy"
+  assert_contains "$OUT" 'copies=2 GiB=2.00 reaped=1 freed=1.00' "configured-limit accounting is wrong"
+  pass "each run respects default ten or configured removal limit, deepest-first, with one original-total and freed-GiB summary"
+}
+
+test_task_record_appearing_during_plan_prevents_release() {
+  local admin before
+  make_locked_copy_case plan-new-owner dead
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  printf 'printf "worktree=%%s\\nkind=ship\\n" "$1" > %q\n' "$HOMED/state/new-owner.meta" > "$W/plan-hook"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a changed proof was not reported: $OUT"
+  assert_contains "$OUT" "new-owner's active record" "post-plan owner was not named"
+  registered locked || fail "copy newly claimed during planning was removed"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "new owner's lock changed"
+  assert_equals 1 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "execute ran after ownership changed"
+  assert_absent "$HOMED/data/copy-sweep" "changed ownership was checked only after preservation"
+  pass "a task record appearing during the driver plan prevents preservation and release"
+}
+
+test_valid_lock_replacement_during_plan_prevents_release() {
+  local admin
+  make_locked_copy_case plan-new-lock dead
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  printf 'printf "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=999999\\n" > %q\n' "$admin/locked" > "$W/plan-hook"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a replaced creation lock was not reported: $OUT"
+  assert_contains "$OUT" "changed HEAD or creation-lock bytes" "valid replacement was not detected"
+  assert_equals 'vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=999999' "$(cat "$admin/locked")" "replacement lock was changed by sweep"
+  registered locked || fail "a different valid lock was released"
+  assert_equals 1 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "execute ran on a different lock"
+  pass "a different but valid Vernant lock appearing during the plan is never released"
+}
+
+test_multiline_and_unknown_owner_locks_are_held_byte_identical() {
+  local reason admin before n=0
+  for reason in $'vernant-session-active owner=launcher:999999 launcher=999999\noperator hold' \
+      $'vernant-session-active owner=launcher:999999 launcher=999999\n' \
+      'vernant-session-active owner=someone launcher=999999' \
+      'vernant-session-active owner=launcher:999998 launcher=999999'; do
+    n=$((n + 1))
+    make_world "malformed-lock-$n"
+    add_copy locked
+    install_driver "$SLOT" "$W"
+    git -C "$SLOT" worktree lock --reason "$reason" "$(copy_path locked)"
+    admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+    if [[ $reason == *$'\n' ]]; then
+      # Git may normalize the reason's terminal newline. Construct an actual
+      # extra lock line rather than assuming argv preserved that byte.
+      printf '\n' >> "$admin/locked"
+      [ "$(wc -l < "$admin/locked")" -ge 2 ] || fail "the multiline-lock fixture has only one line"
+    fi
+    before=$(shasum -a 256 "$admin/locked")
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "unknown lock failed the run: $OUT"
+    assert_class locked HELD-LOCKED
+    assert_contains "$OUT" "not the supported Vernant creation-lock format" "unsupported lock format was not explained"
+    assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "unsupported lock bytes changed"
+    registered locked || fail "an unsupported lock's copy was removed"
+    assert_absent "$W/closeout.log" "unsupported lock reached the driver"
+  done
+  pass "extra lock lines, unknown owners, and mismatched launcher owners stay byte-identical and never reach the driver"
+}
+
+test_binary_creation_lock_is_held_byte_identical() {
+  local admin before
+  make_world binary-lock
+  add_copy locked
+  install_driver "$SLOT" "$W"
+  git -C "$SLOT" worktree lock --reason \
+    'vernant-session-active owner=launcher:999999 launcher=999999' "$(copy_path locked)"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  printf 'vernant-session-active owner=launcher:999999 launcher=999999\000\n' > "$admin/locked"
+  before=$(shasum -a 256 "$admin/locked")
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "binary lock failed the run: $OUT"
+  assert_class locked HELD-LOCKED
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "binary lock bytes changed"
+  registered locked || fail "a binary lock's copy was removed"
+  assert_absent "$W/closeout.log" "binary lock reached the driver"
+  pass "NUL bytes cannot normalize an unsupported lock into an allowed creation lock"
+}
+
+test_failed_driver_removal_cannot_be_retried_as_unlocked() {
+  local before
+  make_locked_copy_case partial-release dead
+  install_driver "$SLOT" "$W"
+  : > "$W/fail-after-unlock"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "partial driver release did not fail the first run: $OUT"
+  assert_contains "$OUT" "injected removal failure after driver released the lock" "driver failure text was lost"
+  before=$(snap "$(copy_path locked)")
+  rm -f "$W/fail-after-unlock"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "retained partial release failed on rerun: $OUT"
+  assert_class locked HELD-LOCKED
+  registered locked || fail "partially released copy was removed on the next sweep"
+  assert_equals "$before" "$(snap "$(copy_path locked)")" "retained partial copy changed"
+  assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "partial release retried the driver"
+  assert_no_grep 'worktree remove' "$W/git.log" "partial release was retried by plain removal"
+  pass "a driver that releases its lock but fails removal leaves a durable protection against later plain removal"
+}
+
+test_report_does_not_claim_unplanned_locks_are_reapable() {
+  make_locked_copy_case report-unplanned dead
+  install_driver "$SLOT" "$W"
+  : > "$W/refuse-plan"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
+  [ "$RC" = 0 ] || fail "report failed: $OUT"
+  assert_class locked PENDING-DRIVER
+  assert_contains "$OUT" 'summary: REAPABLE-DRIVER=0' "report counted an unplanned copy as reapable"
+  assert_contains "$OUT" 'not yet proven removable' "report overstated its local-only proof"
+  assert_absent "$W/closeout.log" "report called the driver"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  assert_class locked HELD-LOCKED
+  registered locked || fail "refused plan removed the reported candidate"
+  pass "report distinguishes a local-proof candidate from a driver-approved removal without executing the driver"
+}
+
+test_driver_verdict_types_and_exit_status_are_not_permission() {
+  local verdict n=0
+  for verdict in '{"allowed":"true"}' '{"allowed":1}' '[{"allowed":true}]' \
+      '{"allowed":true} {"allowed":true}' 'allowed=true trailing text'; do
+    n=$((n + 1))
+    make_locked_copy_case "typed-plan-$n" dead
+    install_driver "$SLOT" "$W"
+    printf '%s\n' "$verdict" > "$W/plan-output"
+    take_snapshots before locked
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "invalid verdict failed the run: $OUT"
+    assert_class locked HELD-LOCKED
+    take_snapshots after locked
+    assert_untouched locked
+    assert_equals 1 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "an invalid verdict reached execute"
+  done
+  make_locked_copy_case nonzero-positive-plan dead
+  install_driver "$SLOT" "$W"
+  printf '{"allowed":true}\n' > "$W/plan-output"
+  printf '3\n' > "$W/plan-exit"
+  take_snapshots before locked
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "nonzero positive plan failed the sweep: $OUT"
+  assert_class locked HELD-LOCKED
+  take_snapshots after locked
+  assert_untouched locked
+  assert_equals 1 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "nonzero positive verdict reached execute"
+  pass "only a boolean positive verdict with exit zero is permission; invalid types, documents, suffixes and nonzero exit keep lock bytes unchanged"
 }
 
 driver_pid_count() { [ -f "$W/driver.pids" ] && wc -l < "$W/driver.pids" | tr -d ' ' || printf '0\n'; }
@@ -852,20 +1109,17 @@ test_a_sweep_stopped_during_a_plan_stops_the_hung_driver() {
 }
 
 test_two_sweeps_of_one_path_keep_both_preserved_directories() {
-  local second pid kept
+  local second pid kept head
   make_locked_copy_case reusedpath dead
   install_driver "$SLOT" "$W"
   printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
   printf 'first copy\n' > "$(copy_path locked)/unique.dat"
+  head=$(git -C "$(copy_path locked)" rev-parse HEAD)
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "the first apply failed ($RC): $OUT"
   [ ! -e "$(copy_path locked)" ] || fail "the first copy was not released"
   second=$(copy_path locked)
-  git -C "$SLOT" worktree add -q -b fm/locked-again "$second"
-  printf 'again\n' > "$second/again.txt"
-  git -C "$second" add again.txt
-  git -C "$second" commit -qm again
-  git -C "$second" push -q origin fm/locked-again
+  git -C "$SLOT" worktree add -q -b fm/locked-again "$second" "$head"
   sleep 0.1 & pid=$!
   wait "$pid" 2>/dev/null || true
   git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$second"
@@ -875,7 +1129,7 @@ test_two_sweeps_of_one_path_keep_both_preserved_directories() {
   [ ! -e "$second" ] || fail "the second copy was not released"
   kept=$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -name unique.dat -type f -exec cat {} + | LC_ALL=C sort | tr '\n' '|')
   assert_equals "first copy|second copy|" "$kept" "the second sweep of the same path replaced the first preserved copy"
-  pass "two sweeps of the same copy path keep both preserved directories"
+  pass "new copies at the same path and HEAD retain both versions of their preserved ignored bytes"
 }
 
 test_a_removal_with_no_measured_size_says_so() {
@@ -886,13 +1140,15 @@ test_a_removal_with_no_measured_size_says_so() {
   [ ! -e "$(copy_path reap)" ] || fail "apply should still remove a proven copy while sizing is skipped"
   assert_contains "$OUT" "copy - GiB, preserved 0.00 GiB, net freed - GiB, unmeasured" \
     "the removal line did not say its size was not measured"
-  assert_equals "freed 0.00 GiB measured, 1 copies unmeasured" "$(printf '%s\n' "$OUT" | tail -n 1)" \
-    "the run did not count the unmeasured copy"
+  assert_contains "$OUT" "sizes: 1 scanned copies unmeasured, 1 removed copies unmeasured" \
+    "the run did not disclose its unmeasured copy"
+  assert_equals "copies=1 GiB=0.00 reaped=1 freed=0.00" "$(printf '%s\n' "$OUT" | tail -n 1)" \
+    "the run did not report its measured lower-bound totals"
   pass "a removal whose size was not measured shows - and unmeasured, and the closing total counts it"
 }
 
 test_locked_copy_with_an_unpushed_equivalence_is_still_held() {
-  make_locked_copy_case locked-unpushed recycled
+  make_locked_copy_case locked-unpushed dead
   install_driver "$SLOT" "$W"
   # An empty commit's content is trivially already in the default branch, so the
   # unlocked landed-content fallback alone would call this copy reapable.
@@ -911,13 +1167,16 @@ test_locked_copy_with_an_unpushed_equivalence_is_still_held() {
 }
 
 test_live_foreign_or_unreleasable_locks_are_kept() {
-  local mode
+  local mode admin before
   for mode in live foreign; do
     make_locked_copy_case "lock-$mode" "$mode"
     install_driver "$SLOT" "$W"
+    admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+    before=$(shasum -a 256 "$admin/locked")
     FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
     [ "$RC" = 0 ] || fail "$mode: apply failed ($RC): $OUT"
     assert_class locked HELD-LOCKED
+    assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "$mode: held lock bytes were written"
     assert_no_grep "REMOVED" <(printf '%s\n' "$OUT") "$mode: a kept copy was removed"
     [ -e "$(copy_path locked)" ] || fail "$mode: the locked copy was removed"
     assert_absent "$W/closeout.log" "$mode: the driver ran on a copy it must not release"
@@ -927,11 +1186,9 @@ test_live_foreign_or_unreleasable_locks_are_kept() {
       wait "$LIVE_PID" 2>/dev/null || true
     fi
   done
-  make_locked_copy_case unreleasable recycled
+  make_locked_copy_case unreleasable dead
   run_sweep
   [ "$RC" = 0 ] || fail "unreleasable: report failed ($RC): $OUT"
-  kill "$LIVE_PID" 2>/dev/null || true
-  wait "$LIVE_PID" 2>/dev/null || true
   assert_class locked HELD-LOCKED
   assert_contains "$OUT" "closeout driver or interpreter unavailable" \
     "the report did not say why the copy cannot be released"
@@ -1755,8 +2012,18 @@ run_case test_a_new_youngest_copy_is_named_first_and_the_wake_stays_bounded
 run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy
-run_case test_recycled_launcher_lock_is_released_by_the_driver
+run_case test_recycled_launcher_lock_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
+run_case test_uuid_owner_lock_is_released_by_the_driver
+run_case test_retained_ignored_payload_is_kept_once_without_growth
+run_case test_removal_limit_and_one_summary
+run_case test_task_record_appearing_during_plan_prevents_release
+run_case test_valid_lock_replacement_during_plan_prevents_release
+run_case test_multiline_and_unknown_owner_locks_are_held_byte_identical
+run_case test_binary_creation_lock_is_held_byte_identical
+run_case test_failed_driver_removal_cannot_be_retried_as_unlocked
+run_case test_report_does_not_claim_unplanned_locks_are_reapable
+run_case test_driver_verdict_types_and_exit_status_are_not_permission
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
