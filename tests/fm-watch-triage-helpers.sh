@@ -8169,14 +8169,45 @@ SH
   pass "slow 1.6 MB log classification commits its endpoint and refreshes the beacon within WATCHER_STALE_GRACE=3"
 )
 
-test_watch_device_shift_regressions() {
-  test_status_device_shift_does_not_resignal
-  test_status_identity_replacement_still_signals
-  test_status_device_shift_lagging_log_reads_only_new_bytes
-  test_status_device_shift_keeps_owned_appends
-  test_signal_rescan_deduplicates_pending
-  test_long_status_scan_keeps_beacon_fresh
-}
+# A crew log torn down after a scan listed it but before its span is read is an
+# empty span, not a classification failure: neither scan may queue a wake or
+# recreate a retired task's marker for it. The injected beacon hook removes the
+# log at exactly the point between the scan's existence check and the read.
+test_vanished_status_log_is_a_quiet_empty_span() (
+  local dir state script out size
+  dir=$(make_case vanished-log); state="$dir/state"; script="$dir/vanish.sh"
+  mkdir -p "$dir/home"
+  cat > "$script" <<'SH'
+root=$1 state=$2 home=$3
+export FM_STATE_OVERRIDE="$state" FM_HOME="$home" FM_ROOT_OVERRIDE="$home"
+. "$root/bin/fm-watch.sh"
+STATE=$state
+rec='' nd=''
+printf 'needs-decision: pick one\n' > "$STATE/live.status"
+size=$(wc -c < "$STATE/live.status" | tr -d ' ')
+watcher_status_span "$STATE/live.status" 0 rec nd
+echo "live rc=$? needs=$nd end=${rec%%$'\t'*} size=$size"
+rm -f "$STATE/live.status"
+watcher_status_span "$STATE/gone.status" 0 rec nd
+echo "absent rc=$? needs=$nd record=[$rec]"
+watcher_beat() { rm -f "$STATE/gone.status"; }
+printf 'done: delivered\n' > "$STATE/gone.status"
+signal_files_actionable "$STATE/gone.status"
+echo "signal rc=$? endpoints=[$FM_SIGNAL_SURFACE_ENDPOINTS]"
+printf 'done: delivered\n' > "$STATE/gone.status"
+heartbeat_scan_finds_actionable
+echo "heartbeat rc=$? endpoints=[$FM_HEARTBEAT_SURFACE_ENDPOINTS]"
+SH
+  out=$(bash "$script" "$ROOT" "$state" "$dir/home" 2>&1) || fail "the vanished-log probe failed: $out"
+  size=$(printf '%s\n' "$out" | sed -n 's/^live .* size=\([0-9]*\)$/\1/p')
+  [ "$out" = "live rc=0 needs=1 end=$size size=$size
+absent rc=1 needs=0 record=[]
+signal rc=1 endpoints=[]
+heartbeat rc=1 endpoints=[]" ] || fail "a vanished status log was not a quiet empty span: $out"
+  [ ! -e "$state/.hb-surfaced-gone" ] && [ ! -e "$state/.seen-gone_status" ] \
+    || fail "a vanished status log recreated a marker for the retired task"
+  pass "a status log that vanishes before its span is read is a quiet empty span in both scans"
+)
 
 # CI's stock macOS Bash lane sets FM_TEST_ONLY to run just the bash-3.2
 # churn-deferral regression. The rest of this file is not a 3.2 snapshot suite.
