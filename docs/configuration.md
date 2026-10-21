@@ -1304,7 +1304,7 @@ The `openrouter/*` key and targets of a `retry.fallbackChains` entry are exempt 
 The same route in another chain, in `modelRoles`, or in any changed form of the approved chain stays flagged.
 All `openai/*` references, OpenRouter's `openai/` model namespace, and OpenRouter model path segments beginning with `gpt` (case-insensitive) remain flagged even inside a recorded chain.
 `openai-codex/*` already uses the subscription route and needs no billing exception; it appears in the record only to name the whole chain.
-A missing approval file grants no exceptions.
+A missing approval file grants no exceptions, and an approval file is read only when the active global omp `config.yml` exists; with no omp configuration the diagnostic stays silent whatever the approval file holds.
 An unreadable or nonregular file reports a configuration problem, and a malformed line reports its line number without its contents; either invalidates all exceptions from that file while unapproved API references are still reported.
 These approvals do not relax explicit worker-launch or relaunch billing-route admission.
 

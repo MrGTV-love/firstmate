@@ -54,8 +54,7 @@ fm_omp_api_billing_config_diagnostics() {
   if [ -n "${OMP_PROFILE:-}" ]; then
     agent_dir="$HOME/.omp/profiles/$OMP_PROFILE/agent"
   fi
-  [ -e "$agent_dir/config.yml" ] || [ -L "$agent_dir/config.yml" ] \
-    || [ -e "$approvals" ] || [ -L "$approvals" ] || return 0
+  [ -e "$agent_dir/config.yml" ] || [ -L "$agent_dir/config.yml" ] || return 0
   command -v ruby >/dev/null 2>&1 || {
     echo "cannot inspect omp configuration: install Ruby for the read-only YAML check"
     return 0
@@ -86,8 +85,6 @@ if File.exist?(approval_file) || File.symlink?(approval_file)
   end
 end
 begin
-  config_file = ARGV.fetch(0)
-  exit unless File.exist?(config_file) || File.symlink?(config_file)
   config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
   config = {} if config.nil?
   raise TypeError unless config.is_a?(Hash)

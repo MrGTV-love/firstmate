@@ -259,11 +259,25 @@ YAML
   pass "malformed and unreadable approval records diagnose configuration problems without granting exceptions"
 }
 
+test_approval_record_without_omp_config_is_silent() {
+  local approval="$TMP_ROOT/config/omp-approved-fallback-chains" out
+  mkdir -p "$TMP_ROOT/empty-path"
+  rm -f "$TMP_ROOT/agent/config.yml"
+  printf 'not a chain\n' > "$approval"
+  out=$(billing_diagnostics)
+  [ -z "$out" ] || fail "an approval record without an omp config must stay silent: $out"
+  out=$(PATH="$TMP_ROOT/empty-path" billing_diagnostics)
+  [ -z "$out" ] || fail "an approval record without an omp config must not demand Ruby: $out"
+  rm "$approval"
+  pass "an approval record alone never produces a diagnostic when no omp config exists"
+}
+
 test_padded_api_selectors_are_refused
 test_padded_config_selectors_are_diagnosed
 test_recorded_fallback_approvals
 test_code_root_approval_for_first_time_seed
 test_invalid_approval_records
+test_approval_record_without_omp_config_is_silent
 test_ordered_role_patterns_are_all_diagnosed
 
 echo "all fm-api-key-guard-lib tests passed"
