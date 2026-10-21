@@ -1441,9 +1441,10 @@ if [ "$VERB" = adopt ]; then
   CONTROL_ADOPT_CAPTURE="$CONTROL_META_TMP.prior"
   mv -- "$CONTROL_ADOPT_RECORD" "$CONTROL_ADOPT_CAPTURE" \
     || die "adopt could not set the session record aside; no session record was changed"
-  [ "$adoption_prior" = "$(cat "$CONTROL_ADOPT_CAPTURE" 2>/dev/null)" ] \
-    && ln -- "$CONTROL_META_TMP" "$CONTROL_ADOPT_RECORD" 2>/dev/null \
-    || die "adopt needs the session record unchanged until publication; a newer record was kept and no session record was overwritten"
+  if [ "$adoption_prior" != "$(cat "$CONTROL_ADOPT_CAPTURE" 2>/dev/null)" ] \
+    || ! ln -- "$CONTROL_META_TMP" "$CONTROL_ADOPT_RECORD" 2>/dev/null; then
+    die "adopt needs the session record unchanged until publication; a newer record was kept and no session record was overwritten"
+  fi
   rm -f -- "$CONTROL_ADOPT_CAPTURE" "$CONTROL_META_TMP"
   CONTROL_ADOPT_CAPTURE=
   CONTROL_META_TMP=
