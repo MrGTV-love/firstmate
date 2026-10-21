@@ -79,6 +79,7 @@ Each retained member carries its slowest successful (`exit=0`, `gate_skip=false`
 The refresh moved `tests/fm-lint.test.sh` from 252498 ms to 737853 ms, `tests/fm-composer-lib.test.sh` from 9521 ms to 218757 ms, and `tests/fm-test-run.test.sh` from 156781 ms to 304481 ms.
 Stale hints of that size made the two lanes look balanced while one carried over 1.2 times the other's real work.
 The six captain-hold group hints below are not slowest-run samples because the groups did not exist in those runs.
+The `tests/fm-cd-pretool-check.test.sh` hint of 47335 ms is a scaled estimate, not a CI measurement: its 19264 ms CI sample multiplied by the growth in checker invocations of its acceptance matrix, from 315 (63 cases x 5 entry forms) to 774 (64 cases x 6 entry forms x the default and deny modes, plus 6 explicit-warn spot-checks); replace it with completed healthy CI measurements when available.
 
 ## Captain-hold groups
 

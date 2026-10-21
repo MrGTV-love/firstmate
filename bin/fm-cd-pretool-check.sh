@@ -4,8 +4,8 @@
 # A stray persistent top-level `cd projects/<clone>` in the PRIMARY firstmate
 # shell silently relocates the shell, so a later firstmate-owned command (a
 # backlog write, an fm-* lifecycle call, tasks-axi) runs inside a project clone
-# instead of the home. This seatbelt denies such a command before it runs.
-# bin/fm-cd-command-policy.mjs is the sole owner of the block/allow decision; it
+# instead of the home. This seatbelt warns by default; FM_CD_GUARD_MODE=deny
+# restores the block. bin/fm-cd-command-policy.mjs owns the decision; it
 # reuses the shell classifier owned by bin/fm-arm-command-policy.mjs. This
 # wrapper only scopes the guard to the real primary checkout, acquires the
 # harness payload, invokes that policy, and renders the established harness
@@ -18,12 +18,16 @@
 #
 # Stdin mode extracts .toolInput.command for Grok or .tool_input.command for
 # Claude, Codex, and Cursor. CLI mode is used by OpenCode and Pi after their
-# adapters extract the exact command string. --cursor selects Cursor's own deny
-# rendering and marks this invocation as the Cursor registration rather than the
-# Claude-settings duplicate Cursor also loads.
+# adapters extract the exact command string. --cursor selects Cursor's own
+# decision rendering and marks this invocation as the Cursor registration rather
+# than the Claude-settings duplicate Cursor also loads.
 #
-# Exit/output contract (identical shape to bin/fm-arm-pretool-check.sh):
+# Exit/output contract (FM_CD_GUARD_MODE=warn by default; deny restores blocks):
 #   ALLOW - exit 0 and no output.
+#   WARN - exit 0, stderr empty, and a systemMessage plus
+#          hookSpecificOutput.additionalContext object on stdout with no
+#          permissionDecision, because an allow would auto-approve the command;
+#          --cursor uses permission=allow and user_message on stdout instead.
 #   DENY - exit 2, a Claude-shaped deny object on stderr, and a Grok-shaped
 #          deny object on stdout unless --claude was supplied.
 #   DENY, --cursor - exit 0 and Cursor's own decision object on stdout. Cursor
@@ -53,9 +57,12 @@ With no --command, reads a PreToolUse-style JSON payload on stdin (Grok
 toolInput.command, or Claude/Codex tool_input.command).
 Fires only in the real primary firstmate checkout; it is a silent no-op in a
 crewmate/scout task worktree or any non-firstmate repo.
-Exits 0 to allow and 2 to deny a persistent top-level cwd change.
-The deny reason is written to stderr, with a Grok decision object on stdout
+FM_CD_GUARD_MODE=warn (default) allows persistent top-level cwd changes with a
+correction message on stdout (systemMessage and additionalContext, no
+permissionDecision) and exit 0. Set FM_CD_GUARD_MODE=deny to restore exit 2 and
+the original deny response on stderr, with a Grok decision object on stdout
 unless --claude is supplied.
+With --cursor, warnings use permission=allow and user_message on stdout.
 With --cursor, a deny is Cursor's own decision object on stdout and exit 0,
 because Cursor reads the returned object rather than the exit status.
 Malformed transport and an unavailable classifier runtime fail open.
@@ -168,7 +175,10 @@ POLICY_OUTPUT=$(node "$POLICY" --command "$CMD" 2>/dev/null) || exit 0
 
 TAB=$(printf '\t')
 DECISION=${POLICY_OUTPUT%%"$TAB"*}
-[ "$DECISION" = "deny" ] || exit 0
+case "$DECISION" in
+  warn|deny) ;;
+  *) exit 0 ;;
+esac
 REST=${POLICY_OUTPUT#*"$TAB"}
 [ "$REST" != "$POLICY_OUTPUT" ] || exit 0
 CODE=${REST%%"$TAB"*}
@@ -181,6 +191,14 @@ json_escape() {
 
 DETAIL="[$CODE] $REASON"
 ESCAPED=$(json_escape "$DETAIL")
+if [ "$DECISION" = warn ]; then
+  if [ "$CURSOR_MODE" -eq 1 ]; then
+    printf '{"permission":"allow","user_message":"%s"}\n' "$ESCAPED"
+  else
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"%s"},"systemMessage":"%s"}\n' "$ESCAPED" "$ESCAPED"
+  fi
+  exit 0
+fi
 if [ "$CURSOR_MODE" -eq 1 ]; then
   printf '{"permission":"deny","user_message":"%s"}\n' "$ESCAPED"
   exit 0

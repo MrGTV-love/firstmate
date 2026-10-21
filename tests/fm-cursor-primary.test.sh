@@ -257,7 +257,7 @@ test_cd_guard_renders_cursor_deny() {
   local dir payload out decision
   dir=$(make_primary_dir "$TMP_ROOT/host-cd")
   payload='{"tool_name":"Shell","tool_input":{"command":"cd projects/example"},"cursor_version":"2026.08.11-e8db854"}'
-  out=$(printf '%s' "$payload" | FM_HOME="$dir" bash "$dir/bin/fm-cd-pretool-check.sh" --cursor 2>/dev/null)
+  out=$(printf '%s' "$payload" | FM_HOME="$dir" FM_CD_GUARD_MODE=deny bash "$dir/bin/fm-cd-pretool-check.sh" --cursor 2>/dev/null)
   decision=$(printf '%s' "$out" | jq -r '.permission // empty' 2>/dev/null)
   [ "$decision" = deny ] || fail "expected a Cursor deny object from the cd guard, got: $out"
   out=$(printf '%s' "$payload" | FM_HOME="$dir" bash "$dir/bin/fm-cd-pretool-check.sh" 2>&1)
