@@ -1625,6 +1625,26 @@ test_omp_adoption_unreadable_environment() {
   pass "omp adoption: unreadable launch environment stays unknown and is not promoted to managed"
 }
 
+test_omp_adoption_other_generation_pin() {
+  prepare_omp_adoption other-generation-pin
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
+  # A readable pin for another launch generation names a different launch, not
+  # a missing pin, so the live process is not this task's agent to adopt.
+  printf other > "$dir/fake/recovery-spawn-gen"
+  assert_adoption_refused "$dir" "$id" 'generation proof needs the live process not to be pinned to another launch generation'
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "process pinned to another generation authorized interrupt: $out"
+  # Without any pin the same record repairs, and a later foreign pin withdraws it.
+  : > "$dir/fake/recovery-spawn-gen"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "unpinned process must adopt: $out"
+  printf other > "$dir/fake/recovery-spawn-gen"
+  rc=0
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopted record authorized a process now pinned to another generation: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "another launch's process must receive no lifecycle input"
+  pass "omp adoption: a live process pinned to another launch generation is not adopted"
+}
+
 test_omp_adoption_caller_gate() {
   prepare_omp_adoption caller-gate
   local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
@@ -1704,6 +1724,7 @@ test_omp_adoption() {
   test_omp_adoption_unproven_same_pid
   test_omp_adoption_non_agent_process
   test_omp_adoption_unreadable_environment
+  test_omp_adoption_other_generation_pin
   test_omp_adoption_caller_gate
   test_omp_adoption_proof_boundaries
 }

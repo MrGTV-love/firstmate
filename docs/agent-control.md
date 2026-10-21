@@ -186,7 +186,7 @@ Every refusal names the missing proof, and no refusal lowers the workspace or du
 
 **This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**
 Lifecycle readers recheck the adoption proofs and the same live PID and session file before using that alternative authorization, so a workspace claimed by another task, a duplicate pane claim, or a changed generation still refuses even after a successful repair.
-A repaired record only replaces a readable environment that lacks the pin; an unreadable environment still reads `unknown` and authorizes nothing.
+A repaired record only replaces a readable environment that lacks the pin; an environment pinned to another launch generation belongs to a different launch and is refused at adoption and at every recheck, and an unreadable environment still reads `unknown` and authorizes nothing.
 This is an explicit repair, not an automatic restart fix: the omp extension's launch-generation recovery and empty-session classification are unchanged.
 
 **Residual risk:** nothing watches which conversation an adopted process runs.
