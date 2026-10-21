@@ -2610,6 +2610,70 @@ event_wait_or_sleep() {
   esac
 }
 
+# A status log or sidecar over the size cap (bin/fm-status-cap-lib.sh) means a
+# writer outside the sanctioned append is running away. Detection costs one stat
+# per poll (fm_status_cap_unalerted); only a file due an alert reaches the guard
+# (bin/fm-status-cap-guard.sh), which names the writer and contains it. A file is
+# due when it first passes the cap and again each time it has grown by more than
+# one cap since its marker, so a resumed writer is caught again and an unchanged
+# file never wakes twice. The wake is queued before the marker is written, so a
+# failed append is retried on the next poll instead of being lost. It runs at the top
+# of each loop, after each poll-sized slice of the signal linger (signal_grace_linger),
+# after each poll-sized slice of every classification of a log's unread lines
+# (status_cap_span_tick: the signal, heartbeat, stale and push walks), and just before
+# a signal or stale wake exits.
+STATUS_CAP_TICK_AT=0
+STATUS_CAP_SLICE=1
+case "$POLL" in
+  ''|*[!0-9]*) ;;
+  *) [ "$((10#$POLL))" -lt 1 ] || STATUS_CAP_SLICE=$((10#$POLL)) ;;
+esac
+status_cap_tick() {
+  local rows records reason='' ident path size text keys='' key
+  STATUS_CAP_TICK_AT=$SECONDS
+  rows=$(fm_status_cap_unalerted "$STATE") || return 0
+  [ -n "$rows" ] || return 0
+  records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
+  [ -n "$records" ] || return 0
+  while IFS=$'\t' read -r ident path size text; do
+    [ -n "$path" ] || continue
+    reason="${reason:+$reason ; }${text#check: }"
+    keys="$keys$ident:$path:$size "
+  done <<EOF
+$records
+EOF
+  [ -n "$reason" ] || return 0
+  reason="check: $reason"
+  key="status-log-over-cap-$(printf '%s' "$keys" | cksum | awk '{print $1}')"
+  fm_wake_append check "$key" "$reason" || exit 1
+  while IFS=$'\t' read -r ident path size text; do
+    [ -n "$path" ] || continue
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" "$size" || :
+  done <<EOF
+$records
+EOF
+  # wake() flushes the pending signals before it prints, and the status signal of a
+  # runaway log is pending: without this the flush would linger one more full grace and
+  # the supervisor would hear of a stop that has already happened a grace late.
+  SIGNAL_PHASE_NO_LINGER=1
+  wake "$reason"
+}
+
+# The classifiers loop over a log's unread lines in the shell, 2.7 to 5 ms a line, and call
+# this once per line: a span of 32,768 lines holds the watcher for 88 s or more, and a
+# runaway writer that starts during it would otherwise run unchecked until the loop ends.
+# It looks at the size cap when a poll has passed since the last look. The caller must run
+# in the watcher's own shell, not in a command substitution: a stop here exits the watcher.
+# It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
+# because the stop appends a row under that same lock.
+status_cap_span_tick() {
+  [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || return 0
+  [ $((SECONDS - STATUS_CAP_TICK_AT)) -lt "$STATUS_CAP_SLICE" ] || status_cap_tick
+  return 0
+}
+# shellcheck disable=SC2034 # Consumed by handle_push_transition in the separately linted transition owner.
+FM_STATUS_SPAN_TICK=status_cap_span_tick
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -2883,67 +2947,6 @@ lavish_auto_retire_tick() {
   fi
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$LAVISH_AUTO_RETIRE_BIN" sweep --auto </dev/null >/dev/null 2>&1 &
   LAVISH_AUTO_RETIRE_PID=$!
-}
-
-# A status log or sidecar over the size cap (bin/fm-status-cap-lib.sh) means a
-# writer outside the sanctioned append is running away. Detection costs one stat
-# per poll (fm_status_cap_unalerted); only a file due an alert reaches the guard
-# (bin/fm-status-cap-guard.sh), which names the writer and contains it. A file is
-# due when it first passes the cap and again each time it has grown by more than
-# one cap since its marker, so a resumed writer is caught again and an unchanged
-# file never wakes twice. The wake is queued before the marker is written, so a
-# failed append is retried on the next poll instead of being lost. It runs at the top
-# of each loop, after each poll-sized slice of the signal linger (signal_grace_linger),
-# after each poll-sized slice of the classification of a log's unread span
-# (status_cap_span_tick), and just before a signal wake exits (signal_phase).
-STATUS_CAP_TICK_AT=0
-STATUS_CAP_SLICE=1
-case "$POLL" in
-  ''|*[!0-9]*) ;;
-  *) [ "$((10#$POLL))" -lt 1 ] || STATUS_CAP_SLICE=$((10#$POLL)) ;;
-esac
-status_cap_tick() {
-  local rows records reason='' ident path size text keys='' key
-  STATUS_CAP_TICK_AT=$SECONDS
-  rows=$(fm_status_cap_unalerted "$STATE") || return 0
-  [ -n "$rows" ] || return 0
-  records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
-  [ -n "$records" ] || return 0
-  while IFS=$'\t' read -r ident path size text; do
-    [ -n "$path" ] || continue
-    reason="${reason:+$reason ; }${text#check: }"
-    keys="$keys$ident:$path:$size "
-  done <<EOF
-$records
-EOF
-  [ -n "$reason" ] || return 0
-  reason="check: $reason"
-  key="status-log-over-cap-$(printf '%s' "$keys" | cksum | awk '{print $1}')"
-  fm_wake_append check "$key" "$reason" || exit 1
-  while IFS=$'\t' read -r ident path size text; do
-    [ -n "$path" ] || continue
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" "$size" || :
-  done <<EOF
-$records
-EOF
-  # wake() flushes the pending signals before it prints, and the status signal of a
-  # runaway log is pending: without this the flush would linger one more full grace and
-  # the supervisor would hear of a stop that has already happened a grace late.
-  SIGNAL_PHASE_NO_LINGER=1
-  wake "$reason"
-}
-
-# The classifiers loop over a log's unread lines in the shell, 2.7 to 5 ms a line, and call
-# this once per line: a span of 32,768 lines holds the watcher for 88 s or more, and a
-# runaway writer that starts during it would otherwise run unchecked until the loop ends.
-# It looks at the size cap when a poll has passed since the last look. The caller must run
-# in the watcher's own shell, not in a command substitution: a stop here exits the watcher.
-# It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
-# because the stop appends a row under that same lock.
-status_cap_span_tick() {
-  [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || return 0
-  [ $((SECONDS - STATUS_CAP_TICK_AT)) -lt "$STATUS_CAP_SLICE" ] || status_cap_tick
-  return 0
 }
 
 # Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
@@ -3865,12 +3868,14 @@ while :; do
               rm -f "$ssf"
               clear_write_tracking "$key"
               stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
-              stale_record=$(status_span_first_actionable_record "$stale_status" 0)
+              stale_record=''
+              status_span_first_actionable_record "$stale_status" 0 stale_record '' status_cap_span_tick
               case $? in
                 0|1) stale_end=${stale_record%%$'\t'*}; stale_rest=${stale_record#*$'\t'}; stale_ident=${stale_rest%%$'\t'*} ;;
                 *) stale_end=''; stale_ident='' ;;
               esac
               mark_surfaced "$stale_status" "$stale_end" "$stale_ident"
+              status_cap_tick
               wake "stale: $w"
             fi
           elif [ -e "$ssf" ]; then

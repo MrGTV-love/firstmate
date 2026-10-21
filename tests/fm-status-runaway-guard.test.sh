@@ -412,15 +412,16 @@ start_gated_tiny_writer() {  # <shell> <status-file> <gate-file> <pid-file> <bur
 
 # A reader for the watcher's FM_STATUS_SPAN_READER seam. It returns exactly the bytes asked for.
 # The first time it is asked for the log named in FM_TEST_GATE_LOG it opens the writer's gate and
-# holds the read until the log is larger than FM_TEST_GATE_SIZE, so the log passes the cap after the
-# watcher has chosen to classify it and before it classifies, whatever the speed of the host.
+# holds the read until the file the writer appends to (FM_TEST_GATE_GROWS, by default that log) is
+# larger than FM_TEST_GATE_SIZE, so the file passes the cap after the watcher has chosen to walk the
+# log and before it walks it, whatever the speed of the host.
 make_gating_span_reader() {  # <path>
   cat > "$1" <<'SH'
 #!/usr/bin/env bash
 if [ "$1" = "$FM_TEST_GATE_LOG" ]; then
   : > "$FM_TEST_GATE"
   waited=0
-  while [ "$(perl -e 'print -s $ARGV[0]' "$1")" -le "$FM_TEST_GATE_SIZE" ] && [ "$waited" -lt 400 ]; do
+  while [ "$(perl -e 'print -s $ARGV[0]' "${FM_TEST_GATE_GROWS:-$1}")" -le "$FM_TEST_GATE_SIZE" ] && [ "$waited" -lt 400 ]; do
     sleep 0.05
     waited=$((waited + 1))
   done
@@ -459,39 +460,62 @@ test_a_cap_crossing_after_the_span_is_captured_is_stopped_before_the_signal_wake
   pass "a log that passes the cap while the watcher classifies a short signaled span is checked before the signal wake exits, and its writer is stopped"
 }
 
-# Shared by the signal case and the heartbeat case below. 20000 five-byte lines are unread (100000
-# bytes, under the cap) and the watcher classifies them one at a time in the shell, at 1.5 to 5 ms
+# A lane whose pane sat at one hash for a poll already, so the next poll finds it stale, over a
+# log whose latest event is terminal and that is recorded as already seen. The watcher surfaces
+# it: it queues a stale wake, walks the whole log from byte 0 to record the surfaced position, and
+# exits on `stale: test:fm-<task>`. The watch environment it needs is stale_lane_env.
+make_stale_lane() {  # <dir> <task>
+  local dir=$1 task=$2 state="$1/state" window="test:fm-$2" key
+  printf 'finished, awaiting review' > "$dir/pane.txt"
+  printf 'window=%s\nkind=ship\n' "$window" > "$state/$task.meta"
+  printf 'done: PR https://example.test/pr/3\n' >> "$state/$task.status"
+  prime_status_seen "$state" "$state/$task.status" || return 1
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  printf '%s' "$(hash_text 'finished, awaiting review')" > "$state/.hash-$key"
+  printf '1\n' > "$state/.count-$key"
+}
+
+stale_lane_env() {  # <dir> <task> -> one watch environment assignment per line
+  printf '%s\n' "PATH=$1/fakebin:$PATH" "FM_FAKE_TMUX_WINDOW=test:fm-$2" \
+    "FM_FAKE_TMUX_CAPTURE=$1/pane.txt" "FM_CREW_STATE_BIN=$1/fakebin/fm-crew-state.sh"
+}
+
+# Shared by the signal, heartbeat and stale cases below. 20000 five-byte lines are unread (100000
+# bytes, under the cap) and the watcher walks them one at a time in the shell, at 1.5 to 5 ms
 # each: 30 s on a fast host, far longer on a loaded one. The writer passes the cap once the watcher
-# holds the span. The stop must come from a check inside the classification, within a few polls,
-# not from the end of it, so the case waits 20 s for it while the watcher is still classifying.
-# With <seeded> 1 the log is recorded as already seen, so only the heartbeat scan reads it.
-stop_a_writer_during_a_long_classification() {  # <case> <seeded: 0|1> <watch env...>
-  local name=$1 seeded=$2 dir state status out omp wpid watch_pid reader cap=131072 deadline rows writer_state stopped=0
-  shift 2
+# holds the span. The stop must come from a check inside the walk, within a few polls, not from
+# the end of it, so the case waits 20 s for it while the watcher is still walking.
+# <walk> picks which walk reads the log: signal (the log is new), heartbeat (the log is recorded
+# as seen and the heartbeat is due) or stale (the log is seen and its lane's pane is stale).
+stop_a_writer_during_a_long_walk() {  # <case> <walk: signal|heartbeat|stale>
+  local name=$1 walk=$2 dir state status out omp wpid watch_pid reader cap=131072 deadline rows writer_state line stopped=0
+  local -a env=()
   command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
   dir=$(make_case "$name"); state="$dir/state"; status="$state/$name.status"; out="$dir/watch.out"
   omp=$(make_named_shell "$dir" omp)
   reader="$dir/gating-span-reader"
   make_gating_span_reader "$reader"
   perl -e 'print "text\n" x 20000' > "$status"
-  if [ "$seeded" -eq 1 ]; then
-    FM_STATE_OVERRIDE="$state" bash -c '
-      . "$1/fm-wake-lib.sh"
-      . "$1/fm-classify-lib.sh"
-      fm_wake_signal_sig_to sig "$2" || exit 1
-      fm_wake_status_reported_commit "$3" "$2" "$sig" || exit 1
-      fm_wake_status_seen_commit "$3" "$2" "$(wc -c < "$2" | tr -d " ")" "$(_fm_open_decisions_file_ident "$2")" || exit 1
-    ' _ "$ROOT/bin" "$status" "$state" || fail "could not record the log as already seen"
-  fi
+  case "$walk" in
+    signal) ;;
+    heartbeat)
+      prime_status_seen "$state" "$status" || fail "could not record the log as already seen"
+      env=(FM_HEARTBEAT=1)
+      ;;
+    stale)
+      make_stale_lane "$dir" "$name" || fail "could not set up the stale lane"
+      while IFS= read -r line; do env+=("$line"); done < <(stale_lane_env "$dir" "$name")
+      ;;
+  esac
   start_gated_tiny_writer "$omp" "$status" "$dir/gate" "$dir/writer.pid" 65 1
   wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
   wpid=$(cat "$dir/writer.pid")
   watch_cap "$state" "$out" FM_STATUS_CAP_BYTES=$cap FM_STATUS_SPAN_READER="$reader" \
-    FM_TEST_GATE_LOG="$status" FM_TEST_GATE="$dir/gate" FM_TEST_GATE_SIZE=$cap "$@"
+    FM_TEST_GATE_LOG="$status" FM_TEST_GATE="$dir/gate" FM_TEST_GATE_SIZE=$cap ${env[@]+"${env[@]}"}
   watch_pid=$!
   deadline=$((SECONDS + 90))
   while [ ! -e "$dir/gate" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.2; done
-  [ -e "$dir/gate" ] || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never began to classify the log: $(cat "$out.err" 2>/dev/null)"; }
+  [ -e "$dir/gate" ] || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never began to walk the log: $(cat "$out" "$out.err" 2>/dev/null)"; }
   deadline=$((SECONDS + 20))
   while [ "$SECONDS" -lt "$deadline" ]; do
     rows=$(queue_rows_for "$state")
@@ -499,20 +523,85 @@ stop_a_writer_during_a_long_classification() {  # <case> <seeded: 0|1> <watch en
     sleep 0.2
   done
   writer_state=$(state_letter "$wpid")
-  is_live_non_zombie "$watch_pid" || { kill -9 "$wpid" 2>/dev/null; fail "the watcher exited before the classification ended: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  is_live_non_zombie "$watch_pid" || { kill -9 "$wpid" 2>/dev/null; fail "the watcher exited before the walk ended: $(cat "$out" "$out.err" 2>/dev/null)"; }
   kill -9 "$wpid" 2>/dev/null
   reap "$watch_pid"
-  [ "$stopped" -eq 1 ] || fail "the writer was not stopped, and the over-cap wake not queued, within 20 s of the watcher capturing a 20000 line span that the writer then pushed past the cap (writer state ${writer_state:-gone})"
+  [ "$stopped" -eq 1 ] || fail "the writer was not stopped, and the over-cap wake not queued, within 20 s of the $walk walk capturing a 20000 line span that the writer then pushed past the cap (writer state ${writer_state:-gone})"
 }
 
 test_a_long_classification_checks_the_cap_every_poll() {
-  stop_a_writer_during_a_long_classification long-span 0 || return $?
+  stop_a_writer_during_a_long_walk long-span signal || return $?
   pass "the watcher checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the classification is stopped long before the classification ends"
 }
 
 test_the_heartbeat_scan_checks_the_cap_every_poll() {
-  stop_a_writer_during_a_long_classification long-heartbeat 1 FM_HEARTBEAT=1 || return $?
+  stop_a_writer_during_a_long_walk long-heartbeat heartbeat || return $?
   pass "the heartbeat scan checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the scan is stopped long before the scan ends"
+}
+
+test_the_stale_surface_checks_the_cap_every_poll() {
+  stop_a_writer_during_a_long_walk long-stale stale || return $?
+  pass "the stale-pane surface checks the cap after each poll-sized slice of its walk over the lane's log, so a writer that passes it during the walk is stopped long before the walk ends"
+}
+
+test_a_cap_crossing_during_a_short_stale_walk_is_stopped_before_the_stale_wake_exits() {
+  local dir state status side out omp wpid watch_pid reader cap=2048 line
+  local -a env=()
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case short-stale); state="$dir/state"; status="$state/short-stale.status"; out="$dir/watch.out"
+  side="$state/.short-stale.home-appends.runaway"
+  omp=$(make_named_shell "$dir" omp)
+  reader="$dir/gating-span-reader"
+  make_gating_span_reader "$reader"
+  # Forty five-byte lines and a terminal event, and a 60 s poll, so the stale surface's walk is far
+  # shorter than one poll. The writer appends to a per-task sidecar, which the cap covers and which
+  # raises no status signal, so the stale wake's flush has no signal to linger on and only the check
+  # just before the stale wake can see the sidecar pass the 2048 byte cap once the walk holds its span.
+  perl -e 'print "text\n" x 40' > "$status"
+  : > "$side"
+  make_stale_lane "$dir" short-stale || fail "could not set up the stale lane"
+  while IFS= read -r line; do env+=("$line"); done < <(stale_lane_env "$dir" short-stale)
+  start_gated_tiny_writer "$omp" "$side" "$dir/gate" "$dir/writer.pid" 4 1
+  wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
+  wpid=$(cat "$dir/writer.pid")
+  watch_cap "$state" "$out" FM_POLL=60 FM_STATUS_CAP_BYTES=$cap FM_STATUS_SPAN_READER="$reader" \
+    FM_TEST_GATE_LOG="$status" FM_TEST_GATE_GROWS="$side" FM_TEST_GATE="$dir/gate" FM_TEST_GATE_SIZE=$cap "${env[@]}"
+  watch_pid=$!
+  wait_for_exit "$watch_pid" 600 || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never woke: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  grep -q 'check: status-log-over-cap: file=.short-stale.home-appends.runaway' "$out" \
+    || { kill -9 "$wpid" 2>/dev/null; fail "the stale wake exited without a check of the cap that the sidecar had passed: $(cat "$out")"; }
+  grep -q "stopped pid $wpid (omp) with SIGSTOP" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "the wake does not say the writer was stopped: $(cat "$out")"; }
+  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$wpid"))"; }
+  awk -F'\t' '$3 == "stale" { found = 1 } END { exit !found }' "$state/.wake-queue" \
+    || { kill -9 "$wpid" 2>/dev/null; fail "the stale wake was not queued with the over-cap wake: $(cat "$state/.wake-queue")"; }
+  kill -CONT "$wpid" 2>/dev/null; kill -9 "$wpid" 2>/dev/null
+  pass "a sidecar that passes the cap while the stale surface walks its lane's log is checked before the stale wake exits, and its writer is stopped"
+}
+
+test_the_push_transition_walk_checks_the_cap() {
+  local dir state wakes
+  dir=$(make_case push-walk); state="$dir/state"; wakes="$dir/wakes"
+  : > "$wakes"
+  # The push handler walks the lane's unread lines before it wakes. Another log is already over the
+  # cap, and a poll has passed since the last check, so the watcher's hook, which the handler calls
+  # once per line, must find it during the walk. The watcher is sourced, so wake records instead of
+  # exiting, and lsof is a stand-in that lists nothing.
+  perl -e 'print "text\n" x 50' > "$state/tk1.status"
+  printf 'window=default:wG:pQ\nbackend=herdr\nkind=ship\n' > "$state/tk1.meta"
+  head -c 70000 /dev/zero | tr '\0' 'x' > "$state/other.status"
+  FM_STATE_OVERRIDE="$state" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=1 FM_STATUS_CAP_BYTES=65536 \
+    FM_STATUS_CAP_LSOF=/usr/bin/false bash -c '
+      wakes=$2
+      # shellcheck source=/dev/null
+      . "$1/bin/fm-watch.sh"
+      wake() { printf "%s\n" "$1" >> "$wakes"; }
+      SECONDS=60
+      handle_push_transition herdr default "$(fm_transition_record wG:pQ wG "" blocked claude)"
+    ' _ "$ROOT" "$wakes" > "$dir/push.out" 2>&1 || fail "the push handler failed: $(tail -c 600 "$dir/push.out")"
+  grep -q 'check: status-log-over-cap: file=other.status' "$wakes" \
+    || fail "the push handler walked the lane's lines without a check of the cap: $(cat "$wakes")"
+  grep -q 'stale: default:wG:pQ' "$wakes" || fail "the push handler did not go on to its own wake: $(cat "$wakes")"
+  pass "the push-transition handler checks the cap while it walks the lane's unread lines, then still wakes for the transition"
 }
 
 test_the_span_classifier_calls_its_tick_for_every_line_it_walks() {
@@ -1028,6 +1117,9 @@ tests=(
   test_a_cap_crossing_after_the_span_is_captured_is_stopped_before_the_signal_wake_exits
   test_a_long_classification_checks_the_cap_every_poll
   test_the_heartbeat_scan_checks_the_cap_every_poll
+  test_the_stale_surface_checks_the_cap_every_poll
+  test_a_cap_crossing_during_a_short_stale_walk_is_stopped_before_the_stale_wake_exits
+  test_the_push_transition_walk_checks_the_cap
   test_the_span_classifier_calls_its_tick_for_every_line_it_walks
   test_guard_says_unknown_when_lsof_is_missing_or_timed_out
   test_non_omp_and_missing_writers_wake_but_stop_nothing
