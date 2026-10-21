@@ -1,0 +1,6 @@
+status log lines: 200001
+explicit pr= (no discovery) #1     real=16.46s maxrss=5MB  pr=https://github.com/example/repo/pull/16 source=meta
+explicit pr= (no discovery) #2     real=14.08s maxrss=5MB  pr=https://github.com/example/repo/pull/16 source=meta
+no pr= (discovery) #1              real=12.90s maxrss=5MB  pr=https://github.com/example/repo/pull/15 source=status_event
+no pr= (discovery) #2              real=22.45s maxrss=5MB  pr=https://github.com/example/repo/pull/15 source=status_event
+no pr= (discovery) #3              real=14.32s maxrss=5MB  pr=https://github.com/example/repo/pull/15 source=status_event

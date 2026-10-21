@@ -1,0 +1,10 @@
+== /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FSQD52TH0VFNAMBZ465PPP  via GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+exit=0 stderr: 
+blank-pr-meta    https://github.com/example/repo/pull/31  status_event
+crlf             https://github.com/example/repo/pull/21  status_event
+empty-log        null                                     absent
+files-suffix     https://github.com/example/repo/pull/32  status_event
+http-scheme      http://forge.example/o/r/pull/27         status_event
+long-line        https://github.com/example/repo/pull/26  status_event
+paren-quote      https://github.com/example/repo/pull/29  status_event
+trailing-nonurl  https://github.com/example/repo/pull/24  status_event

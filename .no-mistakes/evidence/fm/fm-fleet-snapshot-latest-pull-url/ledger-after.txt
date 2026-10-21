@@ -1,0 +1,8 @@
+== AFTER (target 336a698b5)  (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FSQD52TH0VFNAMBZ465PPP/bin/fm-open-loops.sh --json)
+exit=0
+--- snapshot PR the ledger read for the task:
+{"id":"live-task","pr":{"url":"https://github.com/example/repo/pull/2","source":"status_event","head":null}}
+--- forge endpoints the ledger asked for:
+   1 repos/example/repo/pulls/2
+--- ledger complete flag and degraded coverage rows:
+{"complete":true}

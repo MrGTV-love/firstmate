@@ -1,0 +1,11 @@
+== BEFORE (base ff899e92a)  (snapshot: /Users/charlesabrooker/tmp/fm-base.Nlzvhu/bin/fm-fleet-snapshot.sh, locale: en_US.UTF-8, bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26))
+exit=0 stderr_bytes=       0
+explicit-meta           https://github.com/example/repo/pull/8   meta
+first-on-last-line      https://github.com/example/repo/pull/5   status_event
+invalid-bytes           https://github.com/example/repo/pull/10  status_event
+no-url                  null                                     absent
+nul-byte                https://github.com/example/repo/pull/12  status_event
+s1-done-then-withdrawn  https://github.com/example/repo/pull/1   status_event
+s2-done-then-decision   https://github.com/example/repo/pull/1   status_event
+s3-same-line            https://github.com/example/repo/pull/2   status_event
+single                  https://github.com/example/repo/pull/4   status_event

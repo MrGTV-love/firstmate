@@ -1,0 +1,11 @@
+== AFTER (branch target 336a698b5)  (snapshot: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FSQD52TH0VFNAMBZ465PPP/bin/fm-fleet-snapshot.sh, locale: en_US.UTF-8, bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26))
+exit=0 stderr_bytes=       0
+explicit-meta           https://github.com/example/repo/pull/8   meta
+first-on-last-line      https://github.com/example/repo/pull/6   status_event
+invalid-bytes           https://github.com/example/repo/pull/11  status_event
+no-url                  null                                     absent
+nul-byte                https://github.com/example/repo/pull/13  status_event
+s1-done-then-withdrawn  https://github.com/example/repo/pull/2   status_event
+s2-done-then-decision   https://github.com/example/repo/pull/2   status_event
+s3-same-line            https://github.com/example/repo/pull/2   status_event
+single                  https://github.com/example/repo/pull/4   status_event
