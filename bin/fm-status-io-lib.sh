@@ -386,7 +386,7 @@ _fm_status_ident_device_shifted() {  # <recorded-identity> <current-identity>
 # and marker immediately before atomic publication; failure leaves detection
 # conservative. A marker whose reported signature already equals the current one,
 # or whose reported and classified identities already share the current device,
-# is left alone without decoding either signature. Every scan that reads a
+# is left alone without the per-byte signature decode. Every scan that reads a
 # marker calls this first.
 status_presentation_marker_adopt_device() {  # <marker> <status-file> [current-signature]
   local marker=$1 file=$2 current=${3-} raw reported classified old_ident new_ident old_other new_other
