@@ -220,7 +220,9 @@ That is why the bound and the debounce are pinned by separate cases: a change tr
 
 [`tests/fm-procevent.test.sh`](../../tests/fm-procevent.test.sh) exercises these reproductions through the executable interface: a TERM-surviving child under both `retire` and the guard, escalation with an absent or zombie leader or probes configured to become unreadable after TERM, and refusal of mismatched live identities or nonleaders before the first signal.
 The healthy-runner case requires the attached `start` to return status 143 (TERM); the printed retirement duration and sampled stop windows are supplementary evidence, not a timing-based pass condition.
-Two cases pin the guard's own numbers rather than only its outcome: one reaps an orphaned listener within the lease term plus a single check interval, with the lease expiry deliberately placed late in that interval, and one fails exactly one lease read against a home that is still alive and requires the runner to survive it.
+Separate cases pin the detection bound and read recovery: one reaps an orphaned listener within the lease term plus a single check interval, with the lease expiry deliberately placed late in that interval, and one fails exactly one lease-age command while all other age responses are zero.
+The recovery case waits for the source to start before capturing its runner PID, then waits for the guard's next read after a successful recovery result before asserting runner survival, avoiding both a startup marker rewrite race and a fixed sleep that assumes recovery or lease freshness under load.
+Lease expiry remains covered by the real-clock bound case; the recovery fixture changes no production clock, interval, or stop bound.
 They fail for opposite reasons, which is the point of keeping them apart.
 The crashed-leader cases separately pin refusal and claim preservation when a leader dies outside the stop's own signal, so successful escalation cannot be mistaken for closing that limit.
 Refresh the regressions with `bash tests/fm-procevent.test.sh`; the dated measurements above are recorded observations, not fixed timing thresholds.

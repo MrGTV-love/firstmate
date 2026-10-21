@@ -6019,11 +6019,11 @@ pass "the owner guard defaults to a 60-second detection interval, read as two 30
 # separately so the two cannot be traded for each other by accident: against a
 # home that is still alive, an isolated failed read must not stop the runner.
 #
-# The failure is injected where the real path actually reads. ONE lease read
-# fails, exactly once, identified by the lease-age program's own text so no
-# other call in the runner is touched; every read before and after it is the
-# real command, and the home's lease stays long and fresh throughout. The single
-# failed read is therefore the only thing wrong that the guard can see.
+# Inject at the lease-age command boundary: ONE read fails after startup and
+# every other age is zero. A real lease refreshed only during reconcile can
+# expire while a loaded host schedules startup or the observation, making the
+# supposed isolated failure into consecutive misses. Expiry and detection bounds
+# have their own real-clock cases above; this case isolates read recovery.
 
 DEBOUNCE_HOME="$TMP_ROOT/lease-debounce"; new_home "$DEBOUNCE_HOME"
 fm_test_track_procevent_home "$DEBOUNCE_HOME"
@@ -6032,22 +6032,30 @@ DEBOUNCE_BIN=$(fm_fakebin "$TMP_ROOT/lease-debounce-bin")
 REAL_PERL=$(command -v perl) || fail "this host has no perl to build the debounce fixture on"
 cat > "$DEBOUNCE_BIN/perl" <<SH
 #!/usr/bin/env bash
-if [ -s "\$LEASE_DEBOUNCE_STATE/armed" ] && [ ! -s "\$LEASE_DEBOUNCE_STATE/spent" ]; then
-  for arg in "\$@"; do
-    case \$arg in
-      *'int(\$now - \$value)'*)
-        printf 'spent\n' > "\$LEASE_DEBOUNCE_STATE/spent"
-        exit 1
-        ;;
-    esac
-  done
-fi
+for arg in "\$@"; do
+  case \$arg in
+    *'int(\$now - \$value)'*)
+      if [ -s "\$LEASE_DEBOUNCE_STATE/armed" ]; then
+        if [ ! -s "\$LEASE_DEBOUNCE_STATE/spent" ]; then
+          printf 'spent\n' > "\$LEASE_DEBOUNCE_STATE/spent"
+          exit 1
+        elif [ ! -s "\$LEASE_DEBOUNCE_STATE/recovered" ]; then
+          printf 'recovered\n' > "\$LEASE_DEBOUNCE_STATE/recovered"
+        else
+          printf 'observed\n' > "\$LEASE_DEBOUNCE_STATE/observed"
+        fi
+      fi
+      printf '0\n'
+      exit 0
+      ;;
+  esac
+done
 exec "$REAL_PERL" "\$@"
 SH
 chmod +x "$DEBOUNCE_BIN/perl"
 
-# A long lease and a short check: many reads happen inside the observation
-# window, and none of them can go stale on their own during it.
+# Keep the ordinary lease/check settings; freshness is supplied independently
+# above, so scheduling delay cannot manufacture another failed lease check.
 DEBOUNCE_LEASE_SECONDS=30
 DEBOUNCE_CHECK_SECONDS=1
 debounce_pe() {
@@ -6060,8 +6068,11 @@ debounce_pe register lavish debounce-src -- "$QUIET_STUB" "$TMP_ROOT/lease-debou
   || fail "fixture step failed: register debounce-src"
 debounce_pe reconcile >/dev/null \
   || fail "fixture step failed: reconcile debounce_pe"
-wait_for "$DEBOUNCE_HOME/state/procevent/debounce-src.runner" \
-  || fail "the debounce fixture's listener never recorded its runner"
+# The source starts after both startup writes to the runner marker. Reading
+# immediately after its first nonempty publication can race the second write's
+# truncation and capture an empty PID even though the runner stays alive.
+wait_for "$TMP_ROOT/lease-debounce-marker.descendant" \
+  || fail "the debounce fixture's source never started"
 DEBOUNCE_PID=$(cat "$DEBOUNCE_HOME/state/procevent/debounce-src.runner")
 # Armed only now. The guard proves the lease once before it reports ready, and
 # failing THAT read would refuse the runner outright instead of exercising the
@@ -6069,9 +6080,11 @@ DEBOUNCE_PID=$(cat "$DEBOUNCE_HOME/state/procevent/debounce-src.runner")
 printf 'armed\n' > "$DEBOUNCE_STATE/armed"
 wait_for "$DEBOUNCE_STATE/spent" \
   || fail "the single failed lease read this case injects never happened"
-# Several further checks at the configured interval. A guard that acted on one
-# failed read would have stopped the group during them.
-sleep $((DEBOUNCE_CHECK_SECONDS * 4))
+# The next read can begin only after the guard consumed the recovery result.
+# Waiting for that causal boundary proves the guard advanced past the miss;
+# a fixed observation sleep neither proves recovery nor keeps a lease fresh.
+wait_for "$DEBOUNCE_STATE/observed" \
+  || fail "one unreadable lease read ended a runner whose home was still alive"
 kill -0 -"$DEBOUNCE_PID" 2>/dev/null \
   || fail "one unreadable lease read ended a runner whose home was still alive"
 debounce_pe retire debounce-src >/dev/null \
