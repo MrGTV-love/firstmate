@@ -617,6 +617,11 @@ fm_remote_job_next_seq() { # [stage-dir destination]
     # created, and trusting that handed one sequence number to several callers.
     # bash's noclobber create is O_EXCL, so exactly one caller creates the
     # marker whatever mkdir claimed.
+    # Only this reservation is hardened. The worker singleton lock, a job's
+    # .claim, the AFK launch lock, and the busy-state writer lock still treat a
+    # successful mkdir as exclusive ownership; their race window is far narrower
+    # and moving them to a shared exclusive-create helper is recorded as a
+    # follow-up rather than folded into this change.
     (umask 077; mkdir "$claim") 2>/dev/null || true
     if (umask 077; set -C; : > "$claim/owner") 2>/dev/null; then
       chmod 700 "$claim" || return 1
@@ -876,16 +881,16 @@ fm_remote_job_reap_stale() { # <account-home>
       if [ -n "$tmp" ] && printf '%s\n' "$now" > "$tmp" && chmod 600 "$tmp" \
         && mv -f -- "$tmp" "$marker"; then
         # One directory walk: ! -newer matches whole-second mtime <= cutoff
-        # (the former >= age check). Each expired claim's owner marker is
-        # removed before its directory, in the same batch, so the age predicate
-        # is still evaluated against the claim's own mtime rather than a
-        # directory that the marker removal just refreshed. Batched removal
-        # tolerates concurrent creation races the same way the former
-        # per-claim rmdir || true did.
+        # (the former >= age check). The age predicate is evaluated by find
+        # before any removal, so a marker removal that refreshes a directory's
+        # mtime cannot change which claims this pass reaps. Both removals stay
+        # batched, one rm and one rmdir per argument batch rather than two
+        # processes per claim, because this sweep runs inline in the worker
+        # loop before it serves the next job.
         find "$FM_REMOTE_JOB_SEQ_CLAIMS" -mindepth 1 -maxdepth 1 -type d \
           -name '[0-9]*' ! -name '*[!0-9]*' ! -name 0 \
           ! -newer "$ref" \
-          -exec sh -c 'for d in "$@"; do rm -f "$d/owner"; rmdir "$d"; done' sh {} + \
+          -exec sh -c 'printf "%s/owner\0" "$@" | xargs -0 rm -f --; rmdir "$@"' sh {} + \
           2>/dev/null || true
       else
         [ -z "$tmp" ] || rm -f -- "$tmp"
