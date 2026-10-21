@@ -123,10 +123,6 @@ def prepare(args):
         raise ValueError(f"unsupported dsh effort: {effort}")
     source = Path(source_home)
     original = source / "profiles" / "dsh-tui"
-    package = original / "node_modules" / "@deepseek-harness-tui" / "dsh-tui" / "package.json"
-    version = json.loads(package.read_text())["version"]
-    if version != "0.16.1":
-        raise ValueError(f"dsh-tui profile {version} is not live-verified; expected 0.16.1")
     root = Path(state).resolve() / f"{task}.dsh" / generation
     root.mkdir(parents=True, exist_ok=False, mode=0o700)
     home = root / "home"

@@ -151,7 +151,7 @@ installed = source / 'profiles/dsh-tui'
 package = installed / 'node_modules/@deepseek-harness-tui/dsh-tui'
 package.mkdir(parents=True)
 (installed / 'package.json').write_text('{}')
-(package / 'package.json').write_text(json.dumps({'version':'0.16.1'}))
+(package / 'package.json').write_text(json.dumps({'version':'99.1.0'}))
 (source / '.credentials.yaml').write_text('secret\n')
 launches = tmp / 'launches'
 launches.mkdir()
@@ -175,6 +175,29 @@ print('ok - dsh route boundaries, launchable-model admission, provider normaliza
 PY
 # shellcheck source=bin/fm-dsh-lib.sh
 . "$ROOT/bin/fm-dsh-lib.sh"
+# Probe exits, not release strings, decide admission. The probed CLI must be
+# the PATH-selected one even when a different CLI sits beside the launcher.
+mkdir -p "$TMP/launcher" "$TMP/cli"
+printf '#!/bin/sh\nprintf "launcher arbitrary-release\\n"\nexit "${FM_FAKE_DSH_TUI_STATUS:-0}"\n' > "$TMP/launcher/dsh-tui"
+printf '#!/bin/sh\nexit 9\n' > "$TMP/launcher/dsh"
+printf '#!/bin/sh\nprintf "cli next-release\\n"\nexit "${FM_FAKE_DSH_CLI_STATUS:-0}"\n' > "$TMP/cli/dsh"
+chmod +x "$TMP/launcher/dsh-tui" "$TMP/launcher/dsh" "$TMP/cli/dsh"
+[ "$(PATH="$TMP/cli:$TMP/launcher:$PATH" fm_dsh_executable)" = "$TMP/launcher/dsh-tui" ]
+[ "$(PATH="$TMP/cli:$TMP/launcher:$PATH" fm_dsh_cli)" = "$TMP/cli/dsh" ]
+PATH="$TMP/cli:$TMP/launcher:$PATH" fm_dsh_launch_check
+if out=$(FM_FAKE_DSH_TUI_STATUS=3 PATH="$TMP/cli:$TMP/launcher:$PATH" fm_dsh_launch_check 2>&1); then
+  echo 'a failed launcher probe must refuse' >&2; exit 1
+fi
+case "$out" in *'dsh-tui version failed'*) ;; *) echo "$out" >&2; exit 1 ;; esac
+if out=$(FM_FAKE_DSH_CLI_STATUS=4 PATH="$TMP/cli:$TMP/launcher:$PATH" fm_dsh_launch_check 2>&1); then
+  echo 'a failed CLI probe must refuse even when it printed a version' >&2; exit 1
+fi
+case "$out" in *'dsh --version failed'*) ;; *) echo "$out" >&2; exit 1 ;; esac
+if out=$(PATH="$TMP/cli" fm_dsh_launch_check 2>&1); then
+  echo 'an absent launcher must refuse' >&2; exit 1
+fi
+case "$out" in *'dsh-tui executable not found on PATH'*) ;; *) echo "$out" >&2; exit 1 ;; esac
+printf 'ok - PATH-selected DSH probes accept arbitrary releases and refuse failed commands\n'
 fm_dsh_args_are_dsh 'node /opt/node_modules/@deepseek-ai/dsh/lib/bin.js --profile dsh-tui'
 if fm_dsh_args_are_dsh 'node /tmp/unrelated.js /opt/node_modules/@deepseek-ai/dsh/lib/bin.js'; then
   echo 'the dsh script must occupy the interpreter argument slot' >&2
@@ -202,7 +225,14 @@ dsh_draft=$(printf '%s\n' "$dsh_frame_top" "$(dsh_row 'fix the tests')" "$dsh_fr
 [ "$(dsh_verdict "$dsh_draft")" = pending ] || { echo "expected pending dsh draft, got $(dsh_verdict "$dsh_draft")" >&2; exit 1; }
 dsh_busy=$(printf '%s\n' "$dsh_empty" '   esc to interrupt')
 [ "$(dsh_verdict "$dsh_busy")" = empty ] || { echo "expected empty dsh composer under its busy hint, got $(dsh_verdict "$dsh_busy")" >&2; exit 1; }
-printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture\n'
+fm_composer_dsh_screen_check "$dsh_empty"
+fm_composer_dsh_screen_check "$dsh_draft"
+fm_composer_dsh_screen_check "$dsh_busy"
+if out=$(fm_composer_dsh_screen_check 'new frontend without a recognized composer' 2>&1); then
+  echo 'an unrecognized composer must refuse' >&2; exit 1
+fi
+case "$out" in *'could not parse the composer frame or its input content'*) ;; *) echo "$out" >&2; exit 1 ;; esac
+printf 'ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic\n'
 # shellcheck source=bin/fm-control-lib.sh
 . "$ROOT/bin/fm-control-lib.sh"
 [ "$(fm_control_interrupt_key dsh)" = Escape ]

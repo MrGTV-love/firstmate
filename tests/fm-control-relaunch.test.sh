@@ -85,14 +85,14 @@ test_relaunch_refuses_contradictory_dsh_route_before_stopping() {
   cat > "$dir/fakebin/dsh-tui" <<'SH'
 #!/bin/sh
 if [ "${1:-}" = version ]; then
-  printf '@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)\nprofile: 0.16.1  fake\n'
+  printf '@deepseek-harness-tui/dsh-tui 99.1.0 (launcher)\nprofile: 99.1.0  fake\n'
   exit 0
 fi
 exit 1
 SH
   cat > "$dir/fakebin/dsh" <<'SH'
 #!/bin/sh
-printf '0.2.0-rc.2\n'
+printf '99.2.0\n'
 SH
   chmod +x "$dir/fakebin/dsh-tui" "$dir/fakebin/dsh"
   cp "$dir/home/state/dsh-route.meta" "$dir/prior.meta"

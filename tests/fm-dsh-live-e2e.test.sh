@@ -64,7 +64,7 @@ wait_state() {
     sleep 1
   done
   lab pane read "$PANE" --source visible
-  echo "dsh-tui 0.16.1 never reached $want" >&2
+  echo "dsh-tui never reached $want" >&2
   return 1
 }
 wait_rendered() {
@@ -149,6 +149,6 @@ EOF
   done
   control "$ID" exit
   [ "$(fm_backend_agent_state herdr "$SESSION:$PANE")" = dead ] || { echo "final exit did not stop $ID" >&2; exit 1; }
-  printf 'ok - live dsh-tui 0.16.1 %s brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit\n' "$KIND"
+  printf 'ok - live dsh-tui %s brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit\n' "$KIND"
 done
 printf 'lab_project=%s\nlab_copy=%s\nlab_home=%s\n' "$PROJECT" "$COPY" "$HOME_ROOT"

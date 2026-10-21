@@ -213,11 +213,11 @@ pass "capacity does not conflate native Claude quota with a TeamClaude stand-in"
 # DeepSeek is a dsh-tui replacement, never a second omp provider route.
 cat > "$FAKEBIN/dsh-tui" <<'SH'
 #!/bin/sh
-printf '@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)\nprofile: 0.16.1  fake\n'
+printf '@deepseek-harness-tui/dsh-tui 99.1.0 (launcher)\nprofile: 99.1.0  fake\n'
 SH
 cat > "$FAKEBIN/dsh" <<'SH'
 #!/bin/sh
-printf '0.2.0-rc.2\n'
+printf '99.2.0\n'
 SH
 chmod +x "$FAKEBIN/dsh-tui" "$FAKEBIN/dsh"
 deepseek='[{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"high"}]'
@@ -229,7 +229,7 @@ assert_equals deepseek/deepseek-v4-flash "$(jq -r .profile.model <<<"$out")" "th
 if fm_dispatch_fallback_supported "$TMP_ROOT/config" '{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}' 2>/dev/null; then
   fail "the former omp DeepSeek route must not remain supported"
 fi
-printf '#!/bin/sh\nprintf \"unsupported-version\\n\"\n' > "$FAKEBIN/dsh"
+printf '#!/bin/sh\nprintf "probe-failed\n"\nexit 1\n' > "$FAKEBIN/dsh"
 if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$deepseek" '{"status":"exhausted"}' > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "an unavailable verified dsh runtime must not fall back to omp"
 fi

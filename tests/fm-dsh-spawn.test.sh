@@ -213,16 +213,18 @@ test_busy_classify_follows_the_launch_session_log() {
 
 # --- 3. Spawn -----------------------------------------------------------------
 
-# A fake dsh-tui that answers the launcher's version probe like the pinned
-# runtime and, when launched, records the environment, arguments, and git
+# A fake dsh-tui whose successful version probe advertises a different release
+# and, when launched, records the environment, arguments, and git
 # identity the worker would see. A fake dsh answers the CLI version.
 make_fake_dsh() {  # <fakebin>
   cat > "$1/dsh-tui" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = version ]; then
-  printf '@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)\nprofile: 0.16.1  fake\n'
+  printf '@deepseek-harness-tui/dsh-tui 99.1.0 (launcher)\nprofile: 99.1.0  fake\n'
   exit 0
 fi
+# Like the real launcher, require its CLI through the worker's search path.
+dsh --version >/dev/null || exit 1
 log=${FM_FAKE_DSH_ENV_LOG:-/dev/null}
 env > "$log"
 printf '%s\n' "$@" > "$log.args"
@@ -235,7 +237,7 @@ exit 0
 SH
   cat > "$1/dsh" <<'SH'
 #!/usr/bin/env bash
-printf '0.2.0-rc.2\n'
+printf '99.2.0\n'
 SH
   chmod +x "$1/dsh-tui" "$1/dsh"
 }
@@ -274,17 +276,18 @@ make_dsh_case() {  # <name> <id> [crew-harness]
   PROJ_DIR="$CASE_DIR/project"
   WT_DIR="$CASE_DIR/wt"
   LAUNCH_LOG="$CASE_DIR/launch.log"
-  FAKEBIN_DIR=$(make_spawn_fakebin "$CASE_DIR/fake" claude)
+  FAKEBIN_DIR=$(make_spawn_fakebin "$CASE_DIR/fake" claude omp)
   make_fake_dsh "$FAKEBIN_DIR"
   fm_test_spawn_home "$HOME_DIR" "$crew"
   fm_git_worktree "$PROJ_DIR" "$WT_DIR" "wt-$name"
   fm_test_spawn_brief "$HOME_DIR" "$id"
   : > "$LAUNCH_LOG"
+  printf '%s\n' '  ╭──────────────────────────────╮' '  ⌸ ❯                          ⛶' '  ╰──────────────────────────────╯' > "$CASE_DIR/screen"
   # The installed profile prepare reads, and the credentials it copies.
   local installed="$HOME_DIR/user-home/.dsh"
   mkdir -p "$installed/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui"
   printf '{}\n' > "$installed/profiles/dsh-tui/package.json"
-  printf '{"version":"0.16.1"}\n' > "$installed/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/package.json"
+  printf '{"version":"99.1.0"}\n' > "$installed/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/package.json"
   printf 'secret\n' > "$installed/.credentials.yaml"
 }
 
@@ -294,7 +297,7 @@ run_dsh_spawn() {  # <id> <spawn-args...>
   shift
   python3 "$TMP_ROOT/dsh-session-writer.py" "$HOME_DIR/state" "$id" "$LAUNCH_LOG" &
   writer=$!
-  out=$(DSH_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+  out=$(DSH_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="${FM_FAKE_CAPTURE_FILE:-$CASE_DIR/screen}" \
     fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" "$@")
   status=$?
   kill "$writer" 2>/dev/null
@@ -350,7 +353,7 @@ run_recorded_launch() {  # <out-log> <pane-vars...>
   [ -d "$probe/.git" ] || fm_git_init_commit "$probe"
   launch=$(cat "$LAUNCH_LOG")
   : > "$log"
-  env -i HOME="$real_home" PATH="$FAKEBIN_DIR:$PATH" \
+  env -i HOME="$real_home" PATH=/usr/bin:/bin \
     CLAUDECODE=1 FM_OMP_HARNESS=omp PI_CODING_AGENT=true GROK_AGENT=1 CURSOR_AGENT=1 \
     FM_FAKE_DSH_ENV_LOG="$log" FM_FAKE_DSH_REPO="$probe" "$@" \
     /bin/sh -c "$launch" </dev/null >/dev/null 2>&1 || return 1
@@ -433,6 +436,17 @@ test_deepseek_cannot_launch_on_omp() {
   pass "fm-spawn: explicit, raw, and indexed DeepSeek-through-omp routes refuse before launch"
 }
 
+test_unrecognized_dsh_screen_refuses_launch() {
+  local id=dsh-unknown-screen out status
+  make_dsh_case unknown-screen "$id"
+  printf '%s\n' 'An incompatible frontend without a composer' > "$CASE_DIR/screen"
+  out=$(FM_DSH_START_POLLS=10 run_dsh_spawn "$id" --model "$DSH_MODEL" --scout 2>&1)
+  status=$?
+  expect_code 1 "$status" "an unrecognized dsh frontend must refuse: $out"
+  assert_contains "$out" 'could not parse the composer frame or its input content' "the refusal must name the unreadable screen shape"
+  pass "fm-spawn: a successful version probe and durable turn cannot admit an unrecognized dsh screen"
+}
+
 test_exhausted_omp_replaces_deepseek_harness() {
   local id=dsh-replacement out status
   make_dsh_case replacement "$id"
@@ -467,4 +481,5 @@ test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_launch_policy_admits_dsh
 test_deepseek_cannot_launch_on_omp
+test_unrecognized_dsh_screen_refuses_launch
 test_exhausted_omp_replaces_deepseek_harness

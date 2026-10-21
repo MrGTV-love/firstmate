@@ -3884,8 +3884,8 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 
 ## DeepSeek Harness (dsh-tui)
 
-Verified on 2026-10-18 on macOS arm64 (Darwin 27.0.0) through `bin/fm-herdr-lab.sh` in a named non-default lab session.
-Runtime: `dsh-tui` 0.16.1 (launcher and installed profile) with the `dsh` CLI 0.2.0-rc.2.
+Verified on 2026-10-21 on macOS arm64 (Darwin 27.0.0) through `bin/fm-herdr-lab.sh` in a named non-default lab session.
+Observed on the PATH-selected Homebrew `dsh-tui` 0.16.1 (launcher and installed profile), `dsh` CLI 0.2.1-rc.2, and Node v26.4.0; these release numbers record the measurement, not an admission requirement.
 Fixture: a disposable scratch project and its isolated linked copy, registered only in the guard's private home with local-only delivery and no push.
 
 ```sh
@@ -3899,20 +3899,9 @@ bin/fm-test-run.sh tests/fm-dsh-spawn.test.sh
 ```
 
 ```text
-ok - live dsh-tui 0.16.1 ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
-ok - live dsh-tui 0.16.1 scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+ok - live dsh-tui scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
 cleanup_exit=0
-ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement
-ok - dsh frame proves empty, typed draft, and busy-hint furniture
-ok - dsh executable-slot attribution, lifecycle capability and fatal cleanup contract
-ok - fm-harness: dsh detects by anchored name or script argv; the marker is a precedence override that needs real dsh ancestry
-ok - session lock and process classification: dsh is anchored, decoys stay out
-ok - fm_backend_tmux_agent_state: dsh is alive by name and by script argv, an unrelated node is not
-ok - fm_busy_classify: dsh follows the launch's own durable session log
-ok - fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default
-ok - fm-spawn: an explicit dsh pin is honored and a dsh launch without a DeepSeek model is refused
-ok - fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME
-ok - fm-spawn: config/session-launch-policy=omp-or-tc refuses a dsh launch with the policy's own message
 ```
 
 | Fact | Observed |
@@ -3922,14 +3911,27 @@ ok - fm-spawn: config/session-launch-policy=omp-or-tc refuses a dsh launch with 
 | Busy state | `bin/fm-dsh.py state` folded the launch's own `session.v4.jsonl`: the brief turn read `busy`, the completed steer read `idle`, and the pre-turn launch read `unknown`; no screen scrape was consulted |
 | Composer | the rounded `⌸ … ⛶` frame holding `❯` classified `empty` on an idle busy pane and `pending` with typed text, with its two status rows and `esc to interrupt` treated as furniture |
 | Steer | `bin/fm-send.sh` delivered an inbox record mid-task and the worker replied with the requested token before the next interruption |
-| Interrupt and exit | `bin/fm-control.sh <id> interrupt` reported `interrupt-delivered ... verified=agent-alive`, and `exit` reported `stopped` with Herdr then reporting the pane dead |
+| Interrupt and exit | For both workers, `bin/fm-control.sh <id> interrupt` reported `interrupt-delivered ... verified=agent-alive cancel=unconfirmed`; key delivery and agent survival were proven, but cancellation completion was not independently confirmed. `exit` reported `stopped` with Herdr then reporting the pane dead |
 | Relaunch | `bin/fm-control.sh <id> relaunch` replaced the worker in the same endpoint; the replacement read its relaunch instructions and the guard observed the bound session log grow in place |
 | Resume | Available through the launch overlay's `sessionId` field. The stock profile patch reads `DSH_TUI_RESUME_SESSION`, but the launch patch replaces that row config, so `--resume` or the env alone opened a fresh session; `bin/fm-dsh.py resume` now writes the task's newest session id explicitly and DSH continues the conversation in the same session log. Verified by a secret-word probe in which the resumed session recalled a word from the earlier turn, and by the live guard's same-log growth and earlier-conversation assertions. |
 
-The two `live` lines and `cleanup_exit=0` were recorded by the live guard before the start-position proof landed; the eleven portable lines come from the final head. Rerun the live guard to refresh the first three.
+The live guard completed both lifecycles with the durable start-position proof and the recognized-composer launch check enabled.
+The default-session tripwire and lab cleanup succeeded.
+`tests/fm-dsh-harness.test.sh` also reported:
 
-The 93 MB installed profile tree is reproduced file by file inside each launch root and never linked as a directory: Node resolves real paths before DSH's profile interception, so a linked `node_modules` directory escaped the isolated profile and loaded the launcher's own incompatible packages.
-The launcher needs the `dsh` CLI on `PATH`; a pane without the installing nvm bin directory exits with `dsh CLI not found`, so the launch prepends the launcher's own directory.
+```text
+ok - PATH-selected DSH probes accept arbitrary releases and refuse failed commands
+ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic
+```
+
+The launcher and CLI must resolve and their version commands must exit successfully; no release string is compared.
+The actual frontend must then provide a recognizable DSH composer and a new durable turn, so a changed frontend refuses with a diagnostic naming the unreadable composer rather than being accepted because of its version.
+No screen-based DSH quota parser exists: dispatch quota uses structured snapshots and the DSH busy classifier reads its durable session log.
+The launch carries the exact probed `PATH` into the pane: a lab pane that instead selected `/usr/local/bin/node` v22.17.0 returned silently from `dsh --version` with exit zero and started no session, while the same launch using the probed PATH completed both lifecycles.
+This is a search-path handoff, not a Node-version requirement.
+
+The installed profile tree is reproduced file by file inside each launch root and never linked as a directory: Node resolves real paths before DSH's profile interception, so a linked `node_modules` directory escaped the isolated profile and loaded the launcher's own incompatible packages.
+The launcher needs the `dsh` CLI on `PATH`; `bin/fm-dsh-lib.sh` probes both PATH-selected commands and the launch preserves that search path rather than selecting a particular Node installation.
 The launch swaps `HOME` for the task's private one, so `~/.gitconfig` and the no-mistakes home are carried as `GIT_CONFIG_GLOBAL` and `NM_HOME` environment paths resolved by the pane shell; nothing is copied or linked, and the other HOME-relative tool state is absent on purpose.
 On 2026-10-19, against the operator's live no-mistakes daemon, `no-mistakes daemon status` reported the same running daemon from the operator's shell and from a swapped empty `HOME` with `NM_HOME` carried, and `daemon not running` from the swapped `HOME` with `NM_HOME` unset.
 `no-mistakes axi status` from an ungated worktree gave the identical `repo not initialized` answer under both homes. From the gated task copy under the same rendered environment (`HOME` swapped to a fresh empty directory, `NM_HOME`, `GIT_CONFIG_GLOBAL`, and the nvm bin directory carried) it reported the live run `01M59ACR7C1VSYG5SEZHB7K7SW` on branch `fm/fm-dsh-tui-adoption` at head `f09cf534`, identical to the operator's shell; with `NM_HOME` unset it fell back to `repo not initialized`. The checked process was a shell started with the rendered environment, not a command run by a DSH tool call; a DSH tool call that inherits the launch environment is the remaining unrecorded link.

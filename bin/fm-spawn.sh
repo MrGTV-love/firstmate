@@ -2962,7 +2962,7 @@ launch_template() {
   # HOME changes, so a commit keeps its author and the worker still reaches the
   # shared daemon; every other HOME-relative tool state is absent on purpose.
   dsh)
-    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__:"$PATH" __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
     ;;
   # omp (Oh My Pi), a Pi fork. Same one-positional-brief, --model, --thinking,
   # and -e shape as Pi, verified on omp 18.1.11. The differences are all at
@@ -5623,13 +5623,28 @@ agy_spawn_fail() {  # <detail>
 # both mean the brief reached the agent. A resumed launch already holds the
 # earlier conversation, so only a turn that started beyond DSH_START_POSITION,
 # the log position taken before launch, counts. No pane-scrape fallback exists
-# because the log is the same source the busy classifier trusts.
+# because the log is the same source the busy classifier trusts. Separately,
+# require the live composer shape the steering parser understands: a successful
+# version command is not proof that a changed frontend remains compatible.
 dsh_wait_for_start() {
-  local state i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local state pane parse_error i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  # shellcheck source=bin/fm-composer-lib.sh
+  . "$SCRIPT_DIR/fm-composer-lib.sh"
+  DSH_START_ERROR=
   while [ "$i" -lt "$max" ]; do
     state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
     case "$state" in
-      busy | idle) return 0 ;;
+      busy | idle)
+        if fm_backend_visible_capture_supported "$BACKEND"; then
+          pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=
+        else
+          pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null) || pane=
+        fi
+        if parse_error=$(fm_composer_dsh_screen_check "$pane" 2>&1); then
+          return 0
+        fi
+        DSH_START_ERROR=${parse_error#error: }
+        ;;
     esac
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
@@ -6994,7 +7009,7 @@ dsh)
   LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}
   LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
   LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}
-  LAUNCH=${LAUNCH//__DSHPATH__/"$(shell_quote "$(dirname "$DSH_BIN")")"}
+  LAUNCH=${LAUNCH//__DSHPATH__/"$(shell_quote "$PATH")"}
   LAUNCH=${LAUNCH//__DSHBIN__/"$(shell_quote "$DSH_BIN")"}
   ;;
 pi | pi-signed) LAUNCH=${LAUNCH//__PIBIN__/"$(shell_quote "$PI_BIN")"} ;;
@@ -7394,7 +7409,7 @@ if [ "$HARNESS" = agy ]; then
 fi
 if [ "$HARNESS" = dsh ]; then
   if ! dsh_wait_for_start; then
-    dsh_spawn_fail "dsh-tui never recorded a turn for the launch brief in window $T"
+    dsh_spawn_fail "${DSH_START_ERROR:-dsh-tui never recorded a turn for the launch brief in window $T}"
     exit 1
   fi
 fi

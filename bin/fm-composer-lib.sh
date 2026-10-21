@@ -57,7 +57,7 @@
 #                writes its model name there); a titled bottom border that
 #                still starts and ends with the family's rule glyph is
 #                tolerated, including Grok 1.0.5's three-column title overhang.
-#                dsh-tui 0.16.1 draws a rounded frame whose content rows open
+#                dsh-tui (observed on 0.16.1) draws a rounded frame whose content rows open
 #                with `⌸` and close with `⛶`, holding the `❯` prompt glyph.
 #                Its content-width geometry is not comparable to the rule
 #                borders because the glyph itself is content, so the sides,
@@ -1861,7 +1861,7 @@ _fm_composer_row_is_omp_status() {  # <trimmed-row>
 }
 
 # dsh-tui draws its context meter and its model/cost/context cell row directly
-# below the composer frame, with no blank separator (verified live, dsh-tui
+# below the composer frame, with no blank separator (observed on dsh-tui
 # 0.16.1): first `<used>/<window>   <percent>%`, then a middle-dot separated row
 # carrying `ctx <percent>% (<used>/<window>)`. Both are composer furniture; a
 # typed draft never begins with the meter shape, and the model row is only
@@ -2836,6 +2836,20 @@ EOF
         "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
       ;;
   esac
+}
+
+# Require the DSH-specific frame and a proven content verdict, not a release
+# number or a generic prompt glyph. This is a launch compatibility check; busy
+# state remains owned by the durable session log.
+fm_composer_dsh_screen_check() {  # <styled-screen>
+  local proof
+  proof=$(fm_composer_classify_screen $'styled=1\ncursor=0\nidentity=0' "$1"
+    printf '/%s/%s' "${FM_COMPOSER_SELECTED_KIND:-}" "${FM_COMPOSER_SCAN_BOX_DSH:-0}")
+  case "$proof" in
+    empty/box/1 | pending/box/1) return 0 ;;
+  esac
+  echo 'error: dsh-tui screen: could not parse the composer frame or its input content; refusing launch' >&2
+  return 1
 }
 
 # fm_composer_submit_retry_core: the ONE verify-and-retry-Enter submit loop
