@@ -695,11 +695,12 @@ The receipt prevents accidental publication through supported paths; it proves c
 A merged task's pool copy is pruned right after its pull request merges, with no human step.
 `bin/fm-pr-merge.sh` arms the prune once it has verified the merge, and the watcher arms it for a merge that the merge poll sees, such as one made by someone else.
 Arming writes `state/<id>.merge-prune`, and a detached attempt then runs `bin/fm-teardown.sh <id>` without `--force`, under the automatic-reap admission check, so a worker that is still busy, steered, or held for the captain is left alone.
+Because the merge is already verified, that check waives the finished-session sweep's grace wait and ignores its refusal memo, and every other gate stands (`bin/fm-idle-reap-lib.sh` owns this mode).
 The watcher starts `bin/fm-merge-prune.sh sweep` detached while a record exists (`FM_MERGE_PRUNE_INTERVAL`), so no model or person has to carry the retry.
 `FM_MERGE_PRUNE=0` stops new arming.
 
 A refusal that only means "not now" is retried on later ticks and says nothing.
-That covers the task lease or project lock held by another actor, a teardown that outlasts its limit, a worker that is not finished yet, and another lifecycle action already running.
+That covers the task lease or project lock held by another actor, a teardown that outlasts its limit, a worker that is not finished yet, a landing proof that went stale because the copy's HEAD moved while teardown ran, and another lifecycle action already running.
 The retry waits 60 seconds, then doubles up to 3600 seconds.
 One wake is raised if the task is still not pruned after 24 attempts.
 
@@ -712,7 +713,8 @@ Only a known landing refusal makes the fallback re-prove the copy from the live 
 The copy and every nested copy inside it, each checked one by one, must pass all of these:
 
 - The task's own copy is a Treehouse pool slot of the task's project, by the test the rest of Firstmate uses (`fm_treehouse_pool_slot`): the pool's `treehouse-state.json` sits beside it and it shares the project's git directory.
-- Git reports no changed or untracked file, and every untracked file and every changed submodule counts, whatever `status.showUntrackedFiles` or `diff.ignoreSubmodules` says. The one line that does not count is the untracked directory of a nested copy that the project's `.gitignore` does not cover (`?? .claude/worktrees/<name>/`), because each nested copy is proved on its own.
+- Git reports no changed or untracked file, and every untracked file and every changed submodule counts, whatever `status.showUntrackedFiles` or `diff.ignoreSubmodules` says.
+  The one status line that does not count is the untracked directory of a nested copy that the project's `.gitignore` does not cover (`?? .claude/worktrees/<name>/`), because each nested copy is proved on its own.
 - The copy holds no stash entry of its own work: for a linked worktree of the project, a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
 - A nested copy that is an independent clone, with its own git directory, shares nothing with the project, so every stash it holds keeps it.
 - The search for nested copies enters dependency and environment trees too (`.venv`, `venv`, `node_modules`, `__pycache__`), because a clone there holds work like any other.
@@ -722,10 +724,12 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - Every ignored file is scratch, a symlink, or on the preserve list.
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
-Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, and Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`).
-These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape: when a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch. Any other child of that `.tac/` still keeps the copy.
+Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, and Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`).
+These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
+When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
+Any other child of that `.tac/` still keeps the copy.
 A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
-Any other ignored entry under `.claude` or `.opencode` is unique work.
+Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
 Those are copied to `data/<id>/merge-prune-preserved/<time>/` with SHA-256 checksums, and the copy is verified, before anything is removed.
 An ignored file that is neither scratch nor preserved is unique work, so the copy stays.

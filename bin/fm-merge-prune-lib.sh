@@ -57,8 +57,9 @@
 # shape: when a project ignores the whole .tac/ directory, teardown preserves
 # its children other than tmp and uv-cache, and the prune counts rebuildable
 # cache children (.venv, node_modules) as scratch. Under .claude and
-# .opencode only the hook files and a clone (proved on its own) are scratch;
-# any other ignored entry there is unique, stricter than teardown. The preserve
+# .opencode only the hook files, a clone (proved on its own) and an entry with a
+# scratch name are scratch; any other ignored entry there is unique, stricter
+# than teardown. The preserve
 # list is .claude/bug-evidence (slot-specific closeout records) and
 # .claude/channel-outbox (rate files). Before removal those are copied to the
 # task's data folder with SHA-256 checksums and verified there.
