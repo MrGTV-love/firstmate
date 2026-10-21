@@ -1,0 +1,157 @@
+=== S1: report mode (no arguments) ===
+copy-sweep: mode=report containers=1 copies=8
+PENDING-DRIVER	0.14 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/dead	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 89223 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/foreignlock	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/livelauncher	worktree lock: vernant-session-active owner=launcher:90300 launcher=90300 (launcher 90300 is alive; start age=2s; lock mtime=1792579498)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/multiline	worktree lock: vernant-session-active owner=launcher:90593 launcher=90593 (not the supported Vernant creation-lock format)
+REAPABLE-PROVEN	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/plainreap	clean, no process, no record, HEAD contained in a remote branch
+PENDING-DRIVER	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/refused	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 89912 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-UNPUSHED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/unpushedlock	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+PENDING-DRIVER	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/uuidowner	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 89557 is gone; driver verdict not checked in report mode, not yet proven removable
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=3
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <ROOT>/th/pool1: 0.14 GiB of 60 GiB, ok
+budget container <ROOT>/th/pool1/1/repo: 0.14 GiB of 20 GiB, ok
+exit=0
+PASS: S1 exit 0
+PASS: S1 dead-launcher copy is PENDING-DRIVER (not claimed removable)
+PASS: S1 uuid-owner dead-launcher copy is PENDING-DRIVER
+PASS: S1 live-launcher copy is HELD-LOCKED
+PASS: S1 foreign lock is HELD-LOCKED
+PASS: S1 multi-line lock is HELD-LOCKED
+PASS: S1 locked copy with an unpushed commit is HELD-UNPUSHED
+PASS: S1 plain unlocked redundant copy is REAPABLE-PROVEN
+PASS: S1 report did not call the closeout driver
+PASS: S1 report removed nothing and wrote no copy-sweep data
+
+=== S2: bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply ===
+copy-sweep: mode=apply containers=1 copies=5
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/foreignlock	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/livelauncher	worktree lock: vernant-session-active owner=launcher:90300 launcher=90300 (launcher 90300 is alive; start age=4s; lock mtime=1792579498)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/multiline	worktree lock: vernant-session-active owner=launcher:90593 launcher=90593 (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/refused	its closeout driver would not release it (exit 3): pull_request_not_merged: {"allowed": false, "cleanup_command": ["x"], "reason": "pull_request_not_merged"}
+HELD-UNPUSHED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/unpushedlock	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+REMOVED	<ROOT>/th/pool1/1/repo/.claude/worktrees/uuidowner	branch fm/uuidowner at 2b8fb2b1eb93, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 89557 is gone)
+REMOVED	<ROOT>/th/pool1/1/repo/.claude/worktrees/plainreap	branch fm/plainreap at 46aa7a9ce52d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<ROOT>/th/pool1/1/repo/.claude/worktrees/dead	branch fm/dead at 46119b613016, copy 0.14 GiB, preserved 0.02 GiB, net freed 0.13 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 89223 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=4
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <ROOT>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <ROOT>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=8 GiB=0.14 reaped=3 freed=0.13
+exit=0
+PASS: S2 exit 0
+PASS: S2 dead has a REMOVED line
+PASS: S2 dead gone from disk and registry
+PASS: S2 uuidowner has a REMOVED line
+PASS: S2 uuidowner gone from disk and registry
+PASS: S2 plainreap has a REMOVED line
+PASS: S2 plainreap gone from disk and registry
+PASS: S2 dead branch commit preserved locally and on the remote
+PASS: S2 dead: driver asked to plan, then to execute
+PASS: S2 uuidowner branch commit preserved locally and on the remote
+PASS: S2 uuidowner: driver asked to plan, then to execute
+PASS: S2 dead removal line reports copy / preserved / net GiB
+PASS: S2 final line is the copies/GiB/reaped/freed accounting
+PASS: S2 ignored scratch file preserved before release
+PASS: S2 preserved bytes equal the 16 MiB source
+PASS: S2 removal log has 3 lines
+PASS: S2 refused copy: HELD-LOCKED with the driver's own reason
+PASS: S2 refused copy stays, registered, lock bytes unchanged
+PASS: S2 refused copy: driver only asked for its plan
+PASS: S2 livelauncher untouched (present, registered, lock bytes identical)
+PASS: S2 livelauncher: the closeout driver was never called
+PASS: S2 foreignlock untouched (present, registered, lock bytes identical)
+PASS: S2 foreignlock: the closeout driver was never called
+PASS: S2 multiline untouched (present, registered, lock bytes identical)
+PASS: S2 multiline: the closeout driver was never called
+PASS: S2 unpushedlock untouched (present, registered, lock bytes identical)
+PASS: S2 unpushedlock: the closeout driver was never called
+PASS: S2 live launcher process still running
+PASS: S2 sweep reports GiB freed on its last line (nonzero, from 128 MiB copy)
+
+=== S3: driver unlocks 'partial' then fails; the copy must not be removed as unlocked later ===
+copy-sweep: mode=apply containers=1 copies=6
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/foreignlock	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/livelauncher	worktree lock: vernant-session-active owner=launcher:90300 launcher=90300 (launcher 90300 is alive; start age=12s; lock mtime=1792579498)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/multiline	worktree lock: vernant-session-active owner=launcher:90593 launcher=90593 (not the supported Vernant creation-lock format)
+REAPABLE-DRIVER	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/partial	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 9057 is gone
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/refused	its closeout driver would not release it (exit 3): pull_request_not_merged: {"allowed": false, "cleanup_command": ["x"], "reason": "pull_request_not_merged"}
+HELD-UNPUSHED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/unpushedlock	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+FAILED	<ROOT>/th/pool1/1/repo/.claude/worktrees/partial	the copy was left: REFUSED: Vernant's closeout driver did not release <ROOT>/th/pool1/1/repo/.claude/worktrees/partial (exit 4): injected removal failure after driver released the lock
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=4
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <ROOT>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <ROOT>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=6 GiB=0.00 reaped=0 freed=0.00
+exit=1
+PASS: S3 exit 1 (a removal failed)
+PASS: S3 FAILED line carries the driver's own words
+PASS: S3 FAILED line names no teardown completing command
+PASS: S3 copy left on disk and registered
+PASS: S3 driver released the lock (the copy now looks unlocked)
+--- rerun after the failure cause is gone ---
+copy-sweep: mode=apply containers=1 copies=6
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/foreignlock	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/livelauncher	worktree lock: vernant-session-active owner=launcher:90300 launcher=90300 (launcher 90300 is alive; start age=16s; lock mtime=1792579498)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/multiline	worktree lock: vernant-session-active owner=launcher:90593 launcher=90593 (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/partial	driver retained this copy: exit 4: injected removal failure after driver released the lock; no retry until its retained disposition is reconciled
+HELD-LOCKED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/refused	its closeout driver would not release it (exit 3): pull_request_not_merged: {"allowed": false, "cleanup_command": ["x"], "reason": "pull_request_not_merged"}
+HELD-UNPUSHED	0.00 GiB	<ROOT>/th/pool1/1/repo/.claude/worktrees/unpushedlock	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=5
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <ROOT>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <ROOT>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=6 GiB=0.00 reaped=0 freed=0.00
+exit=0
+PASS: S3 rerun holds it as HELD-LOCKED 'driver retained this copy'
+PASS: S3 rerun did NOT remove the now-unlocked copy
+PASS: S3 rerun did not call the driver again for it (still exactly plan+execute)
+
+=== S4: forbidden operations by the sweep itself ===
+PASS: S4 sweep issued no git worktree lock/unlock and no force flag
+PASS: S4 sweep removed the unlocked copy with a plain 'worktree remove' (once)
+PASS: S4 the driver (not the sweep) issued the unlocks
+PASS: S4 Treehouse was never called
+
+git.log (sweep-issued git calls that mutate worktrees):
+-C <ROOT>/th/pool1/1/repo worktree remove -- <ROOT>/th/pool1/1/repo/.claude/worktrees/plainreap
+closeout.log (driver invocations):
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/uuidowner
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/uuidowner --execute-cleanup
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/refused
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/dead
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/dead --execute-cleanup
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/refused
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/partial
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/partial --execute-cleanup
+<ROOT>/th/pool1/1/repo|--cleanup-worktree <ROOT>/th/pool1/1/repo/.claude/worktrees/refused
+
+FAILS=0

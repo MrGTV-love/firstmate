@@ -1,0 +1,2 @@
+ok - extra lock lines stay byte-identical and never reach the driver
+ok - fm-copy-sweep

@@ -1,0 +1,2 @@
+ok - a driver that releases its lock but fails removal leaves a durable protection against later plain removal
+ok - fm-copy-sweep

@@ -1,0 +1,2 @@
+ok - a plan whose whole answer is the bare text allowed=true holds the copy and never executes the driver
+ok - fm-copy-sweep

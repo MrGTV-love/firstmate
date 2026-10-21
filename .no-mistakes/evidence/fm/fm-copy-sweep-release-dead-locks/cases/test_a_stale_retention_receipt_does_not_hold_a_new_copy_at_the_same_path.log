@@ -1,0 +1,2 @@
+ok - a retention receipt whose copy is gone or whose path now holds a different copy, locked or not, is ignored by classification, left by report, and removed and listed by apply, so a new copy at that path is judged on its own proofs
+ok - fm-copy-sweep

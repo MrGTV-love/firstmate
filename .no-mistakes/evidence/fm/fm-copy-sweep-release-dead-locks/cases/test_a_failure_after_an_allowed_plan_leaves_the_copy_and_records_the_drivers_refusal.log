@@ -1,0 +1,2 @@
+ok - a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code
+ok - fm-copy-sweep

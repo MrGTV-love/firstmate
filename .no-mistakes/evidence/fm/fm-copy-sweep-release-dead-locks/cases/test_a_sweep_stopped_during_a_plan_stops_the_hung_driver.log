@@ -1,0 +1,2 @@
+ok - a sweep stopped while its plan hangs stops the driver and its child too
+ok - fm-copy-sweep

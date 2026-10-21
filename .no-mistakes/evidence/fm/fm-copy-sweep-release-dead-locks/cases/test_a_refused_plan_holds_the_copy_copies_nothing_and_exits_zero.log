@@ -1,0 +1,2 @@
+ok - a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it
+ok - fm-copy-sweep

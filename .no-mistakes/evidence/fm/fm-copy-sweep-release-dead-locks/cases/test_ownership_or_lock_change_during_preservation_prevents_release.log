@@ -1,0 +1,2 @@
+ok - a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt
+ok - fm-copy-sweep

@@ -1,0 +1,2 @@
+ok - only a boolean positive verdict with exit zero is permission; invalid types, documents, suffixes and nonzero exit keep lock bytes unchanged
+ok - fm-copy-sweep

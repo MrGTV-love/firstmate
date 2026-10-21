@@ -1,0 +1,2 @@
+ok - a copy whose ignored files cannot be preserved stays locked and registered, the sweep's own FAILED line ends in a human-only question with no command and no friction event, and the run exits 1
+ok - fm-copy-sweep

@@ -1,0 +1,2 @@
+ok - a live recycled launcher pid holds its copy and unchanged lock, with age and lock mtime reported
+ok - fm-copy-sweep

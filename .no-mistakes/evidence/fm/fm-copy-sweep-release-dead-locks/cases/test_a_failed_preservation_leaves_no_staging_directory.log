@@ -1,0 +1,2 @@
+ok - a failed preservation removes the staging directory it built, so repeated failed sweeps leave no staging bytes behind
+ok - fm-copy-sweep

@@ -1,0 +1,2 @@
+ok - apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent
+ok - fm-copy-sweep

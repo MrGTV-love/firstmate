@@ -1,0 +1,2 @@
+ok - exit-3 ignored-payload retention is KEPT, keeps its lock and source, and repeated sweeps neither preserve nor execute again
+ok - fm-copy-sweep

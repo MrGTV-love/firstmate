@@ -1,0 +1,2 @@
+ok - an empty, malformed, missing, false-with-text or garbage-literal plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, leave no driver process running, and exit 0
+ok - fm-copy-sweep

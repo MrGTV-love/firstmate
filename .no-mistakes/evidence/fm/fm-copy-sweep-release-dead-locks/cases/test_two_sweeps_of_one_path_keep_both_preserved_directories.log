@@ -1,0 +1,2 @@
+ok - new copies at the same path and HEAD retain both versions of their preserved ignored bytes
+ok - fm-copy-sweep

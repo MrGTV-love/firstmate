@@ -1,0 +1,2 @@
+ok - a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once
+ok - fm-copy-sweep
