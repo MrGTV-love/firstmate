@@ -2460,10 +2460,24 @@ watcher_status_span_cleanup() {
   FM_STATUS_CAPTURE_SCRATCH=
 }
 
+# True when <offset> is at or past the end of <file> (or the file is absent):
+# the span read has nothing to read, so it needs no owned capture.
+watcher_status_span_idle() {  # <file> <offset>
+  local idle_size
+  [ -e "$1" ] || [ -L "$1" ] || return 0
+  _fm_status_file_size "$1" idle_size || return 1
+  case "$idle_size:$2" in *[!0-9:]*|:*|*:) return 1 ;; esac
+  [ "$2" -ge "$idle_size" ]
+}
+
 watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out]
   local span_capture span_rc
   printf -v "$3" '%s' ''
   [ -z "${4-}" ] || printf -v "$4" '%s' 0
+  if watcher_status_span_idle "$1" "$2"; then
+    status_span_first_actionable_record "$1" "$2" "$3" "${4-}"
+    return
+  fi
   FM_STATUS_CAPTURE_SCRATCH="$(_fm_status_span_scratch "$1").span"
   run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
     || { watcher_status_span_cleanup; return 2; }
@@ -2573,7 +2587,7 @@ heartbeat_scan_finds_actionable() {
     watcher_beat
     [ "$f" = "$exclude" ] && continue
     task=$(basename "$f"); task="${task%.status}"
-    marker=$(_hb_surfaced_path "$task")
+    status_heartbeat_seen_marker_path_to marker "$STATE" "$task"
     status_presentation_marker_adopt_device "$marker" "$f" || true
     record=''
     watcher_status_span "$f" "$(hb_surfaced_offset "$task")" record
@@ -2581,7 +2595,6 @@ heartbeat_scan_finds_actionable() {
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
       sig=$(status_observed_signature "$f")
-      marker=$(_hb_surfaced_path "$task")
       status_presentation_marker_reported_matches "$marker" "$sig" && continue
       FM_HEARTBEAT_SURFACE_ENDPOINTS="${FM_HEARTBEAT_SURFACE_ENDPOINTS}${f}"$'\t'"ERROR"$'\t'"${sig}"$'\n'
       found=0
