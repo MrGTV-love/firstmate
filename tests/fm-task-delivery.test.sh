@@ -929,6 +929,17 @@ EOF
     "empty Task subsections were not rejected semantically"
   assert_absent "$home/state/$id.meta" "empty-subsection spawn wrote task metadata"
 
+  id=delivery-heading-only-spec
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 \
+    || fail "heading-only-spec brief should scaffold"
+  fill_brief_subsections "$home/data/$id/brief.md" "Fix the badge." ""
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn of a spec holding only the scaffold subheading should exit non-zero"
+  assert_contains "$out" "must contain nonempty ## Captain's intent and ## Firstmate spec" \
+    "a scaffold subheading alone counted as Firstmate spec content"
+  assert_absent "$home/state/$id.meta" "heading-only-spec spawn wrote task metadata"
+
   id=promote-unfilled-e1
   meta="$home/state/$id.meta"
   mkdir -p "$home/state"

@@ -124,6 +124,26 @@ EOF
   assert_not_contains "$plan" 'Other build constraints' 'legacy scope paragraph consumed unrelated build constraints'
   assert_contains "$plan" 'Task Definition Of Done: absent' 'missing DoD with exclusions was concealed'
 
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+Out of scope: Do not touch the billing page.
+## Firstmate spec
+Keep the existing renderer.
+Out of scope: Do not rename the badge.
+### Out of scope
+- Do not redesign the dashboard.
+Out of scope: Do not change the dashboard layout.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'multi-source exclusions failed'
+  assert_contains "$plan" 'Do not touch the billing page.' "exclusions under Captain's intent were reported absent"
+  assert_contains "$plan" 'Do not rename the badge.' 'a legacy spec paragraph was dropped beside the subsection'
+  assert_contains "$plan" 'Do not redesign the dashboard.' 'the Out of scope subsection was dropped'
+  assert_not_contains "$plan" 'Out-of-scope list: absent' 'present exclusions were reported absent'
+  [ "$(printf '%s\n' "$plan" | grep -c 'Do not change the dashboard layout.')" -eq 1 ] \
+    || fail 'a marker line inside the subsection was printed twice'
+
   printf 'A failed refresh retains the last known value.\n' > "$criteria"
   cat > "$brief" <<EOF
 ## Definition Of Done (task)
