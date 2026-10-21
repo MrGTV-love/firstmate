@@ -177,12 +177,18 @@ The [control script header](../bin/fm-control.sh) owns the five required proofs,
 The command writes only the session record, never unlocks a session, modifies a project, sends keys, or starts or stops an agent.
 It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
 A stale registration alone grants no authority.
+The resolved foreground process must also classify as an agent process, so a registration that outlives its agent cannot make another program in the worktree a lifecycle target.
 When the existing record's nonempty current-session activation for the same live PID identifies another file, adoption refuses without rewriting that evidence, even if Herdr still registers the original task file.
 Every refusal names the missing proof, and no refusal lowers the workspace or duplicate-pane requirements.
 
 **This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**
 Lifecycle readers recheck the adoption proofs and the same live PID and session file before using that alternative authorization, so a workspace claimed by another task, a duplicate pane claim, or a changed generation still refuses even after a successful repair.
 This is an explicit repair, not an automatic restart fix: the omp extension's launch-generation recovery and empty-session classification are unchanged.
+
+**Residual risk:** nothing watches which conversation an adopted process runs.
+The omp extension rewrites the record on every conversation switch only for a launch-pinned process, and an adopted process has no pin.
+An adopted record therefore relies on Herdr's session registration until the extension records switches without a launch pin.
+A switch to a personal conversation that Herdr has not yet registered is not seen, and the record can still read as managed.
 
 ### Live Herdr task attribution
 
@@ -203,7 +209,8 @@ For omp, the existing worker extension, local-secondmate watcher, or explicit re
 Argv and text embedded in other environment values never supply incarnation evidence.
 Without the matching pin, an omp process is unmanaged, including Herdr-native `omp --resume`, unless its repaired session record passes the [full adoption proof](#repairing-a-restored-omp-session-record).
 Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute individually for current-session proof; the explicit repair requires their independently guarded session-record replacement.
-An in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
+For a launch-pinned omp process, an in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
+An adopted record has no pin to rewrite on a switch, so it relies on Herdr's session registration until the extension records switches without a launch pin; see the [residual risk](#repairing-a-restored-omp-session-record).
 Every other recorded harness remains unknown with missing or mismatched pins.
 Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
 Neither unmanaged nor unknown proof authorizes lifecycle action for a record with `launch_proof`.

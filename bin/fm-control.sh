@@ -9,7 +9,7 @@
 # adopt repairs only a local Herdr omp session record under the task's control
 # and metadata locks. It requires (1) consistent window/herdr_pane_id and an
 # existing worktree and pane, (2) one foreground PID resolved by the launch-proof
-# owner, (3) that PID's kernel cwd inside this task's unique deepest recorded
+# owner that classifies as an agent process, (3) that PID's kernel cwd inside this task's unique deepest recorded
 # worktree, (4) no other local task claiming the pane, and (5) an existing
 # session record with the same nonempty spawn_gen as metadata. It preserves
 # task_session_file (or uses the pane's omp session-file reference if absent),
@@ -557,13 +557,7 @@ CONTROL_LOCK_HELD=1
 # EXIT trap, so the parent has to hold the path the trap removes. Set it
 # only once the lock is held: a process that loses the lock runs the same
 # trap, and would remove the file the lock holder is reading.
-if [ "$VERB" = adopt ]; then
-  # Adoption never reads or writes the composer; do not remove an existing
-  # dialog snapshot through the shared lifecycle cleanup trap.
-  FM_COMPOSER_DIALOG_SINK=
-else
-  FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
-fi
+FM_COMPOSER_DIALOG_SINK=$STATE/$ID.composer-dialog
 META="$STATE/$ID.meta"
 if [ ! -f "$META" ]; then
   case "$RAW_ID" in
