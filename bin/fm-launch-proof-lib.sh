@@ -3,10 +3,9 @@
 # fm-spawn stamps FM_SPAWN_GEN with the record's spawn_gen and records
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
 # For omp, a matching pin also requires current-session proof. Explicit adopt
-# can repair a record that names another PID, never the live PID's own unproven
-# mark, nor a live PID pinned to another generation; without a pin, every
-# adoption proof is rechecked before the repaired live PID and session-file
-# identity authorize lifecycle.
+# repairs only a record whose PID is gone, and never a live PID pinned to
+# another generation; without a pin, every adoption proof is rechecked before
+# the repaired live PID and session-file identity authorize lifecycle.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action
 # for a proven record; a legacy record keeps its pre-proof attribution rule.
