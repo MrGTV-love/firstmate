@@ -519,6 +519,10 @@ if [ "\${3:-}" != --execute-cleanup ]; then
     echo 'allowed=true'
     exit 0
   fi
+  if [ -e "$log/plan-retain" ]; then
+    echo '{"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree", "unique_ignored_paths": ["unique.dat"]}'
+    exit 0
+  fi
   if [ -e "$log/plan-relock" ]; then
     git worktree unlock "\$2" || exit 4
     git worktree lock --reason 'hand-held by an operator' "\$2" || exit 4
@@ -558,7 +562,7 @@ SH
 
 # make_locked_copy_case <name> <lock-mode>: a world with one clean, pushed copy
 # locked the way <lock-mode> says. dead = Vernant's format naming a finished pid;
-# recycled = a pid that started long after the lock file was written; live = a
+# uuid and ppid = the same with that owner form; recycled = a pid that started long after the lock file was written; live = a
 # pid that is still running; foreign = any other lock reason.
 LIVE_PID=
 
@@ -569,11 +573,13 @@ make_locked_copy_case() {
   add_copy locked
   admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
   case "$mode" in
-    dead|uuid)
+    dead|uuid|ppid)
       sleep 0.1 & pid=$!
       wait "$pid" 2>/dev/null || true
       if [ "$mode" = uuid ]; then
         git -C "$SLOT" worktree lock --reason "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=$pid" "$(copy_path locked)"
+      elif [ "$mode" = ppid ]; then
+        git -C "$SLOT" worktree lock --reason "vernant-session-active owner=ppid:$pid launcher=$pid" "$(copy_path locked)"
       else
         git -C "$SLOT" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$(copy_path locked)"
       fi
@@ -700,6 +706,39 @@ test_dead_launcher_lock_is_released_by_the_driver() {
 test_uuid_owner_lock_is_released_by_the_driver() {
   assert_driver_release driver-uuid uuid
   pass "a dead-launcher UUID-owner creation lock uses the same supported driver release"
+}
+
+test_ppid_owner_lock_is_released_by_the_driver() {
+  assert_driver_release driver-ppid ppid
+  pass "a dead-launcher creation lock with an owner=ppid:<pid> owner uses the same driver release, because only its launcher pid and the other proofs decide"
+}
+
+test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_nothing() {
+  local admin before
+  make_locked_copy_case planretain dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+  : > "$W/plan-retain"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "a plan that reports the retain rule must not fail the run, got $RC: $OUT"
+  assert_class locked HELD-LOCKED
+  assert_contains "$OUT" "archive_then_retain_tree" "the driver's retain rule is missing from the report"
+  assert_contains "$OUT" "never removes it automatically" "the report did not say the driver keeps the tree"
+  assert_contains "$OUT" "summary: HELD-LOCKED=1" "the held copy is not counted as held"
+  assert_not_contains "$OUT" "FAILED" "a retain-rule plan was reported as a failure"
+  assert_not_contains "$OUT" "KEPT" "a retain-rule plan was reported as an execution result"
+  assert_absent "$HOMED/data/copy-sweep" "a retain-rule plan copied ignored entries or wrote a receipt"
+  assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
+    "the driver was asked for more than its plan"
+  [ -e "$(copy_path locked)" ] || fail "a retain-rule copy was removed"
+  registered locked || fail "a retain-rule copy is no longer registered"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the retain-rule copy's lock changed"
+  assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "the retain-rule copy's ignored file changed"
+  [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "a retain-rule copy was logged as removed"
+  pass "a plan that reports the driver's retain rule holds the copy with the driver's words, copies nothing, never executes, and exits 0"
 }
 
 test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero() {
@@ -950,12 +989,10 @@ test_valid_lock_replacement_during_plan_prevents_release() {
   pass "a different but valid Vernant lock appearing during the plan is never released"
 }
 
-test_multiline_and_unknown_owner_locks_are_held_byte_identical() {
+test_extra_lock_lines_are_held_byte_identical() {
   local reason admin before n=0
   for reason in $'vernant-session-active owner=launcher:999999 launcher=999999\noperator hold' \
-      $'vernant-session-active owner=launcher:999999 launcher=999999\n' \
-      'vernant-session-active owner=someone launcher=999999' \
-      'vernant-session-active owner=launcher:999998 launcher=999999'; do
+      $'vernant-session-active owner=launcher:999999 launcher=999999\n'; do
     n=$((n + 1))
     make_world "malformed-lock-$n"
     add_copy locked
@@ -977,7 +1014,7 @@ test_multiline_and_unknown_owner_locks_are_held_byte_identical() {
     registered locked || fail "an unsupported lock's copy was removed"
     assert_absent "$W/closeout.log" "unsupported lock reached the driver"
   done
-  pass "extra lock lines, unknown owners, and mismatched launcher owners stay byte-identical and never reach the driver"
+  pass "extra lock lines stay byte-identical and never reach the driver"
 }
 
 test_binary_creation_lock_is_held_byte_identical() {
@@ -2074,15 +2111,17 @@ run_case test_apply_removes_only_the_reapable_copy
 run_case test_recycled_launcher_lock_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_uuid_owner_lock_is_released_by_the_driver
+run_case test_ppid_owner_lock_is_released_by_the_driver
 run_case test_retained_ignored_payload_is_kept_once_without_growth
 run_case test_task_record_appearing_during_plan_prevents_release
 run_case test_valid_lock_replacement_during_plan_prevents_release
-run_case test_multiline_and_unknown_owner_locks_are_held_byte_identical
+run_case test_extra_lock_lines_are_held_byte_identical
 run_case test_binary_creation_lock_is_held_byte_identical
 run_case test_failed_driver_removal_cannot_be_retried_as_unlocked
 run_case test_report_does_not_claim_unplanned_locks_are_reapable
 run_case test_driver_verdict_types_and_exit_status_are_not_permission
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
+run_case test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_nothing
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_its_whole_text
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 run_case test_a_failed_preservation_leaves_no_staging_directory

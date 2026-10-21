@@ -107,6 +107,9 @@
 # malformed or verdictless answer, text that only mentions allowed=true, any other
 # value, or a timeout holds the copy as HELD-LOCKED with the driver's own words
 # (the first 600 characters, on one line), copies nothing, and is not a failure.
+# So does an allowed plan whose document reports ignored_payload_disposition=
+# archive_then_retain_tree: the driver archives a tree's unique ignored files and
+# then keeps the tree, so the sweep neither preserves them nor executes the driver.
 # The timeout is deliberate (FM_COPY_SWEEP_PLAN_TIMEOUT seconds, 120 by default):
 # the owner's rule holds a copy whose plan does not answer. The plan runs as a
 # process group of its own and the timeout kills that whole group, so neither the
@@ -581,11 +584,11 @@ content_in_default() {  # <copy> <clone>
   [ "${merged_tree%%$'\n'*}" = "$default_tree" ]
 }
 
-# Read the whole lock, not just its first line. The only supported owner forms
-# are launcher:<same pid> and a UUID. One terminal newline is allowed; extra
-# lines, whitespace, owner text or a mismatched launcher owner are not Vernant's.
+# Read the whole lock, not just its first line. The launcher pid is what counts;
+# owner= is forensic text, as in Vernant's own parser. One terminal newline is
+# allowed; extra lines, NUL bytes or any other whitespace are not Vernant's.
 sweep_vernant_lock_pid() {  # <lock-file>
-  local reason pid uuid='[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}'
+  local reason pid
   reason=$(cat "$1" && printf '.') || return 1
   reason=${reason%.}
   reason=${reason%$'\n'}
@@ -596,10 +599,7 @@ sweep_vernant_lock_pid() {  # <lock-file>
     return 1
   fi
   pid=$(teardown_vernant_lock_pid "$reason") || return 1
-  if [ "$reason" != "vernant-session-active owner=launcher:$pid launcher=$pid" ] \
-    && ! [[ $reason =~ ^vernant-session-active\ owner=$uuid\ launcher=$pid$ ]]; then
-    return 1
-  fi
+  [[ $reason =~ ^vernant-session-active\ owner=[^[:space:]]+\ launcher=$pid$ ]] || return 1
   printf '%s\n' "$pid"
 }
 
@@ -1008,6 +1008,13 @@ plan_verdict_allows() {  # <driver output>
   printf '%s' "$out" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
 }
 
+# True when the plan's one JSON document reports the driver's retain rule for a
+# tree that holds unique ignored files: the driver archives them and then keeps
+# the tree, so a release of it can never succeed.
+plan_verdict_retains_tree() {  # <driver output>
+  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .ignored_payload_disposition == "archive_then_retain_tree")' >/dev/null 2>&1
+}
+
 # The plan's process group, while one runs. Killing the whole group is the only
 # way the driver and what it started stop with the sweep, so every exit path of
 # the plan, and the sweep's own signal traps, go through stop_plan.
@@ -1066,6 +1073,10 @@ driver_plan_allows() {  # <clone> <copy>
   PLAN_WHY=${PLAN_WHY:0:600}
   if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_OUT"; then
     PLAN_WHY="its closeout driver would not release it (exit ${rc:-1}): ${PLAN_WHY:-no output}"
+    return 1
+  fi
+  if plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_OUT"; then
+    PLAN_WHY="its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: $PLAN_WHY"
     return 1
   fi
 }
