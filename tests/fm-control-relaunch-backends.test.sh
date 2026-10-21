@@ -1574,6 +1574,24 @@ test_omp_adoption_current_session_contradiction() {
   pass "omp adoption: same-PID personal current session overrides stale task registration and remains refused"
 }
 
+test_omp_adoption_unproven_same_pid() {
+  local shape dir id record out rc
+  for shape in empty null; do
+    prepare_omp_adoption "unproven-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    jq --argjson pid "$(cat "$dir/fake/recovery-pid")" --arg shape "$shape" \
+      '.pid=$pid | .current_session_file=(if $shape == "null" then null else "" end)' \
+      "$record" > "$record.new" && mv "$record.new" "$record"
+    printf old > "$dir/fake/recovery-spawn-gen"
+    assert_adoption_refused "$dir" "$id" 'current-session proof for the live PID is empty or invalid'
+    rc=0
+    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+    [ "$rc" -ne 0 ] || fail "unproven same-PID record ($shape) authorized interrupt: $out"
+    assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "an unproven same-PID record must receive no lifecycle input"
+  done
+  pass "omp adoption: the extension's unproven mark for the live PID is not overwritten"
+}
+
 test_omp_adoption_non_agent_process() {
   prepare_omp_adoption non-agent
   local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
@@ -1683,6 +1701,7 @@ test_omp_adoption() {
   test_omp_adoption_ambiguous_foreground
   test_omp_adoption_generation_mismatch
   test_omp_adoption_current_session_contradiction
+  test_omp_adoption_unproven_same_pid
   test_omp_adoption_non_agent_process
   test_omp_adoption_unreadable_environment
   test_omp_adoption_caller_gate
