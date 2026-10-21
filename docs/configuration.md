@@ -1281,27 +1281,29 @@ The Pi supervision branch is an in-process part of the exempt operator primary s
 
 ### OMP fallback approvals (config/omp-approved-fallback-chains)
 
-The optional captain-private, gitignored `config/omp-approved-fallback-chains` records deliberate paid fallback-route approvals for the read-only diagnostic shared by [`fm-bootstrap.sh`](../bin/fm-bootstrap.sh) (`OMP_API_BILLING`) and [`fm-remote-doctor.sh`](../bin/fm-remote-doctor.sh) (`omp-api-billing`).
+The optional captain-private, gitignored `config/omp-approved-fallback-chains` records deliberately approved paid fallback chains for the read-only diagnostic shared by [`fm-bootstrap.sh`](../bin/fm-bootstrap.sh) (`OMP_API_BILLING`) and [`fm-remote-doctor.sh`](../bin/fm-remote-doctor.sh) (`omp-api-billing`).
 [`fm-api-key-guard-lib.sh`](../bin/fm-api-key-guard-lib.sh) is their shared reader; it never edits this file or omp configuration, invokes omp, or calls a provider.
-The file is read from `FM_CONFIG_OVERRIDE` when set, otherwise the operational home's `config/` directory under the [home resolution rules](#fm_home).
-Record approvals separately in every home that needs them; this file is not automatically inherited by secondmates.
 
-Each nonblank, noncomment line has exactly three whitespace-separated fields: `YYYY-MM-DD key|target provider/model`.
-The date must be a real ISO calendar date, and `key` or `target` selects the position class within omp's `retry.fallbackChains`, not an array index or a model role.
-The route must begin with lowercase `openai-codex/`, `openrouter/`, or `openai/`, followed by an ASCII alphanumeric character and then only ASCII alphanumerics, `.`, `_`, `:`, `/`, or `-`; wildcards and comma-separated patterns are not approvals.
-Blank lines and lines whose first nonwhitespace character is `#` are allowed; inline comments and extra fields are not.
-For example:
+The file is read from `FM_CONFIG_OVERRIDE` when set, otherwise the operational home's `config/` directory under the [home resolution rules](#fm_home).
+When that file is absent, the reader falls back to the same file in the code root's `config/` directory (`FM_ROOT_OVERRIDE`, otherwise the checkout that holds the running script).
+A first-time remote home seed runs its readiness check before the home exists, so the remote code root's `config/` is the only place a record can already be.
+One record there covers the host account, which matches omp's one global configuration per account.
+A home's own file wins whenever it exists, even when it is empty or malformed; the two files are never merged.
+
+Each nonblank, noncomment line records one approved chain: its ordered routes, separated by spaces or tabs, starting with the `retry.fallbackChains` key and followed by its targets in order.
+Each route must begin with lowercase `openai-codex/` or `openrouter/`, followed by an ASCII alphanumeric character and then only ASCII alphanumerics, `.`, `_`, `:`, `/`, or `-`; wildcards and comma-separated patterns are not approvals.
+Blank lines and lines whose first nonwhitespace character is `#` are allowed, and a `#` line is the place for the approval date and source; inline comments are not.
+For example, the approved chain Sol, then mimo, then haiku:
 
 ```text
-2026-10-20 key openai-codex/gpt-6.1-sol
-2026-10-20 target openrouter/xiaomi/mimo-v2.6-pro
-2026-10-20 target openrouter/anthropic/claude-haiku-5.5
+# 2026-10-20 captain approval: paid OpenRouter fallbacks behind the GPT subscription route
+openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
 ```
 
-An exception matches only the exact, case-sensitive route string and position class; selector padding, another suffix, a different route, or the same route used in `modelRoles` is not covered.
-Only non-GPT `openrouter/*` fallback references can be exempted.
-All `openai/*` references, OpenRouter's `openai/` model namespace, and OpenRouter model path segments beginning with `gpt` (case-insensitive) remain flagged even if recorded.
-`openai-codex/*` already uses the subscription route and needs no billing exception; recording it documents the approved chain without broadening permission.
+The `openrouter/*` key and targets of a `retry.fallbackChains` entry are exempt only when the entry's key followed by its targets equals a recorded chain exactly: same routes, same order, same case, no selector padding, no added or removed target.
+The same route in another chain, in `modelRoles`, or in any changed form of the approved chain stays flagged.
+All `openai/*` references, OpenRouter's `openai/` model namespace, and OpenRouter model path segments beginning with `gpt` (case-insensitive) remain flagged even inside a recorded chain.
+`openai-codex/*` already uses the subscription route and needs no billing exception; it appears in the record only to name the whole chain.
 A missing approval file grants no exceptions.
 An unreadable or nonregular file reports a configuration problem, and a malformed line reports its line number without its contents; either invalidates all exceptions from that file while unapproved API references are still reported.
 These approvals do not relax explicit worker-launch or relaunch billing-route admission.

@@ -45,8 +45,12 @@ fm_omp_api_billing_route_check() {
 # schema, scope and readers; this diagnostic only reads them.
 fm_omp_api_billing_config_diagnostics() {
   local agent_dir=${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}
-  local config_dir=${FM_CONFIG_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-${FM_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}}/config}
+  local code_root=${FM_ROOT_OVERRIDE:-${FM_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}
+  local config_dir=${FM_CONFIG_OVERRIDE:-${FM_HOME:-$code_root}/config}
   local approvals="$config_dir/omp-approved-fallback-chains"
+  if [ ! -e "$approvals" ] && [ ! -L "$approvals" ]; then
+    approvals="$code_root/config/omp-approved-fallback-chains"
+  fi
   if [ -n "${OMP_PROFILE:-}" ]; then
     agent_dir="$HOME/.omp/profiles/$OMP_PROFILE/agent"
   fi
@@ -56,27 +60,24 @@ fm_omp_api_billing_config_diagnostics() {
     echo "cannot inspect omp configuration: install Ruby for the read-only YAML check"
     return 0
   }
-  ruby -ryaml -rdate -e '
+  ruby -ryaml -e '
 approved = []
 approval_file = ARGV.fetch(1)
 if File.exist?(approval_file) || File.symlink?(approval_file)
   begin
     raise IOError unless File.file?(approval_file) && File.readable?(approval_file)
+    route = %r{(?:openai-codex|openrouter)/[A-Za-z0-9][A-Za-z0-9._:/-]*}
+    record = /\A(#{route}(?:[ \t]+#{route})*)[ \t]*\r?\n?\z/
     invalid = false
     File.foreach(approval_file, encoding: Encoding::BINARY).with_index(1) do |line, number|
       next if line.strip.empty? || line.lstrip.start_with?("#")
-      match = /\A(\d{4}-\d{2}-\d{2})[ \t]+(key|target)[ \t]+((?:openai-codex|openai|openrouter)\/[A-Za-z0-9][A-Za-z0-9._:\/-]*)[ \t]*\r?\n?\z/.match(line)
-      valid_date = begin
-        match && Date.iso8601(match[1])
-      rescue ArgumentError
-        false
-      end
-      unless valid_date
+      match = record.match(line)
+      unless match
         puts "cannot inspect omp approvals: omp-approved-fallback-chains line #{number} is invalid; see docs/configuration.md"
         invalid = true
         next
       end
-      approved << [match[2], match[3]]
+      approved << match[1].split(/[ \t]+/)
     end
     approved.clear if invalid
   rescue StandardError
@@ -96,13 +97,13 @@ begin
   chains = retry_config.fetch("fallbackChains", {})
   raise TypeError unless chains.is_a?(Hash)
   findings = []
-  report = lambda do |field, value, position = nil|
+  report = lambda do |field, value, approved_chain = false|
     next unless value.is_a?(String)
     provider, _, model = value.partition("/")
     provider = provider.strip.downcase
     next unless value.include?("/") && %w[openai openrouter].include?(provider)
     gpt = model.strip.match?(/(?:\A|\/)gpt/i) || model.strip.downcase.start_with?("openai/")
-    next if provider == "openrouter" && !gpt && position && approved.include?([position, value])
+    next if approved_chain && provider == "openrouter" && !gpt
     findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
   end
   %w[default vision tiny].each do |role|
@@ -112,8 +113,9 @@ begin
   end
   chains.each_with_index do |(key, targets), index|
     raise TypeError unless targets.is_a?(Array)
-    report.call("retry.fallbackChains key[#{index}]", key, "key")
-    targets.each_with_index { |target, slot| report.call("retry.fallbackChains target[#{index}][#{slot}]", target, "target") }
+    approved_chain = approved.include?([key, *targets])
+    report.call("retry.fallbackChains key[#{index}]", key, approved_chain)
+    targets.each_with_index { |target, slot| report.call("retry.fallbackChains target[#{index}][#{slot}]", target, approved_chain) }
   end
   puts findings
 rescue StandardError

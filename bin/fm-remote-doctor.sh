@@ -776,7 +776,7 @@ check_omp_api_billing() {
     record omp-api-billing "human: ${notes//$'\n'/; }" \
       "inspect the active omp config.yml; select openai-codex/<gpt-model> for GPT roles and fallback routes; this command never edits omp configuration"
   else
-    record omp-api-billing "ok: no active global omp configuration findings"
+    record omp-api-billing "skip: no active global omp configuration findings"
   fi
 }
 

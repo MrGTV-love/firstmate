@@ -329,9 +329,8 @@ YAML
   for phase in absent present; do
     if [ "$phase" = present ]; then
       cat > "$case_dir/home/config/omp-approved-fallback-chains" <<'APPROVAL'
-2026-10-20 key openai-codex/gpt-6.1-sol
-2026-10-20 target openrouter/xiaomi/mimo-v2.6-pro
-2026-10-20 target openrouter/anthropic/claude-haiku-5.5
+# 2026-10-20 captain approval
+openai-codex/gpt-6.1-sol openrouter/xiaomi/mimo-v2.6-pro openrouter/anthropic/claude-haiku-5.5
 APPROVAL
       cp "$case_dir/home/config/omp-approved-fallback-chains" "$case_dir/approval-before"
     fi
