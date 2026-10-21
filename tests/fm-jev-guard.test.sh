@@ -1027,18 +1027,14 @@ const flaggedBeatsOutage = await result([...lines(100), 'fail500\n', ...lines(30
 assert.equal(flaggedBeatsOutage.isError, true);
 assert.equal(rows(1)[0].decision, 'flag');
 
-// A payload that no complete set of pieces can cover is refused before anything is sent, never screened as a prefix.
+// Shell calls and results still require a complete cover before anything is sent.
 before = sent().length;
-const report = 'x'.repeat(396924);
-assert.equal(Buffer.byteLength(report, 'utf8'), 396924);
-for (const content of [report, 'é'.repeat(MAX_CHUNKS * 8192 - 1000)]) {
-  const tooBig = await write(content);
+for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repeat(MAX_CHUNKS * 8192 - 1000)]) {
+  const tooBig = await shell(content);
   assert.equal(tooBig.block, true);
   assert.match(tooBig.reason, /RequestTooLargeError/);
   assert.match(tooBig.reason, /guard=FM-JEV-SIZE rule=complete-screening-budget/);
   for (const budget of [MAX_CHUNKS, MAX_REQUEST_BYTES, CHUNK_OVERLAP_BYTES]) assert.ok(tooBig.reason.includes(String(budget)));
-  assert.match(tooBig.reason, /same write tool.*separate files.*below 150,000 characters/);
-  assert.match(tooBig.reason, /in the task\x27s own data directory/);
   assert.doesNotMatch(tooBig.reason, /same call once more/, 'size failure must not prescribe a useless identical retry');
   [row] = rows(1);
   assert.equal(row.error_type, 'RequestTooLargeError');
@@ -1055,7 +1051,7 @@ const friction = () => readFileSync(frictionPath, 'utf8').trim().split('\n').map
 const { createHash } = await import('node:crypto');
 const taskDigest = 'sha256:' + createHash('sha256').update('oversize').digest('hex');
 const sizeEvents = friction().filter(r => r.guard_id === 'FM-JEV-SIZE' && r.task_id === taskDigest);
-assert.equal(sizeEvents.length, 3, 'two write denials and one result denial produce one event each');
+assert.equal(sizeEvents.length, 3, 'two shell denials and one result denial produce one event each');
 for (const r of sizeEvents) {
   assert.equal(r.schema, 'fm-friction.v1');
   assert.equal(r.rule_id, 'complete-screening-budget');
@@ -1065,24 +1061,11 @@ for (const r of sizeEvents) {
   assert.match(r.subject.identity, /^sha256:[a-f0-9]{64}$/);
 }
 assert.equal(JSON.stringify(sizeEvents).includes(home), false, 'bridge must not retain input paths');
-// Execute the supported route through the same write guard, then materialize
-// each admitted part as the host would. No oversized prefix is admitted.
-let restored = '';
-for (let offset = 0, n = 0; offset < report.length; offset += 149999, n++) {
-  const content = report.slice(offset, offset + 149999);
-  const path = `${process.env.TASK_DATA}/report-part-${n}.txt`;
-  assert.ok(content.length < 150000);
-  const patch = await handlers.tool_call({ toolName: 'write', input: { path, content } }, ctx);
-  assert.equal(patch, undefined, 'bounded benign report part should complete in the task data directory');
-  writeFileSync(path, content);
-  restored += readFileSync(path, 'utf8');
-}
-assert.equal(restored, report, 'the supported route must preserve the entire refused report');
 // Optional friction storage cannot change admission or replace mandatory Jev audit.
 const { renameSync, mkdirSync } = await import('node:fs');
 renameSync(frictionPath, `${frictionPath}.saved`);
 mkdirSync(frictionPath);
-const telemetryFailure = await write('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
+const telemetryFailure = await shell('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
 assert.equal(telemetryFailure.block, true);
 assert.match(telemetryFailure.reason, /complete-screening-budget/);
 assert.doesNotMatch(telemetryFailure.reason, /AuditUnavailableError/);
@@ -1151,7 +1134,7 @@ console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
   [ "${out##*$'\n'}" = oversize-ok ] || fail "oversize screening did not reach its final line: $out"
-  pass "oversized payloads are screened in complete pieces: benign allowed, any blocked or unscreenable piece blocks, uncoverable and never-send payloads send nothing, deadlines hold"
+  pass "bounded pieces preserve policy/outage decisions; uncoverable shell/results and never-send payloads send nothing, deadlines hold"
 }
 
 test_claude_oversize() {
@@ -1173,21 +1156,236 @@ test_claude_oversize() {
   before=$(requests)
   out=$(WT="$WT" node -e 'process.stdout.write(JSON.stringify({hook_event_name:"PreToolUse",cwd:process.env.WT,tool_name:"Write",tool_input:{file_path:process.env.WT+"/huge.txt",content:"x".repeat(262145)},tool_use_id:"size-refusal"}))' \
     | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1) \
-    || fail 'Claude size refusal changed its hook exit contract'
-  denied "$out" || fail 'Claude admitted an uncoverable payload'
-  jq -e '.hookSpecificOutput.permissionDecisionReason | contains("same write tool") and contains("separate files in the task\u0027s own data directory") and contains("below 150,000 characters") and (contains("same call once more") | not)' <<<"$out" >/dev/null \
-    || fail 'Claude hook lost the supported report write route'
-  jq -e '.hookSpecificOutput.permissionDecisionReason | contains("guard=FM-JEV-SIZE rule=complete-screening-budget")' <<<"$out" >/dev/null \
-    || fail 'Claude hook lost the typed size refusal'
-  [ "$(requests)" = "$before" ] || fail 'Claude sent an uncoverable prefix'
+    || fail 'Claude large write changed its hook exit contract'
+  [ -z "$out" ] || fail 'Claude refused a large benign write'
+  [ "$(requests)" -eq $((before + 16)) ] || fail 'Claude did not use its bounded write screening budget'
   size_before=$(jq -s '[.[] | select(.guard_id == "FM-JEV-SIZE")] | length' "$HOME_DIR/state/friction.jsonl")
-  [ "$size_before" -ge 1 ] || fail 'Claude size denial left no friction event'
   claude_hook "$(WT="$WT" node -e 'process.stdout.write(JSON.stringify({hook_event_name:"PostToolUse",cwd:process.env.WT,tool_name:"Bash",tool_input:{command:"cat huge"},tool_response:{stdout:"x".repeat(262145),stderr:""},tool_use_id:"size-result"}))')"
   jq -e '.hookSpecificOutput.additionalContext | contains("RequestTooLargeError") and contains("Advisory only") and (contains("REFUSED") | not)' <<<"$out" >/dev/null \
     || fail "an oversized Claude result must be an advisory without a refusal line: $out"
   [ "$(jq -s '[.[] | select(.guard_id == "FM-JEV-SIZE")] | length' "$HOME_DIR/state/friction.jsonl")" = "$size_before" ] \
     || fail 'an advisory-only Claude result was counted as a blocked refusal'
-  pass "Claude hooks retain JSON/exit contracts, screen bounded writes, refuse uncoverable size with the typed completing route, and leave advisory-only results uncounted"
+  pass "Claude hooks retain JSON/exit contracts, admit budget-limited benign writes, and leave advisory-only results uncounted"
+}
+
+test_large_write_budget() {
+  local out
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const { MAX_CHUNKS, MAX_REQUEST_BYTES, CHUNK_OVERLAP_BYTES } = await import(pathToFileURL(process.env.REPORT));
+const home = process.env.HOME_DIR;
+const worktree = `${process.env.WT}/large-report`;
+mkdirSync(worktree);
+execFileSync('git', ['init', '-q', worktree]);
+const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'large-report', worktree,
+  data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
+const handlers = {};
+installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
+const ctx = { cwd: worktree };
+const path = `${worktree}/report.md`;
+const report = 'Ordinary report line with measured observations and no credentials.\n'.repeat(7000).slice(0, 396924);
+assert.equal(Buffer.byteLength(report), 396924);
+const sent = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const hook = `${dirname(process.env.GUARD)}/fm-jev-guard-hook.sh`;
+async function call(host, content, tool = 'write', target = path) {
+  if (host === 'omp') return handlers.tool_call({ toolName: tool,
+    input: { path: target, content, new_string: content, old_string: '' } }, ctx);
+  const result = execFileSync(hook, [home, context.config, context.state, context.task, worktree,
+    context.data, context.project, context.policy], { encoding: 'utf8', input: JSON.stringify({
+      hook_event_name: 'PreToolUse', cwd: worktree, tool_name: tool === 'write' ? 'Write' : 'Edit',
+      tool_input: { file_path: target, content, new_string: content, old_string: '' },
+    }) });
+  return result === '' ? undefined : JSON.parse(result).hookSpecificOutput;
+}
+// A handler timer cannot interrupt synchronous regex work: isolate this case behind a process watchdog.
+const hyphenated = 'ordinary-word-'.repeat(100000).slice(0, 1048576);
+const boundedScan = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', '--input-type=module', '-e', `
+  import assert from 'node:assert/strict';
+  import { readFileSync } from 'node:fs';
+  import { pathToFileURL } from 'node:url';
+  const { context, content } = JSON.parse(readFileSync(0, 'utf8'));
+  const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+  const handlers = {};
+  installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
+  const ctx = { cwd: context.worktree };
+  const call = content => handlers.tool_call({ toolName: 'write', input: { path: 'hyphenated.md', content } }, ctx);
+  const start = performance.now();
+  assert.equal(await call(content), undefined, 'a long hyphenated line must be admitted');
+  const denied = await call(content + 'postgres://fixture:FAKE_PASSWORD@localhost/db');
+  assert.equal(denied?.block, true, 'a credential URL after a long scheme-character run still blocks');
+  const row = JSON.parse(readFileSync(context.state + '/jev-guard.jsonl', 'utf8').trim().split('\\n').at(-1));
+  assert.equal(row.branch, 'deterministic');
+  assert.equal(row.request_started, false);
+  console.log('hyphenated-scan-ok bytes=' + Buffer.byteLength(content) + ' offline_loopback_ms=' + Math.round(performance.now() - start));
+`], { input: JSON.stringify({ context, content: hyphenated }), encoding: 'utf8', timeout: 30000, killSignal: 'SIGKILL' });
+console.log(boundedScan.trim());
+for (const host of ['omp', 'claude']) {
+  const before = sent().length;
+  const start = performance.now();
+  assert.equal(await call(host, report), undefined, `${host}: complete report must be admitted in one write`);
+  const elapsed = Math.round(performance.now() - start);
+  const requests = sent().slice(before);
+  assert.equal(requests.length, MAX_CHUNKS);
+  let prefix = '';
+  for (const [index, request] of requests.entries()) {
+    assert.ok(Buffer.byteLength(request.body) <= MAX_REQUEST_BYTES);
+    const piece = JSON.parse(request.body).state.content;
+    let overlap = 0;
+    let escaped = 0;
+    if (index > 0) {
+      while (overlap < prefix.length) {
+        const bytes = Buffer.byteLength(JSON.stringify(prefix.slice(-overlap - 1, prefix.length - overlap))) - 2;
+        if (escaped + bytes > CHUNK_OVERLAP_BYTES) break;
+        escaped += bytes;
+        overlap++;
+      }
+      assert.equal(piece.slice(0, overlap), prefix.slice(-overlap));
+    }
+    prefix += piece.slice(overlap);
+  }
+  assert.equal(report.slice(0, prefix.length), prefix, 'the measured coverage is the unique prefix, not overlap or framing');
+  assert.ok(prefix.length < report.length);
+  const expected = { model_screened_bytes: Buffer.byteLength(prefix), local_only_bytes: Buffer.byteLength(report.slice(prefix.length)) };
+  assert.deepEqual(row().write_coverage, expected);
+  assert.equal(row().decision, 'allow');
+  assert.match(row().note, /unscreened remainder.*deterministic/);
+  // The host writes only after admission; then its ordinary commit shell call is screened too.
+  writeFileSync(path, report);
+  const command = 'git add report.md && git -c user.name=Fixture -c user.email=fixture@example.invalid -c commit.gpgsign=false commit --allow-empty -qm report';
+  assert.equal(await handlers.tool_call({ toolName: 'bash', input: { command } }, ctx), undefined);
+  execFileSync('bash', ['-c', command], { cwd: worktree });
+  assert.equal(execFileSync('git', ['show', 'HEAD:report.md'], { cwd: worktree }).length, 396924);
+  console.log(`${host}: wrote and committed 396924 bytes; requests=${requests.length}; model_screened_bytes=${expected.model_screened_bytes}; local_only_bytes=${expected.local_only_bytes}; offline_loopback_ms=${elapsed}`);
+  for (const tool of ['write', 'edit']) {
+    for (const [position, at] of [['start', 0], ['middle', 198462], ['end', report.length]]) {
+      const fake = '\nghp_FAKECREDENTIALFORTESTSONLY123456\n';
+      const payload = report.slice(0, at) + fake + report.slice(at);
+      const count = sent().length;
+      const denied = await call(host, payload, tool);
+      assert.ok(denied?.block || denied?.permissionDecision === 'deny', `${host} ${tool}: credential at ${position}`);
+      assert.equal(row().branch, 'deterministic');
+      assert.equal(row().request_started, false);
+      assert.equal(sent().length, count, 'a local credential refusal must not send any prefix');
+    }
+  }
+  console.log(`${host}: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests`);
+  const beforeOutside = sent().length;
+  const outside = await call(host, report, 'write', '/etc/large-guard-report');
+  assert.ok(outside?.block || outside?.permissionDecision === 'deny');
+  assert.equal(sent().length, beforeOutside);
+  // Privacy rules cover every piece a model would see, and one refused piece keeps every clean piece home.
+  const canary = 'large-report-never-send-canary';
+  const entry = Array.from({ length: 480 }, (_, i) => `zq${String(i).padStart(4, '0')}`).join(' ').slice(0, 3299);
+  assert.equal(entry.length, 3299);
+  writeFileSync(`${home}/config/dispatch-never-send`, canary + '\n' + entry + '\n');
+  try {
+    for (const at of [1000, expected.model_screened_bytes - 2000]) {
+      const denied = await call(host, report.slice(0, at) + '\n' + canary + '\n' + report.slice(at));
+      assert.ok(denied?.block || denied?.permissionDecision === 'deny', `${host}: canary at ${at} must be refused`);
+      assert.equal(row().error_type, 'PrivacyWithheldError');
+      assert.equal(row().request_started, false);
+      assert.equal(sent().length, beforeOutside, 'a clean piece must not leave beside a refused one');
+    }
+    // Pieces are checked one at a time: a value longer than the 1,024-byte overlap that lies whole in one piece is withheld, and one cut across a boundary reaches the model only as fragments.
+    const first = JSON.parse(requests[0].body).state.content.length;
+    const base = report.slice(0, 4 * first);
+    const around = (at) => base.slice(0, at) + '\n' + entry + '\n' + base.slice(at);
+    const wholeValue = await call(host, around(1000));
+    assert.ok(wholeValue?.block || wholeValue?.permissionDecision === 'deny', `${host}: a long never-send value inside one piece must be refused`);
+    assert.equal(row().error_type, 'PrivacyWithheldError');
+    assert.equal(row().request_started, false);
+    assert.equal(sent().length, beforeOutside);
+    assert.equal(await call(host, around(first - 2000)), undefined, `${host}: a never-send value cut across a piece boundary is admitted`);
+    assert.equal(row().decision, 'allow');
+    const cut = sent().slice(beforeOutside).map(request => JSON.parse(request.body).state.content);
+    assert.ok(cut.length > 1);
+    assert.ok(cut.every(piece => !piece.includes(entry)), 'no piece holds the whole cut value');
+    assert.ok(cut.some(piece => piece.includes(entry.slice(0, 500))) && cut.some(piece => piece.includes(entry.slice(-500))), 'both fragments of the cut value reached the model');
+    const afterCut = sent().length;
+    // The unscreened remainder never reaches a model, so the never-send policy has nothing to withhold.
+    const start = performance.now();
+    assert.equal(await call(host, report + '\n' + canary), undefined, `${host}: a canary only in the remainder must not stop the write`);
+    assert.equal(row().decision, 'allow');
+    assert.ok(sent().slice(afterCut).every(request => !request.body.includes(canary)), 'the remainder must never be sent');
+    console.log(`${host}: never-send file present; 396924-byte report admitted in ${Math.round(performance.now() - start)} ms`);
+    // The never-send check cost must not grow with the size of the write.
+    const megabyte = 'Ordinary report line with measured observations and no credentials.\n'.repeat(16000).slice(0, 1048576);
+    const largeStart = performance.now();
+    assert.equal(await call(host, megabyte), undefined, `${host}: a 1 MiB write with a never-send file must be admitted`);
+    const largeMs = Math.round(performance.now() - largeStart);
+    assert.ok(largeMs < 30000, `${host}: a 1 MiB write took ${largeMs} ms with a never-send file`);
+    assert.equal(row().decision, 'allow');
+    console.log(`${host}: never-send file present; ${Buffer.byteLength(megabyte)}-byte write admitted in ${largeMs} ms`);
+  } finally {
+    const { unlinkSync } = await import('node:fs');
+    unlinkSync(`${home}/config/dispatch-never-send`);
+  }
+}
+// A multi-byte/escaped report also fits every request, keeps code points, and accounts in UTF-8 bytes.
+const unicode = ('é"\\😀\n\ud800x\udfff' + String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i))).repeat(12000);
+let before = sent().length;
+assert.equal(await call('omp', unicode, 'edit'), undefined);
+assert.equal(row().write_coverage.model_screened_bytes + row().write_coverage.local_only_bytes, Buffer.byteLength(unicode));
+assert.ok(row().write_coverage.local_only_bytes > 0);
+for (const request of sent().slice(before)) {
+  assert.ok(Buffer.byteLength(request.body) <= MAX_REQUEST_BYTES);
+  const piece = JSON.parse(request.body).state.content;
+  assert.equal(/\ud83d(?!\ude00)|(?<!\ud83d)\ude00/.test(piece), false, 'a valid astral pair must not be cut');
+}
+for (const [shape, fake] of [['private-key', '-----BEGIN PRIVATE KEY-----'], ['pgp-private-key', '-----BEGIN PGP PRIVATE KEY BLOCK-----'], ['github-token', 'ghp_FAKECREDENTIALFORTESTSONLY123456'],
+  ['github-fine-grained-token', 'github_pat_FAKECREDENTIALFORTESTSONLY123456'], ['aws-key', 'AKIAFAKEFORTESTSONLY'],
+  ['slack-token', 'xoxb-FAKECREDENTIALFORTESTS'], ['connection-url', 'postgres://fixture:FAKE_PASSWORD@localhost/db'],
+  ['password-only-url', 'redis://:hunter2hunter2@cache:6379']]) {
+  before = sent().length;
+  assert.equal((await call('omp', report + '\n' + fake))?.block, true, `embedded ${shape} must be refused locally`);
+  assert.equal(row().branch, 'deterministic');
+  assert.equal(sent().length, before);
+}
+// Ordinary hyphenated prose, prefix look-alikes inside words, query-string addresses and unanchored credential-like wording are not credentials.
+const prose = ['task-specific-guidelines', 'risk-based-assessment', 'disk-backed-storage-layer', 'task-local-logs-and-evidence',
+  'Bearer authentication-scheme', 'password = process.env.DATABASE_PASSWORD', 'password: must-be-at-least-sixteen',
+  'prefix-ghp_FAKECREDENTIALFORTESTSONLY123456', 'task-AKIAFAKEFORTESTSONLY', 'inbox-xoxb-FAKECREDENTIALFORTESTS',
+  'http://localhost:3000?email=foo@bar.com', 'https://example.com:8080?contact=someone@example.com',
+  '{"endpoint":"http://localhost:3000","owner":"alice@example.com"}', 'url,http://host:8080,owner,bob@example.com'].join('\n');
+for (const host of ['omp', 'claude']) {
+  before = sent().length;
+  assert.equal(await call(host, report + '\n' + prose), undefined, `${host}: benign prose in a budget-limited write must be admitted`);
+  assert.equal(row().decision, 'allow');
+  assert.equal(row().branch, 'policy');
+  assert.equal(sent().length - before, MAX_CHUNKS);
+}
+for (const host of ['omp', 'claude']) {
+  for (const prefix of ['-', '+', '.', '---.+', '1-']) {
+    for (const tool of ['write', 'edit']) {
+      before = sent().length;
+      const denied = await call(host, report + '\n' + prefix + 'postgres://fixture:FAKE_PASSWORD@localhost/db', tool);
+      assert.ok(denied?.block || denied?.permissionDecision === 'deny', `${host}: ${tool} URL after ${prefix} must be refused`);
+      assert.equal(row().branch, 'deterministic');
+      assert.equal(row().request_started, false);
+      assert.equal(sent().length, before, 'punctuation-led URL credentials must not reach the model');
+    }
+  }
+}
+console.log('punctuation-led URL credentials: both hosts refuse write/edit locally with zero provider requests');
+// An answered policy refusal and a provider outage still stop a partially model-screened write.
+for (const marker of ['rm -rf', 'fail500']) {
+  const denied = await call('omp', marker + report);
+  assert.equal(denied.block, true);
+  assert.equal(row().enforcement, 'pretool_deny');
+  assert.equal(row().write_coverage, undefined, 'a failed review must not claim complete model coverage of its prefix');
+}
+console.log('large-write-budget-ok');
+JS
+) || fail "large report write budget: $out"
+  printf '%s\n' "$out"
+  [ "${out##*$'\n'}" = large-write-budget-ok ] || fail "large report regression did not finish: $out"
+  pass "396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited"
 }
 
 test_claude_effects
@@ -1206,4 +1404,5 @@ test_deadlines
 test_trusted_reads_and_independent_judgment
 test_oversize_screening
 test_claude_oversize
+test_large_write_budget
 test_ledger_privacy

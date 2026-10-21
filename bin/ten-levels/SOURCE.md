@@ -40,7 +40,10 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
 - `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
 - `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
-  It snapshots and checks the complete request before key lookup, plans an oversized payload as overlapping pieces that each fit the request ceiling (`plan`), refuses one that no complete cover fits, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
+  It checks privacy before key lookup, over the whole payload for shell calls and results and over every model-screened piece for writes, plans overlapping pieces that each fit the request ceiling, and retains strict complete-cover planning for shell calls and results (`plan`).
+  Its write-only planner and coverage audit follow the [operator contract](../../docs/configuration.md#jev-guard).
+  A write checks its pieces one at a time, so a never-send value longer than about 1,000 JSON-escaped bytes can be cut across a piece boundary and reach the model only as fragments.
+  It uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.
   Durable-record failure is explicit rather than silently optional while active.
   It allows Claude, and omp's pre-tool shell and write judgments, up to three 90-second tries with cancellable one-second then two-second backoff inside a 300-second decision budget; the worker overlay raises omp's pre-tool handler deadline above that budget.
@@ -53,7 +56,8 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 ## Firstmate glue outside this directory
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
-  It judges every piece of an oversized payload with the unchanged level 6 policies; shell/write payloads pass only when every piece passes, while result handling applies the explicit advisory and trusted-read rules below.
+  It judges every planned piece with the unchanged level 6 policies; calls pass only when every planned piece passes, while result handling applies the explicit advisory and trusted-read rules below.
+  Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
   Its host response handling preserves answered middle-band results with an advisory and audit row.
   Native reads of task-owned data/state and tracked own-worktree files, including modified tracked files, pass immediately without a judge; cross-task roots are not trusted.
   Native source metadata normalizes numeric and database selectors before bounded path admission.

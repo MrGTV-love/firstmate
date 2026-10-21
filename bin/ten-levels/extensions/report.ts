@@ -22,8 +22,7 @@ export const CHUNK_OVERLAP_BYTES = 1_024;
 const SIZE_REFUSAL_HEAD = `REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within ${MAX_CHUNKS} requests of ${MAX_REQUEST_BYTES} UTF-8 bytes each, including model, questions and JSON framing, with ${CHUNK_OVERLAP_BYTES} JSON-escaped bytes of overlap. `
   + `The ${MAX_CHUNKS * MAX_REQUEST_BYTES}-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. `;
 export const SIZE_REFUSAL_NOTICE = SIZE_REFUSAL_HEAD
-  + "Supported completing route for report writes: use the same write tool to split the report across separate files in the task's own data directory, each below 150,000 characters per write, and smaller again if encoded bytes still exceed the screening budget. Every write must fit and is screened completely. "
-  + "This is size-budget compliance only, not permission to split or reroute a prohibited action. For a shell call or unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
+  + "For a shell call or unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
 /** A result cannot be split by the worker; the withheld output is the thing to shrink. */
 export const SIZE_RESULT_NOTICE = SIZE_REFUSAL_HEAD
   + "human-only-exit: what authorized smaller read or command output gives the intended information within this budget?";
@@ -106,6 +105,8 @@ export interface GuardTerminal {
   branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read";
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
+  /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */
+  write_coverage?: { model_screened_bytes: number; local_only_bytes: number };
   error_type: GuardFailureType | null;
   request_started: boolean;
   result?: SystemOneResult;
@@ -124,6 +125,11 @@ export interface GuardService {
    * overlapping pieces that each fit it. Refuses before any egress when the payload cannot be covered completely.
    */
   plan(state: Record<string, unknown>, field: string, questions: Questions): string[];
+  /**
+   * The pieces of a write that fit within MAX_CHUNKS requests; the caller screens any remainder locally.
+   * Unlike `plan`, each piece gets its own never-send check, so a value longer than the overlap can be cut across a boundary.
+   */
+  planWrite(state: { path: string; content: string }, questions: Questions): { pieces: string[]; model_screened_bytes: number; local_only_bytes: number };
   record(terminal: GuardTerminal): void;
 }
 
@@ -170,6 +176,44 @@ export function splitForRoom(text: string, room: number, overlap = CHUNK_OVERLAP
     let back = 0;
     start = end;
     while (start > 0 && back + sizes[start - 1] <= overlap) back += sizes[--start];
+  }
+}
+
+/** JSON string width without allocating a string or serializing each code point. */
+function escapedPointBytes(point: number): number {
+  if (point === 0x22 || point === 0x5c || point === 8 || point === 9 || point === 10 || point === 12 || point === 13) return 2;
+  if (point < 0x20 || (point >= 0xd800 && point <= 0xdfff)) return 6;
+  return point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
+}
+
+/** Bounded write-only prefix; shell and result plans still require a complete cover. */
+function writePieces(text: string, room: number): { pieces: string[]; covered: number } {
+  if (room < 2 * CHUNK_OVERLAP_BYTES + 64) throw new GuardUnavailableError("RequestTooLargeError");
+  const pieces: string[] = [];
+  let start = 0;
+  for (;;) {
+    let end = start;
+    let used = 0;
+    while (end < text.length) {
+      const point = text.codePointAt(end)!;
+      const bytes = escapedPointBytes(point);
+      if (used + bytes > room) break;
+      used += bytes;
+      end += point > 0xffff ? 2 : 1;
+    }
+    pieces.push(text.slice(start, end));
+    if (end === text.length || pieces.length === MAX_CHUNKS) return { pieces, covered: end };
+    let back = 0;
+    start = end;
+    while (start > 0) {
+      const last = text.charCodeAt(start - 1);
+      const width = last >= 0xdc00 && last <= 0xdfff && start > 1
+        && text.charCodeAt(start - 2) >= 0xd800 && text.charCodeAt(start - 2) <= 0xdbff ? 2 : 1;
+      const bytes = escapedPointBytes(text.codePointAt(start - width)!);
+      if (back + bytes > CHUNK_OVERLAP_BYTES) break;
+      back += bytes;
+      start -= width;
+    }
   }
 }
 
@@ -267,6 +311,18 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       permitted(whole);
       return pieces;
     },
+    planWrite(state, questions) {
+      const whole = JSON.stringify({ model: GUARD_MODEL, state, questions });
+      const bytes = Buffer.byteLength(state.content, "utf8");
+      if (Buffer.byteLength(whole, "utf8") <= MAX_REQUEST_BYTES) {
+        return { pieces: [state.content], model_screened_bytes: bytes, local_only_bytes: 0 };
+      }
+      const frame = Buffer.byteLength(JSON.stringify({ model: GUARD_MODEL, state: { ...state, content: "" }, questions }), "utf8");
+      const { pieces, covered } = writePieces(state.content, MAX_REQUEST_BYTES - frame);
+      for (const piece of pieces) permitted(JSON.stringify({ model: GUARD_MODEL, state: { ...state, content: piece }, questions }));
+      const screened = Buffer.byteLength(state.content.slice(0, covered), "utf8");
+      return { pieces, model_screened_bytes: screened, local_only_bytes: bytes - screened };
+    },
     record(terminal) {
       const result = terminal.result;
       const answered = terminal.results ?? (result ? [result] : []);
@@ -310,6 +366,8 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         usage: answered.length > 0 ? { input_tokens: sum(answered.map((r) => r.usage.input_tokens)), output_tokens: sum(answered.map((r) => r.usage.output_tokens)) } : null,
         cost,
         chunks, planned_chunks: plannedChunks, answers,
+        ...(terminal.write_coverage ? { write_coverage: terminal.write_coverage,
+          ...(terminal.write_coverage.local_only_bytes > 0 ? { note: "unscreened remainder: deterministic local rules only" } : {}) } : {}),
       };
       try {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });

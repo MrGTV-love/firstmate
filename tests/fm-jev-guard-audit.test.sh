@@ -25,6 +25,7 @@ const answer = (noul = 0.05) => ({ model: 'fixture', answers: {
 }, usage: { input_tokens: 3, output_tokens: 1 }, meta: { provider: 'typesafe', attempts: 1, elapsedMs: 7, cost: { amount: 0.001, source: 'reported' } } });
 mock.module(reportUrl, { namedExports: { ...report, createGuardService: () => ({ ...service,
   plan: (...args) => realPlan ? service.plan(...args) : parts.map((_, i) => String(i)),
+  planWrite: state => ({ pieces: parts.map((_, i) => String(i)), model_screened_bytes: Buffer.byteLength(state.content), local_only_bytes: 0 }),
   decide: async () => { const part = parts[next++]; if (part instanceof Error) throw part; return part; },
 }) } });
 const { installJevGuard } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-guard.ts`));
