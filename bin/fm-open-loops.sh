@@ -9,6 +9,7 @@
 # recheck, hold, prerequisite or prerequisite_task (same validation as the single-row form).
 # Example: {"row_id":"ROW_ID","kind":"escalated","evidence":"decision requested"}
 # A batch shares one cached fleet snapshot, including failed reads, across all actions.
+# The whole input is read before the ledger lock is taken, so a slow producer never blocks a drain.
 # Each input line produces one result row (line,id,kind,result,message); valid actions
 # persist even when siblings refuse. Any refusal exits 1; malformed CLI arguments exit 2.
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
