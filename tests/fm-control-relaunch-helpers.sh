@@ -126,6 +126,11 @@ SH
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
+  [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
+  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
+  exit 0
+fi
 encode_cwd() {
   local path=$1
   path=${path//\\/\\\\}
@@ -937,6 +942,11 @@ case "${1:-} ${2:-}" in
     fi
     exit 0 ;;
   'pane process-info')
+    if [ -f "$D/adoption-ambiguous" ]; then
+      jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+        '{result:{type:"pane_process_info",process_info:{pane_id:$pane,foreground_processes:[{pid:2000000000,name:"omp"},{pid:2000000001,name:"omp"}]}}}'
+      exit 0
+    fi
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/herdr-agent-live" ]; then
         pid=2000000000
