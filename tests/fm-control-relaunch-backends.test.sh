@@ -1821,8 +1821,8 @@ test_omp_adoption_publication_race() {
     printf old > "$dir/fake/recovery-spawn-gen"
     # A live record is the extension's own healthy proof for this process.
     [ "$shape" != live-record ] || extension_event start
-    op=mv
-    [ "$shape" != dead-record-link ] || op=ln
+    op='mv'
+    [ "$shape" != dead-record-link ] || op='ln'
     arm_adoption_barrier "$dir" "$id" "$op"
     exec 6<> "$dir/fake/barrier-events"
     (
