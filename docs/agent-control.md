@@ -174,7 +174,9 @@ The command writes only the session record, never unlocks a session, modifies a 
 It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
 A stale registration alone grants no authority.
 The resolved foreground process must also classify as an agent process, so a registration that outlives its agent cannot make another program in the worktree a lifecycle target.
-When the existing record's nonempty current-session activation for the same live PID identifies another file, adoption refuses without rewriting that evidence, even if Herdr still registers the original task file.
+When the existing record already names the same live PID, its current-session activation must be nonempty and identify the registered task file.
+An empty activation is the omp extension's own unproven mark, written on shutdown, before a switch, or after a failed start, and an activation naming another file is a different conversation.
+Adoption refuses both without rewriting that evidence, even if Herdr still registers the original task file; a record naming a different PID is the repair target.
 Every refusal names the missing proof, and no refusal lowers the workspace or duplicate-pane requirements.
 
 **This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**

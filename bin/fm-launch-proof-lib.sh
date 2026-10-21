@@ -3,7 +3,8 @@
 # fm-spawn stamps FM_SPAWN_GEN with the record's spawn_gen and records
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
 # For omp, a matching pin also requires current-session proof. Explicit adopt
-# can repair that record; without a pin, every adoption proof is rechecked
+# can repair a record that names another PID, never the live PID's own unproven
+# mark; without a pin, every adoption proof is rechecked
 # before the repaired live PID and session-file identity authorize lifecycle.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action
@@ -230,10 +231,13 @@ try:
     require(live.is_absolute() and live.is_file() and not any(ord(c) < 32 for c in str(live)),
             "session proof needs an existing absolute live session file")
     current = old.get("current_session_file")
-    if old.get("pid") == pid and current is not None and current != "":
-        # The extension's activation for this exact live process outranks a
-        # registration Herdr may have retained from an earlier conversation.
-        require(isinstance(current, str) and current.startswith("/")
+    if old.get("pid") == pid:
+        # The extension's record for this exact live process, including its
+        # deliberate empty mark, outranks a registration Herdr may have
+        # retained from an earlier conversation.
+        require(isinstance(current, str) and current != "",
+                "current-session proof for the live PID is empty or invalid, which the omp extension writes as unproven; adoption cannot overwrite it")
+        require(current.startswith("/")
                 and not any(ord(c) < 32 for c in current)
                 and Path(current).is_file() and os.path.samefile(current, live),
                 "current-session proof contradicts the registered task session for the live PID; adoption needs agreeing current-session evidence")
