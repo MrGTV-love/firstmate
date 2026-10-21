@@ -103,8 +103,8 @@
 # one first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
 # 0 AND say allowed: its whole answer is one JSON document whose "allowed" is the
-# boolean true, or is exactly the literal allowed=true. A non-zero exit, an empty,
-# malformed or verdictless answer, text that only mentions allowed=true, any other
+# boolean true. A non-zero exit, an empty, malformed or verdictless answer, text
+# that only mentions allowed=true (a bare allowed=true included), any other
 # value, or a timeout holds the copy as HELD-LOCKED with the driver's own words
 # (the first 600 characters, on one line), copies nothing, and is not a failure.
 # So does an allowed plan whose document reports ignored_payload_disposition=
@@ -122,8 +122,12 @@
 # Before executing the driver, a durable receipt under
 # data/copy-sweep/retained/<sha256 of the path> protects the copy from later
 # removal, even when the driver releases its lock but removal fails. Only a
-# successful, verified removal clears that receipt. Other receipts retain the
-# copy until its disposition is reconciled; the sweep never clears one to retry.
+# successful, verified removal clears that receipt. A receipt records the lock's
+# SHA-256 and the copy's path and retains the copy while that lock, or no lock,
+# is there (the driver may have released it); the sweep never clears one to retry
+# a copy. A receipt whose path is gone, whose copy now has a different lock, or
+# that records no hash is stale: classification ignores it, report mode leaves it,
+# and --apply removes it and lists RECEIPT-CLEARED.
 # Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
 # the run exits 0 and later runs neither preserve nor execute that copy again.
 # Other execution failures exit 1, record the driver's text, and retain the copy.
@@ -606,22 +610,54 @@ sweep_vernant_lock_pid() {  # <lock-file>
 # A durable receipt is written before execute: the driver can remove a lock
 # and then fail to remove its copy, or the sweep can stop while it runs. Never
 # let a later run reinterpret that partially completed release as an unlocked
-# copy that is safe to remove. Report mode only reads these receipts.
+# copy that is safe to remove. Report mode only reads these receipts. A receipt
+# records the SHA-256 of the creation lock the driver was asked to release and the
+# copy's path.
 retained_receipt() {  # <copy>
   local hash
   hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
   printf '%s/%s/retained/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
 }
 
-record_driver_retention() {  # <copy> <reason>
+record_driver_retention() {  # <copy> <lock-sha256> <reason>
   local dest tmp
   dest=$(retained_receipt "$1") || return 1
   mkdir -p "${dest%/*}" || return 1
   tmp=$(mktemp "${dest%/*}/.retained.XXXXXX") || return 1
-  if ! printf '%s\n' "$2" > "$tmp" || ! mv -- "$tmp" "$dest"; then
+  if ! printf 'lock-sha256=%s\ncopy=%s\n%s\n' "$2" "$1" "$3" > "$tmp" || ! mv -- "$tmp" "$dest"; then
     rm -f -- "$tmp"
     return 1
   fi
+}
+
+# True when a receipt no longer describes what is at its path: it records no lock
+# hash or path (an older receipt), its path is gone, or the copy there now has a
+# different creation lock. A copy with no lock stays protected, because the driver
+# may have released the lock and then failed to remove the copy. Sets
+# RECEIPT_STALE_COPY and RECEIPT_STALE_WHY. An unreadable receipt is not stale.
+RECEIPT_STALE_COPY=
+RECEIPT_STALE_WHY=
+receipt_is_stale() {  # <receipt>
+  local hash='' copy='' actual rc=0
+  RECEIPT_STALE_COPY=
+  RECEIPT_STALE_WHY=
+  [ -r "$1" ] || return 1
+  { IFS= read -r hash && IFS= read -r copy; } < "$1" || true
+  case "$copy" in copy=/*) copy=${copy#copy=}; RECEIPT_STALE_COPY=$copy ;; *) copy= ;; esac
+  case "$hash" in lock-sha256=*) hash=${hash#lock-sha256=} ;; *) hash= ;; esac
+  if [ -z "$copy" ] || ! [[ $hash =~ ^[0-9a-f]{64}$ ]]; then
+    RECEIPT_STALE_WHY="it records no lock hash and copy path"
+    return 0
+  fi
+  if [ ! -e "$copy" ] && [ ! -L "$copy" ]; then
+    RECEIPT_STALE_WHY="its copy is gone"
+    return 0
+  fi
+  teardown_copy_lock_file "$copy" || rc=$?
+  [ "$rc" = 0 ] || return 1
+  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  [ "$actual" != "$hash" ] || return 1
+  RECEIPT_STALE_WHY="the copy there now has a different creation lock"
 }
 
 # Sets CLASS and REASON for <copy>, registered by <clone> of <pool> and
@@ -662,9 +698,9 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="its previous driver disposition cannot be checked"
     return 0
   }
-  if [ -e "$pending" ] || [ -L "$pending" ]; then
+  if { [ -e "$pending" ] || [ -L "$pending" ]; } && ! receipt_is_stale "$pending"; then
     CLASS=HELD-LOCKED
-    REASON="driver retained this copy: $(cat "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
+    REASON="driver retained this copy: $(sed -n '3,$p' "$pending" 2>/dev/null || printf 'receipt unreadable'); no retry until its retained disposition is reconciled"
     return 0
   fi
   rc=0
@@ -995,17 +1031,13 @@ gib_or_dash() {  # <KiB or ->
   case "$1" in ''|*[!0-9]*) printf -- '-' ;; *) kib_to_gib "$1" ;; esac
 }
 
-# True only when <driver output> carries a real positive verdict: the whole
-# trimmed answer is the literal `allowed=true`, or it is exactly one JSON
-# document whose top-level "allowed" key is the boolean true. Text that merely
-# mentions allowed=true, a false or non-boolean value, no verdict, an empty or
-# malformed answer, and more than one document are not permission.
+# True only when <driver output> carries a real positive verdict: it is exactly
+# one JSON document whose top-level "allowed" key is the boolean true. Text that
+# merely mentions allowed=true, a bare allowed=true, a false or non-boolean
+# value, no verdict, an empty or malformed answer, and more than one document
+# are not permission.
 plan_verdict_allows() {  # <driver output>
-  local out=$1
-  out=${out#"${out%%[![:space:]]*}"}
-  out=${out%"${out##*[![:space:]]}"}
-  [[ $out =~ ^allowed[[:blank:]]*=[[:blank:]]*true$ ]] && return 0
-  printf '%s' "$out" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
+  printf '%s' "$1" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == true)' >/dev/null 2>&1
 }
 
 # True when the plan's one JSON document reports the driver's retain rule for a
@@ -1122,20 +1154,36 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
     return 1
   fi
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
-  record_driver_retention "$copy" "driver release incomplete; the copy remains protected even if its lock was released" || {
+  record_driver_retention "$copy" "$7" "driver release incomplete; the copy remains protected even if its lock was released" || {
     echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
     return 1
   }
   rc=0
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
-    record_driver_retention "$copy" "exit $rc: $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" || true
+    record_driver_retention "$copy" "$7" "exit $rc: $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" || true
     echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
     if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_OUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
       return 3
     fi
     return 1
   fi
+}
+
+# Removes each stale driver-retention receipt and lists it. Only a receipt that
+# receipt_is_stale proves no longer describes its path is removed.
+clear_stale_receipts() {
+  local receipt
+  for receipt in "$DATA_DIR/$CHECK_ID/retained"/*; do
+    [ -e "$receipt" ] || [ -L "$receipt" ] || continue
+    receipt_is_stale "$receipt" || continue
+    if rm -f -- "$receipt"; then
+      REMOVAL_REPORT="${REMOVAL_REPORT}RECEIPT-CLEARED"$'\t'"${RECEIPT_STALE_COPY:-$receipt}"$'\t'"stale driver-retention receipt removed: $RECEIPT_STALE_WHY"$'\n'
+    else
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"${RECEIPT_STALE_COPY:-$receipt}"$'\t'"its stale driver-retention receipt could not be removed"$'\n'
+    fi
+  done
 }
 
 # Removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time, deepest
@@ -1155,6 +1203,7 @@ apply_removals() {
   FAILED_COUNT=0
   FREED_KIB=0
   FREED_UNMEASURED=0
+  clear_stale_receipts
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"

@@ -515,10 +515,6 @@ if [ "\${3:-}" != --execute-cleanup ]; then
     echo 'garbage allowed=true'
     exit 0
   fi
-  if [ -e "$log/plan-bare-literal" ]; then
-    echo 'allowed=true'
-    exit 0
-  fi
   if [ -e "$log/plan-retain" ]; then
     echo '{"allowed": true, "ignored_payload_disposition": "archive_then_retain_tree", "unique_ignored_paths": ["unique.dat"]}'
     exit 0
@@ -1056,6 +1052,50 @@ test_failed_driver_removal_cannot_be_retried_as_unlocked() {
   pass "a driver that releases its lock but fails removal leaves a durable protection against later plain removal"
 }
 
+test_a_stale_retention_receipt_does_not_hold_a_new_copy_at_the_same_path() {
+  local shape second head pid retained
+  for shape in gone replaced; do
+    make_locked_copy_case "stale-receipt-$shape" dead
+    install_driver "$SLOT" "$W"
+    printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'old bytes\n' > "$(copy_path locked)/unique.dat"
+    head=$(git -C "$(copy_path locked)" rev-parse HEAD)
+    retained="$HOMED/data/copy-sweep/retained"
+    : > "$W/retain-ignored"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$shape: the retained first run failed ($RC): $OUT"
+    assert_contains "$OUT" "KEPT"$'\t'"$(copy_path locked)" "$shape: the driver's retention was not reported"
+    assert_equals 1 "$(find "$retained" -type f | wc -l | tr -d ' ')" "$shape: the retained copy has no single receipt"
+    rm -f "$W/retain-ignored"
+    git -C "$SLOT" worktree unlock "$(copy_path locked)" || fail "$shape: fixture could not unlock the old copy"
+    git -C "$SLOT" worktree remove "$(copy_path locked)" || fail "$shape: fixture could not remove the old copy"
+    if [ "$shape" = replaced ]; then
+      second=$(copy_path locked)
+      git -C "$SLOT" worktree add -q -b fm/locked-again "$second" "$head"
+      sleep 0.1 & pid=$!
+      wait "$pid" 2>/dev/null || true
+      git -C "$SLOT" worktree lock --reason "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=$pid" "$second"
+      FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
+      [ "$RC" = 0 ] || fail "$shape: the report failed ($RC): $OUT"
+      assert_class locked PENDING-DRIVER
+      assert_not_contains "$OUT" "driver retained this copy" "$shape: the old receipt still held the new copy"
+    else
+      FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
+      [ "$RC" = 0 ] || fail "$shape: the report failed ($RC): $OUT"
+    fi
+    assert_equals 1 "$(find "$retained" -type f | wc -l | tr -d ' ')" "$shape: report mode changed the receipts"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$shape: the apply failed ($RC): $OUT"
+    assert_contains "$OUT" "RECEIPT-CLEARED"$'\t'"$(copy_path locked)" "$shape: the stale receipt removal was not listed"
+    assert_equals 0 "$(find "$retained" -type f | wc -l | tr -d ' ')" "$shape: a stale receipt was left behind"
+    if [ "$shape" = replaced ]; then
+      assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "$shape: the new copy was not judged on its own proofs and released"
+      [ ! -e "$(copy_path locked)" ] || fail "$shape: the new copy is still on disk"
+    fi
+  done
+  pass "a retention receipt whose copy is gone or whose lock differs is ignored by classification, left by report, and removed and listed by apply, so a new copy at that path is judged on its own proofs"
+}
+
 test_report_does_not_claim_unplanned_locks_are_reapable() {
   make_locked_copy_case report-unplanned dead
   install_driver "$SLOT" "$W"
@@ -1148,15 +1188,25 @@ test_unproved_plan_verdicts_hold_the_copy() {
   pass "an empty, malformed, missing, false-with-text or garbage-literal plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, leave no driver process running, and exit 0"
 }
 
-test_a_bare_allowed_literal_plan_releases_the_copy() {
+test_a_bare_allowed_literal_plan_does_not_release_the_copy() {
+  local admin before
   make_locked_copy_case planbare dead
   install_driver "$SLOT" "$W"
-  : > "$W/plan-bare-literal"
+  printf 'allowed=true\n' > "$W/plan-output"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  take_snapshots before locked
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "a bare allowed=true plan failed the run ($RC): $OUT"
-  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "a bare allowed=true plan did not release the copy"
-  [ ! -e "$(copy_path locked)" ] || fail "a bare allowed=true plan left the copy on disk"
-  pass "a plan whose whole answer is allowed=true releases the copy"
+  assert_class locked HELD-LOCKED
+  assert_not_contains "$OUT" "REMOVED" "a bare allowed=true plan released the copy"
+  take_snapshots after locked
+  assert_untouched locked
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "a bare allowed=true plan changed the lock"
+  assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
+    "a bare allowed=true plan reached execute"
+  assert_absent "$HOMED/data/copy-sweep" "a bare allowed=true plan copied ignored entries or wrote a receipt"
+  pass "a plan whose whole answer is the bare text allowed=true holds the copy and never executes the driver"
 }
 
 test_a_zero_padded_plan_timeout_is_read_as_decimal() {
@@ -2118,6 +2168,7 @@ run_case test_valid_lock_replacement_during_plan_prevents_release
 run_case test_extra_lock_lines_are_held_byte_identical
 run_case test_binary_creation_lock_is_held_byte_identical
 run_case test_failed_driver_removal_cannot_be_retried_as_unlocked
+run_case test_a_stale_retention_receipt_does_not_hold_a_new_copy_at_the_same_path
 run_case test_report_does_not_claim_unplanned_locks_are_reapable
 run_case test_driver_verdict_types_and_exit_status_are_not_permission
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
@@ -2128,7 +2179,7 @@ run_case test_a_failed_preservation_leaves_no_staging_directory
 run_case test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released
 run_case test_ownership_or_lock_change_during_preservation_prevents_release
 run_case test_unproved_plan_verdicts_hold_the_copy
-run_case test_a_bare_allowed_literal_plan_releases_the_copy
+run_case test_a_bare_allowed_literal_plan_does_not_release_the_copy
 run_case test_a_zero_padded_plan_timeout_is_read_as_decimal
 run_case test_a_sweep_stopped_during_a_plan_stops_the_hung_driver
 run_case test_two_sweeps_of_one_path_keep_both_preserved_directories
