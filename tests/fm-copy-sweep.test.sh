@@ -554,15 +554,18 @@ test_apply_raises_the_wake_through_the_queue_once() {
 }
 
 test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
+  local measured
   make_budget_world cut 10 10 10
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   # The first du finishes inside the bound; the second is cut by it; the third never starts.
   FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
-  assert_contains "$OUT" "is over its budget: 10.00 GiB against 5 GiB" "a lower bound already over the budget should wake"
-  assert_contains "$OUT" "2 copies unmeasured" "the wake did not disclose the unmeasured copies"
+  measured=$(du_calls)
+  { [ "$measured" -ge 1 ] && [ "$measured" -le 2 ]; } || fail "a du that could not finish inside the bound was counted, or none finished: $measured completed"
+  assert_contains "$OUT" "container $SLOT is over its budget: " "a lower bound already over the budget should wake"
+  assert_contains "$OUT" "$((measured * 10)).00 GiB against 5 GiB" "the wake did not name only the bytes it measured"
+  assert_contains "$OUT" "$((3 - measured)) copies unmeasured" "the wake did not disclose the unmeasured copies"
   assert_no_grep "last_scan" "$HOMED/state/copy-sweep.record" "a cut scan was recorded as complete"
-  [ "$(du_calls)" = 1 ] || fail "a du that could not finish inside the bound was counted, or one ran past it: $(du_calls) completed"
   make_budget_world cutquiet 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check

@@ -29,7 +29,15 @@
 # Merged PRs and reported scouts remain distinct.
 #
 # A row closed by a captain's drop carries the fixed note "dropped" and is never
-# a delivery, whatever other links it retains.
+# a delivery, whatever other links it retains. A ship row closed because only a
+# verified bundle holds its commits carries the note "preserved in bundle
+# <path>, not landed" and no artifact; bin/fm-fleet-snapshot.sh marks it
+# captain_drop too, so it is never listed as landed either. That mark needs a
+# Done row with no PR or report and the note as its last body line. Restarting
+# the row through bin/fm-backlog-transition-lib.sh retires the note to
+# "Historical preserved in bundle ...", as it retires "dropped", so a restarted
+# row is not marked while it runs, nor once it is closed again with a PR, a
+# report, another note or no flag.
 # The backlog-selection compatibility fallback keeps a structured Done row
 # whose three parsed artifact fields are absent when it does not retain
 # hold-kind captain.

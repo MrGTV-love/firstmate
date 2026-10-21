@@ -33,8 +33,9 @@
 # Automatic sweep calls additionally require reap eligibility before cleanup;
 # bin/fm-idle-session-reap.sh's header owns that admission contract.
 # The captain-call retention path below applies to ordinary teardown admission.
-# REFUSES if a ship's deliverable has not LANDED, because cleanup
-# hard-resets/removes the worktree and kills its processes.
+# REFUSES if a ship's deliverable has not LANDED and its locally-only tips
+# lack recorded bundle preservation below, because cleanup hard-resets/removes
+# the worktree and kills its processes.
 # A pushed branch is recoverable work, not a delivered result.
 # A ship has landed only when its PR is merged and
 # GitHub reports a PR head that contains the current local work, or its content is
@@ -60,7 +61,59 @@
 # HEAD is that run's input head (submitted_head_sha). A copy at any other commit,
 # a run that pushed another head, or a missing record
 # (state database, run row, pushed head, input head) refuses and names the record.
-# Anything else refuses.
+# Anything else refuses unless the recorded bundle alternative below holds.
+# Recorded bundle preservation is a cleanup alternative, not proof of delivery.
+# Its record is $DATA/$ID/preservation-bundles.tsv (normally
+# $FM_HOME/data/<task-id>/preservation-bundles.tsv): exactly ONE line of three
+# TAB-separated fields: absolute bundle path, lowercase SHA-256 (64 hex), and
+# space-separated full commit tips advertised by git bundle list-heads.
+# Re-bundling replaces the line; a record of more than one line, or a blank or
+# malformed one, refuses. The path cannot contain TAB, CR or newline.
+# The record and bundle must be regular nonsymlink files. The bundle's physical
+# parent must be outside every registered copy (symlink aliases included), every
+# enclosing Treehouse pool (non-copy directories in it included) and every
+# removal root this teardown removes: the task's own copy, its tasktmp, its
+# launch-home temp root, the whole state directory (every state-side removal
+# target, including .nm-read-cache-<task-id>), and $STATE/<task-id>.inbox and
+# .git-hooks.
+# The recorded bundle must pass git bundle verify in the copy, match its recorded
+# SHA-256, advertise and record every maximal tip of git rev-list --children
+# <ref> <branches> --not --remotes, and restore on its own: fetching every
+# recorded tip from it into a fresh empty repository outside the copy and pool
+# must succeed and pass git fsck --strict.
+# <ref> is the copy's HEAD (detached included) or a removed copy's branch tip,
+# and it must carry a locally-only commit of its own: <branches> only widen
+# what the bundle must cover, they never make a pushed <ref> eligible, so a
+# pushed-but-undelivered ship still requires the existing delivery proof.
+# <branches> are the local branches no live worktree has checked out, so side
+# branches count; a branch checked out in another worktree whose directory still
+# exists is that task's own, but a branch whose worktree directory is gone or
+# prunable counts. A thin bundle, a truncated pack or a missing tip refuses.
+# Ancestors need not be separate bundle heads.
+# Every proof reads the record and the bundle's digest again and verifies coverage
+# again; only a completed isolated restore is remembered in this process, by
+# bundle digest, object format and recorded tips, so the final custody rechecks
+# and the nested, prior and foreign copy proofs do not repeat it. Nothing is
+# cached on disk.
+# Success prints the bundle path, hash and preserved tips, and never waives dirt,
+# ignored-file preservation, process, ownership or closeout-driver proofs.
+# A ship kept only by its bundle closes its backlog item with the note
+# "preserved in bundle <bundle path>, not landed", never a PR or "local main";
+# bin/fm-landed-lib.sh keeps such a row out of Recently Landed.
+# A Vernant-locked copy still needs its driver's independent landing verdict.
+# To create a self-contained bundle and its record (no creator is run by teardown),
+# choose an absolute durable bundle path OUTSIDE every copy, pool, state directory and scratch root,
+# set copy, task and FM_HOME explicitly, then run under bash:
+#   bundle=/durable/preservation/task.bundle
+#   mkdir -p "${bundle%/*}" "$FM_HOME/data/$task"
+#   git -C "$copy" bundle create "$bundle" --all &&
+#   git -C "$copy" bundle verify "$bundle" &&
+#   digest=$(shasum -a 256 "$bundle" | awk '{print $1}') &&
+#   tips=$(git bundle list-heads "$bundle" | awk '{print $1}' | LC_ALL=C sort -u | paste -sd ' ' -) &&
+#   printf '%s\t%s\t%s\n' "$bundle" "$digest" "$tips" > "$FM_HOME/data/$task/preservation-bundles.tsv"
+# Keep the bundle and record until the preserved commits are no longer needed;
+# data/<task> survives cleanup. Restore into a new repository with
+# git -C <restore-repo> fetch <bundle-path> <tip-sha>:refs/heads/recovered.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
 # where the usual "checks green" fm-pr-check.sh trigger never fires) - by looking
@@ -212,8 +265,9 @@
 # that is not teardown's own is never signalled and refuses at once, named by its
 # pid; it is a clean worktree root, and each ignored file it holds is either
 # regenerable machinery or copied with its SHA-256 into the task's data
-# directory before removal; and its work is landed by the existing landed-work
-# rule. A copy whose work is not proved landed stays, with the reason written.
+# directory before removal; and its work passes the existing landed-work rule,
+# which also accepts the recorded bundle alternative above. A copy whose work is
+# neither proved landed nor held by a recorded bundle stays, with the reason written.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -224,8 +278,8 @@
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); any other ignored entry is
 # preserved first in data/<task>/nested-copy-preserved with its SHA-256. It loses
-# no commit, because the work is landed, and no tracked change, because the clean
-# proof refuses one. The clean proof skips
+# no commit, because the work is landed or held by a recorded bundle, and no
+# tracked change, because the clean proof refuses one. The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
@@ -2350,6 +2404,11 @@ TEARDOWN_LANDED_HEADS=()
 # comparison), empty when it answered "not landed". A reader that types
 # refusals must not count an unasked proof as a policy refusal.
 TEARDOWN_LANDED_UNASKED=
+TEARDOWN_BUNDLE_PROOF=
+work_is_landed_bundle() {  # <branch> <dir> <head> [hint]
+  teardown_bundle_preserved "$2" "$3" "${4:-}" || return 1
+  [ -z "$1" ] || TEARDOWN_BUNDLE_PROOF=$TEARDOWN_BUNDLE_ACCEPTED
+}
 work_is_landed() {
   local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
   TEARDOWN_LANDED_UNASKED=
@@ -2365,14 +2424,19 @@ work_is_landed() {
     fi
   done
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] && [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
+    # Bundle proofs are local, so re-read them even under final project custody.
+    work_is_landed_bundle "$branch" "$dir" "$head" && return 0
     echo "REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof" >&2
     TEARDOWN_LANDED_UNASKED="HEAD changed to ${head:0:12} after its landing proof; retry for a fresh proof"
     return 1
   fi
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
-  work_is_landed_proof "$branch" || return 1
-  TEARDOWN_LANDED_DIRS+=("$dir")
-  TEARDOWN_LANDED_HEADS+=("$head")
+  if work_is_landed_proof "$branch"; then
+    TEARDOWN_LANDED_DIRS+=("$dir")
+    TEARDOWN_LANDED_HEADS+=("$head")
+    return 0
+  fi
+  work_is_landed_bundle "$branch" "$dir" "$head" hint
 }
 
 # A pushed branch proves recoverability, not delivery: require the landing
@@ -2494,7 +2558,8 @@ $refs
 EOF
 }
 
-# The one landed-work rule, applied to <ref> in <dir>: the task copy's own HEAD,
+# The one cleanup commit rule (landing or recorded bundle), applied to <ref>
+# in <dir>: the task copy's own HEAD,
 # the enclosing slot's HEAD, or a removed copy's branch ref read from the
 # project. <branch> names the PR lookup, as for work_is_landed.
 teardown_landed() {  # <dir> <ref> <branch>
@@ -2514,8 +2579,9 @@ teardown_is_dropping() {
 }
 
 # The completion links this teardown already holds locally. A scout's
-# deliverable is its report, a local-only ship lands on local main, and every
-# other ship carries the PR recorded on its own record.
+# deliverable is its report, a ship whose commits only a recorded bundle holds
+# names that bundle and says it is not landed, a local-only ship lands on local
+# main, and every other ship carries the PR recorded on its own record.
 BACKLOG_DONE_ARGS=()
 TEARDOWN_RECORDED_PR_ONLY=0
 backlog_done_args() {
@@ -2531,7 +2597,9 @@ backlog_done_args() {
       BACKLOG_DONE_ARGS=(--report "$data_relative/$ID/report.md")
       ;;
     *)
-      if [ "$MODE" = local-only ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 0 ]; then
+      if [ -n "$TEARDOWN_BUNDLE_PROOF" ]; then
+        BACKLOG_DONE_ARGS=(--note "preserved in bundle $TEARDOWN_BUNDLE_PROOF, not landed")
+      elif [ "$MODE" = local-only ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 0 ]; then
         BACKLOG_DONE_ARGS=(--note "local main")
       elif [ -n "$PR_URL" ]; then
         BACKLOG_DONE_ARGS=(--pr "$PR_URL")
@@ -2887,6 +2955,7 @@ teardown_note_dirty_return() {
 
 validate_worktree_teardown_safety() {
   local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state wt_real
+  TEARDOWN_BUNDLE_PROOF=
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
     secondmate|scout) return 0 ;;

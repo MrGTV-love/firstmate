@@ -1876,6 +1876,136 @@ EOF
   pass "landed accepts only kind-owned delivery artifacts while answered questions stay out"
 }
 
+# A ship closed because only a verified bundle holds its commits records the
+# note bin/fm-teardown.sh writes. It is explicitly not landed, so neither the
+# fleet snapshot nor Recently Landed may present it as shipped work, while a
+# real delivery closed the same way tasks-axi records it still is listed.
+test_landed_excludes_rows_preserved_only_in_a_bundle() {
+  local home fakebin json fleet_json main_backlog bundle_note
+  [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the bundle-preserved row regression"
+  fm_tasks_axi_compatible || {
+    echo "skip: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
+    return 0
+  }
+  home=$(make_home bundle-preserved-landed)
+  write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  main_backlog="$home/data/backlog.md"
+  bundle_note="preserved in bundle $home/bundles/kept.bundle, not landed"
+  "$TASKS_AXI_BIN" add bundle-kept "Work only a bundle holds" --kind ship \
+    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    || fail "could not create the bundle-preserved row"
+  "$TASKS_AXI_BIN" 'done' bundle-kept --note "$bundle_note" --file "$main_backlog" >/dev/null \
+    || fail "could not close the bundle-preserved row"
+  "$TASKS_AXI_BIN" add bundle-kept-local "Local work only a bundle holds" --repo firstmate --start \
+    --file "$main_backlog" >/dev/null || fail "could not create the kindless bundle-preserved row"
+  "$TASKS_AXI_BIN" 'done' bundle-kept-local --note "$bundle_note" --file "$main_backlog" >/dev/null \
+    || fail "could not close the kindless bundle-preserved row"
+  "$TASKS_AXI_BIN" add real-local "Land the local change" --kind ship --repo firstmate --start \
+    --file "$main_backlog" >/dev/null || fail "could not create the real local delivery"
+  "$TASKS_AXI_BIN" 'done' real-local --note "local main" --file "$main_backlog" >/dev/null \
+    || fail "could not close the real local delivery"
+  : > "$home/net.log"
+  fleet_json=$(PATH="$fakebin:$PATH" FM_HOME="$home" \
+    FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json) || fail "Fleet snapshot failed for the bundle-preserved rows"
+  printf '%s' "$fleet_json" | jq -e '
+    (.backlog.records | any(.id == "bundle-kept" and .state == "done" and .captain_drop == true))
+      and (.backlog.records | any(.id == "bundle-kept-local" and .state == "done" and .captain_drop == true))
+      and (.backlog.records | any(.id == "real-local" and .captain_drop == false))
+  ' >/dev/null || fail "the snapshot did not classify bundle-preserved rows apart from deliveries: $fleet_json"
+  json=$(run "$home" "$fakebin" --json --all-landed) || fail "Bearings failed for bundle-preserved rows"
+  printf '%s' "$json" | jq -e '.landed | any(.id == "bundle-kept") | not' >/dev/null \
+    || fail "a bundle-preserved ship was listed as landed: $json"
+  printf '%s' "$json" | jq -e '.landed | any(.id == "bundle-kept-local") | not' >/dev/null \
+    || fail "a kindless bundle-preserved row was listed as landed: $json"
+  printf '%s' "$json" | jq -e '.landed | any(.id == "real-local" and .artifact == "local main")' >/dev/null \
+    || fail "a real delivery was lost from Recently Landed: $json"
+  [ ! -s "$home/net.log" ] || fail "bundle-preserved selection made a network call: $(cat "$home/net.log")"
+  pass "landed excludes rows closed on a bundle alone while real deliveries stay"
+}
+
+# The bundle note is only a drop-like marker while it is the last word on a Done
+# row. Restarting the work retires it, and a later real delivery of the same row
+# is listed, as a restarted drop's "dropped" note is retired by tasks-axi.
+test_restarted_bundle_preserved_row_is_not_a_drop() {
+  local home fakebin json fleet_json main_backlog bundle_note
+  [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the restarted bundle-preserved row regression"
+  fm_tasks_axi_compatible || {
+    echo "skip: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
+    return 0
+  }
+  home=$(make_home bundle-preserved-restarted)
+  write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  main_backlog="$home/data/backlog.md"
+  bundle_note="preserved in bundle $home/bundles/kept.bundle, not landed"
+  "$TASKS_AXI_BIN" add bundle-restarted "Work a bundle held, then restarted" --kind ship \
+    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    || fail "could not create the restarted row"
+  "$TASKS_AXI_BIN" 'done' bundle-restarted --note "$bundle_note" --file "$main_backlog" >/dev/null \
+    || fail "could not close the restarted row on its bundle"
+  "$TASKS_AXI_BIN" start bundle-restarted --file "$main_backlog" >/dev/null \
+    || fail "could not restart the bundle-preserved row"
+  fleet_json=$(PATH="$fakebin:$PATH" FM_HOME="$home" \
+    FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json) || fail "Fleet snapshot failed for the restarted row"
+  printf '%s' "$fleet_json" | jq -e '
+    .backlog.records | any(.id == "bundle-restarted" and .state == "in_flight" and .captain_drop == false)
+  ' >/dev/null || fail "a restarted bundle-preserved row was still marked as a drop: $fleet_json"
+  "$TASKS_AXI_BIN" 'done' bundle-restarted --note "local main" --file "$main_backlog" >/dev/null \
+    || fail "could not close the restarted row on local main"
+  fleet_json=$(PATH="$fakebin:$PATH" FM_HOME="$home" \
+    FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json) || fail "Fleet snapshot failed for the redelivered row"
+  printf '%s' "$fleet_json" | jq -e '
+    .backlog.records | any(.id == "bundle-restarted" and .state == "done" and .captain_drop == false)
+  ' >/dev/null || fail "a row later delivered on local main stayed marked as a drop: $fleet_json"
+  json=$(run "$home" "$fakebin" --json --all-landed) || fail "Bearings failed for the redelivered row"
+  printf '%s' "$json" | jq -e '.landed | any(.id == "bundle-restarted" and .artifact == "local main")' >/dev/null \
+    || fail "a row delivered on local main after a bundle close was hidden from Recently Landed: $json"
+  pass "a restarted bundle-preserved row is not a drop and is listed once it is really delivered"
+}
+
+# A restart through the home's own transition retires the bundle note, so a plain
+# close afterwards (a PR found by branch lookup with no pr= recorded) is a real
+# delivery and not a drop. Bare `tasks-axi start` does not retire it, so the
+# restart runs through bin/fm-tasks-axi.sh, the home's own restart path.
+test_restarted_bundle_preserved_row_closed_plain_is_landed() {
+  local home fakebin json fleet_json main_backlog bundle_note
+  [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the plain-close bundle-preserved row regression"
+  fm_tasks_axi_compatible || {
+    echo "skip: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
+    return 0
+  }
+  home=$(make_home bundle-preserved-plain-close)
+  write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  main_backlog="$home/data/backlog.md"
+  bundle_note="preserved in bundle $home/bundles/kept.bundle, not landed"
+  "$TASKS_AXI_BIN" add bundle-plain "Work a bundle held, then delivered" --kind ship \
+    --repo firstmate --start --file "$main_backlog" >/dev/null \
+    || fail "could not create the plain-close row"
+  "$TASKS_AXI_BIN" 'done' bundle-plain --note "$bundle_note" --file "$main_backlog" >/dev/null \
+    || fail "could not close the plain-close row on its bundle"
+  PATH="$fakebin:$PATH" FM_HOME="$home" "$ROOT/bin/fm-tasks-axi.sh" start bundle-plain >/dev/null \
+    || fail "could not restart the bundle-preserved row through the home's transition"
+  "$TASKS_AXI_BIN" 'done' bundle-plain --file "$main_backlog" >/dev/null \
+    || fail "could not close the restarted row with a plain done"
+  : > "$home/net.log"
+  fleet_json=$(PATH="$fakebin:$PATH" FM_HOME="$home" \
+    FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z NET_LOG="$home/net.log" \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json) || fail "Fleet snapshot failed for the plain-closed row"
+  printf '%s' "$fleet_json" | jq -e '
+    .backlog.records | any(.id == "bundle-plain" and .state == "done" and .captain_drop == false)
+  ' >/dev/null || fail "a restarted bundle-preserved row closed with a plain done was marked as a drop: $fleet_json"
+  json=$(run "$home" "$fakebin" --json --all-landed) || fail "Bearings failed for the plain-closed row"
+  printf '%s' "$json" | jq -e '.landed | any(.id == "bundle-plain")' >/dev/null \
+    || fail "a restarted bundle-preserved row closed with a plain done was hidden from Recently Landed: $json"
+  [ ! -s "$home/net.log" ] || fail "plain-close selection made a network call: $(cat "$home/net.log")"
+  pass "a restarted bundle-preserved row closed with a plain done is not a drop and is listed as landed"
+}
+
 test_kind_fallback_matches_tasks_axi_word_boundaries() {
   local home fakebin id title kind producer_kind fleet_json json
   [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the kind-boundary regression"
@@ -3436,6 +3566,9 @@ test_open_work_ledger_is_dated_evidence_from_the_effective_state_root
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_accepts_only_kind_owned_delivery_artifacts
+test_landed_excludes_rows_preserved_only_in_a_bundle
+test_restarted_bundle_preserved_row_is_not_a_drop
+test_restarted_bundle_preserved_row_closed_plain_is_landed
 test_kind_fallback_matches_tasks_axi_word_boundaries
 test_landed_preserves_kindless_v1_summary_reports
 test_landed_default_balances_dominant_and_sparse_homes

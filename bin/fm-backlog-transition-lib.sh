@@ -648,6 +648,7 @@ fm_backlog_new_work_transition() {
     close $prior or die $!;
     $value =~ s/^([^\S\n]*)dropped([^\S\n]*)$/${1}Historical captain disposition: dropped${2}/mg;
     $value =~ s/^([^\S\n]*)Deliverable of the finished work:/${1}Historical deliverable of the finished work:/mg;
+    $value =~ s/^([^\S\n]*)(preserved in bundle \/[^\n]*, not landed)([^\S\n]*)$/${1}Historical $2$3/mg;
     utf8::encode($value) if utf8::is_utf8($value);
     open my $next, ">:raw", "$ARGV[0]/next" or die $!;
     print {$next} $value;
@@ -1227,7 +1228,13 @@ fm_backlog_close_marker_validate() {  # <marker-path> <authorized-data-dir> <exp
     0) ;;
     2)
       case "${args[0]}" in
-        --note) [ "${args[1]}" = "local%20main" ] || [ "${args[1]}" = dropped ] ;;
+        --note)
+          [ "${args[1]}" = "local%20main" ] || [ "${args[1]}" = dropped ] \
+            || case "${args[1]}" in
+              "preserved in bundle /"*", not landed") [ "${#args[1]}" -le 4096 ] ;;
+              *) false ;;
+            esac
+          ;;
         --pr)
           arg_value=${args[1]}
           [ "${#arg_value}" -le 2048 ] \
@@ -1369,9 +1376,11 @@ fm_backlog_close_marker_clear() {  # <state-dir> <id>
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): record a close that just
 # landed. <done-arg>... are the arguments the close handed to `tasks-axi done`,
 # which name the evidence: a report, a merged PR, the captain's drop, a local
-# main landing, or none. The ledger writes a repeat of the same close once, so
-# the direct teardown, its replay, and a proven `done` can each call this. A
-# failed write never changes the caller's result.
+# main landing, or none. A close on a preserved bundle is none: it is not a
+# landing, so it must not fall into the local main arm. The ledger writes a
+# repeat of the same close once, so the direct teardown, its replay, and a
+# proven `done` can each call this. A failed write never changes the caller's
+# result.
 fm_backlog_ledger_closed() {  # <state-dir> <config-dir> <id> [<done-arg>...]
   local state=$1 config=$2 id=$3 evidence pr=''
   shift 3
@@ -1380,6 +1389,7 @@ fm_backlog_ledger_closed() {  # <state-dir> <config-dir> <id> [<done-arg>...]
     --report:*) evidence=report ;;
     --pr:*) evidence=merged_pr; pr=$2 ;;
     --note:dropped) evidence=drop_file ;;
+    --note:"preserved in bundle /"*", not landed") evidence=none ;;
     --note:*) evidence=local_main ;;
     *) evidence=none ;;
   esac

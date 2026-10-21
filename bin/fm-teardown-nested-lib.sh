@@ -24,8 +24,9 @@
 #     in the copy, waits a bounded time, and sends no KILL; one still alive
 #     refuses the release, named by its pid. A process that is not this
 #     teardown's own is never signalled and refuses at once, named by its pid;
-#   - its work is landed by the existing landed-work rule (teardown_landed).
-# A copy whose work is not proved landed stays, and teardown names why.
+#   - teardown_landed proves delivery or the recorded bundle alternative owned
+#     by bin/fm-teardown.sh's header; the closeout driver keeps its own verdict.
+# A copy with neither proof stays, and teardown names why.
 # The task's own nested copies (the record's worktree= and prior_worktree= copies
 # inside the slot) were already proved clean and landed or anchored by the
 # caller. One of them that Vernant's creation lock holds is released the same
@@ -43,7 +44,8 @@
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, regenerable build caches, and anything
 # ignored under its .claude and .opencode trees); it loses no commit, because
-# the work is landed, and no tracked change, because the clean proof refuses one.
+# the work is landed or held by a recorded bundle, and no tracked change,
+# because the clean proof refuses one.
 # Any other ignored entry is copied to the task's data directory before removal.
 # The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files
@@ -303,6 +305,250 @@ teardown_ignored_sha256() {  # [<path>]
   fi
   case "$hash" in ''|*[!0-9a-f]*) return 1 ;; esac
   printf '%s\n' "$hash"
+}
+
+# Bundle preservation is separate from delivery, and is deliberately rechecked
+# rather than placed in the immutable-HEAD landing cache. fm-teardown.sh's
+# header owns the record format and supported creation/recovery commands.
+teardown_bundle_refuse() {  # <predicate> [hint]
+  echo "teardown: bundle preservation unavailable: $1." >&2
+  [ -z "${2:-}" ] || echo "Create a self-contained external bundle with git -C <copy> bundle create <external-bundle> --all, then record its path, SHA-256 and advertised tips in $DATA/$ID/preservation-bundles.tsv using bin/fm-teardown.sh's header recipe; retry ordinary teardown." >&2
+  return 1
+}
+
+# A physical file path outside every registered copy of this copy's ref store,
+# outside the pool, and outside the removal roots teardown removes (the task's
+# copy, its scratch and the state directory). Parent canonicalization catches
+# symlink aliases;
+# rejecting a leaf symlink avoids making its target part of a removal proof.
+teardown_bundle_external() {  # <copy> <bundle>
+  local copy=$1 bundle=$2 parent path inventory field root cursor incomplete=
+  case "$bundle" in /*) ;; *) TEARDOWN_BUNDLE_REASON='bundle path is not absolute'; return 1 ;; esac
+  if [ ! -f "$bundle" ] || [ -L "$bundle" ]; then
+    TEARDOWN_BUNDLE_REASON='bundle is not a regular nonsymlink file'
+    return 1
+  fi
+  parent=${bundle%/*}
+  [ -n "$parent" ] || parent=/
+  parent=$(fm_task_copy_canonical_dir "$parent") || {
+    TEARDOWN_BUNDLE_REASON='bundle parent cannot be resolved'; return 1;
+  }
+  path="$parent/${bundle##*/}"
+  inventory=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-bundle-copies.XXXXXX") || {
+    TEARDOWN_BUNDLE_REASON='registered-copy inventory cannot be created'; return 1;
+  }
+  if ! git -C "$copy" worktree list --porcelain -z > "$inventory" 2>/dev/null; then
+    rm -f "$inventory"
+    TEARDOWN_BUNDLE_REASON='registered copies cannot be inspected'; return 1
+  fi
+  while IFS= read -r -d '' field; do
+    case "$field" in 'worktree '*) root=${field#worktree } ;; *) continue ;; esac
+    [ -e "$root" ] || continue
+    if ! root=$(fm_task_copy_canonical_dir "$root"); then
+      TEARDOWN_BUNDLE_REASON="registered copy cannot be resolved: ${field#worktree }"
+      incomplete=1
+      break
+    fi
+    case "$path" in "$root"/*)
+      TEARDOWN_BUNDLE_REASON="bundle is inside copy $root"
+      incomplete=1
+      break ;;
+    esac
+  done < "$inventory"
+  rm -f "$inventory"
+  [ -z "$incomplete" ] || return 1
+  # The removal roots are the existing teardown globals: $STATE is the parent
+  # of every state-side removal target (including the .nm-read-cache-<id>
+  # directory teardown removes whole, and any future state target), and $WT is
+  # the task's own copy. Rejecting the roots keeps this proof true as the
+  # teardown's removal set changes; do not replace them with one path name.
+  local roots=() labels=() label i
+  [ -z "${TASK_TMP:-}" ] || { roots+=("$TASK_TMP"); labels+=(scratch); }
+  [ -z "${LAUNCH_HOME_TOKEN:-}" ] || { roots+=("/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"); labels+=(scratch); }
+  roots+=("$STATE/$ID.inbox" "$STATE/$ID.git-hooks"); labels+=(scratch scratch)
+  [ -z "${WT:-}" ] || { roots+=("$WT"); labels+=(copy); }
+  roots+=("$STATE"); labels+=(state)
+  for i in "${!roots[@]}"; do
+    root=${roots[$i]%/}
+    label=${labels[$i]}
+    [ -e "$root" ] || continue
+    field=$(fm_task_copy_canonical_dir "$root") || field=$root
+    case "$path" in "$root"/*|"$field"/*)
+      case "$label" in
+        state) TEARDOWN_BUNDLE_REASON="bundle is inside task state $root" ;;
+        copy) TEARDOWN_BUNDLE_REASON="bundle is inside task copy $root" ;;
+        *) TEARDOWN_BUNDLE_REASON="bundle is inside task scratch $root" ;;
+      esac
+      return 1 ;;
+    esac
+  done
+  cursor=$parent
+  while [ -n "$cursor" ]; do
+    if [ -e "$cursor/treehouse-state.json" ] || [ -L "$cursor/treehouse-state.json" ]; then
+      TEARDOWN_BUNDLE_REASON="bundle is inside pool $cursor"; return 1
+    fi
+    [ "$cursor" != / ] || break
+    cursor=${cursor%/*}
+  done
+}
+
+# A bundle must restore on its own: fetch every recorded tip into a fresh empty
+# repository that holds none of the copy's objects, then require it to pass
+# git fsck --strict.
+# A success is remembered for this process by bundle digest, object format and
+# recorded tips, so the repeated proofs of one teardown restore it once.
+TEARDOWN_BUNDLE_RESTORED=
+teardown_bundle_restorable() {  # <copy> <bundle> <bundle-sha256> <tips>
+  local copy=$1 bundle=$2 digest=$3 tips=$4 scratch format key tip i=0 rc=0
+  local -a specs=()
+  format=$(git -C "$copy" rev-parse --show-object-format 2>/dev/null) || format=sha1
+  key="$digest $format $tips"
+  case $'\n'"$TEARDOWN_BUNDLE_RESTORED" in *$'\n'"$key"$'\n'*) return 0 ;; esac
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/fm-teardown-bundle-restore.XXXXXX") || return 1
+  for tip in $tips; do
+    i=$((i + 1))
+    specs+=("$tip:refs/restore/$i")
+  done
+  git init --quiet --bare --object-format="$format" "$scratch" >/dev/null 2>&1 \
+    && git -C "$scratch" fetch --quiet "$bundle" "${specs[@]}" >/dev/null 2>&1 \
+    && git -C "$scratch" fsck --strict --no-dangling >/dev/null 2>&1 \
+    || rc=1
+  rm -rf "$scratch"
+  [ "$rc" != 0 ] || TEARDOWN_BUNDLE_RESTORED+="$key"$'\n'
+  return "$rc"
+}
+
+# The local branches of <copy>'s ref store that no live worktree has checked
+# out. A worktree whose directory is gone or prunable holds nothing.
+teardown_bundle_unheld_branches() {  # <copy>
+  local copy=$1 field path='' branch='' prunable='' held='' name
+  while IFS= read -r -d '' field; do
+    case "$field" in
+      'worktree '*) path=${field#worktree }; branch=''; prunable='' ;;
+      'branch '*) branch=${field#branch } ;;
+      prunable*) prunable=1 ;;
+      '')
+        [ -z "$branch" ] || [ -n "$prunable" ] || [ ! -d "$path" ] || held+="$branch"$'\n'
+        branch=''; prunable=''
+        ;;
+    esac
+  done < <(git -C "$copy" worktree list --porcelain -z 2>/dev/null; printf '\0')
+  git -C "$copy" for-each-ref --format='%(refname)' refs/heads 2>/dev/null | {
+    while IFS= read -r name; do
+      case $'\n'"$held" in *$'\n'"$name"$'\n'*) ;; *) printf '%s\n' "$name" ;; esac
+    done
+  }
+  [ "${PIPESTATUS[0]}" = 0 ]
+}
+
+# The maximal locally-only tips reachable from the refs on stdin, one per line.
+# --children leaves maximal tips as one-field lines.
+teardown_bundle_tips() {  # <copy>
+  local walk
+  walk=$(git -C "$1" rev-list --stdin --children --not --remotes 2>/dev/null) || return 1
+  printf '%s\n' "$walk" | awk 'NF == 1 {print $1}'
+}
+
+# The record is exactly one line, so re-bundling replaces it. <ref> itself must
+# carry a locally-only commit, or the bundle proves nothing and the delivery
+# proof is still required. The recorded bundle must then advertise all maximal
+# locally-only tips of <ref> and of each local branch no live worktree has
+# checked out; a checked-out branch belongs to its own worktree's task.
+teardown_bundle_preserved() {  # <copy> <ref> [hint]
+  local copy=$1 ref=$2 hint=${3:-} record="$DATA/$ID/preservation-bundles.tsv"
+  local line='' extra='' extra_seen='' rest bundle hash tips tip own required side heads advertised digest
+  local -a recorded=()
+  TEARDOWN_BUNDLE_ACCEPTED=
+  own=$(printf '%s\n' "$ref" | teardown_bundle_tips "$copy") || {
+    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
+  }
+  if [ -z "$own" ]; then
+    teardown_bundle_refuse "copy has no unlanded tips of its own; existing delivery proof is still required"
+    return 1
+  fi
+  side=$(teardown_bundle_unheld_branches "$copy") || {
+    teardown_bundle_refuse "copy's branches cannot be inspected: $copy"; return 1;
+  }
+  required=$({ printf '%s\n' "$ref"; [ -z "$side" ] || printf '%s\n' "$side"; } | teardown_bundle_tips "$copy") || {
+    teardown_bundle_refuse "copy's unlanded commits cannot be inspected: $copy"; return 1;
+  }
+  if [ ! -f "$record" ] || [ -L "$record" ]; then
+    teardown_bundle_refuse "missing preservation record (regular nonsymlink file required): $record" "$hint"
+    return 1
+  fi
+  {
+    IFS= read -r line || true
+    if IFS= read -r extra || [ -n "$extra" ]; then extra_seen=1; fi
+  } < "$record"
+  if [ -n "$extra_seen" ]; then
+    teardown_bundle_refuse "malformed preservation record in $record (exactly one line required)" "$hint"
+    return 1
+  fi
+  if [ -z "$line" ]; then
+    teardown_bundle_refuse "empty preservation record: $record" "$hint"
+    return 1
+  fi
+  bundle=${line%%$'\t'*}
+  rest=${line#*$'\t'}
+  hash=${rest%%$'\t'*}
+  tips=${rest#*$'\t'}
+  if [ "$line" = "$rest" ] || [ "$rest" = "$tips" ] \
+      || [ -z "$bundle" ] || [ -z "$tips" ] \
+      || [[ "$tips" = *$'\t'* || "$line" = *$'\r'* ]] \
+      || ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
+    teardown_bundle_refuse "malformed preservation record in $record (expected absolute path, SHA-256 and full tips in three TAB-separated fields)" "$hint"
+    return 1
+  fi
+  read -r -a recorded <<< "$tips"
+  if [ "${#recorded[@]}" = 0 ]; then
+    teardown_bundle_refuse "malformed preservation record in $record (no commit tips)" "$hint"
+    return 1
+  fi
+  for tip in "${recorded[@]}"; do
+    if ! [[ "$tip" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+      teardown_bundle_refuse "malformed preservation record in $record (invalid full commit tip: $tip)" "$hint"
+      return 1
+    fi
+  done
+  tips="${recorded[*]}"
+  TEARDOWN_BUNDLE_REASON=
+  if ! teardown_bundle_external "$copy" "$bundle"; then
+    :
+  elif ! digest=$(teardown_ignored_sha256 "$bundle"); then
+    TEARDOWN_BUNDLE_REASON='bundle sha256 cannot be read'
+  elif [ "$digest" != "$hash" ]; then
+    TEARDOWN_BUNDLE_REASON='bundle sha256 does not match record'
+  elif ! git -C "$copy" bundle verify "$bundle" >/dev/null 2>&1; then
+    TEARDOWN_BUNDLE_REASON='git bundle verify failed'
+  elif ! heads=$(git -C "$copy" bundle list-heads "$bundle" 2>/dev/null); then
+    TEARDOWN_BUNDLE_REASON='bundle advertised tips cannot be read'
+  else
+    advertised=$(printf '%s\n' "$heads" | awk '{print $1}' | tr '\n' ' ')
+    while IFS= read -r tip; do
+      case " $advertised " in *" $tip "*) ;; *)
+        TEARDOWN_BUNDLE_REASON="bundle does not list unlanded tip $tip"; break ;;
+      esac
+      case " $tips " in *" $tip "*) ;; *)
+        TEARDOWN_BUNDLE_REASON="record does not list unlanded tip $tip"; break ;;
+      esac
+    done <<< "$required"
+    if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
+      for tip in $tips; do
+        case " $advertised " in *" $tip "*) ;; *)
+          TEARDOWN_BUNDLE_REASON="recorded tip $tip is not advertised by bundle"; break ;;
+        esac
+      done
+    fi
+    if [ -z "$TEARDOWN_BUNDLE_REASON" ] && ! teardown_bundle_restorable "$copy" "$bundle" "$digest" "$tips"; then
+      TEARDOWN_BUNDLE_REASON='bundle cannot be restored in an isolated repository'
+    fi
+  fi
+  if [ -z "$TEARDOWN_BUNDLE_REASON" ]; then
+    echo "teardown: preserved unlanded commits in bundle $bundle sha256=$hash tips=$tips" >&2
+    TEARDOWN_BUNDLE_ACCEPTED=$bundle
+    return 0
+  fi
+  teardown_bundle_refuse "$bundle: $TEARDOWN_BUNDLE_REASON" "$hint"
 }
 
 # Copies every preservable ignored entry of <copy> into
