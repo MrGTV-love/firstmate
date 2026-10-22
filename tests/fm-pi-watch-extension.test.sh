@@ -5500,13 +5500,14 @@ EOF
 }
 
 test_opencode_healthy_arm_output_does_not_suppress_guard() {
+  local write_mode=${1:-immediate}
   local arm_plugin guard_plugin repo home log guard_log out status
   arm_plugin="$ROOT/.opencode/plugins/fm-primary-watch-arm.js"
   guard_plugin="$ROOT/.opencode/plugins/fm-primary-turnend-guard.js"
-  repo="$TMP_ROOT/opencode-external-healthy-root"
-  home="$TMP_ROOT/opencode-external-healthy-home"
-  log="$TMP_ROOT/opencode-external-healthy-arm.log"
-  guard_log="$TMP_ROOT/opencode-external-healthy-guard.log"
+  repo="$TMP_ROOT/opencode-external-healthy-$write_mode-root"
+  home="$TMP_ROOT/opencode-external-healthy-$write_mode-home"
+  log="$TMP_ROOT/opencode-external-healthy-$write_mode-arm.log"
+  guard_log="$TMP_ROOT/opencode-external-healthy-$write_mode-guard.log"
   mkdir -p "$repo/bin" "$home/state" "$home/config"
   git init -q "$repo"
   : > "$repo/AGENTS.md"
@@ -5526,9 +5527,31 @@ printf 'guard ran after external healthy watcher\n' >&2
 exit 2
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-turnend-guard.sh"
-  out=$(ARM_PLUGIN="$arm_plugin" GUARD_PLUGIN="$guard_plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_GUARD_LOG="$guard_log" node 2>&1 <<'EOF'
+  out=$(FM_WRITE_MODE="$write_mode" ARM_PLUGIN="$arm_plugin" GUARD_PLUGIN="$guard_plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_GUARD_LOG="$guard_log" node 2>&1 <<'EOF'
+import childProcess from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { pathToFileURL } from "node:url";
+
+let delayedWrite = false;
+if (process.env.FM_WRITE_MODE === "delayed") {
+  const spawn = childProcess.spawn;
+  childProcess.spawn = function (command, ...args) {
+    const child = spawn.call(this, command, ...args);
+    if (command === `${process.env.WORKTREE}/bin/fm-turnend-guard.sh`) {
+      const end = child.stdin.end.bind(child.stdin);
+      child.stdin.end = (...input) => {
+        // Block the parent event loop so a stdin-ignoring stub can exit before
+        // the write, without first letting Node mark the stream destroyed.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+        delayedWrite = true;
+        return end(...input);
+      };
+    }
+    return child;
+  };
+  syncBuiltinESMExports();
+}
 
 const armMod = await import(pathToFileURL(process.env.ARM_PLUGIN).href);
 const guardMod = await import(pathToFileURL(process.env.GUARD_PLUGIN).href);
@@ -5571,12 +5594,15 @@ if (!promptBody.includes("TURN WOULD END BLIND")) {
   console.error(`missing blind-turn prompt: ${promptBody}`);
   process.exit(1);
 }
+if (process.env.FM_WRITE_MODE === "delayed" && !delayedWrite) {
+  throw new Error("guard hook payload write was not delayed");
+}
 EOF
 )
   status=$?
-  expect_code 0 "$status" "OpenCode watch plugin must not treat external healthy output as an owned arm"
+  expect_code 0 "$status" "OpenCode watch plugin must not treat external healthy output as an owned arm ($write_mode hook write): $out"
   [ -z "$out" ] || fail "OpenCode external-healthy test printed output: $out"
-  pass "OpenCode healthy arm output does not suppress the turn-end guard"
+  pass "OpenCode healthy arm output does not suppress the turn-end guard ($write_mode hook write)"
 }
 
 test_watch_instance_rebind_releases_predecessors() {
@@ -5689,3 +5715,4 @@ test_opencode_established_empty_close_honors_retry_limit
 test_opencode_actionable_close_rechecks_session_lock
 test_opencode_watch_arm_coordinates_with_turnend_guard
 test_opencode_healthy_arm_output_does_not_suppress_guard
+test_opencode_healthy_arm_output_does_not_suppress_guard delayed
