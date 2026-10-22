@@ -114,6 +114,18 @@ assert_not_contains "$out" 'transport failure' "DOD-02 the resolution post of an
 assert_contains "$(thread_texts "$ts")" 'Resolved: oversized-card' "DOD-02 oversized call has no resolution notice"
 assert_not_contains "$(thread_texts "$ts")" 'PRIVATE_TASK_BODY' "T1 task body leaked into the resolution notice"
 assert_eq "$(thread_field oversized-card retired)" True "DOD-02 oversized thread was not retired"
+question="Pick the rollout $(python3 -c 'print("r" * 5000)')"
+(cd "$FM_HOME" && tasks-axi add long-question "Long question" --kind captain --repo sample --body-file "$FM_HOME/oversized.body" >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold long-question --reason "$question" >/dev/null
+mirror card-payload >/dev/null
+card=$(python3 "$HELPER" card-text "$(replay_file)" long-question)
+assert_contains "$card" "Question: $question" "DOD-02 an under-budget card cut its question"
+assert_not_contains "$card" '\.\.\.' "DOD-02 an under-budget card was cut"
+python3 "$HELPER" stage-notice "$(state_file)" "$ts" oversized-card 45000
+out=$(poll card-payload)
+assert_not_contains "$out" 'transport failure' "DOD-02 an oversized post was refused"
+assert_contains "$out" "check: slack $ts - oversized notice" "DOD-02 the oversized notice was not published"
+assert_contains "$(thread_texts "$ts")" 'Full text remains in the local backlog.' "DOD-02 an oversized post was not cut"
 printf 'ok - DOD-02\n'
 
 # DOD-03

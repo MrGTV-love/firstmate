@@ -357,12 +357,20 @@ class Watch:
         if not usable:
             footer.append('Missing reaction scope: ' + ', '.join(sorted(missing)) + '.')
         footer.append('Full decision remains in the local backlog.')
-        # Budget values, not the assembled card: every field and the precedence
-        # rule must survive even when one decision field is larger than Slack allows.
-        fixed = '\n'.join([prefix for prefix, _ in fields] + footer)
-        limit = (CARD_LIMIT - len(fixed)) // len(fields)
-        if limit < 3:
-            raise SlackError('decision_card_too_large')
+        text = '\n'.join([prefix + value for prefix, value in fields] + footer)
+        if len(text) <= CARD_LIMIT:
+            return text, options, usable
+        # Only an oversized card is budgeted: short values stay whole and the long
+        # ones share what is left, so every field and the precedence rule survive.
+        budget = CARD_LIMIT - len('\n'.join([prefix for prefix, _ in fields] + footer))
+        lengths = sorted(len(value) for _, value in fields)
+        limit = budget
+        for n, length in enumerate(lengths):
+            share = budget // (len(lengths) - n)
+            if length > share:
+                limit = share
+                break
+            budget -= length
         text = [prefix + short(value, limit) for prefix, value in fields]
         return '\n'.join(text + footer), options, usable
 
@@ -382,7 +390,7 @@ class Watch:
         return self.api.call('conversations.history', channel=channel, limit=100,
                              include_all_metadata=True).get('messages', [])
 
-    def post(self, event, text, thread=None, tail='\nFull text remains in the local backlog.'):
+    def post(self, event, text, thread=None):
         channel = self.state.get('channel')
         if not channel:
             raise SlackError('dm_not_prepared')
@@ -391,7 +399,7 @@ class Watch:
             if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                 return message['ts']
         if len(text) > 39000:
-            text = text[:38000] + tail
+            text = text[:38000] + '\nFull text remains in the local backlog.'
         args = {'channel': channel, 'text': text,
                 'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
                 'metadata': {'event_type': STATE_KEY, 'event_payload': {'id': marker}},

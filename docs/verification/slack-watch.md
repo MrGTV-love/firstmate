@@ -53,6 +53,8 @@ On 2026-10-22, the strengthened regression first failed before the repair with `
 After the repair, a fourth task with a 45,000-character body and a 45,000-character held question preserved all six required card parts: task id, decision/question, recommendation, evidence, both numbered options, and the disagreement rule.
 Its rendered card stayed within 38,000 characters and omitted the `PRIVATE_TASK_BODY` sentinel from both the card and the resolution notice.
 Answering that task closed it; its `Resolved: oversized-card` notice posted without a transport failure and the thread was retired.
+A fifth task whose 5,000-character held question fits the budget was posted whole, with no `...` cut.
+A staged notice of 45,000 characters was posted cut to the 38,000-character post bound, ending with `Full text remains in the local backlog.`, with no transport failure.
 The replay double rejects any post over 40,000 characters, as Slack does.
 Result: pass.
 
@@ -136,7 +138,7 @@ Result: pass.
 ## DOD-11 - re-notification
 
 Not built and not run.
-The firstmate instruction defers DOD-11 and S4 until the owner confirms they ride this PR.
+DOD-11 and S4 are deferred to `fm-slack-watch-renotify-digest`; this PR lands step 1 without them.
 The current code emits no re-notification and no digest.
 
 ## DOD-12 - unconfigured is a hard no-op
@@ -232,7 +234,7 @@ Result: pass.
 ## S4 - digest
 
 Not built and not run.
-Deferred with DOD-11 until the owner confirms it rides this PR.
+Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 without it.
 
 ## X1..X22 - review-round regressions
 

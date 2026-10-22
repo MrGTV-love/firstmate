@@ -2950,7 +2950,8 @@ No Slack request runs when there are neither open calls nor tracked threads need
 
 Each card includes only decision-card fields: the task id and title, the current board's about/question text or the hold reason, options, recommendation, and evidence pointer; arbitrary task-body prose is never posted.
 Every card tells the captain to reply inside the card's thread and says that a message typed in the main DM window is not read, because only a thread reply maps to one decision.
-Card values share a 38,000-character budget, preserving every field heading, the option block, the affordance, and the tap-versus-type disagreement rule even when a question is oversized; the full decision remains in the local backlog.
+A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the affordance, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
+Any other post longer than 39,000 characters is cut to 38,000 characters and ends with `Full text remains in the local backlog.`, below Slack's 40,000-character message limit.
 The mirror reads explicit `Option N:`, `Recommendation:`, and `Evidence:` fields from the task body, but does not post other body lines or infer options from arbitrary prose.
 An option written without a `(value)` records its label, never its hint, as the keyed answer.
 A board card (options, recommendation, evidence, close mode) is used only when the board was regenerated after the hold's recorded set time.

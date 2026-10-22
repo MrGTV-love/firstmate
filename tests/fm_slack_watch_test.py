@@ -20,6 +20,7 @@ Usage:
   fm_slack_watch_test.py root-count <replay-state.json> <task-id>
   fm_slack_watch_test.py reply <replay-state.json> <thread-ts> <ts> <user> <text> [extra-json]
   fm_slack_watch_test.py seen-count <state.json> <thread-ts>
+  fm_slack_watch_test.py stage-notice <state.json> <thread-ts> <task-id> <length>
   fm_slack_watch_test.py react <replay-state.json> <ts> <name> <user>
   fm_slack_watch_test.py unreact <replay-state.json> <ts> <name> <user>
 """
@@ -134,6 +135,11 @@ def main(argv):
         extra = json.loads(argv[6]) if len(argv) > 6 else {}
         edit(argv[1], lambda data: data['messages'].append(
             {'ts': argv[3], 'thread_ts': argv[2], 'user': argv[4], 'text': argv[5], **extra}))
+    elif command == 'stage-notice':
+        edit(argv[1], lambda data: data['pending'].append(
+            {'event': 'test/oversized-notice/' + argv[2], 'key': argv[3], 'thread': argv[2],
+             'text': 'Oversized notice ' + 'n' * int(argv[4]), 'line': 'check: slack %s - oversized notice' % argv[2],
+             'kind': 'notice', 'stage': 'notice', 'contributing': []}))
     elif command == 'seen-count':
         seen = json.load(open(argv[1])).get('seen', {})
         print(len([event for event in seen if '/' + argv[2] + '/' in event]))
