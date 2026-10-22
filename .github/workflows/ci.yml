@@ -220,12 +220,11 @@ jobs:
       # The Pi extension tests read the installed Pi package's own types and
       # runtime, so without it they gate-skip and pass silently. It is a public
       # npm package and needs no credential, so CI can hold the real thing.
-      - name: Install Pi and TypeScript for the Pi extension tests
+      - name: Install Pi for the Pi extension tests
         run: |
           set -eu
-          npm install -g @earendil-works/pi-coding-agent typescript
-          npm ls -g --depth 0 @earendil-works/pi-coding-agent typescript
-          tsc --version
+          npm install -g @earendil-works/pi-coding-agent
+          npm ls -g --depth 0 @earendil-works/pi-coding-agent
       - name: Run portable serial shard ${{ matrix.shard }}
         env:
           # job-total rather than a literal, so shrinking or growing the matrix

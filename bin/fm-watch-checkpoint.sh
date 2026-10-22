@@ -88,7 +88,10 @@ run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...
     if (!$pid) {
       $SIG{$_} = "DEFAULT" for qw(ALRM HUP INT TERM);
       setpgrp(0, 0);
-      exec @ARGV;
+      # The indirect-object form keeps a one-item command out of the shell: a
+      # plain exec of a single element is parsed as a command line, so a home
+      # path with spaces would split the watcher path into words.
+      exec { $ARGV[0] } @ARGV;
       die "exec failed: $!\n";
     }
     setpgid($pid, $pid);
@@ -153,8 +156,9 @@ run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>
   # KILL. The Perl bound owns those dispositions and reports 124 when it had to
   # escalate, which the platform timeout does not: GNU timeout reports 137 when
   # it KILLs a child that could not take INT, and that is a normal quiet
-  # checkpoint here. Perl therefore leads, and the plain timeout tools and then
-  # Perl again remain the fallbacks for a host that lacks it.
+  # checkpoint here. Perl therefore leads, the plain timeout tools remain the
+  # fallback for a host that lacks it, and the last branch is the Perl call
+  # itself, which reports the shell's own 127 when Perl is absent too.
   if command -v perl >/dev/null 2>&1; then
     run_with_perl_timeout "$seconds" "$signal" "$kill_after" "$@"
   elif command -v timeout >/dev/null 2>&1; then
@@ -194,12 +198,11 @@ if fm_supervision_host_enabled "$CONFIG" codex; then
   # grant, per-arm waits and branch leases within ENGINE_GRACE plus one arm
   # wait, so the shared two-second KILL default would cut that cleanup short
   # and strand the records it was releasing.
-  HOST_KILL_AFTER=$(positive_or "${FM_SUPERVISION_HOST_KILL_AFTER:-}" 30)
   set +e
   # The host ends its own park; the outer bound only catches a host that
   # outlived every one of its own bounds.
   FM_SUPERVISION_HOST_PRIMARY=codex FM_SUPERVISION_HOST_PARK_SECONDS=$BOUND FM_SUPERVISION_HOST_PARK_LIMIT=$LIMIT \
-    run_bounded $((LIMIT + 120)) TERM "$HOST_KILL_AFTER" "$SCRIPT_DIR/fm-supervision-host.sh" park >"$OUT" 2>"$ERR"
+    run_bounded $((LIMIT + 120)) TERM 30 "$SCRIPT_DIR/fm-supervision-host.sh" park >"$OUT" 2>"$ERR"
   RC=$?
   set -e
   if grep -E '^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)' "$OUT" 2>/dev/null \

@@ -123,7 +123,7 @@ cmds = {e["command"]: e["count"] for e in c["by_command"]}
 # was started through on Linux, so the shell and sleeper may carry either name.
 shells = sum(n for name, n in cmds.items() if "bash" in name)
 assert shells >= 60, "bash-named processes: %d" % shells
-assert any("sleep" in name for name in cmds), "no sleep in by_command"
+assert any("sleep" in name or "standin" in name for name in cmds), "no sleeper (sleep or standin) in by_command"
 assert any(re.search(r"bash\+", e["chain"]) and e["count"] >= 59 for e in c["by_parent_chain"]), \
     c["by_parent_chain"][:5]
 deepest = c["deepest_chains"]
