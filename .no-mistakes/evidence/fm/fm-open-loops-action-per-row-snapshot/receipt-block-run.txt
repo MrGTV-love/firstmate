@@ -1,0 +1,16 @@
+PASS: batch validates per row, preserves valid actions and uses one real snapshot
+PASS: drain and refused acknowledgement preserve unchanged recorded work
+PASS: stdin batch recovery and partial acknowledgements preserve completed actions
+PASS: every obligation identity change requires new evidence
+PASS: firstmate escalation and steer stand for four hours, then require action
+PASS: a recorded action answers its own turn at any age
+PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do
+PASS: a pane timer in any unit changes no obligation; a different task still does
+PASS: an unreadable config file never blocks the receipt gate
+PASS: second deferral requires new follow-up even after a standing escalation
+PASS: reviewed PRs keep their next-turn action requirement
+PASS: a refused batch line leaks no state into its siblings
+PASS: a hold-bound escalation answers its own turn without a backlog read
+PASS: a home without a ledger acknowledges without the receipt command
+PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated
+env -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE -u FM_DATA_OVERRIDE -u  -u      29.01s user 48.19s system 34% cpu 3:43.14 total

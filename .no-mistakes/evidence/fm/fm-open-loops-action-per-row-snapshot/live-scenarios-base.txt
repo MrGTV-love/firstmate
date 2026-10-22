@@ -1,0 +1,84 @@
+====================================================================================================
+SCENARIO: 50 actions logged, queue re-read, then cleared in one ack
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+60s rc=0 3.47s
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",7200,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",7200,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",7200,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",7200,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",7200,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",7200,"decision pending",false
+  |   "row-11","firstmate","job:question-11","obtain decision",7200,"decision pending",false
+  | ... (39 more lines)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 30419.1792697959.eqmykd
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+60s rc=0 0.63s
+  | action: "row-0"
+  | kind: escalated
+  | standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+$ bin/fm-open-loops.sh action row-49 escalated --evidence reported decision    # clock=+60s rc=0 0.60s
+  | action: "row-49"
+  | kind: escalated
+  | standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+  (50 single-row actions took 33.56s)
+  -- supervisor re-reads the queue to find the ack command (the step that used to void progress)
+$ bin/fm-wake-drain.sh    # clock=+60s rc=0 2.77s
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",7200,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",7200,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",7200,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",7200,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",7200,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",7200,"decision pending",false
+  |   "row-11","firstmate","job:question-11","obtain decision",7200,"decision pending",false
+  | ... (39 more lines)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 30419.1792697959.eqmykd
+  -- second read printed OVERDUE block: True
+$ bin/fm-open-loops.sh --check-actions    # clock=+60s rc=1 0.23s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",7200,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",7200,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",7200,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",7200,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",7200,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",7200,"decision pending",false
+  | ... (39 more lines)
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 30419.1792697959.eqmykd    # clock=+60s rc=1 0.44s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",7200,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",7200,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",7200,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",7200,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",7200,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",7200,"decision pending",false
+  | ... (39 more lines)
+RESULT: FAIL ack after 50 actions plus an in-between read must succeed
+
+SUMMARY
+  FAIL  50 actions logged, queue re-read, then cleared in one ack  -- FAIL: ack after 50 actions plus an in-between read must succeed

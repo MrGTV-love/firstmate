@@ -1,0 +1,504 @@
+====================================================================================================
+SCENARIO: 50 actions logged, queue re-read, then cleared in one ack
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+60s rc=0 1.91s
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",7200,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",7200,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",7200,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",7200,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",7200,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",7200,"decision pending",false
+  |   "row-11","firstmate","job:question-11","obtain decision",7200,"decision pending",false
+  | ... (39 more lines)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 89318.1792697711.pXAh22
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/tmp/fm-lab.qSTaNj/actions.jsonl    # clock=+60s rc=0 0.68s
+  | results[50]{line,id,kind,result,message}:
+  |   1,"row-0","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   2,"row-1","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   3,"row-2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   4,"row-3","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   5,"row-4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   6,"row-5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   7,"row-6","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   8,"row-7","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   9,"row-8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   10,"row-9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   11,"row-10","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   12,"row-11","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   13,"row-12","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  | ... (37 more lines)
+  -- supervisor re-reads the queue to find the ack command (the step that used to void progress)
+$ bin/fm-wake-drain.sh    # clock=+60s rc=0 1.82s
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 89318.1792697711.pXAh22
+  -- second read printed OVERDUE block: False
+$ bin/fm-open-loops.sh --check-actions    # clock=+60s rc=0 0.13s
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 89318.1792697711.pXAh22    # clock=+60s rc=0 0.92s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: next handling turn: unchanged firstmate escalations stand until four hours, then re-present
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+120s rc=0 1.48s
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",7200,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",7200,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",7200,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",7200,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",7200,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",7200,"decision pending",false
+  |   "row-11","firstmate","job:question-11","obtain decision",7200,"decision pending",false
+  | ... (39 more lines)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 45731.1792697831.uHZGY8
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/tmp/fm-lab.qSTaNj/actions.jsonl    # clock=+120s rc=0 0.47s
+  | results[50]{line,id,kind,result,message}:
+  |   1,"row-0","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   2,"row-1","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   3,"row-2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   4,"row-3","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   5,"row-4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   6,"row-5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   7,"row-6","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   8,"row-7","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   9,"row-8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   10,"row-9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   11,"row-10","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   12,"row-11","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   13,"row-12","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  | ... (37 more lines)
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 45731.1792697831.uHZGY8    # clock=+120s rc=0 0.80s
+$ bin/fm-wake-drain.sh    # clock=+3720s rc=0 2.90s
+  | 1792697834	1	check	later-3600	check: later-3600
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 51234.1792697834.H019sN
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 51234.1792697834.H019sN    # clock=+3720s rc=0 0.72s
+$ bin/fm-wake-drain.sh    # clock=+14519s rc=0 2.50s
+  | 1792697837	2	check	later-14399	check: later-14399
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 57944.1792697837.nAO5rB
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 57944.1792697837.nAO5rB    # clock=+14519s rc=0 0.81s
+$ bin/fm-wake-drain.sh    # clock=+14520s rc=0 1.77s
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",21600,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",21600,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",21600,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",21600,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",21600,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",21600,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",21600,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",21600,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",21600,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",21600,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",21600,"decision pending",false
+  |   "row-11","firstmate","job:question-11","obtain decision",21600,"decision pending",false
+  | ... (39 more lines)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 63078.1792697841.NZMU8X
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 63078.1792697841.NZMU8X    # clock=+14520s rc=1 0.28s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",21600,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",21600,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",21600,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",21600,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",21600,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",21600,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",21600,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",21600,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",21600,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",21600,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",21600,"decision pending",false
+  | ... (39 more lines)
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/tmp/fm-lab.qSTaNj/actions.jsonl    # clock=+14520s rc=0 0.57s
+  | results[50]{line,id,kind,result,message}:
+  |   1,"row-0","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   2,"row-1","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   3,"row-2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   4,"row-3","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   5,"row-4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   6,"row-5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   7,"row-6","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   8,"row-7","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   9,"row-8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   10,"row-9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   11,"row-10","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   12,"row-11","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   13,"row-12","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  | ... (37 more lines)
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 63078.1792697841.NZMU8X    # clock=+14520s rc=0 0.63s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: adversarial: bad batch lines and one unactioned row stay gated; refused ack keeps progress
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+14580s rc=0 1.85s
+  | OVERDUE:
+  | rows[50]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  |   "row-5","firstmate","job:question-5","obtain decision",7200,"decision pending",false
+  |   "row-6","firstmate","job:question-6","obtain decision",7200,"decision pending",false
+  |   "row-7","firstmate","job:question-7","obtain decision",7200,"decision pending",false
+  |   "row-8","firstmate","job:question-8","obtain decision",7200,"decision pending",false
+  |   "row-9","firstmate","job:question-9","obtain decision",7200,"decision pending",false
+  |   "row-10","firstmate","job:question-10","obtain decision",7200,"decision pending",false
+  |   "row-11","firstmate","job:question-11","obtain decision",7200,"decision pending",false
+  | ... (39 more lines)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 69124.1792697845.D6YtlH
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/tmp/fm-lab.qSTaNj/actions.jsonl    # clock=+14580s rc=1 0.98s
+  | results[52]{line,id,kind,result,message}:
+  |   1,"row-0","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   2,"row-1","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   3,"row-2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   4,"row-3","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   5,"row-4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   6,"row-5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   7,"row-6","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   8,"row-7","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   9,"row-8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   10,"row-9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   11,"row-10","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   12,"row-11","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   13,"row-12","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  | ... (39 more lines)
+$ bin/fm-open-loops.sh --check-actions    # clock=+14580s rc=1 0.23s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-49","firstmate","job:question-49","obtain decision",7200,"decision pending",false
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 69124.1792697845.D6YtlH    # clock=+14580s rc=1 1.45s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-49","firstmate","job:question-49","obtain decision",7200,"decision pending",false
+$ bin/fm-open-loops.sh --check-actions    # clock=+14580s rc=1 0.28s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-49","firstmate","job:question-49","obtain decision",7200,"decision pending",false
+$ bin/fm-open-loops.sh action row-49 escalated --evidence reported decision    # clock=+14580s rc=0 1.77s
+  | action: "row-49"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 69124.1792697845.D6YtlH    # clock=+14580s rc=0 2.28s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: adversarial: each of five identity-field changes voids a receipt
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+14640s rc=0 5.59s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 88499.1792697855.fUbZcT
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14640s rc=0 0.87s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-open-loops.sh --check-actions    # clock=+14640s rc=1 0.13s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 88499.1792697855.fUbZcT    # clock=+14640s rc=1 0.46s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14640s rc=0 0.14s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 88499.1792697855.fUbZcT    # clock=+14640s rc=0 0.76s
+$ bin/fm-wake-drain.sh    # clock=+14700s rc=0 1.70s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 5384.1792697861.ey3nYb
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14700s rc=0 0.45s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-open-loops.sh --check-actions    # clock=+14700s rc=1 0.10s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0-changed","obtain decision",7200,"decision pending",false
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 5384.1792697861.ey3nYb    # clock=+14700s rc=1 0.35s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0-changed","obtain decision",7200,"decision pending",false
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14700s rc=0 0.39s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 5384.1792697861.ey3nYb    # clock=+14700s rc=0 0.63s
+$ bin/fm-wake-drain.sh    # clock=+14760s rc=0 1.42s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 12231.1792697865.snyyo9
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14760s rc=0 0.37s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-open-loops.sh --check-actions    # clock=+14760s rc=1 0.07s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate-changed","job:question-0","obtain decision",7200,"decision pending",false
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 12231.1792697865.snyyo9    # clock=+14760s rc=1 0.27s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate-changed","job:question-0","obtain decision",7200,"decision pending",false
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14760s rc=0 0.09s
+  | action: "row-0"
+  | kind: escalated
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 12231.1792697865.snyyo9    # clock=+14760s rc=0 0.58s
+$ bin/fm-wake-drain.sh    # clock=+14820s rc=0 1.66s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 17326.1792697868.ReuEUs
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14820s rc=0 0.44s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-open-loops.sh --check-actions    # clock=+14820s rc=1 0.09s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision-changed",7200,"decision pending",false
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 17326.1792697868.ReuEUs    # clock=+14820s rc=1 0.30s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision-changed",7200,"decision pending",false
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14820s rc=0 0.61s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 17326.1792697868.ReuEUs    # clock=+14820s rc=0 0.71s
+$ bin/fm-wake-drain.sh    # clock=+14880s rc=0 1.80s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 24659.1792697872.0kSiXh
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14880s rc=0 0.45s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-open-loops.sh --check-actions    # clock=+14880s rc=1 0.16s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending-changed",false
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 24659.1792697872.0kSiXh    # clock=+14880s rc=1 0.27s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending-changed",false
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14880s rc=0 0.43s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 24659.1792697872.0kSiXh    # clock=+14880s rc=0 0.69s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: stalled-worker pane timer tick keeps the receipt; a different task voids it
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+14940s rc=0 1.80s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","worker:job","job","follow up on the recorded wait and recover the worker",7200,"Running lint… (3m 12s · esc to interrupt); 3600s without progress",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 32903.1792697875.Lc7y3k
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14940s rc=0 0.09s
+  | action: "row-0"
+  | kind: escalated
+$ bin/fm-open-loops.sh --check-actions    # clock=+14940s rc=0 0.15s
+$ bin/fm-wake-drain.sh    # clock=+14940s rc=0 1.36s
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 32903.1792697875.Lc7y3k
+$ bin/fm-open-loops.sh --check-actions    # clock=+14940s rc=1 0.11s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","worker:job","job","follow up on the recorded wait and recover the worker",7200,"Running tests… (3m 13s · esc to interrupt); 3601s without progress",false
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+14940s rc=0 0.10s
+  | action: "row-0"
+  | kind: escalated
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 32903.1792697875.Lc7y3k    # clock=+14940s rc=0 0.79s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: --report piped into action --batch - completes without a lock hang
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+15000s rc=0 2.67s
+  | OVERDUE:
+  | rows[5]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  |   "row-1","firstmate","job:question-1","obtain decision",7200,"decision pending",false
+  |   "row-2","firstmate","job:question-2","obtain decision",7200,"decision pending",false
+  |   "row-3","firstmate","job:question-3","obtain decision",7200,"decision pending",false
+  |   "row-4","firstmate","job:question-4","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 40727.1792697880.MeuHla
+$ "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JGZ51GN336VZNPQWCYP0ZV/bin/fm-open-loops.sh" --report | python3 -c 'import re,sys,json
+[print(json.dumps(dict(row_id=m,kind="escalated",evidence="reported decision"))) for m in re.findall(r"^  \"(row-[0-9]+)\"", sys.stdin.read(), re.M)]' | "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JGZ51GN336VZNPQWCYP0ZV/bin/fm-open-loops.sh" action --batch -    # clock=+15000s rc=0 0.81s
+  | results[5]{line,id,kind,result,message}:
+  |   1,"row-0","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   2,"row-1","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   3,"row-2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   4,"row-3","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  |   5,"row-4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+$ bin/fm-open-loops.sh --check-actions    # clock=+15000s rc=0 0.12s
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 40727.1792697880.MeuHla    # clock=+15000s rc=0 0.97s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: partial ack keeps the remaining rows' receipts
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+15060s rc=0 2.94s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","worker:job","job:question-0","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1792697884	3	check	first	check: first
+  | 1792697884	4	check	second	check: second
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 51825.1792697884.NNbmPG
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+15060s rc=0 0.33s
+  | action: "row-0"
+  | kind: escalated
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 51825.1792697884.NNbmPG    # clock=+15060s rc=0 1.96s
+$ bin/fm-wake-drain.sh    # clock=+15060s rc=0 3.00s
+  | 1792697884	4	check	second	check: second
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 51825.1792697884.NNbmPG
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh --check-actions    # clock=+15060s rc=0 0.14s
+$ bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 51825.1792697884.NNbmPG    # clock=+15060s rc=0 0.98s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: adversarial: second deferral still refuses and requires follow-up
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+15120s rc=0 2.23s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 78542.1792697895.4wSAEG
+$ bin/fm-open-loops.sh action row-0 deferred --evidence short wait --recheck 2026-10-22T23:59:05+00:00    # clock=+15120s rc=0 0.10s
+  | action: "row-0"
+  | kind: deferred
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 78542.1792697895.4wSAEG    # clock=+15120s rc=0 1.43s
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+15120s rc=0 0.62s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-open-loops.sh action row-0 deferred --evidence another wait --recheck 2026-10-22T23:59:05+00:00    # clock=+15120s rc=1 0.32s
+  | error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+$ bin/fm-open-loops.sh --check-actions    # clock=+15120s rc=1 0.15s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","job:question-0","obtain decision",7200,"decision pending",true
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+15120s rc=0 0.47s
+  | action: "row-0"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+$ bin/fm-open-loops.sh --check-actions    # clock=+15120s rc=0 0.11s
+RESULT: PASS
+
+====================================================================================================
+SCENARIO: adversarial: review_pass_not_merged still requires a new action next turn
+====================================================================================================
+$ bin/fm-wake-drain.sh    # clock=+15180s rc=0 2.39s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","https://github.com/o/r/pull/1","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91469.1792697900.yNZht8
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+15180s rc=0 0.11s
+  | action: "row-0"
+  | kind: escalated
+$ bin/fm-wake-drain.sh    # clock=+15180s rc=0 1.83s
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91469.1792697900.yNZht8
+$ bin/fm-open-loops.sh --check-actions    # clock=+15180s rc=0 0.09s
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91469.1792697900.yNZht8    # clock=+15180s rc=0 0.64s
+$ bin/fm-wake-drain.sh    # clock=+15180s rc=0 2.18s
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","https://github.com/o/r/pull/1","obtain decision",7200,"decision pending",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1792697905	5	check	next	check: next
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 2204.1792697905.J4DDO4
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 2204.1792697905.J4DDO4    # clock=+15180s rc=1 0.26s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-0","firstmate","https://github.com/o/r/pull/1","obtain decision",7200,"decision pending",false
+$ bin/fm-open-loops.sh action row-0 escalated --evidence reported decision    # clock=+15180s rc=0 0.09s
+  | action: "row-0"
+  | kind: escalated
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 2204.1792697905.J4DDO4    # clock=+15180s rc=0 0.78s
+RESULT: PASS
+
+SUMMARY
+  PASS  50 actions logged, queue re-read, then cleared in one ack
+  PASS  next handling turn: unchanged firstmate escalations stand until four hours, then re-present
+  PASS  adversarial: bad batch lines and one unactioned row stay gated; refused ack keeps progress
+  PASS  adversarial: each of five identity-field changes voids a receipt
+  PASS  stalled-worker pane timer tick keeps the receipt; a different task voids it
+  PASS  --report piped into action --batch - completes without a lock hang
+  PASS  partial ack keeps the remaining rows' receipts
+  PASS  adversarial: second deferral still refuses and requires follow-up
+  PASS  adversarial: review_pass_not_merged still requires a new action next turn
