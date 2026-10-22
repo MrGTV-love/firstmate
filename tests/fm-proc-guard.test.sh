@@ -17,8 +17,11 @@ mkdir -p "$STATE"
 # Everything this suite starts runs through a symlink under $LAB, so one pattern
 # names exactly this suite's processes and nothing else.
 ln -s "$(command -v bash)" "$LAB/bash"
-ln -s "$(command -v sleep)" "$LAB/nestsleep"
-ln -s "$(command -v sleep)" "$LAB/burstsleep"
+# A host sleep may dispatch on argv[0], so renaming it is not portable.
+# Keep real, suite-named native processes for both the census and its cleanup.
+STANDIN=$(fm_agent_standin "$LAB/standin") || fail "cannot create the process-tree stand-in"
+ln -s "$STANDIN" "$LAB/nestsleep"
+ln -s "$STANDIN" "$LAB/burstsleep"
 cat > "$LAB/nest.sh" <<'SH'
 #!/bin/sh
 # A self-recursive tree: every level waits for the next, the last level sleeps.
@@ -120,13 +123,16 @@ cmds = {e["command"]: e["count"] for e in c["by_command"]}
 # was started through on Linux, so the shell and sleeper may carry either name.
 shells = sum(n for name, n in cmds.items() if "bash" in name)
 assert shells >= 60, "bash-named processes: %d" % shells
-assert any("sleep" in name for name in cmds), "no sleep in by_command"
+assert any("sleep" in name or "standin" in name for name in cmds), "no sleeper (sleep or standin) in by_command"
 assert any(re.search(r"bash\+", e["chain"]) and e["count"] >= 59 for e in c["by_parent_chain"]), \
     c["by_parent_chain"][:5]
 deepest = c["deepest_chains"]
 assert 1 <= len(deepest) <= 5, len(deepest)
 top = deepest[0]
-assert "sleep" in top["leaf"]["executable"] and top["leaf"]["script"] == "", top["leaf"]
+# The leaf runs the suite's own stand-in (a compiled spinner, or the host sleep
+# it symlinks when no compiler exists), so its executable carries either the
+# suite's sleep name or the stand-in's binary name, by the same kernel rule above.
+assert re.search(r"sleep|standin", top["leaf"]["executable"]) and top["leaf"]["script"] == "", top["leaf"]
 runs = [int(n) for n in re.findall(r"bash\(x(\d+)\)", top["chain"])]
 assert runs and max(runs) >= 60, top["chain"]
 assert top["run_length"] >= 60 and top["depth"] >= 61, top

@@ -15,11 +15,15 @@
 # work executes.
 # Stage writes state=queued last. seq is a queue-wide monotonic staging
 # sequence reserved atomically by its persistent .seq-claims directory; the
-# counter is only a forward-moving allocation hint. If the bounded hint walk
-# is exhausted, allocation rescans the claims for the maximum and continues
-# above it. Expired claims are reaped by an independently hourly-rate-limited
-# sweep that remains inline in the worker loop but uses one directory walk
-# with batched rmdir rather than per-claim uname/stat subprocesses.
+# counter is only a forward-moving allocation hint. A claim is a directory
+# holding an owner marker created with an exclusive (noclobber) create, and
+# that marker alone owns the number: a claim directory's existence proves
+# nothing, because some platforms' mkdir reports success for a directory a
+# concurrent caller created. If the bounded hint walk is exhausted, allocation
+# rescans the claims for the maximum and continues above it. Expired claims are
+# reaped by an independently hourly-rate-limited sweep that remains inline in
+# the worker loop but uses one directory walk with batched marker removal and
+# rmdir rather than per-claim subprocesses.
 # seq is the worker's FIFO ordering key within a home, with the job id as the
 # deterministic tiebreak.
 # FIFO is defined over completed stagings: a stage that returns before another
@@ -606,7 +610,20 @@ fm_remote_job_next_seq() { # [stage-dir destination]
     attempt=$((attempt + 1))
     value=$((value + 1))
     claim="$FM_REMOTE_JOB_SEQ_CLAIMS/$value"
-    if (umask 077; mkdir "$claim") 2>/dev/null; then
+    # The owner marker, not mkdir's exit status, decides the winner. mkdir is
+    # still called so the claim keeps the directory shape and mtime the reaper
+    # reads, but its result is deliberately ignored: Ubuntu 26.04's uutils
+    # coreutils mkdir can report success for a directory a concurrent caller
+    # created, and trusting that handed one sequence number to several callers.
+    # bash's noclobber create is O_EXCL, so exactly one caller creates the
+    # marker whatever mkdir claimed.
+    # Only this reservation is hardened. The worker singleton lock, a job's
+    # .claim, the AFK launch lock, and the busy-state writer lock still treat a
+    # successful mkdir as exclusive ownership; their race window is far narrower
+    # and moving them to a shared exclusive-create helper is the follow-up in
+    # docs/remote-secondmates.md "Known limitation: mkdir-based locks".
+    (umask 077; mkdir "$claim") 2>/dev/null || true
+    if (umask 077; set -C; : > "$claim/owner") 2>/dev/null; then
       chmod 700 "$claim" || return 1
       fm_remote_job_advance_seq_hint "$value" || true
       if [ -n "$stage" ]; then
@@ -864,11 +881,17 @@ fm_remote_job_reap_stale() { # <account-home>
       if [ -n "$tmp" ] && printf '%s\n' "$now" > "$tmp" && chmod 600 "$tmp" \
         && mv -f -- "$tmp" "$marker"; then
         # One directory walk: ! -newer matches whole-second mtime <= cutoff
-        # (the former >= age check). Batched rmdir tolerates concurrent mkdir/rmdir races
-        # and non-empty dirs the same way the old per-claim rmdir || true did.
+        # (the former >= age check). The age predicate is evaluated by find
+        # before any removal, so a marker removal that refreshes a directory's
+        # mtime cannot change which claims this pass reaps. Both removals stay
+        # batched, one rm and one rmdir per argument batch rather than two
+        # processes per claim, because this sweep runs inline in the worker
+        # loop before it serves the next job.
         find "$FM_REMOTE_JOB_SEQ_CLAIMS" -mindepth 1 -maxdepth 1 -type d \
           -name '[0-9]*' ! -name '*[!0-9]*' ! -name 0 \
-          ! -newer "$ref" -exec rmdir {} + 2>/dev/null || true
+          ! -newer "$ref" \
+          -exec sh -c 'printf "%s/owner\0" "$@" | xargs -0 rm -f --; rmdir "$@"' sh {} + \
+          2>/dev/null || true
       else
         [ -z "$tmp" ] || rm -f -- "$tmp"
       fi

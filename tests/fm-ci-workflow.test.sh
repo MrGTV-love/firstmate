@@ -249,6 +249,46 @@ RUBY
   pass "CI matrices cover every executable serial lane and canonical lint root exactly once"
 }
 
+# Each parallel job's runner invocation is read from its parsed run step and
+# split into words, so the check is the --lane and --jobs the runner receives,
+# whichever spelling or flag order the step uses.
+test_parallel_lanes_pass_the_modeled_job_count() {
+  local jobs
+  jobs=$("$ROOT/bin/fm-test-run.sh" --check-coverage 2>/dev/null \
+    | sed -n 's/.*parallel_jobs=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$jobs" ] || fail "the runner did not report parallel_jobs, so CI cannot be checked against the model"
+  [ "$jobs" -gt 1 ] || fail "parallel_jobs must be greater than one, got $jobs"
+  ruby -ryaml -rshellwords - "$CI_WORKFLOW" "$jobs" <<'RUBY' || fail "portable parallel CI job count"
+jobs = YAML.load_file(ARGV[0]).fetch("jobs")
+want = ARGV[1]
+%w[1 2].each do |n|
+  job = "tests-portable-parallel-#{n}"
+  lane = "portable-parallel-#{n}"
+  commands = jobs.fetch(job).fetch("steps").map { |s| s["run"] }.compact.flat_map do |run|
+    run.gsub(/\\\n/, " ").lines.reject { |l| l.strip.start_with?("#") }.map { |l| Shellwords.split(l) }
+  end.select { |words| words.first == "bin/fm-test-run.sh" }
+  raise "#{job} must invoke bin/fm-test-run.sh exactly once, got #{commands.length}" unless commands.length == 1
+  words = commands.first.drop(1)
+  options = {}
+  index = 0
+  while index < words.length
+    word = words[index]
+    if (match = word.match(/\A--(lane|jobs)=(.*)\z/))
+      options[match[1]] = match[2]
+    elsif %w[--lane --jobs].include?(word)
+      options[word.delete_prefix("--")] = words[index + 1]
+      index += 1
+    end
+    index += 1
+  end
+  raise "#{job} must run --lane #{lane}, got #{options["lane"].inspect}" unless options["lane"] == lane
+  raise "#{job} must pass --jobs #{want}, the count the makespan budget is modeled at, got #{options["jobs"].inspect}" \
+    unless options["jobs"] == want
+end
+RUBY
+  pass "both portable parallel jobs pass the modeled concurrency the budget is computed for"
+}
+
 test_ci_matrices_match_executable_partitions
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
@@ -258,3 +298,4 @@ test_every_job_belongs_to_exactly_one_timeout_tier
 test_fast_tier_shares_one_short_tripwire
 test_normal_tier_shares_one_budget
 test_heavy_tier_keeps_a_step_tripwire_under_a_job_backstop
+test_parallel_lanes_pass_the_modeled_job_count
