@@ -388,9 +388,10 @@ test_a_lingering_signal_does_not_hold_back_the_over_cap_stop() {
 
 # The incident's writer shape on a held descriptor: five-byte lines. The writer opens the log,
 # waits for a gate file, appends <burst> units of 100 lines at once and then <round> units every
-# second for up to 60 rounds, under a hard file-size limit. It builds its unit before it opens the
-# log and writes only with shell builtins, so no forked child of it ever holds the log open.
-start_gated_tiny_writer() {  # <shell> <status-file> <gate-file> <pid-file> <burst-units> <round-units>
+# <pause> seconds (default 1) for up to <rounds> rounds (default 60), under a hard file-size limit.
+# It builds its unit before it opens the log and writes only with shell builtins, so no forked
+# child of it ever holds the log open.
+start_gated_tiny_writer() {  # <shell> <status-file> <gate-file> <pid-file> <burst-units> <round-units> [<pause> [<rounds>]]
   (
     ulimit -f "$HARD_LIMIT_BLOCKS"
     "$1" -c '
@@ -399,12 +400,12 @@ start_gated_tiny_writer() {  # <shell> <status-file> <gate-file> <pid-file> <bur
       while [ ! -e "$2" ]; do sleep 0.1 9>&-; done
       for ((k = 0; k < $3; k++)); do printf "%s" "$unit" >&9; done
       i=0
-      while [ "$i" -lt 60 ]; do
+      while [ "$i" -lt "$5" ]; do
         i=$((i + 1))
         for ((k = 0; k < $4; k++)); do printf "%s" "$unit" >&9; done
-        sleep 1 9>&-
+        sleep "$6" 9>&-
       done
-    ' _ "$2" "$3" "$5" "$6" &
+    ' _ "$2" "$3" "$5" "$6" "${8:-60}" "${7:-1}" &
     printf '%s\n' "$!" > "$4"
     wait "$!" 2>/dev/null
   ) &
@@ -527,6 +528,36 @@ stop_a_writer_during_a_long_walk() {  # <case> <walk: signal|heartbeat|stale>
   kill -9 "$wpid" 2>/dev/null
   reap "$watch_pid"
   [ "$stopped" -eq 1 ] || fail "the writer was not stopped, and the over-cap wake not queued, within 20 s of the $walk walk capturing a 20000 line span that the writer then pushed past the cap (writer state ${writer_state:-gone})"
+}
+
+test_a_runaway_that_keeps_growing_through_the_over_cap_wake_raises_exactly_one_wake() {
+  local dir state side out shell wpid watch_pid waited=0
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case one-wake); state="$dir/state"; side="$state/.one-wake.home-appends.runaway"; out="$dir/watch.out"
+  shell=$(make_named_shell "$dir" notomp)
+  : > "$side"
+  # A writer that is not omp is named and left alone, so it is still growing the file through the
+  # whole over-cap wake: 5000 bytes every 20 ms or so against a 2048 byte cap, far more than one cap
+  # between the size the guard keeps in its marker and the next look at the file. It starts once the
+  # watcher is looping. The check that raised the wake must not run again inside that wake: if it did,
+  # each pass would find the file grown by another cap and raise another wake, and the watcher would
+  # print nothing until the writer ended. The file is a per-task sidecar, which the cap covers and which
+  # raises no status signal, so the wake has no signal walk to wait for. The writer's 200 rounds are
+  # 1 MB, under its hard limit.
+  start_gated_tiny_writer "$shell" "$side" "$dir/gate" "$dir/writer.pid" 5 10 0.02 200
+  wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
+  wpid=$(cat "$dir/writer.pid")
+  watch_cap "$state" "$out" FM_STATUS_CAP_BYTES=2048
+  watch_pid=$!
+  while [ ! -e "$state/.last-watcher-beat" ] && [ "$waited" -lt 600 ]; do sleep 0.1; waited=$((waited + 1)); done
+  [ -e "$state/.last-watcher-beat" ] || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never started its loop"; }
+  : > "$dir/gate"
+  wait_for_exit "$watch_pid" 600 || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher did not exit for a file that kept growing through its over-cap wake: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  kill -9 "$wpid" 2>/dev/null
+  grep -q 'check: status-log-over-cap: file=.one-wake.home-appends.runaway' "$out" || fail "the watcher's wake is not the over-cap check: $(cat "$out")"
+  grep -q 'is not an omp process' "$out" || fail "the wake does not say the writer is not omp: $(cat "$out")"
+  [ "$(queue_rows_for "$state")" -eq 1 ] || fail "expected exactly one queued over-cap wake for one runaway file, found $(queue_rows_for "$state"): $(cat "$state/.wake-queue")"
+  pass "a runaway that keeps growing through the over-cap wake raises exactly one wake and the watcher exits on it"
 }
 
 test_a_long_classification_checks_the_cap_every_poll() {
@@ -1201,6 +1232,7 @@ tests=(
   test_the_incident_writer_that_holds_the_log_open_is_found_and_stopped
   test_a_lingering_signal_does_not_hold_back_the_over_cap_stop
   test_a_cap_crossing_after_the_span_is_captured_is_stopped_before_the_signal_wake_exits
+  test_a_runaway_that_keeps_growing_through_the_over_cap_wake_raises_exactly_one_wake
   test_a_long_classification_checks_the_cap_every_poll
   test_the_heartbeat_scan_checks_the_cap_every_poll
   test_the_stale_surface_checks_the_cap_every_poll
