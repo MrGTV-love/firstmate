@@ -1930,6 +1930,19 @@ test_squash_merged_pushed_prerebase_copy_allows() {
   pass "squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head"
 }
 
+refusal_names_add_a() {
+  grep -Eq '^[[:xdigit:]]+ add a$' "$1"
+}
+
+test_squash_pushed_missing_subject_match_ignores_hash_boundary() {
+  local stderr="$TMP_ROOT/squash-pushed-missing-subject.stderr"
+  printf '%s\n' 'c29cadd add b' > "$stderr"
+  ! refusal_names_add_a "$stderr" || fail "squash-pushed-missing: commit ID plus add b was mistaken for an add a subject"
+  printf '%s\n' 'abcdef0 add a' >> "$stderr"
+  refusal_names_add_a "$stderr" || fail "squash-pushed-missing: a genuine add a subject was not detected"
+  pass "squash-pushed-missing subject match ignores a commit ID ending in add and detects a genuine add a"
+}
+
 # One pre-rebase commit's change never reached the PR head, so the copy still
 # holds work the merged PR lacks. The refusal must name that commit and keep
 # every recovery route.
@@ -1952,7 +1965,7 @@ test_squash_merged_pushed_prerebase_copy_missing_commit_refuses() {
   expect_code 1 "$rc" "squash-pushed-missing: teardown should refuse when one pre-rebase commit's change is not in the PR head"$'\n'"$(cat "$case_dir/stderr")"
   grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-missing: no REFUSED line in stderr"
   grep -q 'add b' "$case_dir/stderr" || fail "squash-pushed-missing: the refusal does not name the commit missing from the PR head"
-  ! grep -q 'add a' "$case_dir/stderr" || fail "squash-pushed-missing: the refusal names a commit whose patch is in the PR head"
+  ! refusal_names_add_a "$case_dir/stderr" || fail "squash-pushed-missing: the refusal names a commit whose patch is in the PR head"
   assert_refusal_retained_task_state "$case_dir" squash-pushed-missing "$local_head"
   pass "squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head"
 }
@@ -14505,6 +14518,7 @@ test_squash_merged_same_file_different_content_refuses
 test_squash_merged_rebased_local_with_unlanded_commit_refuses
 test_squash_merged_stale_local_refuses_when_forge_unreachable
 test_squash_merged_pushed_prerebase_copy_allows
+test_squash_pushed_missing_subject_match_ignores_hash_boundary
 test_squash_merged_pushed_prerebase_copy_missing_commit_refuses
 test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
 test_squash_merged_prerebase_copy_with_a_later_main_merge_allows
