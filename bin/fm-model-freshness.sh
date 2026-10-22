@@ -12,11 +12,8 @@
 # where <tier> is "base model" for a newer id with no tier word (gpt-5.2).
 # Notices (a catalog that could not be read) go to stderr as
 #   model-freshness: notice: <detail>
-# The check is advisory by default: it exits 0 whatever it finds, refuses
-# nothing, and writes no config file; the supervisor decides. Exit 2 is a
-# malformed call. FM_MODEL_FRESHNESS_STRICT=1 makes any stale finding exit 3, so
-# a caller that must not launch a superseded model can gate on the verdict; the
-# spawn path uses it and admits a stale model only under an explicit captain pin.
+# The check is advisory. It exits 0 whatever it finds, refuses nothing, and
+# writes no config file; the supervisor decides. Exit 2 is a malformed call.
 #
 # What stale means. The model id is split into a family (its leading name, such
 # as gemini, gpt, claude, glm), a version (the first run of numeric parts, so
@@ -150,7 +147,6 @@ FRESHNESS_JQ='
         end
     end'
 
-STALE_COUNT=0
 while IFS=$'\t' read -r harness model; do
   [ -n "$harness" ] && [ -n "$model" ] || continue
   if [ ! -f "$TMP/catalog-$harness.json" ]; then
@@ -165,10 +161,6 @@ while IFS=$'\t' read -r harness model; do
   newer=${found%%$'\t'*}
   tier=${found#*$'\t'}
   [ -z "$tier" ] || tier=" (other tier: $tier)"
-  STALE_COUNT=$((STALE_COUNT + 1))
   printf 'MODEL_FRESHNESS: %s on %s is older than %s in the %s catalog%s\n' "$model" "$harness" "$newer" "$harness" "$tier"
 done < "$TMP/pairs"
-if [ "$STALE_COUNT" -gt 0 ] && [ "${FM_MODEL_FRESHNESS_STRICT:-0}" = 1 ]; then
-  exit 3
-fi
 exit 0

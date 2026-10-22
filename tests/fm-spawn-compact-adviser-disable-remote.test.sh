@@ -64,7 +64,7 @@ cat > "$REMOTE_ROOT/bin/omp" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
   --version) printf 'omp/18.1.20\n' ;;
-  models) printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}' ;;
+  models) printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-5.6-luna","selector":"openai-codex/gpt-5.6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}' ;;
 esac
 exit 0
 SH
@@ -328,6 +328,25 @@ assert_contains "$LAUNCH" 'FM_OMP_HARNESS=omp' "the remote pane did not receive 
 assert_contains "$LAUNCH" "--model 'openai-codex/gpt-6.1-sol'" "the remote omp launch command lost the selected model"
 assert_contains "$LAUNCH" "--thinking 'high'" "the remote omp launch command lost the selected effort"
 pass "a remote second mate on omp is accepted and its launch command carries the model and effort"
+
+# The stale-model gate runs in the remote host's own spawn, so the captain pin
+# has to cross the transport: an unpinned stale model is refused there, and the
+# same model launches once the parent passes the pin that names it.
+STALE_REMOTE_MODEL=openai-codex/gpt-5.6-luna
+reset_remote_herdr_fixture "$HERDR_STATE"
+: > "$HERDR_LOG"
+if OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --harness omp --model "$STALE_REMOTE_MODEL" 2>&1); then
+  fail "a remote second mate was launched on a stale model without a captain pin: $OUT"
+fi
+assert_contains "$OUT" 'refusing to launch a stale model' \
+  "the remote host did not refuse the unpinned stale model"
+[ -z "$(remote_pane_payload send-text)" ] || fail "a refused remote stale launch reached the remote pane"
+OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --harness omp \
+  --model "$STALE_REMOTE_MODEL" --captain-model-pin "$STALE_REMOTE_MODEL" 2>&1) \
+  || fail "a captain pin naming the stale model did not reach the remote host: $OUT"
+LAUNCH=$(remote_launch_command) || fail "the remote pane received no launch command for the pinned stale model"
+assert_contains "$LAUNCH" "--model '$STALE_REMOTE_MODEL'" "the pinned stale remote launch lost the selected model"
+pass "a captain pin crosses the transport so a remote second mate can launch the stale model the captain named"
 
 if OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --harness notaharness 2>&1); then
   fail "the parent spawn accepted an unverified remote harness: $OUT"

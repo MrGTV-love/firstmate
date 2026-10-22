@@ -2,7 +2,7 @@
 # Host-local lifecycle control for the remote secondmate home selected by fm-on.
 #
 # Usage:
-#   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--compact-adviser-disable]
+#   fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--captain-model-pin=<model-id>] [--compact-adviser-disable]
 #   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--compact-adviser-disable]
 #   fm-remote-secondmate-control.sh state <id>
 #   fm-remote-secondmate-control.sh route <id>
@@ -166,13 +166,17 @@ cmd_route() {
 
 cmd_launch() {
   local id=$1 harness=$2 model=$3 effort=$4 selected_backend=$5 traceparent=
-  local current meta out herdr_session compact_disable=0 arg
+  local current meta out herdr_session compact_disable=0 arg captain_model_pin=
   shift 5
   for arg in "$@"; do
     case "$arg" in
     --compact-adviser-disable)
       [ "$compact_disable" = 0 ] || die "duplicate --compact-adviser-disable"
       compact_disable=1 ;;
+    --captain-model-pin=*)
+      [ -z "$captain_model_pin" ] || die "duplicate --captain-model-pin"
+      captain_model_pin=${arg#--captain-model-pin=}
+      [ -n "$captain_model_pin" ] || die "--captain-model-pin requires a non-empty <model-id> value" ;;
     --*) die "unknown launch option: $arg" ;;
     *)
       [ -z "$traceparent" ] || die "launch accepts only one traceparent"
@@ -221,6 +225,7 @@ cmd_launch() {
   [ "$model" = - ] || ARGS+=(--model "$model")
   [ "$effort" = - ] || ARGS+=(--effort "$effort")
   [ -z "$traceparent" ] || ARGS+=(--traceparent "$traceparent")
+  [ -z "$captain_model_pin" ] || ARGS+=(--captain-model-pin "$captain_model_pin")
   if ! out=$(HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
     FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
     FM_CONFIG_OVERRIDE="$TARGET_HOME/config" FM_SKIP_SECONDMATE_INHERIT=1 \
@@ -458,7 +463,7 @@ cmd_retire() {
 }
 
 case "${1:-}" in
-  launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 7 ] || usage; cmd_launch "$@" ;;
+  launch) shift; [ "$#" -ge 5 ] && [ "$#" -le 8 ] || usage; cmd_launch "$@" ;;
   relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 5 ] || usage; cmd_relaunch "$@" ;;
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;

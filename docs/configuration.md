@@ -1771,8 +1771,8 @@ An unreachable, empty, missing, or malformed catalog (including concatenated JSO
 ## Model freshness
 
 `bin/fm-model-freshness.sh` reports a worker or reviewer model that a newer model of the same family has passed in its own harness's catalog, so a stale model is noticed instead of launched by habit.
-It is advisory by default: it exits 0 whatever it finds, refuses nothing, and edits no configuration file, so a caller that only wants the report decides what to change.
-`FM_MODEL_FRESHNESS_STRICT=1` makes any stale finding exit 3, which is the mode a caller that must not launch a superseded model gates on.
+It is advisory: it exits 0 whatever it finds, refuses nothing, and edits no configuration file, so the supervisor decides what to change.
+`bin/fm-spawn.sh` is the one caller that gates on its output, as the Spawn item below describes.
 Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each harness's discovery command and its time-limit floor, which measured durations from `bin/fm-duration.py` may raise.
 
 - **Inputs.** Every model named in the effective home's `config/crew-dispatch.json` (role references resolve through the [model index](#fleet-model-index-configmodel-indexjson)), and the model requested at each `bin/fm-spawn.sh`.
@@ -1788,6 +1788,10 @@ Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each
 - **Spawn.** `fm-spawn.sh` refuses to launch a stale model: it exits 1 with the stale line and the newer model to use instead.
   Only the captain may run a superseded model, and only for the task where the captain named that exact model.
   The caller passes `--captain-model-pin <model-id>`, which must equal the requested model, so a pin can never admit a different pick; a mismatched pin is its own error.
+  One pin covers every task in a batch invocation (`fm-spawn.sh a=<repo> b=<repo> --model <id> --captain-model-pin <id>`), because the batch shares one `--model` and forwards the pin to each pair.
+  A remote secondmate launch forwards the pin to the host-local spawn, where the same check runs against that host's catalog.
+  A `--relaunch` of the model the task already records is not gated again, because that model was admitted at launch: it prints `warning: stale model kept by relaunch, admitted at launch - ...` and keeps the task's recorded `model_stale=` value, so a captain-pinned task stays marked as pinned, or records the finding with an `(admitted at launch)` marker when the model went stale after launch.
+  Every other relaunch model still gates.
   An admitted stale model prints `warning: stale model admitted by captain pin - ...` and is recorded as `model_stale=` in the task record with an `(admitted by captain pin)` marker appended to the stale line, which `fm-crew-state.sh` repeats as a `model-stale:` component on that task's state line, so the authorized exception stays visible after the launch output is gone.
   A check that produced no verdict never reads as a clean one: an unreadable catalog is announced as `warning: model freshness unverified - <notice>` instead of being discarded, so a model this spawn could not compare is never silently cleared.
   The check reads the catalog from the spawn's own environment, under the worker account pin when one is set, so a pinned Claude account answers from its own catalog.
