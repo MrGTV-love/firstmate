@@ -1,0 +1,6 @@
+arrival 1 at SECONDS=4
+arrival 12 at SECONDS=70
+arrival 24 at SECONDS=142
+elapsed_seconds=144 source_invocations=1
+ok - concurrent stale-claim replacement starts exactly one runner
+nice -n 15 bash bin/fm-proc-budget.sh -- bash   7.59s user 17.84s system 17% cpu 2:25.50 total

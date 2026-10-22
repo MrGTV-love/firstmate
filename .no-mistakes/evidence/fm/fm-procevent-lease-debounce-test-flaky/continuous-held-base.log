@@ -1,0 +1,2 @@
+not ok - a page held by a leftover poller stranded the listener
+env PATH="$EV/heldps-bin:$PATH" HELDPS_LOG=$EV/heldps-$v.log  nice -n 15 bash  1.84s user 4.62s system 17% cpu 36.271 total

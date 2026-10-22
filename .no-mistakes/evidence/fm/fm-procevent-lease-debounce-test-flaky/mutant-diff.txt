@@ -1,0 +1,8 @@
+index 12c31f468..8c507b256 100755
+--- a/bin/fm-procevent.sh
++++ b/bin/fm-procevent.sh
+@@ -1749,3 +1749,3 @@ cmd_owner_watchdog() {  # <source-id> <runner-pid> <runner-identity> <ready-file
+     misses=$((misses + 1))
+-    [ "$misses" -ge 2 ] || continue
++    [ "$misses" -ge 1 ] || continue
+     if stop_runner_pid "$pid" "$identity"; then

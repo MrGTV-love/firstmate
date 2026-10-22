@@ -1,0 +1,8 @@
+A empty-then-complete: rc=0 out=<4242>
+B non-numeric: rc=1 out=<>
+C empty: rc=1 out=<>
+D missing: rc=1 out=<>
+E unterminated: rc=1 out=<>
+F tight truncate/rewrite: reads=31 bad_values=0
+G old wait+cat pattern: reads=2092 empty_or_wrong=1149
+HELPER-PROBE-OK

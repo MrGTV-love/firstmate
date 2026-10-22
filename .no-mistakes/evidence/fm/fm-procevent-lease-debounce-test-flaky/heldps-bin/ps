@@ -1,0 +1,7 @@
+#!/bin/bash
+# Holds ONLY the host-wide poll enumeration query; every other ps call goes straight to the real ps.
+if [ "$#" -eq 2 ] && [ "$1" = -axo ] && [ "$2" = pid=,ppid=,pgid=,lstart=,command= ]; then
+  printf 'held %s\n' "$(date -u +%T)" >> "${HELDPS_LOG:-/dev/null}"
+  for _ in $(seq 1 600); do [ -e "${HELDPS_RELEASE:-/nonexistent}" ] && break; sleep 0.1; done
+fi
+exec /bin/ps "$@"
