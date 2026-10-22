@@ -740,28 +740,64 @@ test_record_bound_to_another_task_is_refused() {
 # postconditions this plane verifies could be read for it here. Endpoint
 # validation would refuse the record anyway - `window=remote:<id>` can never
 # match a local backend's shape - but it would blame malformed metadata for a
-# correctly configured route, so the placement is named instead. Every verb
-# refuses, and none of them reaches a local endpoint.
+# correctly configured route, so the placement is named instead. Interrupt,
+# exit, and relaunch refuse, and none reaches a local endpoint or the transport.
+# Stay is the one verb delegated to the owning host, whose control plane reads
+# the picker and the agent beside the endpoint.
+#
+# remote_secondmate_case <name> [kind]: task t1 recorded as placed on a remote
+# host, a registry route to it, and an SSH stub that appends every decoded remote
+# argv, one word per line and each call closed by a line of --, and replies with
+# the stdout, stderr, and exit status staged under fake/.
+remote_secondmate_case() {
+  local name=$1 kind=${2:-secondmate} dir
+  dir=$(new_case "$name")
+  add_task "$dir" t1 claude "$kind"
+  alive_as "$dir" claude
+  {
+    grep -v '^window=' "$dir/home/state/t1.meta"
+    echo "window=remote:t1"
+    echo "home=$dir/wt-t1"
+    echo "remote_host=example.invalid"
+    echo "remote_root=/srv/fm"
+    echo "remote_backend=herdr"
+    echo "remote_target=fm:pane-1"
+  } > "$dir/home/state/t1.meta.tmp"
+  mv "$dir/home/state/t1.meta.tmp" "$dir/home/state/t1.meta"
+  printf -- '- t1 - remote domain (host: example.invalid; root: /srv/fm; home: /srv/t1; scope: things; projects: p; added 2026-09-03)\n' \
+    > "$dir/home/data/secondmates.md"
+  printf 'stayed t1 harness=claude backend=herdr endpoint=fm-remote:w1:p1 verified=picker-closed agent=alive\n' \
+    > "$dir/fake/ssh-stdout"
+  printf 'host-side note\n' > "$dir/fake/ssh-stderr"
+  printf '0' > "$dir/fake/ssh-exit"
+  cat > "$dir/fakebin/fake-ssh" <<'SH'
+#!/usr/bin/env bash
+set -u
+cat > /dev/null
+while [ "$#" -gt 0 ]; do
+  case "$1" in -o) shift 2 ;; --) shift; break ;; *) exit 90 ;; esac
+done
+shift 2
+argv_b64=$4
+{ printf '%s' "$argv_b64" | base64 --decode 2>/dev/null || printf '%s' "$argv_b64" | base64 -D; } \
+  | tr '\0' '\n' >> "$FM_FAKE_DIR/ssh-argv"
+printf -- '--\n' >> "$FM_FAKE_DIR/ssh-argv"
+cat "$FM_FAKE_DIR/ssh-stdout"
+cat "$FM_FAKE_DIR/ssh-stderr" >&2
+exit "$(cat "$FM_FAKE_DIR/ssh-exit")"
+SH
+  chmod +x "$dir/fakebin/fake-ssh"
+  printf '%s\n' "$dir"
+}
+
 test_remote_secondmate_is_refused_by_placement() {
   local dir out rc verb
-  for verb in interrupt exit stay relaunch; do
-    dir=$(new_case "remote-$verb")
-    add_task "$dir" t1 claude secondmate
-    alive_as "$dir" claude
-    {
-      grep -v '^window=' "$dir/home/state/t1.meta"
-      echo "window=remote:t1"
-      echo "home=$dir/wt-t1"
-      echo "remote_host=example.invalid"
-      echo "remote_root=/srv/fm"
-      echo "remote_backend=herdr"
-      echo "remote_target=fm:pane-1"
-    } > "$dir/home/state/t1.meta.tmp"
-    mv "$dir/home/state/t1.meta.tmp" "$dir/home/state/t1.meta"
+  for verb in interrupt exit relaunch; do
+    dir=$(remote_secondmate_case "remote-$verb")
     if [ "$verb" = relaunch ]; then
-      out=$(run_control "$dir" t1 "$verb" --note "x"); rc=$?
+      out=$(FM_SSH_BIN="$dir/fakebin/fake-ssh" run_control "$dir" t1 "$verb" --note "x"); rc=$?
     else
-      out=$(run_control "$dir" t1 "$verb"); rc=$?
+      out=$(FM_SSH_BIN="$dir/fakebin/fake-ssh" run_control "$dir" t1 "$verb"); rc=$?
     fi
     expect_code 1 "$rc" "$verb on a remotely placed secondmate should refuse"
     assert_contains "$out" "remotely placed secondmate on example.invalid" \
@@ -770,8 +806,58 @@ test_remote_secondmate_is_refused_by_placement() {
       "a correctly configured remote route must not be reported as malformed"
     [ -z "$(literals "$dir")" ] && [ -z "$(keys_sent "$dir")" ] \
       || fail "$verb on a remote secondmate must reach no local endpoint"
+    [ ! -e "$dir/fake/ssh-argv" ] \
+      || fail "$verb on a remote secondmate must not reach the remote host"
   done
   pass "fm-control: a remotely placed secondmate is refused by placement, not by a metadata complaint"
+}
+
+test_remote_secondmate_stay_delegates_to_the_owning_host() {
+  local dir out rc
+  dir=$(remote_secondmate_case remote-stay)
+  cp "$dir/home/state/t1.meta" "$dir/meta.before"
+  out=$(FM_SSH_BIN="$dir/fakebin/fake-ssh" run_control "$dir" t1 stay); rc=$?
+  expect_code 0 "$rc" "a remote stay that the host accepted should succeed"
+  assert_equals "$(printf 'fm-remote-secondmate-control.sh\nstay\nt1\n--')" "$(cat "$dir/fake/ssh-argv")" \
+    "stay must run exactly one host-local 'fm-remote-secondmate-control.sh stay t1'"
+  assert_contains "$out" "stayed t1 harness=claude backend=herdr endpoint=fm-remote:w1:p1 verified=picker-closed agent=alive" \
+    "the host's proof line must be relayed to the caller"
+  assert_contains "$out" "host-side note" "the host's stderr must be relayed to the caller"
+  [ -z "$(literals "$dir")" ] && [ -z "$(keys_sent "$dir")" ] \
+    || fail "a delegated stay must reach no local endpoint"
+  cmp -s "$dir/meta.before" "$dir/home/state/t1.meta" \
+    || fail "a delegated stay must not rewrite the parent's task record"
+
+  dir=$(remote_secondmate_case remote-stay-refused)
+  printf 'error: task t1 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input\n' \
+    > "$dir/fake/ssh-stderr"
+  : > "$dir/fake/ssh-stdout"
+  printf '1' > "$dir/fake/ssh-exit"
+  out=$(FM_SSH_BIN="$dir/fakebin/fake-ssh" run_control "$dir" t1 stay); rc=$?
+  expect_code 1 "$rc" "a host refusal must keep its exit status"
+  assert_contains "$out" "cannot positively attribute its live Herdr agent" \
+    "a host refusal must keep its reason"
+  assert_not_contains "$out" "stayed" "a host refusal must never read as success"
+  printf '255' > "$dir/fake/ssh-exit"
+  out=$(FM_SSH_BIN="$dir/fakebin/fake-ssh" run_control "$dir" t1 stay); rc=$?
+  expect_code 255 "$rc" "an unavailable transport must keep its exit status, not read as a stay"
+  assert_not_contains "$out" "stayed" "an unavailable transport must never read as success"
+  [ -z "$(literals "$dir")" ] && [ -z "$(keys_sent "$dir")" ] \
+    || fail "a refused delegated stay must reach no local endpoint"
+  pass "fm-control: stay on a remote secondmate runs the owning host's stay and relays its output and exit status"
+}
+
+test_remote_stay_is_refused_for_a_remote_record_that_is_not_a_secondmate() {
+  local dir out rc
+  dir=$(remote_secondmate_case remote-stay-ship ship)
+  out=$(FM_SSH_BIN="$dir/fakebin/fake-ssh" run_control "$dir" t1 stay); rc=$?
+  expect_code 1 "$rc" "stay on a remote record that is not a secondmate should refuse"
+  assert_contains "$out" "remotely placed secondmate on example.invalid" \
+    "the refusal should name the remote placement"
+  [ ! -e "$dir/fake/ssh-argv" ] || fail "stay on a non-secondmate remote record must not reach the remote host"
+  [ -z "$(literals "$dir")" ] && [ -z "$(keys_sent "$dir")" ] \
+    || fail "stay on a non-secondmate remote record must reach no local endpoint"
+  pass "fm-control: stay on a remote record that is not a secondmate is refused before any transport call"
 }
 
 hold_lifecycle_lock() {  # <lock-path>
@@ -1922,6 +2008,8 @@ test_explicit_endpoint_is_refused
 test_unknown_task_is_refused
 test_record_bound_to_another_task_is_refused
 test_remote_secondmate_is_refused_by_placement
+test_remote_secondmate_stay_delegates_to_the_owning_host
+test_remote_stay_is_refused_for_a_remote_record_that_is_not_a_secondmate
 test_interrupt_and_exit_lock_before_task_state_resolution
 test_verb_allowlist_is_closed
 test_resume_is_refused_with_its_reason

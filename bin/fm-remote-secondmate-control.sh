@@ -6,6 +6,7 @@
 #   fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--compact-adviser-disable]
 #   fm-remote-secondmate-control.sh state <id>
 #   fm-remote-secondmate-control.sh route <id>
+#   fm-remote-secondmate-control.sh stay <id>
 #   fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
 #   fm-remote-secondmate-control.sh key <id> <key>
 #   fm-remote-secondmate-control.sh capture <id> [lines]
@@ -55,6 +56,10 @@
 # The optional --compact-adviser-disable carries the parent's normalized
 # emergency override across the transport's cleared environment, scoped to the
 # host-local spawn or control call. It never changes an already-alive session.
+# A successful launch prints its confirmed route and launch=spawned or
+# launch=already-running. The latter preserves the live agent even when its
+# profile differs from the request. Stay delegates to the ordinary local control
+# plane with this endpoint's private state directory; it never sends a raw key.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,7 +81,7 @@ REMOTE_HERDR_SESSION=fm-remote
 . "$SCRIPT_DIR/fm-session-launch-policy-lib.sh"
 
 die() { printf 'error: %s\n' "$1" >&2; exit 1; }
-usage() { sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 validate_id() { case "$1" in ''|*[!A-Za-z0-9._-]*) die "invalid secondmate id: $1" ;; esac; }
 
 validate_home() { # <id> [allow-absent]
@@ -203,6 +208,7 @@ cmd_launch() {
     case "$current" in
       alive)
         print_route "$id"
+        printf 'launch=already-running\n'
         return 0
         ;;
       dead)
@@ -234,6 +240,7 @@ cmd_launch() {
   [ "$herdr_session" = "$REMOTE_HERDR_SESSION" ] \
     || die "remote launch recorded Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'"
   print_route "$id"
+  printf 'launch=spawned\n'
 }
 
 # Restart the second-mate agent this host runs, by executing the ORDINARY local
@@ -289,6 +296,19 @@ cmd_relaunch() {
   # values - is what makes that record correct even when relaunch resolved
   # "default" against a configured pin this call never saw.
   print_route "$id"
+}
+
+# The same local picker recognizer, task-attribution guard, generation-bound
+# marker cleanup, and alive-after-dismissal proof apply on the owning host.
+cmd_stay() {
+  local id=$1
+  validate_id "$id"
+  validate_home "$id"
+  remote_endpoint_require "$id"
+  HERDR_SESSION="$REMOTE_HERDR_SESSION" FM_HOME="$FM_ROOT" FM_ROOT_OVERRIDE="$FM_ROOT" \
+    FM_STATE_OVERRIDE="$CONTROL_STATE" FM_DATA_OVERRIDE="$CONTROL_DATA" \
+    FM_CONFIG_OVERRIDE="$TARGET_HOME/config" \
+    "$SCRIPT_DIR/fm-control.sh" "$id" stay
 }
 
 cmd_send() {
@@ -462,6 +482,7 @@ case "${1:-}" in
   relaunch) shift; [ "$#" -ge 4 ] && [ "$#" -le 5 ] || usage; cmd_relaunch "$@" ;;
   state) shift; [ "$#" -eq 1 ] || usage; validate_id "$1"; validate_home "$1"; state_value "$1" ;;
   route) shift; [ "$#" -eq 1 ] || usage; cmd_route "$1" ;;
+  stay) shift; [ "$#" -eq 1 ] || usage; cmd_stay "$1" ;;
   send) shift; [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage; cmd_send "$@" ;;
   key) shift; [ "$#" -eq 2 ] || usage; cmd_key "$@" ;;
   capture) shift; [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage; cmd_capture "$@" ;;
