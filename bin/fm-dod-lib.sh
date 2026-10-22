@@ -134,6 +134,9 @@
 # session does not register the skill, such as one in another project's
 # worktree, cannot, so the role also names the file as the fallback to read;
 # the Claude launch grants the skills directory that holds it.
+# It renders docs/review-rubric.md for independent review readers rather than
+# pointing at it, because that file is outside the Claude and Rovo read grants;
+# a missing rubric fails the role render instead of dropping the criteria.
 # The task-specific Definition of Done is the second half of a ship or scout
 # brief's completion contract: fm_task_dod_block prints the two sections
 # bin/fm-brief.sh scaffolds after the delivery contract above ("## Definition Of
@@ -189,7 +192,8 @@ When this task works on Firstmate itself, the repository root `AGENTS.md` (also 
 Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
 EOF
   printf "If the \`firstmate-coding-guidelines\` skill name does not resolve in this session, read \`%s/.agents/skills/firstmate-coding-guidelines/SKILL.md\` instead.\n" "$root"
-  printf '%s\n' "When assigned an independent review, read and apply \`$root/docs/review-rubric.md\` against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied."
+  printf '%s\n\n' "When assigned an independent review, apply the shared review rubric below, rendered from \`$root/docs/review-rubric.md\`, against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied."
+  cat "$root/docs/review-rubric.md"
 }
 
 # Launch-only scope override; the original instructions remain recovery context
