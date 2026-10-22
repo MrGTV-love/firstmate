@@ -57,6 +57,21 @@ assert_stale omp openai-codex/gpt-5.6-luna 'MODEL_FRESHNESS: openai-codex/gpt-5.
 assert_stale omp openrouter/z-ai/glm-5.3 'MODEL_FRESHNESS: openrouter/z-ai/glm-5.3 on omp is older than openrouter/z-ai/glm-5.4 in the omp catalog'
 pass 'aliases and context suffixes count as current; versions compare as numbers across spellings'
 
+# Strict mode is the verdict a caller gates on: exit 3 when anything asked about
+# is stale, exit 0 when every requested model is current. Advisory mode keeps
+# exiting 0 on the same stale model and still prints it, so a report-only caller
+# is unaffected and a gating caller can never read a refusal as "clean".
+assert_check_exit() { # <expected-exit> <strict 1|0> <harness> <model>
+  local got=0
+  FM_MODEL_FRESHNESS_STRICT=$2 "$TOOL" check "$3" "$4" > "$TMP_ROOT/exit.out" 2> "$TMP_ROOT/stderr" || got=$?
+  [ "$got" -eq "$1" ] || fail "expected exit $1 (strict=$2) for $3 $4, got $got"
+}
+assert_check_exit 3 1 omp openai-codex/gpt-5.6-luna
+assert_check_exit 0 1 omp openai-codex/gpt-6.1-sol
+assert_check_exit 0 0 omp openai-codex/gpt-5.6-luna
+[ -s "$TMP_ROOT/exit.out" ] || fail 'the stale line the gate exits on was not printed'
+pass 'strict mode exits 3 on a stale model and 0 when current; advisory mode still exits 0'
+
 # A newer model from another provider route or another family is not a
 # replacement: the same family under a different provider prefix is not offered.
 assert_current omp openrouter/deepseek/deepseek-v4-flash

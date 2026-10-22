@@ -1771,7 +1771,8 @@ An unreachable, empty, missing, or malformed catalog (including concatenated JSO
 ## Model freshness
 
 `bin/fm-model-freshness.sh` reports a worker or reviewer model that a newer model of the same family has passed in its own harness's catalog, so a stale model is noticed instead of launched by habit.
-It is advisory: it exits 0 whatever it finds, refuses nothing, and edits no configuration file, so the supervisor decides what to change.
+It is advisory by default: it exits 0 whatever it finds, refuses nothing, and edits no configuration file, so a caller that only wants the report decides what to change.
+`FM_MODEL_FRESHNESS_STRICT=1` makes any stale finding exit 3, which is the mode a caller that must not launch a superseded model gates on.
 Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each harness's discovery command and its time-limit floor, which measured durations from `bin/fm-duration.py` may raise.
 
 - **Inputs.** Every model named in the effective home's `config/crew-dispatch.json` (role references resolve through the [model index](#fleet-model-index-configmodel-indexjson)), and the model requested at each `bin/fm-spawn.sh`.
@@ -1784,11 +1785,14 @@ Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each
 - **Output.** One line per stale model: `MODEL_FRESHNESS: <model> on <harness> is older than <newer> in the <harness> catalog`.
 - **Session start.** The deferred network stage runs the scan beside its other checks and prints each line as a `MODEL_FRESHNESS:` diagnostic; an unreadable catalog is a `BOOTSTRAP_INFO` fact only under `FM_BOOTSTRAP_VERBOSE_FACTS=1`.
   When `config/claude-launcher` selects a custom launcher, claude models are not checked, because the plain `claude` catalog is not the one those workers use.
-- **Spawn.** `fm-spawn.sh` prints `warning: model is stale - ...`, records `model_stale=` in the task record, and `fm-crew-state.sh` repeats it as a `model-stale:` component on that task's state line; the spawn proceeds.
-  The advisory reads the catalog from the spawn's own environment, under the worker account pin when one is set, so a pinned Claude account answers from its own catalog.
-  It reads there even where the model-index check treats the worker account context as unavailable, such as an unpinned launch, because it gates nothing; its read never stands in for the worker's catalog in the index check.
+- **Spawn.** `fm-spawn.sh` refuses to launch a stale model: it exits 1 with the stale line and the newer model to use instead.
+  Only the captain may run a superseded model, and only for the task where the captain named that exact model.
+  The caller passes `--captain-model-pin <model-id>`, which must equal the requested model, so a pin can never admit a different pick; a mismatched pin is its own error.
+  An admitted stale model prints `warning: stale model admitted by captain pin - ...` and is recorded as `model_stale=` in the task record, which `fm-crew-state.sh` repeats as a `model-stale:` component on that task's state line, so the exception stays visible after the launch output is gone.
+  The check reads the catalog from the spawn's own environment, under the worker account pin when one is set, so a pinned Claude account answers from its own catalog.
+  It reads there even where the model-index check treats the worker account context as unavailable, such as an unpinned launch.
   It is skipped for a raw launch and for a Claude custom launcher.
-  A spawn reads each catalog at most once: the advisory reuses the catalog the model-index check or the agy, omp, or cursor model validator already read, and runs its own read only when no earlier read happened.
+  A spawn reads each catalog at most once: the check reuses the catalog the model-index check or the agy, omp, or cursor model validator already read, and runs its own read only when no earlier read happened.
 - **Off switch.** `FM_MODEL_FRESHNESS=0` turns the check off; the test suite sets it so no case reads a developer's real catalogs.
 
 `tests/fm-model-freshness.test.sh` covers the comparison, scan, spawn, and catalog-reuse behavior against fixture catalogs.
