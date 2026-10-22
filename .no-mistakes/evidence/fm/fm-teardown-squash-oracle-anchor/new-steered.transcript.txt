@@ -1,0 +1,4 @@
+$ PATH=repro-bin:$PATH bash tests/fm-teardown.test.sh test_squash_merged_pushed_prerebase_copy_missing_commit_refuses   # test file = new (e9f58913), commit IDs steered
+grind: steered 'add b' to ed6dadd after 4446 tries
+ok - squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head
+[exit=0]

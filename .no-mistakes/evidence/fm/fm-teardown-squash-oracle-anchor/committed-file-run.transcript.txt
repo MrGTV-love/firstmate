@@ -1,0 +1,4 @@
+$ bash tests/fm-teardown.test.sh test_squash_pushed_missing_subject_match_ignores_hash_boundary test_squash_merged_pushed_prerebase_copy_missing_commit_refuses   # committed file e9f58913, unmodified
+ok - squash-pushed-missing subject match ignores a commit ID ending in add and detects a genuine add a
+ok - squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head
+[exit=0]

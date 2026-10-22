@@ -1,0 +1,4 @@
+$ PATH=repro-bin:$PATH bash tests/fm-teardown.test.sh test_squash_merged_pushed_prerebase_copy_missing_commit_refuses   # test file = base (b13c1b1b), commit IDs steered
+grind: steered 'add b' to 0049add after 10594 tries
+not ok - squash-pushed-missing: the refusal names a commit whose patch is in the PR head
+[exit=1]

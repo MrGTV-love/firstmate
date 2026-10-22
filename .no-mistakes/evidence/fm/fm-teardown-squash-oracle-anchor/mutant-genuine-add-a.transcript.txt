@@ -1,0 +1,3 @@
+$ bash tests/fm-teardown.test.sh test_squash_merged_pushed_prerebase_copy_missing_commit_refuses   # new test (e9f58913) with fixture mutated so the PR head also lacks 'add a'
+not ok - squash-pushed-missing: the refusal names a commit whose patch is in the PR head
+[exit=1]

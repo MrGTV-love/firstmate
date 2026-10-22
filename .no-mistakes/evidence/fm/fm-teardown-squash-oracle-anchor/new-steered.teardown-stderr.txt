@@ -1,0 +1,6 @@
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+commits whose change is not proven present in the merged PR head:
+ed6dadd add b
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes state database at /Users/charlesabrooker/tmp/fm-teardown-tests.kS00uc/squash-pushed-missing/nm/state.sqlite, so no run record ties this copy to https://github.com/example/repo/pull/7
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.

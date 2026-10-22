@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Test-fixture git wrapper: passes every call to the real git. Only after the
+# squash-pushed-missing case's worktree commit "add b" does it re-time that one
+# commit so its short ID ends in "add" (the reported CI flake condition).
+"/usr/bin/git" "$@"; rc=$?
+[ $rc -eq 0 ] || exit $rc
+if [ "${1:-}" = -C ] && [[ "${2:-}" == */squash-pushed-missing/wt ]] && [ "${@: -1}" = "add b" ]; then
+  python3 "/Users/charlesabrooker/.no-mistakes/evidence/01M5JH8ZD14BTQKBM1EDE9E78H/grind_commit.py" "/usr/bin/git" "$2" || exit 1
+fi
+exit 0

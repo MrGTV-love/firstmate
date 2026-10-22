@@ -1,0 +1,3 @@
+$ bash tests/fm-teardown.test.sh test_squash_pushed_missing_subject_match_ignores_hash_boundary   # helper reverted to the old substring grep 'add a'
+not ok - squash-pushed-missing: commit ID plus add b was mistaken for an add a subject
+[exit=1]
