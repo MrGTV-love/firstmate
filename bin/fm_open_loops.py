@@ -33,7 +33,7 @@ CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream depe
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
-RECEIPT_SECONDS = 4 * 60 * 60  # policy: how long an unchanged firstmate escalation or steer stands
+RECEIPT_SECONDS = int(dt.timedelta(hours=4).total_seconds())  # policy: how long an unchanged firstmate escalation or steer stands
 ELAPSED_TIME = re.compile(r"\b\d+(?:[.]\d+)?[hms](?: ?\d+(?:[.]\d+)?[hms])*\b")
 # Categories a captain decision can park: the same set a dependency wait may bind.
 CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
