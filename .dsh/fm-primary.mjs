@@ -2,7 +2,7 @@
 // and turn-end predicates; no external daemon or second supervision model.
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
 export const name = 'firstmate-primary';
@@ -20,6 +20,10 @@ export function apply(ctx, config) {
   Object.assign(process.env, {FM_HOME: home, FM_ROOT_OVERRIDE: home,
     FM_STATE_OVERRIDE: state, FM_CONFIG_OVERRIDE: join(home, 'config'),
     FM_DATA_OVERRIDE: join(home, 'data'), FM_PROJECTS_OVERRIDE: join(home, 'projects')});
+  // The launch hands its opening prompt here instead of to dsh-tui, which
+  // would submit it before this adapter's session-start digest exists.
+  const opening = process.env.FM_DSH_OPENING_PROMPT ?? '';
+  delete process.env.FM_DSH_OPENING_PROMPT;
   const env = {...process.env};
   let disposed = false;
   let agent;
@@ -39,8 +43,15 @@ export function apply(ctx, config) {
   const previous = instances.get(home);
   previous?.();
   mkdirSync(state, {recursive: true});
+  const events = join(state, '.dsh-primary-events.jsonl');
   const log = (event, fields = {}) => {
-    appendFileSync(join(state, '.dsh-primary-events.jsonl'), JSON.stringify({at: Date.now(), pid: process.pid, event, ...fields}) + '\n');
+    appendFileSync(events, JSON.stringify({at: Date.now(), pid: process.pid, event, ...fields}) + '\n');
+    const rows = readFileSync(events, 'utf8').split('\n').filter(Boolean);
+    if (rows.length > 600) {
+      const temporary = `${events}.tmp.${process.pid}`;
+      writeFileSync(temporary, rows.slice(-400).join('\n') + '\n');
+      renameSync(temporary, events);
+    }
   };
   const command = (script, args = [], input = '') => new Promise((accept, reject) => {
     const child = spawn('nice', ['-n', '20', 'bash', join(root, 'bin', script), ...args],
@@ -68,11 +79,11 @@ export function apply(ctx, config) {
       throw error;
     }
   };
-  const failure = error => {
+  const failure = (error, after = '') => {
     log('error', {detail: String(error)});
     if (!guardNudged) {
       guardNudged = true;
-      send(`Firstmate DSH primary supervision failed: ${String(error)}. Run bin/fm-wake-drain.sh first and follow the emitted recovery protocol.`, 'guard');
+      send(`Firstmate DSH primary supervision failed: ${String(error)}. Run bin/fm-wake-drain.sh first and follow the emitted recovery protocol.${after && `\n\n${after}`}`, 'guard');
     }
   };
   const guard = async () => {
@@ -194,17 +205,29 @@ export function apply(ctx, config) {
     guardNudged = false;
     failedArm = false;
     wakeConsumed = pendingRows.size > 0;
-    const result = await command('fm-sessionstart-run.sh', ['--source', started ? 'clear' : 'startup']);
-    if (disposed || activation !== generation) return;
-    started = true;
-    if (result.code !== 0) throw new Error(`DSH primary session start failed: ${result.stderr || result.stdout}`);
-    if (!result.stdout.trim()) throw new Error('DSH primary session start supplied no digest; primary scope or startup transport is missing');
-    const digest = message(result.stdout);
-    ownMessages.add(digest.id);
-    agent.inject(digest);
-    writeFileSync(join(state, '.dsh-primary-loaded'), JSON.stringify({pid: process.pid, root, home}) + '\n');
-    log('startup', {session: agent.id});
-    await ensure();
+    const source = started ? 'clear' : 'startup';
+    // A fresh process has no turn until this adapter wakes the driver, so the
+    // digest leads the first provider turn; a cleared session already runs.
+    let unsent = source === 'startup' ? opening : '';
+    try {
+      const result = await command('fm-sessionstart-run.sh', ['--source', source]);
+      if (disposed || activation !== generation) return;
+      started = true;
+      if (result.code !== 0) throw new Error(`DSH primary session start failed: ${result.stderr || result.stdout}`);
+      if (!result.stdout.trim()) throw new Error('DSH primary session start supplied no digest; primary scope or startup transport is missing');
+      if (source === 'startup') {
+        send(unsent ? `${result.stdout}\n\n${unsent}` : result.stdout, 'startup');
+        unsent = '';
+      } else {
+        const digest = message(result.stdout);
+        ownMessages.add(digest.id);
+        agent.inject(digest);
+      }
+      log('startup', {session: agent.id});
+      await ensure();
+    } catch (error) {
+      if (!disposed && activation === generation) failure(error, unsent);
+    }
   });
   ctx.on('session/event', (session, event) => {
     if (session !== agent?.session) return;

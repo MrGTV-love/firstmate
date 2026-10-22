@@ -417,6 +417,48 @@ $foreign="*|"$foreign="*) fail "the launch must clear the inherited $foreign" ;;
   pass "fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME"
 }
 
+# A crew harness mirrored from a DSH primary with no model carries that
+# session's bound model and stages from the operator's install, not from the
+# primary's private runtime copy; without a live record it refuses.
+mirror_spawn() {  # <dsh-home> <id> -> spawn output
+  local writer status out
+  python3 "$TMP_ROOT/dsh-session-writer.py" "$HOME_DIR/state" "$2" "$LAUNCH_LOG" &
+  writer=$!
+  # shellcheck disable=SC2016 # the body expands inside the dsh-named shell
+  out=$(export -f fm_test_run_spawn; ROOT="$ROOT" FM_DSH_HARNESS=dsh DSH_HOME="$1" FM_DSH_SOURCE_HOME="$HOME_DIR/user-home/.dsh" \
+    FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
+    "$CASE_DIR/ancestor/dsh" -c 'fm_test_run_spawn "$@"; exit "$?"' _ "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$2" "$PROJ_DIR" --scout)
+  status=$?
+  kill "$writer" 2>/dev/null
+  wait "$writer" 2>/dev/null
+  printf '%s' "$out"
+  return "$status"
+}
+
+test_mirrored_dsh_primary_carries_its_bound_model() {
+  local id=dsh-mirror primary out status
+  make_dsh_case mirror "$id" ''
+  mkdir -p "$CASE_DIR/ancestor" "$CASE_DIR/primary-state" "$CASE_DIR/operator-home"
+  ln -sf /bin/bash "$CASE_DIR/ancestor/dsh"
+  primary=$(FM_DSH_OPERATOR_HOME="$CASE_DIR/operator-home" python3 "$ROOT/bin/fm-dsh.py" prepare-primary \
+    "$CASE_DIR/primary-state" dsh-primary g1 "$HOME_DIR/user-home/.dsh" deepseek/deepseek-v4-pro max "$HOME_DIR" "$ROOT") \
+    || fail "the primary runtime fixture could not be prepared"
+  printf 'stale\n' > "$primary/dsh/.credentials.yaml"
+  out=$(mirror_spawn "$primary/dsh" "$id")
+  status=$?
+  expect_code 0 "$status" "a mirrored dsh crew harness with no model must carry the primary's model: $out"
+  assert_grep "harness=dsh" "$HOME_DIR/state/$id.meta" "the mirrored crew harness must stay dsh"
+  assert_grep "model=deepseek/deepseek-v4-pro" "$HOME_DIR/state/$id.meta" "the worker must carry the DSH primary's bound model"
+  assert_equals secret "$(cat "$HOME_DIR/state/$id.dsh/"*/dsh/.credentials.yaml)" \
+    "the worker must stage credentials from the operator's DSH install, not the primary's runtime copy"
+  out=$(mirror_spawn "$CASE_DIR/unbound/dsh" "$id-unbound" 2>&1)
+  status=$?
+  expect_code 1 "$status" "a mirrored dsh harness without a live session record must refuse: $out"
+  assert_contains "$out" "has no configured model" "the refusal must name the missing model configuration"
+  assert_absent "$HOME_DIR/state/$id-unbound.meta" "a refused mirror must publish no task"
+  pass "fm-spawn: a dsh crew harness mirrored from a DSH primary carries its bound model and the operator's install, and refuses without a live record"
+}
+
 test_launch_policy_admits_dsh() {
   local id=dsh-policy out status config
   make_dsh_case policy "$id"
@@ -530,6 +572,7 @@ test_busy_classify_follows_the_launch_session_log
 test_deepseek_model_without_a_harness_routes_to_dsh
 test_explicit_harness_is_not_rerouted
 test_launch_environment
+test_mirrored_dsh_primary_carries_its_bound_model
 test_launch_policy_admits_dsh
 test_deepseek_cannot_launch_on_omp
 test_omp_default_cannot_hide_a_deepseek_route

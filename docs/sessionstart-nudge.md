@@ -379,8 +379,9 @@ A later in-process `clear` re-emits only when this lock owner completed a full s
 ### DSH
 
 `bin/fm-dsh-primary.sh` and DSH secondmate launches add the tracked `.dsh/fm-primary.mjs` Cordis plugin to a private launch patch.
-Its awaited `agent/created` callback invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry and injects the resulting digest into the agent inbox before the first provider turn.
-Top-level same-process session replacements use the shared `clear` source; delegated children never receive the primary digest or take over the watcher.
+DSH does not await its `agent/created` callback, so the launch passes no opening prompt to `dsh-tui`; the callback invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry and only then submits the digest followed by the launch's opening prompt or secondmate brief as the first follow-up turn.
+A failed or empty startup is recorded in `state/.dsh-primary-events.jsonl` and sent as the bounded supervision-failure follow-up, still carrying that opening prompt.
+Top-level same-process session replacements use the shared `clear` source and inject the digest into the running session; delegated children never receive the primary digest or take over the watcher.
 A fresh process resuming a conversation takes the helm again through the same idempotent startup owner.
 Bare `dsh-tui` launches do not discover this plugin, and automatic in-place compaction has no separate tracked re-emit callback.
 The [DSH protocol](supervision-protocols/dsh.md) owns watcher continuity and recovery.

@@ -262,6 +262,60 @@ for role in primary secondmate; do
   case "$out" in *'requires perl for owner-bound supervision cleanup'*) ;; *) echo "$out" >&2; exit 1 ;; esac
 done
 printf 'ok - PATH-selected DSH probes accept arbitrary releases, refuse failed commands and require ownership cleanup only for primaries\n'
+# The primary launcher must resume the recorded conversation with its bound
+# model and effort, and never retire a generation it cannot resume or that a
+# live DSH session still owns.
+P=$TMP/primary
+mkdir -p "$P/home/bin" "$P/home/state" "$P/fake" "$P/user" "$P/operator" "$P/user/.dsh/profiles/dsh-tui/node_modules" "$P/live"
+printf '{}\n' > "$P/user/.dsh/profiles/dsh-tui/package.json"
+printf '# fixture\n' > "$P/home/AGENTS.md"
+git init -q "$P/home"
+cat > "$P/fake/dsh-tui" <<'SH'
+#!/bin/sh
+[ "${1:-}" = version ] && exit 0
+printf '%s\n' "$@" > "$FM_FAKE_DSH_LOG"
+printf '%s\n' "$FM_DSH_OPENING_PROMPT" > "$FM_FAKE_DSH_LOG.prompt"
+SH
+printf '#!/bin/sh\nexit 0\n' > "$P/fake/dsh"
+chmod +x "$P/fake/dsh-tui" "$P/fake/dsh"
+primary_launch() {
+  FM_HOME="$P/home" HOME="$P/user" DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_DSH_OPERATOR_HOME="$P/operator" \
+    FM_FAKE_DSH_LOG="$P/launch" PATH="$P/fake:$PATH" bash "$ROOT/bin/fm-dsh-primary.sh" "$@"
+}
+primary_launch --model deepseek/deepseek-v4-pro --effort max -- 'fixture opening'
+[ "$(cat "$P/launch.prompt")" = 'fixture opening' ] || { echo 'the opening prompt must reach the native plugin' >&2; exit 1; }
+[ "$(sed -n 1p "$P/launch")" = --patch ] && [ "$(wc -l < "$P/launch")" -eq 2 ] || { echo "dsh-tui must receive no positional opening prompt: $(cat "$P/launch")" >&2; exit 1; }
+GEN=$(dirname "$(sed -n 2p "$P/launch")")
+python3 - "$GEN" "$P/home" <<'PY2'
+import json, sys, uuid
+from pathlib import Path
+log = Path(sys.argv[1]) / 'dsh/sessions/workspace/s/session.v4.jsonl'
+log.parent.mkdir(parents=True)
+log.write_text(json.dumps({'type': 'session', 'version': 4, 'id': str(uuid.uuid4()), 'cwd': str(Path(sys.argv[2]).resolve()), 'delegationDepth': 0}) + '\n' + json.dumps({'type': 'turn/start', 'seq': 1}) + '\n')
+PY2
+primary_launch --resume
+[ "$(sed -n 2p "$P/launch")" = "$GEN/launch.yml" ] || { echo 'resume must continue the bound generation' >&2; exit 1; }
+python3 - "$GEN/launch.yml" <<'PY2'
+import json, sys
+row = json.load(open(sys.argv[1]))[0]['config']
+assert row['model'] == 'deepseek-v4-pro' and row['effort'] == 'max' and row.get('sessionId'), row
+PY2
+if out=$(primary_launch --resume --model deepseek/deepseek-v4-flash 2>&1); then
+  echo 'an unprovable resume must refuse' >&2; exit 1
+fi
+case "$out" in *'cannot resume the conversation bound in'*) ;; *) echo "$out" >&2; exit 1 ;; esac
+ln -sf /bin/bash "$P/live/dsh-tui"
+"$P/live/dsh-tui" -c 'sleep 30; :' &
+LIVE=$!
+printf '%s\n' "$LIVE" > "$P/home/state/.lock"
+if out=$(primary_launch 2>&1); then
+  kill "$LIVE"; echo 'a fresh primary must not replace a live DSH session' >&2; exit 1
+fi
+kill "$LIVE"
+wait "$LIVE" 2>/dev/null || true
+case "$out" in *"live DSH session pid $LIVE"*) ;; *) echo "$out" >&2; exit 1 ;; esac
+[ -s "$GEN/dsh/sessions/workspace/s/session.v4.jsonl" ] || { echo 'refusals must keep the bound conversation' >&2; exit 1; }
+printf 'ok - the DSH primary resumes its bound model and effort and refuses to replace an unresumable or live conversation\n'
 for args in \
   'node /opt/homebrew/bin/dsh-tui --patch /state/t.dsh/g1/launch.yml -- brief' \
   'node /opt/homebrew/lib/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch x' \

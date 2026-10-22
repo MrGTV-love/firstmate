@@ -21,7 +21,7 @@ async function until(predicate) {
     await delay(25);
   }
 }
-function setup(name, failArm = false) {
+function setup(name, {failArm = false, failStart = false} = {}) {
   const dir = join(tmp, name);
   const bin = join(dir, 'bin');
   const home = join(dir, 'home');
@@ -29,7 +29,7 @@ function setup(name, failArm = false) {
   mkdirSync(join(home, 'state'), {recursive: true});
   symlinkSync(join(root, 'bin/fm-timeout-lib.sh'), join(bin, 'fm-timeout-lib.sh'));
   const executable = (name, body) => writeFileSync(join(bin, name), '#!/usr/bin/env bash\nset -eu\n' + body + '\n', {mode: 0o700});
-  executable('fm-sessionstart-run.sh', "printf 'SESSION START - fixture\\n'");
+  executable('fm-sessionstart-run.sh', failStart ? "echo 'fixture startup fault' >&2; exit 1" : "printf 'SESSION START - fixture\\n'");
   executable('fm-dsh-primary.sh', "printf 'watch\\n'");
   executable('fm-turnend-guard.sh', "if [ -f \"$FM_HOME/state/ready\" ]; then exit 0; fi; echo 'no live supervisor' >&2; exit 2");
   executable('fm-wake-drain.sh', 'cat "$FM_HOME/state/queue"');
@@ -47,37 +47,56 @@ function setup(name, failArm = false) {
   const stops = [];
   const ctx = {on(event, fn) {handlers.set(event, fn);}, effect(fn) {stops.push(fn());}};
   const followups = [];
-  const agent = {id: name, session: {header: {cwd: home}}, inject() {}, followup(value) {followups.push(value);}};
+  const injected = [];
+  const agent = {id: name, session: {header: {cwd: home}}, inject(value) {injected.push(value);}, followup(value) {followups.push(value);}};
+  process.env.FM_DSH_OPENING_PROMPT = `opening for ${name}`;
   apply(ctx, {root: dir, home});
+  assert.equal(process.env.FM_DSH_OPENING_PROMPT, undefined, 'the opening prompt must not leak into native tool calls');
   const emit = (type, payload) => handlers.get(type)?.(payload);
   const end = () => handlers.get('session/event')(agent.session, {type: 'turn/end', seq: 1});
   const consume = input => handlers.get('session/event')(agent.session, {type: 'user/message', data: input});
   const stop = () => {for (const fn of stops) fn();};
-  return {home, agent, followups, emit, end, consume, stop};
+  return {home, agent, followups, injected, emit, end, consume, stop};
 }
-const fail = setup('failed-arm', true);
+// DSH does not await agent/created, so no opening prompt may reach dsh-tui:
+// the only first-turn input is this follow-up, sent after the digest exists.
+const opened = setup('startup-order');
+await opened.emit('agent/created', {agent: opened.agent});
+assert.equal(opened.followups.length, 1, 'startup must wake exactly one first turn');
+assert.equal(opened.followups[0].content[0].text, 'SESSION START - fixture\n\n\nopening for startup-order', 'the first turn must carry the digest before the opening prompt');
+assert.equal(opened.injected.length, 0, 'a fresh process must not park the digest behind an earlier turn');
+opened.stop();
+const broken = setup('startup-failure', {failStart: true});
+await broken.emit('agent/created', {agent: broken.agent});
+assert.equal(broken.followups.length, 1, 'a failed startup must still wake one first turn');
+assert.match(broken.followups[0].content[0].text, /session start failed: fixture startup fault[\s\S]*opening for startup-failure$/, 'a failed startup must report the fault and keep the opening prompt');
+assert.match(readFileSync(join(broken.home, 'state/.dsh-primary-events.jsonl'), 'utf8'), /"event":"error"/, 'a failed startup must be recorded');
+broken.stop();
+const fail = setup('failed-arm', {failArm: true});
 await fail.emit('agent/created', {agent: fail.agent});
-await until(() => fail.followups.length === 1);
+await until(() => fail.followups.length === 2);
 // DSH commits UserMessage directly as event.data, including synthetic input.
 // Consuming the forced continuation must not classify it as a new human turn.
 fail.consume(fail.followups[0]);
-fail.end();
-await delay(1000);
-fail.end();
-await delay(1000);
-assert.equal(fail.followups.length, 1, 'one failed episode must not force an endless series of model turns');
-assert.match(fail.followups[0].content[0].text, /no live supervisor/);
-fail.consume({id: 'external-user-turn', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'Try the recovery again.'}]});
-fail.end();
-await until(() => fail.followups.length === 2);
 fail.consume(fail.followups[1]);
 fail.end();
+await delay(1000);
+fail.end();
+await delay(1000);
+assert.equal(fail.followups.length, 2, 'one failed episode must not force an endless series of model turns');
+assert.match(fail.followups[1].content[0].text, /no live supervisor/);
+fail.consume({id: 'external-user-turn', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'Try the recovery again.'}]});
+fail.end();
+await until(() => fail.followups.length === 3);
+fail.consume(fail.followups[2]);
+fail.end();
 await delay(500);
-assert.equal(fail.followups.length, 2, 'a real new user turn grants one fresh continuation, not unlimited synthetic continuations');
+assert.equal(fail.followups.length, 3, 'a real new user turn grants one fresh continuation, not unlimited synthetic continuations');
 fail.stop();
 
 const wake = setup('wake');
 await wake.emit('agent/created', {agent: wake.agent});
+wake.consume(wake.followups[0]);
 await until(() => existsSync(join(wake.home, 'state/ready')));
 const firstPid = readFileSync(join(wake.home, 'state/arm-pid'), 'utf8');
 wake.end(); wake.end();
@@ -85,19 +104,19 @@ await delay(500);
 assert.equal(readFileSync(join(wake.home, 'state/arm-pid'), 'utf8'), firstPid, 'repeated turn ends must retain one arm');
 writeFileSync(join(wake.home, 'state/queue'), '100\t1\tcheck\tfixture\tnotice\n');
 writeFileSync(join(wake.home, 'state/close'), '');
-await until(() => wake.followups.length === 1);
+await until(() => wake.followups.length === 2);
 wake.end();
 await delay(500);
-assert.equal(wake.followups.length, 1, 'an accepted but unconsumed notification must not be delivered twice');
+assert.equal(wake.followups.length, 2, 'an accepted but unconsumed notification must not be delivered twice');
 assert.equal(existsSync(join(wake.home, 'state/ready')), false, 'unacknowledged rows must not spin new watcher cycles');
-wake.consume(wake.followups[0]);
-wake.end();
-await until(() => wake.followups.length === 2);
-assert.match(wake.followups[1].content[0].text, /generation-bound acknowledgement/, 'a consumed but unacknowledged wake requires the bounded guard continuation');
 wake.consume(wake.followups[1]);
 wake.end();
+await until(() => wake.followups.length === 3);
+assert.match(wake.followups[2].content[0].text, /generation-bound acknowledgement/, 'a consumed but unacknowledged wake requires the bounded guard continuation');
+wake.consume(wake.followups[2]);
+wake.end();
 await delay(500);
-assert.equal(wake.followups.length, 2, 'consuming the synthetic guard continuation must not reset its budget');
+assert.equal(wake.followups.length, 3, 'consuming the synthetic guard continuation must not reset its budget');
 writeFileSync(join(wake.home, 'state/queue'), '');
 wake.end();
 await until(() => existsSync(join(wake.home, 'state/ready')));
@@ -146,5 +165,5 @@ try {
   for (const pid of ownedPids) {try {process.kill(pid, 'SIGKILL');} catch {}}
   crash.stop();
 }
-console.log('ok - DSH primary bounds guard follow-ups, preserves wake acknowledgement, excludes children, and retires watcher descendants on disposal and native SIGKILL');
+console.log('ok - DSH primary sends its digest before the opening prompt as the first turn, reports startup failure, bounds guard follow-ups, preserves wake acknowledgement, excludes children, and retires watcher descendants on disposal and native SIGKILL');
 JS

@@ -199,5 +199,15 @@ assert sum(row['event']=='startup' for row in rows)>=2, 'resume must load the na
 assert any(row['event']=='disposed' for row in rows), 'native exit must retire the adapter'
 text=open(sys.argv[2]).read()
 assert 'primary harness: dsh' in text and 'Mode: DSH native Cordis supervision.' in text, 'the actual startup digest must select the dedicated protocol'
+first=None
+for line in open(sys.argv[2]):
+    try: event=json.loads(line)
+    except ValueError: continue
+    if event.get('type') in ('user/message','assistant/message'):
+        first=event
+        break
+assert first and first['type']=='user/message', 'no provider reply may precede the startup digest'
+words='\n'.join(part.get('text','') for part in first['data'].get('content',[]) if part.get('type')=='text')
+assert 'Mode: DSH native Cordis supervision.' in words and 'ORCHID73' in words, 'the first turn must carry the startup digest followed by the opening prompt'
 print('ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume')
 PY

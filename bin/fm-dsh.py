@@ -19,6 +19,10 @@ stages the same private runtime plus CODE_ROOT/.dsh/fm-primary.mjs, the native
 session-open, watcher and passive turn-end adapter. Resume retains that role.
 resume STATE ID MODEL EFFORT CWD rewrites the bound launch patch to resume the
 newest depth-zero session, or prints nothing when the binding changed.
+bound STATE ID prints the binding's model as deepseek/<id> and its effort
+(default when none) on two lines.
+own-model prints, as deepseek/<id>, the model bound to the Firstmate-prepared
+generation that DSH_HOME names, and fails unless that binding still names it.
 session-file STATE ID prints the live depth-zero session log.
 position STATE ID prints the live session log and its last durable seq as JSON,
 or nothing before the launch has a log.
@@ -341,6 +345,24 @@ def resume(args, primary_root=None):
     print(root)
 
 
+def bound(state, task):
+    binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
+    print("deepseek/" + binding["model"])
+    print(binding.get("effort") or "default")
+
+
+def own_model():
+    dsh = os.environ.get("DSH_HOME", "")
+    runtime = Path(dsh).resolve().parent
+    store = runtime.parent
+    if not dsh or not store.name.endswith(".dsh"):
+        raise ValueError("DSH_HOME names no Firstmate-prepared dsh session")
+    binding = json.loads(store.with_name(store.name + "-session").read_text())
+    if Path(binding["root"]) != runtime:
+        raise ValueError(f"{runtime} is no longer the bound dsh generation")
+    print("deepseek/" + binding["model"])
+
+
 def session_file(args):
     state, task = args
     path = live_log(state, task)
@@ -359,6 +381,10 @@ def main():
     p = sub.add_parser("resume")
     p.add_argument("values", nargs=5)
     p.add_argument("--primary-root")
+    p = sub.add_parser("bound")
+    p.add_argument("state")
+    p.add_argument("task")
+    sub.add_parser("own-model")
     p = sub.add_parser("session-file")
     p.add_argument("values", nargs=2)
     p = sub.add_parser("position")
@@ -386,6 +412,10 @@ def main():
             prepare(args.values, args.primary_root)
         elif args.command == "resume":
             resume(args.values, args.primary_root)
+        elif args.command == "bound":
+            bound(args.state, args.task)
+        elif args.command == "own-model":
+            own_model()
         elif args.command == "session-file":
             session_file(args.values)
         elif args.command == "route":

@@ -306,9 +306,11 @@
 #   operator's trust.json. Ordinary Pi worker launches never receive --approve.
 #   A missing selected executable refuses before endpoint creation, and pi-signed
 #   never falls back to pi.
-#   DeepSeek runs through dsh-tui, not omp. An implicit ship/scout route selects
-#   dsh; a contradictory explicit harness refuses. A secondmate cannot use dsh
-#   until its primary supervision protocol is verified. The dsh adapter reference
+#   DeepSeek runs through dsh-tui, not omp. An implicit route selects dsh; a
+#   contradictory explicit harness refuses. A dsh secondmate loads the native
+#   primary plugin, and a dsh harness resolved from config or mirrored from a
+#   DSH session with no model carries that session's bound model (fm-dsh.py
+#   own-model) or refuses. The dsh adapter reference
 #   (.agents/skills/harness-adapters/references/harness/dsh.md) owns the route,
 #   and launch_template's dsh case documents the private HOME it launches under.
 #   config/session-launch-policy can restrict even explicit launches; its schema
@@ -692,7 +694,8 @@
 # a mate's completed turns stay in its own home. Codex stays unknown until a semantic
 # source exists. Grok keeps its rendered-tail fallback and is not given a parent
 # turn-end hook. Cursor's transcript binding is written for a secondmate the same way
-# as for a crewmate. Muse, gemini, agy, devin, rovo, and dsh are refused as secondmates.
+# as for a crewmate, and a dsh secondmate's busy verdict reads its bound session log the
+# same way. Muse, gemini, agy, devin, and rovo are refused as secondmates.
 # A raw launch command for a claude, pi, pi-signed, or omp secondmate is not armed
 # and retires any arm an earlier launch of that mate left, so its verdict is unknown:
 # the raw command carries no --settings or -e flag to load the wiring.
@@ -2962,8 +2965,14 @@ launch_template() {
   # real git identity file and no-mistakes home, resolved by the pane shell before
   # HOME changes, so a commit keeps its author and the worker still reaches the
   # shared daemon; every other HOME-relative tool state is absent on purpose.
+  # A secondmate's native plugin submits the brief after its session-start
+  # digest, and its own spawns stage from the operator's DSH install.
   dsh)
-    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+    if [ "$kind" = secondmate ]; then
+      printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh FM_DSH_SOURCE_HOME=__DSHSOURCE__ GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ FM_DSH_OPENING_PROMPT="$( __OPINPUT__ encode launch-brief < __BRIEF__)" __DSHBIN__ --patch __DSHPATCH__'
+    else
+      printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+    fi
     ;;
   # omp (Oh My Pi), a Pi fork. Same one-positional-brief, --model, --thinking,
   # and -e shape as Pi, verified on omp 18.1.11. The differences are all at
@@ -3220,6 +3229,12 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
       esac
     fi
   fi
+fi
+if [ "$RAW_LAUNCH" = 0 ] && [ -z "$ARG3" ] && [ "$HARNESS" = dsh ] && { [ -z "$MODEL" ] || [ "$MODEL" = default ]; }; then
+  MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) || {
+    echo "error: the dsh harness from config/crew-harness, config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness" >&2
+    exit 1
+  }
 fi
 if { [ -n "$MODEL" ] && [ "$MODEL" != default ]; } || { [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; }; then
   SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
@@ -5615,7 +5630,8 @@ agy_spawn_fail() {  # <detail>
   rovo_endpoint_cleanup
 }
 
-# dsh-tui submits the brief as its opening prompt, so its own durable session
+# dsh-tui (or, for a secondmate, its native plugin after the session-start
+# digest) submits the brief as its opening prompt, so its own durable session
 # log is the start proof: a turn opening (busy) or already finishing (idle)
 # both mean the brief reached the agent. A resumed launch already holds the
 # earlier conversation, so only a turn that started beyond DSH_START_POSITION,
@@ -7004,16 +7020,20 @@ dsh)
       DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" 2>/dev/null) || DSH_RUNTIME=
     fi
   fi
+  # Inside a DSH primary or secondmate DSH_HOME is that session's private
+  # runtime; FM_DSH_SOURCE_HOME keeps naming the operator's installed DSH.
+  DSH_SOURCE_HOME=${FM_DSH_SOURCE_HOME:-${DSH_HOME:-$HOME/.dsh}}
   if [ -z "$DSH_RUNTIME" ]; then
     if [ "$KIND" = secondmate ]; then
-      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare-primary "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT" "$FM_ROOT") || exit 1
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare-primary "$STATE_REAL" "$ID" "$SPAWN_GEN" "$DSH_SOURCE_HOME" "$MODEL" "$EFFORT" "$WT" "$FM_ROOT") || exit 1
     else
-      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT") || exit 1
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "$DSH_SOURCE_HOME" "$MODEL" "$EFFORT" "$WT") || exit 1
     fi
   fi
   DSH_START_POSITION=$(python3 "$SCRIPT_DIR/fm-dsh.py" position "$STATE_REAL" "$ID") || exit 1
   LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}
   LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
+  LAUNCH=${LAUNCH//__DSHSOURCE__/"$(shell_quote "$DSH_SOURCE_HOME")"}
   LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}
   LAUNCH=${LAUNCH//__DSHPATH__/"$(shell_quote "$PATH")"}
   LAUNCH=${LAUNCH//__DSHBIN__/"$(shell_quote "$DSH_BIN")"}
