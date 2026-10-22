@@ -1,0 +1,64 @@
+
+=== [base] S1 log 50 actions in one step, then acknowledge with no read in between
+$ fm-wake-drain.sh            [presents 50 overdue rows] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-open-loops.sh action ROW escalated x50 (one call per row)   [50 escalations] exit=0 recorded=50/50 snapshot_reads=50 wall=14.86s
+$ fm-wake-drain.sh --ack-through 0 ...   [clear the queue] exit=0 -> ACCEPTED
+
+=== [base] S2 log 50 actions, re-read the queue (drain + --check-actions), then acknowledge
+$ fm-wake-drain.sh            [presents 50 overdue rows] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-open-loops.sh action ROW escalated x50 (one call per row)   [50 escalations] exit=0 recorded=50/50 snapshot_reads=50 wall=15.01s
+$ fm-wake-drain.sh            [re-read to find the ack command] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-open-loops.sh --check-actions   [read-only check] exit=1 rows_listed=50
+$ fm-wake-drain.sh --ack-through 0 ...   [clear the queue after reads] exit=1 -> REFUSED |   "row-49","firstmate","job:question-49","obtain decision",7230,"decision pending",false
+
+=== [base] S3 refused acknowledgement does not reset recorded progress
+$ fm-wake-drain.sh            [presents 10 rows] exit=0 overdue_rows_shown=10 ack_required=yes
+$ fm-open-loops.sh action row-0..row-4 escalated   (5 of 10 recorded)
+$ fm-wake-drain.sh --ack-through 0 ...   [ack with 5 missing (must refuse)] exit=1 -> REFUSED |   "row-9","firstmate","job:question-9","obtain decision",7230,"decision pending",false
+$ fm-open-loops.sh --check-actions   [after refused ack: only the 5 unactioned rows should be listed] exit=1 rows_listed=5
+$ fm-open-loops.sh action row-5..row-9 escalated   (remaining 5 recorded, first 5 NOT re-recorded)
+$ fm-wake-drain.sh --ack-through 0 ...   [ack after finishing the rest] exit=0 -> ACCEPTED
+
+=== [base] S4 unchanged firstmate-owned escalations stand next turn, re-required after 4 h
+$ fm-wake-drain.sh            [turn 1 presents 50] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-open-loops.sh action ROW escalated x50 (one call per row)   [turn 1 actions] exit=0 recorded=50/50 snapshot_reads=50 wall=14.80s
+$ fm-wake-drain.sh            [turn 1 re-read] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-wake-drain.sh --ack-through 0 ...   [turn 1 ack] exit=1 -> REFUSED |   "row-49","firstmate","job:question-49","obtain decision",7290,"decision pending",false
+$ fm-wake-drain.sh            [turn 2 at +1h, rows unchanged] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-wake-drain.sh --ack-through 0 ...   [turn 2 ack with no new actions] exit=1 -> REFUSED |   "row-49","firstmate","job:question-49","obtain decision",10890,"decision pending",false
+$ fm-wake-drain.sh            [turn 3 at +4h02m] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-wake-drain.sh --ack-through 0 ...   [turn 3 ack with no new actions (must refuse: 4h bound)] exit=1 -> REFUSED |   "row-49","firstmate","job:question-49","obtain decision",21810,"decision pending",false
+
+=== [base] S5 gate still refuses missing actions; bad batch lines refuse alone
+$ fm-wake-drain.sh            [presents 50] exit=0 overdue_rows_shown=50 ack_required=yes
+$ fm-open-loops.sh --check-actions   [row-49 has no action] exit=1 rows_listed=1
+    listed: row-49
+$ fm-wake-drain.sh --ack-through 0 ...   [ack with row-49 missing (must refuse)] exit=1 -> REFUSED |   "row-49","firstmate","job:question-49","obtain decision",21810,"decision pending",false
+$ fm-wake-drain.sh --ack-through 0 ...   [ack after row-49 recorded] exit=0 -> ACCEPTED
+
+=== [base] S6 a changed row (new evidence text) voids the old receipt
+$ fm-wake-drain.sh            [presents row-0] exit=0 overdue_rows_shown=1 ack_required=yes
+   (heartbeat republishes row-0 with different evidence)
+$ fm-open-loops.sh --check-actions   [changed row (must refuse)] exit=0 rows_listed=0
+$ fm-wake-drain.sh --ack-through 0 ...   [ack on changed row (must refuse)] exit=0 -> ACCEPTED
+
+=== [base] S7 review_pass_not_merged row needs a new action every turn
+$ fm-wake-drain.sh            [turn 1] exit=0 overdue_rows_shown=1 ack_required=yes
+$ fm-wake-drain.sh            [re-read in turn 1] exit=0 overdue_rows_shown=1 ack_required=yes
+$ fm-wake-drain.sh --ack-through 0 ...   [turn 1 ack] exit=1 -> REFUSED |   "row-0","firstmate","job:question-0","obtain decision",21810,"decision pending",false
+$ fm-wake-drain.sh            [turn 2] exit=0 overdue_rows_shown=1 ack_required=yes
+$ fm-wake-drain.sh --ack-through 0 ...   [turn 2 ack without new action (must refuse)] exit=1 -> REFUSED |   "row-0","firstmate","job:question-0","obtain decision",21870,"decision pending",false
+
+=== [base] S8 a second deferral is refused and needs real follow-up
+$ fm-wake-drain.sh            [turn 1] exit=0 overdue_rows_shown=1 ack_required=yes
+$ fm-open-loops.sh action row-0 deferred   exit=0
+$ fm-wake-drain.sh --ack-through 0 ...   [turn 1 ack] exit=0 -> ACCEPTED
+$ fm-open-loops.sh action row-0 deferred (2nd)   exit=1 | error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+$ fm-open-loops.sh --check-actions   [after 2nd deferral (must refuse)] exit=1 rows_listed=1
+
+=== [base] S9 stalled worker: pane timer tick keeps the action; a real change voids it
+$ fm-wake-drain.sh            [presents stalled row] exit=0 overdue_rows_shown=1 ack_required=yes
+   (heartbeat: evidence -> 'Running lint… (3m 13s · esc to interrupt); 3660s without progress')
+$ fm-open-loops.sh --check-actions   [timer ticked] exit=0 rows_listed=0
+   (heartbeat: evidence -> 'Running tests… (3m 13s · esc to interrupt); 3660s without progress')
+$ fm-open-loops.sh --check-actions   [different task] exit=0 rows_listed=0
