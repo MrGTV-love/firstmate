@@ -1862,7 +1862,7 @@ test_portable_parallel_lanes_stay_duration_balanced() {
 }
 
 test_portable_parallel_lanes_run_bounded_and_concurrently() {
-  local out jobs makespan budget mismatch rc
+  local out jobs makespan budget
   out=$("$RUNNER" --check-coverage)
   jobs=$(printf '%s\n' "$out" | sed -n 's/.*parallel_jobs=\([0-9]*\).*/\1/p')
   makespan=$(printf '%s\n' "$out" | sed -n 's/.*parallel_makespan_ms=\([0-9]*\).*/\1/p')
@@ -1878,16 +1878,40 @@ test_portable_parallel_lanes_run_bounded_and_concurrently() {
   [ "$makespan" -gt 0 ] || fail "parallel_makespan_ms must be a positive modeled duration, got $makespan"
   [ "$makespan" -le "$budget" ] \
     || fail "modeled parallel makespan ${makespan}ms exceeds the ${budget}ms budget"
-  # The lane takes the modeled count by default and refuses any other explicit
-  # count, so CI cannot run a width the budget was not computed for.
-  "$RUNNER" --list --lane portable-parallel-1 >/dev/null 2>&1 \
-    || fail "a portable parallel lane must run at the modeled count without an explicit --jobs"
-  mismatch=$((jobs + 1))
-  rc=0
-  "$RUNNER" --list --lane portable-parallel-1 --jobs "$mismatch" >/dev/null 2>&1 || rc=$?
-  [ "$rc" -ne 0 ] \
-    || fail "a portable parallel lane must refuse --jobs $mismatch when the model budget is computed at $jobs"
-  pass "portable parallel lanes run bounded by a modeled makespan at a proved width"
+  pass "portable parallel lanes are bounded by a modeled makespan at the CI job count"
+}
+
+# The makespan model packs a lane longest-first over its parallel hints, so the
+# concurrent run must start the lane's scripts in that same order. Run the real
+# lane at the modeled job count in a fixture checkout and compare the order the
+# runner dispatched them in against its own --list-scheduled output.
+test_portable_parallel_run_order_matches_list_scheduled() {
+  local tmp repo runner jobs lane script
+  tmp=$(fm_test_tmproot fm-test-run-parallel-order)
+  repo="$tmp/repo"
+  runner="$repo/bin/fm-test-run.sh"
+  jobs=$("$RUNNER" --check-coverage | sed -n 's/.*parallel_jobs=\([0-9]*\).*/\1/p')
+  [ -n "$jobs" ] || fail "coverage guard must report parallel_jobs"
+  mkdir -p "$repo/bin" "$repo/tests"
+  cp "$RUNNER" "$runner"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  for lane in portable-parallel-1 portable-parallel-2; do
+    while IFS= read -r script; do
+      printf '#!/usr/bin/env bash\necho "ok - %s"\n' "$script" >"$repo/$script"
+      chmod +x "$repo/$script"
+    done < <("$RUNNER" --list --lane "$lane")
+  done
+  for lane in portable-parallel-1 portable-parallel-2; do
+    "$runner" --list-scheduled --lane "$lane" >"$tmp/$lane.scheduled" \
+      || fail "--list-scheduled --lane $lane failed"
+    FM_TEST_KEY_SLOTS=0 "$runner" --lane "$lane" --jobs "$jobs" >"$tmp/$lane.out" 2>"$tmp/$lane.err" \
+      || { cat "$tmp/$lane.out" "$tmp/$lane.err"; fail "$lane must run at --jobs $jobs"; }
+    awk '$1 == "FM_TEST_BEGIN" { print $3 }' "$tmp/$lane.out" >"$tmp/$lane.started"
+    cmp -s "$tmp/$lane.scheduled" "$tmp/$lane.started" \
+      || fail "$lane at --jobs $jobs must start scripts in its --list-scheduled order"$'\n'"$(diff "$tmp/$lane.scheduled" "$tmp/$lane.started" || true)"
+  done
+  rm -rf "$tmp"
+  pass "portable parallel lanes start their scripts in the order the makespan model packs"
 }
 
 test_portable_serial_shards_partition_the_serial_lane() {
@@ -1937,7 +1961,7 @@ test_portable_serial_shards_partition_the_serial_lane() {
 }
 
 test_portable_serial_hint_coverage_is_reported_and_bounded() {
-  local out serial unhinted max budget
+  local out serial unhinted max budget indivisible
   # Shards are packed from measured duration hints, so an unmeasured script is
   # placed on a guess. Enough of them and the partition still looks balanced by
   # script count while one shard carries far more real work than another and
@@ -1969,10 +1993,11 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   [ "$budget" -eq 1200000 ] || fail "serial packing target must stay at twenty minutes, got ${budget}ms"
   [ "$max" -gt 0 ] || fail "largest serial shard must be a positive duration, got $max"
   # The target bounds packing, not an unsplittable suite: a shard may exceed it
-  # only when one script alone is that large.
-  [ "$max" -le "$budget" ] || [ "$max" -le "$indivisible" ] \
-    || fail "largest serial shard packs ${max}ms above the ${budget}ms target and beyond the ${indivisible}ms biggest script"
-  pass "coverage guard bounds the unmeasured share and bounds serial packing by the target or one indivisible script"
+  # only when it holds one script alone, so the largest shard is then exactly the
+  # largest single script.
+  [ "$max" -le "$budget" ] || [ "$max" -eq "$indivisible" ] \
+    || fail "largest serial shard packs ${max}ms above the ${budget}ms target and is not the ${indivisible}ms largest script alone"
+  pass "coverage guard bounds the unmeasured share and bounds serial packing by the target or one script alone"
 }
 
 test_portable_serial_packing_budget_boundary() {
@@ -1990,18 +2015,22 @@ test_portable_serial_packing_budget_boundary() {
     assert_contains "$out" "serial_indivisible_ms=${weight}" "fixture did not report the indivisible floor"
   done
 
-  # Two heavy scripts that can only share one shard: the excess is packing, not
-  # indivisibility, so the guard must refuse it even though either script alone
-  # would have been tolerated.
-  shard_fixture_init "$repo" 1200000
-  sed -i.bak 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' "$repo/bin/fm-test-run.sh"
-  sed -i.bak 's/^tests\/fm-teardown\.test\.sh 1$/tests\/fm-teardown.test.sh 1200000/' "$repo/bin/fm-test-run.sh"
+  # Three shards: the 1500000 ms script fills one alone, two of the three
+  # 700000 ms scripts must share another, and that 1400000 ms shard is packing.
+  # The lane's larger single script elsewhere must not license it.
+  shard_fixture_init "$repo" 1500000
+  sed -i.bak \
+    -e 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=3/' \
+    -e 's/^tests\/fm-teardown\.test\.sh 1$/tests\/fm-teardown.test.sh 700000/' \
+    -e 's/^tests\/fm-watch-triage-waits\.test\.sh 1$/tests\/fm-watch-triage-waits.test.sh 700000/' \
+    -e 's/^tests\/fm-watcher-lock\.test\.sh 1$/tests\/fm-watcher-lock.test.sh 700000/' \
+    "$repo/bin/fm-test-run.sh"
   out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
-  expect_code 1 "$rc" "a shard carrying two indivisible-sized scripts must be refused"
-  assert_contains "$out" "exceeds the biggest single script" \
-    "packing refusal did not name the indivisible floor it passed"
+  expect_code 1 "$rc" "a multi-script shard above the target must be refused beside a larger lone script"
+  assert_contains "$out" "packs 1400000ms above the 1200000ms target and beyond its own largest script (700000ms)" \
+    "packing refusal did not name the shard's own largest script"
   assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
-  pass "serial packing accepts an indivisible script above the target and refuses two in one shard"
+  pass "serial packing accepts one script alone above the target and refuses a packed shard beside it"
 }
 
 # The serial shard lists are computed again for every shard and for the whole
@@ -3005,6 +3034,7 @@ test_list_scheduled_non_lane_selections_use_serial_weights
 test_portable_shard_union_and_coverage_guard
 test_portable_parallel_lanes_stay_duration_balanced
 test_portable_parallel_lanes_run_bounded_and_concurrently
+test_portable_parallel_run_order_matches_list_scheduled
 test_portable_serial_shards_partition_the_serial_lane
 test_portable_serial_hint_coverage_is_reported_and_bounded
 test_portable_serial_packing_budget_boundary
