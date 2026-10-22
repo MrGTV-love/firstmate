@@ -51,14 +51,12 @@ wait_gone() { # <pid> <seconds>
   ! alive "$pid"
 }
 
-# Wait up to <seconds> for <pid> to have a live child; 0 when it does.
+has_child() { [ -n "$(pgrep -P "$1" 2>/dev/null || true)" ]; }
+
+# Wait up to <seconds> for <pid> to have a live child; 0 when it does. The wait
+# polls through fm_test_wait_until, which tests its condition before any clock.
 wait_child() { # <pid> <seconds>
-  local pid=$1 deadline=$(( $(date +%s) + $2 ))
-  while [ "$(date +%s)" -lt "$deadline" ]; do
-    [ -n "$(pgrep -P "$pid" 2>/dev/null || true)" ] && return 0
-    sleep 0.1
-  done
-  return 1
+  fm_test_wait_until "$2" has_child "$1"
 }
 
 # True when <pid>'s parent is a reaper for orphaned processes: init itself, or
@@ -77,12 +75,7 @@ is_orphaned() { # <pid>
 # Wait up to <seconds> for <pid> to be reparented to an orphan reaper (see
 # is_orphaned) after its launching shell exits; 0 when it does.
 wait_orphaned() { # <pid> <seconds>
-  local pid=$1 deadline=$(( $(date +%s) + $2 ))
-  while [ "$(date +%s)" -lt "$deadline" ]; do
-    is_orphaned "$pid" && return 0
-    sleep 0.1
-  done
-  return 1
+  fm_test_wait_until "$2" is_orphaned "$1"
 }
 
 # --- a real worker fixture, launched exactly the way fm-on's Linux start does -
@@ -119,15 +112,15 @@ start_worker() {
     . "$ROOT/bin/fm-remote-job-lib.sh"
     fm_remote_job_start_linux_worker "$root" "$account_home" >&2 || exit 1
     deadline=$(( $(date +%s) + 10 ))
-    while [ "$(date +%s)" -lt "$deadline" ]; do
+    while :; do
       pid=$(pgrep -f "^/bin/bash $root/bin/fm-remote-job-worker.sh\$" | head -n 1)
       if pid_is_numeric "$pid"; then
         printf '%s\n' "$pid"
         exit 0
       fi
+      [ "$(date +%s)" -lt "$deadline" ] || exit 1
       sleep 0.1
     done
-    exit 1
   ) || return 1
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
   printf '%s\n' "$pid"

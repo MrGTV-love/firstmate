@@ -38,15 +38,15 @@ trap reap_cleanup EXIT
 initialized_identity() {
   local pid=$1 command deadline=$((SECONDS + 5))
   shift
-  while [ "$SECONDS" -lt "$deadline" ]; do
+  while :; do
     command=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o command= 2>/dev/null) || return 1
     if [ "$command" = "$*" ]; then
       fm_test_pid_identity "$pid"
       return
     fi
+    [ "$SECONDS" -lt "$deadline" ] || return 1
     sleep 0.05
   done
-  return 1
 }
 
 track() {
@@ -68,22 +68,16 @@ alive() {
   [ "$current" = "$identity" ]
 }
 
-wait_gone() { # <pid> <seconds>
-  local pid=$1 deadline=$(( $(date +%s) + $2 )) identity=${3:-}
-  while [ "$(date +%s)" -lt "$deadline" ]; do
-    alive "$pid" "$identity" || return 0
-    sleep 0.1
-  done
-  return 1
+# Both waits poll through fm_test_wait_until, which tests its condition before it
+# reads any clock, so a short window can never end without one real look.
+gone() { ! alive "$@"; }
+
+wait_gone() { # <pid> <seconds> [identity]
+  fm_test_wait_until "$2" gone "$1" "${3:-}"
 }
 
 wait_file() { # <file> <seconds>
-  local file=$1 deadline=$(( $(date +%s) + $2 ))
-  while [ "$(date +%s)" -lt "$deadline" ]; do
-    [ -s "$file" ] && return 0
-    sleep 0.05
-  done
-  return 1
+  fm_test_wait_until "$2" test -s "$1"
 }
 
 # A stub that waits for a release file, bounded as every polling stub must be.
