@@ -296,5 +296,9 @@ Inside `tests/fm-remote-secondmate-lifecycle-e2e.test.sh`, the remote recovery w
 It still requires a successful relaunch, exactly one captain-facing wake, the durable wake and relaunch records, a fresh live remote endpoint, and the preserved host route.
 This fixes the former 30-second observation window, which could stop a healthy relaunch before its own deadline; it does not change production relaunch bounds or CI job timeouts.
 
+The same test's three waits for a deliberately held point behind a chain of remote jobs (the spawn and config-push inheritance writes and the respawn launch) carry no elapsed-time cap.
+That chain takes about 25 seconds in a two-core container and scales with the runner, so a 30-second cap was reached on the Ubuntu 26.04 runners with the product healthy.
+Each wait still fails at once when the process it waits on exits first; a stalled remote job is bounded by the remote job timeouts and the CI step limit above.
+
 [`tests/fm-ci-workflow.test.sh`](../tests/fm-ci-workflow.test.sh) holds the policy against the parsed workflow: every job belongs to exactly one tier, the workflow carries exactly three distinct job-level values, the fast tier stays within 5-10 minutes, the normal jobs share one 60-minute budget, and the Herdr family-run step is the 60-minute tripwire below its 120-minute job backstop with an `always()` teardown after it.
 A passing coverage guard does not establish a healthy job duration; refresh the healthy figures above from the lanes' uploaded timing artifacts.
