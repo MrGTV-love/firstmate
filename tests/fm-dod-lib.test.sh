@@ -99,6 +99,7 @@ EOF
   assert_not_contains "$plan" 'Firstmate-only build constraints' 'plan included mixed Firstmate specification'
   assert_not_contains "$plan" 'This grading prose' 'plan included the grading section'
   assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
+  assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
 
   printf '# Task\nLegacy task.\n' > "$brief"
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy plan crashed'
