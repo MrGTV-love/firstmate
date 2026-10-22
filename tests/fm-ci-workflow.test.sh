@@ -249,6 +249,19 @@ RUBY
   pass "CI matrices cover every executable serial lane and canonical lint root exactly once"
 }
 
+test_parallel_lanes_pass_the_modeled_job_count() {
+  local jobs lane
+  jobs=$(bin/fm-test-run.sh --check-coverage 2>/dev/null \
+    | sed -n 's/.*parallel_jobs=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$jobs" ] || fail "the runner did not report parallel_jobs, so CI cannot be checked against the model"
+  [ "$jobs" -gt 1 ] || fail "parallel_jobs must be greater than one, got $jobs"
+  for lane in portable-parallel-1 portable-parallel-2; do
+    grep -qF -- "--lane $lane --jobs $jobs" .github/workflows/ci.yml \
+      || fail "ci.yml must run $lane with --jobs $jobs, the count the makespan budget is modeled at"
+  done
+  pass "both portable parallel jobs pass the modeled concurrency the budget is computed for"
+}
+
 test_ci_matrices_match_executable_partitions
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
@@ -258,3 +271,4 @@ test_every_job_belongs_to_exactly_one_timeout_tier
 test_fast_tier_shares_one_short_tripwire
 test_normal_tier_shares_one_budget
 test_heavy_tier_keeps_a_step_tripwire_under_a_job_backstop
+test_parallel_lanes_pass_the_modeled_job_count

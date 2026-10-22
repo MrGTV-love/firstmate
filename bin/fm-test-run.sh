@@ -179,7 +179,7 @@
 # share a machine. This script owns <n>: a lane whose <n> disagrees with the
 # configured shard count is refused, so a CI matrix cannot silently drop a shard.
 # --check-coverage also reports serial_max_ms (largest packed hint sum, including
-# default weights) and serial_budget_ms (the 25-minute packing target, 1500000 ms), refusing
+# default weights) and serial_budget_ms (the 20-minute packing target), refusing
 # a split above that target. Neither figure is an execution timeout or proof of
 # observed headroom: refresh growing files from CI measurements.
 # --changed is conservative: it over-selects related families rather than
@@ -253,6 +253,23 @@ PROGRESS_GUARD=0
 # One owner: CI lane names carry this count and are refused when they disagree.
 PORTABLE_SERIAL_SHARDS=18
 
+# How many scripts each portable-parallel job runs at once. The lane membership
+# is exactly the proven-isolated set, and docs/fm-test-isolation-proof.md records
+# that set passing under four-way concurrency, so these lanes were always safe to
+# run wider than one and ran one at a time only because no lane asked. Three
+# leaves a core for the runner itself on the four-vCPU CI image; the coverage
+# guard models the resulting makespan and refuses a lane above its budget, and
+# tests/fm-ci-workflow.test.sh refuses a CI matrix that does not pass this count.
+PORTABLE_PARALLEL_JOBS=3
+
+# Modeled makespan budget for one portable-parallel job at the count above.
+# Measured on the 26.04 image the two lanes finish inside it with margin; the
+# budget exists so a new member or a slow path fails the coverage guard instead
+# of quietly stretching the workflow. Like the serial target this is packing
+# arithmetic, not an execution timeout.
+# measured: value=900000 date=2026-10-21 host=github-ubuntu-26.04 margin=1.22 (modeled makespan 737853 ms at three jobs; a four-vCPU A/B measured 2.1x speedup at three-at-a-time with about 5 percent per-script inflation)
+PORTABLE_PARALLEL_MAX_MSPAN_MS=900000
+
 # Conservative balance hint for a portable-serial script with no measurement.
 # Rounded above the current CI mean, including the capability-skipped scripts.
 PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
@@ -260,11 +277,13 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # Packing target, not an execution timeout: it stays far inside the 60-minute
 # normal CI tier so setup and runtime variance on a loaded runner never reach
 # the job cap. --check-coverage refuses a modeled serial shard above this
-# target; refresh hints or rebalance instead. It must stay above the largest
-# indivisible script, so this is a floor no partition can pack under, not a
-# slack allowance for a badly balanced shard.
-# measured: value=1500000 date=2026-10-21 host=github-ubuntu-26.04 margin=1.05 (largest indivisible serial suite: tests/fm-watch-triage-waits.test.sh at 1433371 ms in run 39656115805)
-PORTABLE_SERIAL_MAX_WEIGHT_MS=1500000
+# target unless one script alone exceeds it, because a single indivisible suite
+# sets a floor no partition can pack under and raising the target for everyone
+# would also license a genuinely lopsided shard. The guard reports that floor as
+# serial_indivisible_ms and still refuses a shard larger than the biggest single
+# script, so packing quality stays enforced while an unsplittable suite is named
+# rather than paid for by a policy change.
+PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
 # Hints are what keep the shards balanced, so once too much of the lane is
@@ -1082,6 +1101,36 @@ portable_serial_lane_weight() {
   ' <(portable_serial_weight_hints) -
 }
 
+# Longest-processing-time makespan for one portable-parallel lane at <jobs>
+# concurrent scripts, printing "<makespan_ms> <scripts>". The selection arrives
+# on stdin and the hints come from portable_parallel_weight_hints, so the model
+# moves with the same weights the lanes are composed from. A lane runs its
+# scripts independently, but they share the runner's CPU, which is why the model
+# packs the hinted work over <jobs> bins rather than adding it up.
+portable_parallel_lane_makespan() {  # <jobs>
+  local jobs=$1
+  awk -v jobs="$jobs" -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+    NR == FNR { if (NF) { hint[$1] = $2 }; next }
+    NF { v[++n] = ($1 in hint) ? hint[$1] : def }
+    END {
+      if (jobs < 1) jobs = 1
+      for (i = 2; i <= n; i++) {
+        key = v[i]; j = i - 1
+        while (j > 0 && v[j] < key) { v[j + 1] = v[j]; j-- }
+        v[j + 1] = key
+      }
+      for (i = 1; i <= n; i++) {
+        target = 1
+        for (b = 2; b <= jobs; b++) if (bin[b] < bin[target]) target = b
+        bin[target] += v[i]
+      }
+      makespan = 0
+      for (b = 1; b <= jobs; b++) if (bin[b] > makespan) makespan = bin[b]
+      printf "%d %d\n", makespan, n
+    }
+  ' <(portable_parallel_weight_hints) -
+}
+
 portable_parallel_weight_for() {
   local want=$1 ms
   ms=$(portable_parallel_weight_hints | awk -v want="$want" '$1 == want { print $2; exit }')
@@ -1335,8 +1384,16 @@ run_coverage_guard() {
     return 1
   fi
 
-  if [ "$serial_max_ms" -gt "$PORTABLE_SERIAL_MAX_WEIGHT_MS" ]; then
-    log "coverage guard: largest portable serial shard packs ${serial_max_ms}ms above the ${PORTABLE_SERIAL_MAX_WEIGHT_MS}ms target"
+  # A single suite cannot be split by packing, so its own hint is the floor any
+  # partition carries. Anything above that floor is packing, not indivisibility.
+  serial_indivisible_ms=$(awk -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
+    NR == FNR { if (NF) { hint[$1] = $2 }; next }
+    NF { ms = ($1 in hint) ? hint[$1] : def; if (ms > max) max = ms }
+    END { print max + 0 }
+  ' <(portable_serial_weight_hints) "$tmp/serial")
+  if [ "$serial_max_ms" -gt "$PORTABLE_SERIAL_MAX_WEIGHT_MS" ] \
+    && [ "$serial_max_ms" -gt "$serial_indivisible_ms" ]; then
+    log "coverage guard: largest portable serial shard packs ${serial_max_ms}ms above the ${PORTABLE_SERIAL_MAX_WEIGHT_MS}ms target and exceeds the biggest single script (${serial_indivisible_ms}ms), so the excess is packing"
     log "refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md"
     rm -rf "$tmp"
     return 1
@@ -1361,17 +1418,36 @@ run_coverage_guard() {
   parallel_imbalance_ms=$((p1_ms - p2_ms))
   [ "$parallel_imbalance_ms" -ge 0 ] || parallel_imbalance_ms=$((-parallel_imbalance_ms))
 
-  printf 'FM_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s herdr=%s\n' \
+  # The serial target bounds a shard's hinted work. A parallel job runs several
+  # scripts beside each other, so its bound is a modeled makespan at the job
+  # count CI actually passes: without this the lanes carrying the proven set were
+  # the only jobs with no duration bound at all.
+  read -r p1_makespan_ms _ <<<"$(list_portable_parallel_1 | portable_parallel_lane_makespan "$PORTABLE_PARALLEL_JOBS")"
+  read -r p2_makespan_ms _ <<<"$(list_portable_parallel_2 | portable_parallel_lane_makespan "$PORTABLE_PARALLEL_JOBS")"
+  parallel_makespan_ms=$p1_makespan_ms
+  [ "$p2_makespan_ms" -le "$parallel_makespan_ms" ] || parallel_makespan_ms=$p2_makespan_ms
+  if [ "$parallel_makespan_ms" -gt "$PORTABLE_PARALLEL_MAX_MSPAN_MS" ]; then
+    log "coverage guard: portable parallel shard models a ${parallel_makespan_ms}ms makespan at ${PORTABLE_PARALLEL_JOBS} jobs, above the ${PORTABLE_PARALLEL_MAX_MSPAN_MS}ms budget"
+    log "move the heaviest member to the lighter lane or raise --jobs; do not let the lanes run unbounded: docs/fm-test-portable-shards.md"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  printf 'FM_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s parallel_jobs=%s parallel_makespan_ms=%s parallel_budget_ms=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s serial_indivisible_ms=%s herdr=%s\n' \
     "$(wc -l <"$tmp/all" | tr -d ' ')" \
     "$(wc -l <"$tmp/shards_union" | tr -d ' ')" \
     "$parallel_max_ms" \
     "$parallel_imbalance_ms" \
     "$((p1_unhinted + p2_unhinted))" \
+    "$PORTABLE_PARALLEL_JOBS" \
+    "$parallel_makespan_ms" \
+    "$PORTABLE_PARALLEL_MAX_MSPAN_MS" \
     "$(wc -l <"$tmp/serial" | tr -d ' ')" \
     "$PORTABLE_SERIAL_SHARDS" \
     "$unhinted" \
     "$serial_max_ms" \
     "$PORTABLE_SERIAL_MAX_WEIGHT_MS" \
+    "$serial_indivisible_ms" \
     "$(wc -l <"$tmp/herdr" | tr -d ' ')"
   rm -rf "$tmp"
   return 0
@@ -2438,6 +2514,23 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+# A portable-parallel lane is exactly the proven-isolated set, so it runs at the
+# modeled job count unless the caller names one. An explicit count that differs
+# from the modeled one is refused: the makespan budget the coverage guard checks
+# is computed for that count, and letting CI choose another would validate a
+# model nobody runs.
+if [ "$MODE" = lane ]; then
+  case "$LANE" in
+    portable-parallel-*)
+      if [ "$JOBS_EXPLICIT" -eq 0 ]; then
+        JOBS=$PORTABLE_PARALLEL_JOBS
+      elif [ "$JOBS" -ne "$PORTABLE_PARALLEL_JOBS" ]; then
+        die "--jobs $JOBS refused for $LANE: the modeled makespan budget is computed at PORTABLE_PARALLEL_JOBS=$PORTABLE_PARALLEL_JOBS; change that constant instead"
+      fi
+      ;;
+  esac
+fi
 
 if [ "$LIST_FAMILIES" -eq 1 ]; then
   list_known_families

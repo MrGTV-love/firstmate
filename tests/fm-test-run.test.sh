@@ -1861,6 +1861,35 @@ test_portable_parallel_lanes_stay_duration_balanced() {
   pass "portable parallel lanes are fully hinted and packed within 5% of each other"
 }
 
+test_portable_parallel_lanes_run_bounded_and_concurrently() {
+  local out jobs makespan budget mismatch rc
+  out=$("$RUNNER" --check-coverage)
+  jobs=$(printf '%s\n' "$out" | sed -n 's/.*parallel_jobs=\([0-9]*\).*/\1/p')
+  makespan=$(printf '%s\n' "$out" | sed -n 's/.*parallel_makespan_ms=\([0-9]*\).*/\1/p')
+  budget=$(printf '%s\n' "$out" | sed -n 's/.*parallel_budget_ms=\([0-9]*\).*/\1/p')
+  [ -n "$jobs" ] && [ -n "$makespan" ] && [ -n "$budget" ] \
+    || fail "coverage guard must report parallel_jobs, parallel_makespan_ms, parallel_budget_ms: $out"
+  # These are the only CI jobs whose members run beside each other, so the model
+  # has to bound the makespan the concurrency produces, not the summed hints.
+  [ "$jobs" -gt 1 ] \
+    || fail "portable parallel lanes must run more than one script at a time, got $jobs"
+  [ "$jobs" -le 4 ] \
+    || fail "$jobs exceeds the recorded four-way isolation proof; re-prove the set before running wider"
+  [ "$makespan" -gt 0 ] || fail "parallel_makespan_ms must be a positive modeled duration, got $makespan"
+  [ "$makespan" -le "$budget" ] \
+    || fail "modeled parallel makespan ${makespan}ms exceeds the ${budget}ms budget"
+  # The lane takes the modeled count by default and refuses any other explicit
+  # count, so CI cannot run a width the budget was not computed for.
+  "$RUNNER" --list --lane portable-parallel-1 >/dev/null 2>&1 \
+    || fail "a portable parallel lane must run at the modeled count without an explicit --jobs"
+  mismatch=$((jobs + 1))
+  rc=0
+  "$RUNNER" --list --lane portable-parallel-1 --jobs "$mismatch" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] \
+    || fail "a portable parallel lane must refuse --jobs $mismatch when the model budget is computed at $jobs"
+  pass "portable parallel lanes run bounded by a modeled makespan at a proved width"
+}
+
 test_portable_serial_shards_partition_the_serial_lane() {
   local lanes count serial shard listed union dups shard_lane total cap
   lanes=$("$RUNNER" --list-lanes)
@@ -1935,10 +1964,15 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   budget=$(printf '%s\n' "$out" | sed -n 's/.*serial_budget_ms=\([0-9][0-9]*\).*/\1/p')
   [ -n "$max" ] && [ -n "$budget" ] \
     || fail "coverage summary must carry serial packing and budget: $out"
-  [ "$budget" -eq 1500000 ] || fail "serial packing target must stay at twenty-five minutes, got ${budget}ms"
-  [ "$max" -gt 0 ] && [ "$max" -le "$budget" ] \
-    || fail "largest serial shard packs ${max}ms above the ${budget}ms target"
-  pass "coverage guard bounds the unmeasured share and serial packing within twenty-five minutes"
+  indivisible=$(printf '%s\n' "$out" | sed -n 's/.*serial_indivisible_ms=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$indivisible" ] || fail "coverage summary must carry the indivisible-script floor: $out"
+  [ "$budget" -eq 1200000 ] || fail "serial packing target must stay at twenty minutes, got ${budget}ms"
+  [ "$max" -gt 0 ] || fail "largest serial shard must be a positive duration, got $max"
+  # The target bounds packing, not an unsplittable suite: a shard may exceed it
+  # only when one script alone is that large.
+  [ "$max" -le "$budget" ] || [ "$max" -le "$indivisible" ] \
+    || fail "largest serial shard packs ${max}ms above the ${budget}ms target and beyond the ${indivisible}ms biggest script"
+  pass "coverage guard bounds the unmeasured share and bounds serial packing by the target or one indivisible script"
 }
 
 test_portable_serial_packing_budget_boundary() {
@@ -1946,22 +1980,28 @@ test_portable_serial_packing_budget_boundary() {
   tmp=$(fm_test_tmproot fm-test-run-packing-boundary)
   repo="$tmp/repo"
 
-  for weight in 1500000 1500001; do
+  for weight in 1200000 1500000; do
     shard_fixture_init "$repo" "$weight"
     out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
-    if [ "$weight" -eq 1500000 ]; then
-      expect_code 0 "$rc" "packing exactly at the budget must be accepted"
-      assert_contains "$out" "FM_TEST_COVERAGE ok" "boundary coverage did not pass"
-      assert_contains "$out" "serial_max_ms=1500000" "fixture did not pack exactly at the budget"
-      assert_contains "$out" "serial_budget_ms=1500000" "fixture changed the packing budget"
-    else
-      expect_code 1 "$rc" "packing one millisecond above the budget must be refused"
-      assert_contains "$out" "largest portable serial shard packs 1500001ms above the 1500000ms target" \
-        "over-budget refusal did not explain the modeled excess"
-      assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
-    fi
+    expect_code 0 "$rc" "a shard at or above the budget only through one indivisible script must be accepted"
+    assert_contains "$out" "FM_TEST_COVERAGE ok" "boundary coverage did not pass"
+    assert_contains "$out" "serial_max_ms=${weight}" "fixture did not pack the seeded script"
+    assert_contains "$out" "serial_budget_ms=1200000" "fixture changed the packing budget"
+    assert_contains "$out" "serial_indivisible_ms=${weight}" "fixture did not report the indivisible floor"
   done
-  pass "serial packing accepts the exact budget and refuses one millisecond above it"
+
+  # Two heavy scripts that can only share one shard: the excess is packing, not
+  # indivisibility, so the guard must refuse it even though either script alone
+  # would have been tolerated.
+  shard_fixture_init "$repo" 1200000
+  sed -i.bak 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' "$repo/bin/fm-test-run.sh"
+  sed -i.bak 's/^tests\/fm-teardown\.test\.sh 1$/tests\/fm-teardown.test.sh 1200000/' "$repo/bin/fm-test-run.sh"
+  out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
+  expect_code 1 "$rc" "a shard carrying two indivisible-sized scripts must be refused"
+  assert_contains "$out" "exceeds the biggest single script" \
+    "packing refusal did not name the indivisible floor it passed"
+  assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
+  pass "serial packing accepts an indivisible script above the target and refuses two in one shard"
 }
 
 # The serial shard lists are computed again for every shard and for the whole
@@ -2964,6 +3004,7 @@ test_list_scheduled_proven_isolated_uses_serial_weights
 test_list_scheduled_non_lane_selections_use_serial_weights
 test_portable_shard_union_and_coverage_guard
 test_portable_parallel_lanes_stay_duration_balanced
+test_portable_parallel_lanes_run_bounded_and_concurrently
 test_portable_serial_shards_partition_the_serial_lane
 test_portable_serial_hint_coverage_is_reported_and_bounded
 test_portable_serial_packing_budget_boundary
