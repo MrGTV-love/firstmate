@@ -171,6 +171,23 @@ EOF
     *'Captain exclusion A.'*'Spec exclusion B.'*) ;;
     *) fail 'Out of scope subsections were not printed in brief order' ;;
   esac
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+Out of scope: legacy list item one.
+#12 legacy list item two.
+## Firstmate spec
+Keep the existing renderer.
+### Out of scope
+- Keep A.
+#1 priority is B.
+- Keep C.
+EOF
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'hash-led exclusion lines failed'
+  assert_contains "$out" '#12 legacy list item two.' 'a hash-led line ended a legacy exclusion paragraph'
+  assert_contains "$out" '#1 priority is B.' 'a hash-led line ended an Out of scope subsection'
+  assert_contains "$out" '- Keep C.' 'exclusions after a hash-led line were dropped'
   plan=$(cd "$ROOT/bin" && bash fm-dod-lib.sh --verification-plan "$brief" 2>&1) \
     || fail "a relative builder path could not find the shared rubric: $plan"
   assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'a relative builder path lost the rubric'
