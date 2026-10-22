@@ -20,7 +20,10 @@ model's family is derived from its id (any provider route prefix ending in / is
 dropped; the leading name, case-insensitive, selects it) into the closed set
 anthropic, openai, google, deepseek, xai, moonshot, meta (aliases claude, gpt,
 chatgpt, codex, oN, gemini, gemma, grok, kimi, llama) and stored beside the model.
-A model outside them records family unknown, which is never independent.
+A model outside them records family unknown, which is never independent. Reads
+accept any stored known family or unknown; verify derives every family again from
+the stored model ids, so a later family change neither invalidates history nor
+lets a stale stored family decide independence.
 verify accepts the newest captain-word when it names the exact live head; it then
 stands in for the review and every trigger. Otherwise the newest review must be
 PASS at the exact live head with a known reader family outside every known author
@@ -51,6 +54,7 @@ FAMILIES = {"anthropic": "anthropic", "claude": "anthropic",
             "google": "google", "gemini": "google", "gemma": "google",
             "deepseek": "deepseek", "xai": "xai", "grok": "xai",
             "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta"}
+RECORDED_FAMILIES = set(FAMILIES.values()) | {"unknown"}
 
 
 class RecordError(Exception):
@@ -105,8 +109,9 @@ def validate(row):
         return
     if row.get("verdict") not in ("PASS", "FAIL"):
         raise RecordError("verdict must be PASS or FAIL")
-    if model(row.get("reader_model"), "reader_model") != row.get("reader_family"):
-        raise RecordError("reader_family must be derived from reader_model")
+    model(row.get("reader_model"), "reader_model")
+    if row.get("reader_family") not in RECORDED_FAMILIES:
+        raise RecordError("reader_family must be a known family or unknown")
     groups = row.get("author_groups")
     if not isinstance(groups, dict) or not groups:
         raise RecordError("author_groups must map each commit group to non-empty author models")
@@ -115,8 +120,11 @@ def validate(row):
         if not isinstance(authors, list) or not authors:
             raise RecordError("author_groups must contain non-empty author models for every commit group")
         for author in authors:
-            if not isinstance(author, dict) or model(author.get("model"), "author_groups model") != author.get("family"):
-                raise RecordError("author_groups family must be derived from each author model")
+            if not isinstance(author, dict):
+                raise RecordError("author_groups must list author model records")
+            model(author.get("model"), "author_groups model")
+            if author.get("family") not in RECORDED_FAMILIES:
+                raise RecordError("author_groups family must be a known family or unknown")
     for trigger in TRIGGERS:
         if row.get(trigger) not in ("yes", "no"):
             raise RecordError(f"{trigger} must be yes or no")
@@ -186,14 +194,16 @@ def verify(records, head):
         raise RecordError("verdict is FAIL; obtain and record a new PASS with fm-review-record.py review, then retry the merge")
     if review["head"] != head:
         raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
-    unknown = [review["reader_model"]] if review["reader_family"] == "unknown" else []
-    unknown += [a["model"] for authors in review["author_groups"].values() for a in authors if a["family"] == "unknown"]
+    reader = model(review["reader_model"], "reader_model")
+    authors = [(group, a["model"], model(a["model"], "author_groups model"))
+               for group, models in review["author_groups"].items() for a in models]
+    unknown = [review["reader_model"]] if reader == "unknown" else []
+    unknown += [name for _, name, family in authors if family == "unknown"]
     if unknown:
         raise RecordError(f"model family unknown for {', '.join(unknown)}; an unknown family is never independent, so obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
-    for group, authors in review["author_groups"].items():
-        for author in authors:
-            if author["family"] == review["reader_family"]:
-                raise RecordError(f"reader_family {review['reader_family']} ({review['reader_model']}) matches author_groups {group} ({author['model']}); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge")
+    for group, name, family in authors:
+        if family == reader:
+            raise RecordError(f"reader_family {reader} ({review['reader_model']}) matches author_groups {group} ({name}); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge")
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes:
         raise RecordError(f"{', '.join(yes)} is yes but captain-word is missing at live head {head}; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")

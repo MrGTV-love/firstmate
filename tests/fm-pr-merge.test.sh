@@ -3066,6 +3066,30 @@ test_review_record_derives_model_families() {
   pass "review helper derives each family from the exact model id and records unknown otherwise"
 }
 
+test_review_record_survives_a_later_family_change() {
+  local case_dir head url rc
+  case_dir=$(make_case review-family-added-later)
+  : > "$case_dir/explicit-review"
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  add_gh_mocks "$case_dir" "$head"
+  record_review "$case_dir" "$url" "$head" --author-groups '{"all":["kimi-k2"]}' >/dev/null || fail "record kimi-authored PASS"
+  record_review "$case_dir" https://github.com/example/repo/pull/10 "$head" >/dev/null || fail "record another PR's PASS"
+  # Rows written before moonshot joined the closed set stored kimi as unknown.
+  "$JQ_BIN" -c 'if .pr | endswith("/pull/9") then .author_groups.all[0].family = "unknown" else . end' \
+    "$case_dir/state/review-records.jsonl" > "$case_dir/older-ledger" || fail "could not write the older ledger"
+  mv "$case_dir/older-ledger" "$case_dir/state/review-records.jsonl"
+  review_record_command "$case_dir" latest --pr https://github.com/example/repo/pull/10 > "$case_dir/latest" \
+    || fail "a row stored under an older family set must stay valid: $(cat "$case_dir/latest")"
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a family added after the row was stored must let the merge proceed: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  "$JQ_BIN" -se '.[0].author_groups.all[0].family == "unknown"' "$case_dir/state/review-records.jsonl" >/dev/null \
+    || fail "verify must not rewrite stored history"
+  pass "a family added after a row was stored leaves the row valid and verify derives the current family"
+}
+
 test_recorded_review_merge_conditions() {
   local case_dir head url scenario rc expected
   head=1111111111111111111111111111111111111111
@@ -3141,6 +3165,7 @@ test_missing_review_record_refuses() {
 test_missing_review_record_refuses
 test_review_record_validation_and_latest
 test_review_record_derives_model_families
+test_review_record_survives_a_later_family_change
 test_recorded_review_merge_conditions
 test_github_zero_exit_queue_required_refuses_with_exact_retry
 test_github_closed_unqueued_outcome_omits_retry_flags
