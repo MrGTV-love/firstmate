@@ -14,7 +14,7 @@ fail() { printf 'not ok - %s\n' "$1" >&2; cleanup_all; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
 
 wait_for_capture_text() {  # <target> <text> [samples]
-  local target=$1 text=$2 samples=${3:-100} out= pane_state status signal i=0
+  local target=$1 text=$2 samples=${3:-100} out='' pane_state status signal i=0
   while [ "$i" -lt "$samples" ]; do
     # Unlike display-message, list-panes refuses an unresolved window target.
     pane_state=$(tmux list-panes -t "$target" -F '#{pane_dead}:#{pane_dead_status}:#{pane_dead_signal}' 2>/dev/null || true)
