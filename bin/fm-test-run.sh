@@ -175,11 +175,13 @@
 # parallel_unhinted (the number of members missing a parallel hint).
 # These sums exclude unhinted members and are estimates, not measured job wall
 # times. Missing parallel hints are reported without failing this guard.
-# It also reports parallel_jobs (PORTABLE_PARALLEL_JOBS, the concurrency the
-# model assumes and CI passes as --jobs), parallel_makespan_ms (the larger lane's
-# longest-first makespan over the parallel hints at that count) and
-# parallel_budget_ms (PORTABLE_PARALLEL_MAX_MSPAN_MS), refusing a lane whose
-# modeled makespan is above that budget. These are modeled, not observed.
+# It also reports parallel_jobs (PORTABLE_PARALLEL_JOBS, the count CI passes as
+# --jobs), parallel_effective_jobs (the bins the model packs: the smaller of
+# parallel_jobs and PORTABLE_PARALLEL_EFFECTIVE_JOBS), parallel_makespan_ms (the
+# larger lane's longest-first makespan over the parallel hints packed into that
+# many bins) and parallel_budget_ms (PORTABLE_PARALLEL_MAX_MSPAN_MS), refusing a
+# lane whose modeled makespan is above that budget. These are modeled, not
+# observed.
 #
 # portable-serial stays strictly serial. Its CI shards (portable-serial-<k>of<n>)
 # split it across separate runners, so two of its stateful scripts still never
@@ -270,16 +272,31 @@ PORTABLE_SERIAL_SHARDS=20
 # leaves a core for the runner itself on the four-vCPU CI image. CI passes this
 # count as an explicit --jobs, which the proven-isolation admission accepts or
 # refuses like any other count; tests/fm-ci-workflow.test.sh holds the workflow
-# to this value, and the coverage guard models the makespan at it.
+# to this value, and the coverage guard packs min(this, the effective count
+# below) bins.
 PORTABLE_PARALLEL_JOBS=3
 
-# Modeled makespan budget for one portable-parallel job at the count above. No
-# three-wide run on the 26.04 image has been observed yet; the budget exists so a
-# new member or a slow path fails the coverage guard instead of quietly
-# stretching the workflow. Like the serial target this is packing arithmetic,
-# not an execution timeout.
-# measured: value=900000 date=2026-10-21 host=local-four-vcpu-container margin=1.22 (modeled makespan 737853 ms at three jobs from the CI parallel hints; the A/B was a local four-vCPU container, not a CI host, and measured 2.1x speedup at three-at-a-time with about 5 percent per-script inflation)
-PORTABLE_PARALLEL_MAX_MSPAN_MS=900000
+# How many of the scripts above the runner actually runs at full speed. Three
+# are in flight, but a four-vCPU runner saturates before that: the lane that
+# summed 33.5 minutes serially took 20 minutes three abreast, an effective
+# factor near two rather than three, and its per-script wall times rose to a
+# 57.9 minute sum. The makespan model packs min(jobs, this) bins rather than the
+# raw job count, because a model that assumed perfect scaling would pass while
+# the real lane ran a third over its own budget. Raising the job count past
+# this changes neither the model nor the guard.
+# measured: value=2 date=2026-10-22 host=github-ubuntu-26.04 margin=1.0 (lane 1: 33.5 min serial, 57.9 min summed at three abreast, 20 min wall; run 39757092565)
+PORTABLE_PARALLEL_EFFECTIVE_JOBS=2
+
+# Modeled makespan budget for one portable-parallel job. The guard compares this
+# with the modeled makespan, not with wall time, and the model reads about
+# sixteen percent below what the runner measured: the lane that finished in 20
+# minutes on the 26.04 image models at 1004772 ms. So 1200000 ms bounds a real
+# lane near 24 minutes, a fifth above the measured 20 minute lane, and a new
+# member or a slow path fails the coverage guard instead of quietly stretching
+# the workflow. Like the serial target this is packing arithmetic, not an
+# execution timeout.
+# measured: value=1200000 date=2026-10-22 host=github-ubuntu-26.04 margin=1.19 (the slowest parallel lane measured 20 minutes in run 39757092565 and models at 1004772 ms at two bins)
+PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
 # Conservative balance hint for a portable-serial script with no measurement.
 # Rounded above the current CI mean, including the capability-skipped scripts.
@@ -629,35 +646,35 @@ EOF
 # refresh procedure are owned by docs/fm-test-portable-shards.md.
 portable_parallel_weight_hints() {
   cat <<'EOF'
-tests/fm-arm-pretool-check.test.sh 56404
-tests/fm-backend-herdr.test.sh 56549
-tests/fm-brief.test.sh 16147
-tests/fm-captain-hold-archive.test.sh 143236
-tests/fm-captain-hold-cleanup.test.sh 173175
-tests/fm-captain-hold-keyed-answers.test.sh 257148
-tests/fm-captain-hold-lifecycle.test.sh 264427
-tests/fm-captain-hold-reconcile.test.sh 247202
-tests/fm-captain-hold-sweep.test.sh 199013
-tests/fm-cd-pretool-check.test.sh 19264
-tests/fm-composer-ghost.test.sh 2912
-tests/fm-composer-lib.test.sh 218757
-tests/fm-crew-state.test.sh 80671
-tests/fm-ensure-agents-md.test.sh 1159
-tests/fm-grok-harness.test.sh 7757
-tests/fm-herdr-lab.test.sh 23536
-tests/fm-lint.test.sh 737853
-tests/fm-pi-primary-types.test.sh 5993
-tests/fm-pr-merge.test.sh 369918
-tests/fm-review-diff.test.sh 6838
-tests/fm-send-popup-settle.test.sh 8316
-tests/fm-send-settle.test.sh 3008
-tests/fm-send-strict.test.sh 5339
-tests/fm-spawn-batch.test.sh 4726
-tests/fm-supervision-instructions.test.sh 1085
-tests/fm-test-run.test.sh 304481
-tests/fm-tmux-submit-busy.test.sh 7994
-tests/fm-transition-lib.test.sh 354
-tests/fm-x-mode.test.sh 32866
+tests/fm-arm-pretool-check.test.sh 62853
+tests/fm-backend-herdr.test.sh 63003
+tests/fm-brief.test.sh 23750
+tests/fm-captain-hold-archive.test.sh 148345
+tests/fm-captain-hold-cleanup.test.sh 270094
+tests/fm-captain-hold-keyed-answers.test.sh 185475
+tests/fm-captain-hold-lifecycle.test.sh 277909
+tests/fm-captain-hold-reconcile.test.sh 268161
+tests/fm-captain-hold-sweep.test.sh 261144
+tests/fm-cd-pretool-check.test.sh 19990
+tests/fm-composer-ghost.test.sh 3649
+tests/fm-composer-lib.test.sh 192576
+tests/fm-crew-state.test.sh 116812
+tests/fm-ensure-agents-md.test.sh 1673
+tests/fm-grok-harness.test.sh 8934
+tests/fm-herdr-lab.test.sh 27489
+tests/fm-lint.test.sh 758806
+tests/fm-pi-primary-types.test.sh 2395
+tests/fm-pr-merge.test.sh 461903
+tests/fm-review-diff.test.sh 7665
+tests/fm-send-popup-settle.test.sh 8997
+tests/fm-send-settle.test.sh 3498
+tests/fm-send-strict.test.sh 6756
+tests/fm-spawn-batch.test.sh 5826
+tests/fm-supervision-instructions.test.sh 1773
+tests/fm-test-run.test.sh 444553
+tests/fm-tmux-submit-busy.test.sh 10242
+tests/fm-transition-lib.test.sh 613
+tests/fm-x-mode.test.sh 41640
 EOF
 }
 
@@ -685,15 +702,13 @@ tests/fm-test-run.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-captain-hold-sweep.test.sh
-tests/fm-crew-state.test.sh
-tests/fm-backend-herdr.test.sh
 tests/fm-arm-pretool-check.test.sh
 tests/fm-cd-pretool-check.test.sh
 tests/fm-tmux-submit-busy.test.sh
 tests/fm-review-diff.test.sh
-tests/fm-pi-primary-types.test.sh
 tests/fm-send-strict.test.sh
 tests/fm-composer-ghost.test.sh
+tests/fm-pi-primary-types.test.sh
 tests/fm-supervision-instructions.test.sh
 EOF
 }
@@ -702,10 +717,12 @@ EOF
 list_portable_parallel_2() {
   cat <<'EOF'
 tests/fm-lint.test.sh
-tests/fm-captain-hold-keyed-answers.test.sh
-tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-cleanup.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-archive.test.sh
+tests/fm-crew-state.test.sh
+tests/fm-backend-herdr.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
 tests/fm-brief.test.sh
@@ -1113,13 +1130,24 @@ portable_serial_lane_weight() {
   ' <(portable_serial_weight_hints) -
 }
 
-# Longest-processing-time makespan for one portable-parallel lane at <jobs>
-# concurrent scripts, printing "<makespan_ms> <scripts>". The selection arrives
-# on stdin and the hints come from portable_parallel_weight_hints, so the model
-# moves with the same weights the lanes are composed from. A lane runs its
-# scripts independently, but they share the runner's CPU, which is why the model
-# packs the hinted work over <jobs> bins rather than adding it up.
-portable_parallel_lane_makespan() {  # <jobs>
+# Bins the portable-parallel makespan model packs for <jobs> concurrent
+# scripts: min(<jobs>, PORTABLE_PARALLEL_EFFECTIVE_JOBS), at least one. One owner
+# for the packing and for the parallel_effective_jobs the guard reports.
+portable_parallel_effective_jobs() {  # <jobs>
+  local jobs=$1
+  [ "$jobs" -ge 1 ] || jobs=1
+  [ "$jobs" -le "$PORTABLE_PARALLEL_EFFECTIVE_JOBS" ] || jobs=$PORTABLE_PARALLEL_EFFECTIVE_JOBS
+  printf '%s\n' "$jobs"
+}
+
+# Longest-processing-time makespan for one portable-parallel lane packed into
+# <bins> bins, printing "<makespan_ms> <scripts>". The selection arrives on stdin
+# and the hints come from portable_parallel_weight_hints, so the model moves with
+# the same weights the lanes are composed from. A lane runs its scripts
+# independently, but they share the runner's CPU, which is why the model packs
+# the hinted work over <bins> bins rather than adding it up. Callers pass the
+# count from portable_parallel_effective_jobs.
+portable_parallel_lane_makespan() {  # <bins>
   local jobs=$1
   awk -v jobs="$jobs" -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
     NR == FNR { if (NF) { hint[$1] = $2 }; next }
@@ -1287,7 +1315,7 @@ run_coverage_guard() {
   local tmp missing extra a b shard unhinted serial_total serial_ms serial_max_ms=0
   local serial_largest_ms serial_indivisible_ms=0 serial_over=
   local p1_ms p1_unhinted p2_ms p2_unhinted parallel_max_ms parallel_imbalance_ms
-  local p1_makespan_ms p2_makespan_ms parallel_makespan_ms
+  local p1_makespan_ms p2_makespan_ms parallel_makespan_ms parallel_effective_jobs
   local -a saved_scripts=()
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-coverage.XXXXXX")
 
@@ -1444,25 +1472,28 @@ run_coverage_guard() {
   # The serial target bounds a shard's hinted work. A parallel job runs several
   # scripts beside each other, so its bound is a modeled makespan at the job
   # count CI passes: without this the lanes carrying the proven set had no
-  # packing bound, only their job timeouts.
-  read -r p1_makespan_ms _ <<<"$(list_portable_parallel_1 | portable_parallel_lane_makespan "$PORTABLE_PARALLEL_JOBS")"
-  read -r p2_makespan_ms _ <<<"$(list_portable_parallel_2 | portable_parallel_lane_makespan "$PORTABLE_PARALLEL_JOBS")"
+  # packing bound, only their job timeouts. The model packs
+  # min(PORTABLE_PARALLEL_JOBS, PORTABLE_PARALLEL_EFFECTIVE_JOBS) bins.
+  parallel_effective_jobs=$(portable_parallel_effective_jobs "$PORTABLE_PARALLEL_JOBS")
+  read -r p1_makespan_ms _ <<<"$(list_portable_parallel_1 | portable_parallel_lane_makespan "$parallel_effective_jobs")"
+  read -r p2_makespan_ms _ <<<"$(list_portable_parallel_2 | portable_parallel_lane_makespan "$parallel_effective_jobs")"
   parallel_makespan_ms=$p1_makespan_ms
   [ "$p2_makespan_ms" -le "$parallel_makespan_ms" ] || parallel_makespan_ms=$p2_makespan_ms
   if [ "$parallel_makespan_ms" -gt "$PORTABLE_PARALLEL_MAX_MSPAN_MS" ]; then
-    log "coverage guard: portable parallel shard models a ${parallel_makespan_ms}ms makespan at ${PORTABLE_PARALLEL_JOBS} jobs, above the ${PORTABLE_PARALLEL_MAX_MSPAN_MS}ms budget"
-    log "move the heaviest member to the lighter lane or raise --jobs; do not let the lanes run unbounded: docs/fm-test-portable-shards.md"
+    log "coverage guard: portable parallel shard models a ${parallel_makespan_ms}ms makespan packed into ${parallel_effective_jobs} bins, above the ${PORTABLE_PARALLEL_MAX_MSPAN_MS}ms budget"
+    log "move the heaviest member to the lighter lane, split the lane, or refresh the hints from CI measurements; a higher --jobs does not change the model: docs/fm-test-portable-shards.md"
     rm -rf "$tmp"
     return 1
   fi
 
-  printf 'FM_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s parallel_jobs=%s parallel_makespan_ms=%s parallel_budget_ms=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s serial_indivisible_ms=%s herdr=%s\n' \
+  printf 'FM_TEST_COVERAGE ok total=%s parallel=%s parallel_max_ms=%s parallel_imbalance_ms=%s parallel_unhinted=%s parallel_jobs=%s parallel_effective_jobs=%s parallel_makespan_ms=%s parallel_budget_ms=%s serial=%s serial_shards=%s serial_unhinted=%s serial_max_ms=%s serial_budget_ms=%s serial_indivisible_ms=%s herdr=%s\n' \
     "$(wc -l <"$tmp/all" | tr -d ' ')" \
     "$(wc -l <"$tmp/shards_union" | tr -d ' ')" \
     "$parallel_max_ms" \
     "$parallel_imbalance_ms" \
     "$((p1_unhinted + p2_unhinted))" \
     "$PORTABLE_PARALLEL_JOBS" \
+    "$parallel_effective_jobs" \
     "$parallel_makespan_ms" \
     "$PORTABLE_PARALLEL_MAX_MSPAN_MS" \
     "$(wc -l <"$tmp/serial" | tr -d ' ')" \

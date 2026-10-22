@@ -4,7 +4,8 @@
 # and the cause of that growth is unproven.
 # The blocked-write waits below are 120-second wall-clock hang tripwires, not
 # slack for that growth, and they must not be raised further.
-# Serial 7 is not called green until the Ubuntu CI log shows this suite passing.
+# docs/fm-test-portable-shards.md records the CI run that passed this suite on
+# that image.
 set -u
 
 # shellcheck source=tests/lib.sh

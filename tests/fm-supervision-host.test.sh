@@ -793,22 +793,23 @@ test_attended_close_with_unidentified_main_session_passes_to_main() {
   pass "host: an attended close whose main session cannot be identified reaches main and runs no engine turn"
 }
 
-# The close is accepted attended as routine, then its task turns main-only (a
-# decision is recorded) while the successor starts: the turn meets the offer
-# rule again, so the close reaches main exactly as the arm printed it and no
-# engine turn runs on the stale offer.
-# Change the task immediately before the second offer computation, rather
-# than racing the successor startup. The first offer accepts the close; the
-# turn-boundary offer must see the new main-owned decision.
+# The close is accepted attended as routine, then its task turns main-only
+# while the successor starts: the turn meets the offer rule again, so the close
+# reaches main exactly as the arm printed it and no engine turn runs on the
+# stale offer.
+# Turn the second offer main-only, rather than racing the successor startup.
+# The first offer accepts the close; the turn-boundary offer must refuse it.
+# Quiet: a decision line written after the successor started is a new event
+# that successor closes on, so its liveness check would race that close.
 test_attended_close_that_turns_main_only_before_its_turn_passes_to_main() {
   local home
   home=$(make_home attended-turns-main-only attended)
-  turn_main_only_at_second_offer "$home"
+  turn_main_only_at_second_offer "$home" quiet
   start_host "$home"
   wait_until 150 watcher_live "$home" || fail "turns-main-only: the host never started a watcher cycle"
   append_status "$home" 'step one'
   wait_until 250 host_exited "$home" || fail "turns-main-only: the close did not reach main: $(cat "$home/state/.supervision-host.log")"
-  assert_grep 'which export format?' "$home/state/demo.status" "fixture: the decision was not recorded before the turn"
+  [ "$(cat "$home/offer-count" 2>/dev/null)" -ge 2 ] || fail "fixture: the close was not accepted before it turned main-only"
   expect_code 0 "$(cat "$home/host.rc")" "the close must exit 0"
   assert_re '^signal: .*demo.status' "$home/host.out" "the close must carry the watcher's reason line"
   assert_no_re '^supervision-host' "$home/host.out" "the close must reach main exactly as the arm printed it"

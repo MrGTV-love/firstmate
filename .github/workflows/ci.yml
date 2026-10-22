@@ -127,10 +127,11 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fm-test"
           # Three scripts at a time: the lane is exactly the proven-isolated
           # set, whose recorded four-way proof ran on macOS with two members
-          # not passing (docs/fm-test-isolation-proof.md). This branch's own CI
-          # run is the first three-wide run on the 26.04 image. --jobs must
-          # match PORTABLE_PARALLEL_JOBS, which the coverage guard models and
-          # tests/fm-ci-workflow.test.sh enforces.
+          # not passing (docs/fm-test-isolation-proof.md). The first three-wide
+          # run on the 26.04 image passed; docs/fm-test-portable-shards.md
+          # cites it. --jobs must match PORTABLE_PARALLEL_JOBS, which the
+          # coverage guard packs into min(jobs, PORTABLE_PARALLEL_EFFECTIVE_JOBS)
+          # bins and tests/fm-ci-workflow.test.sh enforces.
           bin/fm-test-run.sh --lane portable-parallel-1 --jobs 3 \
             --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \
             --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-1.json"
