@@ -34,10 +34,9 @@ USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
 QUEUE_RESERVE = 16
+LABEL_LIMIT = 172  # Leave room for two candidates, a remedy, and the queue marker.
+CARD_LIMIT = 38000
 SLACK_LINK = re.compile(r'<((?:https?://|mailto:)[^<>|\s]+)(?:\|([^<>]*))?>')
-CARD_TAIL = ('\nFull decision remains in the local backlog.'
-             '\nReply in this thread with your answer.'
-             '\nMessages typed in the main DM window are not read.')
 
 
 def run(script, *args, text=None):
@@ -76,6 +75,10 @@ def flat(value):
     """Keep the intake's one-line framing: newlines, tabs, and controls become spaces."""
     value = str(value).replace('\r', ' ').replace('\n', ' ').replace('\t', ' ')
     return ''.join(ch for ch in value if ord(ch) >= 32 and ord(ch) != 127)
+
+
+def short(value, limit=LABEL_LIMIT):
+    return value if len(value) <= limit else value[:limit - 3] + '...'
 
 
 def typed_text(value):
@@ -326,34 +329,42 @@ class Watch:
         if not (isinstance(evidence, str) and (evidence.startswith('/')
                 or re.match(r'^https?://[^\s]+$', evidence))):
             evidence = ''
-        detail = [line for line in lines
-                  if not re.match(r'^\s*(Recommendation:|Evidence:)', line) and not OPTION_LINE.match(line)]
         usable, missing = self.scope_state()
-        text = ['Task: ' + row['id'], 'Decision: ' + (row.get('title') or row['id'])]
-        if row.get('hold_reason'):
-            text.append(row['hold_reason'])
-        text.extend(detail)
-        text.append('')
-        text.append('Recommendation: ' + (recommendation or 'none recorded'))
-        text.append('Evidence: ' + (evidence or 'none recorded'))
+        fields = [('Task: ', row['id']),
+                  ('Decision: ', card.get('title') or row.get('title') or row['id'])]
+        if card.get('about'):
+            fields.append(('About: ', card['about']))
+        question = card.get('decide') or row.get('hold_reason')
+        if question:
+            fields.append(('Question: ', question))
+        fields.extend([('Recommendation: ', recommendation or 'none recorded'),
+                       ('Evidence: ', evidence or 'none recorded')])
         if options:
-            text.append('Options:')
+            fields.append(('Options:', ''))
             for i, option in enumerate(options, 1):
                 hint = ' - ' + option['hint'] if option.get('hint') else ''
-                text.append(f"{i}. {option['label']} ({option['value']}){hint}")
-        text.append('Affordance: ' + ('text' if not options else 'reaction' if usable else 'single-character'))
+                fields.append((f'{i}. ', f"{option['label']} ({option['value']}){hint}"))
+        footer = ['Affordance: ' + ('text' if not options else 'reaction' if usable else 'single-character')]
         if usable and options:
-            text.append('React with ' + '/'.join(REACTIONS[:len(options)])
-                        + ' or reply in this thread with the option number.')
+            footer.append('React with ' + '/'.join(REACTIONS[:len(options)])
+                          + ' or reply in this thread with the option number.')
         elif options:
-            text.append('Reply in this thread with the option number.')
+            footer.append('Reply in this thread with the option number.')
         else:
-            text.append('Reply in this thread with your answer.')
-        text.append('Messages typed in the main DM window are not read.')
-        text.append('If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.')
+            footer.append('Reply in this thread with your answer.')
+        footer.append('Messages typed in the main DM window are not read.')
+        footer.append('If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.')
         if not usable:
-            text.append('Missing reaction scope: ' + ', '.join(sorted(missing)) + '.')
-        return '\n'.join(text), options, usable
+            footer.append('Missing reaction scope: ' + ', '.join(sorted(missing)) + '.')
+        footer.append('Full decision remains in the local backlog.')
+        # Budget values, not the assembled card: every field and the precedence
+        # rule must survive even when one decision field is larger than Slack allows.
+        fixed = '\n'.join([prefix for prefix, _ in fields] + footer)
+        limit = (CARD_LIMIT - len(fixed)) // len(fields)
+        if limit < 3:
+            raise SlackError('decision_card_too_large')
+        text = [prefix + short(value, limit) for prefix, value in fields]
+        return '\n'.join(text + footer), options, usable
 
     def messages(self, thread):
         channel = self.state.get('channel')
@@ -379,7 +390,7 @@ class Watch:
         for message in self.recent(thread):
             if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                 return message['ts']
-        if len(text.encode()) > 39000:
+        if len(text) > 39000:
             text = text[:38000] + tail
         args = {'channel': channel, 'text': text,
                 'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
@@ -512,7 +523,7 @@ class Watch:
             again, current = self.probe(key)
             if again == 1 or (current if again == 0 else 'uncertain') != identity:
                 continue
-            ts = self.post('card:' + occurrence, text, tail=CARD_TAIL)
+            ts = self.post('card:' + occurrence, text)
             record = {'key': key, 'identity': identity, 'ts': ts, 'options': options,
                       'mode': card.get('close') if card.get('close') in ('done', 'release') else 'done',
                       'reactions': usable, 'retired': False}
@@ -532,7 +543,6 @@ class Watch:
                 if not record.get('retired')]
 
     def resolve(self):
-        rows = None
         for occurrence, record in self.tracked():
             if record['ts'] in self.noticed_threads or record['ts'] not in self.read_threads:
                 continue
@@ -544,12 +554,10 @@ class Watch:
                           'Superseded: ' + record['key'] + ' was held again. Answer in its newer thread.',
                           record['ts'])
             else:
-                if rows is None:
-                    rows = self.backlog()
-                row = next((r for r in rows if r.get('id') == record['key']), {})
-                body = row.get('body_lines', []) if isinstance(row.get('body_lines'), list) else []
                 self.post('resolved:' + occurrence,
-                          'Resolved: ' + record['key'] + '\n' + '\n'.join(body), record['ts'])
+                          'Resolved: ' + record['key']
+                          + '\nThe decision is no longer open. Full resolution remains in the local backlog.',
+                          record['ts'])
             record['retired'] = True
             self.commit()
 
@@ -663,7 +671,10 @@ class Watch:
             if len(typed) > 1 or len(tapped) > 1 or (typed and tapped and typed.keys() != tapped.keys()):
                 record['conflicts'] = record.get('conflicts', 0) + 1
                 record['blocked'] = signature
-                labels = ' vs '.join(sorted(set(typed.values()) | set(tapped.values())))
+                candidates = sorted(set(typed.values()) | set(tapped.values()))
+                labels = ' vs '.join(short(flat(label)) for label in candidates[:2])
+                if len(candidates) > 2:
+                    labels += ' (+%d more)' % (len(candidates) - 2)
                 event = new_replies[0]['event'] if new_replies else self.event(
                     record, 'conflict', str(record['conflicts']))
                 if len(tapped) > 1:
@@ -675,7 +686,7 @@ class Watch:
                     remedy = 'Please reply once.'
                 self.notice(event, key, record['ts'],
                             'Conflicting signals: ' + labels + '. No answer was recorded. ' + remedy,
-                            'check: slack %s - conflicting signals: %s' % (record['ts'], labels),
+                            'check: slack %s - conflicting signals: %s. %s' % (record['ts'], labels, remedy),
                             [r['event'] for r in new_replies])
                 remaining -= 1
                 continue

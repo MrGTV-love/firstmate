@@ -1,7 +1,8 @@
 # Slack watch verification
 
-Date: 2026-10-19 (UTC).
+Date: 2026-10-22 (UTC); live read-only probe evidence below remains dated 2026-10-19.
 Host: macOS arm64, shared operator host.
+Validation tool: no-mistakes v1.86.1-private.f6.startup-deadline.20261008 (bb545cc).
 No fixture opened a socket, created a real DM, bound the real source, armed the real poll, or posted to Slack.
 Every Slack response came from `--replay` transcripts under `tests/fixtures/slack/`.
 Fixture homes were created with `tests/fixtures/slack/make-home.sh <scenario> <tmpdir>`.
@@ -10,7 +11,10 @@ Fixture homes were created with `tests/fixtures/slack/make-home.sh <scenario> <t
 
 The canonical suite is `tests/fm-slack-watch.test.sh`, run as a single process under `nice -n 20`.
 It invokes the real `fm-captain-hold.sh` intake and `tasks-axi` against each disposable home.
-No clean full-suite result is claimed here; each section below records the targeted command and observed result for one guarantee.
+No repository-wide test run is claimed; each section below records the targeted command and observed result for one guarantee.
+The 2026-10-22 targeted replay refresh ran `bash /Users/charlesabrooker/firstmate/bin/fm-proc-budget.sh -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1`.
+It printed `ok - all Slack watch checks` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1444534`.
+The suite exercised DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3, and X1 through X22; DOD-11, S4, and ACT-1 were not run.
 The targeted commands below are the DoD's Verify commands with the fixture home exported as `FM_HOME`, `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, and `FM_CONFIG_OVERRIDE`.
 
 ## Live read-only probe
@@ -45,9 +49,11 @@ Observed: three cards, each with `Task:`, `Decision:`, `Recommendation:`, `Evide
 `no-options` carried no option block.
 `no-recommendation` rendered `Recommendation: none recorded` and `Evidence: none recorded` for its invalid evidence value.
 Exactly two `none recorded` occurrences appeared across the three cards.
-A fourth task with a 45,000-character body was cut to fit Slack's size limit; its card still ended with `Full decision remains in the local backlog.`, `Reply in this thread with your answer.`, and the main-window note.
-Answering that task closed it; its `Resolved:` post was cut with `Full text remains in the local backlog.`, the poll printed no transport failure, and the thread was retired.
-The replay double rejects any post over 40,000 characters, as Slack does, so an uncut resolution post would fail with `slack: transport failure: api_error` and leave the thread unretired.
+On 2026-10-22, the strengthened regression first failed before the repair with `not ok - DOD-02 oversized card lost its option block: missing [Options:]`.
+After the repair, a fourth task with a 45,000-character body and a 45,000-character held question preserved all six required card parts: task id, decision/question, recommendation, evidence, both numbered options, and the disagreement rule.
+Its rendered card stayed within 38,000 characters and omitted the `PRIVATE_TASK_BODY` sentinel from both the card and the resolution notice.
+Answering that task closed it; its `Resolved: oversized-card` notice posted without a transport failure and the thread was retired.
+The replay double rejects any post over 40,000 characters, as Slack does.
 Result: pass.
 
 ## DOD-03 - typed reply through the existing intake
@@ -98,13 +104,15 @@ Result: pass.
 
 Commands: `fm-slack-poll.sh` with `contradiction` and `contradiction-typed`, each polled again, then answered with a fresh typed reply; `reaction-answer` with a second reaction added and then removed; and `reaction-skipped` polled twice.
 
-Observed: one `check: slack 900.000001 - conflicting signals: Abort vs Wait`, zero `closed:` lines, and the call still open.
+Observed: one `check: slack 900.000001 - conflicting signals: Abort vs Wait. Remove the :two: reaction, or type 2.`, zero `closed:` lines, and the call still open.
 (a) Two contradictory typed replies produced one check line; the next poll printed nothing and recorded nothing; a fresh typed `3` then recorded `abort`.
 (b) A typed reply plus a reaction produced one check line; the next poll printed nothing and posted nothing; a fresh typed `2` then recorded `wait`.
 (c) Two different reactions produced one check line and one notice; later polls stayed silent; removing one reaction changed the reaction set and recorded the remaining option.
 (d) A reaction the intake refused (`refused: typed-call`, call still open) was not submitted again by the next poll, and no second acknowledgement was posted.
 The conflict notice in the thread named the remedy: `Remove the :two: reaction, or type 2.` for a reaction against a typed reply, `Please reply once.` for two typed replies, and `Remove all but one reaction.` for two reactions.
-Two conflicting typed replies of 45,000 characters each produced one conflict notice cut with `Full text remains in the local backlog.`, no transport failure, and an unanswered call.
+Two conflicting typed replies of 45,000 characters each produced one readable outbound notice under 1,200 characters and one notification no longer than 480 characters, both naming previews of both candidates and retaining `Please reply once.`.
+The notice was measured from the outbound log, not from the incoming full-length replies sharing the thread.
+No transport failure or answer was recorded.
 Result: pass.
 
 ## DOD-09 - duplicate and cross-channel answers record once
@@ -244,12 +252,12 @@ Each runs against replay transcripts and the real intake; none opens a socket.
 - X11: with the call-state probe unreadable, a typed reply was left unread: the poll exited 0 with no output, closed nothing, and posted nothing; once the probe recovered the same reply closed the call.
 - X12: a card mirrored while the probe was unreadable recorded identity `uncertain`; once the call read as open under a verified hold, a reaction already standing on that card answered nothing, the verified hold got its own thread, and the uncertain thread was retired with a `Superseded` post.
 - X13: with 25 retired thread records in state, a poll probed only the one open thread, and a poll with nothing open probed no call; after 300 more messages in the DM, mirroring one new card read exactly one history page.
-- X14: numbered facts in a hold body stayed in the card as text and produced no options; a body with `Option N:` lines produced options, a line without a `(value)` recorded its label as the answer, and its hint stayed out of the value.
+- X14: numbered facts in a hold body stayed private and produced no options; explicit `Option N:` fields produced options without exporting nearby task-body facts, a line without a `(value)` recorded its label as the answer, and its hint stayed out of the value.
 - X15: a tap by a second allowlisted member was staged with that member as its author; with that member removed from the allowlist, the next poll dropped the staged answer and left the call open.
 - X16: `prepare` is no longer a command: the entry point exited 2 with `unknown command`.
 - X17: with the bot token in the process environment, every local child the poll and the mirror ran (the call-state probe, the answer intake, the fleet snapshot) saw it unset.
 - X18: a typed reply that Slack delivered as `merge 12 &amp; 13, skip CI &lt; 5 min &gt; see <https://example.com/b> and <https://example.com/a|the doc>` closed the call with the answer `merge 12 & 13, skip CI < 5 min > see https://example.com/b and the doc`, and the recorded label matched.
-- X19: two conflicts of 450-character wake lines on two threads, plus a later unmatched reply on a third, ran through the armed `check`. The first poll emitted the first conflict's line ending `; +2 queued` within 480 characters; the second conflict's replies and the unmatched reply were not marked seen, their rows stayed pending, and the second conflict's notice was not yet posted. The second poll emitted the second conflict ending `; +1 queued` and posted its notice. The third poll emitted the unmatched reply's line with no marker, and a fourth poll printed nothing. No conflict recorded an answer.
+- X19: two conflicts with bounded candidate previews on two threads, plus a later unmatched reply on a third, ran through the armed `check`. The first poll emitted the first conflict's line ending `; +2 queued` within 480 characters; the second conflict's replies and the unmatched reply were not marked seen, their rows stayed pending, and the second conflict's notice was not yet posted. The second poll emitted the second conflict ending `; +1 queued` and posted its notice. The third poll emitted the unmatched reply's line with no marker, and a fourth poll printed nothing. No conflict recorded an answer.
 - X20: an owner reply carrying only `subtype: thread_broadcast` closed the call with the typed words as the answer, while replies from the owner's id carrying `bot_id`, `app_id`, or `bot_profile` answered nothing and closed nothing.
 - X21: with stdout and stderr captured apart, an explicit `arm` named its failure on stderr, wrote nothing to stdout, and exited nonzero on every run: after `FM_SLACK_DM_USER` changed (`dm_user_changed`, run twice with the failure already recorded by the standing check in between), with a state file of the wrong schema (`invalid_state_schema`), with a symlinked state directory (`unsafe_state_path`), and with a missing transcript (`replay_transcript_unreadable`). The standing `check` was silent on both streams with exit 0 while healthy, reported `dm_user_changed` once on stdout when it changed, and was silent on the repeat.
 - X22: with `FM_SLACK_POLL_MAX_ANSWERS=1`, a live thread with an owner reply and a thread whose call was closed in the terminal after the owner replied late: the first poll answered the live thread and did not retire the closed one (no `Resolved:` post, `retired` false); the second poll emitted `unmatched reply` for the late reply; the third poll posted `Resolved:` and retired the thread.

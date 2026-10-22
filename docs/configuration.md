@@ -2948,17 +2948,18 @@ Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
-Each card includes the task's title, hold reason and body (including its evidence links), plus current board-authored options/recommendation when available.
+Each card includes only decision-card fields: the task id and title, the current board's about/question text or the hold reason, options, recommendation, and evidence pointer; arbitrary task-body prose is never posted.
 Every card tells the captain to reply inside the card's thread and says that a message typed in the main DM window is not read, because only a thread reply maps to one decision.
-Every message the plane posts (card, notice, acknowledgement, and resolution) is cut to fit Slack's size limit with a note that the full text stays in the local backlog; a cut card still tells the captain where to reply.
-The mirror also reads explicit `Option N:`, `Recommendation:`, and `Evidence:` lines from the task body; other numbered lines stay in the card as plain text and are never options, and it does not infer options from arbitrary prose.
+Card values share a 38,000-character budget, preserving every field heading, the option block, the affordance, and the tap-versus-type disagreement rule even when a question is oversized; the full decision remains in the local backlog.
+The mirror reads explicit `Option N:`, `Recommendation:`, and `Evidence:` fields from the task body, but does not post other body lines or infer options from arbitrary prose.
 An option written without a `(value)` records its label, never its hint, as the keyed answer.
 A board card (options, recommendation, evidence, close mode) is used only when the board was regenerated after the hold's recorded set time.
 When a board card exists but that cannot be proven, the thread carries the question and reason as text only, with no numbered options and no seed reactions, and a reply is recorded verbatim.
 A typed reply and a reaction seen in the same poll are compared: agreement records one answer, disagreement surfaces to the captain once and records neither.
 Two contradictory typed replies, or two different reactions, likewise record nothing and surface once.
 A conflicted thread stays blocked until a fresh typed reply arrives or the reaction set changes; every typed reply in the conflict is consumed and is never recorded later.
-When a reaction is part of the conflict, the notice tells the captain to remove it or to type its option number, since a fresh reply alone cannot outvote a standing reaction.
+Conflict notices and notifications show bounded previews of the first two candidate labels, name any additional candidates by count, and retain the remedy instead of truncating it behind the conflicting text.
+When a reaction is part of the conflict, both surfaces tell the captain to remove it or to type its option number, since a fresh reply alone cannot outvote a standing reaction.
 Notices (conflicts and unmatched replies) surface in the order they arose, and a poll emits only as many of their lines as fit the wake line with room left for a queue marker; a notice is posted to its thread, reported, and marked seen only when its line is emitted, along with the replies that caused it.
 The notices that do not fit stay pending unchanged for the next poll, and the emitted line ends with `; +N queued` while N wait, so one long reply cannot push other pending conditions out of the wake line.
 A reply or reaction on a thread whose call has closed, or whose task was held again under a newer hold, is never applied; the old thread is retired and a typed reply there is surfaced as unmatched.
@@ -2971,7 +2972,7 @@ A long or multiline reply is flattened to one line for the intake, which keeps i
 An authorized reply that the intake refuses is acknowledged in its thread and surfaced for firstmate rather than silently dropped; a reply the intake fails to process at all is neither acknowledged nor consumed, stays staged, and is retried on the next poll, with one wake line per failure episode that carries the intake's own error text.
 Anything the intake writes to its error stream, such as a parent-channel delivery problem after a successful close, is passed on in the wake line.
 A repeat sighting of an already-recorded reply produces no extra line: the intake's replay detection keeps one record, and the poll reports only what it did.
-A closed tracked call receives one resolution and is retired; it is not re-posted unless that task starts a genuinely new hold occurrence.
+A closed tracked call receives one resolution notice naming the task and pointing to its local resolution record, without copying the task body, and is retired; it is not re-posted unless that task starts a genuinely new hold occurrence.
 
 `state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, and the last reported failure class.
 It is transport state, not a second decision store; `fm-captain-hold.sh answers` still owns record creation and answer replay detection.

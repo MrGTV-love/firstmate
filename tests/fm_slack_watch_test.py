@@ -8,6 +8,7 @@ Usage:
   fm_slack_watch_test.py outbound-count <outbound.jsonl> <method> [thread_ts]
   fm_slack_watch_test.py replay-file <state-dir>
   fm_slack_watch_test.py thread-texts <replay-state.json> <thread-ts>
+  fm_slack_watch_test.py thread-posts <outbound.jsonl> <thread-ts>
   fm_slack_watch_test.py pending-count <state.json>
   fm_slack_watch_test.py pending-field <state.json> <field>
   fm_slack_watch_test.py add-retired <state.json> <count>
@@ -96,6 +97,10 @@ def main(argv):
         print(count)
     elif command == 'thread-texts':
         print('\n'.join(m.get('text', '') for m in messages(argv[1]) if m.get('thread_ts') == argv[2]))
+    elif command == 'thread-posts':
+        rows = (json.loads(line) for line in open(argv[1]))
+        print('\n'.join(row.get('text', '') for row in rows
+                        if row.get('method') == 'chat.postMessage' and row.get('thread_ts') == argv[2]))
     elif command == 'pending-count':
         print(len(json.load(open(argv[1])).get('pending', [])))
     elif command == 'pending-field':
