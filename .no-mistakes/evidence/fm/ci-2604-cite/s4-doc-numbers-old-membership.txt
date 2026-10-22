@@ -1,0 +1,9 @@
+### Old (base-commit) lane membership + new hints + 2-bin model
+FM_TEST_COVERAGE
+parallel_max_ms=2008808
+parallel_imbalance_ms=331092
+parallel_makespan_ms=1004772
+parallel_budget_ms=1200000
+### lane sums from hints, old membership
+old-l1.txt 15 members, sum = 2008808
+old-l2.txt 14 members, sum = 1677716

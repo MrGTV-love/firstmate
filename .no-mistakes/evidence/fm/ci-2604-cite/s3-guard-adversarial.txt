@@ -1,0 +1,53 @@
+### A: baseline (JOBS=3, EFFECTIVE=2, budget 1200000)
+parallel_jobs=3
+parallel_effective_jobs=2
+parallel_makespan_ms=983606
+parallel_budget_ms=1200000
+rc=0
+### B: PORTABLE_PARALLEL_JOBS=1
+rc=1
+### B: PORTABLE_PARALLEL_JOBS=2
+FM_TEST_COVERAGE
+parallel_jobs=2
+parallel_effective_jobs=2
+parallel_makespan_ms=983606
+rc=0
+### B: PORTABLE_PARALLEL_JOBS=3
+FM_TEST_COVERAGE
+parallel_jobs=3
+parallel_effective_jobs=2
+parallel_makespan_ms=983606
+rc=0
+### B: PORTABLE_PARALLEL_JOBS=4
+FM_TEST_COVERAGE
+parallel_jobs=4
+parallel_effective_jobs=2
+parallel_makespan_ms=983606
+rc=0
+### B: PORTABLE_PARALLEL_JOBS=8
+FM_TEST_COVERAGE
+parallel_jobs=8
+parallel_effective_jobs=2
+parallel_makespan_ms=983606
+rc=0
+### C: budget exactly at modeled makespan 983606 (strict > guard, expect pass)
+parallel_makespan_ms=983606
+parallel_budget_ms=983606
+rc=0
+### D: budget 983605 (one below, expect refuse)
+fm-test-run: coverage guard: portable parallel shard models a 983606ms makespan packed into 2 bins, above the 983605ms budget
+fm-test-run: move the heaviest member to the lighter lane, split the lane, or refresh the hints from CI measurements; a higher --jobs does not change the model: docs/fm-test-portable-shards.md
+rc=1
+### E: JOBS=4 + budget=1 (refusal must name effective bins, not jobs)
+fm-test-run: coverage guard: portable parallel shard models a 983606ms makespan packed into 2 bins, above the 1ms budget
+fm-test-run: move the heaviest member to the lighter lane, split the lane, or refresh the hints from CI measurements; a higher --jobs does not change the model: docs/fm-test-portable-shards.md
+rc=1
+### F: EFFECTIVE_JOBS=3 (model un-clamped = old 3-bin behaviour)
+parallel_jobs=3
+parallel_effective_jobs=3
+parallel_makespan_ms=758806
+rc=0
+### G: JOBS=3 EFFECTIVE=1 (single bin)
+fm-test-run: coverage guard: portable parallel shard models a 1857531ms makespan packed into 1 bins, above the 1200000ms budget
+fm-test-run: move the heaviest member to the lighter lane, split the lane, or refresh the hints from CI measurements; a higher --jobs does not change the model: docs/fm-test-portable-shards.md
+rc=1

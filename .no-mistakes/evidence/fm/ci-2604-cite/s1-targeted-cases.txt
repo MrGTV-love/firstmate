@@ -1,0 +1,9 @@
+=== FM_TEST_ONLY=test_portable_parallel_lanes_stay_duration_balanced
+ok - portable parallel lanes are fully hinted and packed within 5% of each other
+rc=
+=== FM_TEST_ONLY=test_portable_parallel_lanes_run_bounded_and_concurrently
+ok - portable parallel lanes are bounded by a modeled makespan packed into the effective bin count
+rc=
+=== FM_TEST_ONLY=test_portable_parallel_run_order_matches_list_scheduled
+ok - portable parallel lanes start their scripts in the order the makespan model packs
+rc=

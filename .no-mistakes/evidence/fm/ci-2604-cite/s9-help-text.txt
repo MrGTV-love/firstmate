@@ -1,0 +1,10 @@
+175-These sums exclude unhinted members and are estimates, not measured job wall
+176-times. Missing parallel hints are reported without failing this guard.
+177-It also reports parallel_jobs (PORTABLE_PARALLEL_JOBS, the count CI passes as
+178:--jobs), parallel_effective_jobs (the bins the model packs: the smaller of
+179-parallel_jobs and PORTABLE_PARALLEL_EFFECTIVE_JOBS), parallel_makespan_ms (the
+180-larger lane's longest-first makespan over the parallel hints packed into that
+181-many bins) and parallel_budget_ms (PORTABLE_PARALLEL_MAX_MSPAN_MS), refusing a
+182-lane whose modeled makespan is above that budget. These are modeled, not
+183-observed.
+184-

@@ -1,0 +1,7 @@
+run 39709903843 lane 1: 15 scripts, sum ms = 2008808, all exit0 = True, any gate_skip = False
+run 39709903843 lane 2: 14 scripts, sum ms = 1677716, all exit0 = True, any gate_skip = False
+hint table: 29 artifact scripts: 29 mismatches: [] hint-only: [] artifact-only: []
+run 39757092565 lane 1: 15 scripts, summed wall ms = 3473291 (57.9 min), all exit0 = True, any gate_skip = False
+    tests/fm-pr-merge.test.sh exit 0 duration_ms 907277 gate_skip False
+    tests/fm-pi-primary-types.test.sh exit 0 duration_ms 4187 gate_skip False
+run 39757092565 lane 2: 14 scripts, summed wall ms = 2004867 (33.4 min), all exit0 = True, any gate_skip = False

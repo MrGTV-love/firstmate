@@ -1,0 +1,6 @@
+Behavior portable serial 4	UNKNOWN STEP	2026-10-22T09:39:23.2088773Z Version: 20261012.601
+Behavior portable serial 4	UNKNOWN STEP	2026-10-22T09:39:23.2099872Z Image: ubuntu-26.04
+Behavior portable serial 4	UNKNOWN STEP	2026-10-22T09:39:23.2100543Z Version: 20261012.163.1
+Behavior portable serial 4	UNKNOWN STEP	2026-10-22T09:39:37.9808620Z FM_TEST_BEGIN 2026-10-22T09:39:37Z tests/fm-remote-secondmate-lifecycle-e2e.test.sh family=secondmate expected_gate_skip=none
+Behavior portable serial 4	UNKNOWN STEP	2026-10-22T09:52:33.7338716Z FM_TEST_END 2026-10-22T09:52:33Z tests/fm-remote-secondmate-lifecycle-e2e.test.sh exit=0 duration_ms=775742 gate_skip=false
+Behavior portable serial 4	UNKNOWN STEP	2026-10-22T09:55:50.0172526Z FM_TEST_SUMMARY total=14 failed=0 skipped_gate=3 duration_ms=972351

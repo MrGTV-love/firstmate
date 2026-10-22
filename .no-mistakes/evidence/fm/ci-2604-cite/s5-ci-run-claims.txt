@@ -1,0 +1,11 @@
+### run 39757092565
+{"conclusion":"success","created":"2026-10-22T09:39:19Z","event":"pull_request","head_sha":"2f5fd30035b86886f8930ef89e320bc43fa3d3c4","run_attempt":1,"title":"fix(bin): repair watcher checkpoint, job seq claims, and CI on Ubuntu 26.04","updated":"2026-10-22T10:02:36Z"}
+### job counts / conclusions
+      30
+  30 success
+### parallel + serial 4 jobs
+119751733683	Behavior portable parallel 2	success	2026-10-22T09:39:22Z	2026-10-22T09:52:50Z
+119751733879	Behavior portable serial 4	success	2026-10-22T09:39:22Z	2026-10-22T09:55:52Z
+119751733914	Behavior portable parallel 1	success	2026-10-22T09:39:22Z	2026-10-22T09:59:58Z
+### run 39709903843
+{"conclusion":"success","event":"pull_request","head_sha":"12a9cef06adcefab3e06107dec792def6c3c2d2c"}
