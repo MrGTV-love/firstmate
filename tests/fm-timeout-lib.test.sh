@@ -617,6 +617,24 @@ SH
   pass "no bounded-call status file survives a normal, failing, timed-out, or signalled exit of the caller"
 }
 
+test_owned_execution_has_no_deadline_and_requires_owner_capability() {
+  local out rc=0 dir="$TMP_ROOT/owned"
+  mkdir -p "$dir"
+  out=$(PATH="$PERL_ONLY" bash -c '. "$1/bin/fm-timeout-lib.sh"; fm_exec_owned 1 bash -c "sleep 2; echo completed; exit 7"' _ "$ROOT" 2>&1) || rc=$?
+  [ "$rc" -eq 7 ] || fail "owned execution lost natural completion beyond its grace (rc=$rc: $out)"
+  [ "$out" = completed ] || fail "owned execution lost command output: $out"
+  ln -s "$(command -v bash)" "$dir/bash"
+  printf '#!/bin/sh\necho timeout-must-not-run\n' > "$dir/timeout"
+  chmod +x "$dir/timeout"
+  rc=0
+  out=$(PATH="$dir" bash -c '. "$1/bin/fm-timeout-lib.sh"; fm_exec_owned 1 bash -c "echo command-must-not-run"' _ "$ROOT" 2>&1) || rc=$?
+  [ "$rc" -eq 127 ] || fail "owned execution without Perl did not refuse (rc=$rc: $out)"
+  assert_contains "$out" 'perl is required' 'owned execution must explain the missing ownership capability'
+  case "$out" in *must-not-run*) fail "owned execution silently used a deadline-only fallback: $out" ;; esac
+  pass 'owned execution has no deadline, preserves completion and refuses deadline-only fallback'
+}
+
+test_owned_execution_has_no_deadline_and_requires_owner_capability
 test_passes_the_command_status_and_output_through
 test_system_bash_preserves_completion_and_signal_statuses
 test_run_timed_reports_the_bound_when_the_wrapper_records_a_signal_death

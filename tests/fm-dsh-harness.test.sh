@@ -6,13 +6,14 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 python3 - "$ROOT" "$TMP" <<'PY'
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 root, tmp = map(Path, sys.argv[1:])
 helper = root / 'bin/fm-dsh.py'
-def call(*args, ok=True):
-    result = subprocess.run([sys.executable, str(helper), *map(str, args)], capture_output=True, text=True)
+def call(*args, ok=True, env=None):
+    result = subprocess.run([sys.executable, str(helper), *map(str, args)], capture_output=True, text=True, env=env)
     assert (result.returncode == 0) == ok, result.stderr
     return result.stdout.strip()
 def unknown(*args, check):
@@ -193,8 +194,32 @@ outside = tmp / 'outside'
 outside.mkdir()
 (outside / 'keep').write_text('x')
 (launches / 'task.dsh-session').write_text(json.dumps({'root':str(outside),'cwd':str(cwd)}))
-prepare('g3')
+worker = prepare('g3')
 assert (outside / 'keep').exists(), 'prepare must not remove a root outside the task generations'
+# Primaries retain operator CLI state, while DSH preferences and credentials
+# remain private. Worker HOME must not gain that primary-only access.
+operator = tmp / 'operator-home'
+(operator / '.config').mkdir(parents=True)
+(operator / '.config/token').write_text('operator-token')
+(operator / '.dsh').mkdir()
+(operator / '.dsh-tui').mkdir()
+(operator / '.dsh-tui/model.json').write_text('operator-model')
+primary_env = {**os.environ, 'FM_DSH_OPERATOR_HOME': str(operator)}
+primary = Path(call('prepare-primary', launches, 'primary', 'g1', source, 'deepseek/v4', 'high', cwd, root, env=primary_env))
+assert (primary / 'home/.config/token').read_text() == 'operator-token'
+(primary / 'home/.config/token').write_text('refreshed-token')
+assert (operator / '.config/token').read_text() == 'refreshed-token', 'primary CLI state must retain the operator identity'
+(primary / 'home/.dsh-tui/model.json').write_text('private-model')
+assert (operator / '.dsh-tui/model.json').read_text() == 'operator-model', 'DSH preferences must never reach the operator home'
+assert (primary / 'home/.dsh').resolve() == primary / 'dsh'
+assert not (worker / 'home/.config').exists(), 'workers must retain their isolated HOME contract'
+primary_log = primary / 'dsh/sessions/2026-01-01' / header['id'] / 'session.v1.jsonl'
+primary_log.parent.mkdir(parents=True)
+primary_log.write_text(json.dumps(header) + '\n' + json.dumps(start) + '\n' + json.dumps(end) + '\n')
+assert call('resume', launches, 'primary', 'deepseek/v4', 'high', cwd, '--primary-root', root) == str(primary)
+assert (primary / 'home/.config/token').read_text() == 'refreshed-token', 'resume must retain operator CLI identity'
+call('prepare-primary', launches, 'missing-primary', 'g1', source, 'deepseek/v4', 'high', cwd, tmp / 'absent-code-root', env=primary_env, ok=False)
+assert not (launches / 'missing-primary.dsh').exists(), 'missing native plugin must refuse before staging a runtime'
 print('ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, any log generation admitted by behavior, named unknown checks and generation retirement')
 PY
 # shellcheck source=bin/fm-dsh-lib.sh
@@ -229,7 +254,14 @@ if out=$(PATH="$TMP/cli" fm_dsh_launch_check 2>&1); then
   echo 'an absent launcher must refuse' >&2; exit 1
 fi
 case "$out" in *'dsh-tui executable not found on PATH'*) ;; *) echo "$out" >&2; exit 1 ;; esac
-printf 'ok - PATH-selected DSH probes accept arbitrary releases and refuse failed commands\n'
+PATH="$TMP/cli:$TMP/launcher" fm_dsh_launch_check "$TMP/launcher/dsh-tui" ship
+for role in primary secondmate; do
+  if out=$(PATH="$TMP/cli:$TMP/launcher" fm_dsh_launch_check "$TMP/launcher/dsh-tui" "$role" 2>&1); then
+    echo "a $role without owner-death cleanup must refuse" >&2; exit 1
+  fi
+  case "$out" in *'requires perl for owner-bound supervision cleanup'*) ;; *) echo "$out" >&2; exit 1 ;; esac
+done
+printf 'ok - PATH-selected DSH probes accept arbitrary releases, refuse failed commands and require ownership cleanup only for primaries\n'
 for args in \
   'node /opt/homebrew/bin/dsh-tui --patch /state/t.dsh/g1/launch.yml -- brief' \
   'node /opt/homebrew/lib/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch x' \

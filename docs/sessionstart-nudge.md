@@ -26,7 +26,7 @@ The tier is a property of the harness surface, not of the home.
 
 | Tier | What the adapter does | Used by |
 | --- | --- | --- |
-| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, Cursor |
+| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, dsh primary launcher, Cursor |
 | Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier sources routed to the nudge |
 
 Codex's interactive TUI has no tracked session-open, compaction, or re-emit channel and is not covered by either tier.
@@ -43,6 +43,7 @@ Codex's interactive TUI has no tracked session-open, compaction, or re-emit chan
 | Grok | Nudge | [Grok](#grok) |
 | Cursor | Run | [Cursor](#cursor) |
 | omp | Run | [omp](#omp) |
+| dsh primary launcher | Run | [DSH](#dsh) |
 | Cursor compaction | Uncovered | [Cursor compaction](#cursor-compaction) |
 
 ### Why the run tier exists
@@ -374,6 +375,15 @@ So the source is derived following the Cursor precedent:
 
 A later in-process `clear` re-emits only when this lock owner completed a full startup.
 `before_agent_start` message delivery was verified to reach model context on 18.1.11.
+
+### DSH
+
+`bin/fm-dsh-primary.sh` and DSH secondmate launches add the tracked `.dsh/fm-primary.mjs` Cordis plugin to a private launch patch.
+Its awaited `agent/created` callback invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry and injects the resulting digest into the agent inbox before the first provider turn.
+Top-level same-process session replacements use the shared `clear` source; delegated children never receive the primary digest or take over the watcher.
+A fresh process resuming a conversation takes the helm again through the same idempotent startup owner.
+Bare `dsh-tui` launches do not discover this plugin, and automatic in-place compaction has no separate tracked re-emit callback.
+The [DSH protocol](supervision-protocols/dsh.md) owns watcher continuity and recovery.
 
 ### Cursor compaction
 

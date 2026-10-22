@@ -2225,7 +2225,7 @@ resolve_relaunch_profile() {
     fm_control_omp_launch_check || return 1
   fi
   if [ "$TARGET_HARNESS" = dsh ]; then
-    fm_dsh_launch_check || return 1
+    fm_dsh_launch_check '' "$KIND" || return 1
   fi
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the

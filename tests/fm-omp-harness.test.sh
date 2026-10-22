@@ -1499,12 +1499,12 @@ test_secondmate_config_pinned_model_is_validated() {
   pass "fm-spawn: the config/secondmate-harness model pin is validated against the omp catalog before launch"
 }
 
-test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh() {
-  # dsh has no secondmate protocol. DeepSeek must refuse rather than escape
-  # that unsupported boundary through the former omp route.
+test_secondmate_explicit_omp_deepseek_profile_is_refused() {
+  # Explicit omp selections must refuse DeepSeek instead of silently
+  # bypassing the model-family route, including secondmate configuration.
   local world home fakebin launchlog out status via
   local -a extra
-  for via in config model dsh; do
+  for via in config model; do
     extra=()
     [ "$via" != model ] || extra=(--model deepseek/deepseek-v4-flash)
     world="$TMP_ROOT/secondmate-deepseek-$via"
@@ -1522,7 +1522,6 @@ test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh() {
     case "$via" in
       config) printf 'omp deepseek/deepseek-v4-flash\n' > "$world/home/config/secondmate-harness" ;;
       model) printf 'omp\n' > "$world/home/config/secondmate-harness" ;;
-      dsh) printf 'dsh deepseek/deepseek-v4-flash\n' > "$world/home/config/secondmate-harness" ;;
     esac
     out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
       FM_ROOT_OVERRIDE='' FM_HOME="$world/home" HOME="$world/user-home" \
@@ -1531,20 +1530,12 @@ test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh() {
       FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
       "$ROOT/bin/fm-spawn.sh" sm "$home" --secondmate ${extra[@]+"${extra[@]}"} 2>&1)
     status=$?
-    if [ "$via" = dsh ]; then
-      expect_code 1 "$status" "an explicit dsh secondmate pin must be refused: $out"
-      assert_contains "$out" "dsh is a verified crewmate/scout adapter only and cannot run a secondmate" \
-        "the dsh secondmate refusal must name its reason: $out"
-      assert_absent "$world/home/state/sm.meta" "a refused dsh secondmate must publish no sm.meta"
-      [ ! -s "$launchlog" ] || fail "a refused dsh secondmate must record no launch: $(cat "$launchlog")"
-      continue
-    fi
     expect_code 1 "$status" "a $via-selected DeepSeek secondmate must not fall back to omp: $out"
     assert_contains "$out" "DeepSeek runs through dsh-tui, not omp" "the refusal must name the adapter cutover"
     assert_absent "$world/home/state/sm.meta" "a refused DeepSeek secondmate must publish no metadata"
     [ ! -s "$launchlog" ] || fail "a refused DeepSeek secondmate must launch nothing"
   done
-  pass "fm-spawn: unsupported DeepSeek secondmates refuse rather than retain omp"
+  pass "fm-spawn: contradictory omp DeepSeek secondmate profiles refuse before launch"
 }
 
 # --- 3. Busy state -------------------------------------------------------------
@@ -4284,7 +4275,7 @@ test_spawn_raw_omp_expansions_pass_through_unchanged
 test_spawn_raw_omp_literal_evidence_still_refuses
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
-test_secondmate_deepseek_stand_in_is_not_rerouted_to_dsh
+test_secondmate_explicit_omp_deepseek_profile_is_refused
 test_busy_extension_lifecycle
 test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed

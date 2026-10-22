@@ -105,7 +105,22 @@ SH
   out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_DSH_HARNESS=dsh \
     PATH="$bin:$PATH" bash -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = claude ] || fail "a leaked FM_DSH_HARNESS without a dsh ancestor must not relabel a claude worker, got '$out'"
-  pass "fm-harness: dsh detects by anchored name or script argv; the marker is a precedence override that needs real dsh ancestry"
+  cat > "$bin/deep-tool.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" -gt 0 ]; then
+  bash "$0" "$(( $1 - 1 ))" "$2"
+else
+  "$2"
+fi
+:
+SH
+  # The native session-start transport nests real bounded shell helpers;
+  # its structural DSH marker proof must survive that depth.
+  # shellcheck disable=SC2016 # this body expands in the dsh-named shell
+  out=$("${clean[@]}" FM_DSH_HARNESS=dsh PATH="$bin:$PATH" \
+    "$bin/dsh" -c 'bash "$1" 9 "$2"; :' _ "$bin/deep-tool.sh" "$HARNESS")
+  [ "$out" = dsh ] || fail "nested native startup must still detect dsh, got '$out'"
+  pass "fm-harness: dsh detects by anchored name or script argv, including nested native startup; its marker needs real dsh ancestry"
 }
 
 test_lock_identity_and_tmux_liveness_name_dsh() {
@@ -439,6 +454,39 @@ test_deepseek_cannot_launch_on_omp() {
   pass "fm-spawn: explicit, raw, and indexed DeepSeek-through-omp routes refuse before launch"
 }
 
+test_omp_default_cannot_hide_a_deepseek_route() {
+  local model id out status config
+  for model in deepseek/deepseek-v4-flash lab/native-model; do
+    id="default-${model%%/*}"
+    make_dsh_case "$id" "$id"
+    config="$CASE_DIR/omp-config"
+    mkdir -p "$config"
+    printf 'modelRoles:\n  default: %s:high\n' "$model" > "$config/config.yml"
+    cat > "$FAKEBIN_DIR/omp" <<'SH'
+#!/bin/sh
+case "$1" in
+  --version) printf 'omp/18.1.20\n' ;;
+  models) printf '{"models":[{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"},{"provider":"lab","id":"native-model","selector":"lab/native-model"}]}\n' ;;
+  *) exit 0 ;;
+esac
+SH
+    chmod +x "$FAKEBIN_DIR/omp"
+    out=$(PI_CODING_AGENT_DIR="$config" OMP_PROFILE='' PI_PROFILE='' FM_BACKEND=tmux FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+      fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --harness omp --scout)
+    status=$?
+    if [ "${model%%/*}" = deepseek ]; then
+      expect_code 1 "$status" "a catalog-listed DeepSeek default without --model must refuse: $out"
+      assert_contains "$out" 'DeepSeek runs through dsh-tui, not omp' 'the inherited default must obey the same family route'
+      assert_absent "$HOME_DIR/state/$id.meta" 'a contradictory inherited default must publish no task'
+      [ ! -s "$LAUNCH_LOG" ] || fail 'a contradictory inherited default must launch nothing'
+    else
+      expect_code 0 "$status" "a non-DeepSeek default must retain its original route: $out"
+      assert_grep 'harness=omp' "$HOME_DIR/state/$id.meta" 'a non-DeepSeek inherited default must remain omp'
+    fi
+  done
+  pass 'fm-spawn: catalog-listed DeepSeek defaults refuse without --model; non-DeepSeek defaults retain omp'
+}
+
 test_unrecognized_dsh_screen_refuses_launch() {
   local id=dsh-unknown-screen out status
   make_dsh_case unknown-screen "$id"
@@ -484,5 +532,6 @@ test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_launch_policy_admits_dsh
 test_deepseek_cannot_launch_on_omp
+test_omp_default_cannot_hide_a_deepseek_route
 test_unrecognized_dsh_screen_refuses_launch
 test_exhausted_omp_replaces_deepseek_harness

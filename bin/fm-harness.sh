@@ -177,7 +177,9 @@ ancestry_names_omp() {
 
 ancestry_names_dsh() {
   local pid=$$ comm
-  for _ in 1 2 3 4 5 6 7 8; do
+  # Native session-open delivery nests the bounded startup wrappers below
+  # the TUI. Match the session-lock library's sixteen-parent proof boundary.
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
     comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
     case "${comm##*/}" in dsh|dsh-tui) return 0 ;; esac
     fm_dsh_pid_is_dsh "$pid" && return 0

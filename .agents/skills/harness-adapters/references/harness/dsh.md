@@ -1,7 +1,9 @@
 # dsh (DeepSeek Harness)
 
 dsh is the terminal frontend for DeepSeek Harness, launched through `dsh-tui`.
-It is verified as a crewmate and scout adapter only; it has no primary supervision protocol, so `../../../bin/fm-spawn.sh` refuses a secondmate on it.
+It supports workers and scouts, and primary or secondmate sessions through the tracked native plugin loaded by `../../../bin/fm-dsh-primary.sh` or the secondmate launch patch.
+Primary and secondmate supervision requires Perl for the shared owner-bound watcher watchdog; it has no lifetime deadline and terminates only its owned subtree on native process death or disposal.
+A bare `dsh-tui` is detectable but does not load Firstmate's primary supervision adapter automatically; [the DSH protocol](../../../docs/supervision-protocols/dsh.md) owns that boundary and recovery.
 Runtime evidence is owned by [runtime verification](../../../docs/verification/runtime-backends.md#deepseek-harness-dsh-tui); portable regressions are [`tests/fm-dsh-harness.test.sh`](../../../tests/fm-dsh-harness.test.sh) for the adapter helper and [`tests/fm-dsh-spawn.test.sh`](../../../tests/fm-dsh-spawn.test.sh) for detection, the spawn route and launch environment, launch policy, and busy and liveness classification, and the live lifecycle guard is [`tests/fm-dsh-live-e2e.test.sh`](../../../tests/fm-dsh-live-e2e.test.sh).
 
 ## Operating facts
@@ -30,15 +32,18 @@ The dsh template clears every foreign marker at its own boundary, and the omp te
 
 `bin/fm-dsh.py route` maps provider `deepseek` or a `deepseek/` model prefix to dsh; `claude*` maps to claude and everything else to omp, without changing non-DeepSeek dispatch.
 `../../../bin/fm-spawn.sh` selects dsh for an implicit DeepSeek ship or scout; contradictory explicit DeepSeek adapters refuse rather than keep omp as a parallel route.
+An omp launch omitting `--model` also checks its resolved shared Default role through this owner, so a catalog-listed DeepSeek default cannot bypass the cutover.
 `bin/fm-dsh.py check` requires dsh for DeepSeek and requires a concrete model id (a `deepseek/` prefix, or an explicit `deepseek` provider, followed by a non-empty id with no `/` or whitespace).
-Relaunch checks that admission before stopping the running agent; unsupported dsh secondmates refuse rather than return DeepSeek to omp.
+Relaunch checks that admission before stopping the running agent; dsh secondmates load the same native primary plugin as the main session rather than returning DeepSeek to omp.
 `../../../bin/fm-dispatch-resolve.sh` normalizes provider-only models only for dsh profiles and rejects contradictory adapter/model profiles without rewriting them.
 Declared DeepSeek stand-ins are cross-harness dsh replacements, never native omp fallback-chain entries; the fallback schema and session-policy admission belong to [configuration](../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson).
 
 ## Launch posture
 
 The launch swaps `HOME` for the task's private one, because `dsh-tui` keeps its model and effort preferences under `~/.dsh-tui` and has no flag for them.
-Other HOME-relative tool state is therefore absent from the worker on purpose: ssh keys, `gh` configuration and tokens, `~/.npmrc`, toolchain and package caches, and the XDG git configuration are neither copied nor linked.
+Other HOME-relative tool state is therefore absent from ships and scouts on purpose: ssh keys, `gh` configuration and tokens, `~/.npmrc`, toolchain and package caches, and the XDG git configuration are neither copied nor linked.
+Primary and secondmate preparation instead links unrelated operator-home entries into the private HOME, retaining existing CLI authentication and tool state without copying it; `.dsh` and `.dsh-tui` remain exclusively launch-local.
+`FM_DSH_OPERATOR_HOME` selects that operator home when explicitly supplied, otherwise preparation uses the launching operator's HOME.
 Exactly two paths are carried as environment variables resolved by the pane shell before `HOME` changes, so they name the operator's real files and nothing is copied: `GIT_CONFIG_GLOBAL` (the exported value, else `~/.gitconfig`) keeps the configured commit author and works beside the `GIT_CONFIG_*` `core.hooksPath` entry, and `NM_HOME` (the exported value, else `~/.no-mistakes`) lets `no-mistakes` reach the shared daemon, which it otherwise looks for under `$HOME/.no-mistakes`.
 Run from a swapped `HOME`, `no-mistakes daemon status` reported the same running daemon as the operator's shell with `NM_HOME` carried and `daemon not running` without it; [runtime verification](../../../docs/verification/runtime-backends.md#deepseek-harness-dsh-tui) records the run.
 

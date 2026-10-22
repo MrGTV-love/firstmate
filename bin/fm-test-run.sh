@@ -471,6 +471,7 @@ family_for_basename() {
     fm-codex-continuity-live-e2e.test.sh|fm-codex-hook-layer-live-e2e.test.sh|\
     fm-grok-continuity-live-e2e.test.sh|\
     fm-cursor-primary-live-e2e.test.sh|\
+    fm-dsh-live-e2e.test.sh|fm-dsh-primary-live-e2e.test.sh|\
     fm-grok-stop-live-e2e.test.sh|fm-harness-adapter-instructions-live-e2e.test.sh|\
     fm-harness-liveness-drift-live-e2e.test.sh|\
     fm-devin-signals-live-e2e.test.sh|fm-muse-signals-live-e2e.test.sh|fm-rovo-signals-live-e2e.test.sh|fm-agy-signals-live-e2e.test.sh|\
@@ -1963,6 +1964,13 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
       printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' session-bootstrap
+      ;;
+    .dsh/fm-primary.mjs|bin/fm-dsh-primary.sh|bin/fm-dsh.py|bin/fm-dsh-lib.sh)
+      printf '%s\n' __script__:fm-dsh-primary.test.sh
+      printf '%s\n' __script__:fm-dsh-harness.test.sh
+      printf '%s\n' __script__:fm-dsh-spawn.test.sh
+      printf '%s\n' __script__:fm-dsh-primary-live-e2e.test.sh
+      printf '%s\n' __script__:fm-dsh-live-e2e.test.sh
       ;;
     bin/fm-env-lib.sh)
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and

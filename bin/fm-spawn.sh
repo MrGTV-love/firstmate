@@ -2801,6 +2801,7 @@ print role.to_s
   *:off | *:minimal | *:low | *:medium | *:high | *:xhigh | *:max | *:auto) selector=${role%:*} ;;
   esac
   case "$selector" in */*) ;; *) return 0 ;; esac
+  python3 "$SCRIPT_DIR/fm-dsh.py" check omp "$selector" || return 1
   verdict=$(omp_catalog_verdict "$(PI_CODING_AGENT_DIR="$agent_dir" omp_models_listing "$bin")" "$selector")
   case "$verdict" in
   unknown-provider)
@@ -3325,7 +3326,7 @@ if [ "$HARNESS" = claude ]; then
   CLAUDE_LAUNCH_BIN=$(fm_claude_launcher_select "$CONFIG") || exit 1
 fi
 
-# muse, gemini, agy, devin, and dsh are verified as CREWMATE/SCOUT adapters only. A secondmate is
+# muse, gemini, agy, and devin are verified as CREWMATE/SCOUT adapters only. A secondmate is
 # a firstmate instance, so it needs a primary supervision protocol.
 # gemini has none: docs/supervision-protocols/ carries no gemini wake protocol
 # and this task verified only crewmate-side launch, busy state, interrupt, and
@@ -3339,10 +3340,6 @@ fi
 # docs/supervision-protocols/ carries no agy wake protocol (agy 1.2.0).
 # devin has none either: only its worker lifecycle hooks are verified, and
 # docs/supervision-protocols/ carries no devin wake protocol (devin 3000.11.1).
-if [ "$KIND" = secondmate ] && [ "$HARNESS" = dsh ]; then
-  echo "error: dsh is a verified crewmate/scout adapter only and cannot run a secondmate yet; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
-  exit 1
-fi
 if [ "$KIND" = secondmate ] && { [ "$HARNESS" = muse ] || [ "$HARNESS" = gemini ] || [ "$HARNESS" = agy ] || [ "$HARNESS" = devin ]; }; then
   echo "error: $HARNESS is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
   exit 1
@@ -3367,7 +3364,7 @@ fi
 case "$HARNESS" in
 dsh)
   DSH_BIN=$(fm_dsh_executable) || exit 1
-  fm_dsh_launch_check "$DSH_BIN" || exit 1
+  fm_dsh_launch_check "$DSH_BIN" "$KIND" || exit 1
   ;;
 devin)
   DEVIN_BIN=$(command -v devin) || {
@@ -7001,10 +6998,18 @@ dsh)
   # session; anything it cannot prove falls back to a fresh session.
   DSH_RUNTIME=
   if [ "$RELAUNCH" = 1 ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
-    DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" 2>/dev/null) || DSH_RUNTIME=
+    if [ "$KIND" = secondmate ]; then
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" --primary-root "$FM_ROOT") || exit 1
+    else
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" 2>/dev/null) || DSH_RUNTIME=
+    fi
   fi
   if [ -z "$DSH_RUNTIME" ]; then
-    DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT") || exit 1
+    if [ "$KIND" = secondmate ]; then
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare-primary "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT" "$FM_ROOT") || exit 1
+    else
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "${DSH_HOME:-$HOME/.dsh}" "$MODEL" "$EFFORT" "$WT") || exit 1
+    fi
   fi
   DSH_START_POSITION=$(python3 "$SCRIPT_DIR/fm-dsh.py" position "$STATE_REAL" "$ID") || exit 1
   LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}

@@ -14,6 +14,9 @@ The installed package tree is reproduced inside the launch root, hard-linked
 file by file where the filesystem allows and copied otherwise, never linked as
 a directory; configuration, credentials, preferences, and session logs belong
 exclusively to this launch.
+prepare-primary STATE ID GENERATION SOURCE_HOME MODEL EFFORT CWD CODE_ROOT
+stages the same private runtime plus CODE_ROOT/.dsh/fm-primary.mjs, the native
+session-open, watcher and passive turn-end adapter. Resume retains that role.
 resume STATE ID MODEL EFFORT CWD rewrites the bound launch patch to resume the
 newest depth-zero session, or prints nothing when the binding changed.
 session-file STATE ID prints the live depth-zero session log.
@@ -91,7 +94,7 @@ def atomic_json(path, value):
         temporary.unlink(missing_ok=True)
 
 
-def launch_patch(model, effort, cwd, dsh, session_id):
+def launch_patch(model, effort, cwd, dsh, session_id, primary_root=None):
     # JSON is valid YAML. A complete row config is required: overlays replace
     # config, not individual fields, and they also replace the profile patch
     # fields this row carries (preset, workspace, sessionId, backend). The
@@ -104,6 +107,8 @@ def launch_patch(model, effort, cwd, dsh, session_id):
             **({"sessionId": session_id} if session_id else {})}},
         {"id": "llm-deepseek", "config": {"apiKeyEnv": "DEEPSEEK_API_KEY", "models": [{"id": model}]}},
         {"id": "session-persistence-jsonl", "config": {"root": str(dsh / "sessions"), "compression": "none"}},
+        *([{"insert": [{"id": "firstmate-primary", "name": str(Path(primary_root) / ".dsh" / "fm-primary.mjs"),
+            "config": {"root": primary_root, "home": str(Path(cwd).resolve())}}]}] if primary_root else []),
     ]
 
 
@@ -116,8 +121,12 @@ def resume_target(path):
     return session
 
 
-def prepare(args):
+def prepare(args, primary_root=None):
     state, task, generation, source_home, model, effort, cwd = args
+    if primary_root is not None:
+        primary_root = str(Path(primary_root).resolve())
+        if not (Path(primary_root) / ".dsh" / "fm-primary.mjs").is_file():
+            raise ValueError("dsh primary plugin is missing")
     check("dsh", model)
     model = model.removeprefix("deepseek/")
     if effort in ("", "default"):
@@ -132,6 +141,15 @@ def prepare(args):
     dsh = root / "dsh"
     prefs = home / ".dsh-tui"
     prefs.mkdir(parents=True, mode=0o700)
+    if primary_root is not None:
+        # A primary must retain the operator's CLI authentication and tool
+        # state. Link unrelated home entries, not copies of credentials;
+        # DSH's own two roots remain exclusively launch-local.
+        operator_home = Path(os.environ.get("FM_DSH_OPERATOR_HOME", str(Path.home()))).resolve()
+        for entry in operator_home.iterdir():
+            if entry.name not in (".dsh", ".dsh-tui"):
+                (home / entry.name).symlink_to(entry, target_is_directory=entry.is_dir())
+        (home / ".dsh").symlink_to(dsh, target_is_directory=True)
     profile = dsh / "profiles" / "dsh-tui"
     profile.mkdir(parents=True, mode=0o700)
     # Do not link the profile itself: DSH rewrites cordis.yml at boot.
@@ -154,13 +172,13 @@ def prepare(args):
     atomic_json(prefs / "model.json", {"provider": "deepseek-official", "model": model})
     if effort not in ("", "default"):
         atomic_json(prefs / "effort.json", {"effort": effort})
-    atomic_json(root / "launch.yml", launch_patch(model, effort, cwd, dsh, ""))
+    atomic_json(root / "launch.yml", launch_patch(model, effort, cwd, dsh, "", primary_root))
     binding = Path(state) / f"{task}.dsh-session"
     try:
         previous = Path(json.loads(binding.read_text())["root"])
     except (OSError, ValueError, KeyError, TypeError):
         previous = None
-    atomic_json(binding, {"root": str(root), "cwd": str(Path(cwd).resolve()), "generation": generation, "model": model, "effort": effort})
+    atomic_json(binding, {"root": str(root), "cwd": str(Path(cwd).resolve()), "generation": generation, "model": model, "effort": effort, "primary_root": primary_root})
     if previous is not None and previous != root and previous.parent == root.parent:
         shutil.rmtree(previous, ignore_errors=True)
     print(root)
@@ -297,7 +315,7 @@ def position(state, task):
     return [str(path), fold(path)[1]]
 
 
-def resume(args):
+def resume(args, primary_root=None):
     state, task, model, effort, cwd = args
     try:
         binding = json.loads((Path(state) / f"{task}.dsh-session").read_text())
@@ -313,7 +331,13 @@ def resume(args):
         return
     session = resume_target(path)
     root = Path(binding["root"])
-    atomic_json(root / "launch.yml", launch_patch(model, effort, cwd, root / "dsh", session))
+    if primary_root is not None:
+        primary_root = str(Path(primary_root).resolve())
+        if not (Path(primary_root) / ".dsh" / "fm-primary.mjs").is_file():
+            raise ValueError("dsh primary plugin is missing")
+        binding["primary_root"] = primary_root
+        atomic_json(Path(state) / f"{task}.dsh-session", binding)
+    atomic_json(root / "launch.yml", launch_patch(model, effort, cwd, root / "dsh", session, binding.get("primary_root")))
     print(root)
 
 
@@ -329,8 +353,12 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("prepare")
     p.add_argument("values", nargs=7)
+    p = sub.add_parser("prepare-primary")
+    p.add_argument("values", nargs=7)
+    p.add_argument("primary_root")
     p = sub.add_parser("resume")
     p.add_argument("values", nargs=5)
+    p.add_argument("--primary-root")
     p = sub.add_parser("session-file")
     p.add_argument("values", nargs=2)
     p = sub.add_parser("position")
@@ -354,8 +382,10 @@ def main():
     try:
         if args.command == "prepare":
             prepare(args.values)
+        elif args.command == "prepare-primary":
+            prepare(args.values, args.primary_root)
         elif args.command == "resume":
-            resume(args.values)
+            resume(args.values, args.primary_root)
         elif args.command == "session-file":
             session_file(args.values)
         elif args.command == "route":

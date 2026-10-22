@@ -328,6 +328,15 @@ The blocking and bounded-follow-up mechanisms were validated across seven harnes
 | Grok | 0.2.112 native and 0.2.73 pre-native | Running-payload adaptive `Stop` | Native false-to-true continuation stayed in one process with two model turns and zero resume launches; the field-absent pre-native process launched exactly one guarded resume. |
 | Cursor | 2026.08.11-e8db854 | Awaited `stop` hook park returning one `followup_message` | Exit 2 ended the turn normally, proving it cannot block; a returned follow-up ran a genuine second turn; a sleeping hook held the boundary open and the wake landed after it; `loop_limit` stopped the hook being invoked at its ceiling. |
 
+### DSH native message identity, 2026-10-22
+
+The native `user/message` event carries `UserMessage` directly in `data`, including `data.id`; it does not use the wrapper carried by `assistant/message`.
+The DSH primary bridge uses that identity to distinguish its own consumed notifications and guard continuations from new external input.
+On Node 26.4.0, `nice -n 20 bash tests/fm-dsh-primary.test.sh` passed with native-shaped events and explicit consumption of synthetic messages before their next turn end.
+It exercised one continuation per failed episode, a fresh budget for a genuinely new user message, a bounded guard continuation for a consumed but unacknowledged wake, no duplicate accepted notification, acknowledgement before re-arm, delegated-child exclusion, ordinary process-group retirement, and native SIGKILL cleanup of a TERM-resistant descendant.
+The real `FM_DSH_PRIMARY_LIVE=1 nice -n 20 bash tests/fm-dsh-primary-live-e2e.test.sh` then passed native startup, registered-check wake consumption, shared guard recovery, interrupt, exit, same-conversation resume and forced-native-death watcher cleanup in a named Herdr lab, with `cleanup_exit=0`.
+[Runtime verification](runtime-backends.md#native-primary-and-secondmate-lifecycle) owns the detailed live record, commands and limits; the passive boundary cannot block a completed DSH turn.
+
 ### Claude mid-turn Lavish feedback, 2026-09-30
 
 Claude Code 2.1.285 was exercised in an isolated primary with the tracked `PostToolUse` registration and production hook, queue drain, result reader, and acknowledgement commands.

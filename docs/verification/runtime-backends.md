@@ -3932,10 +3932,56 @@ This is a search-path handoff, not a Node-version requirement.
 
 The installed profile tree is reproduced file by file inside each launch root and never linked as a directory: Node resolves real paths before DSH's profile interception, so a linked `node_modules` directory escaped the isolated profile and loaded the launcher's own incompatible packages.
 The launcher needs the `dsh` CLI on `PATH`; `bin/fm-dsh-lib.sh` probes both PATH-selected commands and the launch preserves that search path rather than selecting a particular Node installation.
-The launch swaps `HOME` for the task's private one, so `~/.gitconfig` and the no-mistakes home are carried as `GIT_CONFIG_GLOBAL` and `NM_HOME` environment paths resolved by the pane shell; nothing is copied or linked, and the other HOME-relative tool state is absent on purpose.
+Ship and scout launches swap `HOME` for the task's private one, so `~/.gitconfig` and the no-mistakes home are carried as `GIT_CONFIG_GLOBAL` and `NM_HOME` environment paths resolved by the pane shell; those paths are not copied or linked, and the other HOME-relative tool state is absent on purpose.
 On 2026-10-19, against the operator's live no-mistakes daemon, `no-mistakes daemon status` reported the same running daemon from the operator's shell and from a swapped empty `HOME` with `NM_HOME` carried, and `daemon not running` from the swapped `HOME` with `NM_HOME` unset.
 `no-mistakes axi status` from an ungated worktree gave the identical `repo not initialized` answer under both homes. From the gated task copy under the same rendered environment (`HOME` swapped to a fresh empty directory, `NM_HOME`, `GIT_CONFIG_GLOBAL`, and the nvm bin directory carried) it reported the live run `01M59ACR7C1VSYG5SEZHB7K7SW` on branch `fm/fm-dsh-tui-adoption` at head `f09cf534`, identical to the operator's shell; with `NM_HOME` unset it fell back to `repo not initialized`. The checked process was a shell started with the rendered environment, not a command run by a DSH tool call; a DSH tool call that inherits the launch environment is the remaining unrecorded link.
 DSH's default `workspace-write` posture parked a real worker on an `Awaiting approval` panel when it moved a steering record outside the session workspace; the launch therefore selects DSH's own `danger-full-access` preset, whose approval policy is `never`.
+
+### Native primary and secondmate lifecycle
+
+Verified on 2026-10-22 on macOS arm64 with the PATH-selected `dsh-tui` 0.16.1 profile and Node v26.4.0, through a named non-default Herdr lab.
+The fixture starts a real primary with `bin/fm-dsh-primary.sh`, then exercises the existing secondmate control and spawn path against that same conversation.
+Its private home is an initialized throwaway Git repository with its own identity marker, empty operator-home fixture and bounded charter; no additional shared checkout or live fleet pane is used.
+The registered LAB check runs every second through `FM_CHECK_INTERVAL=1`; production cadence and verification wait bounds are unchanged.
+
+```sh
+FM_DSH_PRIMARY_LIVE=1 FM_DSH_EVIDENCE_DIR=<fresh evidence directory> \
+  bin/fm-proc-budget.sh -- nice -n 20 bash tests/fm-dsh-primary-live-e2e.test.sh
+```
+
+Observed output:
+
+```text
+interrupt-delivered ... harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped ... harness=dsh backend=herdr ...
+relaunched ... harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr ...
+ok - forced native owner death retired private arm and watcher
+relaunched ... harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr ...
+stopped ... harness=dsh backend=herdr ...
+ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume
+cleanup_exit=0
+```
+
+| Boundary | Evidence |
+| --- | --- |
+| Startup | The native Cordis plugin loaded from the private launch patch; the real session log contained the DSH-specific ordered startup digest and supervision protocol |
+| Native notification | A registered check produced a durable epoch/sequence row; native follow-up caused the model to drain and acknowledge it, and the guard required unique delivery keys |
+| Turn end | The shared guard recorded `2` without supervision and `0` after the native adapter restored its tracked watcher |
+| Interrupt | The real key-plane call delivered Escape and proved agent survival; cancellation completion remains unconfirmed |
+| Exit and resume | Ordinary exit disposed the native adapter; control/spawn relaunched it in the same endpoint and log, and a new assistant reply recovered the earlier conversation's secret word, which was absent from its charter |
+| Forced crash | SIGKILL of the exact native owner bypassed disposal; both the recorded private arm and home watcher PIDs disappeared before a second same-conversation resume and final exit |
+| Cleanup | Guarded named-session teardown and the default-session tripwire completed successfully; final watcher stop reported none running |
+
+The complete live guard took a measured 217.94 seconds; this is an observation, not a launch or watcher deadline.
+`tests/fm-dsh-primary.test.sh` separately exercises failed-arm follow-up budgets, native `user/message` identity, consumed-but-unacknowledged rows, delegated-child exclusion, ordinary disposal and forced native SIGKILL with a TERM-resistant descendant.
+`tests/fm-timeout-lib.test.sh` proves the shared owner-bound runner has no deadline, preserves natural command exit/output and refuses a deadline-only fallback when Perl is unavailable, alongside the existing timed-runner regressions.
+`tests/fm-dsh-harness.test.sh` covers primary-only operator tool-state sharing while keeping DSH preferences private and preserving the isolated worker-HOME contract.
+Primary CLI state is linked from the operator home, not copied; the live fixture uses an empty operator home, so it does not prove authentication to external tools.
+
+This is passive turn-end protection, not a blocking Stop hook or native pre-tool veto.
+The guard bounds synthetic failure continuations; it cannot prevent a completed DSH turn from becoming idle.
+Native automatic in-place compaction has no separate tracked startup re-emit callback, and the live guard does not exercise plugin hot reload or an away supervision-host session.
+The [DSH protocol](../supervision-protocols/dsh.md) and [session-start contract](../sessionstart-nudge.md#dsh) own those operating boundaries.
 
 ## Busy inbox escalation
 

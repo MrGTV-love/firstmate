@@ -25,8 +25,13 @@ fm_dsh_cli() {
   printf '%s' "$candidate"
 }
 
-fm_dsh_launch_check() {  # [executable]
+fm_dsh_launch_check() {  # [executable] [ship|scout|primary|secondmate]
   local executable=${1:-} cli
+  case "${2:-}" in
+    primary|secondmate)
+      command -v perl >/dev/null 2>&1 || { echo 'error: DSH primary requires perl for owner-bound supervision cleanup' >&2; return 1; }
+      ;;
+  esac
   [ -n "$executable" ] || executable=$(fm_dsh_executable) || return 1
   "$executable" version >/dev/null 2>&1 || {
     echo 'error: dsh-tui version failed; inspect the launcher and installed profile' >&2
