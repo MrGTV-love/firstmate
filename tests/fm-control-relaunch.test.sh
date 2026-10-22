@@ -1685,6 +1685,37 @@ test_explicit_model_wins_over_the_recorded_one() {
   pass "fm-control relaunch: explicit model and effort win over the recorded ones"
 }
 
+# The launch owner refuses a stale replacement model only after the old agent
+# has stopped, so the control plane asks the same model freshness verdict first.
+# Without a captain pin the running agent stays up and the record is unchanged;
+# with the pin naming that model the relaunch swaps to it.
+test_stale_replacement_model_refuses_before_stop_unless_pinned() {
+  local dir out rc before id=rl-stale
+  dir=$(new_case stale-model "$id")
+  add_ship_task "$dir" "$id" claude
+  sed 's/^model=default$/model=claude-sonnet-5-5/' "$dir/home/state/$id.meta" > "$dir/home/state/$id.meta.tmp"
+  mv "$dir/home/state/$id.meta.tmp" "$dir/home/state/$id.meta"
+  mkdir -p "$dir/catalogs"
+  printf '%s\n' '{"models":[{"id":"claude-sonnet-5"},{"id":"claude-sonnet-5-5"}]}' > "$dir/catalogs/claude.json"
+  before=$(cat "$dir/home/state/$id.meta")
+  out=$(FM_MODEL_FRESHNESS=1 FM_MODEL_CATALOG_DIR="$dir/catalogs" \
+    run_control "$dir" "$id" relaunch --model claude-sonnet-5 --note "move to the older model"); rc=$?
+  expect_code 1 "$rc" "a stale replacement model without a captain pin must refuse"$'\n'"$out"
+  assert_contains "$out" "refusing to relaunch $id onto a stale model - claude-sonnet-5 on claude is older than claude-sonnet-5-5" \
+    "the refusal should name the stale model and the newer one"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused stale relaunch stopped the running agent"
+  [ ! -s "$dir/fake/literal" ] || fail "a refused stale relaunch sent lifecycle input"
+  [ "$before" = "$(cat "$dir/home/state/$id.meta")" ] || fail "a refused stale relaunch must leave the record byte-identical"
+  out=$(FM_MODEL_FRESHNESS=1 FM_MODEL_CATALOG_DIR="$dir/catalogs" \
+    run_control "$dir" "$id" relaunch --model claude-sonnet-5 --captain-model-pin claude-sonnet-5 \
+      --note "the captain asked for the older model"); rc=$?
+  expect_code 0 "$rc" "a captain pin naming the stale replacement model must admit the relaunch"$'\n'"$out"
+  [ "$(meta_field "$dir" "$id" model)" = claude-sonnet-5 ] || fail "the pinned relaunch should record the stale model"
+  assert_contains "$(meta_field "$dir" "$id" model_stale)" "claude-sonnet-5 on claude is older than claude-sonnet-5-5 in the claude catalog (admitted by captain pin)" \
+    "the pinned relaunch should record the finding as captain-authorized"
+  pass "fm-control relaunch: a stale replacement model refuses before the stop unless the captain pins it"
+}
+
 test_relaunch_onto_an_unverified_harness_is_refused() {
   local dir out rc
   dir=$(new_case badharness rl8)
@@ -6666,6 +6697,7 @@ test_spawn_relaunch_without_the_opt_in_drops_the_recorded_api_key
 test_pi_exclude_tools_follow_the_relaunch
 test_exclude_tools_refusals_happen_before_the_agent_stops
 test_explicit_model_wins_over_the_recorded_one
+test_stale_replacement_model_refuses_before_stop_unless_pinned
 test_relaunch_onto_an_unverified_harness_is_refused
 test_no_helper_task_refuses_a_harness_switch_before_stopping
 test_prior_harness_turnend_registry_entry_is_cleared

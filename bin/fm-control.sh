@@ -13,6 +13,7 @@
 # bin/fm-project-lock-lib.sh attempt that never jumps a queued waiter.
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
+#                                         [--captain-model-pin <model-id>]
 #                                         [--reconcile-only] [--worktree <path>]
 #                                         (--note <text> | --note-file <path>)
 #        fm-control.sh <task-id> relaunch --recover-launch
@@ -23,6 +24,11 @@
 # keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
 # legacy-unproven launches skip.
 # This mode cannot change a profile or create a relaunch transaction.
+# --captain-model-pin is relaunch-only. A replacement model that a newer model of
+# its own family and tier has passed in the harness catalog is refused before
+# the running agent stops, unless it is the model the task already records or
+# the pin names it exactly; the pin is passed through to fm-spawn, whose header
+# owns the model freshness gate.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -400,6 +406,8 @@ EFFORT_SET=0
 NOTE=
 NOTE_SET=0
 CLAUDE_DEBUG=0
+CAPTAIN_MODEL_PIN=
+CAPTAIN_MODEL_PIN_SET=0
 RECONCILE_ONLY=0
 RELOCATE_TO=
 RELOCATE_SET=0
@@ -434,6 +442,7 @@ for control_arg in "$@"; do
       harness) NEW_HARNESS=$control_arg; HARNESS_SET=1 ;;
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
+      captain-model-pin) CAPTAIN_MODEL_PIN=$control_arg; CAPTAIN_MODEL_PIN_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
       also) parse_also "$control_arg" ;;
@@ -453,6 +462,8 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
+    --captain-model-pin) control_want_value=captain-model-pin ;;
+    --captain-model-pin=*) CAPTAIN_MODEL_PIN=${control_arg#--captain-model-pin=}; CAPTAIN_MODEL_PIN_SET=1 ;;
     --worktree) control_want_value=worktree ;;
     --worktree=*) RELOCATE_TO=${control_arg#--worktree=}; RELOCATE_SET=1 ;;
     --also) control_want_value=also ;;
@@ -480,14 +491,14 @@ fi
   || die "--also applies to 'reassociate' only"
 if [ "$VERB" = reassociate ]; then
   # reassociate takes --worktree, --also, and --note; every other relaunch option stays refused.
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
-    || die "--harness, --model, --effort, --claude-debug, --recover-launch, and --reconcile-only apply to 'relaunch' only"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
+    || die "--harness, --model, --effort, --claude-debug, --captain-model-pin, --recover-launch, and --reconcile-only apply to 'relaunch' only"
 elif [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
-    || die "--harness, --model, --effort, --note, --claude-debug, --recover-launch, --reconcile-only, and --worktree apply to 'relaunch' only (reassociate also takes --worktree and --note)"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+    || die "--harness, --model, --effort, --note, --claude-debug, --captain-model-pin, --recover-launch, --reconcile-only, and --worktree apply to 'relaunch' only (reassociate also takes --worktree and --note)"
 fi
 if [ "$RECOVER_LAUNCH" = 1 ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
     || die "--recover-launch only inspects the recorded launch; it cannot be combined with replacement options, --reconcile-only, or --worktree"
 fi
 [ "$RELOCATE_SET" = 0 ] || [ -n "$RELOCATE_TO" ] || die "--worktree requires a value"
@@ -495,6 +506,7 @@ fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
 [ "$EFFORT_SET" = 0 ] || [ -n "$NEW_EFFORT" ] || die "--effort requires a non-empty value"
+[ "$CAPTAIN_MODEL_PIN_SET" = 0 ] || [ -n "$CAPTAIN_MODEL_PIN" ] || die "--captain-model-pin requires a non-empty <model-id> value"
 case "$NEW_EFFORT" in
   ''|default|low|medium|high|xhigh|max|ultra) ;;
   *) die "--effort must be one of default, low, medium, high, xhigh, max, ultra" ;;
@@ -2313,6 +2325,26 @@ resolve_relaunch_profile() {
   if [ "$KIND" != secondmate ]; then
     fm_exclude_tools_check "$TARGET_HARNESS" 0 "$config" >/dev/null || return 1
   fi
+  # The launch owner's model freshness gate refuses a replacement model that a
+  # newer model of its own family and tier has passed, but only after the old
+  # agent has stopped. The same verdict is asked here, under the same worker
+  # account, so that refusal happens while nothing has changed yet. The model the
+  # task already records was admitted at launch, a captain pin naming the model
+  # admits it, and a newer model of another tier only warns.
+  if [ "$catalog_context" = selected ] && [ -n "$account_model" ] \
+     && [ "$TARGET_MODEL" != "$PRIOR_MODEL" ] && [ "$CAPTAIN_MODEL_PIN" != "$TARGET_MODEL" ]; then
+    local stale
+    stale=$(fm_worker_account_check_entry "$TARGET_WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" \
+      "$TARGET_HARNESS" "$TARGET_MODEL" 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || stale=
+    case "$stale" in
+      ''|*' (other tier: '*')') ;;
+      *)
+        [ -z "$CAPTAIN_MODEL_PIN" ] \
+          || echo "error: --captain-model-pin '$CAPTAIN_MODEL_PIN' is not the requested model '$TARGET_MODEL'; a pin authorizes only that exact model" >&2
+        die "refusing to relaunch $ID onto a stale model - $stale; the running agent was not stopped (relaunch onto the newer model, or pass --captain-model-pin $TARGET_MODEL only when the captain explicitly asked for $TARGET_MODEL)"
+        ;;
+    esac
+  fi
 }
 
 # safe_checkpoint: prove, before anything is stopped, that the work a relaunch
@@ -2564,6 +2596,7 @@ do_relaunch() {
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
   [ "$RELOCATING" = 0 ] || spawn_args+=(--worktree "$RELOCATE_DEST")
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
+  [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] || spawn_args+=(--captain-model-pin "$CAPTAIN_MODEL_PIN")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   [ -z "$TARGET_DISPATCH_RULE" ] || spawn_args+=(--dispatch-rule "$TARGET_DISPATCH_RULE")
   [ -z "$TARGET_DISPATCH_ROUTE" ] || spawn_args+=(--dispatch-route "$TARGET_DISPATCH_ROUTE")

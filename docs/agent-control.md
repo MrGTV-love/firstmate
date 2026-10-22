@@ -116,6 +116,7 @@ The [verification record](verification/runtime-backends.md#claude-background-tas
    Claude replacements also honor the home's [Claude launcher](configuration.md#claude-launcher-configclaude-launcher) preflight.
    The resolved replacement is also subject to the home's [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy) before checkpointing.
    Model resolution and selected-entry catalog preflight follow the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson) before the old agent stops.
+   A replacement model that a newer model of its own family and tier has passed is refused before the old agent stops, unless it is the model the task already records or `--captain-model-pin <model-id>` names it exactly; the pin is passed through to the launch, and [model freshness](configuration.md#model-freshness) owns the gate.
    Omp replacements must pass the [launch owner's billing-route admission](../bin/fm-spawn.sh) for explicit, recorded, indexed, and secondmate-pinned model selections before checkpointing or stopping the old agent.
    Ship and scout replacements also pass the [worker tool exclusion checks](configuration.md#worker-tool-exclusions-configcrew-exclude-tools) at this step.
 2. **Check replacement admission, then checkpoint.**
