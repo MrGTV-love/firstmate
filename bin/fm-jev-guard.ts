@@ -248,6 +248,58 @@ function credentialShaped(content: string): boolean {
     || /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s/:@?#"'`<>()\[\]{}\\,;|]*:[^\s/@?#"'`<>()\[\]{}\\,;|]{8,}@/i.test(content);
 }
 
+// A disposable lab home is not a production fleet. Its marker is written by
+// bin/fm-lab-home.sh and carries the same token bin/fm-gate-refuse-lib.sh reads,
+// so an approved lab teardown is not screened and cannot be refused by an
+// unavailable judge. The marker grants nothing in a real home.
+const LAB_MARKER = ".fm-lab-home";
+const LAB_TOKEN = "fm-lab-home v1";
+
+function labelledLab(home: string): boolean {
+  try {
+    return readFileSync(resolve(home, LAB_MARKER), "utf8").split("\n")[0].trim() === LAB_TOKEN;
+  } catch {
+    return false;
+  }
+}
+
+// Read-only shell commands have no effect to judge, so screening them buys
+// nothing and an unavailable judge must never refuse a directory listing, a
+// process check or a repository inspection. The test is deliberately
+// conservative: any redirection, substitution, sequencing or background
+// operator disqualifies the command, and every pipeline segment must itself be
+// a read-only program. Anything not proven read-only still goes to the judge.
+const READ_ONLY_PROGRAMS = new Set([
+  "ls", "cat", "head", "tail", "wc", "stat", "file", "du", "df", "pwd", "echo", "printf",
+  "grep", "rg", "egrep", "fgrep", "ps", "pgrep", "uname", "id", "whoami", "hostname",
+  "which", "type", "date", "uptime", "lsof", "sort", "uniq", "cut", "basename", "dirname",
+  "realpath", "readlink", "jq", "true", "false",
+]);
+const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "rev-parse", "ls-files", "describe", "blame", "shortlog", "reflog", "branch"]);
+const SHELL_MUTATION = /[<>`]|\$\(|\n|;|&&|\|\||&/;
+
+function readOnlyShell(command: string): boolean {
+  const text = command.trim();
+  if (text === "" || SHELL_MUTATION.test(text)) return false;
+  for (const segment of text.split("|")) {
+    const tokens = segment.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return false;
+    const program = tokens[0];
+    if (program === "git") {
+      const sub = tokens.slice(1).find((token) => !token.startsWith("-"));
+      if (sub === undefined || !READ_ONLY_GIT.has(sub)) return false;
+      if (sub === "branch" && tokens.some((token) => /^-[dDmMf]$|^--(delete|move|force)$/.test(token))) return false;
+      continue;
+    }
+    if (program === "find") {
+      if (tokens.some((token) => /^-(exec|execdir|ok|okdir|delete|fprint|fprintf|fls)$/.test(token))) return false;
+      continue;
+    }
+    if (!READ_ONLY_PROGRAMS.has(program)) return false;
+  }
+  return true;
+}
+
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
@@ -336,6 +388,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
             "contains a credential-shaped value: the whole write was checked locally; no content was sent for model screening");
         }
+        if (labelledLab(c.home)) return finishCall({ ...terminal, branch: "lab" });
         const settled = settle(await screenParts(pieces, async (piece, judge) => {
           const { kind, contains_secret } = (await judge({ path, content: piece }, WRITE_QUESTIONS)).answers;
           if (kind?.type !== "choice" || contains_secret?.type !== "noul") throw new ContractError("Invalid write answers.");
@@ -349,6 +402,8 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       }
       if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
       if (typeof input.command !== "string") throw new GuardUnavailableError("InvalidToolInputError");
+      if (labelledLab(c.home)) return finishCall({ ...terminal, branch: "lab" });
+      if (readOnlyShell(input.command)) return finishCall({ ...terminal, branch: "read_only" });
       const settled = settle(await screenParts(service.plan({ command: input.command, cwd: ctx.cwd }, "command", BASH_QUESTIONS), async (piece, judge) => {
         const { effect, destructive_intent } = (await judge({ command: piece, cwd: ctx.cwd }, BASH_QUESTIONS)).answers;
         if (effect?.type !== "choice" || destructive_intent?.type !== "noul") throw new ContractError("Invalid shell answers.");

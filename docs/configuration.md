@@ -2359,6 +2359,11 @@ This is an operator-only migration, not an automated retrofit; isolated verifica
 Questions and numeric policy are code-owned:
 
 - Shell screening keeps the independent effect Choice and destructive-intent Noul and their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts).
+- A shell command proven read-only never reaches the judge.
+  [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns the program allowlist, the requirement that every pipeline segment be read-only, and the disqualifying operators: redirection, substitution, sequencing and background.
+  Anything not proven read-only is judged as before, so a directory listing or process check can never be refused by an unavailable review service.
+- A home carrying the `.fm-lab-home` token written by [`bin/fm-lab-home.sh`](../bin/fm-lab-home.sh) is a disposable lab, so its tool calls are admitted without a request and an approved lab teardown cannot be refused by an unavailable judge.
+  The marker grants nothing in a real home, and the deterministic outside-root and credential checks for writes run before this admission.
 - Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
 - Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
   The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
@@ -2464,6 +2469,8 @@ This is not sustained-outage permission to execute shell commands or write files
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
+Two effect-free admissions are not exceptions to that rule: a shell command proven read-only requests no judgment, and a marked disposable lab home admits its tool calls without one.
+Neither admits an unproven command or a write in a real home, so an unavailable review service still refuses everything it would have judged.
 Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
 On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude retains its existing advisory-only path.
 Clear scores at or below 0.20 pass without an advisory.

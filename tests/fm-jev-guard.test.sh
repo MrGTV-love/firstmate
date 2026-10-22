@@ -96,7 +96,21 @@ test_claude_effects() {
   denied "$out" || fail "destructive shell command was not denied"
   claude_hook "$(pre Bash '{"command":"ls -la"}')"
   [ -z "$out" ] || fail "read-only shell command did not proceed"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "shell calls did not receive one judgment each"
+  [ "$(requests)" -eq $((before + 1)) ] || fail "read-only shell command reached the provider"
+  for command in 'ps aux | grep firstmate' 'git status --short' 'git log --oneline -3' 'find . -name "*.ts"'; do
+    claude_hook "$(pre Bash "$(jq -cn --arg c "$command" '{command:$c}')")"
+    [ -z "$out" ] || fail "read-only shell command was refused: $command"
+  done
+  [ "$(requests)" -eq $((before + 1)) ] || fail "a read-only shell command reached the provider"
+  claude_hook "$(pre Bash '{"command":"ls; rm -rf build"}')"
+  denied "$out" || fail "a sequenced command was admitted as read-only"
+  [ "$(requests)" -eq $((before + 2)) ] || fail "the sequenced command skipped judgment"
+  printf 'fm-lab-home v1\n' > "$HOME_DIR/.fm-lab-home"
+  before=$(requests)
+  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  [ -z "$out" ] || fail "an approved lab teardown was refused"
+  [ "$(requests)" -eq "$before" ] || fail "a lab home teardown reached the provider"
+  rm "$HOME_DIR/.fm-lab-home"
   before=$(requests)
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
   denied "$out" || fail "outside-root write was not denied"
@@ -132,7 +146,7 @@ test_outages_and_scope() {
   denied "$out" || fail "privacy refusal allowed active execution"
   jq -se '.[-1].error_type == "PrivacyWithheldError" and .[-1].request_started == false' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "privacy was not checked before missing credentials"
   rm "$HOME_DIR/config/dispatch-never-send"
-  claude_hook "$(pre Bash '{"command":"ls"}')"
+  claude_hook "$(pre Bash '{"command":"deploy"}')"
   denied "$out" || fail "missing credentials allowed active execution"
   [ "$(requests)" -eq "$before" ] || fail "privacy or missing credentials sent a request"
   mv "$HOME_DIR/env.off" "$HOME_DIR/.env"
@@ -405,7 +419,7 @@ const unsupported = await handlers.tool_result({ toolName: 'bash', content: [{ t
 assert.equal(unsupported.isError, true);
 assert.equal(JSON.stringify(unsupported).includes('private-output-canary'), false);
 const bad = install({ state: `${home}/audit-bad` });
-assert.match((await bad.tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx)).reason, /AuditUnavailableError/);
+assert.match((await bad.tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx)).reason, /AuditUnavailableError/);
 const unavailableAudit = await bad.tool_result(event('fail500'), ctx);
 assert.match(unavailableAudit.content[0].text, /AuditUnavailableError/);
 assert.match(unavailableAudit.content[0].text, /error_type=Error/);
@@ -671,12 +685,12 @@ assert.match(withheld.content[0].text, /TimeoutError/);
 assert.ok(performance.now() - started >= 24000 && performance.now() - started < 30000);
 assert.equal(row().attempts, 2);
 let judged = sent();
-assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined, 'a safe call is judged and admitted right after an outage');
+assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx), undefined, 'a safe call is judged and admitted right after an outage');
 assert.equal(row().error_type, null);
 assert.equal(row().request_started, true);
 assert.equal(sent(), judged + 1, 'the pre-tool call reached its own judge');
 judged = sent();
-assert.equal(await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined);
+assert.equal(await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx), undefined);
 assert.equal(sent(), judged + 1, 'the Claude pre-tool call reached its own judge');
 writeFileSync(`${worktree}/plain.txt`, 'plain notes\n');
 judged = sent();
@@ -1000,7 +1014,7 @@ assert.equal(await shell('echo ' + 'a '.repeat(20000)), undefined);
 blocked = await shell('echo ' + 'a '.repeat(20000) + '\nrm -rf build');
 assert.equal(blocked.block, true);
 assert.match(blocked.reason, /\(part \d+ of \d+\)/);
-outage = await shell('echo ' + 'a '.repeat(10000) + 'fail500' + ' a'.repeat(10000));
+outage = await shell('deploy ' + 'a '.repeat(10000) + 'fail500' + ' a'.repeat(10000));
 assert.match(outage.reason, /Review required: Error/);
 
 // Oversized tool results keep the score-band rule on every piece.
