@@ -82,7 +82,9 @@ trap 'rm -f "$OUT" "$ERR"' EXIT
 # watcher that holds the watcher lock. An INT, TERM, or HUP sent to the bound,
 # unless it inherited that signal as ignored, is forwarded to the command group,
 # and losing the calling shell sends the deadline's own signal; either starts
-# the deadline's kill-after escalation. The timeout/gtimeout fallback bounds
+# the deadline's kill-after escalation. Both the bound and the command call
+# setpgrp for the command's group, so it exists before any signal can target it;
+# bin/fm-timeout-lib.sh owns the same rule. The timeout/gtimeout fallback bounds
 # only by deadline and kill-after; it does not track the calling shell.
 run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...>
   perl -e '
