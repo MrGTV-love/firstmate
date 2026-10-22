@@ -2468,7 +2468,7 @@ A healthy judge still screens every shell command and write; two narrow shell-on
 
 - A shell command proven read-only is admitted with branch `read_only`.
   [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns the program allowlist, the read-only git subcommands, the requirement that every pipeline segment be read-only, and the disqualifiers: redirection, substitution, expansion, quoting, sequencing, background, git options before the subcommand other than `--no-pager`, any `--output` option, and the writing or executing `find` actions.
-  Anything not proven read-only is refused on an outage as before.
+  Outside the lab admission below, anything not proven read-only is refused on an outage as before.
 - A shell command in a home carrying the `.fm-lab-home` token written by [`bin/fm-lab-home.sh`](../bin/fm-lab-home.sh) is admitted with branch `lab` when every `FM_*_OVERRIDE` is empty, the same rule as `fm_gate_lab_permitted` in [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh), so an approved lab teardown is not refused by an unavailable judge.
   Writes and edits in a lab home are screened and refused exactly as in a real home.
 
