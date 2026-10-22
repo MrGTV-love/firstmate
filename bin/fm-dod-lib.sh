@@ -22,9 +22,9 @@
 # captain-approved <host>/<owner>/<repo> publication scope for this one task,
 # rendered as an `upstream-consent=<scope>` suffix token on the Delivery
 # contract line so brief, spawn record, and worker instructions agree.
-# The optional seventh argument is the durable task brief used to build the
-# separate verification plan; ordinary scaffolding and promotion pass it
-# explicitly, otherwise it defaults to data/<task-id>/brief.md in the active home.
+# The seventh argument is the durable task brief used to build the separate
+# verification plan; it is required for mode=no-mistakes, which refuses to
+# render without it, and unused by the other modes.
 # Callers of the gate are bin/fm-crew-state.sh (current-state done),
 # bin/fm-pr-check.sh (PR registration), and bin/fm-inactive-reconcile.sh
 # (secondmate ledger-first publish of a child done). A ship `done:` is not
@@ -111,9 +111,9 @@
 # Task DoD content includes nested headings up to ## How You're Graded; an
 # unfenced DoD file directive selects that file's contents instead of the inline
 # scaffold, matching the criteria check, and never passes only its path.
-# Exclusions are gathered from ### Out of scope and from every unfenced legacy
-# Out of scope: paragraph anywhere in # Task (including its following list until
-# a blank line), and every source found is printed.
+# Exclusions are gathered from the unfenced lines of every ### Out of scope
+# subsection and every legacy Out of scope: paragraph anywhere in # Task
+# (including its following list until a blank line), each printed once in order.
 # A promoted brief, marked by its # Current ship Firstmate spec heading, labels
 # that DoD and those exclusions as scout-time context; the promoted ship intent
 # governs where they conflict.
@@ -471,18 +471,17 @@ fm_brief_task_dod_file() {  # <brief>
 fm_brief_out_of_scope() {  # <brief>
   local task
   task=$(fm_brief_heading_body "$1" "# Task")
-  fm_brief_heading_parse - '### Out of scope' body <<<"$task"
-  # Unfenced mode ignores quoted examples of the legacy paragraph marker.
+  # Unfenced mode ignores quoted examples of either exclusion marker.
   fm_brief_heading_parse - "# Task" unfenced-body <<<"# Task
 $task" | awk '
       /^#/ {
         level = match($0, /[^#]/) - 1
-        if ($0 == "### Out of scope") in_scope = 1
-        else if (level <= 3) in_scope = 0
         emit = 0
-        next
+        if ($0 == "### Out of scope") { in_scope = 1; next }
+        if (level <= 3) in_scope = 0
+        if (!in_scope) next
       }
-      in_scope { next }
+      in_scope { print; next }
       /^Out of scope:/ { emit = 1 }
       /^[[:space:]]*$/ { emit = 0 }
       emit { print }
@@ -491,7 +490,7 @@ $task" | awk '
 
 fm_brief_verification_plan() {  # <brief>
   local brief=$1 rubric dod scope dod_file context=''
-  rubric="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)/docs/review-rubric.md"
+  rubric="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)/docs/review-rubric.md"
   [ -f "$brief" ] && [ -r "$brief" ] || {
     printf 'error: verification-plan brief is not a readable file: %s\n' "$brief" >&2
     return 1
@@ -678,7 +677,7 @@ EOF
 
 fm_verification_plan_block() {  # <brief>
   local root brief_q output_q builder_q
-  root=$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)
+  root=$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)
   printf -v builder_q '%q' "$root/bin/fm-dod-lib.sh"
   printf -v brief_q '%q' "$1"
   printf -v output_q '%q' "${1%/*}/verification-plan.md"
@@ -773,8 +772,9 @@ EOF
 
 fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<brief>]
   local mode=$1 id=$2 forge=${4:-none} base=${5:-} consent=${6:-} brief=${7:-}
-  if [ -z "$brief" ]; then
-    brief="${DATA:-${FM_DATA_OVERRIDE:-${FM_HOME:-$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)}/data}}/$id/brief.md"
+  if [ "$mode" = no-mistakes ] && [ -z "$brief" ]; then
+    echo "error: fm_dod_block: mode=no-mistakes needs the durable task brief to build its verification plan" >&2
+    return 1
   fi
   local branch=${3:-fm/$id} pr_base='' nm_base='' base_q contract_forge='' contract_consent='' forge_cli=gh-axi draft_check
   fm_forge_valid_for_mode "$forge" "$mode" fm_dod_block || return 1
