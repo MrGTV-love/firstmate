@@ -1,0 +1,8 @@
+round 1 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=2*50ms lock_pid_gone_at=2*50ms
+round 2 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=2*50ms lock_pid_gone_at=1*50ms
+round 3 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=2*50ms lock_pid_gone_at=2*50ms
+round 4 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=2*50ms lock_pid_gone_at=1*50ms
+round 5 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=1*50ms lock_pid_gone_at=1*50ms
+round 6 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=1*50ms lock_pid_gone_at=1*50ms
+round 7 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=2*50ms lock_pid_gone_at=2*50ms
+round 8 (spaced code root + spaced home, cancel after first heartbeat): checkpoint_exit=143 watcher_dead_at=2*50ms lock_pid_gone_at=2*50ms

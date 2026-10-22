@@ -1,0 +1,8 @@
+fm-base2.GLh8oI run 1: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+fm-base2.GLh8oI run 2: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+fm-base2.GLh8oI run 3: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+fm-base2.GLh8oI run 4: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+fm-tgt.xWBMmU run 1: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+fm-tgt.xWBMmU run 2: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+fm-tgt.xWBMmU run 3: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+fm-tgt.xWBMmU run 4: ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main

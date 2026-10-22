@@ -1,0 +1,16 @@
+ok - proven-isolated scheduling ignores parallel hints
+ok - family, all, changed, and script selections ignore parallel hints
+ok - portable shard union, disjointness, and coverage guard hold
+ok - portable parallel lanes are fully hinted and packed within 5% of each other
+ok - portable parallel lanes are bounded by a modeled makespan at the CI job count
+ok - portable parallel lanes start their scripts in the order the makespan model packs
+ok - portable serial shards are a deterministic disjoint cover of the serial lane
+ok - coverage guard bounds the unmeasured share and bounds serial packing by the target or one script alone
+ok - serial packing accepts a lone script above the target, accepts a packed shard at it, and refuses one a millisecond above
+ok - --jobs refuses non-proven / stateful selections
+ok - --jobs admits and schedules a family with a recorded concurrent proof
+ok - a concurrent run starts the longest-hint script first
+ok - jobs scheduler runs proven scripts; failure propagates; non-proven refused
+ok - portable serial shard lanes refuse mismatched, out-of-range, and countless names
+ok - coverage guard still refuses a script that sits in two shards
+bash tests/_sel_all.test.sh  87.61s user 164.02s system 80% cpu 5:12.27 total

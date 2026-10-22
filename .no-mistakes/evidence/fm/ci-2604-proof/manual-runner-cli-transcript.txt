@@ -1,0 +1,28 @@
+### --list-scheduled --lane portable-parallel-1 (first 5 of 15)
+tests/fm-pr-merge.test.sh
+tests/fm-test-run.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
+tests/fm-captain-hold-reconcile.test.sh
+tests/fm-captain-hold-sweep.test.sh
+
+### runner: --lane portable-parallel-1  (stub scripts, real runner)
+exit=0 begins=15 first_begin=tests/fm-pr-merge.test.sh
+
+### runner: --lane portable-parallel-1 --jobs 1 (stub scripts, real runner)
+exit=0 begins=15 first_begin=tests/fm-pr-merge.test.sh
+start order == --list-scheduled order
+
+### runner: --lane portable-parallel-1 --jobs 3 (stub scripts, real runner)
+exit=0 begins=15 first_begin=tests/fm-pr-merge.test.sh
+start order == --list-scheduled order
+
+### runner: --lane portable-parallel-1 --jobs 4 (stub scripts, real runner)
+exit=0 begins=15 first_begin=tests/fm-pr-merge.test.sh
+start order == --list-scheduled order
+
+### runner: --lane portable-parallel-1 --jobs 9 (stub scripts, real runner)
+exit=2 begins=0 first_begin=
+fm-test-run: --jobs is capped at 8 (got 9)
+
+### stateful (non-proven) selection with --jobs 2 must be refused
+fm-test-run: lane 'portable-serial-1of20' selected no tests

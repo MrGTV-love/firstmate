@@ -1,0 +1,9 @@
+--- target run 1
+ok - host: an engine turn is bounded, and tool processes outside its process group are reaped
+bash tests/_host_one.test.sh  4.30s user 10.77s system 73% cpu 20.585 total
+--- target run 2
+ok - host: an engine turn is bounded, and tool processes outside its process group are reaped
+bash tests/_host_one.test.sh  4.10s user 10.00s system 70% cpu 19.861 total
+--- target run 3
+ok - host: an engine turn is bounded, and tool processes outside its process group are reaped
+bash tests/_host_one.test.sh  4.10s user 9.40s system 68% cpu 19.575 total

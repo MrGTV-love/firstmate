@@ -1,0 +1,6 @@
+round=1 prior_checkpoint=no checkpoint_exit=143 watcher_dead_at=2*50ms pidfile_gone_at=never*50ms
+round=2 prior_checkpoint=no checkpoint_exit=143 watcher_dead_at=1*50ms pidfile_gone_at=never*50ms
+round=3 prior_checkpoint=no checkpoint_exit=143 watcher_dead_at=1*50ms pidfile_gone_at=1*50ms
+round=4 prior_checkpoint=yes checkpoint_exit=143 watcher_dead_at=2*50ms pidfile_gone_at=never*50ms
+round=5 prior_checkpoint=yes checkpoint_exit=143 watcher_dead_at=1*50ms pidfile_gone_at=never*50ms
+round=6 prior_checkpoint=yes checkpoint_exit=143 watcher_dead_at=1*50ms pidfile_gone_at=never*50ms

@@ -1,0 +1,28 @@
+Lint 1	success	2026-10-22T02:10:30Z	2026-10-22T02:28:24Z
+Repo invariants	success	2026-10-22T02:10:30Z	2026-10-22T02:10:37Z
+Behavior portable serial 2	success	2026-10-22T02:10:30Z	2026-10-22T02:37:11Z
+Lint 2	success	2026-10-22T02:10:30Z	2026-10-22T02:25:32Z
+Behavior portable parallel 1	success	2026-10-22T02:10:30Z	2026-10-22T02:44:22Z
+Test coverage guard	success	2026-10-22T02:10:30Z	2026-10-22T02:10:42Z
+Behavior portable serial 12	success	2026-10-22T02:10:30Z	2026-10-22T02:30:45Z
+Behavior portable parallel 2	success	2026-10-22T02:10:30Z	2026-10-22T02:38:43Z
+Behavior portable serial 10	success	2026-10-22T02:10:29Z	2026-10-22T02:26:03Z
+Behavior tests (Herdr)	success	2026-10-22T02:10:30Z	2026-10-22T02:24:55Z
+Behavior portable serial 7	success	2026-10-22T02:10:30Z	2026-10-22T02:22:30Z
+Behavior portable serial 14	success	2026-10-22T02:10:30Z	2026-10-22T02:31:16Z
+Behavior portable serial 15	success	2026-10-22T02:10:30Z	2026-10-22T02:33:15Z
+Behavior portable serial 11	success	2026-10-22T02:10:30Z	2026-10-22T02:31:51Z
+Behavior portable serial 8	success	2026-10-22T02:10:30Z	2026-10-22T02:25:30Z
+Behavior portable serial 13	success	2026-10-22T02:10:30Z	2026-10-22T02:28:21Z
+Behavior portable serial 6	success	2026-10-22T02:10:30Z	2026-10-22T02:31:26Z
+Lint 3	success	2026-10-22T02:10:30Z	2026-10-22T02:21:49Z
+Behavior portable serial 16	success	2026-10-22T02:10:30Z	2026-10-22T02:28:57Z
+Behavior portable serial 17	success	2026-10-22T02:10:30Z	2026-10-22T02:29:02Z
+Behavior portable serial 9	success	2026-10-22T02:10:30Z	2026-10-22T02:33:31Z
+Stock macOS Bash snapshot compatibility	success	2026-10-22T02:10:31Z	2026-10-22T02:16:50Z
+Behavior portable serial 18	success	2026-10-22T02:10:30Z	2026-10-22T02:32:46Z
+Behavior portable serial 3	success	2026-10-22T02:10:30Z	2026-10-22T02:28:09Z
+Behavior portable serial 1	success	2026-10-22T02:10:30Z	2026-10-22T02:33:14Z
+Behavior portable serial 4	success	2026-10-22T02:10:30Z	2026-10-22T02:33:58Z
+Behavior portable serial 5	success	2026-10-22T02:10:30Z	2026-10-22T02:32:38Z
+Behavior timing aggregate	success	2026-10-22T02:44:24Z	2026-10-22T02:44:33Z

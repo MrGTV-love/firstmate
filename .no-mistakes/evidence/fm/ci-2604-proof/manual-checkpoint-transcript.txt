@@ -1,0 +1,10 @@
+### 1. real checkpoint + real watcher from a code root containing a space; quiet bound
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+exit=0 (124 = quiet bound)
+lock after quiet bound: ls: /Users/charlesabrooker/tmp/fm lab space.korgRv/home/state/.watch.lock: No such file or directory
+
+### 2. cancel (TERM to checkpoint's process group) while the real watcher runs
+watcher pid=42577 alive=yes lock=held
+checkpoint exit=143 (143 = 128+TERM)
+watcher alive after cancel=no
+lock pid file after cancel: STILL-HELD

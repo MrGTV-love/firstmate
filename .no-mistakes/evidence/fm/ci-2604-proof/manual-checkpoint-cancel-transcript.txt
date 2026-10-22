@@ -1,0 +1,13 @@
+watcher pid=92476
+  PID  PPID  PGID COMMAND
+92276 92273 92276 bash /Users/charlesabrooker/tmp/fm lab space.rxKpmf/code root/bin/fm-watch-checkpoint.sh --seconds 60
+92476 92415 92476 bash /Users/charlesabrooker/tmp/fm lab space.rxKpmf/code root/bin/fm-watch.sh
+lrwxr-xr-x  1 charlesabrooker  staff  82 Oct 22 03:36 /Users/charlesabrooker/tmp/fm lab space.rxKpmf/home/state/.watch.lock -> /Users/charlesabrooker/tmp/fm lab space.rxKpmf/home/state/.watch.lock.owner.f1JQMB
+checkpoint exit=143
+t+0s: watcher_alive=yes lock_pid=present lock_dir=present
+t+1s: watcher_alive=no lock_pid=absent lock_dir=absent
+t+2s: watcher_alive=no lock_pid=absent lock_dir=absent
+t+3s: watcher_alive=no lock_pid=absent lock_dir=absent
+t+4s: watcher_alive=no lock_pid=absent lock_dir=absent
+t+5s: watcher_alive=no lock_pid=absent lock_dir=absent
+--- cancel.out
