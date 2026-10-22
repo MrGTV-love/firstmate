@@ -118,6 +118,45 @@ SH
   pass "a checkpoint restores ignored INT before launching its watcher"
 }
 
+# A harness stops a foreground checkpoint by killing its process group. The
+# bound must outlive that kill and still interrupt its watcher, or the orphaned
+# watcher keeps the lock and every later checkpoint reports it as foreign.
+test_group_killed_checkpoint_still_stops_its_watcher() {
+  local home checkpoint_pid watcher_pid status i
+  home=$(make_home group-killed)
+  TMPDIR="$home" FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    perl -e 'setpgrp(0, 0); exec @ARGV' "$CHECKPOINT" --seconds 180 \
+    >"$home/killed-out.txt" 2>"$home/killed-err.txt" &
+  checkpoint_pid=$!
+  wait_for_checkpoint_lock "$home" || {
+    kill -KILL -- "-$checkpoint_pid" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "group-killed checkpoint did not take the watcher lock"
+  }
+  watcher_pid=$(cat "$home/state/.watch.lock/pid")
+  kill -KILL -- "-$checkpoint_pid"
+  wait "$checkpoint_pid" 2>/dev/null || true
+  i=0
+  while kill -0 "$watcher_pid" 2>/dev/null && [ "$i" -lt 120 ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  if kill -0 "$watcher_pid" 2>/dev/null; then
+    kill -KILL "$watcher_pid" 2>/dev/null || true
+    fail "the watcher outlived its group-killed checkpoint's 5-second cleanup grace"
+  fi
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    "$CHECKPOINT" --seconds 1 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  assert_not_contains "$(cat "$home/err.txt")" "watcher is already running outside this foreground checkpoint" \
+    "the next checkpoint found the group-killed checkpoint's watcher still holding the lock"
+  case "$status" in
+    0|124) ;;
+    *) fail "the next checkpoint did not run its own watcher (exit $status): $(cat "$home/out.txt" "$home/err.txt")" ;;
+  esac
+  pass "a group-killed checkpoint still stops its watcher and frees the next checkpoint"
+}
+
 # A code root whose path holds a space must launch its watcher as one path.
 test_checkpoint_launches_a_watcher_under_a_spaced_root() {
   local home bin status
@@ -544,6 +583,7 @@ test_perl_timeout_fallback_honors_cleanup_bound_before_escalating
 test_checkpoint_resets_an_inherited_ignored_interrupt
 test_checkpoint_launches_a_watcher_under_a_spaced_root
 test_cancelled_checkpoint_lets_its_watcher_release_the_lock
+test_group_killed_checkpoint_still_stops_its_watcher
 test_announced_recovery_is_not_reannounced_by_next_checkpoint
 test_never_announced_recovery_is_announced_once
 test_queue_append_during_checkpoint_still_resurfaces
