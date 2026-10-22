@@ -3057,6 +3057,7 @@ test_review_record_validation_and_latest() {
   record_review "$case_dir" "$url" "$head" --reader-model Claude-Sonnet-5-5 \
     --author-groups '{"initial":["openai-codex/gpt-5.1-codex"],"fixes":["Gemini-3-Pro","o3"]}' > /dev/null || fail "record grouped PASS"
   review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read newest record"
+  # shellcheck disable=SC2016  # jq program; single quotes are intended.
   "$JQ_BIN" -e --arg pr "$url" --arg head "$head" --arg report "$case_dir/review.md" '
     .review | .pr == $pr and .head == $head and .verdict == "PASS"
     and .reader_model == "Claude-Sonnet-5-5" and .reader_family == "anthropic"
