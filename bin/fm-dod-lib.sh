@@ -474,8 +474,11 @@ fm_brief_out_of_scope() {  # <brief>
   # Unfenced mode ignores quoted examples of either exclusion marker.
   fm_brief_heading_parse - "# Task" unfenced-body <<<"# Task
 $task" | awk '
-      /^#/ {
-        level = match($0, /[^#]/) - 1
+      /^(   |  | )?#+([[:space:]]|$)/ {
+        scan = $0
+        sub(/^ +/, "", scan)
+        level = match(scan, /[^#]/) - 1
+        if (level < 0) level = length(scan)
         emit = 0
         if ($0 == "### Out of scope") { in_scope = 1; next }
         if (level <= 3) in_scope = 0
