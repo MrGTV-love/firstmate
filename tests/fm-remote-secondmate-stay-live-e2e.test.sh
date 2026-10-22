@@ -16,7 +16,7 @@ TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
 PARENT="$TMP_ROOT/parent"
 REMOTE_HOME="$TMP_ROOT/remote"
 FAKEBIN="$TMP_ROOT/fakebin"
-ID=remote-stay-live
+ID='remote-stay-live'
 VERSION=$(claude --version)
 cleanup() {
   local rc=$?
