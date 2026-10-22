@@ -1153,7 +1153,9 @@ The guard never deletes or rewrites a file.
 
 For a foreign writer the guarantee is detection plus a stop of that one pid within one watcher poll.
 The check runs at the top of each poll, after each poll-sized slice of the status-signal linger, after each poll-sized slice (at least one second) of each of these walks over a log's lines: the status-signal classification, the heartbeat scan, the stale-pane surface, the push-transition surface and the inbox-steer open-decisions fold.
-It runs once more just before any wake exits the watcher, except a process-event wake, which holds the wake-queue lock that the check appends under, and except inside the over-cap wake itself, so one check raises at most one wake.
+It runs once more just before any wake exits the watcher, except a process-event wake, which holds the wake-queue lock that the check appends under.
+Inside the over-cap wake it raised, while that wake flushes pending signals, the check still stops and queues a row for any file that is newly over the cap, and skips only a second wake: one check raises at most one wake, and a file already reported by that wake is not reported again until its next poll.
+The row for such a second file reaches firstmate in the queue with the first, not in the printed wake text.
 The declared-wait reads walk the last 200 lines, and walk the whole log only when those lines hold no opening event or a wait that opened before them; that whole walk is not checked.
 The linger matters because a runaway writer's first append is itself a status signal, the linger is 30 s (`FM_SIGNAL_GRACE`), and the wake it ends in exits the watcher before the next poll: a check that ran only at the top of the poll would reach the writer only after a drain, an ack and a re-arm.
 The walks matter for the same reason: each takes the lines one at a time in the shell, 2.7 to 5 ms a line, so a span of up to 32,768 lines holds the watcher for 88 s or more, and the wake a walk ends in exits without another poll.

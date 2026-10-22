@@ -2623,9 +2623,11 @@ event_wait_or_sleep() {
 # after each poll-sized slice of a walk over a log's lines (status_cap_span_tick: the
 # signal, heartbeat, stale and push walks and the inbox-steer open-decisions fold), and
 # just before any wake exits (watch_before_wake), except one that holds the wake-queue lock.
-# It never runs inside the wake it raised (STATUS_CAP_WAKING), so one check raises at most one wake.
+# Inside the wake it raised (STATUS_CAP_WAKING) it still stops and queues a file that is newly due,
+# but raises no second wake and leaves the files that wake already reported (STATUS_CAP_ALERTED).
 STATUS_CAP_TICK_AT=0
 STATUS_CAP_WAKING=0
+STATUS_CAP_ALERTED=
 STATUS_CAP_SLICE=1
 case "$POLL" in
   ''|*[!0-9]*) ;;
@@ -2633,11 +2635,10 @@ case "$POLL" in
 esac
 status_cap_tick() {
   local rows records reason='' ident path size text keys='' key
-  [ "$STATUS_CAP_WAKING" -eq 0 ] || return 0
   STATUS_CAP_TICK_AT=$SECONDS
   rows=$(fm_status_cap_unalerted "$STATE") || return 0
   [ -n "$rows" ] || return 0
-  records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
+  records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
   [ -n "$records" ] || return 0
   while IFS=$'\t' read -r ident path size text; do
     [ -n "$path" ] || continue
@@ -2653,9 +2654,11 @@ EOF
   while IFS=$'\t' read -r ident path size text; do
     [ -n "$path" ] || continue
     FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" "$size" || :
+    STATUS_CAP_ALERTED="$STATUS_CAP_ALERTED$path"$'\n'
   done <<EOF
 $records
 EOF
+  [ "$STATUS_CAP_WAKING" -eq 0 ] || return 0
   # wake() flushes the pending signals before it prints, and the status signal of a
   # runaway log is pending: without this the flush would linger one more full grace and
   # the supervisor would hear of a stop that has already happened a grace late.
@@ -2663,6 +2666,7 @@ EOF
   STATUS_CAP_WAKING=1
   wake "$reason"
   STATUS_CAP_WAKING=0
+  STATUS_CAP_ALERTED=
 }
 
 # The classifiers loop over a log's unread lines in the shell, 2.7 to 5 ms a line, and call

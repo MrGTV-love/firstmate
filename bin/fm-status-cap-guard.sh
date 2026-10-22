@@ -42,7 +42,8 @@
 # rate times the poll interval, which docs/configuration.md "Status log size bounds"
 # states with measured numbers.
 # Environment: FM_STATE_OVERRIDE (state dir), FM_STATUS_CAP_LSOF (the lsof command,
-# for tests). The cap itself is FM_STATUS_CAP_BYTES.
+# for tests), FM_STATUS_CAP_SKIP (paths, one per line, that scan leaves out: the files
+# the watcher's wake in flight has already reported). The cap itself is FM_STATUS_CAP_BYTES.
 #
 # tests/fm-status-runaway-guard.test.sh is the regression entry point.
 set -u
@@ -239,6 +240,7 @@ case "${1:-}" in
   scan)
     fm_status_cap_unalerted "$STATE" | while IFS=$'\t' read -r size ident path; do
       [ -n "$path" ] || continue
+      case $'\n'"${FM_STATUS_CAP_SKIP:-}"$'\n' in *$'\n'"$path"$'\n'*) continue ;; esac
       investigate "$size" "$ident" "$path"
     done
     ;;
