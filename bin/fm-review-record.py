@@ -111,14 +111,18 @@ def validate(row):
     nonempty(row.get("report"), "report")
 
 
-@contextlib.contextmanager
-def ledger(write):
+def task_home():
     home = os.environ.get("FM_HOME", "")
     if not home or not Path(home).is_absolute():
         raise RecordError("FM_HOME must explicitly name the absolute home holding the PR task record")
     if not Path(home).is_dir():
         raise RecordError(f"FM_HOME {home} does not exist; name the existing home holding the PR task record")
-    state = Path(os.environ.get("FM_STATE_OVERRIDE") or Path(home) / "state")
+    return Path(home)
+
+
+@contextlib.contextmanager
+def ledger(write, home):
+    state = Path(os.environ.get("FM_STATE_OVERRIDE") or home / "state")
     if not state.is_absolute() or state.is_symlink():
         raise RecordError("state directory must be absolute and not a symlink")
     if write:
@@ -194,6 +198,7 @@ def main():
             command.add_argument("--words", required=True)
     args = parser.parse_args()
     try:
+        home = task_home()
         pr = canonical_pr(args.pr)
         row = {"schema": "fm-review-record.v1", "kind": args.command, "pr": pr, "at": int(time.time())}
         if args.command == "review":
@@ -215,7 +220,7 @@ def main():
         print(f"error: {exc}")
         return 2
     try:
-        with ledger(write) as fd:
+        with ledger(write, home) as fd:
             records = newest(fd, pr)
             if write:
                 data = (json.dumps(row, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
