@@ -1,0 +1,10 @@
+Worker pane status lines captured live (tmux capture-pane on the lab socket, window primary:fm-stale-a1):
+
+After `fm-spawn.sh stale-a1 ... --model openai-codex/gpt-5.6-luna --captain-model-pin openai-codex/gpt-5.6-luna`:
+ ⠧ 23s · ◒ GPT-5.6 Luna 👁 · 🌳 demo/demo · ⑂ detached · ◫ 7.9%/272K ⟲ · S0.01 + 👁 0.02
+
+After the three refused `fm-control.sh stale-a1 relaunch --model <other stale>` calls, the pane still ran the same agent:
+primary:fm-stale-a1 pid=2347 cmd=omp   (state/stale-a1.meta byte-identical to before: "META-UNCHANGED")
+
+After `fm-control.sh stale-a1 relaunch --model openai-codex/gpt-5.6-sol --captain-model-pin openai-codex/gpt-5.6-sol`:
+ ⠧ 15s · ◒ GPT-5.6 Sol 👁 · 🌳 demo/demo · ⑂ detached · ◫ 4.9%/272K ⟲ · S0.07 + 👁 0.02

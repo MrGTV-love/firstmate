@@ -1,0 +1,143 @@
+===== s1-stale-nopin
+$ bin/fm-spawn.sh stale-a1 $LAB/projects/demo --scout --harness omp --model openai-codex/gpt-5.6-luna
+error: refusing to launch a stale model - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+hint: launch the newer model above, or pass --captain-model-pin openai-codex/gpt-5.6-luna only when the captain explicitly asked for openai-codex/gpt-5.6-luna for this task
+[exit=1]
+
+===== s2-mismatch-pin
+$ bin/fm-spawn.sh stale-a1 $LAB/projects/demo --scout --harness omp --model openai-codex/gpt-5.6-luna --captain-model-pin openai-codex/gpt-6-luna
+error: refusing to launch a stale model - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+error: --captain-model-pin 'openai-codex/gpt-6-luna' is not the requested model 'openai-codex/gpt-5.6-luna'; a pin authorizes only that exact model
+hint: launch the newer model above, or pass --captain-model-pin openai-codex/gpt-5.6-luna only when the captain explicitly asked for openai-codex/gpt-5.6-luna for this task
+[exit=1]
+
+===== s2b-pin-on-other-stale
+$ bin/fm-spawn.sh stale-a1 $LAB/projects/demo --scout --harness omp --model openai-codex/gpt-5.6-sol --captain-model-pin openai-codex/gpt-5.6-luna
+error: refusing to launch a stale model - openai-codex/gpt-5.6-sol on omp is older than openai-codex/gpt-6.1-sol in the omp catalog
+error: --captain-model-pin 'openai-codex/gpt-5.6-luna' is not the requested model 'openai-codex/gpt-5.6-sol'; a pin authorizes only that exact model
+hint: launch the newer model above, or pass --captain-model-pin openai-codex/gpt-5.6-sol only when the captain explicitly asked for openai-codex/gpt-5.6-sol for this task
+[exit=1]
+
+===== s4-pin-admit
+$ bin/fm-spawn.sh stale-a1 $LAB/projects/demo --scout --harness omp --model openai-codex/gpt-5.6-luna --captain-model-pin openai-codex/gpt-5.6-luna
+warning: stale model admitted by captain pin - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+skill selection for stale-a1: unavailable - no TypeSafe or OpenRouter key
+spawned stale-a1 harness=omp kind=scout window=primary:fm-stale-a1 worktree=$LAB/treehouse/.treehouse/demo-274cb3/1/demo
+[exit=0]
+
+===== s4-crewstate3
+$ bin/fm-crew-state.sh stale-a1
+state: done · source: status-log · README contains the single heading # demo; report written and completion gate passed · model-stale: openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog (admitted by captain pin)
+[exit=0]
+
+===== s6-relaunch-stale-nopin
+$ bin/fm-control.sh stale-a1 relaunch --model openai-codex/gpt-5.8-luna --note lab: relaunch onto a different stale model without a pin
+error: refusing to relaunch stale-a1 onto a stale model - openai-codex/gpt-5.8-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog; the running agent was not stopped (relaunch onto the newer model, or pass --captain-model-pin openai-codex/gpt-5.8-luna only when the captain explicitly asked for openai-codex/gpt-5.8-luna)
+[exit=1]
+
+===== s6-relaunch-stale-nopin2
+$ bin/fm-control.sh stale-a1 relaunch --model openai-codex/gpt-5.6-sol --note lab: relaunch onto a stale sol model without a pin
+error: refusing to relaunch stale-a1 onto a stale model - openai-codex/gpt-5.6-sol on omp is older than openai-codex/gpt-6.1-sol in the omp catalog; the running agent was not stopped (relaunch onto the newer model, or pass --captain-model-pin openai-codex/gpt-5.6-sol only when the captain explicitly asked for openai-codex/gpt-5.6-sol)
+[exit=1]
+
+===== s6b-relaunch-mismatch-pin
+$ bin/fm-control.sh stale-a1 relaunch --model openai-codex/gpt-5.8-luna --captain-model-pin openai-codex/gpt-5.6-luna --note lab: mismatched pin
+error: --captain-model-pin 'openai-codex/gpt-5.6-luna' is not the requested model 'openai-codex/gpt-5.8-luna'; a pin authorizes only that exact model
+error: refusing to relaunch stale-a1 onto a stale model - openai-codex/gpt-5.8-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog; the running agent was not stopped (relaunch onto the newer model, or pass --captain-model-pin openai-codex/gpt-5.8-luna only when the captain explicitly asked for openai-codex/gpt-5.8-luna)
+[exit=1]
+
+===== s8-relaunch-same
+$ bin/fm-control.sh stale-a1 relaunch --model openai-codex/gpt-5.6-luna --note lab: relaunch on the recorded model
+warning: stale model kept by relaunch, admitted at launch - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+skill selection for stale-a1: unavailable - no TypeSafe or OpenRouter key
+relaunched stale-a1 harness=omp from=omp model=openai-codex/gpt-5.6-luna effort=default backend=tmux endpoint=primary:fm-stale-a1 worktree=$LAB/treehouse/.treehouse/demo-274cb3/1/demo
+[exit=0]
+
+===== s7-relaunch-pin-swap
+$ bin/fm-control.sh stale-a1 relaunch --model openai-codex/gpt-5.8-luna --captain-model-pin openai-codex/gpt-5.8-luna --note lab: captain-pinned swap
+error: omp model 'openai-codex/gpt-5.8-luna' is not listed by 'omp models --json' although provider 'openai-codex' is; choose a listed <provider>/<id> or omit --model
+error: the replacement agent for stale-a1 could not be launched on omp
+error: stale-a1's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at $LAB/treehouse/.treehouse/demo-274cb3/1/demo
+[exit=1]
+
+===== s7-relaunch-pin-swap2
+$ bin/fm-control.sh stale-a1 relaunch --model openai-codex/gpt-5.6-sol --captain-model-pin openai-codex/gpt-5.6-sol --note lab: captain-pinned swap to a listed stale model
+warning: stale model admitted by captain pin - openai-codex/gpt-5.6-sol on omp is older than openai-codex/gpt-6.1-sol in the omp catalog
+skill selection for stale-a1: unavailable - no TypeSafe or OpenRouter key
+relaunched stale-a1 harness=omp from=omp model=openai-codex/gpt-5.6-sol effort=default backend=tmux endpoint=primary:fm-stale-a1 worktree=$LAB/treehouse/.treehouse/demo-274cb3/1/demo
+[exit=0]
+
+===== s9-relaunch-other-tier
+$ bin/fm-control.sh stale-a1 relaunch --model openai-codex/gpt-6-luna --note lab: other-tier newer only
+warning: a newer model exists in another tier - openai-codex/gpt-6-luna on omp is older than openai-codex/gpt-6.1-sol in the omp catalog (other tier: sol)
+skill selection for stale-a1: unavailable - no TypeSafe or OpenRouter key
+relaunched stale-a1 harness=omp from=omp model=openai-codex/gpt-6-luna effort=default backend=tmux endpoint=primary:fm-stale-a1 worktree=$LAB/treehouse/.treehouse/demo-274cb3/1/demo
+[exit=0]
+
+===== s9-crewstate
+$ bin/fm-crew-state.sh stale-a1
+state: working · source: pane · harness busy (omp-ext) · model-stale: openai-codex/gpt-6-luna on omp is older than openai-codex/gpt-6.1-sol in the omp catalog (other tier: sol)
+[exit=0]
+
+===== s5-batch-nopin
+$ bin/fm-spawn.sh batch-b1=$LAB/projects/demo batch-b2=$LAB/projects/demo --scout --harness omp --model openai-codex/gpt-5.6-luna
+error: refusing to launch a stale model - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+hint: launch the newer model above, or pass --captain-model-pin openai-codex/gpt-5.6-luna only when the captain explicitly asked for openai-codex/gpt-5.6-luna for this task
+batch: FAILED to spawn batch-b1 ($LAB/projects/demo)
+error: refusing to launch a stale model - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+hint: launch the newer model above, or pass --captain-model-pin openai-codex/gpt-5.6-luna only when the captain explicitly asked for openai-codex/gpt-5.6-luna for this task
+batch: FAILED to spawn batch-b2 ($LAB/projects/demo)
+[exit=1]
+
+===== s5-batch-pin
+$ bin/fm-spawn.sh batch-b1=$LAB/projects/demo batch-b2=$LAB/projects/demo --scout --harness omp --model openai-codex/gpt-5.6-luna --captain-model-pin openai-codex/gpt-5.6-luna
+warning: stale model admitted by captain pin - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+skill selection for batch-b1: unavailable - no TypeSafe or OpenRouter key
+spawned batch-b1 harness=omp kind=scout window=primary:fm-batch-b1 worktree=$LAB/treehouse/.treehouse/demo-274cb3/2/demo
+warning: stale model admitted by captain pin - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+skill selection for batch-b2: unavailable - no TypeSafe or OpenRouter key
+spawned batch-b2 harness=omp kind=scout window=primary:fm-batch-b2 worktree=$LAB/treehouse/.treehouse/demo-274cb3/3/demo
+[exit=0]
+
+===== s10-current
+$ bin/fm-spawn.sh current-c1 $LAB/projects/demo --scout --harness omp --model openai-codex/gpt-6.1-sol
+skill selection for current-c1: unavailable - no TypeSafe or OpenRouter key
+spawned current-c1 harness=omp kind=scout window=primary:fm-current-c1 worktree=$LAB/treehouse/.treehouse/demo-274cb3/4/demo
+[exit=0]
+
+===== s11-unverified
+$ FM_MODEL_CATALOG_DIR=$LAB/nocat bin/fm-spawn.sh unv-u1 $LAB/projects/demo --scout --harness omp --model openai-codex/gpt-5.6-luna
+error: refusing to launch a stale model - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+hint: launch the newer model above, or pass --captain-model-pin openai-codex/gpt-5.6-luna only when the captain explicitly asked for openai-codex/gpt-5.6-luna for this task
+[exit=1]
+
+===== s11-unverified-claude
+$ FM_MODEL_CATALOG_DIR=$LAB/nocat ANTHROPIC_API_KEY=lab-not-a-key bin/fm-spawn.sh unv-u1 $LAB/projects/demo --scout --harness claude --model claude-opus-4-5
+warning: model freshness unverified - claude catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'claude-opus-4-5' not checked
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+[exit=1]
+
+===== s12-claude-fable
+$ ANTHROPIC_API_KEY=lab-not-a-key bin/fm-spawn.sh unv-u1 $LAB/projects/demo --scout --harness claude --model claude-fable-5-1
+warning: a newer model exists in another tier - claude-fable-5-1 on claude is older than claude-haiku-5-5 in the claude catalog (other tier: haiku)
+error: ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance; unset it or pass --allow-api-key to deliberately bill the API
+[exit=1]
+
+===== s12-claude-old-sonnet
+$ ANTHROPIC_API_KEY=lab-not-a-key bin/fm-spawn.sh unv-u1 $LAB/projects/demo --scout --harness claude --model claude-sonnet-4-5
+error: refusing to launch a stale model - claude-sonnet-4-5 on claude is older than claude-sonnet-5-5[1m] in the claude catalog
+hint: launch the newer model above, or pass --captain-model-pin claude-sonnet-4-5 only when the captain explicitly asked for claude-sonnet-4-5 for this task
+[exit=1]
+
+===== s13-sm-respawn-same
+$ bin/fm-spawn.sh sm-r1 --harness omp --model openai-codex/gpt-5.6-luna --secondmate
+warning: stale model kept by relaunch, admitted at launch - openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog
+error: no firstmate home supplied or registered for sm-r1
+[exit=1]
+
+===== s13-sm-respawn-other
+$ bin/fm-spawn.sh sm-r1 --harness omp --model openai-codex/gpt-5.6-sol --secondmate
+error: refusing to launch a stale model - openai-codex/gpt-5.6-sol on omp is older than openai-codex/gpt-6.1-sol in the omp catalog
+hint: launch the newer model above, or pass --captain-model-pin openai-codex/gpt-5.6-sol only when the captain explicitly asked for openai-codex/gpt-5.6-sol for this task
+[exit=1]
+

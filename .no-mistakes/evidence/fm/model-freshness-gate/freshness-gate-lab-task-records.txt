@@ -1,0 +1,20 @@
+===== state/stale-a1.meta (model fields)
+harness=omp
+model=openai-codex/gpt-6-luna
+model_stale=openai-codex/gpt-6-luna on omp is older than openai-codex/gpt-6.1-sol in the omp catalog (other tier: sol)
+===== state/batch-b1.meta (model fields)
+harness=omp
+model=openai-codex/gpt-5.6-luna
+model_stale=openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog (admitted by captain pin)
+===== state/batch-b2.meta (model fields)
+harness=omp
+model=openai-codex/gpt-5.6-luna
+model_stale=openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog (admitted by captain pin)
+===== state/current-c1.meta (model fields)
+harness=omp
+model=openai-codex/gpt-6.1-sol
+===== state/sm-r1.meta (hand-written lab record for the secondmate respawn decision)
+harness=omp
+kind=secondmate
+model=openai-codex/gpt-5.6-luna
+model_stale=openai-codex/gpt-5.6-luna on omp is older than openai-codex/gpt-6-luna in the omp catalog (admitted by captain pin)
