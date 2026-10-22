@@ -77,6 +77,13 @@ ERR=$(mktemp "${TMPDIR:-/tmp}/fm-watch-checkpoint.err.XXXXXX") || {
 }
 trap 'rm -f "$OUT" "$ERR"' EXIT
 
+# The bound runs in a process group apart from both its caller and the command,
+# so a group-kill of the caller cannot also kill the deadline and orphan a
+# watcher that holds the watcher lock. An INT, TERM, or HUP sent to the bound,
+# unless it inherited that signal as ignored, is forwarded to the command group,
+# and losing the calling shell sends the deadline's own signal; either starts
+# the deadline's kill-after escalation. The timeout/gtimeout fallback bounds
+# only by deadline and kill-after; it does not track the calling shell.
 run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...>
   perl -e '
     use POSIX qw(:sys_wait_h);
