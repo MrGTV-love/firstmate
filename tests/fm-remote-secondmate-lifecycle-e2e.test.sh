@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Full remote secondmate lifecycle over the deterministic generic SSH boundary.
+# On the Ubuntu 26.04 runner this suite grew about 1.6x (564382 to 898093 ms),
+# and the cause of that growth is unproven.
+# The blocked-write waits below are 120-second wall-clock hang tripwires, not
+# slack for that growth, and they must not be raised further.
+# Serial 7 is not called green until the Ubuntu CI log shows this suite passing.
 set -u
 
 # shellcheck source=tests/lib.sh

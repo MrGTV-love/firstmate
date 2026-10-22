@@ -20,6 +20,7 @@ The stale table modelled every serial shard at 19.3 minutes while shards 2, 3, a
 A stale table is what makes the packing guard pass while a real shard overruns, so this refresh reuses successful samples only and excludes the failed or unfinished scripts, exactly as the procedure above requires.
 The corpus grows from fifteen to eighteen serial shards, which packs the slowest shard at 23.9 minutes.
 The packing target moves from 1200000 to 1500000 ms because one indivisible suite now costs 1433371 ms; the target is a floor that no partition can pack under, not slack for a badly balanced shard, and the 60-minute job timeout is unchanged.
+If the target must return to 1200000 ms, splitting `tests/fm-watch-triage-waits.test.sh` is the agreed follow-up, the same way the former combined watch-triage suite was split below.
 The two parallel lanes are unchanged at a modelled 27.1 minutes each and are now the workflow's longest jobs; a validated `--jobs 2` on CI or a third parallel lane would fix that, and neither is proven on this image yet.
 
 The earlier shared hint tables were refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).

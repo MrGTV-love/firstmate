@@ -620,8 +620,8 @@ fm_remote_job_next_seq() { # [stage-dir destination]
     # Only this reservation is hardened. The worker singleton lock, a job's
     # .claim, the AFK launch lock, and the busy-state writer lock still treat a
     # successful mkdir as exclusive ownership; their race window is far narrower
-    # and moving them to a shared exclusive-create helper is recorded as a
-    # follow-up rather than folded into this change.
+    # and moving them to a shared exclusive-create helper is the follow-up in
+    # docs/remote-secondmates.md "Known limitation: mkdir-based locks".
     (umask 077; mkdir "$claim") 2>/dev/null || true
     if (umask 077; set -C; : > "$claim/owner") 2>/dev/null; then
       chmod 700 "$claim" || return 1

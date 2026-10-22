@@ -118,6 +118,58 @@ SH
   pass "a checkpoint restores ignored INT before launching its watcher"
 }
 
+# A code root whose path holds a space must launch its watcher as one path.
+test_checkpoint_launches_a_watcher_under_a_spaced_root() {
+  local home bin status
+  home=$(make_home spaced-root)
+  bin="$home/code root/bin"
+  mkdir -p "$bin"
+  cp "$CHECKPOINT" "$bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$bin/fm-supervision-engine-lib.sh"
+  cat > "$bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'signal: spaced-root.status\n'
+SH
+  chmod +x "$bin/fm-watch-checkpoint.sh" "$bin/fm-watch.sh"
+  status=0
+  FM_HOME="$home" "$bin/fm-watch-checkpoint.sh" --seconds 5 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 0 "$status" "spaced-root checkpoint exit: $(cat "$home/err.txt")"
+  assert_contains "$(cat "$home/out.txt")" "signal: spaced-root.status" \
+    "the watcher under a spaced code root did not run"
+  pass "a checkpoint launches its watcher from a code root whose path holds a space"
+}
+
+# A harness cancels a checkpoint by signalling its process group, which does
+# not hold the watcher's own group. The cancel must still reach the watcher, so
+# its EXIT cleanup releases state/.watch.lock instead of leaving it held.
+test_cancelled_checkpoint_lets_its_watcher_release_the_lock() {
+  local home checkpoint_pid watcher_pid i=0
+  home=$(make_home cancelled)
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    perl -e 'setpgrp(0, 0); exec @ARGV' "$CHECKPOINT" --seconds 30 >"$home/out.txt" 2>"$home/err.txt" &
+  checkpoint_pid=$!
+  wait_for_checkpoint_lock "$home" || {
+    kill -KILL -- "-$checkpoint_pid" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "cancelled checkpoint did not take the watcher lock"
+  }
+  watcher_pid=$(cat "$home/state/.watch.lock/pid")
+  kill -TERM -- "-$checkpoint_pid" || fail "could not signal the checkpoint's process group"
+  wait "$checkpoint_pid" 2>/dev/null || true
+  while [ "$i" -lt 100 ]; do
+    if ! kill -0 "$watcher_pid" 2>/dev/null && [ ! -e "$home/state/.watch.lock/pid" ]; then
+      break
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if kill -0 "$watcher_pid" 2>/dev/null; then
+    fail "the watcher outlived its cancelled checkpoint"
+  fi
+  assert_absent "$home/state/.watch.lock/pid" "the cancelled checkpoint's watcher did not release its lock"
+  pass "a cancelled checkpoint forwards the cancel so its watcher releases the lock"
+}
+
 test_announced_recovery_is_not_reannounced_by_next_checkpoint() {
   local home out err status marker
   home=$(make_home announced-recovery)
@@ -490,6 +542,8 @@ test_real_host_checkpoint_ends_quietly_at_its_bound() {
 test_quiet_checkpoint_exits_124_cleanly
 test_perl_timeout_fallback_honors_cleanup_bound_before_escalating
 test_checkpoint_resets_an_inherited_ignored_interrupt
+test_checkpoint_launches_a_watcher_under_a_spaced_root
+test_cancelled_checkpoint_lets_its_watcher_release_the_lock
 test_announced_recovery_is_not_reannounced_by_next_checkpoint
 test_never_announced_recovery_is_announced_once
 test_queue_append_during_checkpoint_still_resurfaces
