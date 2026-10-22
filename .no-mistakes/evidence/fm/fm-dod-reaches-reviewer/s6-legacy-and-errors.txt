@@ -1,0 +1,39 @@
+$ bash bin/fm-dod-lib.sh --verification-plan <legacy brief with no DoD and no out-of-scope list>
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+Task Definition Of Done: absent from this brief.
+
+## Out-of-scope list
+Out-of-scope list: absent from this brief.
+
+# Shared review rubric
+exit=0
+
+$ bash bin/fm-dod-lib.sh --verification-plan <legacy mixed Task with "Out of scope:" paragraph>
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+Task Definition Of Done: absent from this brief.
+
+## Out-of-scope list
+Out of scope: the dashboard redesign,
+- and the API schema.
+
+exit=0
+
+$ bash bin/fm-dod-lib.sh --verification-plan /nonexistent/brief.md
+error: verification-plan brief is not a readable file: /nonexistent/brief.md
+exit=1
+
+$ bash bin/fm-dod-lib.sh --help
+Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>
+Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.
+Legacy briefs state absent sections; unreadable inputs refuse construction.
+exit=0
+
+$ bash bin/fm-dod-lib.sh (no args)
+error: use bash bin/fm-dod-lib.sh --verification-plan <brief> (or --help)
+exit=2

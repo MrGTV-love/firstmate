@@ -1,0 +1,32 @@
+$ fm-promote.sh scout-ok --mode no-mistakes --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+promoted scout-ok to ship mode=no-mistakes yolo=off (teardown protection restored)
+wrote ship instructions for mode=no-mistakes: /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/scout-ok/ship-instructions.md
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.UvWE07 bin/fm-send.sh fm-scout-ok "$(cat /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/scout-ok/ship-instructions.md)"
+exit=0
+
+=== plan-build command from ship-instructions.md ===
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JA0W773D6V06YYJJ0MP62W/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/scout-ok/brief.md > /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/scout-ok/verification-plan.md
+exit=0
+
+=== generated plan (head) ===
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+This task was promoted from a scout: the Task Definition Of Done and Out-of-scope list below are scout-time context from the original scout brief, not ship criteria.
+Where they conflict with the promoted ship intent, the promoted ship intent governs.
+
+## Task Definition Of Done (scout-time context)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: SCOUT-DOD: the report names the stale cache key.
+
+### Mandatory items
+Each item has Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader).
+Filled criterion.
+
+### Supporting items
+Filled criterion.
+

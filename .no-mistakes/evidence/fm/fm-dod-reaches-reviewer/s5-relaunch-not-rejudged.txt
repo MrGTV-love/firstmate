@@ -1,0 +1,13 @@
+=== scout-ok Captain's intent before relaunch ===
+See report.md.
+
+--- fm-spawn.sh scout-ok --relaunch --harness claude ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UvWE07
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+skill selection for scout-ok: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on GTT-CB.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on GTT-CB.local"
+fallback: "25s existing caller limit"
+spawned scout-ok harness=claude kind=scout window=primary:fm-scout-ok worktree=/Users/charlesabrooker/.treehouse/proj-8c7726/1/proj
+exit=0

@@ -1,0 +1,17 @@
+$ fm-dod-lib.sh --verification-plan <brief with unfenced "DoD file:" directive>
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+# External DoD
+1. EXT-DOD-ITEM: badge refresh proven by test.
+
+## Out-of-scope list
+- No redesign.
+
+# Shared review rubric
+
+
+$ (same brief after the DoD file is removed)
+error: verification-plan DoD file is not a readable file: /Users/charlesabrooker/tmp/fm-lab.UvWE07/dod-external.md
+exit=1

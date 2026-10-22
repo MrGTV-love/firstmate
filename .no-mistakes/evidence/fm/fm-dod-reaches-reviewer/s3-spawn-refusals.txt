@@ -1,0 +1,51 @@
+=== ask-ptr-path: Captain's intent ===
+/Users/someone/data/report.md
+
+--- fm-spawn.sh output ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UvWE07
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/ask-ptr-path/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+launch-brief.md present: no; state meta present: no
+
+=== ask-ptr-see: Captain's intent ===
+See report.md.
+
+--- fm-spawn.sh output ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UvWE07
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/ask-ptr-see/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+launch-brief.md present: no; state meta present: no
+
+=== ask-ptr-url: Captain's intent ===
+https://example.test/report
+
+--- fm-spawn.sh output ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UvWE07
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/ask-ptr-url/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+launch-brief.md present: no; state meta present: no
+
+=== ask-ptr-link: Captain's intent ===
+[report](https://example.test/report)
+
+--- fm-spawn.sh output ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UvWE07
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/ask-ptr-link/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+launch-brief.md present: no; state meta present: no
+
+=== ask-comment: Captain's intent ===
+<!-- only a comment -->
+### Context
+
+--- fm-spawn.sh output ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UvWE07
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/ask-comment/brief.md has no concrete ask (no substantive ask after blank lines, headings and standalone comments); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+launch-brief.md present: no; state meta present: no
+

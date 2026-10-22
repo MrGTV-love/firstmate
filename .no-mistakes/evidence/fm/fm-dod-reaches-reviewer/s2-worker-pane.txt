@@ -1,0 +1,24 @@
+⚠ Ask rule Bash(*>*/.claude/hooks/*:*) reads its * literally · use
+  Bash(*>*/.claude/hooks/*)
+⚠ Ask rule Bash(rm*/.tac/governance/*:*) reads its * literally · use
+  Bash(rm*/.tac/governance/*)
+⚠ Ask rule Bash(mv*/.tac/governance/*:*) reads its * literally · use
+  Bash(mv*/.tac/governance/*)
+⚠ Ask rule Bash(*>*/.tac/governance/*:*) reads its * literally · use
+  Bash(*>*/.tac/governance/*)
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.UvWE07/state/operational-inbox/1792690746-8754d1d181d6dca7.msg' and handle
+  its contents as Firstmate operational input.
+
+  Reading the Firstmate operational inbox message
+  ⎿  $ cat '/Users/charlesabrooker/tmp/fm-lab.UvWE07/state/operational-inbox/179
+     2690746-8754d1d181d6dca7.msg'
+
+✽ Inferring… (8s · ↓ 140 tokens)
+                                                              ● high · /effort
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 (1M context) ░░░░░░░░░░ 3% 33k/1.0M proj:19d61f2c
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

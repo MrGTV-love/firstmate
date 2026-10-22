@@ -1,0 +1,6 @@
+== FM_TEST_ONLY=test_fresh_charter_bypasses_concrete_ask_check bash tests/fm-control-relaunch.test.sh
+ok - fm-spawn: fresh secondmate charters bypass the concrete-ask minimum
+exit=0
+== FM_TEST_ONLY=test_relaunch_never_runs_the_task_definition_of_done_check bash tests/fm-control-relaunch.test.sh
+ok - fm-spawn --relaunch: the task Definition of Done check and its missing-section warning belong to a fresh spawn only
+exit=0

@@ -1,0 +1,18 @@
+$ grep -rlF 'Every factual claim in a PR body must be backed by a record' bin docs .agents tests AGENTS.md
+docs/review-rubric.md
+tests/fm-dod-lib.test.sh
+tests/fm-task-delivery.test.sh
+
+$ grep -rlF 'delete or narrow the claim' bin docs .agents tests AGENTS.md
+docs/review-rubric.md
+
+$ grep -rlF 'A fix that would add scope beyond the intent' bin docs .agents tests AGENTS.md
+docs/review-rubric.md
+tests/fm-dod-lib.test.sh
+
+$ grep -rlF 'Grade every DoD mandatory item' bin docs .agents tests AGENTS.md
+docs/review-rubric.md
+tests/fm-dod-lib.test.sh
+
+$ git diff --stat 03d47acd..HEAD -- AGENTS.md
+(empty = AGENTS.md unchanged)

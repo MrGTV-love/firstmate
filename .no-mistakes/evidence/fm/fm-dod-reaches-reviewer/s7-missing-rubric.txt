@@ -1,0 +1,12 @@
+# Code copy with docs/review-rubric.md removed
+$ bash <copy>/bin/fm-dod-lib.sh --verification-plan <filled badge-fix brief>
+error: shared review rubric is not a readable file: /Users/charlesabrooker/tmp/fm-lab.UvWE07/code-copy/docs/review-rubric.md; restore it before building the verification plan
+exit=1
+stdout bytes:        0
+# fm-spawn.sh from a code copy with docs/review-rubric.md removed; fresh no-mistakes ship with a concrete ask
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.UvWE07
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+cat: /Users/charlesabrooker/tmp/fm-lab.UvWE07/code-copy/docs/review-rubric.md: No such file or directory
+error: could not render current launch contract for /Users/charlesabrooker/tmp/fm-lab.UvWE07/data/norubric/brief.md
+exit=1
+launch-brief.md present: no; state meta present: no
