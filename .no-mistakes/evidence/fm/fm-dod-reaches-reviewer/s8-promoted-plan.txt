@@ -1,0 +1,52 @@
+$ bin/fm-promote.sh ok-scout --mode no-mistakes --yolo off
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/projects.md; defaulting proj to no-mistakes off
+promoted ok-scout to ship mode=no-mistakes yolo=off (teardown protection restored)
+wrote ship instructions for mode=no-mistakes: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/ok-scout/ship-instructions.md
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.HpXJHi bin/fm-send.sh fm-ok-scout "$(cat /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/ok-scout/ship-instructions.md)"
+exit=0
+
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5GDRGSWD5D3TVMKPEAWHDX2/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/ok-scout/brief.md > /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/ok-scout/verification-plan.md   # the command the ship instructions hand the worker
+exit=0
+
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+This task was promoted from a scout: the Task Definition Of Done and Out-of-scope list below are scout-time context from the original scout brief, not ship criteria.
+Where they conflict with the promoted ship intent, the promoted ship intent governs.
+
+## Task Definition Of Done (scout-time context)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: DOD-FILLED DOD_CAPABILITY
+
+### Mandatory items
+Each item has Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader).
+DOD-FILLED DOD_MANDATORY_ITEMS
+
+### Supporting items
+DOD-FILLED DOD_SUPPORTING_ITEMS
+
+### Hard gates
+DOD-FILLED DOD_HARD_GATES
+
+### Honesty rule
+DOD-FILLED DOD_HONESTY_RULE
+
+## Out-of-scope list (scout-time context)
+- do not redesign the badge.
+
+# Shared review rubric
+
+This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
+It does not change the selected delivery path, review authority, or merge policy.
+
+- Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
+- Verify each applicable DoD item against observable behavior and its evidence; identify missing criteria or evidence explicitly rather than inventing requirements.
+- Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
+- Keep findings tied to the authorized change and its effects; do not demand an excluded redesign or unrelated improvement as a condition of completion.
+- Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the available execution records.
+- Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a verification-plan row id.
+- When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely re-word it.

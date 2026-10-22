@@ -1,0 +1,23 @@
+$ grep -rn -F 'Every factual claim in a PR body' bin docs .agents/skills tests AGENTS.md
+docs/review-rubric.md:11:- Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a verification-plan row id.
+tests/fm-dod-lib.test.sh:101:  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
+tests/fm-dod-lib.test.sh:193:  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'a relative builder path lost the rubric'
+
+$ grep -rn -F 'Treat the DoD and exclusions as author-supplied' bin docs .agents/skills tests
+docs/review-rubric.md:8:- Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
+
+$ grep -rn 'review-rubric' bin docs .agents/skills tests (pointers/renders)
+bin/fm-dod-lib.sh:110:# docs/review-rubric.md, the one rubric owner also used by independent readers.
+bin/fm-dod-lib.sh:183:  printf '%s\n' "When assigned an independent review, read and apply \`$root/docs/review-rubric.md\` against the reviewed task's DoD and exclusions; obtain that task's brief or v
+bin/fm-dod-lib.sh:403:  rubric="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)/docs/review-rubric.md"
+docs/documentation-audiences.json:424:      "path": "docs/review-rubric.md",
+docs/configuration.md:1527:The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` supplies its pointer in every worker launch's 
+.agents/skills/hyper-jev/templates/starter/tests/starter-regressions.test.ts:6:import { buildReviewRubric } from "../src/levels/level10/review-rubric.ts";
+.agents/skills/hyper-jev/cookbook/use-cases/10-dynamic-questions.md:11:- **[buildReviewRubric / judgePullRequest](../../templates/starter/src/levels/level10/review-rubric.ts)**: file/line counts, touc
+tests/fm-dod-lib.test.sh:230:  assert_contains "$out" "$isolated/docs/review-rubric.md" 'missing rubric error did not name its owner'
+.agents/skills/hyper-jev/cookbook/use-cases/README.md:84:| 10C [Dynamic questions](10-dynamic-questions.md) | [review-rubric.ts](../../templates/starter/src/levels/level10/review-rubric.ts): `buildRev
+.agents/skills/hyper-jev/templates/starter/src/levels/level10/index.ts:4:export * from "./review-rubric.ts";
+tests/fm-task-delivery.test.sh:1141:    assert_grep "$ROOT/docs/review-rubric.md" "$home/data/$id/launch-brief.md" 'independent readers did not receive the single rubric owner'
+
+$ git diff --stat 93e65be7..HEAD -- AGENTS.md
+(empty = AGENTS.md unchanged)

@@ -1,0 +1,16 @@
+$ no-mistakes axi run --help | grep verification-plan
+      --verification-plan string       capture a nonempty UTF-8 verification plan as separate run evidence (new runs only)
+
+$ shasum -a 256 /Users/charlesabrooker/.no-mistakes/run-inputs/01M5GDRGSWD5D3TVMKPEAWHDX2/verification-plan.txt  (this run's own captured plan input)
+23c30258c5d9f3c0c67f2f8bb9567eafd55483fb8e989d2262311640dd2e2db5  /Users/charlesabrooker/.no-mistakes/run-inputs/01M5GDRGSWD5D3TVMKPEAWHDX2/verification-plan.txt
+
+$ grep -n '^#\|PR body' /Users/charlesabrooker/.no-mistakes/run-inputs/01M5GDRGSWD5D3TVMKPEAWHDX2/verification-plan.txt
+1:# Verification plan
+4:## Task Definition Of Done
+11:### Mandatory items
+35:### Supporting items
+41:### Hard gates
+47:### Honesty rule
+50:## Out-of-scope list
+53:# Shared review rubric
+63:- Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a verification-plan row id.

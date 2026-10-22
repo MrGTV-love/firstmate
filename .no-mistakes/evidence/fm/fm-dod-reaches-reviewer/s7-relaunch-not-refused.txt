@@ -1,0 +1,24 @@
+$ bin/fm-spawn.sh nm-ship --relaunch --harness tail -n 60 -f __BRIEF__
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+skill selection for nm-ship: unavailable - no TypeSafe or OpenRouter key
+spawned nm-ship harness=tail kind=ship mode=no-mistakes yolo=off window=primary:fm-nm-ship worktree=/Users/charlesabrooker/tmp/fm-lab.HpXJHi/treehouse/.treehouse/proj-cf5c7c/1/proj
+exit=0
+
+--- durable brief Captain's intent at relaunch time (pointer only) ---
+## Captain's intent
+See report.md.
+
+## Firstmate spec
+--- relaunched launch-brief still carries plan instructions ---
+159:`bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5GDRGSWD5D3TVMKPEAWHDX2/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/brief.md > /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md`
+161:Pass `--verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md` when starting the run, alongside the unchanged `--intent` input described below.
+236:Use everything under `## Captain intent authorized for --intent` through the end of this brief, including any nested subheadings but excluding that heading, plus any later words the captain actually supplied as `--intent`; never include Firstmate specification or other mixed Task content.
+242:`bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5GDRGSWD5D3TVMKPEAWHDX2/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/brief.md > /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md`
+244:Pass `--verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md` when starting the run, alongside the unchanged `--intent` input described below.
+247:## Captain intent authorized for --intent
+--- worker pane after relaunch ---
+
+## Captain intent authorized for --intent
+See report.md.
+

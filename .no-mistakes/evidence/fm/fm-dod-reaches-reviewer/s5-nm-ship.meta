@@ -1,0 +1,16 @@
+window=primary:fm-nm-ship
+endpoint_task_id=nm-ship
+worktree=/Users/charlesabrooker/tmp/fm-lab.HpXJHi/treehouse/.treehouse/proj-cf5c7c/1/proj
+project=/Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj
+harness=tail
+kind=ship
+mode=no-mistakes
+yolo=off
+branch=fm/nm-ship
+tasktmp=/tmp/fm-nm-ship
+model=default
+effort=default
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+spawn_gen=s1792629310.61811.26742

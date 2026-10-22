@@ -1,0 +1,2 @@
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5GDRGSWD5D3TVMKPEAWHDX2/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/brief.md > /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md
+exit=0

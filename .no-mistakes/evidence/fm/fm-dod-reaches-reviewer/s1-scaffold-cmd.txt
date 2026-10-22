@@ -1,0 +1,3 @@
+$ bin/fm-brief.sh nm-ship proj --mode no-mistakes
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/brief.md (ship, mode=no-mistakes; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+exit=0

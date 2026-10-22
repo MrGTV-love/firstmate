@@ -1,0 +1,30 @@
+$ bin/fm-spawn.sh ok-scout /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --scout --harness tail -n 60 -f __BRIEF__
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+skill selection for ok-scout: unavailable - no TypeSafe or OpenRouter key
+spawned ok-scout harness=tail kind=scout window=primary:fm-ok-scout worktree=/Users/charlesabrooker/tmp/fm-lab.HpXJHi/treehouse/.treehouse/proj-cf5c7c/2/proj
+exit=0
+
+--- ok-scout brief Captain's intent ---
+## Captain's intent
+<!-- context is optional --> Find why the badge goes grey after a refresh.
+See report.md.
+
+## Firstmate spec
+--- launch-brief rubric pointer ---
+10:When assigned an independent review, read and apply `/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5GDRGSWD5D3TVMKPEAWHDX2/docs/review-rubric.md` against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied.
+--- worker pane ---
+- A crossed hard gate fails the task. Stop and report it.
+- Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
+
+# Skill selection
+
+Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+

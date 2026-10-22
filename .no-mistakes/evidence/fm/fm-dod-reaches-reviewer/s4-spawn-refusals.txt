@@ -1,0 +1,55 @@
+$ bin/fm-spawn.sh refuse-scout-10 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --scout --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-scout-10/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-scout-6 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --scout --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-scout-6/brief.md has no concrete ask (no substantive ask after blank lines, headings and standalone comments); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-scout-7 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --scout --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-scout-7/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-scout-8 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --scout --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-scout-8/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-scout-9 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --scout --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-scout-9/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-ship-1 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --mode no-mistakes --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-ship-1/brief.md has no concrete ask (no substantive ask after blank lines, headings and standalone comments); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-ship-2 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --mode no-mistakes --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-ship-2/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-ship-3 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --mode no-mistakes --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-ship-3/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-ship-4 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --mode no-mistakes --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-ship-4/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+$ bin/fm-spawn.sh refuse-ship-5 /Users/charlesabrooker/tmp/fm-lab.HpXJHi/projects/proj --mode no-mistakes --yolo off --harness claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.HpXJHi
+error: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-ship-5/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+exit=1
+
+=== state/ and launch-brief check after all refusals ===
+.treehouse-project-d27843a725fe58b8ff52c8bc0f69e14c7e4ba830.lock.holds
+.treehouse-project-d27843a725fe58b8ff52c8bc0f69e14c7e4ba830.lock.queue
+(eval):1: no matches found: /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/refuse-*/launch-brief.md
+primary:0: bash* (1 panes) [220x50] 

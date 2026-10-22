@@ -1,0 +1,24 @@
+(cwd: worker worktree /Users/charlesabrooker/tmp/fm-lab.HpXJHi/treehouse/.treehouse/proj-cf5c7c/1/proj)
+$ bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5GDRGSWD5D3TVMKPEAWHDX2/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/brief.md > /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md
+exit=0
+plan bytes:     2350
+/Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md: ASCII text
+intent sentence in plan? 0
+SPEC-MARKER in plan? 0
+SPEC-MARKER in authorized --intent section? 0
+PR-body claim line in plan? 1
+DoD items in plan: 5
+
+--- worker pane (tmux capture) ---
+The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+Before starting a new no-mistakes run, build the separate verification plan from the current durable task brief:
+`bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5GDRGSWD5D3TVMKPEAWHDX2/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/brief.md > /Users/charlesabrooker/tm
+p/fm-lab.HpXJHi/data/nm-ship/verification-plan.md`
+If plan construction fails, stop and report the error to firstmate; do not start a run with a partial plan.
+Pass `--verification-plan /Users/charlesabrooker/tmp/fm-lab.HpXJHi/data/nm-ship/verification-plan.md` when starting the run, alongside the unchanged `--intent` input described below.
+The installed no-mistakes input reads a nonempty UTF-8 file as separate run evidence, not user intent; omit that flag when reattaching to an existing run.
+
+## Captain intent authorized for --intent
+Make the status badge show the real build state after a page refresh.
+
