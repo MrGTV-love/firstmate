@@ -5,6 +5,7 @@
 # The blocked-write waits below are 120-second wall-clock hang tripwires, not
 # slack for that growth, and they must not be raised further.
 # Serial 7 is not called green until the Ubuntu CI log shows this suite passing.
+# It passed there in portable serial pool 4 of [run 39757092565](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565), job 119751733879, on head `2f5fd300`.
 set -u
 
 # shellcheck source=tests/lib.sh
