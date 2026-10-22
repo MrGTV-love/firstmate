@@ -1156,6 +1156,45 @@ EOF
 
 test_fresh_spawn_requires_a_concrete_ask
 
+# A promoted scout's plan is built by the command the ship instructions hand the
+# worker. Scout-time criteria stay visible but must not read as ship criteria.
+test_promoted_plan_labels_scout_criteria() {
+  local rec home proj fakebin id=promote-plan instructions command plan
+  rec=$(make_home promote-plan)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+  mkdir -p "$home/data/$id"
+  cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Find why the guard blocks large writes.
+## Firstmate spec
+Measure the guard on recorded sessions.
+Out of scope: changing guard code.
+# Definition of done
+## Definition Of Done (task)
+The report names the blocking threshold.
+## How You're Graded
+EOF
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off >/dev/null 2>&1 \
+    || fail 'promotion to no-mistakes failed'
+  instructions="$home/data/$id/ship-instructions.md"
+  command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$instructions")
+  [ -n "$command" ] || fail 'promoted instructions carry no plan-build command'
+  bash -c "$command" || fail 'promoted plan-build command failed'
+  plan="$home/data/$id/verification-plan.md"
+  assert_grep 'The report names the blocking threshold.' "$plan" 'promoted plan dropped the scout DoD'
+  assert_grep 'Out of scope: changing guard code.' "$plan" 'promoted plan dropped the scout exclusions'
+  assert_grep '## Task Definition Of Done (scout-time context)' "$plan" 'scout DoD read as ship criteria'
+  assert_grep '## Out-of-scope list (scout-time context)' "$plan" 'scout exclusions read as ship exclusions'
+  assert_grep 'the promoted ship intent governs' "$plan" 'promoted plan did not say which intent governs'
+  pass 'fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent'
+}
+
+test_promoted_plan_labels_scout_criteria
+
 # Exercise the serialized input a worker is told to pass to no-mistakes, not
 # just the presence of words somewhere in its much larger launch brief.
 # No live model or pipeline is needed: spawn publishes this exact input before

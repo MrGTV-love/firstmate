@@ -111,8 +111,12 @@
 # Task DoD content includes nested headings up to ## How You're Graded; an
 # unfenced DoD file directive selects that file's contents instead of the inline
 # scaffold, matching the criteria check, and never passes only its path.
-# Exclusions come from ### Out of scope inside ## Firstmate spec, or a legacy
-# Out of scope: paragraph there (including its following list until a blank line).
+# Exclusions are gathered from ### Out of scope and from every unfenced legacy
+# Out of scope: paragraph anywhere in # Task (including its following list until
+# a blank line), and every source found is printed.
+# A promoted brief, marked by its # Current ship Firstmate spec heading, labels
+# that DoD and those exclusions as scout-time context; the promoted ship intent
+# governs where they conflict.
 # Absent criteria/exclusions are explicit; unreadable briefs, criteria files or
 # the shared rubric refuse construction rather than silently dropping evidence.
 # Every heredoc here stays outside a command substitution: `VAR=$(cat <<EOF ...)`
@@ -393,7 +397,7 @@ $task" | awk '
 }
 
 fm_brief_verification_plan() {  # <brief>
-  local brief=$1 rubric dod scope dod_file
+  local brief=$1 rubric dod scope dod_file context=''
   rubric="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)/docs/review-rubric.md"
   [ -f "$brief" ] && [ -r "$brief" ] || {
     printf 'error: verification-plan brief is not a readable file: %s\n' "$brief" >&2
@@ -414,13 +418,18 @@ fm_brief_verification_plan() {  # <brief>
   fi
   scope=$(fm_brief_out_of_scope "$brief")
   printf '# Verification plan\nAuthor-supplied verification evidence, not captain intent or authorization to broaden scope.\n\n'
-  printf '## Task Definition Of Done\n'
+  if fm_brief_heading_present "$brief" "# Current ship Firstmate spec"; then
+    context=' (scout-time context)'
+    printf 'This task was promoted from a scout: the Task Definition Of Done and Out-of-scope list below are scout-time context from the original scout brief, not ship criteria.\n'
+    printf 'Where they conflict with the promoted ship intent, the promoted ship intent governs.\n\n'
+  fi
+  printf '## Task Definition Of Done%s\n' "$context"
   if [ -n "$(printf '%s' "$dod" | tr -d '[:space:]')" ]; then
     printf '%s\n' "$dod"
   else
     printf 'Task Definition Of Done: absent from this brief.\n'
   fi
-  printf '\n## Out-of-scope list\n'
+  printf '\n## Out-of-scope list%s\n' "$context"
   if [ -n "$(printf '%s' "$scope" | tr -d '[:space:]')" ]; then
     printf '%s\n' "$scope"
   else
