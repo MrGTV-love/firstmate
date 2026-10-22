@@ -694,8 +694,30 @@ glab_merge_line() {
   grep -F ' mr merge ' "$1" || true
 }
 
+record_review() {
+  local case_dir=$1 url=$2 head=$3
+  shift 3
+  FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
+      --verdict PASS --reader-family anthropic --author-groups '{"all":["openai"]}' \
+      --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
+      --report "$case_dir/review.md" "$@"
+}
+
 run_pr_merge() {
-  local case_dir=$1 rc; shift
+  local case_dir=$1 rc head=; shift
+  # Legacy forge/authority cases meet the independent-review prerequisite.
+  # Review-specific cases opt out and publish their own evidence explicitly.
+  if [ ! -e "$case_dir/explicit-review" ] && [ "$#" -ge 2 ]; then
+    case "$2" in
+      https://github.com/*) head=$(cat "$case_dir/github-head" 2>/dev/null || true) ;;
+      */-/merge_requests/*) head=$("$JQ_BIN" -r .sha "$case_dir/mr.json" 2>/dev/null || true) ;;
+      */pulls/*) head=$("$JQ_BIN" -r .head.sha "$case_dir/pr.json" 2>/dev/null || true) ;;
+    esac
+    if [ -n "$head" ]; then
+      record_review "$case_dir" "$2" "$head" >/dev/null 2>&1 || true
+    fi
+  fi
   FM_ROOT_OVERRIDE="$ROOT" \
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" \
   FM_STATE_OVERRIDE="$case_dir/state" \
@@ -1293,7 +1315,7 @@ test_github_unrecognised_queue_method_still_names_the_queue() {
   expect_code 1 "$rc" "github-unrecognised-queue-method: an unproved merge must fail"
   assert_grep 'base branch main requires the merge queue, but its configured merge method (FASTFORWARD) is not one this script recognises' \
     "$case_dir/stderr" \
-    "github-unrecognised-queue-method: a readable queue rule produced no queue mention"
+    "github-unrecognised-queue-method: a readable queue rule produced no queue mention: $(cat "$case_dir/stderr")"
   assert_no_grep 'retry with:' "$case_dir/stderr" \
     "github-unrecognised-queue-method: retry flags were named for a method nothing recognises"
   assert_no_grep '--auto --' "$case_dir/stderr" \
@@ -2987,6 +3009,118 @@ test_secondmate_without_parent_binding_is_loud() {
   pass "a secondmate home that cannot report upward says so instead of merging in silence"
 }
 
+review_record_command() {
+  local case_dir=$1
+  shift
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-review-record.py" "$@"
+}
+
+test_review_record_validation_and_latest() {
+  local case_dir head url rc bad
+  case_dir=$(make_case review-record-fields)
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  for bad in missing-report invalid-verdict invalid-url empty-words empty-groups; do
+    rc=0
+    case "$bad" in
+      missing-report) record_review "$case_dir" "$url" "$head" --report '' > "$case_dir/out" 2>&1 || rc=$? ;;
+      invalid-verdict) record_review "$case_dir" "$url" "$head" --verdict MAYBE > "$case_dir/out" 2>&1 || rc=$? ;;
+      invalid-url) record_review "$case_dir" nonsense "$head" > "$case_dir/out" 2>&1 || rc=$? ;;
+      empty-words) review_record_command "$case_dir" captain-word --pr "$url" --words '' > "$case_dir/out" 2>&1 || rc=$? ;;
+      empty-groups) record_review "$case_dir" "$url" "$head" --author-groups '{}' > "$case_dir/out" 2>&1 || rc=$? ;;
+    esac
+    expect_code 2 "$rc" "$bad must refuse invalid field"
+    case "$bad" in
+      missing-report) assert_grep report "$case_dir/out" "invalid report named" ;;
+      invalid-verdict) assert_grep verdict "$case_dir/out" "invalid verdict named" ;;
+      invalid-url) assert_grep pr "$case_dir/out" "invalid PR named" ;;
+      empty-words) assert_grep words "$case_dir/out" "empty words named" ;;
+      empty-groups) assert_grep author_groups "$case_dir/out" "empty authors named" ;;
+    esac
+  done
+  record_review "$case_dir" "$url" "$head" --verdict FAIL > /dev/null || fail "record FAIL"
+  cp "$case_dir/state/review-records.jsonl" "$case_dir/first-record"
+  record_review "$case_dir" "$url" "$head" --reader-family ANTHROPIC \
+    --author-groups '{"initial":["openai"],"fixes":["google","openai"]}' > /dev/null || fail "record grouped PASS"
+  review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read newest record"
+  "$JQ_BIN" -e --arg pr "$url" --arg head "$head" --arg report "$case_dir/review.md" '
+    .review | .pr == $pr and .head == $head and .verdict == "PASS"
+    and .reader_family == "anthropic" and .author_groups == {initial:["openai"],fixes:["google","openai"]}
+    and .loosens_deny_allow_list == "no" and .widens_guard == "no"
+    and .customer_data_billing_spend == "no" and .report == $report' "$case_dir/latest" >/dev/null \
+    || fail "latest must preserve all review fields and groups"
+  "$JQ_BIN" -sce 'length == 2 and .[0].verdict == "FAIL" and .[1].verdict == "PASS"' \
+    "$case_dir/state/review-records.jsonl" >/dev/null || fail "review history must remain append-only"
+  IFS= read -r bad < "$case_dir/state/review-records.jsonl"
+  printf '%s\n' "$bad" > "$case_dir/retained-first"
+  cmp -s "$case_dir/first-record" "$case_dir/retained-first" || fail "append changed existing bytes"
+  pass "review helper validates fields, retains history, and returns newest grouped evidence"
+}
+
+test_recorded_review_merge_conditions() {
+  local case_dir head url scenario rc expected
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  for scenario in stale same-family fail trigger-list trigger-guard trigger-data other-pr captain-word valid newest-fail; do
+    case_dir=$(make_case "review-$scenario")
+    : > "$case_dir/explicit-review"
+    add_gh_mocks "$case_dir" "$head"
+    case "$scenario" in
+      stale) record_review "$case_dir" "$url" 2222222222222222222222222222222222222222 >/dev/null; expected='head mismatch' ;;
+      same-family) record_review "$case_dir" "$url" "$head" --author-groups '{"initial":["openai"],"fixes":["anthropic"]}' >/dev/null; expected=reader_family ;;
+      fail) record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null; expected=verdict ;;
+      newest-fail)
+        record_review "$case_dir" "$url" "$head" >/dev/null
+        record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null; expected=verdict ;;
+      trigger-list) record_review "$case_dir" "$url" "$head" --loosens-deny-allow-list yes >/dev/null; expected=loosens_deny_allow_list ;;
+      trigger-guard) record_review "$case_dir" "$url" "$head" --widens-guard yes >/dev/null; expected=widens_guard ;;
+      trigger-data|other-pr|captain-word)
+        record_review "$case_dir" "$url" "$head" --customer-data-billing-spend yes >/dev/null
+        expected=customer_data_billing_spend
+        if [ "$scenario" = other-pr ]; then
+          review_record_command "$case_dir" captain-word --pr https://github.com/example/repo/pull/10 --words 'Merge this PR.' >/dev/null
+        elif [ "$scenario" = captain-word ]; then
+          review_record_command "$case_dir" captain-word --pr "$url" --words 'Merge this PR despite the spend trigger.' >/dev/null
+          review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest"
+          "$JQ_BIN" -e '.["captain-word"].words == "Merge this PR despite the spend trigger."' "$case_dir/latest" >/dev/null \
+            || fail "captain exact words not preserved"
+        fi ;;
+      valid) record_review "$case_dir" "$url" "$head" >/dev/null ;;
+    esac
+    rc=0
+    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    case "$scenario" in
+      valid|captain-word)
+        expect_code 0 "$rc" "$scenario must merge"
+        assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
+      *)
+        expect_code 1 "$rc" "$scenario must refuse"
+        assert_grep "$expected" "$case_dir/stderr" "$scenario refusal names field"
+        assert_grep 'fm-review-record.py' "$case_dir/stderr" "$scenario refusal names completing step"
+        assert_no_grep '^pr merge ' "$case_dir/gh.log" "$scenario must never call merge" ;;
+    esac
+    pass "recorded review merge condition: $scenario"
+  done
+}
+
+test_missing_review_record_refuses() {
+  local case_dir rc
+  case_dir=$(make_case missing-review-record)
+  : > "$case_dir/explicit-review"
+  add_gh_mocks "$case_dir" 1111111111111111111111111111111111111111
+  rc=0
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/9 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "missing review record must refuse"
+  assert_grep 'review record' "$case_dir/stderr" "missing review refusal names the field"
+  assert_no_grep '^pr merge ' "$case_dir/gh.log" "missing review must not reach forge merge"
+  pass "missing review record refuses before forge merge"
+}
+
+test_missing_review_record_refuses
+test_review_record_validation_and_latest
+test_recorded_review_merge_conditions
 test_github_zero_exit_queue_required_refuses_with_exact_retry
 test_github_closed_unqueued_outcome_omits_retry_flags
 test_github_agreeing_queue_rules_keep_retry_guidance
