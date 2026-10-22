@@ -191,7 +191,7 @@ run_pr_merge() {  # <home> <id> <url>
   # Each fixture merge carries an independent PASS for the live head.
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-review-record.py" review \
     --pr "$2" --head 1111111111111111111111111111111111111111 \
-    --verdict PASS --reader-family anthropic --author-groups '{"all":["openai"]}' \
+    --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
     --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
     --report "$home/review.md" >/dev/null || return
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \

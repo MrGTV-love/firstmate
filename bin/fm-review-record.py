@@ -3,7 +3,7 @@
 
 Usage (FM_HOME must name the absolute home holding the PR task record):
   fm-review-record.py review --pr URL --head SHA --verdict PASS|FAIL
-    --reader-family FAMILY --author-groups '{"commit-group":["family",...]}'
+    --reader-model MODEL --author-groups '{"commit-group":["model",...]}'
     --loosens-deny-allow-list yes|no --widens-guard yes|no
     --customer-data-billing-spend yes|no --report PATH
   fm-review-record.py captain-word --pr URL --head SHA --words 'Exact captain merge instruction'
@@ -15,14 +15,16 @@ FM_STATE_OVERRIDE selects its state directory, as in the PR merge/poll helpers.
 state/review-records.jsonl uses the friction ledger's locked O_APPEND JSONL shape:
 records are never replaced; append order, not wall-clock time, selects the newest
 review and captain-word for each canonical PR URL. Reads share the same lock.
-Author groups name commit ranges/groups with their author model families; every
-family must differ from the reader. Families come from a closed set (anthropic,
-openai, deepseek, google; aliases claude, codex, gpt, gemini), match case-
-insensitively, and are stored by canonical name; any other family is refused.
+Author groups name commit ranges/groups with their exact author model ids. Each
+model's family is derived from its id (any provider route prefix ending in / is
+dropped; the leading name, case-insensitive, selects it) into the closed set
+anthropic, openai, google, deepseek, xai, moonshot, meta (aliases claude, gpt,
+chatgpt, codex, oN, gemini, gemma, grok, kimi, llama) and stored beside the model.
+A model outside them records family unknown, which is never independent.
 verify accepts the newest captain-word when it names the exact live head; it then
 stands in for the review and every trigger. Otherwise the newest review must be
-PASS at the exact live head with an independent reader, and any yes trigger is
-refused. Captain words waive no existing forge/hold guard. captain-word records only
+PASS at the exact live head with a known reader family outside every known author
+family, and any yes trigger is refused. Captain words waive no existing forge/hold guard. captain-word records only
 a current explicit captain merge instruction naming the concrete PR, given in the
 captain's own turn; away words are never recorded as captain-word.
 latest emits the complete newest review and captain-word as JSON for relay reads.
@@ -44,8 +46,11 @@ import time
 
 BIN = Path(__file__).resolve().parent
 TRIGGERS = ("loosens_deny_allow_list", "widens_guard", "customer_data_billing_spend")
-FAMILIES = {"anthropic": "anthropic", "openai": "openai", "deepseek": "deepseek", "google": "google",
-            "claude": "anthropic", "codex": "openai", "gpt": "openai", "gemini": "google"}
+FAMILIES = {"anthropic": "anthropic", "claude": "anthropic",
+            "openai": "openai", "gpt": "openai", "chatgpt": "openai", "codex": "openai",
+            "google": "google", "gemini": "google", "gemma": "google",
+            "deepseek": "deepseek", "xai": "xai", "grok": "xai",
+            "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta"}
 
 
 class RecordError(Exception):
@@ -58,10 +63,17 @@ def nonempty(value, field):
     return value
 
 
-def family(value):
-    if not isinstance(value, str) or value.casefold() not in FAMILIES:
-        raise RecordError(f"reader_family/author_groups family must be one of {', '.join(FAMILIES)}")
-    return FAMILIES[value.casefold()]
+def model(value, field):
+    if not isinstance(value, str) or not re.fullmatch(r"[^\s\x00]+", value):
+        raise RecordError(f"{field} must be an exact model id")
+    name = re.match(r"([a-z]*)(\d*)", value.casefold().rsplit("/", 1)[-1])
+    if name.group(1) == "o" and name.group(2):
+        return "openai"
+    return FAMILIES.get(name.group(1), "unknown")
+
+
+def modelled(value, field):
+    return {"model": value, "family": model(value, field)}
 
 
 def head_sha(value):
@@ -93,18 +105,18 @@ def validate(row):
         return
     if row.get("verdict") not in ("PASS", "FAIL"):
         raise RecordError("verdict must be PASS or FAIL")
-    if family(row.get("reader_family")) != row["reader_family"]:
-        raise RecordError("reader_family must be a canonical family")
+    if model(row.get("reader_model"), "reader_model") != row.get("reader_family"):
+        raise RecordError("reader_family must be derived from reader_model")
     groups = row.get("author_groups")
     if not isinstance(groups, dict) or not groups:
-        raise RecordError("author_groups must map each commit group to non-empty author families")
+        raise RecordError("author_groups must map each commit group to non-empty author models")
     for group, authors in groups.items():
         nonempty(group, "author_groups commit group")
         if not isinstance(authors, list) or not authors:
-            raise RecordError("author_groups must contain non-empty author families for every commit group")
+            raise RecordError("author_groups must contain non-empty author models for every commit group")
         for author in authors:
-            if family(author) != author:
-                raise RecordError("author_groups families must be canonical families")
+            if not isinstance(author, dict) or model(author.get("model"), "author_groups model") != author.get("family"):
+                raise RecordError("author_groups family must be derived from each author model")
     for trigger in TRIGGERS:
         if row.get(trigger) not in ("yes", "no"):
             raise RecordError(f"{trigger} must be yes or no")
@@ -174,9 +186,14 @@ def verify(records, head):
         raise RecordError("verdict is FAIL; obtain and record a new PASS with fm-review-record.py review, then retry the merge")
     if review["head"] != head:
         raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
+    unknown = [review["reader_model"]] if review["reader_family"] == "unknown" else []
+    unknown += [a["model"] for authors in review["author_groups"].values() for a in authors if a["family"] == "unknown"]
+    if unknown:
+        raise RecordError(f"model family unknown for {', '.join(unknown)}; an unknown family is never independent, so obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
     for group, authors in review["author_groups"].items():
-        if review["reader_family"] in authors:
-            raise RecordError(f"reader_family {review['reader_family']} matches author_groups {group}; record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge")
+        for author in authors:
+            if author["family"] == review["reader_family"]:
+                raise RecordError(f"reader_family {review['reader_family']} ({review['reader_model']}) matches author_groups {group} ({author['model']}); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge")
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes:
         raise RecordError(f"{', '.join(yes)} is yes but captain-word is missing at live head {head}; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
@@ -192,7 +209,7 @@ def main():
         if name != "latest":
             command.add_argument("--head", required=True)
         if name == "review":
-            for flag in ("verdict", "reader-family", "author-groups", "report", *(t.replace("_", "-") for t in TRIGGERS)):
+            for flag in ("verdict", "reader-model", "author-groups", "report", *(t.replace("_", "-") for t in TRIGGERS)):
                 command.add_argument("--" + flag, required=True)
         if name == "captain-word":
             command.add_argument("--words", required=True)
@@ -205,12 +222,12 @@ def main():
             try:
                 groups = json.loads(args.author_groups)
             except ValueError as exc:
-                raise RecordError("author_groups must be a JSON object of commit groups and family lists") from exc
+                raise RecordError("author_groups must be a JSON object of commit groups and model lists") from exc
             if isinstance(groups, dict):
-                groups = {group: [family(a) for a in authors] if isinstance(authors, list) else authors
+                groups = {group: [modelled(a, "author_groups model") for a in authors] if isinstance(authors, list) else authors
                           for group, authors in groups.items()}
-            row.update(head=args.head, verdict=args.verdict, reader_family=family(args.reader_family),
-                       author_groups=groups, report=args.report, **{t: getattr(args, t) for t in TRIGGERS})
+            row.update(head=args.head, verdict=args.verdict, reader_model=args.reader_model,
+                       reader_family=model(args.reader_model, "reader_model"), author_groups=groups, report=args.report, **{t: getattr(args, t) for t in TRIGGERS})
         elif args.command == "captain-word":
             row.update(head=args.head, words=args.words)
         write = args.command in ("review", "captain-word")
