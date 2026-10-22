@@ -3021,14 +3021,17 @@ test_review_record_validation_and_latest() {
   case_dir=$(make_case review-record-fields)
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
-  for bad in missing-report invalid-verdict invalid-url empty-words empty-groups; do
+  for bad in missing-report invalid-verdict invalid-url empty-words empty-groups unknown-reader unknown-author captain-head; do
     rc=0
     case "$bad" in
       missing-report) record_review "$case_dir" "$url" "$head" --report '' > "$case_dir/out" 2>&1 || rc=$? ;;
       invalid-verdict) record_review "$case_dir" "$url" "$head" --verdict MAYBE > "$case_dir/out" 2>&1 || rc=$? ;;
       invalid-url) record_review "$case_dir" nonsense "$head" > "$case_dir/out" 2>&1 || rc=$? ;;
-      empty-words) review_record_command "$case_dir" captain-word --pr "$url" --words '' > "$case_dir/out" 2>&1 || rc=$? ;;
+      empty-words) review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words '' > "$case_dir/out" 2>&1 || rc=$? ;;
       empty-groups) record_review "$case_dir" "$url" "$head" --author-groups '{}' > "$case_dir/out" 2>&1 || rc=$? ;;
+      unknown-reader) record_review "$case_dir" "$url" "$head" --reader-family mistral > "$case_dir/out" 2>&1 || rc=$? ;;
+      unknown-author) record_review "$case_dir" "$url" "$head" --author-groups '{"all":["anthropic-ish"]}' > "$case_dir/out" 2>&1 || rc=$? ;;
+      captain-head) review_record_command "$case_dir" captain-word --pr "$url" --head main --words 'Merge it.' > "$case_dir/out" 2>&1 || rc=$? ;;
     esac
     expect_code 2 "$rc" "$bad must refuse invalid field"
     case "$bad" in
@@ -3037,12 +3040,15 @@ test_review_record_validation_and_latest() {
       invalid-url) assert_grep pr "$case_dir/out" "invalid PR named" ;;
       empty-words) assert_grep words "$case_dir/out" "empty words named" ;;
       empty-groups) assert_grep author_groups "$case_dir/out" "empty authors named" ;;
+      unknown-reader|unknown-author) assert_grep 'family must be one of anthropic' "$case_dir/out" "$bad family named" ;;
+      captain-head) assert_grep head "$case_dir/out" "captain-word head named" ;;
     esac
   done
+  [ ! -e "$case_dir/state/review-records.jsonl" ] || fail "refused input must not append a record"
   record_review "$case_dir" "$url" "$head" --verdict FAIL > /dev/null || fail "record FAIL"
   cp "$case_dir/state/review-records.jsonl" "$case_dir/first-record"
-  record_review "$case_dir" "$url" "$head" --reader-family ANTHROPIC \
-    --author-groups '{"initial":["openai"],"fixes":["google","openai"]}' > /dev/null || fail "record grouped PASS"
+  record_review "$case_dir" "$url" "$head" --reader-family Claude \
+    --author-groups '{"initial":["codex"],"fixes":["Gemini","gpt"]}' > /dev/null || fail "record grouped PASS"
   review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read newest record"
   "$JQ_BIN" -e --arg pr "$url" --arg head "$head" --arg report "$case_dir/review.md" '
     .review | .pr == $pr and .head == $head and .verdict == "PASS"
@@ -3055,43 +3061,50 @@ test_review_record_validation_and_latest() {
   IFS= read -r bad < "$case_dir/state/review-records.jsonl"
   printf '%s\n' "$bad" > "$case_dir/retained-first"
   cmp -s "$case_dir/first-record" "$case_dir/retained-first" || fail "append changed existing bytes"
-  pass "review helper validates fields, retains history, and returns newest grouped evidence"
+  pass "review helper validates fields, retains history, and returns newest canonical grouped evidence"
 }
 
 test_recorded_review_merge_conditions() {
   local case_dir head url scenario rc expected
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
-  for scenario in stale same-family fail trigger-list trigger-guard trigger-data other-pr captain-word valid newest-fail; do
+  for scenario in stale same-family alias-family fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail; do
     case_dir=$(make_case "review-$scenario")
     : > "$case_dir/explicit-review"
     add_gh_mocks "$case_dir" "$head"
     case "$scenario" in
       stale) record_review "$case_dir" "$url" 2222222222222222222222222222222222222222 >/dev/null; expected='head mismatch' ;;
       same-family) record_review "$case_dir" "$url" "$head" --author-groups '{"initial":["openai"],"fixes":["anthropic"]}' >/dev/null; expected=reader_family ;;
+      alias-family) record_review "$case_dir" "$url" "$head" --reader-family claude --author-groups '{"all":["anthropic"]}' >/dev/null; expected='reader_family anthropic' ;;
       fail) record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null; expected=verdict ;;
       newest-fail)
         record_review "$case_dir" "$url" "$head" >/dev/null
         record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null; expected=verdict ;;
       trigger-list) record_review "$case_dir" "$url" "$head" --loosens-deny-allow-list yes >/dev/null; expected=loosens_deny_allow_list ;;
       trigger-guard) record_review "$case_dir" "$url" "$head" --widens-guard yes >/dev/null; expected=widens_guard ;;
-      trigger-data|other-pr|captain-word)
+      trigger-data|other-pr|stale-captain-word|captain-word)
         record_review "$case_dir" "$url" "$head" --customer-data-billing-spend yes >/dev/null
         expected=customer_data_billing_spend
         if [ "$scenario" = other-pr ]; then
-          review_record_command "$case_dir" captain-word --pr https://github.com/example/repo/pull/10 --words 'Merge this PR.' >/dev/null
+          review_record_command "$case_dir" captain-word --pr https://github.com/example/repo/pull/10 --head "$head" --words 'Merge this PR.' >/dev/null
+        elif [ "$scenario" = stale-captain-word ]; then
+          review_record_command "$case_dir" captain-word --pr "$url" --head 2222222222222222222222222222222222222222 --words 'Merge this PR.' >/dev/null
         elif [ "$scenario" = captain-word ]; then
-          review_record_command "$case_dir" captain-word --pr "$url" --words 'Merge this PR despite the spend trigger.' >/dev/null
+          review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge this PR despite the spend trigger.' >/dev/null
           review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest"
           "$JQ_BIN" -e '.["captain-word"].words == "Merge this PR despite the spend trigger."' "$case_dir/latest" >/dev/null \
             || fail "captain exact words not preserved"
         fi ;;
+      captain-only) review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge the approved pull request.' >/dev/null ;;
+      stale-captain-only)
+        review_record_command "$case_dir" captain-word --pr "$url" --head 2222222222222222222222222222222222222222 --words 'Merge the approved pull request.' >/dev/null
+        expected='review record is missing' ;;
       valid) record_review "$case_dir" "$url" "$head" >/dev/null ;;
     esac
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|captain-word)
+      valid|captain-word|captain-only)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)

@@ -13,7 +13,8 @@
 # Every supported forge also requires a recorded independent PASS for the live
 # head before its merge command: bin/fm-review-record.py owns the append-only
 # review/captain-word format and recording CLI. A yes escalation trigger needs
-# recorded captain words for that PR; neither --attended-override nor away
+# recorded captain words at the live head, and captain words recorded at the
+# live head stand in for the PASS; neither --attended-override nor away
 # authority substitutes for this evidence, and captain words waive no old guard.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
@@ -210,15 +211,6 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-merge-authority-lib.sh"
 # shellcheck source=bin/fm-afk-contract.sh
 . "$SCRIPT_DIR/fm-afk-contract.sh"
-
-if [ "$#" -eq 1 ] && [ "$1" = --help ]; then
-  printf '%s\n' \
-    'Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--allow-red <check-name>] [--allow-missing <check-name>] [-- <extra forge merge args>]' \
-    'Requires the newest recorded different-family PASS at the live head; yes triggers also require captain words for that PR.' \
-    'Record evidence with FM_HOME=<task-home> bin/fm-review-record.py review or captain-word (see its --help).' \
-    'All existing live forge, hold, away-authority and head-binding guards remain in force.'
-  exit 0
-fi
 
 if [ "$#" -lt 2 ]; then
   echo "error: invalid PR merge request" >&2
