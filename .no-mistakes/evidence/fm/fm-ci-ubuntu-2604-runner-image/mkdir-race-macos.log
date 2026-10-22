@@ -1,0 +1,4 @@
+=== macOS host target ===
+mkdir=/bin/mkdir -> /bin/mkdir :: mkdir: illegal option -- -
+mode=bare trials=25 callers=20 trials_with_not_exactly_one_owner=0 owners_per_trial: 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+mode=excl trials=25 callers=20 trials_with_not_exactly_one_owner=0 owners_per_trial: 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1

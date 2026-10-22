@@ -1,0 +1,9 @@
+=== macOS ===
+[A-default-HUP] checkpoint=95835 bound=95862 watcher=95868 caller_HUP=default
+[A-default-HUP] 1.2s after HUP to the bound: watcher GONE, checkpoint exited
+[A-default-HUP] checkpoint final exit status=129; watcher after exit: gone; lock dir: absent
+[A-default-HUP] stdout: 
+[B-ignored-HUP] checkpoint=98369 bound=98403 watcher=98412 caller_HUP=ignore
+[B-ignored-HUP] 1.2s after HUP to the bound: watcher ALIVE, checkpoint running
+[B-ignored-HUP] checkpoint final exit status=0; watcher after exit: gone; lock dir: absent
+[B-ignored-HUP] stdout: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|

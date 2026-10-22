@@ -1,0 +1,15 @@
+### target x10 on Ubuntu 26.04 (stopped-coordinator case)
+run 1 rc=0 3s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 2 rc=0 2s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 3 rc=0 3s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 4 rc=0 3s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 5 rc=0 2s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 6 rc=0 3s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 7 rc=0 3s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 8 rc=0 2s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 9 rc=0 3s :: ok - a gate stopped while owning admission does not freeze free capacity 
+run 10 rc=0 3s :: ok - a gate stopped while owning admission does not freeze free capacity 
+### counterfactual: stopped-gate bypass disabled
+a stopped coordinator owner froze a free slot
+not ok - stopped coordinator regression failed
+rc=

@@ -1,0 +1,6 @@
+ok - quiet checkpoint exits 124 with a clean checkpoint line and no live lock
+ok - Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher
+ok - a checkpoint restores ignored INT before launching its watcher
+ok - a checkpoint launches its watcher from a code root whose path holds a space
+ok - a cancelled checkpoint forwards the cancel so its watcher releases the lock
+not ok - the watcher outlived its group-killed checkpoint's 5-second cleanup grace

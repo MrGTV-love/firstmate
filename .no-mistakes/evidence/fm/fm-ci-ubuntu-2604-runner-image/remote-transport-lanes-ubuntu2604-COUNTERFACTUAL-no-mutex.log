@@ -1,0 +1,2 @@
+ok - atomic sequence claims remain unique and reap only after expiry
+not ok - 20 of 20 concurrent callers each took the exclusive directory; exactly one may

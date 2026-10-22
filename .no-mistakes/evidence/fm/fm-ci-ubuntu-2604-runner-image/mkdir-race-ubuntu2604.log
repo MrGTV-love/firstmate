@@ -1,0 +1,4 @@
+=== Ubuntu 26.04 (uutils mkdir) target ===
+mkdir=/usr/bin/mkdir -> /usr/lib/cargo/bin/coreutils/mkdir :: mkdir (uutils coreutils) 0.10.0
+mode=bare trials=25 callers=20 trials_with_not_exactly_one_owner=17 owners_per_trial: 7 1 5 1 6 1 3 1 1 1 2 1 1 5 2 2 2 3 3 2 3 3 3 4 3
+mode=excl trials=25 callers=20 trials_with_not_exactly_one_owner=0 owners_per_trial: 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
