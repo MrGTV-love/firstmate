@@ -159,6 +159,7 @@ That is close to the family's ceiling rather than a scheduling loss: its longest
 The family's clock is two long scripts that do not contend: `fm-pr-check-security` (198.5s) and `fm-teardown` (194.1s) each own a worker for nearly the whole run, and `fm-pr-merge` (118.5s) plus `fm-x-mode` (79.4s) fill the other two.
 `bin/fm-test-isolation-proof.sh`'s own `--list-exclusions` keeps `fm-pr-check-security` and `fm-teardown` out of the mixed PORTABLE pool, where they would share a machine with unrelated lock and forge stress.
 Admitting them inside their own family is a different question and this proof answers it: the six members present on that date are safe with each other at four workers.
+The teardown file named above has since split into `fm-teardown`, `fm-teardown-pool`, and `fm-teardown-cleanup` ([portable shards](fm-test-portable-shards.md#teardown-groups)); this proof measured the combined script, so it does not cover the three group files running concurrently with the family.
 
 `tests/fm-pr-state.test.sh` and `tests/fm-pr-reviewers.test.sh` joined this family after the date above, so that result does not cover them.
 `script_allows_concurrency` in `bin/fm-test-run.sh` grants concurrency by family membership alone, so the family was re-proved at its then-current eight-member membership.

@@ -142,6 +142,31 @@ Five cases run their independent matrix cells at once through `run_cells_in_para
 Each cell builds its own homes under unique names, and a failing cell fails the case with the tail of its log.
 No case body, assertion, or `ok -` line was shortened or removed.
 
+## Teardown groups
+
+The former combined `tests/fm-teardown.test.sh` was an indivisible member: serial shard 2 of [run 39838628417](https://github.com/MrGTV-love/firstmate/actions/runs/39838628417) held it alone, its script time was 1587660 ms, and that job finished 26 minutes 49 seconds after the workflow started against the 1200000 ms packing target.
+Its 333 cases now run exactly once across three independently runnable files:
+
+| File | Area |
+|---|---|
+| `tests/fm-teardown.test.sh` | the landed-work proof and refusal matrix: fork and local-only landing, squash-merge and PR-head proofs, content fallback, task archives, pipeline-input ties, PR-check head records, dirty-worktree diagnostics, legacy records, and index-lock recovery |
+| `tests/fm-teardown-pool.test.sh` | pool slots, leases, custody, and returns: reservation before cleanup, proved landing after a wait, return-pending records across a refusal, reassigned and enclosing slots, reassociated and prior copies, nested slots, and subordinate cleanup custody |
+| `tests/fm-teardown-cleanup.test.sh` | post-close cleanup: the bounded process reap, foreign and held copies with the closeout driver, private no-mistakes launch agents, Docker stacks with their retained records, Herdr projection journals, and secondmate delivery and retirement |
+
+All three source `tests/fm-teardown-helpers.sh`, which owns every fixture and assertion helper plus the working tree's temporary root, the birth-identity fixture registry, and the EXIT cleanup.
+Each invocation owns its temporary root, its registered cleanup, and its own process inspection, so the final `ok -` line appears once per file.
+Every case still builds and tears down its own sandbox through `make_case`, and selecting one case by name still works in the file that owns it.
+The three files stay serial: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md) records that its concurrent proof covered the former combined script.
+`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 333-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a shared-helper change to select its pr-forge family, and that family to keep all three.
+
+The first hints (272355, 439235, and 876070 ms) are the former combined 1587660 ms measurement apportioned by the groups' measured local Ubuntu 26.04 container times (199413, 321599, and 641441 ms of a 1162453 ms total), not by a CI measurement of the separate files.
+The intact suite and the three groups report the same 335 `ok -` lines and no failures in that container, which is the behavior-parity evidence for the split.
+Replace these hints from the groups' own `fm-test-timing-portable-serial-*` artifacts as soon as a CI run measures them.
+
+The same refresh raised the four successful measurements that grew by more than 30 seconds - `fm-teardown` (split above), `fm-pr-check-security` (342666 to 420272 ms), `fm-control-relaunch` (1318470 to 1358153 ms), and `fm-spawn-compact-adviser-disable-remote` (294998 to 352918 ms) - and added the four measured but previously unhinted serial members `fm-api-key-guard-lib` (3850), `fm-copy-sweep` (207702), `fm-friction-ledger` (2020), and `fm-jev-guard-audit` (1281 ms).
+Measurements come from the successful per-script `duration_ms` records in that run's `fm-test-timing-portable-serial-*` artifacts.
+The serial lane still passes `--check-coverage` at the unchanged twenty shards, and the largest remaining single script is `fm-watch-triage-waits` at 1433371 ms, so splitting that suite is the way to a packed shard below it.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.

@@ -112,7 +112,7 @@ exclusion_reason() {
     fm-pr-check-security.test.sh)
       printf '%s\n' 'watcher lock / migration / poll security surface; intentional shared-lock class'
       ;;
-    fm-teardown.test.sh)
+    fm-teardown.test.sh|fm-teardown-pool.test.sh|fm-teardown-cleanup.test.sh)
       printf '%s\n' 'landed-work + lock-race teardown matrix; keep serial with forge/git stress peers'
       ;;
     fm-herdr-session-cleanup.test.sh)
@@ -210,6 +210,8 @@ fm-spawn-worktree-settle.test.sh
 fm-trace-context-spawn.test.sh
 fm-pr-check-security.test.sh
 fm-teardown.test.sh
+fm-teardown-pool.test.sh
+fm-teardown-cleanup.test.sh
 fm-watcher-lock.test.sh
 fm-watch-triage-waits.test.sh
 fm-wake-queue.test.sh

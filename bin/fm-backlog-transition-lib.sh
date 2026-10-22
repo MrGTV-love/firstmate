@@ -103,7 +103,7 @@ FM_BACKLOG_ROW_SHOW_WEDGED=0
 
 # Emit each byte of a value as a decimal number, locale-independently.
 # Deliberately perl rather than od: the spawn and teardown lifecycle runs under a
-# curated PATH (tests/fm-teardown.test.sh make_path_without_lsof pins that set)
+# curated PATH (tests/fm-teardown-helpers.sh make_path_without_lsof pins that set)
 # that excludes od, and a validator that cannot run must never wedge dispatch or
 # cleanup. perl is already in that curated set and is already used elsewhere in
 # this repo for the same portability reason.

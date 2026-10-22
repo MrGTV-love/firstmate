@@ -518,7 +518,8 @@ family_for_basename() {
       ;;
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|\
     fm-pr-merge.test.sh|fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
-    fm-review-diff.test.sh|fm-teardown.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
+    fm-review-diff.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
+    fm-teardown-cleanup.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
     fm-afk-contract.test.sh|fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|\
@@ -832,6 +833,7 @@ tests/fm-afk-return.test.sh 65368
 tests/fm-agy-composer-live-e2e.test.sh 403
 tests/fm-agy-harness.test.sh 75165
 tests/fm-agy-signals-live-e2e.test.sh 454
+tests/fm-api-key-guard-lib.test.sh 3850
 tests/fm-ask-user-authority.test.sh 1072
 tests/fm-backend-cmux-smoke.test.sh 151
 tests/fm-backend-cmux.test.sh 6375
@@ -877,8 +879,9 @@ tests/fm-composer-native-idle-hint.test.sh 4023
 tests/fm-contributions-read-saved.test.sh 2078
 tests/fm-contributions.test.sh 248058
 tests/fm-control-reassociate.test.sh 347235
-tests/fm-control-relaunch.test.sh 1318470
+tests/fm-control-relaunch.test.sh 1358153
 tests/fm-control.test.sh 120383
+tests/fm-copy-sweep.test.sh 207702
 tests/fm-cpu-pass.test.sh 26909
 tests/fm-cursor-harness.test.sh 30735
 tests/fm-cursor-primary-live-e2e.test.sh 441
@@ -901,6 +904,7 @@ tests/fm-fleet-snapshot-view.test.sh 23334
 tests/fm-fleet-sync.test.sh 100061
 tests/fm-forge-detect.test.sh 982
 tests/fm-fork-free-helpers.test.sh 2971
+tests/fm-friction-ledger.test.sh 2020
 tests/fm-gate-refuse.test.sh 13661
 tests/fm-gemini-harness.test.sh 2370
 tests/fm-gh-rest.test.sh 20225
@@ -925,6 +929,7 @@ tests/fm-host-mirror.test.sh 15221
 tests/fm-idle-session-reap.test.sh 157908
 tests/fm-inactive-reconcile.test.sh 78824
 tests/fm-inbox.test.sh 9152
+tests/fm-jev-guard-audit.test.sh 1281
 tests/fm-jev-guard-claude-live-e2e.test.sh 368
 tests/fm-jev-guard-omp-live-e2e.test.sh 293
 tests/fm-jev-guard.test.sh 475590
@@ -976,7 +981,7 @@ tests/fm-pi-watch-extension.test.sh 107996
 tests/fm-pi-watch-loader-live.test.sh 785
 tests/fm-pi-windows-shell-invocation.test.sh 5121
 tests/fm-pipeline-spend.test.sh 3215
-tests/fm-pr-check-security.test.sh 342666
+tests/fm-pr-check-security.test.sh 420272
 tests/fm-pr-reviewers.test.sh 1030
 tests/fm-pr-state-live-e2e.test.sh 423
 tests/fm-pr-state.test.sh 1583
@@ -1043,7 +1048,7 @@ tests/fm-skill-pick.test.sh 120549
 tests/fm-spawn-acquisition-cleanup.test.sh 35483
 tests/fm-spawn-claude-api-key-guard.test.sh 86356
 tests/fm-spawn-claude-start-confirm.test.sh 58902
-tests/fm-spawn-compact-adviser-disable-remote.test.sh 294998
+tests/fm-spawn-compact-adviser-disable-remote.test.sh 352918
 tests/fm-spawn-compact-adviser-disable.test.sh 189707
 tests/fm-spawn-dispatch-profile.test.sh 450244
 tests/fm-spawn-herdr-launch-shell.test.sh 60679
@@ -1069,8 +1074,10 @@ tests/fm-task-inbox.test.sh 99758
 tests/fm-tasks-axi.test.sh 95465
 tests/fm-teamclaude-launch-live-e2e.test.sh 413
 tests/fm-teamclaude-launch.test.sh 13322
+tests/fm-teardown-cleanup.test.sh 876070
 tests/fm-teardown-endpoint-safety.test.sh 75589
-tests/fm-teardown.test.sh 1404727
+tests/fm-teardown-pool.test.sh 439235
+tests/fm-teardown.test.sh 272355
 tests/fm-test-fixture-cleanup.test.sh 7305
 tests/fm-test-fixtures.test.sh 19579
 tests/fm-test-isolation-proof.test.sh 5078

@@ -1497,8 +1497,11 @@ tests/fm-task-inbox.test.sh	2322
 tests/fm-tasks-axi.test.sh	2121
 tests/fm-teamclaude-launch-live-e2e.test.sh	718
 tests/fm-teamclaude-launch.test.sh	1119
+tests/fm-teardown-cleanup.test.sh	4219
 tests/fm-teardown-endpoint-safety.test.sh	2321
-tests/fm-teardown.test.sh	10286
+tests/fm-teardown-helpers.sh	2194
+tests/fm-teardown-pool.test.sh	2043
+tests/fm-teardown.test.sh	1830
 tests/fm-test-fixture-cleanup.test.sh	819
 tests/fm-test-fixtures.test.sh	1270
 tests/fm-test-isolation-proof.test.sh	917

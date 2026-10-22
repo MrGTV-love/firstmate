@@ -570,8 +570,8 @@
 #     daemon. Missing launchctl, a service that stays loaded, an unreadable load
 #     state, or a failed archive refuses even with --force, preserving the
 #     unarchived plist and any remaining copy.
-#     tests/fm-teardown.test.sh's private, foreign, nested, and absent-copy
-#     launch-agent cases exercise this boundary with a fake launchctl.
+#     tests/fm-teardown-cleanup.test.sh's private, foreign, nested, and
+#     absent-copy launch-agent cases exercise this boundary with a fake launchctl.
 #   Fix 4 - remove the task's own Docker stacks. Docker resources survive process
 #     exit, so after the process reap teardown calls bin/fm-task-docker-lib.sh,
 #     whose header owns object attribution, removal, and retry metadata.
@@ -601,7 +601,8 @@
 #     supabase/config.toml project_id. Reading a present config requires python3's
 #     standard-library tomllib parser; unreadable or invalid configuration refuses
 #     cleanup before Docker removal.
-#     tests/fm-teardown.test.sh covers failure/retry and forced-descendant cleanup.
+#     tests/fm-teardown-cleanup.test.sh covers failure/retry and forced-descendant
+#     cleanup.
 #     Residual: teardown leaves autonomous pipelines live, and forced-descendant
 #     cleanup does not reap a child's processes; a still-live producer can create
 #     a stack after the final listing. Snapshot cleanup cannot stop a live producer.
@@ -2885,7 +2886,7 @@ teardown_refuse_removed_nested_copy() {
 # script header for why `git clean -fd` is not enough and why a dirty return
 # is not reported as clean. The registered-copy custody proof runs before the
 # clean, so a refused return never deletes a registered nested worktree
-# (tests/fm-teardown.test.sh test_non_pool_returns_recheck_registered_copies).
+# (tests/fm-teardown-pool.test.sh test_non_pool_returns_recheck_registered_copies).
 teardown_scrub_scratch_copy() {  # <wt> <owner-task>
   local wt=$1 owner=$2
   # A non-git path has no nested repository this clean can remove.
