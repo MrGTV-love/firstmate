@@ -981,6 +981,35 @@ assert_contains "$out" "schema=fm-remote-secondmate-control.v1" "ordinary host-l
 cmp -s "$TMP_ROOT/remote-before-policy.meta" "$REMOTE_HOME/state/parent-route/ios.meta" || fail "ordinary alive reuse changed endpoint metadata"
 pass "host-local launch refuses policy before dead-endpoint removal and keeps ordinary alive reuse"
 
+# The host's stay runs the ordinary local control plane against this endpoint's
+# private state. The fixture's synthetic agent cannot prove live launch
+# ownership, so it must stop at that gate without sending any pane input, and
+# only the exact one-argument form is accepted.
+cp "$REMOTE_HOME/state/parent-route/ios.meta" "$TMP_ROOT/remote-before-stay.meta"
+herdr_input_count() { grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true; }
+stay_inputs=$(herdr_input_count)
+stay_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios 2>&1)
+stay_rc=$?
+[ "$stay_rc" -ne 0 ] || fail "host-local stay accepted an agent it cannot attribute to the task"
+assert_contains "$stay_out" 'cannot positively attribute its live Herdr agent to this task; refusing lifecycle input' \
+  "host-local stay did not reach the ordinary control plane's ownership gate"
+[ "$(herdr_input_count)" = "$stay_inputs" ] || fail "a refused host-local stay sent pane or tab input"
+for stay_extra in '' 'extra'; do
+  if [ -z "$stay_extra" ]; then
+    stay_arity_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay 2>&1)
+  else
+    stay_arity_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios "$stay_extra" 2>&1)
+  fi
+  stay_arity_rc=$?
+  [ "$stay_arity_rc" -ne 0 ] || fail "host-local stay accepted the wrong number of arguments (extra='$stay_extra')"
+  assert_contains "$stay_arity_out" 'fm-remote-secondmate-control.sh stay <id>' \
+    "host-local stay arity refusal did not print usage (extra='$stay_extra')"
+  [ "$(herdr_input_count)" = "$stay_inputs" ] || fail "a wrong-arity host-local stay sent pane or tab input (extra='$stay_extra')"
+done
+cmp -s "$TMP_ROOT/remote-before-stay.meta" "$REMOTE_HOME/state/parent-route/ios.meta" \
+  || fail "a refused host-local stay rewrote endpoint metadata"
+pass "host-local stay reaches the ordinary control plane's ownership gate, accepts exactly one id, and sends nothing"
+
 remote_route_meta="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-before-default-session.meta"
 legacy_pane=$(sed -n 's/^herdr_pane_id=//p' "$remote_route_meta")
@@ -995,6 +1024,7 @@ cp "$HERDR_LOG" "$TMP_ROOT/herdr-before-default-session.log"
 if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh route ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh send ios probe >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh key ios Enter >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh capture ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh observe ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh retire ios --force >/dev/null 2>&1 \
