@@ -1,0 +1,33 @@
+$ fm-control.sh t1 stay   (kind=ship)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LKLmrg
+error: task t1 is a remotely placed secondmate on example.invalid; its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane
+exit=1
+
+$ fm-control.sh t1 interrupt   (kind=secondmate)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LKLmrg
+error: task t1 is a remotely placed secondmate on example.invalid; its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane
+exit=1
+
+$ fm-control.sh t1 exit   (kind=secondmate)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LKLmrg
+error: task t1 is a remotely placed secondmate on example.invalid; its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane
+exit=1
+
+$ fm-control.sh t1 relaunch --note x   (kind=secondmate)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LKLmrg
+error: task t1 is a remotely placed secondmate on example.invalid; its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane
+exit=1
+
+ssh calls so far: 0
+
+$ fm-control.sh t1 stay   (kind=secondmate)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.LKLmrg
+exit=7
+
+ssh calls after secondmate stay: 1
+decoded remote argv:
+  fm-remote-secondmate-control.sh
+  stay
+  t1
+parent task record unchanged: yes
+lab home removed

@@ -1,0 +1,37 @@
+FM_TASK_ID=remote-stay-live FM_TASK_INBOX=/Users/charlesabrooker/tmp/fm-remote-stay-live.fUp8kF/remote/state/parent-rou
+te/remote-stay-live.inbox FM_SPAWN_GEN=live-9779 CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-p
+ermissions --setting-sources project,local --settings \{\"hooks\":\{\"Stop\":\[\{\"hooks\":\[\{\"type\":\"command\"\,\"
+command\":\"touch\ \'/Users/charlesabrooker/tmp/fm-remote-stay-live.fUp8kF/turn-finished\'\"\}\]\}\]\}\} Use\ Bash\ to\
+ run\ sleep\ 600\ with\ run_in_background=true.\ Then\ reply\ BACKGROUND_READY\ and\ wait.\ When\ you\ receive\ a\ Firs
+tmate\ instruction\ waiting\ doorbell\,\ read\ exactly\ its\ named\ file\,\ carry\ out\ its\ instruction\ and\ move\ it
+\ to\ the\ handled\ directory\ beside\ it.\ Do\ not\ stop\ the\ background\ shell.\ Do\ not\ edit\ any\ other\ file.
+charlesabrooker@Mac-Studio remote % FM_TASK_ID=remote-stay-live FM_TASK_INBOX=/Users/charlesabrooker/tmp/fm-remote-stay
+-live.fUp8kF/remote/state/parent-route/remote-stay-live.inbox FM_SPAWN_GEN=live-9779 CLAUDE_CODE_ENABLE_PROMPT_SUGGESTI
+ON=false claude --dangerously-skip-permissions --setting-sources project,local --settings \{\"hooks\":\{\"Stop\":\[\{\"
+hooks\":\[\{\"type\":\"command\"\,\"command\":\"touch\ \'/Users/charlesabrooker/tmp/fm-remote-stay-live.fUp8kF/turn-fin
+ished\'\"\}\]\}\]\}\} Use\ Bash\ to\ run\ sleep\ 600\ with\ run_in_background=true.\ Then\ reply\ BACKGROUND_READY\ and
+\ wait.\ When\ you\ receive\ a\ Firstmate\ instruction\ waiting\ doorbell\,\ read\ exactly\ its\ named\ file\,\ carry\
+out\ its\ instruction\ and\ move\ it\ to\ the\ handled\ directory\ beside\ it.\ Do\ not\ stop\ the\ background\ shell.\
+ Do\ not\ edit\ any\ other\ file.
+ ▐▛███▛█   Claude Code v2.1.308
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-remote-stay-live.fUp8kF/remote
+
+
+❯ Use Bash to run sleep 600 with run_in_background=true. Then reply BACKGROUND_READY and wait. When you receive a
+  Firstmate instruction waiting doorbell, read exactly its named file, carry out its instruction and move it to the
+  handled directory beside it. Do not stop the background shell. Do not edit any other file.
+
+⏺ Bash(sleep 600)
+  ⎿  Running in the background (↓ to manage)
+
+⏺ BACKGROUND_READY
+
+✻ Worked for 8s · done 2:12 PM · 1 shell still running
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 1 shell · ← for agents · ↓ to manage                                  ◐ medium · /effort
+ok - 2.1.308 (Claude Code): remote stay releases the real picker, preserves the route and queued record, and the same agent acknowledges steering
+exit=0

@@ -1,0 +1,28 @@
+lab session: fm-lab-remote-reuse-liv-51788-22262
+live Claude pid before: 62125
+
+$ fm-remote-secondmate-control.sh launch remote-reuse-live codex - - herdr    # CHANGED host; parent asks for codex, Claude is alive
+schema=fm-remote-secondmate-control.v1
+backend=herdr
+target=fm-remote:w1:p1
+herdr_session=fm-remote
+harness=claude
+model=claude-opus-5-5
+effort=high
+launch=already-running
+exit=0
+live Claude pid after: 62125
+ok - changed host: launch on an alive agent reports launch=already-running with the live profile; same pid, no pane input, metadata unchanged
+
+$ <base 03d47acde host> fm-remote-secondmate-control.sh launch remote-reuse-live codex - - herdr    # OLDER host, same live agent
+schema=fm-remote-secondmate-control.v1
+backend=herdr
+target=fm-remote:w1:p1
+herdr_session=fm-remote
+harness=claude
+model=claude-opus-5-5
+effort=high
+exit=0
+ok - older host: the same live reuse reply carries no launch= line (the 'running' case the parent now handles)
+teardown: lab fm-lab-remote-reuse-liv-51788-22262 removed, tmp removed (rc=0)
+exit=0

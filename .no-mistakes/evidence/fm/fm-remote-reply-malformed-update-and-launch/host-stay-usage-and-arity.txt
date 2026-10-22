@@ -1,0 +1,35 @@
+$ fm-remote-secondmate-control.sh stay   (no id)
+Host-local lifecycle control for the remote secondmate home selected by fm-on.
+
+Usage:
+  fm-remote-secondmate-control.sh launch <id> <harness> <model|-> <effort|-> herdr [traceparent] [--compact-adviser-disable]
+  fm-remote-secondmate-control.sh relaunch <id> <harness> <model|default|-> <effort|default|-> [--compact-adviser-disable]
+  fm-remote-secondmate-control.sh state <id>
+  fm-remote-secondmate-control.sh route <id>
+  fm-remote-secondmate-control.sh stay <id>
+  fm-remote-secondmate-control.sh send <id> <message> [fire-and-forget]
+  fm-remote-secondmate-control.sh key <id> <key>
+  fm-remote-secondmate-control.sh capture <id> [lines]
+  fm-remote-secondmate-control.sh observe <id>
+  fm-remote-secondmate-control.sh sync <id> [<parent-commit>]
+  fm-remote-secondmate-control.sh update <id>
+  fm-remote-secondmate-control.sh retire <id> [--force]
+
+Remote placement ends here, but the second-mate agent always runs on the
+Herdr backend in the dedicated fm-remote session, so launch refuses any other
+selection rather than reading this home's config/backend. The interactive
+default session remains for the user's work.
+fm-spawn/fm-send/fm-teardown keep owning the local endpoint mechanics.
+The home's own workers keep their ordinary backend selection.
+bin/fm-remote-doctor.sh owns that host's readiness for Herdr.
+docs/remote-secondmates.md owns why.
+exit=2
+
+$ fm-remote-secondmate-control.sh stay a b   (extra arg)
+bin/fm-remote-doctor.sh owns that host's readiness for Herdr.
+docs/remote-secondmates.md owns why.
+exit=2
+
+$ fm-remote-secondmate-control.sh stay x   (home not seeded)
+error: remote home is not a seeded secondmate home
+exit=1
