@@ -282,11 +282,11 @@ want = ARGV[1]
     index += 1
   end
   raise "#{job} must run --lane #{lane}, got #{options["lane"].inspect}" unless options["lane"] == lane
-  raise "#{job} must pass --jobs #{want}, the count the makespan budget is modeled at, got #{options["jobs"].inspect}" \
+  raise "#{job} must pass --jobs #{want}, the count CI runs and the model starts from, got #{options["jobs"].inspect}" \
     unless options["jobs"] == want
 end
 RUBY
-  pass "both portable parallel jobs pass the modeled concurrency the budget is computed for"
+  pass "both portable parallel jobs pass the concurrency the model starts from"
 }
 
 test_ci_matrices_match_executable_partitions

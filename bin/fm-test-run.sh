@@ -282,7 +282,7 @@ PORTABLE_PARALLEL_JOBS=3
 # factor near two rather than three, and its per-script wall times rose to a
 # 57.9 minute sum. The makespan model packs min(jobs, this) bins rather than the
 # raw job count, because a model that assumed perfect scaling would pass while
-# the real lane ran 40 percent over its own budget. Raising the job count past
+# the real lane ran a third over its own budget. Raising the job count past
 # this changes neither the model nor the guard.
 # measured: value=2 date=2026-10-22 host=github-ubuntu-26.04 margin=1.0 (lane 1: 33.5 min serial, 57.9 min summed at three abreast, 20 min wall; run 39757092565)
 PORTABLE_PARALLEL_EFFECTIVE_JOBS=2
