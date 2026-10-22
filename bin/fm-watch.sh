@@ -630,7 +630,8 @@ inbox_steer_check() {  # <window> <task>
   verb=${action%% *}
   [ "$verb" != quiet ] || return 0
   if [ "$verb" = retry ]; then
-    own_open=$(status_own_open_decisions "$STATE/$task.status") || return 0
+    own_open=''
+    status_own_open_decisions "$STATE/$task.status" own_open status_cap_span_tick || return 0
     [ -z "$own_open" ] || return 0
   fi
   rec=${action#* }
@@ -2619,9 +2620,9 @@ event_wait_or_sleep() {
 # file never wakes twice. The wake is queued before the marker is written, so a
 # failed append is retried on the next poll instead of being lost. It runs at the top
 # of each loop, after each poll-sized slice of the signal linger (signal_grace_linger),
-# after each poll-sized slice of every classification of a log's unread lines
-# (status_cap_span_tick: the signal, heartbeat, stale and push walks), and just before
-# a signal or stale wake exits.
+# after each poll-sized slice of a walk over a log's lines (status_cap_span_tick: the
+# signal, heartbeat, stale and push walks and the inbox-steer open-decisions fold), and
+# just before any wake exits (watch_before_wake), except one that holds the wake-queue lock.
 STATUS_CAP_TICK_AT=0
 STATUS_CAP_SLICE=1
 case "$POLL" in
@@ -3231,6 +3232,7 @@ signal_phase_note_queued() {
 }
 
 watch_before_wake() {
+  [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ] || status_cap_tick
   case "$1" in
     signal:*) ;;
     *) signal_phase_flush ;;
@@ -3639,7 +3641,6 @@ EOF
       signal_phase_note_deferred_prelude
       signal_phase_note_queued "$files"
       [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
-      status_cap_tick
       wake "$reason"
     else
       while IFS=$(printf '\t') read -r sf sig f; do
@@ -3668,7 +3669,6 @@ EOF
         signal_phase_note_deferred_prelude
         signal_phase_note_queued "$files"
         [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
-        status_cap_tick
         wake "$reason"
       fi
       triage_log "absorbed benign $reason"
@@ -3875,7 +3875,6 @@ while :; do
                 *) stale_end=''; stale_ident='' ;;
               esac
               mark_surfaced "$stale_status" "$stale_end" "$stale_ident"
-              status_cap_tick
               wake "stale: $w"
             fi
           elif [ -e "$ssf" ]; then

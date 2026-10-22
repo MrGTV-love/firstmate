@@ -1152,7 +1152,9 @@ The guard never deletes or rewrites a file.
 [`bin/fm-control.sh`](../bin/fm-control.sh) is addressed by task id and drives an endpoint, and has no verb for one process, so the one-process stop lives in the guard.
 
 For a foreign writer the guarantee is detection plus a stop of that one pid within one watcher poll.
-The check runs at the top of each poll, after each poll-sized slice of the status-signal linger, after each poll-sized slice (at least one second) of every walk the watcher makes over a log's lines (the status-signal classification, the heartbeat scan, the stale-pane surface and the push-transition surface), and once more just before a status-signal or stale-pane wake exits.
+The check runs at the top of each poll, after each poll-sized slice of the status-signal linger, after each poll-sized slice (at least one second) of each of these walks over a log's lines: the status-signal classification, the heartbeat scan, the stale-pane surface, the push-transition surface and the inbox-steer open-decisions fold.
+It runs once more just before any wake exits the watcher, except a process-event wake, which holds the wake-queue lock that the check appends under.
+The declared-wait reads walk the last 200 lines, and walk the whole log only when those lines hold no opening event or a wait that opened before them; that whole walk is not checked.
 The linger matters because a runaway writer's first append is itself a status signal, the linger is 30 s (`FM_SIGNAL_GRACE`), and the wake it ends in exits the watcher before the next poll: a check that ran only at the top of the poll would reach the writer only after a drain, an ack and a re-arm.
 The walks matter for the same reason: each takes the lines one at a time in the shell, 2.7 to 5 ms a line, so a span of up to 32,768 lines holds the watcher for 88 s or more, and the wake a walk ends in exits without another poll.
 The over-cap wake still delivers that pending status signal with it, but does not linger on it, so the stop is not reported a grace late.

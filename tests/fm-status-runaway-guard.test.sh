@@ -544,23 +544,35 @@ test_the_stale_surface_checks_the_cap_every_poll() {
   pass "the stale-pane surface checks the cap after each poll-sized slice of its walk over the lane's log, so a writer that passes it during the walk is stopped long before the walk ends"
 }
 
-test_a_cap_crossing_during_a_short_stale_walk_is_stopped_before_the_stale_wake_exits() {
-  local dir state status side out omp wpid watch_pid reader cap=2048 line
+# Shared by the stale and heartbeat cases below. Forty five-byte lines and a terminal event, and a
+# 60 s poll, so the walk is far shorter than one poll and ends in a wake. The writer starts once the
+# walk holds its span and appends to a per-task sidecar, which the cap covers and which raises no
+# status signal, so the wake's flush has no signal to linger on: only the check just before the wake
+# exits can see the sidecar pass the 2048 byte cap.
+# <walk> picks the walk: stale (the lane's pane is stale) or heartbeat (the log is recorded as seen
+# and the heartbeat is due).
+stop_a_sidecar_writer_before_a_short_walk_wake() {  # <case> <walk: stale|heartbeat>
+  local name=$1 walk=$2 dir state status side out omp wpid watch_pid reader cap=2048 line
   local -a env=()
   command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
-  dir=$(make_case short-stale); state="$dir/state"; status="$state/short-stale.status"; out="$dir/watch.out"
-  side="$state/.short-stale.home-appends.runaway"
+  dir=$(make_case "$name"); state="$dir/state"; status="$state/$name.status"; out="$dir/watch.out"
+  side="$state/.$name.home-appends.runaway"
   omp=$(make_named_shell "$dir" omp)
   reader="$dir/gating-span-reader"
   make_gating_span_reader "$reader"
-  # Forty five-byte lines and a terminal event, and a 60 s poll, so the stale surface's walk is far
-  # shorter than one poll. The writer appends to a per-task sidecar, which the cap covers and which
-  # raises no status signal, so the stale wake's flush has no signal to linger on and only the check
-  # just before the stale wake can see the sidecar pass the 2048 byte cap once the walk holds its span.
   perl -e 'print "text\n" x 40' > "$status"
   : > "$side"
-  make_stale_lane "$dir" short-stale || fail "could not set up the stale lane"
-  while IFS= read -r line; do env+=("$line"); done < <(stale_lane_env "$dir" short-stale)
+  case "$walk" in
+    stale)
+      make_stale_lane "$dir" "$name" || fail "could not set up the stale lane"
+      while IFS= read -r line; do env+=("$line"); done < <(stale_lane_env "$dir" "$name")
+      ;;
+    heartbeat)
+      printf 'done: PR https://example.test/pr/3\n' >> "$status"
+      prime_status_seen "$state" "$status" || fail "could not record the log as already seen"
+      env=(FM_HEARTBEAT=1)
+      ;;
+  esac
   start_gated_tiny_writer "$omp" "$side" "$dir/gate" "$dir/writer.pid" 4 1
   wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
   wpid=$(cat "$dir/writer.pid")
@@ -568,14 +580,23 @@ test_a_cap_crossing_during_a_short_stale_walk_is_stopped_before_the_stale_wake_e
     FM_TEST_GATE_LOG="$status" FM_TEST_GATE_GROWS="$side" FM_TEST_GATE="$dir/gate" FM_TEST_GATE_SIZE=$cap "${env[@]}"
   watch_pid=$!
   wait_for_exit "$watch_pid" 600 || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never woke: $(cat "$out" "$out.err" 2>/dev/null)"; }
-  grep -q 'check: status-log-over-cap: file=.short-stale.home-appends.runaway' "$out" \
-    || { kill -9 "$wpid" 2>/dev/null; fail "the stale wake exited without a check of the cap that the sidecar had passed: $(cat "$out")"; }
+  grep -q "check: status-log-over-cap: file=.$name.home-appends.runaway" "$out" \
+    || { kill -9 "$wpid" 2>/dev/null; fail "the $walk wake exited without a check of the cap that the sidecar had passed: $(cat "$out")"; }
   grep -q "stopped pid $wpid (omp) with SIGSTOP" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "the wake does not say the writer was stopped: $(cat "$out")"; }
   [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the omp writer was not stopped (state $(state_letter "$wpid"))"; }
-  awk -F'\t' '$3 == "stale" { found = 1 } END { exit !found }' "$state/.wake-queue" \
-    || { kill -9 "$wpid" 2>/dev/null; fail "the stale wake was not queued with the over-cap wake: $(cat "$state/.wake-queue")"; }
+  awk -F'\t' -v kind="$walk" '$3 == kind { found = 1 } END { exit !found }' "$state/.wake-queue" \
+    || { kill -9 "$wpid" 2>/dev/null; fail "the $walk wake was not queued with the over-cap wake: $(cat "$state/.wake-queue")"; }
   kill -CONT "$wpid" 2>/dev/null; kill -9 "$wpid" 2>/dev/null
+}
+
+test_a_cap_crossing_during_a_short_stale_walk_is_stopped_before_the_stale_wake_exits() {
+  stop_a_sidecar_writer_before_a_short_walk_wake short-stale stale || return $?
   pass "a sidecar that passes the cap while the stale surface walks its lane's log is checked before the stale wake exits, and its writer is stopped"
+}
+
+test_a_cap_crossing_during_a_short_heartbeat_scan_is_stopped_before_the_heartbeat_wake_exits() {
+  stop_a_sidecar_writer_before_a_short_walk_wake short-heartbeat heartbeat || return $?
+  pass "a sidecar that passes the cap while a heartbeat scan shorter than one poll walks a log is checked before the heartbeat wake exits, and its writer is stopped"
 }
 
 test_the_push_transition_walk_checks_the_cap() {
@@ -602,6 +623,71 @@ test_the_push_transition_walk_checks_the_cap() {
     || fail "the push handler walked the lane's lines without a check of the cap: $(cat "$wakes")"
   grep -q 'stale: default:wG:pQ' "$wakes" || fail "the push handler did not go on to its own wake: $(cat "$wakes")"
   pass "the push-transition handler checks the cap while it walks the lane's unread lines, then still wakes for the transition"
+}
+
+test_the_inbox_steer_fold_checks_the_cap() {
+  local dir state wakes
+  dir=$(make_case steer-fold); state="$dir/state"; wakes="$dir/wakes"
+  : > "$wakes"
+  # A due steer retry folds the lane's open decisions before it re-sends. Another log is already
+  # over the cap, and a poll has passed since the last check, so the watcher's hook, which the fold
+  # calls once per line, must find it during the fold. The lane has an open decision of its own, so
+  # the retry stops right after the fold. The watcher is sourced, so wake records instead of exiting,
+  # the inbox is stood in for by a due retry, and lsof is a stand-in that lists nothing.
+  {
+    perl -e 'print "working: step $_\n" for 1 .. 40'
+    printf 'needs-decision [key=q1]: which option?\n'
+  } > "$state/tk1.status"
+  head -c 70000 /dev/zero | tr '\0' 'x' > "$state/other.status"
+  FM_STATE_OVERRIDE="$state" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=1 FM_STATUS_CAP_BYTES=65536 \
+    FM_STATUS_CAP_LSOF=/usr/bin/false bash -c '
+      wakes=$2
+      # shellcheck source=/dev/null
+      . "$1/bin/fm-watch.sh"
+      wake() { printf "%s\n" "$1" >> "$wakes"; }
+      fm_task_inbox_due_action() { printf "retry 1\n"; }
+      SECONDS=60
+      inbox_steer_check test:fm-tk1 tk1
+    ' _ "$ROOT" "$wakes" > "$dir/steer.out" 2>&1 || fail "the steer check failed: $(tail -c 600 "$dir/steer.out")"
+  grep -q 'check: status-log-over-cap: file=other.status' "$wakes" \
+    || fail "the steer retry folded the lane's decisions without a check of the cap: $(cat "$wakes")"
+  pass "the inbox-steer retry checks the cap while it folds the lane's open decisions"
+}
+
+test_the_open_decisions_fold_calls_its_tick_for_every_line() {
+  local dir status ticks out
+  dir=$(make_case fold-tick); status="$dir/state/fold.status"; ticks="$dir/ticks"
+  # 40 routine lines and one open decision: a fold from the start walks 41 lines. Then a checkpoint
+  # is saved and 20 more lines land, so the next fold starts from the checkpoint and walks only them.
+  {
+    perl -e 'print "working: step $_\n" for 1 .. 40'
+    printf 'needs-decision [key=q1]: which option?\n'
+  } > "$status"
+  : > "$ticks"
+  out=$(bash -c '
+    . "$1/fm-classify-lib.sh"
+    ticks=$3
+    count_tick() { printf "x\n" >> "$ticks"; }
+    plain=$(status_own_open_decisions "$2")
+    status_own_open_decisions "$2" whole count_tick || exit 1
+    whole_ticks=$(wc -l < "$ticks" | tr -d " ")
+    status_open_decisions_incremental "$2" >/dev/null
+    perl -e "print qq{working: later step \$_\\n} for 1 .. 20" >> "$2"
+    : > "$ticks"
+    status_own_open_decisions "$2" tail count_tick || exit 1
+    tail_ticks=$(wc -l < "$ticks" | tr -d " ")
+    printf "%s|%s|%s|%s|%s\n" "$plain" "$(printf "%s" "$whole")" "$whole_ticks" "$(printf "%s" "$tail")" "$tail_ticks"
+  ' _ "$ROOT/bin" "$status" "$ticks") || fail "the fold run failed: $out"
+  IFS='|' read -r plain whole whole_ticks tail tail_ticks <<EOF
+$out
+EOF
+  case "$plain" in q1*) ;; *) fail "the fold did not report the open decision: $out" ;; esac
+  [ "$whole" = "$plain" ] || fail "the out-var fold with a tick differs from the printed fold: '$whole' vs '$plain'"
+  [ "$tail" = "$plain" ] || fail "the fold from the checkpoint lost the open decision: '$tail' vs '$plain'"
+  [ "$whole_ticks" -ge 41 ] || fail "the fold from the start ran its tick $whole_ticks times for 41 lines"
+  [ "$tail_ticks" -ge 20 ] || fail "the fold from the checkpoint ran its tick $tail_ticks times for 20 new lines"
+  [ "$tail_ticks" -lt 41 ] || fail "the second fold walked the whole log ($tail_ticks ticks), so the checkpoint path was not exercised"
+  pass "the open-decisions fold calls its tick once per line it walks, from the start and from a checkpoint, and the tick changes nothing it reports"
 }
 
 test_the_span_classifier_calls_its_tick_for_every_line_it_walks() {
@@ -1119,7 +1205,10 @@ tests=(
   test_the_heartbeat_scan_checks_the_cap_every_poll
   test_the_stale_surface_checks_the_cap_every_poll
   test_a_cap_crossing_during_a_short_stale_walk_is_stopped_before_the_stale_wake_exits
+  test_a_cap_crossing_during_a_short_heartbeat_scan_is_stopped_before_the_heartbeat_wake_exits
   test_the_push_transition_walk_checks_the_cap
+  test_the_inbox_steer_fold_checks_the_cap
+  test_the_open_decisions_fold_calls_its_tick_for_every_line
   test_the_span_classifier_calls_its_tick_for_every_line_it_walks
   test_guard_says_unknown_when_lsof_is_missing_or_timed_out
   test_non_omp_and_missing_writers_wake_but_stop_nothing
