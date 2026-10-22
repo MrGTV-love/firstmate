@@ -23,7 +23,9 @@ export function apply(ctx, config) {
   // The launch hands its opening prompt here instead of to dsh-tui, which
   // would submit it before this adapter's session-start digest exists.
   const opening = process.env.FM_DSH_OPENING_PROMPT ?? '';
+  const launch = process.env.FM_DSH_LAUNCH_ID || undefined;
   delete process.env.FM_DSH_OPENING_PROMPT;
+  delete process.env.FM_DSH_LAUNCH_ID;
   const env = {...process.env};
   let disposed = false;
   let agent;
@@ -210,6 +212,7 @@ export function apply(ctx, config) {
     // digest leads the first provider turn; a cleared session already runs.
     let unsent = source === 'startup' ? opening : '';
     try {
+      log('startup', {session: created.id, launch});
       const result = await command('fm-sessionstart-run.sh', ['--source', source]);
       if (disposed || activation !== generation) return;
       started = true;
@@ -223,7 +226,6 @@ export function apply(ctx, config) {
         ownMessages.add(digest.id);
         agent.inject(digest);
       }
-      log('startup', {session: agent.id});
       await ensure();
     } catch (error) {
       if (!disposed && activation === generation) failure(error, unsent);

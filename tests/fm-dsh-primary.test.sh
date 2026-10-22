@@ -50,8 +50,10 @@ function setup(name, {failArm = false, failStart = false} = {}) {
   const injected = [];
   const agent = {id: name, session: {header: {cwd: home}}, inject(value) {injected.push(value);}, followup(value) {followups.push(value);}};
   process.env.FM_DSH_OPENING_PROMPT = `opening for ${name}`;
+  process.env.FM_DSH_LAUNCH_ID = `launch-${name}`;
   apply(ctx, {root: dir, home});
   assert.equal(process.env.FM_DSH_OPENING_PROMPT, undefined, 'the opening prompt must not leak into native tool calls');
+  assert.equal(process.env.FM_DSH_LAUNCH_ID, undefined, 'the launch id must not leak into nested launches');
   const emit = (type, payload) => handlers.get(type)?.(payload);
   const end = () => handlers.get('session/event')(agent.session, {type: 'turn/end', seq: 1});
   const consume = input => handlers.get('session/event')(agent.session, {type: 'user/message', data: input});
@@ -65,6 +67,12 @@ await opened.emit('agent/created', {agent: opened.agent});
 assert.equal(opened.followups.length, 1, 'startup must wake exactly one first turn');
 assert.equal(opened.followups[0].content[0].text, 'SESSION START - fixture\n\n\nopening for startup-order', 'the first turn must carry the digest before the opening prompt');
 assert.equal(opened.injected.length, 0, 'a fresh process must not park the digest behind an earlier turn');
+// The spawn start proof reads this row while the digest is still running.
+const rows = readFileSync(join(opened.home, 'state/.dsh-primary-events.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+const startupRow = rows.findIndex(row => row.event === 'startup');
+assert(startupRow >= 0 && startupRow < rows.findIndex(row => row.event === 'followup'), 'startup must be recorded before the digest turn');
+assert.equal(rows[startupRow].launch, 'launch-startup-order', 'startup must name this launch');
+assert.equal(rows[startupRow].pid, process.pid, 'startup must name the native process');
 opened.stop();
 const broken = setup('startup-failure', {failStart: true});
 await broken.emit('agent/created', {agent: broken.agent});

@@ -3975,6 +3975,8 @@ cleanup_exit=0
 The complete live guard took a measured 217.94 seconds; this is an observation, not a launch or watcher deadline.
 That run predates follow-up startup delivery: it passed the opening prompt to `dsh-tui` positionally and injected the digest, so its Startup row proves the digest reached the log but not that it preceded the first provider turn.
 The guard now also asserts that the first user message carries the digest before any assistant message; that ordering has not yet been re-run live.
+Secondmate spawn and relaunch now treat this launch's own `startup` row in `state/.dsh-primary-events.jsonl` as start progress and wait on that live native process past the read budget; `tests/fm-dsh-spawn.test.sh` proves this with a stand-in digest that outlasts the budget, but no live secondmate spawn or relaunch has run under that wait.
+A 2026-10-22 re-run of this guard stopped in `bin/fm-herdr-lab.sh` before any lab action, because its fleet-state tripwire requires exactly one running default Herdr session; it is not evidence for either behavior.
 `tests/fm-dsh-primary.test.sh` separately exercises failed-arm follow-up budgets, native `user/message` identity, consumed-but-unacknowledged rows, delegated-child exclusion, ordinary disposal and forced native SIGKILL with a TERM-resistant descendant.
 `tests/fm-timeout-lib.test.sh` proves the shared owner-bound runner has no deadline, preserves natural command exit/output and refuses a deadline-only fallback when Perl is unavailable, alongside the existing timed-runner regressions.
 `tests/fm-dsh-harness.test.sh` covers primary-only operator tool-state sharing while keeping DSH preferences private and preserving the isolated worker-HOME contract.

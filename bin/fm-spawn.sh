@@ -2966,12 +2966,16 @@ launch_template() {
   # HOME changes, so a commit keeps its author and the worker still reaches the
   # shared daemon; every other HOME-relative tool state is absent on purpose.
   # A secondmate's native plugin submits the brief after its session-start
-  # digest, and its own spawns stage from the operator's DSH install.
+  # digest and records this launch's id; its own spawns stage from the
+  # operator's DSH install and link the operator's real home.
   dsh)
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh '
+    [ "$kind" != secondmate ] || printf '%s' 'FM_DSH_SOURCE_HOME=__DSHSOURCE__ FM_DSH_OPERATOR_HOME=__DSHOPERATOR__ FM_DSH_LAUNCH_ID=__DSHLAUNCH__ '
+    printf '%s' 'GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ '
     if [ "$kind" = secondmate ]; then
-      printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh FM_DSH_SOURCE_HOME=__DSHSOURCE__ GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ FM_DSH_OPENING_PROMPT="$( __OPINPUT__ encode launch-brief < __BRIEF__)" __DSHBIN__ --patch __DSHPATCH__'
+      printf '%s' 'FM_DSH_OPENING_PROMPT="$( __OPINPUT__ encode launch-brief < __BRIEF__)" __DSHBIN__ --patch __DSHPATCH__'
     else
-      printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+      printf '%s' '__DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
     ;;
   # omp (Oh My Pi), a Pi fork. Same one-positional-brief, --model, --thinking,
@@ -5639,11 +5643,16 @@ agy_spawn_fail() {  # <detail>
 # because the log is the same source the busy classifier trusts. Separately,
 # require the live composer shape the steering parser understands: a successful
 # version command is not proof that a changed frontend remains compatible.
+# A secondmate's first turn waits on its native session-start digest. Once its
+# plugin records startup for this launch id, the read budget stops counting:
+# only that native process exiting, or recording an error, ends the wait.
 dsh_wait_for_start() {
-  local state pane parse_error i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local state pane parse_error i=0 waited=0 rc max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local events="$WT/state/.dsh-primary-events.jsonl"
   # shellcheck source=bin/fm-composer-lib.sh
   . "$SCRIPT_DIR/fm-composer-lib.sh"
   DSH_START_ERROR=
+  DSH_NATIVE_PID=
   while [ "$i" -lt "$max" ]; do
     state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
     case "$state" in
@@ -5658,12 +5667,52 @@ dsh_wait_for_start() {
         fi
         DSH_START_ERROR=${parse_error#error: }
         ;;
-      unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;;
+      *)
+        case "$state" in unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;; esac
+        if [ "$KIND" = secondmate ]; then
+          dsh_native_progress "$events" && rc=0 || rc=$?
+          case "$rc" in
+            0)
+              if [ $((waited % max)) -eq 0 ]; then
+                echo "dsh secondmate $ID: native startup pid $DSH_NATIVE_PID is preparing its session-start digest; waiting for its first turn" >&2
+              fi
+              waited=$((waited + 1))
+              sleep "$interval"
+              continue
+              ;;
+            2) return 1 ;;
+          esac
+        fi
+        ;;
     esac
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
   done
+  if [ "$KIND" = secondmate ] && [ -z "$DSH_NATIVE_PID" ]; then
+    DSH_START_ERROR="no native DSH startup event for launch $SPAWN_GEN in $events${DSH_START_ERROR:+ ($DSH_START_ERROR)}"
+  fi
   return 1
+}
+
+# 0: this launch's native plugin recorded startup and its process is alive with
+# no recorded error. 1: no startup event for this launch yet. 2: positive
+# failure evidence, described in DSH_START_ERROR.
+dsh_native_progress() {  # <events>
+  local found detail
+  if [ -z "$DSH_NATIVE_PID" ]; then
+    found=$(jq -nRr --arg launch "$SPAWN_GEN" '[inputs | fromjson? | select(.event == "startup" and .launch == $launch) | .pid] | last // empty' "$1" 2>/dev/null) || found=
+    case "$found" in '' | *[!0-9]*) return 1 ;; esac
+    DSH_NATIVE_PID=$found
+  fi
+  detail=$(jq -nRr --argjson pid "$DSH_NATIVE_PID" '[inputs | fromjson? | select(.event == "error" and .pid == $pid) | .detail] | last // empty' "$1" 2>/dev/null) || detail=
+  if [ -n "$detail" ]; then
+    DSH_START_ERROR="native DSH startup pid $DSH_NATIVE_PID recorded an error before its first turn: $detail"
+    return 2
+  fi
+  kill -0 "$DSH_NATIVE_PID" 2>/dev/null || {
+    DSH_START_ERROR="native DSH startup pid $DSH_NATIVE_PID exited before its first turn"
+    return 2
+  }
 }
 
 dsh_spawn_fail() {  # <detail>
@@ -7023,9 +7072,10 @@ dsh)
   # Inside a DSH primary or secondmate DSH_HOME is that session's private
   # runtime; FM_DSH_SOURCE_HOME keeps naming the operator's installed DSH.
   DSH_SOURCE_HOME=${FM_DSH_SOURCE_HOME:-${DSH_HOME:-$HOME/.dsh}}
+  DSH_OPERATOR_HOME=${FM_DSH_OPERATOR_HOME:-$HOME}
   if [ -z "$DSH_RUNTIME" ]; then
     if [ "$KIND" = secondmate ]; then
-      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare-primary "$STATE_REAL" "$ID" "$SPAWN_GEN" "$DSH_SOURCE_HOME" "$MODEL" "$EFFORT" "$WT" "$FM_ROOT") || exit 1
+      DSH_RUNTIME=$(FM_DSH_OPERATOR_HOME="$DSH_OPERATOR_HOME" python3 "$SCRIPT_DIR/fm-dsh.py" prepare-primary "$STATE_REAL" "$ID" "$SPAWN_GEN" "$DSH_SOURCE_HOME" "$MODEL" "$EFFORT" "$WT" "$FM_ROOT") || exit 1
     else
       DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "$DSH_SOURCE_HOME" "$MODEL" "$EFFORT" "$WT") || exit 1
     fi
@@ -7034,6 +7084,8 @@ dsh)
   LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}
   LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
   LAUNCH=${LAUNCH//__DSHSOURCE__/"$(shell_quote "$DSH_SOURCE_HOME")"}
+  LAUNCH=${LAUNCH//__DSHOPERATOR__/"$(shell_quote "$DSH_OPERATOR_HOME")"}
+  LAUNCH=${LAUNCH//__DSHLAUNCH__/"$(shell_quote "$SPAWN_GEN")"}
   LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}
   LAUNCH=${LAUNCH//__DSHPATH__/"$(shell_quote "$PATH")"}
   LAUNCH=${LAUNCH//__DSHBIN__/"$(shell_quote "$DSH_BIN")"}
