@@ -3469,7 +3469,7 @@ if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != d
   fi
   if [ -n "$MODEL_STALE" ]; then
     if [ "$CAPTAIN_MODEL_PIN" = "$MODEL" ]; then
-      echo "warning: stale model admitted by captain pin - $MODEL_STALE" >&2
+      echo "warning: model is stale - $MODEL_STALE (admitted by captain pin)" >&2
       # The marker rides in the recorded value, so the task record and the
       # crew-state line say the exception was authorized rather than merely
       # noticed. No new record field: the value is free text by construction.

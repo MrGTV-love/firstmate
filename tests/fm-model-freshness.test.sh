@@ -206,15 +206,15 @@ out=$(printf '%s\n' '{"models":[]}' | FM_MODEL_FRESHNESS_CATALOG=stdin "$TOOL" c
 assert_contains "$(cat "$TMP_ROOT/stderr")" 'agy catalog unavailable' 'an empty catalog on stdin must be reported as unavailable'
 pass 'a catalog on stdin is compared without discovery, and an empty one is a notice'
 
-# Spawn: the warning is advisory (the spawn succeeds, nothing is refused), it is
-# printed for the supervisor, and it is recorded on the task.
+# Spawn: a stale model refuses the launch unless the captain pins that model, and an
+# admitted one is recorded on the task.
 CASE="$TMP_ROOT/spawn"
 SPAWN_HOME="$CASE/home"
 fm_test_spawn_home "$SPAWN_HOME" codex
 fm_git_worktree "$CASE/project" "$CASE/wt" wt-freshness
 fm_test_spawn_brief "$SPAWN_HOME" freshness-z1
 SPAWN_FAKEBIN=$(fm_test_make_spawn_fakebin "$CASE/fake")
-out=$(fm_test_run_spawn "$SPAWN_HOME" "$CASE/wt" "$SPAWN_FAKEBIN" freshness-z1 "$CASE/project" --mode no-mistakes --yolo off --model gpt-5.6-luna) \
+out=$(fm_test_run_spawn "$SPAWN_HOME" "$CASE/wt" "$SPAWN_FAKEBIN" freshness-z1 "$CASE/project" --mode no-mistakes --yolo off --model gpt-5.6-luna --captain-model-pin gpt-5.6-luna) \
   || fail "a stale model must not refuse the spawn: $out"
 assert_contains "$out" 'warning: model is stale - gpt-5.6-luna on codex is older than gpt-6.1-sol in the codex catalog (other tier: sol)' 'spawn did not warn about the stale model'
 assert_grep 'model_stale=gpt-5.6-luna on codex is older than gpt-6.1-sol in the codex catalog (other tier: sol)' "$SPAWN_HOME/state/freshness-z1.meta" 'the task record did not keep the warning'
@@ -280,20 +280,20 @@ run_counted_spawn() { # <id> [spawn args...]
 }
 
 claude_spawn_case reads-indexed
-out=$(run_counted_spawn reads-indexed --model role:routine) || fail "an indexed stale model must not refuse the spawn: $out"
+out=$(run_counted_spawn reads-indexed --model role:routine --captain-model-pin claude-sonnet-5) || fail "an indexed stale model must not refuse the spawn: $out"
 assert_contains "$out" 'warning: model is stale - claude-sonnet-5 on claude is older than claude-sonnet-5-5 in the claude catalog' 'the indexed model was not flagged from the shared catalog read'
 [ "$(reads_of "$READS")" = 1 ] || fail "an indexed model's catalog must be read once per spawn, read $(reads_of "$READS") times"
 assert_grep 'model_stale=claude-sonnet-5 on claude' "$SPAWN_HOME/state/reads-indexed.meta" 'the shared read did not reach the task record'
 
 claude_spawn_case reads-literal
 printf '%s\n' '{"version":1,"roles":{"routine":{"claude":{"model":"claude-sonnet-5-5"}}},"retired":[]}' > "$SPAWN_HOME/config/model-index.json"
-out=$(run_counted_spawn reads-literal --model claude-sonnet-5) || fail "a literal stale model must not refuse the spawn: $out"
+out=$(run_counted_spawn reads-literal --model claude-sonnet-5 --captain-model-pin claude-sonnet-5) || fail "a literal stale model must not refuse the spawn: $out"
 assert_contains "$out" 'warning: model is stale - claude-sonnet-5 on claude is older than claude-sonnet-5-5' 'a model outside the index was not checked'
 [ "$(reads_of "$READS")" = 1 ] || fail "a literal model's catalog must be read once per spawn, read $(reads_of "$READS") times"
 
 claude_spawn_case reads-unreadable
 rm -f "$CASE/catalog"
-out=$(run_counted_spawn reads-unreadable --model role:routine) || fail "an unreadable catalog must not refuse the spawn: $out"
+out=$(run_counted_spawn reads-unreadable --model role:routine --captain-model-pin claude-sonnet-5) || fail "an unreadable catalog must not refuse the spawn: $out"
 assert_not_contains "$out" 'model is stale' 'an unreadable catalog drew a stale warning'
 [ "$(reads_of "$READS")" = 1 ] || fail "a failed catalog read must not be repeated by the freshness check, read $(reads_of "$READS") times"
 pass 'a spawn reads the harness catalog once, for an indexed model, a literal model, and an unreadable catalog'
@@ -344,21 +344,21 @@ export FM_FAKE_CAPTURE_FILE="$AGY_SCREEN" FM_AGY_READY_POLLS=4 FM_AGY_POLL_INTER
 
 listing_spawn_case reads-agy agy
 make_agy_fake "$FAKE" "$READS" 0
-out=$(run_counted_spawn reads-agy --harness agy --model gemini-3.1-pro-high) || fail "a stale agy model must not refuse the spawn: $out"
+out=$(run_counted_spawn reads-agy --harness agy --model gemini-3.1-pro-high --captain-model-pin gemini-3.1-pro-high) || fail "a stale agy model must not refuse the spawn: $out"
 assert_contains "$out" 'warning: model is stale - gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high in the agy catalog (other tier: flash)' 'the agy model was not flagged from the listing spawn already held'
 [ "$(reads_of "$READS")" = 1 ] || fail "the agy catalog must be read once per spawn, read $(reads_of "$READS") times"
 assert_grep 'model_stale=gemini-3.1-pro-high on agy' "$SPAWN_HOME/state/reads-agy.meta" 'the held agy listing did not reach the task record'
 
 listing_spawn_case reads-agy-unreachable agy
 make_agy_fake "$FAKE" "$READS" 1
-out=$(run_counted_spawn reads-agy-unreachable --harness agy --model gemini-3.1-pro-high) || fail "an unreachable agy listing must not refuse the spawn: $out"
+out=$(run_counted_spawn reads-agy-unreachable --harness agy --model gemini-3.1-pro-high --captain-model-pin gemini-3.1-pro-high) || fail "an unreachable agy listing must not refuse the spawn: $out"
 assert_not_contains "$out" 'model is stale' 'an unreachable agy listing drew a stale warning'
 [ "$(reads_of "$READS")" = 1 ] || fail "an unreachable agy listing must not be read again by the freshness check, read $(reads_of "$READS") times"
 unset FM_FAKE_CAPTURE_FILE FM_AGY_READY_POLLS FM_AGY_POLL_INTERVAL
 
 listing_spawn_case reads-omp omp
 make_omp_fake "$FAKE" "$READS"
-out=$(run_counted_spawn reads-omp --harness omp --model openai-codex/gpt-6-luna) || fail "a stale omp model must not refuse the spawn: $out"
+out=$(run_counted_spawn reads-omp --harness omp --model openai-codex/gpt-6-luna --captain-model-pin openai-codex/gpt-6-luna) || fail "a stale omp model must not refuse the spawn: $out"
 assert_contains "$out" 'warning: model is stale - openai-codex/gpt-6-luna on omp is older than openai-codex/gpt-6.1-sol in the omp catalog (other tier: sol)' 'the omp model was not flagged from the listing spawn already held'
 [ "$(reads_of "$READS")" = 1 ] || fail "the omp catalog must be read once per spawn, read $(reads_of "$READS") times"
 assert_grep 'model_stale=openai-codex/gpt-6-luna on omp' "$SPAWN_HOME/state/reads-omp.meta" 'the held omp listing did not reach the task record'
@@ -372,7 +372,7 @@ fm_test_fake_teamclaude "$FAKE"
 make_claude_fake "$FAKE" "$READS" "$CASE/catalog"
 printf 'teamclaude\n' > "$SPAWN_HOME/config/claude-launcher"
 rm -f "$SPAWN_HOME/config/claude-account"
-out=$(run_counted_spawn reads-launcher --model claude-sonnet-5) || fail "a launcher spawn failed: $out"
+out=$(run_counted_spawn reads-launcher --model claude-sonnet-5 --captain-model-pin claude-sonnet-5) || fail "a launcher spawn failed: $out"
 assert_not_contains "$out" 'model is stale' 'a custom launcher spawn reported a stale model from the plain claude catalog'
 [ "$(reads_of "$READS")" = 0 ] || fail "a custom launcher spawn read the plain claude catalog $(reads_of "$READS") times"
 assert_no_grep 'model_stale=' "$SPAWN_HOME/state/reads-launcher.meta" 'a custom launcher spawn recorded a stale model'
