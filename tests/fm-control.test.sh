@@ -740,11 +740,12 @@ test_record_bound_to_another_task_is_refused() {
 # postconditions this plane verifies could be read for it here. Endpoint
 # validation would refuse the record anyway - `window=remote:<id>` can never
 # match a local backend's shape - but it would blame malformed metadata for a
-# correctly configured route, so the placement is named instead. Every verb
-# refuses, and none of them reaches a local endpoint.
+# correctly configured route, so the placement is named instead. Interrupt,
+# exit, and relaunch refuse, and none reaches a local endpoint. Remote stay's
+# owning-host postconditions are exercised by the isolated live guard.
 test_remote_secondmate_is_refused_by_placement() {
   local dir out rc verb
-  for verb in interrupt exit stay relaunch; do
+  for verb in interrupt exit relaunch; do
     dir=$(new_case "remote-$verb")
     add_task "$dir" t1 claude secondmate
     alive_as "$dir" claude
