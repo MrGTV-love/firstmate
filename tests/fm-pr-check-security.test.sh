@@ -319,9 +319,23 @@ run_check_entry() {
     "$PR_CHECK" "$@"
 }
 
+seed_merge_review() {
+  local dir=$1 url=$2
+  FM_HOME="$dir/home" "$ROOT/bin/fm-review-record.py" review --pr "$url" \
+    --head "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" \
+    --verdict PASS --reader-family anthropic --author-groups '{"all":["openai"]}' \
+    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
+    --report "$dir/review.md"
+}
+
 run_merge_entry() {
   local dir=$1
   shift
+  # Valid merge fixtures satisfy the separate independent-review prerequisite;
+  # malformed-input fixtures still reach the merge entrypoint's own parser.
+  if [ "$#" -ge 2 ] && (fm_pr_task_id_valid "$1" && fm_pr_url_parse "$2"); then
+    seed_merge_review "$dir" "$2" >/dev/null || fail "valid merge fixture could not record its review"
+  fi
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
     FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
     FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
@@ -3352,6 +3366,7 @@ test_authority_retirement_preserves_replacement() {
   run_check_entry "$dir" task-a "$url_a" >/dev/null 2> "$dir/seed.err" \
     || fail "replacement: could not arm the original poll"
   queue_merge "$dir" "$url_a"
+  seed_merge_review "$dir" "$url_b" >/dev/null || fail "replacement review could not be recorded"
   # The replacement runs inside the watcher, whose environment names the real
   # firstmate root, so restore the fixture root every other arming here uses.
   cat > "$dir/replace-authority.sh" <<SH
