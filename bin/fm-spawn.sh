@@ -1014,6 +1014,8 @@ BASE_BRANCH=
 BASE_BRANCH_SET=0
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
+CAPTAIN_MODEL_PIN=
+CAPTAIN_MODEL_PIN_SET=0
 TRACEPARENT_SET=0
 RELAUNCH=0
 RECONCILE_ONLY=0
@@ -1076,6 +1078,10 @@ for a in "$@"; do
     upstream-consent)
       UPSTREAM_CONSENT=$a
       UPSTREAM_CONSENT_SET=1
+      ;;
+    captain-model-pin)
+      CAPTAIN_MODEL_PIN=$a
+      CAPTAIN_MODEL_PIN_SET=1
       ;;
     traceparent)
       TRACEPARENT_ARG=$a
@@ -1156,6 +1162,11 @@ for a in "$@"; do
     UPSTREAM_CONSENT=${a#--upstream-consent=}
     UPSTREAM_CONSENT_SET=1
     ;;
+  --captain-model-pin) want_value="captain-model-pin" ;;
+  --captain-model-pin=*)
+    CAPTAIN_MODEL_PIN=${a#--captain-model-pin=}
+    CAPTAIN_MODEL_PIN_SET=1
+    ;;
   --traceparent) want_value=traceparent ;;
   --traceparent=*)
     TRACEPARENT_ARG=${a#--traceparent=}
@@ -1199,6 +1210,10 @@ done
 }
 [ "$UPSTREAM_CONSENT_SET" -eq 0 ] || [ -n "$UPSTREAM_CONSENT" ] || {
   echo "error: --upstream-consent requires a non-empty <host>/<owner>/<repo> value" >&2
+  exit 1
+}
+[ "$CAPTAIN_MODEL_PIN_SET" -eq 0 ] || [ -n "$CAPTAIN_MODEL_PIN" ] || {
+  echo "error: --captain-model-pin requires a non-empty <model-id> value" >&2
   exit 1
 }
 [ "$TRACEPARENT_SET" -eq 0 ] || [ -n "$TRACEPARENT_ARG" ] || {
@@ -3425,15 +3440,17 @@ if [ "$MODEL_INDEXED" = 1 ]; then
   MODEL_CATALOG_READ=$(FM_MODEL_CATALOG_EMIT=1 FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT") || exit 1
 fi
 
-# Model freshness (advisory): warn when the requested model is older than the
-# newest model of its family in the harness's own catalog. It never refuses the
-# spawn and never changes the model; the supervisor decides. The line is
-# recorded as model_stale= in the task record so fm-crew-state.sh keeps showing
-# it after this terminal output is gone. Run under the worker account pin so a
-# pinned account answers from its own catalog; skipped for a raw launch and a
-# Claude custom launcher, whose catalog this environment does not hold. A
-# catalog this spawn already read (MODEL_CATALOG_READ) is handed over rather
-# than read a second time.
+# Model freshness (blocking): a model that a newer model of its own family has
+# passed in the harness's catalog refuses the spawn. Only the captain may run a
+# superseded model, and only for the task where the captain named that exact
+# model: the caller passes --captain-model-pin <that id>, which must equal the
+# requested model, so a pin can never launder a different (or newer) pick. The
+# finding is recorded as model_stale= in the task record so fm-crew-state.sh
+# keeps showing it after this terminal output is gone. Run under the worker
+# account pin so a pinned account answers from its own catalog; skipped for a raw
+# launch and a Claude custom launcher, whose catalog this environment does not
+# hold. A catalog this spawn already read (MODEL_CATALOG_READ) is handed over
+# rather than read a second time.
 MODEL_STALE=
 if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
   if [ -n "$MODEL_CATALOG_READ" ]; then
@@ -3441,7 +3458,18 @@ if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != d
   else
     MODEL_STALE=$(fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
   fi
-  [ -z "$MODEL_STALE" ] || echo "warning: model is stale - $MODEL_STALE" >&2
+  if [ -n "$MODEL_STALE" ]; then
+    if [ "$CAPTAIN_MODEL_PIN" = "$MODEL" ]; then
+      echo "warning: stale model admitted by captain pin - $MODEL_STALE" >&2
+    else
+      echo "error: refusing to launch a stale model - $MODEL_STALE" >&2
+      if [ -n "$CAPTAIN_MODEL_PIN" ]; then
+        echo "error: --captain-model-pin '$CAPTAIN_MODEL_PIN' is not the requested model '$MODEL'; a pin authorizes only that exact model" >&2
+      fi
+      echo "hint: launch the newer model above, or pass --captain-model-pin $MODEL only when the captain explicitly asked for $MODEL for this task" >&2
+      exit 1
+    fi
+  fi
 fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
