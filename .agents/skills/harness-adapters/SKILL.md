@@ -43,7 +43,7 @@ Muse, Gemini, AGY, Devin, and dsh are verified only for crewmate and scout work,
 A marker names its harness, but a structural ancestor of a different harness outranks it, because a marker is ordinary environment state a child or a multiplexer can retain while ancestry is what proves who owns the process tree.
 Only `FM_PI_HARNESS=pi-signed` at the launch boundary together with `PI_CODING_AGENT=true` selects Pi-signed; shared unmarked launcher ancestry remains Pi.
 omp publishes no marker of its own; `FM_OMP_HARNESS=omp` is Firstmate's launch marker and the anchored process name `omp` is its ancestry evidence, as `references/harness/omp.md` records.
-dsh publishes no marker either; `FM_DSH_HARNESS=dsh` is Firstmate's launch marker, and its ancestry evidence is the launched launcher or `node` argv naming the dsh-tui or DSH entry script, as `references/harness/dsh.md` records.
+dsh publishes no marker either; `FM_DSH_HARNESS=dsh` is Firstmate's launch marker, and its ancestry evidence is the `dsh` or `dsh-tui` process name or a `node` argv naming a dsh-tui script, as `references/harness/dsh.md` records.
 `../../../bin/fm-spawn.sh` owns worker marker establishment, while the README launch command owns the signed-primary boundary.
 `../../../bin/fm-harness.sh crew` resolves `config/crew-harness`, where absent or `default` means firstmate's own harness.
 `../../../bin/fm-harness.sh secondmate` resolves `config/secondmate-harness` -> `config/crew-harness` -> firstmate's own harness.
