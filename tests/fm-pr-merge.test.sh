@@ -3021,6 +3021,12 @@ test_review_record_validation_and_latest() {
     esac
   done
   [ ! -e "$case_dir/state/review-records.jsonl" ] || fail "refused input must not append a record"
+  rc=0
+  FM_HOME="$case_dir/no-such-home" "$ROOT/bin/fm-review-record.py" captain-word --pr "$url" --head "$head" \
+    --words 'Merge it.' > "$case_dir/out" 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "a missing home must refuse the write"
+  assert_grep 'does not exist' "$case_dir/out" "missing home named"
+  [ ! -e "$case_dir/no-such-home" ] || fail "a missing home must not be created"
   record_review "$case_dir" "$url" "$head" --verdict FAIL > /dev/null || fail "record FAIL"
   cp "$case_dir/state/review-records.jsonl" "$case_dir/first-record"
   record_review "$case_dir" "$url" "$head" --reader-family Claude \
