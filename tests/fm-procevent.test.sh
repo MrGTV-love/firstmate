@@ -7239,6 +7239,18 @@ done
 cat "$CONT/round$n"
 SH
 chmod +x "$CONT/bin/lavish-axi"
+# The held-page round has no real second poller, so this fixture's view of every
+# poll process on the host is the empty one that round describes; every other
+# ps read, including each process's own identity, goes to the real ps.
+REAL_PS=$(command -v ps) || fail "the continuous-Lavish fixture requires ps"
+cat > "$CONT/bin/ps" <<SH
+#!/usr/bin/env bash
+if [ "\$#" -eq 2 ] && [ "\$1" = -axo ] && [ "\$2" = pid=,ppid=,pgid=,lstart=,command= ]; then
+  exit 0
+fi
+exec "$REAL_PS" "\$@"
+SH
+chmod +x "$CONT/bin/ps"
 export CONT
 cont_art="$CONT/review.html"
 printf '<h1>continuous review</h1>\n' > "$cont_art"
