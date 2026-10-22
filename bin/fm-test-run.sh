@@ -71,10 +71,11 @@
 #                   family proofs may impose a lower cap. Individually proven
 #                   scripts share one phase; scripts admitted only by a family
 #                   proof run in a separate phase for each family. Concurrent
-#                   phases use serial weights, longest-hint-first. Unproven stateful
-#                   scripts run serially after all concurrent phases. Default is
-#                   1 (serial) except for plain --changed and a plain list of
-#                   script paths, which use the bounded automatic scheduler.
+#                   phases start scripts longest-hint-first in the --list-scheduled
+#                   order. Unproven stateful scripts run serially after all
+#                   concurrent phases. Default is 1 (serial) except for plain
+#                   --changed and a plain list of script paths, which use the
+#                   bounded automatic scheduler.
 #   --per-script-timeout-secs N
 #                   terminate a script that runs longer than N seconds, raised
 #                   to its measured test.<script> p99 x 3 from bin/fm-duration.py
