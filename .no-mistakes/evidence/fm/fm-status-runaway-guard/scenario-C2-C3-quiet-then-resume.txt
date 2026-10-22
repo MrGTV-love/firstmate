@@ -1,0 +1,18 @@
+## Scenario C2: the stopped writer's log does not grow; a re-armed watcher stays quiet
+acked through 7
+drain showed the wake to the supervisor:
+1792706940	1	check	status-log-over-cap-2555574383	check: status-log-over-cap: file=victim.status size=520000 bytes (cap 262144) growth=55131 bytes/s writer=pid 24532 omp; stopped pid 24532 (omp) with SIGSTOP; resume it with kill -CONT 24532; nothing was deleted, truncated or rewritten
+watcher exited: signal: /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/state/raw.status /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/state/victim.status
+over-cap rows in queue: 1
+
+## Scenario C3: the operator resumes the writer (kill -CONT); it grows by more than one cap and is stopped again with one new wake
+(eval):kill:12: kill 24532 failed: no such process
+resumed pid 24532, state 
+attempt 1 after 6s: signal: /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/state/victim.status
+acked through 9
+attempt 2 after 11s: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+acked through 10
+attempt 3 after 322s: 
+acked through 10
+attempt 4 after 631s: 
+acked through 10

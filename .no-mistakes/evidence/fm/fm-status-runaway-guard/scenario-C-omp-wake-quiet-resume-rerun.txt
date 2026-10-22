@@ -1,0 +1,16 @@
+## C1: omp writer pid 54358 appends ~65000 bytes/s with a held descriptor; bystander omp pid 58041 holds no log
+  watcher run 1 ended after 8s: check: status-log-over-cap: file=victim.status size=390000 bytes (cap 262144) growth=66394 bytes/s writer=pid 54358 omp; stopped pid 54358 (omp) with SIGSTOP; resume it with kill -CONT 54358; nothing was deleted, truncated or rewritten
+  over-cap wake: yes
+  writer state: T ; bystander state: S
+  log size 390000 then 390000 after 3s; file present: yes
+  over-cap rows queued: 1
+  drain delivered the wake to the supervisor: 1 line(s)
+## C2: log does not grow; a re-armed watcher raises no second over-cap wake (25 s)
+  watcher still armed after 25s, output: ''
+  over-cap rows queued now: 0
+## C3: operator resumes the writer with kill -CONT 54358
+  writer state after CONT: S
+  watcher run 1 ended after 13s: check: status-log-over-cap: file=victim.status size=845000 bytes (cap 262144) growth=56570 bytes/s writer=pid 54358 omp; stopped pid 54358 (omp) with SIGSTOP; resume it with kill -CONT 54358; nothing was deleted, truncated or rewritten
+  second over-cap wake: yes
+  writer state: T; log size 845000; over-cap rows queued: 1
+## done

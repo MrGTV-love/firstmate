@@ -1,0 +1,20 @@
+## Scenario A: a worker loop appends the same line through the sanctioned helper until refused
+$ FM_STATUS_CAP_BYTES=8192 FM_STATUS_CAP_RESERVE_BYTES=1024; loop: bin/fm-status-append.sh $S "working: text $(date +%s)" (hard limit 4 MiB, max 5000 iterations)
+iteration 328: exit 75
+stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/state/d1-intake.status is 8175 bytes and this line would pass the limit of 8192 bytes (cap 8192, reserve 1024 for decision and terminal lines)
+size after loop: 8175 bytes (cap 8192); lines: 327
+
+## Scenario B: at the cap, a working: line is refused but done: uses the reserve
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/state/d1-intake.status is 8175 bytes and this line would pass the limit of 8192 bytes (cap 8192, reserve 1024 for decision and terminal lines)
+note: exit 75
+done: exit 0
+last line: done: finished the intake
+size now: 8201 bytes (limit 9216)
+
+## Scenario B2: a log already past cap+reserve refuses even a terminal line, and the existing bytes are untouched
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/state/d1-intake.status is 10202 bytes and this line would pass the limit of 9216 bytes (cap 8192, reserve 1024 for decision and terminal lines)
+blocked: exit 75
+log bytes unchanged after the refusal (size 10202)
+
+## Scenario A2 (mutation): the same loop with a raw >> append is not bounded
+raw loop size: 50000 bytes, past the 8192 cap

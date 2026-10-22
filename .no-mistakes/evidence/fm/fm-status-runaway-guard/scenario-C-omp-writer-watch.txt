@@ -1,0 +1,9 @@
+writer pid 24532 (omp) appending ~65000 bytes/s with a held descriptor to victim.status
+attempt 1: watcher exited rc=0 after 28s; stdout: check: status-log-over-cap: file=victim.status size=520000 bytes (cap 262144) growth=55131 bytes/s writer=pid 24532 omp; stopped pid 24532 (omp) with SIGSTOP; resume it with kill -CONT 24532; nothing was deleted, truncated or rewritten
+over-cap wake seen: 1
+writer pid 24532 state: T
+log size: 520000 then 520000 two seconds later; file exists: yes
+over-cap rows in .wake-queue: 1
+bystander omp pid 24293 state: SN
+== /Users/charlesabrooker/tmp/fm-lab.t2Qgzl/run/c.watch.1.out
+check: status-log-over-cap: file=victim.status size=520000 bytes (cap 262144) growth=55131 bytes/s writer=pid 24532 omp; stopped pid 24532 (omp) with SIGSTOP; resume it with kill -CONT 24532; nothing was deleted, truncated or rewritten

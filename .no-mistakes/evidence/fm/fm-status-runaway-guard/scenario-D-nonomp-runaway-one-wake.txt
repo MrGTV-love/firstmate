@@ -1,0 +1,7 @@
+## D: non-omp writer 'agentsh' pid 13611 appends ~10 KB every 50 ms (about 200 KB/s) with no end in sight; FM_STATUS_CAP_BYTES=2048
+  watcher run 1 exited rc=0 after 15s: check: status-log-over-cap: file=runaway.status size=600000 bytes (cap 2048) growth=63807 bytes/s writer=pid 13611 agentsh; stopped nothing: pid 13611 (agentsh) is not an omp process; nothing was deleted, truncated or rewritten
+  over-cap rows in .wake-queue: 1
+  over-cap lines printed by this watcher: 1
+  writer state: S (not stopped: only omp writers are stopped)
+  log keeps growing (writer still running): 1150000 -> 1320000
+## done

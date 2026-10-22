@@ -1,5 +1,59 @@
+FM_TEST_BEGIN 2026-10-22T22:06:34Z tests/fm-status-runaway-guard.test.sh family=watcher-wake-lock expected_gate_skip=none
 ok - the sanctioned writer holds the cap, refuses a repeat loop and filler loudly, keeps the reserve for done:, and refuses everything past cap plus reserve
 ok - mutation: the same loop through a raw append passes the cap, so the helper is what holds it
 ok - the 2026-10-18 shape (3000 distinct lines, then one line repeated) keeps every distinct line and is refused loudly at the cap with exit 75
-# wake text: check: status-log-over-cap: file=victim.status size=1040000 bytes (cap 262144) growth=0 bytes/s writer=pid 78260 omp; stopped pid 78260 (omp) with SIGSTOP; resume it with kill -CONT 78260; nothing was deleted, truncated or rewritten
-Terminated: 15
+# wake text: check: status-log-over-cap: file=victim.status size=325000 bytes (cap 262144) growth=0 bytes/s writer=pid 90834 omp; stopped pid 90834 (omp) with SIGSTOP; resume it with kill -CONT 90834; nothing was deleted, truncated or rewritten
+wait_for_exit: owned pid 53064 exceeded 30 polls; sending TERM
+53064  9061 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JEP7JBE1M3121EZV5RJ1V3/bin/fm-watch.sh
+ok - a raw omp writer over the cap is detected within polls, named by pid, stopped alone, and the log is left intact with one wake while it does not grow
+tests/fm-status-runaway-guard.test.sh: line 1269: 90828 Killed: 9               "$omp" -c 'sleep 600'
+wait_for_exit: owned pid 71488 exceeded 30 polls; sending TERM
+71488  9061 R    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JEP7JBE1M3121EZV5RJ1V3/bin/fm-watch.sh
+ok - a stopped writer that is continued gets a second wake and a second stop, and a log that has not grown gets none
+ok - the incident writer, which holds the log open and writes without a pause, is named and stopped by the guard and the log is left in place
+ok - the watcher checks the cap during the status-signal linger, so the over-cap stop is the first wake and waits for no ack or re-arm
+ok - a log that passes the cap while the watcher classifies a short signaled span is checked before the signal wake exits, and its writer is stopped
+ok - a runaway that keeps growing through the over-cap wake raises exactly one wake and the watcher exits on it
+ok - the watcher checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the classification is stopped long before the classification ends
+ok - a second writer that passes the cap while the over-cap wake flushes is stopped and queued, and raises no second wake
+ok - the heartbeat scan checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the scan is stopped long before the scan ends
+ok - the stale-pane surface checks the cap after each poll-sized slice of its walk over the lane's log, so a writer that passes it during the walk is stopped long before the walk ends
+ok - a sidecar that passes the cap while the stale surface walks its lane's log is checked before the stale wake exits, and its writer is stopped
+ok - a sidecar that passes the cap while a heartbeat scan shorter than one poll walks a log is checked before the heartbeat wake exits, and its writer is stopped
+ok - the push-transition handler checks the cap while it walks the lane's unread lines, then still wakes for the transition
+ok - the inbox-steer retry checks the cap while it folds the lane's open decisions
+ok - the open-decisions fold calls its tick once per line it walks, from the start and from a checkpoint, and the tick changes nothing it reports
+ok - the span classifier calls its tick once per line in its own walk and in the decision fold, and the tick changes nothing it reports
+ok - the guard reports a missing or timed-out lsof as an unknown writer, and an lsof that ran and listed nothing as none found
+ok - a non-omp writer, and no writer at all, still raise the wake and stop nothing
+ok - a per-task sidecar over the cap is named once, wakes again only after one cap of growth, and its marker clears when it shrinks
+# timing table (seconds, 2 GiB sparse log: 3000 events, a hole, a 6 MiB repeated tail)
+# | reader | seconds |
+# | open-decisions fold | 0s |
+# | status-event library (last_status_line) | 0s |
+# | status-event library (declared wait) | 0s |
+# | retry check (status_event_recorded) | 0s |
+# | wake drain (cold cursor) | 2s |
+# | wake drain (warm cursor) | 2s |
+ok - every reader finishes inside 60s on a 2 GiB log and creates no file over 1 MB
+ok - a history reader refuses a 2 GiB log and a log of too many lines, names it, and reads nothing; a short span from it is exact
+ok - a fold that cannot read its span leaves the saved cursor and its open decision where they were
+ok - a log the read limits refuse reads as unknown (status 2), never as no open decision, while a checkpointed fold keeps its open set
+ok - one lane's log past the read limits is named on stderr and the drain still presents every other lane's open decisions
+ok - a signal row for a log past the read limit annotates nothing and names the log; a log within the limit is annotated whole
+ok - the latest-event endpoint of a log of tiny lines is its true byte position, 100023
+ok - a long log's declared wait keeps one identity at its true line position however many continuation lines follow
+# | fleet snapshot (secondmate home summary) | 1s |
+ok - the fleet snapshot summarizes a home with a 2 GiB log inside 60s, names the log it will not copy, and leaves no large file
+ok - mutation: with the read limit raised past the log the same reader takes all 2 GiB; with the default it takes nothing
+ok - a drain killed with SIGKILL mid-run leaves no scratch or cursor file
+fm-test-run: reaped after tests/fm-status-runaway-guard.test.sh: reaped pid=75836 root=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.4i2con cmd=/bin/bash /Users/charlesabrooker/tmp/fm-remote-compact-adviser.4i2con/remote-root/bin/fm-remote-job-...
+fm-test-run: reaped after tests/fm-status-runaway-guard.test.sh: reaped pid=76924 root=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.4i2con cmd=/bin/bash /Users/charlesabrooker/tmp/fm-remote-compact-adviser.4i2con/remote-root/bin/fm-remote-job-...
+fm-test-run: reaped after tests/fm-status-runaway-guard.test.sh: reaped pid=79807 root=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.4i2con cmd=/bin/bash /Users/charlesabrooker/tmp/fm-remote-compact-adviser.4i2con/remote-root/bin/fm-remote-job-...
+FM_TEST_END 2026-10-22T22:13:55Z tests/fm-status-runaway-guard.test.sh exit=0 duration_ms=439734 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JEP7JBE1M3121EZV5RJ1V3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=443569
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=439734 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-status-runaway-guard.test.sh duration_ms=439734
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JEP7JBE1M3121EZV5RJ1V3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0

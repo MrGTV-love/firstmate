@@ -1,0 +1,6 @@
+## C2 (clean): writer is gone, log is over cap and not growing; ack every wake, then re-arm the watcher twice
+  acked through 8
+  re-arm 1: watcher exited: signal: /Users/charlesabrooker/tmp/fm-lab.4JXn4H/state/victim.status
+  acked through 8
+  re-arm 2: watcher exited: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+  log size 911000 (over the 262144 cap); over-cap rows in queue: 2

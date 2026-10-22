@@ -1,0 +1,26 @@
+## Scenario F: the wake drain on a lab home with a 2 GiB status log (incident shape: 3000 events, a hole, a repeated tail) and one healthy lane
+huge.status apparent size: 2147483648 bytes
+real blocks: 6016 KiB
+$ FM_HOME=$LAB bin/fm-wake-drain.sh   (default cap 32 MiB, reserve 1 MiB)
+exit 0 after 4 s
+--- stdout ---
+1792707792	1	signal	huge.status	signal: huge.status
+1792707792	2	signal	healthy.status	signal: healthy.status
+wake annotation: latest wake-EVENT observed at drain, not current state: healthy.status: needs-decision [key=q1]: the healthy lane still asks this
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+healthy [key=q1] needs-decision: the healthy lane still asks this
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+--- stderr ---
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 11018.1792707792.m3tId0
+fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: huge.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+--- files over 1 MB in state (other than *.status) ---
+huge.status size after: 2147483648
