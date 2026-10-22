@@ -137,7 +137,7 @@ test_group_killed_checkpoint_still_stops_its_watcher() {
   kill -KILL -- "-$checkpoint_pid"
   wait "$checkpoint_pid" 2>/dev/null || true
   i=0
-  while kill -0 "$watcher_pid" 2>/dev/null && [ "$i" -lt 120 ]; do
+  while kill -0 "$watcher_pid" 2>/dev/null && [ "$i" -lt 100 ]; do
     sleep 0.05
     i=$((i + 1))
   done
