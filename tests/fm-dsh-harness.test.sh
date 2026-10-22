@@ -202,9 +202,17 @@ PY
 # Probe exits, not release strings, decide admission. The probed CLI must be
 # the PATH-selected one even when a different CLI sits beside the launcher.
 mkdir -p "$TMP/launcher" "$TMP/cli"
-printf '#!/bin/sh\nprintf "launcher arbitrary-release\\n"\nexit "${FM_FAKE_DSH_TUI_STATUS:-0}"\n' > "$TMP/launcher/dsh-tui"
+cat > "$TMP/launcher/dsh-tui" <<'SH'
+#!/bin/sh
+printf "launcher arbitrary-release\n"
+exit "${FM_FAKE_DSH_TUI_STATUS:-0}"
+SH
 printf '#!/bin/sh\nexit 9\n' > "$TMP/launcher/dsh"
-printf '#!/bin/sh\nprintf "cli next-release\\n"\nexit "${FM_FAKE_DSH_CLI_STATUS:-0}"\n' > "$TMP/cli/dsh"
+cat > "$TMP/cli/dsh" <<'SH'
+#!/bin/sh
+printf "cli next-release\n"
+exit "${FM_FAKE_DSH_CLI_STATUS:-0}"
+SH
 chmod +x "$TMP/launcher/dsh-tui" "$TMP/launcher/dsh" "$TMP/cli/dsh"
 [ "$(PATH="$TMP/cli:$TMP/launcher:$PATH" fm_dsh_executable)" = "$TMP/launcher/dsh-tui" ]
 [ "$(PATH="$TMP/cli:$TMP/launcher:$PATH" fm_dsh_cli)" = "$TMP/cli/dsh" ]
