@@ -300,7 +300,7 @@ EOF
 
   # The original malformed update was not reproduced. This is the exact reply
   # captured from an isolated gtt-cb home and worker, not the incident's bytes.
-  out=$(FM_TEST_UPDATE_REPLY="$ROOT/tests/fixtures/gtt-cb-fm-mini-scratch-update.txt" \
+  out=$(FM_TEST_UPDATE_REPLY="$ROOT/tests/fixtures/gtt-cb-fm-mini-scratch-update.reply" \
     FM_TEST_SSH_BIN="$fake_ssh" run_update "$w")
   assert_contains "$out" 'remote secondmate sm1: already current on remote-mac (93e65be73ad6289be95a8c02ee636dc19f2afd41)' \
     "the captured gtt-cb current result was not accepted"

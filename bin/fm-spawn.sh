@@ -775,7 +775,8 @@
 # disposition this parent recognizes (an older host sends none). Neither outcome
 # claims a replacement. Only a spawned launch must carry the requested harness.
 # The recorded profile is the endpoint's confirmed harness/model/effort, not the
-# requested launch profile.
+# requested launch profile; a model or effort the host does not report keeps the
+# requested value.
 # A ship task records the explicit mode/yolo it was passed; a secondmate spawn records
 # mode=secondmate, yolo=off, home=, and projects=; a scout records neither, and both the
 # success line and state/<id>.meta omit them.
@@ -1400,7 +1401,7 @@ fi
 spawn_remote_secondmate() {
   local id=$1 remote host root home harness positional model effort backend out rc meta tmp
   local remote_backend remote_target remote_harness remote_herdr_session registry_lock remote_lock remote_generation
-  local remote_model remote_effort remote_launch remote_outcome
+  local remote_launch remote_outcome
   local remote_traceparent remote_recorded_traceparent sm_primary_head sync_out sync_rc
   local -a launch_args
   id=${POS[0]:-}
@@ -1662,13 +1663,15 @@ spawn_remote_secondmate() {
     echo "error: remote launch returned Herdr session '${remote_herdr_session:-missing}', expected 'fm-remote'; preserving the remote route for reconciliation" >&2
     return 1
   fi
-  remote_model=$(printf '%s\n' "$out" | sed -n 's/^model=//p' | tail -1)
-  remote_effort=$(printf '%s\n' "$out" | sed -n 's/^effort=//p' | tail -1)
   # An alive endpoint is deliberately reused. Its profile can differ from the
   # requested one, so record and report what actually runs, not the request.
   harness=$remote_harness
-  model=$remote_model
-  effort=$remote_effort
+  if grep -q '^model=' <<<"$out"; then
+    model=$(printf '%s\n' "$out" | sed -n 's/^model=//p' | tail -1)
+  fi
+  if grep -q '^effort=' <<<"$out"; then
+    effort=$(printf '%s\n' "$out" | sed -n 's/^effort=//p' | tail -1)
+  fi
   # Record what the remote endpoint ACTUALLY carries, read back from its own
   # launch, rather than what this side hoped to deliver. That keeps the #995
   # guarantee that the recorded carrier is the identity the child received even
@@ -1722,7 +1725,7 @@ spawn_remote_secondmate() {
     echo "error: remote secondmate $id launched, but its reply source could not be armed; endpoint metadata is preserved" >&2
     return 1
   fi
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
+  [ ! -e "$CONFIG/fleet-ledger" ] || [ "$remote_outcome" = already-running ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
   echo "$remote_outcome $id harness=$harness kind=secondmate mode=secondmate yolo=off window=remote:$id worktree=$home remote=$host backend=$remote_backend"
   case "$remote_outcome" in
     already-running) echo "notice: the existing remote agent was kept running; no replacement was performed" ;;
