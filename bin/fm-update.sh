@@ -224,7 +224,11 @@ if [ -f "$SECONDMATES_MD" ]; then
               claim_settled_secondmate "$id"
             fi
             ;;
-          *) echo "remote secondmate $id: skipped on $SECONDMATE_REGISTRY_HOST: malformed update result" >&2 ;;
+          *)
+            remote_lines=$(printf '%s' "$remote_out" | awk 'END { print NR }')
+            remote_shown=$(printf '%s' "$remote_result" | LC_ALL=C tr -c '[:print:]' '?' | cut -c1-200)
+            echo "remote secondmate $id: skipped on $SECONDMATE_REGISTRY_HOST: malformed update result (lines=$remote_lines, last line: '$remote_shown')" >&2
+            ;;
         esac
       else
         echo "remote secondmate $id: skipped on $SECONDMATE_REGISTRY_HOST: ${remote_out%%$'\n'*}" >&2

@@ -426,7 +426,7 @@ The primary then takes these steps:
 All remote secondmates on one host share `fm-remote` and retain separate `2ndmate-<id>` workspaces inside it.
 A live agent is retained, not restarted, even when its running profile differs from the requested profile.
 The parent reconciles its record to the host's confirmed harness, model, effort, and endpoint.
-The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns the launch-outcome labels, including the conservative report for a host that does not yet emit a launch disposition.
+The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns the launch-outcome labels, including the conservative report for a host whose launch disposition is missing or unrecognized.
 
 ### Release a background-task exit picker
 

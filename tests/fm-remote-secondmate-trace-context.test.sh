@@ -375,6 +375,45 @@ assert_grep 'model=openai-codex/gpt-6.1-sol' "$PARENT/state/ios2.meta" "reuse mu
 assert_grep 'effort=high' "$PARENT/state/ios2.meta" "reuse must record the actual effort"
 assert_grep 'remote_target=fm-remote:w3:p2' "$PARENT/state/ios2.meta" "reuse must preserve the reported route"
 assert_not_contains "$REPLAY_OUT" 'spawned ios2' "an older host without a launch disposition cannot prove replacement"
+assert_contains "$REPLAY_OUT" 'running ios2 harness=omp' "an older host's route must be reported as running"
+assert_contains "$REPLAY_OUT" 'replacement is not confirmed' "an older host's route must not claim a replacement"
 pass "captured gtt-cb route: actual identity is reconciled without claiming replacement"
+
+route_reply() {  # <harness> [launch]
+  local reply="$TMP_ROOT/route-reply-$1-${2:-none}.txt"
+  sed "s/^harness=.*/harness=$1/" "$ROOT/tests/fixtures/gtt-cb-r2-route.txt" > "$reply"
+  [ -z "${2:-}" ] || printf 'launch=%s\n' "$2" >> "$reply"
+  printf '%s\n' "$reply"
+}
+
+# Only a reused or unconfirmed endpoint may run another harness than requested.
+# A host that says it spawned a fresh agent must have launched the requested one.
+cp "$PARENT/state/ios2.meta" "$TMP_ROOT/ios2-before-spawned-mismatch.meta"
+MISMATCH_OUT=$(FM_TEST_ROUTE_REPLY=$(route_reply omp spawned) \
+  remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex 2>&1); MISMATCH_RC=$?
+[ "$MISMATCH_RC" -ne 0 ] || fail "a spawned launch of another harness than requested was accepted"$'\n'"$MISMATCH_OUT"
+assert_contains "$MISMATCH_OUT" 'remote launch returned malformed route metadata' \
+  "a spawned harness mismatch must be refused as malformed route metadata"
+cmp -s "$TMP_ROOT/ios2-before-spawned-mismatch.meta" "$PARENT/state/ios2.meta" \
+  || fail "a refused spawned harness mismatch rewrote the parent's route"
+SPAWNED_OUT=$(FM_TEST_ROUTE_REPLY=$(route_reply codex spawned) \
+  remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex 2>&1); SPAWNED_RC=$?
+expect_code 0 "$SPAWNED_RC" "a spawned launch of the requested harness was rejected"$'\n'"$SPAWNED_OUT"
+assert_contains "$SPAWNED_OUT" 'spawned ios2 harness=codex' "a confirmed fresh launch must be reported as spawned"
+assert_not_contains "$SPAWNED_OUT" 'replacement is not confirmed' "a confirmed fresh launch needs no unconfirmed notice"
+assert_grep 'harness=codex' "$PARENT/state/ios2.meta" "a spawned launch must record the requested harness"
+pass "spawned launch: the requested harness is still required"
+
+# A disposition this parent does not recognize still confirmed a working route.
+# It must be recorded and reported as unconfirmed, never refused or called spawned.
+UNKNOWN_OUT=$(FM_TEST_ROUTE_REPLY=$(route_reply omp future-label) \
+  remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex 2>&1); UNKNOWN_RC=$?
+expect_code 0 "$UNKNOWN_RC" "an unrecognized launch disposition refused a confirmed route"$'\n'"$UNKNOWN_OUT"
+assert_contains "$UNKNOWN_OUT" 'running ios2 harness=omp' "an unrecognized disposition must be reported as running"
+assert_contains "$UNKNOWN_OUT" 'replacement is not confirmed' "an unrecognized disposition must not claim a replacement"
+assert_not_contains "$UNKNOWN_OUT" 'spawned ios2' "an unrecognized disposition cannot prove a launch"
+assert_grep 'harness=omp' "$PARENT/state/ios2.meta" "an unrecognized disposition must record the confirmed harness"
+assert_grep 'remote_target=fm-remote:w3:p2' "$PARENT/state/ios2.meta" "an unrecognized disposition must preserve the reported route"
+pass "unknown launch disposition: the confirmed route is kept and reported as unconfirmed"
 
 echo "ALL TESTS PASSED"

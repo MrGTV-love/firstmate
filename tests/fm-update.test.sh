@@ -137,7 +137,7 @@ run_update() {
   local w=$1
   PATH="$w/fakebin:$PATH" FM_FAKE_DIR="$w/fake" \
     FM_SSH_BIN="${FM_TEST_SSH_BIN:-ssh}" \
-    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" "$UPDATE" 2>/dev/null
+    FM_ROOT_OVERRIDE="$w/main" FM_HOME="$w/home" "$UPDATE" 2>"${FM_TEST_UPDATE_STDERR:-/dev/null}"
 }
 
 # --- T1: main + secondmate behind, instruction change; FF, not a merge ------
@@ -307,6 +307,31 @@ EOF
   assert_contains "$out" 'restart-secondmates: fm-sm1' \
     "the captured current result must retain the restart action"
   pass "T3e captured gtt-cb scratch update is accepted without inventing an incident reproduction"
+
+  # A rejected reply must say what was received: the line count and a bounded,
+  # printable copy of the last line the parser judged, never the whole stream.
+  local err long
+  err="$w/update-stderr"
+  long=$(printf 'x%.0s' $(seq 1 300))
+  printf 'warning: earlier line\nsecond line\nbad\033[31m%s\n' "$long" > "$w/malformed-reply.txt"
+  out=$(FM_TEST_UPDATE_STDERR="$err" FM_TEST_UPDATE_REPLY="$w/malformed-reply.txt" \
+    FM_TEST_SSH_BIN="$fake_ssh" run_update "$w")
+  assert_contains "$(cat "$err")" "remote secondmate sm1: skipped on remote-mac: malformed update result (lines=3, last line: 'bad?[31m$(printf 'x%.0s' $(seq 1 192))')" \
+    "a malformed reply did not report its line count and bounded last line"
+  assert_not_contains "$(cat "$err")" "$(printf 'x%.0s' $(seq 1 193))" \
+    "the rejected last line was not length-bounded"
+  assert_not_contains "$(cat "$err")" "earlier line" \
+    "only the judged last line may be echoed, not the whole reply"
+  [ -z "$(LC_ALL=C tr -d '[:print:]\n' < "$err")" ] \
+    || fail "the diagnostic echoed a control byte from the remote reply"
+  assert_contains "$out" 'restart-secondmates: none' \
+    "a skipped remote home must not be restarted"
+  : > "$w/empty-reply.txt"
+  FM_TEST_UPDATE_STDERR="$err" FM_TEST_UPDATE_REPLY="$w/empty-reply.txt" \
+    FM_TEST_SSH_BIN="$fake_ssh" run_update "$w" > /dev/null
+  assert_contains "$(cat "$err")" "malformed update result (lines=0, last line: '')" \
+    "an empty reply must be reported as zero lines"
+  pass "T3e a malformed remote update reply reports its line count and a bounded last line"
 }
 
 # --- T4: dirty secondmate is skipped, its edit preserved -------------------
