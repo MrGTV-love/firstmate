@@ -4,8 +4,8 @@
 # and the cause of that growth is unproven.
 # The blocked-write waits below are 120-second wall-clock hang tripwires, not
 # slack for that growth, and they must not be raised further.
-# This suite is green on the Ubuntu CI log: [run 39757092565](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565) at head
-# `2f5fd300` ran it inside `portable-serial-4of20`, the CI job "Behavior portable serial 4" (job 119751733879).
+# docs/fm-test-portable-shards.md records the CI run that passed this suite on
+# that image.
 set -u
 
 # shellcheck source=tests/lib.sh
