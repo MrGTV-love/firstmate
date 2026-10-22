@@ -3605,18 +3605,27 @@ pass "cross-home stale recovery removes abandoned output from the old state dire
 HR="$TMP_ROOT/hr"; new_home "$HR"
 RACE_TRIGGER="$TMP_ROOT/race-trigger"
 RACE_LOG="$TMP_ROOT/race-executions"
+RACE_PROGRESS="$TMP_ROOT/race-progress"
 RACE_BLOCKER="$TMP_ROOT/race-blocker.sh"
 cat > "$RACE_BLOCKER" <<'SH'
 #!/usr/bin/env bash
 printf 'started\n' >> "$1"
+idle_since=$SECONDS
+progress_seen=
 while [ ! -e "$2" ]; do
-  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
+  progress=
+  [ -z "${3:-}" ] || IFS= read -r progress 2>/dev/null < "$3" || true
+  if [ "$progress" != "$progress_seen" ]; then
+    progress_seen=$progress
+    idle_since=$SECONDS
+  fi
+  [ "$((SECONDS - idle_since))" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
   sleep 0.05
 done
 printf 'race result\n'
 SH
 chmod +x "$RACE_BLOCKER"
-pe_register "$HR" lavish race-src -- "$RACE_BLOCKER" "$RACE_LOG" "$RACE_TRIGGER" >/dev/null
+pe_register "$HR" lavish race-src -- "$RACE_BLOCKER" "$RACE_LOG" "$RACE_TRIGGER" "$RACE_PROGRESS" >/dev/null
 printf '%s\n%s\nold-token\nold-identity\n' "$TMP_ROOT/gone-home" 999999 > "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 race_pids=()
@@ -3631,8 +3640,9 @@ done
 # blocks until the trigger, so each loser's record is its own completion, not a
 # settle sleep that lets late contenders arrive after ownership is released.
 # Only a stretch with no new record fails this wait, however long the whole
-# group takes. A second runner also blocks, and stops this wait on its second
-# start marker.
+# group takes, and the winner's own safety exit counts from the last new record
+# through the progress file, so it stays blocked while records keep arriving.
+# A second runner also blocks, and stops this wait on its second start marker.
 race_expected_losers=$((${#race_pids[@]} - 1))
 race_observed_losers() {
   awk '/^already owned: race-src$/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
@@ -3646,6 +3656,7 @@ while :; do
   [ ! -e "$RACE_LOG" ] || [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || break
   if [ "$race_losers" -gt "$race_progress" ]; then
     race_progress=$race_losers
+    printf '%s\n' "$race_progress" > "$RACE_PROGRESS"
     race_progress_deadline=$((SECONDS + 30))
   fi
   if [ "$SECONDS" -ge "$race_progress_deadline" ]; then
