@@ -1,0 +1,6 @@
+=== lint: stopped admission coordinator test, HEAD tree, Ubuntu 26.04.1, 5 runs ===
+run 1 exit=0 secs=3 ok - a gate stopped while owning admission does not freeze free capacity
+run 2 exit=0 secs=3 ok - a gate stopped while owning admission does not freeze free capacity
+run 3 exit=0 secs=3 ok - a gate stopped while owning admission does not freeze free capacity
+run 4 exit=0 secs=3 ok - a gate stopped while owning admission does not freeze free capacity
+run 5 exit=0 secs=3 ok - a gate stopped while owning admission does not freeze free capacity

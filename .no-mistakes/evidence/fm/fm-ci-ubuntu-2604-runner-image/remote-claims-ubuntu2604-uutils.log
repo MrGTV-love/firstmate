@@ -1,0 +1,44 @@
+##### base tree on Ubuntu 26.04.1 (uutils mkdir) #####
+trial 11: .seq-claims entries=16 (litter?)
+trial 12 SEQ BAD: 1 2 2 2 3 4 5 6 7 8 9 10 11 12 12 13 14 14 15 16 
+trial 12: .seq-claims entries=16 (litter?)
+trial 13 SEQ BAD: 1 1 1 2 3 4 4 5 6 6 7 7 7 8 9 10 10 10 11 12 
+trial 13: .seq-claims entries=12 (litter?)
+trial 14 SEQ BAD: 1 1 2 2 2 2 2 2 2 2 3 4 5 6 7 8 9 10 11 12 
+trial 14: .seq-claims entries=12 (litter?)
+trial 15 SEQ BAD: 1 2 2 3 4 4 5 6 7 8 9 10 11 12 13 14 15 15 15 16 
+trial 15: .seq-claims entries=16 (litter?)
+trial 16 SEQ BAD: 1 2 3 4 5 5 5 5 5 6 6 7 8 9 10 11 12 13 14 15 
+trial 16: .seq-claims entries=15 (litter?)
+trial 17 SEQ BAD: 1 2 3 4 5 6 7 8 9 10 10 11 12 12 12 13 13 14 15 16 
+trial 17: .seq-claims entries=16 (litter?)
+trial 18 SEQ BAD: 1 2 3 4 5 6 6 7 7 7 8 9 10 11 12 12 13 14 15 16 
+trial 18: .seq-claims entries=16 (litter?)
+trial 19 SEQ BAD: 1 2 3 3 3 4 5 6 7 7 8 9 10 11 12 13 14 15 16 17 
+trial 19: .seq-claims entries=17 (litter?)
+trial 20 SEQ BAD: 1 2 3 4 5 6 7 8 8 9 9 10 11 12 13 13 14 15 16 17 
+trial 20: .seq-claims entries=17 (litter?)
+trial 21 SEQ BAD: 1 2 2 3 4 5 6 7 8 9 9 10 11 12 13 14 14 15 16 17 
+trial 21: .seq-claims entries=17 (litter?)
+trial 22 SEQ BAD: 1 2 3 4 5 6 7 8 9 10 11 12 12 13 13 14 15 16 17 18 
+trial 22: .seq-claims entries=18 (litter?)
+trial 23 SEQ BAD: 1 2 3 4 5 5 6 7 8 9 10 11 12 13 14 15 16 17 18 18 
+trial 23: .seq-claims entries=18 (litter?)
+trial 24 SEQ BAD: 1 2 3 4 5 6 7 7 8 9 10 11 11 12 13 14 14 15 16 16 
+trial 24: .seq-claims entries=16 (litter?)
+trial 25 SEQ BAD: 1 2 3 4 5 6 7 8 8 8 9 10 10 10 11 12 13 14 15 16 
+trial 25: .seq-claims entries=16 (litter?)
+RESULT lib=/w/base trials=25 seq_trials_with_duplicates_or_gaps=25 claim_trials_not_exactly_one_owner=20 max_owners_in_a_trial=8 claim_mode_not_0700=0
+##### new tree on Ubuntu 26.04.1 (uutils mkdir) #####
+mkdir: /usr/lib/cargo/bin/coreutils/mkdir mkdir (uutils coreutils) 0.10.0
+claim primitive: fm_remote_job_mkdir_exclusive
+RESULT lib=/w/new trials=25 seq_trials_with_duplicates_or_gaps=0 claim_trials_not_exactly_one_owner=0 max_owners_in_a_trial=1 claim_mode_not_0700=0
+##### new tree on Ubuntu 24.04 (GNU mkdir) control #####
+mkdir: /usr/bin/mkdir mkdir (GNU coreutils) 9.4
+claim primitive: fm_remote_job_mkdir_exclusive
+RESULT lib=/w/new trials=25 seq_trials_with_duplicates_or_gaps=0 claim_trials_not_exactly_one_owner=0 max_owners_in_a_trial=1 claim_mode_not_0700=0
+##### new tree on macOS host (BSD mkdir) #####
+usage: mkdir [-pv] [-m mode] directory_name ...
+mkdir: /bin/mkdir 
+claim primitive: fm_remote_job_mkdir_exclusive
+RESULT lib=/Users/charlesabrooker/tmp/fm-live.8fO7td/new trials=25 seq_trials_with_duplicates_or_gaps=0 claim_trials_not_exactly_one_owner=0 max_owners_in_a_trial=1 claim_mode_not_0700=0

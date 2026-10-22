@@ -1,0 +1,8 @@
+=== tests/fm-remote-transport-lanes.test.sh, tree /tmp/base0, Ubuntu 26.04.1 (uutils mkdir 0.10.0) ===
+run 1 exit=1: not ok - concurrent sequence claims were not unique and monotonic: 1 0 ok lines
+run 2 exit=1: not ok - concurrent sequence claims were not unique and monotonic: 1 0 ok lines
+run 3 exit=1: not ok - concurrent sequence claims were not unique and monotonic: 1 0 ok lines
+=== tests/fm-remote-transport-lanes.test.sh, tree /tmp/work, Ubuntu 26.04.1 (uutils mkdir 0.10.0) ===
+run 1 exit=0:  12 ok lines
+run 2 exit=0:  12 ok lines
+run 3 exit=0:  12 ok lines

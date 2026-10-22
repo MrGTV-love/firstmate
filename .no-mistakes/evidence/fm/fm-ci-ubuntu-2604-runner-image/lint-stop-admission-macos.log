@@ -1,0 +1,13 @@
+ok - a gate stopped while owning admission does not freeze free capacity
+run 1 exit= secs=9
+ok - a gate stopped while owning admission does not freeze free capacity
+run 2 exit= secs=8
+ok - a gate stopped while owning admission does not freeze free capacity
+run 3 exit= secs=8
+ok - a gate stopped while owning admission does not freeze free capacity
+run 4 exit= secs=8
+ok - a gate stopped while owning admission does not freeze free capacity
+run 5 exit= secs=8
+=== lint STOP test with product stopped-gate bypass disabled (counterfactual, macOS) ===
+a stopped coordinator owner froze a free slot
+not ok - stopped coordinator regression failed

@@ -1,0 +1,16 @@
+FM_TEST_END 2026-10-22T09:58:09Z tests/fm-contributions.test.sh exit=0 duration_ms=200587 gate_skip=false
+FM_TEST_END 2026-10-22T09:59:47Z tests/fm-proc-guard.test.sh exit=0 duration_ms=16140 gate_skip=false
+FM_TEST_END 2026-10-22T10:00:34Z tests/fm-pi-primary-types.test.sh exit=0 duration_ms=1683 gate_skip=false
+FM_TEST_END 2026-10-22T10:08:51Z tests/fm-remote-secondmate-lifecycle-e2e.test.sh exit=0 duration_ms=309206 gate_skip=false
+FM_TEST_END 2026-10-22T10:18:12Z tests/fm-busy-adapter-wiring.test.sh exit=0 duration_ms=92660 gate_skip=false
+FM_TEST_END 2026-10-22T10:16:39Z tests/fm-fleet-ledger.test.sh exit=0 duration_ms=20784 gate_skip=false
+FM_TEST_END 2026-10-22T10:23:10Z tests/fm-public-followup.test.sh exit=0 duration_ms=297719 gate_skip=false
+FM_TEST_END 2026-10-22T10:16:18Z tests/fm-supervision-host.test.sh exit=0 duration_ms=291269 gate_skip=false
+
+packaged tools:
+mkdir -> /usr/lib/cargo/bin/coreutils/mkdir
+env -> /usr/lib/cargo/bin/coreutils/env
+sleep -> /usr/lib/cargo/bin/coreutils/sleep
+timeout -> /usr/lib/cargo/bin/coreutils/timeout
+v24.22.1
+Version 7.0.2

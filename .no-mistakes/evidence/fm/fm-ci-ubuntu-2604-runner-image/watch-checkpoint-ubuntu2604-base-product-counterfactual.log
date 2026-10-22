@@ -1,0 +1,11 @@
+=== test_quiet_checkpoint_exits_124_cleanly on Ubuntu 26.04.1 with BASE bin/fm-watch-checkpoint.sh ===
+not ok - quiet checkpoint exit: expected exit 124, got 137
+exit=1
+=== test_checkpoint_resets_an_inherited_ignored_interrupt on Ubuntu 26.04.1 with BASE bin/fm-watch-checkpoint.sh ===
+not ok - the bound must deliver INT despite its caller ignoring it (missing: 'interrupted')
+--- output ---
+
+exit=1
+=== test_group_killed_checkpoint_still_stops_its_watcher on Ubuntu 26.04.1 with BASE bin/fm-watch-checkpoint.sh ===
+not ok - the watcher outlived its group-killed checkpoint's 5-second cleanup grace
+exit=1

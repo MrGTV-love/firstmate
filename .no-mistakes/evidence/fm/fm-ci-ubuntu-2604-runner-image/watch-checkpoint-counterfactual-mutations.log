@@ -1,0 +1,6 @@
+=== test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start (product minus parent-side setpgrp) ===
+not ok - the bound and its slow-starting child were not both gone within 5 seconds of the checkpoint's group-kill (gone=0, 137756107ms - 137751084ms)
+exit=1
+=== test_checkpoint_launches_a_watcher_under_a_path_with_a_space (product with single-arg exec) ===
+not ok - a watcher under a path with a space exit: expected exit 0, got 2
+exit=1

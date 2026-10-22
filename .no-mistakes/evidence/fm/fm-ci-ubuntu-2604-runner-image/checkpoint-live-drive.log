@@ -1,0 +1,23 @@
+##### macOS, HEAD tree
+host: Darwin 27.0.0; perl: v5.34.1
+--- A: quiet bound (2 s)
+exit=0 elapsed=2s out: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+lock after: absent
+--- B: TERM sent to the bound (perl) process of a running checkpoint (180 s bound)
+checkpoint=67716 bound=67738 watcher=67747
+exit=143 after TERM; elapsed=0s
+watcher alive: no; lock: absent
+--- C: next checkpoint right after (must not say watcher is already running outside)
+exit=124 out: checkpoint: no actionable wake within 1s err: 
+
+##### Ubuntu 26.04.1, HEAD tree
+host: Linux 7.0.14-linuxkit; perl: v5.40.1
+--- A: quiet bound (2 s)
+exit=0 elapsed=2s out: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+lock after: absent
+--- B: TERM sent to the bound (perl) process of a running checkpoint (180 s bound)
+checkpoint=1363683 bound=1363691 watcher=1363692
+exit=143 after TERM; elapsed=0s
+watcher alive: no; lock: absent
+--- C: next checkpoint right after (must not say watcher is already running outside)
+exit=124 out: checkpoint: no actionable wake within 1s err: 

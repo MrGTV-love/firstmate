@@ -1,0 +1,14 @@
+=== test_checkpoint_resets_an_inherited_ignored_interrupt (BASE bin/fm-watch-checkpoint.sh) ===
+not ok - the bound must deliver INT despite its caller ignoring it (missing: 'interrupted')
+--- output ---
+
+exit=1
+=== test_group_killed_checkpoint_still_stops_its_watcher (BASE bin/fm-watch-checkpoint.sh) ===
+not ok - the watcher outlived its group-killed checkpoint's 5-second cleanup grace
+exit=1
+=== test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start (BASE bin/fm-watch-checkpoint.sh) ===
+not ok - the bound child never reached its delayed process-group setup
+exit=1
+=== test_checkpoint_launches_a_watcher_under_a_path_with_a_space (BASE bin/fm-watch-checkpoint.sh) ===
+ok - a checkpoint launches a watcher under a path with a space
+exit=0

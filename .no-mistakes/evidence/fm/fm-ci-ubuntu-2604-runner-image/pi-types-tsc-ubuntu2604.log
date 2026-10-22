@@ -1,0 +1,7 @@
+=== fm-pi-primary-types on Ubuntu 26.04.1 WITHOUT tsc on PATH (the original failure shape) ===
+tsc: not on PATH
+skip: Pi extension typecheck prerequisite not found: tsc
+exit=0
+=== same test WITH tsc 7.0.2 installed (what the parallel-1 job now installs) ===
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.4.0
+exit=0
