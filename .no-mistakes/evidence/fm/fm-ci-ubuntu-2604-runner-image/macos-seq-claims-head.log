@@ -1,0 +1,23 @@
+host: Darwin 27.0.0 mkdir=/bin/mkdir
+raw-mkdir trial  1: 1 successful owners
+raw-mkdir trial  2: 1 successful owners
+raw-mkdir trial  3: 1 successful owners
+raw-mkdir trial  4: 1 successful owners
+raw-mkdir trial  5: 1 successful owners
+raw-mkdir trial  6: 1 successful owners
+raw-mkdir trial  7: 1 successful owners
+raw-mkdir trial  8: 1 successful owners
+raw-mkdir trial  9: 1 successful owners
+raw-mkdir trial 10: 1 successful owners
+raw-mkdir: trials with >1 owner: 0/10
+next_seq trial 1: unique 1..20
+next_seq trial 2: unique 1..20
+next_seq trial 3: unique 1..20
+next_seq trial 4: unique 1..20
+next_seq trial 5: unique 1..20
+next_seq trial 6: unique 1..20
+next_seq trial 7: unique 1..20
+next_seq trial 8: unique 1..20
+next_seq trial 9: unique 1..20
+next_seq trial 10: unique 1..20
+next_seq: bad trials: 0/10

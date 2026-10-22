@@ -1,0 +1,40 @@
+host: Linux 7.0.14-linuxkit Ubuntu 26.04.1 LTS timeout=/usr/bin/timeout perl=/usr/bin/perl
+head: 93e65be73ad6289be95a8c02ee636dc19f2afd41 (base)
+== A. quiet checkpoint ends at its bound with exit 124 and frees the lock
+exit=137 elapsed=3.01s stdout=
+FAIL: A
+total 40
+drwxr-xr-x 4 ubuntu ubuntu 4096 Oct 22 06:13 .
+drwx------ 5 ubuntu ubuntu 4096 Oct 22 06:13 ..
+-rw-r--r-- 1 ubuntu ubuntu   11 Oct 22 06:13 .idle-reap-next
+-rw------- 1 ubuntu ubuntu   25 Oct 22 06:13 .inactive-outcome-reconcile
+-rw-r--r-- 1 ubuntu ubuntu    0 Oct 22 06:13 .last-check
+-rw-r--r-- 1 ubuntu ubuntu    0 Oct 22 06:13 .last-heartbeat
+-rw-r--r-- 1 ubuntu ubuntu    0 Oct 22 06:13 .last-watcher-beat
+-rw-r--r-- 1 ubuntu ubuntu   11 Oct 22 06:13 .lavish-auto-retire-next
+-rw-r--r-- 1 ubuntu ubuntu    0 Oct 22 06:13 .open-loops-started
+-rw------- 1 ubuntu ubuntu    0 Oct 22 06:13 .open-loops.lock
+-rw-r--r-- 1 ubuntu ubuntu    0 Oct 22 06:13 .secondmate-liveness-tick
+-rw-r--r-- 1 ubuntu ubuntu   11 Oct 22 06:13 .typesafe-health-next
+lrwxrwxrwx 1 ubuntu ubuntu   59 Oct 22 06:13 .watch.lock -> /home/ubuntu/h/fm-lab.ahsFSx/state/.watch.lock.owner.f8NE8w
+drwx------ 2 ubuntu ubuntu 4096 Oct 22 06:13 .watch.lock.owner.f8NE8w
+-rw------- 1 ubuntu ubuntu  990 Oct 22 06:13 home-summary.json
+-rw------- 1 ubuntu ubuntu  132 Oct 22 06:13 open-loops.json
+drwxr-xr-x 2 ubuntu ubuntu 4096 Oct 22 06:13 terminal-outcomes
+== B. async caller (bash 'cmd &' ignores INT) still interrupts and cleans up
+exit=137 stdout=child SIGINT disposition: SigIgn:	0000000000000006|
+lock after first checkpoint: present
+next checkpoint exit=0 stderr=
+FAIL: B
+== C. harness KILLs the checkpoint's process group: watcher still stops, next checkpoint runs
+checkpoint pgid=1198876 watcher pid=1198884
+      PID    PGID    PPID COMMAND
+  1198884 1198883 1198883 bash /home/ubuntu/base/bin/fm-watch.sh
+watcher after group KILL: alive after 22.32s; lock present: yes
+next checkpoint exit=1 stdout=watcher: already running pid 1198884 stderr=checkpoint: watcher is already running outside this foreground checkpoint
+FAIL: C
+== D. checkout path containing a space
+watcher pid under spaced path: 1203513 cmd: bash /home/ubuntu/h/fm space.o1FOcM/bin/fm-watch.sh
+exit=137 stdout= stderr=
+FAIL: D
+FAILS=4

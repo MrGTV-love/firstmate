@@ -1,0 +1,21 @@
+host: Darwin 27.0.0  timeout=/opt/homebrew/bin/timeout perl=/usr/bin/perl
+head: 8b8a66bf0f5bdda8ca8c94d0bf6aa73604d2abcb
+== A. quiet checkpoint ends at its bound with exit 124 and frees the lock
+exit=124 elapsed=3.39s stdout=checkpoint: no actionable wake within 3s
+PASS: A quiet exit 124, lock released
+== B. async caller (bash 'cmd &' ignores INT) still interrupts and cleans up
+exit=124 stdout=child SIGINT disposition: n/a|checkpoint: no actionable wake within 3s|
+next checkpoint exit=0 stderr=
+FAIL: B
+== C. harness KILLs the checkpoint's process group: watcher still stops, next checkpoint runs
+checkpoint pgid=42838 watcher pid=42937
+    PID  PGID  PPID COMMAND
+  42937 42937 42900 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5GTMKG3Y1DP0ZH7X2XDZFF1/bin/fm-watch.sh
+watcher after group KILL: gone after 0.20s; lock present: yes
+next checkpoint exit=0 stdout=check: rearm-resurface stderr=
+PASS: C group-KILL: watcher stopped, next checkpoint free
+== D. checkout path containing a space
+watcher pid under spaced path: 47238 cmd: bash /Users/charlesabrooker/tmp/fm space.YWaSf3/bin/fm-watch.sh
+exit=124 stdout=checkpoint: no actionable wake within 3s stderr=
+PASS: D watcher launched from '/Users/charlesabrooker/tmp/fm space.YWaSf3/bin'
+FAILS=1

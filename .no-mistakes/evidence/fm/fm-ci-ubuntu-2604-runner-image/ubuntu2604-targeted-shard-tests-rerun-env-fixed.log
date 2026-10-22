@@ -1,0 +1,230 @@
+ledger: "/home/ubuntu/fm/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-22T05:57:47Z tests/fm-pi-primary-types.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.4.0
+FM_TEST_END 2026-10-22T05:57:48Z tests/fm-pi-primary-types.test.sh exit=0 duration_ms=1526 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:57:48Z tests/fm-public-followup.test.sh family=standalone expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T05:57:48Z tests/fm-busy-adapter-wiring.test.sh family=standalone expected_gate_skip=none
+ok - a claude secondmate spawn arms the busy contract the stall gate can see, and Stop does not wake the parent
+ok - a raw claude, pi, pi-signed, or omp secondmate launch writes no busy wiring and classifies unknown
+ok - a claude secondmate's Stop guard records busy on a blocked Stop and idle on an allowed one, in any hook order, and a rewake turn reopens busy
+ok - a claude secondmate whose home guard predates .fm-busy-stop keeps the Stop idle hook
+ok - a claude secondmate spawn leaves an existing settings.local.json untouched
+ok - a pi secondmate loads the busy extension beside its primary extensions and does not emit a parent turn-end
+ok - an omp secondmate names only the out-of-home busy extension and does not emit a parent turn-end
+ok - an opencode secondmate plugin closes the parent busy record without a parent turn-end
+ok - codex and grok secondmates stay on their existing verdicts and do not emit a parent turn-end
+ok - pi extension reports agent_start busy, settles idle only via ctx.isIdle(), and keeps turn_end a notification
+ok - pi extension awaits agent_settled before the next agent_start without a test delay
+ok - pi extension events from a superseded incarnation are rejected as stale
+ok - kimi and grok install no unverified semantic wiring and classify through their own gates
+ok - opencode plugin classifies from session.status, scoped to the latched worker session
+ok - claude hooks open on UserPromptSubmit and close on Stop, StopFailure, and SessionEnd
+ok - claude Stop rejects only exit 2 and closes accepted, failed, and timed-out turns before the host deadline
+ok - claude hook events from a superseded incarnation are rejected without breaking the hook
+ok - gemini hooks open on BeforeAgent and close on AfterAgent and a repeated SessionEnd
+ok - gemini hook events from a superseded incarnation are rejected without breaking the hook
+ok - raw gemini launch remains unwired and classifies unknown
+ok - gemini is refused as a secondmate because it has no primary supervision protocol
+ok - codex classifies unknown until a semantic source is verified, never idle or footer-matched
+all fm-busy-adapter-wiring tests passed
+FM_TEST_END 2026-10-22T05:59:28Z tests/fm-busy-adapter-wiring.test.sh exit=0 duration_ms=99945 gate_skip=false
+ok - the suite's seeding never reaches a backlog named by ambient TASKS_AXI_FILE/BACKEND
+ok - outcome text is collapsed to one line, bounded by codepoint, and never corrupts characters
+ok - restart end-to-end: typed result reconciles from disk and delivers one reply to the original thread
+ok - failed work on a pr-merged promise delivers its honest outcome exactly once
+ok - duplicate terminal results, restart replay, and repeated delivery are all no-ops
+ok - wrong source, wrong work id, stale generation, malformed, unsupported deliverable, and forged identity are all refused
+ok - a relay transport failure is held as retryable with no false completion, and the retry posts once
+ok - a dry-run records no public delivery and leaves the commitment retryable
+ok - a late success receipt closes the exact attempt with no second post, and a mismatched attempt is refused
+ok - typed terminal cleanup clears the legacy link without posting
+ok - a delivery interrupted between post and receipt refuses to repost
+ok - a child home reports typed results but can never become the outward-post owner
+ok - typed delivery refuses to post when its cleanup registration is missing
+ok - marked secondmate teardown resolves its parent and fails closed when unavailable
+ok - local seeding publishes durable parent state before its identity marker
+ok - a lost launch-time parent binding is recovered from the durable local record
+ok - a durable local parent record does not bypass a genuinely missing parent-side registration
+ok - unknown durable parent fields remain forward-compatible
+ok - conflicting live and durable parent bindings fail closed
+ok - unsafe durable parent records fail closed before cleanup
+ok - a NUL-bearing durable parent record fails closed before cleanup
+ok - relay-disabled unmarked teardown runs no public-followup work
+ok - a marked child proceeds without tasks-axi when its parent relay is disabled
+ok - secondmate parent resolution matches the durable registry id literally
+ok - traversal-shaped registrations are rejected before path construction or posting
+ok - pending keeps registrations when tasks-axi returns malformed JSON
+ok - the retained private request context keeps the original thread deliverable after inbox cleanup
+ok - cleanup refuses while a public reply is owed and proceeds once it has landed
+ok - a relay-disabled home runs no tasks-axi call, prints nothing, and gains no artifact
+ok - a relay-enabled home with no commitments makes no backlog call and stays silent
+ok - a relay-exhausted follow-up binding is escalated rather than retried into the thread
+ok - the relay poll stays inert without a token, silent with no commitments, and surfaces a new result once
+ok - startup surfaces unresolved public commitments only in a relay home that owes one
+ok - typed public-followup records carry only public-safe summaries and deliverables
+ok - dropped-baton regression: delivery retains the loop and pending prints open-loop
+ok - CONTROL: the identical teardown REFUSES the moment a commitment is registered
+ok - rechain posts the shipped follow-on into the same thread
+ok - rechain resumes the same obligation after an interrupted bind
+ok - concurrent rechains cannot fork one delivered source
+ok - failed rechain retirement keeps the source claimed by one resumable destination
+ok - first register succeeds with an empty lock list under /bin/bash
+ok - registration replay preserves delivered and retired loop states
+ok - redelivery does not report a retired loop as open
+ok - retire closes delivered loops after secondmate home removal
+ok - retire fails closed for an unbound existing secondmate
+ok - retire fails closed when a secondmate ID is reassigned
+ok - rechain refuses an unrelated existing destination
+ok - pending skips a registration retired during settlement
+ok - retire --reason closes the loop and drops the open-loop line
+ok - retention creates no false teardown refusal and pending no longer prunes
+ok - expiry escalation is pinned by FMX_NOW_OVERRIDE
+ok - brief fails explicitly when typed deliverable keys are unavailable
+ok - pre-change registrations are open loops and un-rechainable, never a crash
+ok - teardown reports an unreconciled legacy Relay link
+ok - secondmate promotion matches teardown parent resolution
+ok - a public loop bound to a remote secondmate home delivers and retires
+ok - delivered remote registrations skip offline collection routes
+ok - --force still covers only the unresolved obligation, not the link clear
+ok - retire fails closed when a remote route is reassigned
+ok - retire fails closed when remote state is unreadable
+ok - retire fails closed when remote state is non-writable
+ok - retire accepts link absence in non-writable remote state
+ok - the guarded remote clear refuses a lock it cannot acquire instead of hanging
+ok - an unconfirmed remote clear is unknown completion, never a silent close
+ok - a typed terminal result emitted in a remote work home reaches the owning home
+ok - a promise that requires no deliverable is briefable and reportable
+ok - an unreachable remote work home fails loudly instead of reporting an empty inbox
+ok - an unreadable remote outbox fails collection without losing its result
+ok - invalid registration fails collection without dropping the staged result
+ok - unsafe registration entries fail collection without dropping staged results
+ok - route loss fails brief and consume without dropping the staged result
+ok - empty reachable remote collection remains a healthy no-op
+ok - remote brief rejects traversal and empty route path components
+ok - a local work home's emit path is unchanged
+ok - a duplicate report from a remote work home stays a no-op
+ok - staging requires the matching secondmate firstmate home
+ok - brief pre-fills the report path and states the format of every value it cannot know
+ok - the emitter refuses a deliverable tasks-axi would reject, naming key, value, and format
+ok - the emitter refuses a repeated deliverable key by name in both destinations
+ok - the emitter refuses an event missing a required deliverable in both destinations
+ok - the emitter's work-event rules agree with the real tasks-axi consumer on 74 cases
+ok - a rejected event records a specific reason and wakes the owning home once
+ok - a rejection collected from a remote secondmate wakes the owning home
+ok - only a failed result may answer a promise without the deliverable it promised
+ok - a failure promise keeps needing its own error_code
+ok - a rejection whose wake cannot be recorded is retried rather than lost
+ok - a rejection wake survives a poll that could not write its line
+ok - a rejection wake survives a poll that could not read its line
+ok - a wake that cannot be dropped repeats the same refusal
+ok - a refusal whose event was retained repeats its wake instead of a new one
+FM_TEST_END 2026-10-22T06:03:28Z tests/fm-public-followup.test.sh exit=0 duration_ms=339680 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T06:03:28Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none
+ok - host: parked child-exit sampling uses ordinary half-second sleeps
+ok - report surface: only the branch actor's current turn may report, and only on the tasks its wake names
+ok - report surface: visible late outcomes queue a relay, while silent outcomes remain stored without a wake or note
+ok - dispatch entry: the host reads branch eligibility, the offer rule, and the wake prompt from the Pi branch's own owner
+ok - drain: BRANCH OUTCOMES runs on a Claude home by default and on another primary with the file, never with off, and never on Pi
+ok - drain: captain outcomes come first, and routine overflow collapses into a count one drain clears
+ok - drain: repeated captain outcomes collapse per task, and the byte cap presents only the run its acknowledgement covers
+ok - drain: a long away window costs one short drain, captain outcomes collapsed per task and routine overflow counted, and nothing from it is shown again
+ok - drain: the BRANCH OUTCOMES budgets count bytes, cutting multibyte summaries by whole characters in any locale
+ok - drain: branch outcomes stay unread when a projection of the store fails
+ok - drain: branch outcomes stay unread and the drain fails when jq is missing
+ok - drain: branch outcomes stay unread when the drain cannot print them
+ok - drain: a legacy backlog is presented with each outcome's age and a check-first instruction, never adopted
+ok - drain: a keyed decision survives acknowledgement through a newer outcome for its task
+ok - drain: an outcome carried across a switch off Pi comes back with its age, never adopted
+ok - drain: an outcome nothing has shown is presented until acknowledged, and a repeated acknowledgement changes nothing
+ok - drain: an outcome the host drain presented but main never acknowledged stays unprocessed across a switch to Pi
+ok - drain: an outcome the host drain presented but main never acknowledged survives an outcome index repair
+ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+ok - host: an attended captain outcome wakes main once and stays in its drain until main acknowledges it
+ok - host: a captain outcome recorded after the captain left waits for the return, then reaches main's drain
+ok - host: a quiet record without its daemon is a present captain, so outcomes and decisions reach main
+ok - host: an attended decision close stays main's exactly as the plain arm delivers it
+ok - host: an off written while the host is parked sends the next attended close to main, naming the opt-out
+ok - host: a main-only pass-through leaves the successor watcher running and the close undelivered for main
+ok - host: an attended close whose main session cannot be identified reaches main and runs no engine turn
+ok - host: a decision close accepted away whose turn starts attended still reaches main unchanged
+ok - host: an attended close whose task turns main-only before its turn still reaches main unchanged
+ok - host: a primary with no verified dialog mirror keeps every attended close on main, and its away posture still runs
+ok - host: each wake carries the captain's dialog since the last wake, without operational input
+ok - host: the dialog mirror, its feed, and the wake file are owner-only
+ok - host: dialog a turn never completed with its report (a park boundary, a stopped turn, no report) reaches the next turn
+ok - host: an attended wake whose mirror is missing, cannot be read (at the feed or at the prompt), or holds a malformed entry reaches main before any engine turn, and the cursor stays put
+ok - host: an away wake is handled on the engine through the branch contract and never reaches main
+ok - host: an engine turn that records no outcome hands its durable wake to main
+ok - host: a captain return during an engine turn hands that turn's outcomes to main
+ok - host: silent outcomes are excluded from both captain-return handoff paths
+ok - host: an early visible outcome survives more than 1,000 same-turn receipts
+ok - host: an outcome lookup failure forces a visible main handoff
+ok - host: an outcome recorded after the return reaches main even when its host dies at the turn's end
+ok - host: a killed predecessor's engine is reaped and the next host removes its turn files
+ok - host: a turn that reports but leaves its granted rows queued hands the wake to main
+ok - host: a captain return during a failed engine turn still hands that turn's outcomes to main
+ok - host: an engine turn whose result is incomplete hands its wake to main
+ok - host: two engine errors latch the session, main keeps every away wake in the cooldown, a failed probe doubles it up to its cap, and a report recovers it silently
+ok - host: an attended close in a latched session reaches main as the arm printed it and leaves the latch as it was, and a home that opted out with off never reads it
+ok - host: attended, two engine errors latch the session, main keeps every close unchanged in the cooldown, a failed probe doubles it up to its cap, and a routine probe's recovery stays in the ledger, off main
+ok - host: an engine turn is bounded, and tool processes outside its process group are reaped
+ok - host: a restarted host stops, by recorded identity, the cycle a killed predecessor left running
+ok - host: the park ends itself with a boundary wake and a stopped watcher
+ok - host: waiting closes cannot carry the park past its boundary
+ok - host: a close whose margin runs out while the successor starts reaches main at the boundary without a turn
+ok - host: the park's test clock is inert without the test marker
+ok - host: a park at or beyond the Stop-hook registration falls back to the default boundary
+ok - host: an owner's later park limit lets a turn outlive the boundary, and no other limit does
+ok - host: the first cycle's status streams once, --restart replaces a stale watcher, and an owner predecessor makes a handling successor
+ok - host: an unchanged held outcome reaches the captain once across cadences, and a later decision on the task still does
+ok - host: a home naming an unverified engine hands every away wake to main with the reason
+ok - host: a host outside the session-lock owner stands down without arming
+ok - host: a host under a superseded auto-arm generation stands down without touching the owner
+FM_TEST_END 2026-10-22T06:08:29Z tests/fm-supervision-host.test.sh exit=0 duration_ms=300500 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T06:08:29Z tests/fm-fleet-ledger.test.sh family=unclassified expected_gate_skip=none
+ok - flag on: dispatch, polled status lines, the local merge after its task's pending lines, and cleanup are recorded in order
+ok - flag on: a PR merge is recorded once, after the task's pending status lines
+ok - flag on: registering a PR records task.pr_ready with its full URL after the task's pending status lines, and the merge-time re-record adds nothing
+ok - flag on: a worker's status command records its line at once, and the watcher backstop does not record it again
+ok - flag on, state override outside the home: the worker's status command records its line at once
+ok - flag on, relative config override: a worker running elsewhere still records its line at once
+ok - append failing: the worker's status command exits nonzero and records nothing
+ok - ledger failing: the worker's status line still lands exactly, quietly, and the backstop records it later
+ok - flag off: the worker's status command is a plain append and leaves no ledger file, offset, or lock
+ok - flag off: the whole lifecycle leaves no ledger file, offset, or lock
+ok - flag on: filed, closed, and answered write exactly their fields, one line each, with ts and at the same instant
+ok - closed: a repeat of the same task, evidence, and PR writes nothing; any difference writes a record
+ok - closed: a replay inside one incarnation writes nothing, and the same close after a new dispatch is recorded again, for every evidence
+ok - answered_by is derived from the home role and two exact source prefixes, and is unknown when neither says
+ok - flag off writes nothing, and an unwritable ledger fails with one line for the producer to ignore
+FM_TEST_END 2026-10-22T06:08:50Z tests/fm-fleet-ledger.test.sh exit=0 duration_ms=21092 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T06:08:50Z tests/fm-supervision-host-hook.test.sh family=afk expected_gate_skip=none
+ok - host+hook: a successor closed before exit_to_main does not suppress the branch-outcome rewake
+ok - host+hook: a successor that closes during a held engine turn does not suppress the branch-outcome rewake
+ok - host+hook: a refused hand-back becomes a delivered failure notice
+ok - host+hook: a refused hand-back on an announced handling marker becomes a delivered failure notice
+ok - host+hook: an attended main-only pass-through rewakes main and keeps its successor watcher
+ok - host+hook: a captain outcome beside a quiet record rewakes the present captain with no away note
+ok - host+hook: a Claude home without config/supervision-host runs the host at the default engine, and an off file restores the plain arm
+ok - host+hook: a close that turns main-only at its turn rewakes main and keeps its successor watcher
+ok - host+hook: the successor a close that turns main-only at its turn leaves for main survives the hook's process group teardown
+ok - host+hook: failed at-turn downtime write notifies main despite a healthy successor
+ok - host+hook: a successor close that lands during main's turn is delivered at the next turn end
+ok - host+hook: the successor a pass-through leaves for main survives the hook's process group teardown
+ok - host+hook: the next park takes over the cycle a main-only pass-through left, so one arm owns it
+ok - host+hook: a park stopped mid take-over leaves the take-over to the next park
+ok - host+hook: a successor that cannot be recorded is stopped, and main's next turn end arms a fresh cycle
+FM_TEST_END 2026-10-22T06:09:56Z tests/fm-supervision-host-hook.test.sh exit=0 duration_ms=66073 gate_skip=false
+FM_TEST_SUMMARY total=6 failed=0 skipped_gate=0 duration_ms=729399
+FM_TEST_SUMMARY_FAMILY family=afk count=2 duration_ms=366573 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=1526 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=2 duration_ms=439625 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=21092 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-public-followup.test.sh duration_ms=339680
+FM_TEST_SLOWEST rank=2 script=tests/fm-supervision-host.test.sh duration_ms=300500
+FM_TEST_SLOWEST rank=3 script=tests/fm-busy-adapter-wiring.test.sh duration_ms=99945
+FM_TEST_SLOWEST rank=4 script=tests/fm-supervision-host-hook.test.sh duration_ms=66073
+FM_TEST_SLOWEST rank=5 script=tests/fm-fleet-ledger.test.sh duration_ms=21092
+FM_TEST_SLOWEST rank=6 script=tests/fm-pi-primary-types.test.sh duration_ms=1526
+fm-test-run: wrote timing artifact: /home/ubuntu/h/timing2.json
+exit=0

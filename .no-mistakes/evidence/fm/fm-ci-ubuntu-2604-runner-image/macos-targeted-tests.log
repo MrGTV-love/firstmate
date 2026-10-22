@@ -1,0 +1,65 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5GTMKG3Y1DP0ZH7X2XDZFF1/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-22T06:14:35Z tests/fm-watch-checkpoint.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - quiet checkpoint exits 124 with a clean checkpoint line and no live lock
+ok - Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher
+ok - a checkpoint restores ignored INT before launching its watcher
+ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint
+ok - a checkpoint launches a watcher under a path with a space
+ok - an announced recovery is not reannounced by the next foreground checkpoint
+ok - a never-announced recovery still surfaces once from a foreground checkpoint
+ok - a queue append during a foreground checkpoint still resurfaces
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 50469.1792649701.VNJ4DU
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - checkpoint passes through a real watcher wake and leaves the queue for drain
+ok - checkpoint preserves watcher environment for registered custom checks
+ok - checkpoint: due checks progress before repeated unmanaged recovery, whose durable notice and cooldown survive
+ok - checkpoint rejects an existing watcher singleton as unowned
+ok - checkpoint: an opted-in home runs the host for the checkpoint's bound, raised only while away
+ok - checkpoint: a handed-back wake passes through, and a host stand-down or signal death is a failure
+ok - checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host
+ok - checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint
+FM_TEST_END 2026-10-22T06:15:34Z tests/fm-watch-checkpoint.test.sh exit=0 duration_ms=58778 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T06:15:34Z tests/fm-remote-transport-lanes.test.sh family=secondmate expected_gate_skip=none
+ok - atomic sequence claims remain unique and reap only after expiry
+ok - lanes run homes concurrently while each home stays FIFO
+ok - same-home jobs staged in the same second execute in staging-sequence order
+ok - same-home sequence order follows completed staging publication
+ok - a caller killed mid-wait cancels its queued job before execution
+ok - a caller killed mid-wait stops its running job's process group
+ok - a signal-less caller disconnect cancels the abandoned job through the parent probe
+ok - bounded reads after a cancellation meet their own budget with no convoy
+ok - an open caller stdin no longer wedges a non-payload remote command
+ok - a live explicit-stdin stage survives the staging-litter age bound
+ok - --stdin still delivers a payload caller's bytes
+ok - abandoned stage litter is reaped by age while live staging survives
+ALL TESTS PASSED
+FM_TEST_END 2026-10-22T06:16:49Z tests/fm-remote-transport-lanes.test.sh exit=0 duration_ms=74522 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T06:16:49Z tests/fm-proc-guard.test.sh family=unclassified expected_gate_skip=none
+...............
+----------------------------------------------------------------------
+Ran 15 tests in 0.158s
+
+OK
+ok - guard real-UID, limit, privacy, and fixed-boundary behavior
+ok - check reads the user's process count and reports its limit or UNKNOWN
+ok - check classifies the count against the limit and --check exits on WARNING or CRITICAL
+ok - threshold and retention customization are refused, as are invalid remaining options
+ok - census names the tree: command counts, parent chains, deepest chains with run samples and leaf, oldest and newest
+ok - census only reads: every measured process is still alive
+ok - a count above the threshold for more than the hold writes one census and reports it
+ok - while the count stays high an open episode keeps watch silent: one census per episode
+ok - an episode closes once the count stays at or below the clear threshold
+ok - a pile-up after the episode closed is reported again
+ok - a count below the threshold writes nothing
+ok - a census that cannot be saved still reports the pile-up, with the reason
+ok - dip case skipped: this host's own process limit leaves no room for a real burst
+ok - a reported pile-up is never killed
+FM_TEST_END 2026-10-22T06:17:17Z tests/fm-proc-guard.test.sh exit=0 duration_ms=27493 gate_skip=false
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=163100
+FM_TEST_SUMMARY_FAMILY family=secondmate count=1 duration_ms=74522 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=27493 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=58778 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-remote-transport-lanes.test.sh duration_ms=74522
+FM_TEST_SLOWEST rank=2 script=tests/fm-watch-checkpoint.test.sh duration_ms=58778
+FM_TEST_SLOWEST rank=3 script=tests/fm-proc-guard.test.sh duration_ms=27493
+exit=0

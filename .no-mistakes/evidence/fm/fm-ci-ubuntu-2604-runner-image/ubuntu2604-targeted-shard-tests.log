@@ -1,0 +1,315 @@
+ledger: "/home/ubuntu/fm/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-22T05:42:11Z tests/fm-pi-primary-types.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.4.0
+FM_TEST_END 2026-10-22T05:42:12Z tests/fm-pi-primary-types.test.sh exit=0 duration_ms=1444 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:42:13Z tests/fm-watch-checkpoint.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - quiet checkpoint exits 124 with a clean checkpoint line and no live lock
+ok - Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher
+ok - a checkpoint restores ignored INT before launching its watcher
+ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint
+ok - a checkpoint launches a watcher under a path with a space
+ok - an announced recovery is not reannounced by the next foreground checkpoint
+ok - a never-announced recovery still surfaces once from a foreground checkpoint
+ok - a queue append during a foreground checkpoint still resurfaces
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 69864.1792647751.UlO6Rp
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - checkpoint passes through a real watcher wake and leaves the queue for drain
+ok - checkpoint preserves watcher environment for registered custom checks
+ok - checkpoint: due checks progress before repeated unmanaged recovery, whose durable notice and cooldown survive
+ok - checkpoint rejects an existing watcher singleton as unowned
+ok - checkpoint: an opted-in home runs the host for the checkpoint's bound, raised only while away
+ok - checkpoint: a handed-back wake passes through, and a host stand-down or signal death is a failure
+ok - checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host
+ok - checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint
+FM_TEST_END 2026-10-22T05:42:45Z tests/fm-watch-checkpoint.test.sh exit=0 duration_ms=32422 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:42:45Z tests/fm-remote-secondmate-lifecycle-e2e.test.sh family=secondmate expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T05:42:45Z tests/fm-remote-job.test.sh family=secondmate expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T05:42:45Z tests/fm-remote-transport-lanes.test.sh family=secondmate expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T05:42:45Z tests/fm-remote-job-orphan-reap.test.sh family=secondmate expected_gate_skip=none
+ok - the Linux start path puts the whole worker tree in its own process group
+ok - removing the state root and killing the recorded worker pid leaves the tree running, orphaned
+ok - a worker whose code root still exists is never reaped
+ok - a worker stops its whole tree once its code root is pruned
+ok - a dry run reports the abandoned worker and signals nothing
+ok - the reaper stops an abandoned worker's whole tree
+ok - the reaper is idempotent
+FM_TEST_END 2026-10-22T05:42:49Z tests/fm-remote-job-orphan-reap.test.sh exit=0 duration_ms=4067 gate_skip=false
+ok - atomic sequence claims remain unique and reap only after expiry
+ok - lanes run homes concurrently while each home stays FIFO
+ok - same-home jobs staged in the same second execute in staging-sequence order
+ok - same-home sequence order follows completed staging publication
+ok - a caller killed mid-wait cancels its queued job before execution
+ok - a caller killed mid-wait stops its running job's process group
+ok - a signal-less caller disconnect cancels the abandoned job through the parent probe
+ok - bounded reads after a cancellation meet their own budget with no convoy
+ok - an open caller stdin no longer wedges a non-payload remote command
+ok - a live explicit-stdin stage survives the staging-litter age bound
+ok - --stdin still delivers a payload caller's bytes
+ok - abandoned stage litter is reaped by age while live staging survives
+ALL TESTS PASSED
+FM_TEST_END 2026-10-22T05:43:42Z tests/fm-remote-transport-lanes.test.sh exit=0 duration_ms=57334 gate_skip=false
+ok - default: result and command samples use 0.25 seconds; dispatcher uses four 0.05-second waits then one second
+ok - legacy: result and command samples use 0.07 seconds; dispatcher uses four 0.07-second waits then one second
+ok - active: result and command samples use 0.12 seconds; dispatcher uses four 0.07-second waits then one second
+ok - default queue and execution bounds independently cover long polls
+ok - operator PATH excludes a symlinked local bin
+ok - operator PATH honors nvm defaults with a deterministic fallback
+ok - operator PATH resolves the authorized Nix profile bin link
+ok - operator PATH orders discovered tool installs deterministically
+ok - the worker preserves bounded argv and stdin in an empty environment
+ok - active jobs keep the worker ready for concurrent requests
+ok - ensure replaces a live worker after its code changes
+ok - worker identity binds the canonical configured code root
+ok - stale ownership is reclaimed without signaling a reused pid
+ok - the worker enforces the job timeout and publishes its result
+ok - the worker expires queued jobs before they can mutate
+ok - queued jobs receive a fresh bounded execution window
+ok - a queued short command preempts a running long poll instead of waiting its window
+ok - a poll re-armed after preemption reads the same cursor with nothing lost
+ok - sibling polls never preempt each other into a re-arm churn loop
+ok - worker shutdown terminates the active command tree before replacement
+ok - Linux supervision recovers crashes and stops orphaned commands
+ok - pre-execution validation obeys the job timeout
+ok - the worker drains bounded output without changing command results
+ok - the worker refuses symlinked job fields before command execution
+ok - failed shutdown quarantines ownership against replacement workers
+ok - quarantine recovery refuses unverifiable supervisors and ignores reused pids
+ok - a repeatedly signalled shutdown still releases ownership for the next worker
+ok - TERM after ownership loss stops the serving worker
+ok - TERM after ownership loss still stops the active command tree
+ok - a lost owner terminates without stopping the replacement owner's work
+ok - an ousted worker in shutdown leaves the replacement quarantine untouched
+ok - an idle worker sleeps out a second between passes instead of busy-polling
+ok - an idle worker keeps its readiness heartbeat fresh between passes
+ok - an idle worker claims and publishes a staged job within a few seconds
+ok - an idle worker still repairs queue permissions and stops promptly on TERM
+ok - the fork-free state read keeps every malformed-record rejection
+ok - the builtin record reads bound bytes, not characters, in a UTF-8 locale
+ok - the lane scan reads staged records without execs and honors home isolation
+ok - a same-home queued command still preempts the poll through the builtin scan
+ok - the lane scan bounds argv in bytes, not characters, in a UTF-8 locale
+ok - barely healthy worker failures remain bounded by the restart guard
+ALL TESTS PASSED
+FM_TEST_END 2026-10-22T05:44:56Z tests/fm-remote-job.test.sh exit=0 duration_ms=130515 gate_skip=false
+ok - overlapping remote home provisioning serializes through publication and rollback
+ok - competing cleanup of the public home cannot reach a live provisioning clone
+ok - a home that appears mid-provision makes the provision die without touching it
+ok - source repack during cloning preserves a complete home with independent objects
+ok - remote seed rollback preserves serialized competing routes
+ok - unknown readiness preserves its route and brief for reconciliation
+ok - remote seeding checks, repairs, and re-checks readiness, then stops on a remaining gap
+ok - remote seeding proceeds once the repair closes every gap
+ok - remote seeding provisions a supplied origin without touching the primary project tree
+ok - remote provisioning re-validates a supplied origin at the receiving host
+ok - seeding carries bitbucket, self-hosted, and scp-like origins through to the remote clone
+ok - remote seed registers the route and provisions the whole home and project clone on that host
+ok - remote inheritance rejects incomplete and superseded payload generations
+ok - mixed local and remote routes validate without migration
+ok - remote spawn launches on the remote-local backend and records a host-qualified route
+ok - host-local launch refuses policy before dead-endpoint removal and keeps ordinary alive reuse
+ok - legacy and mismatched remote endpoints fail closed before backend access
+ok - non-herdr remote endpoints are refused without changing either route
+ok - remote spawn serializes inheritance through launch publication
+ok - marked send and routed reply complete through the existing parent correlation owner
+ok - partial remote inheritance notifies completed writes before bootstrap convergence
+ok - config push and bootstrap serialize remote inheritance convergence
+WARNING: watcher still down (same stale episode; last beat: 54s ago, grace 300s) - full banner already printed this episode.
+ok - remote inherited config retains and retries a failed live reread nudge
+ok - fleet snapshot projects mixed local and remote structured state
+ok - remote update imports and fast-forwards the persistent home on its configured host
+ok - the remote restart verb delegates to the host-local control plane and refuses before stopping anything
+ok - startup repairs remote readiness before probing without relaunching
+ok - watch liveness: a dead remote secondmate is auto-relaunched on its own host with one wake
+ok - watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over
+ok - the host-local state read steps around a stale shadowing herdr client
+ok - startup reports alive legacy backends without changing their routes
+ok - unreachable no-ledger remote state remains explicit with no local respawn or failover
+ok - remote retirement refuses child work, then removes only its own endpoint while a shared-session sibling survives
+ALL TESTS PASSED
+FM_TEST_END 2026-10-22T05:47:47Z tests/fm-remote-secondmate-lifecycle-e2e.test.sh exit=0 duration_ms=301985 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:47:47Z tests/fm-public-followup.test.sh family=standalone expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T05:47:47Z tests/fm-busy-adapter-wiring.test.sh family=standalone expected_gate_skip=none
+skip: tasks-axi not found
+fm-test-run: gate skip: tests/fm-public-followup.test.sh: tasks-axi not found
+FM_TEST_END 2026-10-22T05:47:47Z tests/fm-public-followup.test.sh exit=0 duration_ms=325 gate_skip=true
+ok - a claude secondmate spawn arms the busy contract the stall gate can see, and Stop does not wake the parent
+ok - a raw claude, pi, pi-signed, or omp secondmate launch writes no busy wiring and classifies unknown
+ok - a claude secondmate's Stop guard records busy on a blocked Stop and idle on an allowed one, in any hook order, and a rewake turn reopens busy
+ok - a claude secondmate whose home guard predates .fm-busy-stop keeps the Stop idle hook
+ok - a claude secondmate spawn leaves an existing settings.local.json untouched
+not ok - pi secondmate turn_end drive failed: node:internal/modules/esm/get_format:219
+  throw new ERR_UNKNOWN_FILE_EXTENSION(ext, filepath);
+        ^
+
+TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts" for /tmp/fm-test-run.DnM3oU/w8/tmp/fm-busy-adapter-wiring.bxS69s/sm-pi/primary/state/sm-pi.pi-ext.ts
+    at Object.getFileProtocolModuleFormat [as file:] (node:internal/modules/esm/get_format:219:9)
+    at defaultGetFormat (node:internal/modules/esm/get_format:245:36)
+    at defaultLoad (node:internal/modules/esm/load:98:16)
+    at ModuleLoader.load (node:internal/modules/esm/loader:815:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:594:31)
+    at #createModuleJob (node:internal/modules/esm/loader:624:36)
+    at #getJobFromResolveResult (node:internal/modules/esm/loader:343:34)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:311:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:664:25) {
+  code: 'ERR_UNKNOWN_FILE_EXTENSION'
+}
+
+Node.js v22.22.1
+FM_TEST_END 2026-10-22T05:48:24Z tests/fm-busy-adapter-wiring.test.sh exit=1 duration_ms=36698 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:48:24Z tests/fm-proc-guard.test.sh family=unclassified expected_gate_skip=none
+...............
+----------------------------------------------------------------------
+Ran 15 tests in 0.064s
+
+OK
+ok - guard real-UID, limit, privacy, and fixed-boundary behavior
+ok - check reads the user's process count and reports its limit or UNKNOWN
+ok - check classifies the count against the limit and --check exits on WARNING or CRITICAL
+ok - threshold and retention customization are refused, as are invalid remaining options
+ok - census names the tree: command counts, parent chains, deepest chains with run samples and leaf, oldest and newest
+ok - census only reads: every measured process is still alive
+ok - a count above the threshold for more than the hold writes one census and reports it
+ok - while the count stays high an open episode keeps watch silent: one census per episode
+ok - an episode closes once the count stays at or below the clear threshold
+ok - a pile-up after the episode closed is reported again
+ok - a count below the threshold writes nothing
+ok - a census that cannot be saved still reports the pile-up, with the reason
+ok - dip case skipped: this host's own process limit leaves no room for a real burst
+ok - a reported pile-up is never killed
+FM_TEST_END 2026-10-22T05:48:40Z tests/fm-proc-guard.test.sh exit=0 duration_ms=16147 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:48:40Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none
+ok - host: parked child-exit sampling uses ordinary half-second sleeps
+ok - report surface: only the branch actor's current turn may report, and only on the tasks its wake names
+ok - report surface: visible late outcomes queue a relay, while silent outcomes remain stored without a wake or note
+node:internal/modules/esm/get_format:219
+  throw new ERR_UNKNOWN_FILE_EXTENSION(ext, filepath);
+        ^
+
+TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts" for /home/ubuntu/fm/.pi/extensions/lib/fm-branch-dispatch.ts
+    at Object.getFileProtocolModuleFormat [as file:] (node:internal/modules/esm/get_format:219:9)
+    at defaultGetFormat (node:internal/modules/esm/get_format:245:36)
+    at defaultLoad (node:internal/modules/esm/load:98:16)
+    at ModuleLoader.load (node:internal/modules/esm/loader:815:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:594:31)
+    at #createModuleJob (node:internal/modules/esm/loader:624:36)
+    at #getJobFromResolveResult (node:internal/modules/esm/loader:343:34)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:311:41)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:664:25) {
+  code: 'ERR_UNKNOWN_FILE_EXTENSION'
+}
+
+Node.js v22.22.1
+not ok - an attended scan with a resolvable row must be safe (missing: 'status=safe')
+--- output ---
+
+FM_TEST_END 2026-10-22T05:48:43Z tests/fm-supervision-host.test.sh exit=1 duration_ms=2900 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:48:43Z tests/fm-contributions.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+ok - only required-captain contributions are rows; other actors are counted
+ok - replaced-head verdict is stale and cannot create a captain requirement
+ok - unchecked ownership is disclosed and cannot prove silence
+ok - newest check with no verdict is distinct from passing and pending
+ok - new maintainer comment wakes once and stays pending until acknowledged
+ok - new maintainer review wakes once and stays pending until acknowledged
+ok - new maintainer inline wakes once and stays pending until acknowledged
+ok - ready-for-pr on a filed issue becomes a planning wake
+ok - a fresh open issue remains measured maintainer triage
+ok - an absent check lane remains missing across repeated observations
+ok - mixed freshness retains measured captain work and discloses the gap
+ok - malformed durable evidence cannot prove silence
+ok - a transient ready-for-pr label wakes and its exact acknowledgement survives replay
+ok - recorded judgment keeps its exact head and is stale immediately on a published replacement
+ok - verdict help and refusal name exactly the actors the command accepts
+ok - a current forge observation refreshes a verdict after a replacement
+ok - an unavailable current head leaves verdict freshness unknown
+ok - away yolo delivery is fleet work without granting merge authority
+actionable: PR https://github.com/o/r/pull/8 is registered but its ready line did not reach the parent channel (rc=3)
+ok - cross-home away yolo delivery is fleet work
+ok - retired ownership persists and unsupported forge remains visibly unmeasured
+ok - unsupported forge coverage is disclosed without inventing fleet work
+ok - held unsupported forge coverage remains unmeasured
+ok - shared contribution signal wakes once while retaining both acknowledgements
+ok - watcher keeps observer diagnostics separate from contribution wakes
+ok - expired child unsupported-forge coverage remains unmeasured
+ok - watcher surfaces one newly durable contribution signal without re-ringing it
+ok - parent consumes measured child coverage and refuses expired child silence
+ok - unreadable pending signals refuse an empty-inbox claim
+ok - record task identity is the directory dirname/basename named
+ok - snapshot and pending create nothing in a home without state
+ok - budget exhausted mid-observation (exhaust) keeps the prior record and stays silent
+ok - budget exhausted mid-observation (hang) keeps the prior record and stays silent
+ok - a genuine forge failure inside the budget still records the error and wakes
+ok - a URL owned by two tasks is observed once and every owner receives the result
+ok - a merged or closed contribution settles once, is not re-read, and never wakes again
+ok - a late owner inherits a terminal observation without a forge read or wake
+ok - a retry converges every owner whose saved row is not terminal, keeping its own acknowledgement state
+ok - an open PR linked from a done task keeps being observed
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - eight 3-second PR reads complete fresh within one 20-second poll cycle
+ok - a read killed at the five-second bound is budget refusal and stays silent
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+ok - the effective budget is cut down to the watcher per-check bound with margin
+ok - generated checks enforce configured and inherited budgets at runtime
+ok - a genuinely unavailable forge records an error and wakes once per failure episode
+ok - a late owner does not restart a shared forge failure episode
+ok - retire stops the unavailable check, leaves rotation and restores complete coverage
+ok - a late owner settled beside a retired final record stays unretired and known
+ok - retire is idempotent and refuses non-captain, unknown, malformed and signal-bearing pairs
+ok - a repeated poll answers unchanged PR reads with 304s and still sees a changed resource
+ok - below the floor the poll keeps the last observation stale with the reset time, once, and resumes after the reset
+ok - a genuine forge failure after a quota-stale episode wakes once
+ok - late owners of the same or another URL inherit quota staleness without restarting its episode
+ok - a successful REST wave below the floor refuses GraphQL and marks every tail owner despite the budget reserve
+ok - a completed issue stays measured while all unmeasured tail owners become quota-stale
+ok - HTTP and passthrough shims preserve backend failures without a successful response
+FM_TEST_END 2026-10-22T05:52:02Z tests/fm-contributions.test.sh exit=0 duration_ms=198701 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:52:02Z tests/fm-fleet-ledger.test.sh family=unclassified expected_gate_skip=none
+not ok - teardown failed: WARNING: watcher still down (same stale episode; last beat: 3s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+REFUSED: cannot determine leaked processes under /tmp/fm-fleet-ledger.j8BBnn/on-lifecycle/wt for on-lifecycle-t1 (lsof is unavailable, so no signal target can be audited); preserving the worktree/tasktmp for manual inspection or retry.
+FM_TEST_END 2026-10-22T05:52:08Z tests/fm-fleet-ledger.test.sh exit=1 duration_ms=6120 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:52:08Z tests/fm-supervision-host-hook.test.sh family=afk expected_gate_skip=none
+not ok - the host must hand its captain outcome to main
+--- /tmp/fm-supervision-host.L6FjT9/hook-successor-closed-before-return/hook.err ---
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: /tmp/fm-supervision-host.L6FjT9/hook-successor-closed-before-return/state/demo.status
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+FM_TEST_END 2026-10-22T05:52:10Z tests/fm-supervision-host-hook.test.sh exit=1 duration_ms=2358 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:52:10Z tests/fm-remote-job-claim-reap.test.sh family=unclassified expected_gate_skip=none
+ok - a due claim sweep over ~17460 dirs does not starve job serving
+FM_TEST_END 2026-10-22T05:52:16Z tests/fm-remote-job-claim-reap.test.sh exit=0 duration_ms=5967 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T05:52:17Z tests/fm-remote-job-claim-retention.test.sh family=unclassified expected_gate_skip=none
+ok - claim sweep preserves numeric-name eligibility and whole-second expiry
+FM_TEST_END 2026-10-22T05:52:17Z tests/fm-remote-job-claim-retention.test.sh exit=0 duration_ms=685 gate_skip=false
+FM_TEST_SUMMARY total=15 failed=4 skipped_gate=1 duration_ms=606540
+FM_TEST_SUMMARY_FAMILY family=afk count=2 duration_ms=5258 failed=2
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=1444 failed=0
+FM_TEST_SUMMARY_FAMILY family=secondmate count=4 duration_ms=493901 failed=0
+FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=1 duration_ms=198701 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=2 duration_ms=37023 failed=1
+FM_TEST_SUMMARY_FAMILY family=unclassified count=4 duration_ms=28919 failed=1
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=32422 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-remote-secondmate-lifecycle-e2e.test.sh duration_ms=301985
+FM_TEST_SLOWEST rank=2 script=tests/fm-contributions.test.sh duration_ms=198701
+FM_TEST_SLOWEST rank=3 script=tests/fm-remote-job.test.sh duration_ms=130515
+FM_TEST_SLOWEST rank=4 script=tests/fm-remote-transport-lanes.test.sh duration_ms=57334
+FM_TEST_SLOWEST rank=5 script=tests/fm-busy-adapter-wiring.test.sh duration_ms=36698
+FM_TEST_SLOWEST rank=6 script=tests/fm-watch-checkpoint.test.sh duration_ms=32422
+FM_TEST_SLOWEST rank=7 script=tests/fm-proc-guard.test.sh duration_ms=16147
+FM_TEST_SLOWEST rank=8 script=tests/fm-fleet-ledger.test.sh duration_ms=6120
+FM_TEST_SLOWEST rank=9 script=tests/fm-remote-job-claim-reap.test.sh duration_ms=5967
+FM_TEST_SLOWEST rank=10 script=tests/fm-remote-job-orphan-reap.test.sh duration_ms=4067
+FM_TEST_SLOWEST rank=11 script=tests/fm-supervision-host.test.sh duration_ms=2900
+FM_TEST_SLOWEST rank=12 script=tests/fm-supervision-host-hook.test.sh duration_ms=2358
+FM_TEST_SLOWEST rank=13 script=tests/fm-pi-primary-types.test.sh duration_ms=1444
+FM_TEST_SLOWEST rank=14 script=tests/fm-remote-job-claim-retention.test.sh duration_ms=685
+FM_TEST_SLOWEST rank=15 script=tests/fm-public-followup.test.sh duration_ms=325
+fm-test-run: wrote timing artifact: /home/ubuntu/h/timing.json
+exit=1

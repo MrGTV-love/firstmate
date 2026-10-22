@@ -1,0 +1,53 @@
+host: Ubuntu 26.04.1 LTS mkdir=/usr/lib/cargo/bin/coreutils/mkdir
+raw-mkdir trial  1: 1 successful owners
+raw-mkdir trial  2: 2 successful owners
+raw-mkdir trial  3: 1 successful owners
+raw-mkdir trial  4: 7 successful owners
+raw-mkdir trial  5: 3 successful owners
+raw-mkdir trial  6: 4 successful owners
+raw-mkdir trial  7: 10 successful owners
+raw-mkdir trial  8: 4 successful owners
+raw-mkdir trial  9: 1 successful owners
+raw-mkdir trial 10: 4 successful owners
+raw-mkdir trial 11: 7 successful owners
+raw-mkdir trial 12: 4 successful owners
+raw-mkdir trial 13: 1 successful owners
+raw-mkdir trial 14: 7 successful owners
+raw-mkdir trial 15: 3 successful owners
+raw-mkdir trial 16: 4 successful owners
+raw-mkdir trial 17: 3 successful owners
+raw-mkdir trial 18: 7 successful owners
+raw-mkdir trial 19: 4 successful owners
+raw-mkdir trial 20: 9 successful owners
+raw-mkdir trial 21: 3 successful owners
+raw-mkdir trial 22: 5 successful owners
+raw-mkdir trial 23: 3 successful owners
+raw-mkdir trial 24: 4 successful owners
+raw-mkdir trial 25: 3 successful owners
+raw-mkdir: trials with >1 owner: 21/25
+next_seq trial 1: unique 1..20
+next_seq trial 2: unique 1..20
+next_seq trial 3: unique 1..20
+next_seq trial 4: unique 1..20
+next_seq trial 5: unique 1..20
+next_seq trial 6: unique 1..20
+next_seq trial 7: unique 1..20
+next_seq trial 8: unique 1..20
+next_seq trial 9: unique 1..20
+next_seq trial 10: unique 1..20
+next_seq trial 11: unique 1..20
+next_seq trial 12: unique 1..20
+next_seq trial 13: unique 1..20
+next_seq trial 14: unique 1..20
+next_seq trial 15: unique 1..20
+next_seq trial 16: unique 1..20
+next_seq trial 17: unique 1..20
+next_seq trial 18: unique 1..20
+next_seq trial 19: unique 1..20
+next_seq trial 20: unique 1..20
+next_seq trial 21: unique 1..20
+next_seq trial 22: unique 1..20
+next_seq trial 23: unique 1..20
+next_seq trial 24: unique 1..20
+next_seq trial 25: unique 1..20
+next_seq: bad trials: 0/25
