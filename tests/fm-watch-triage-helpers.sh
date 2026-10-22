@@ -7922,6 +7922,15 @@ IFS= read -r identity < "${1%.status}.identity" || exit 1
 printf '%s' "$identity"
 SH
   chmod +x "$dir/identity-reader"
+  # A change that adds no bytes (a new device, a mode) wakes only while the crew
+  # is not provably working. Fix that verdict here: an earlier test in this shell
+  # may leave FM_FAKE_CREW_STATE exported as working, and the fake would then
+  # absorb the wake these cases assert on, or hide the one they assert is absent.
+  cat > "$dir/fakebin/fm-crew-state.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' 'state: unknown · source: none · fixed by the identity fixture'
+SH
+  chmod +x "$dir/fakebin/fm-crew-state.sh"
   printf '%s' "$dir"
 }
 
