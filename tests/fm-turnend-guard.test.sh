@@ -1255,22 +1255,30 @@ function invoke(registration, home, context, payload) {
   });
   if (context === 'legacy') env.GROK_AGENT = '1';
   if (context === 'session-metadata') env.GROK_SESSION_ID = 'native-session-metadata';
-  // Inert hooks exit without reading stdin, and a pipe write to an exited child fails with EPIPE
-  // on a loaded host, so the payload is a file the child may leave unread.
-  const stdinPath = path.join(home, 'pane-home', 'hook-input.json');
-  fs.writeFileSync(stdinPath, JSON.stringify(payload));
-  const stdinFd = fs.openSync(stdinPath, 'r');
+  const label = `${registration.event}/${registration.target}/home=${home}/context=${context}/command=${registration.command}`;
   let result;
   try {
-    result = spawnSync('/bin/bash', ['-c', registration.command], {
-      cwd: home, env, stdio: [stdinFd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,
-    });
-  } finally {
-    fs.closeSync(stdinFd);
+    // Inert hooks exit without reading stdin, and a pipe write to an exited child fails with EPIPE
+    // on a loaded host, so the payload is a file the child may leave unread.
+    const stdinPath = path.join(home, 'pane-home', 'hook-input.json');
+    fs.writeFileSync(stdinPath, JSON.stringify(payload));
+    const stdinFd = fs.openSync(stdinPath, 'r');
+    try {
+      result = spawnSync('/bin/bash', ['-c', registration.command], {
+        cwd: home, env, stdio: [stdinFd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,
+      });
+    } finally {
+      fs.closeSync(stdinFd);
+    }
+    assert.ifError(result.error);
+    assert.equal(result.signal, null, `${label}: did not settle`);
+    return result;
+  } catch (error) {
+    const output = result ? JSON.stringify({
+      status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr,
+    }) : 'child did not start';
+    throw new Error(`${label}: ${error.message}\n${output}`, { cause: error });
   }
-  assert.ifError(result.error);
-  assert.equal(result.signal, null, `${registration.target} did not settle`);
-  return result;
 }
 function silent(result, label) {
   assert.equal(result.status, 0, `${label}: ${result.stderr}`);
@@ -1400,6 +1408,20 @@ if (mode === 'contexts') {
       assert.deepEqual(snapshot(primary), before, `${registration.target}: ordinary hook changed state`);
     }
   }
+} else if (mode === 'large-exclusions') {
+  const registration = registrations.find(r => r.target === 'fm-turnend-guard.sh');
+  // Larger than the stdin pipe buffer: an excluded hook exits without reading it.
+  const payload = { ...payloadFor(registration), prompt: 'x'.repeat(1024 * 1024) };
+  for (const home of [primary, task]) {
+    for (const context of ['modern', 'legacy']) {
+      reset(home, registration.target);
+      const before = snapshot(home);
+      const label = `${registration.event}/${registration.target}/${home}/${context}/large-payload`;
+      silent(invoke(registration, home, context, payload), label);
+      assert.deepEqual(snapshot(home), before, `${label}: excluded hook changed state`);
+      console.log(`large-payload Grok exclusion: ${label}`);
+    }
+  }
 } else if (mode === 'tools') {
   assert.deepEqual(settings.permissions?.deny ?? [], [], 'tracked permissions deny helper/session tools');
   const pretool = registrations.filter(r => r.event === 'PreToolUse');
@@ -1435,6 +1457,11 @@ JS
 test_tracked_claude_entries_inert_under_grok() {
   claude_config_hook_behavior contexts
   pass "tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion"
+}
+
+test_claude_large_payload_grok_exclusions() {
+  claude_config_hook_behavior large-exclusions
+  pass "tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions"
 }
 
 test_claude_helper_tools_are_not_intercepted() {
@@ -2930,6 +2957,7 @@ test_grok_adapter_native_true_allows_without_resume
 test_grok_adapter_snake_case_native_and_camel_precedence
 test_grok_adapter_invalid_inputs_start_neither_path
 test_grok_adapter_missing_jq_and_no_supervision_allow
+test_claude_large_payload_grok_exclusions
 test_tracked_claude_entries_inert_under_grok
 test_claude_helper_tools_are_not_intercepted
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root
