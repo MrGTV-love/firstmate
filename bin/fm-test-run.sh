@@ -2185,6 +2185,12 @@ families_for_changed_path() {
       families_for_test_reference wake-helpers.sh fm-supervision-host-helpers.sh fm-watch-triage-helpers.sh \
         || printf '%s\n' "__unmapped__:$path"
       ;;
+    tests/git-lock-helpers.sh)
+      # tests/fm-teardown-helpers.sh sources this helper.
+      # The reference scan reads only tests/*.test.sh, so name the module too.
+      families_for_test_reference git-lock-helpers.sh fm-teardown-helpers.sh \
+        || printf '%s\n' "__unmapped__:$path"
+      ;;
     tests/lib.sh|tests/*-helpers.sh|tests/fixtures.sh|tests/*-fixture.sh)
       # Shared top-level test files, selected by the suites that name them.
       # Must stay below the tests/fixtures/*/* arm: a case glob's * spans /, so

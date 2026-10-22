@@ -507,8 +507,12 @@ test_teardown_groups_register_each_case_once() {
 # shared helper change selects all three, and the pr-forge family still owns the
 # landing and cleanup paths the former single file carried.
 test_teardown_groups_share_helper_and_stay_selectable() {
-  local tmp repo listed listed_alone family script group
+  local tmp repo listed listed_alone family script group helper lock_helper
   local -a groups=(fm-teardown fm-teardown-pool fm-teardown-cleanup)
+  helper=fm-teardown-helpers
+  helper=$helper.sh
+  lock_helper=git-lock-helpers
+  lock_helper=$lock_helper.sh
   family=$("$RUNNER" --list --family pr-forge)
   for group in "${groups[@]}"; do
     script=$group.test.sh
@@ -520,13 +524,14 @@ test_teardown_groups_share_helper_and_stay_selectable() {
   repo="$tmp/repo"
   init_changed_fixture_repo "$repo"
   for group in "${groups[@]}"; do
-    printf '#!/usr/bin/env bash\n# fm-teardown-helpers.sh\n' >"$repo/tests/$group.test.sh"
+    printf '#!/usr/bin/env bash\n# %s\n' "$helper" >"$repo/tests/$group.test.sh"
     chmod +x "$repo/tests/$group.test.sh"
   done
-  printf '# helpers\n' >"$repo/tests/fm-teardown-helpers.sh"
+  printf '# helpers\n# %s\n' "$lock_helper" >"$repo/tests/$helper"
+  printf '# lock helpers\n' >"$repo/tests/$lock_helper"
   git -C "$repo" add tests
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm teardown-selection-fixture
-  printf '\n' >>"$repo/tests/fm-teardown-helpers.sh"
+  printf '\n' >>"$repo/tests/$helper"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
     || fail "the teardown helper change failed selection"
   for group in "${groups[@]}"; do
@@ -539,8 +544,19 @@ test_teardown_groups_share_helper_and_stay_selectable() {
   expected=$(cd "$repo" && bin/fm-test-run.sh --list --family pr-forge | LC_ALL=C sort)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "the teardown helper change must select exactly the pr-forge family; got: $(printf '%s ' $listed)"
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm teardown-helper-change
+  printf '\n' >>"$repo/tests/$lock_helper"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "the git lock helper change failed selection"
+  for group in "${groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$listed" "tests/$script" "the git lock helper change must select $script through the teardown helper"
+  done
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "the git lock helper change must select exactly the pr-forge family; got: $(printf '%s ' $listed)"
   rm -rf "$tmp"
-  pass "every teardown group stays independently selectable, the shared helper selects its pr-forge family, and pr-forge keeps them"
+  pass "every teardown group stays independently selectable, the shared and git lock helpers select its pr-forge family, and pr-forge keeps them"
 }
 
 test_changed_task_copy_lib_selects_retained_and_secondmate() {
