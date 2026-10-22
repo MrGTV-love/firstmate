@@ -1,0 +1,32 @@
+10,31c10,15
+<   const label = `${registration.event}/${registration.target}/home=${home}/context=${context}/command=${registration.command}`;
+<   const inputPath = path.join(home, 'hook-input.json');
+<   let input, result;
+<   try {
+<     // Excluded registrations may exit before reading: stdin must not be a pipe.
+<     fs.writeFileSync(inputPath, JSON.stringify(payload));
+<     input = fs.openSync(inputPath, 'r');
+<     result = spawnSync('/bin/bash', ['-c', registration.command], {
+<       cwd: home, env, stdio: [input, 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,
+<     });
+<     assert.ifError(result.error);
+<     assert.equal(result.signal, null, `${label}: did not settle`);
+<     return result;
+<   } catch (error) {
+<     const output = result ? JSON.stringify({
+<       status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr,
+<     }) : 'child did not start';
+<     throw new Error(`${label}: ${error.message}\n${output}`, { cause: error });
+<   } finally {
+<     if (input !== undefined) fs.closeSync(input);
+<     fs.rmSync(inputPath, { force: true });
+<   }
+---
+>   const result = spawnSync('/bin/bash', ['-c', registration.command], {
+>     cwd: home, env, input: JSON.stringify(payload), encoding: 'utf8', timeout: 15000,
+>   });
+>   assert.ifError(result.error);
+>   assert.equal(result.signal, null, `${registration.target} did not settle`);
+>   return result;
+41a26
+>   assert.equal(output.hookSpecificOutput.hookEventName, 'PreToolUse');

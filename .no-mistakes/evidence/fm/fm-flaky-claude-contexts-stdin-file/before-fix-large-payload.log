@@ -1,0 +1,47 @@
+warning: re-init: ignored --initial-branch=main
+node:assert:818
+    throw newErr;
+    ^
+
+AssertionError [ERR_ASSERTION]: ifError got unwanted exception: spawnSync /bin/bash EPIPE
+    at invoke ([stdin]:85:10)
+    at Object.spawnSync (node:internal/child_process:1175:20)
+    at spawnSync (node:child_process:974:24)
+    at invoke ([stdin]:82:18)
+    at [stdin]:224:14
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:485:12
+    at [stdin]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:483:60)
+    at evalFunction (node:internal/process/execution:317:30)
+    at evalTypeScript (node:internal/process/execution:329:3) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: Error: spawnSync /bin/bash EPIPE
+      at Object.spawnSync (node:internal/child_process:1175:20)
+      at spawnSync (node:child_process:974:24)
+      at invoke ([stdin]:82:18)
+      at [stdin]:224:14
+      at runScriptInThisContext (node:internal/vm:219:10)
+      at node:internal/process/execution:485:12
+      at [stdin]-wrapper:6:24
+      at runScriptInContext (node:internal/process/execution:483:60)
+      at evalFunction (node:internal/process/execution:317:30)
+      at evalTypeScript (node:internal/process/execution:329:3) {
+    errno: -32,
+    code: 'EPIPE',
+    syscall: 'spawnSync /bin/bash',
+    path: '/bin/bash',
+    spawnargs: [
+      '-c',
+      '[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-turnend-guard.sh --claude'
+    ]
+  },
+  expected: null,
+  operator: 'ifError',
+  diff: 'simple'
+}
+
+Node.js v26.11.1
+not ok - tracked Claude configuration failed its large-exclusions behavioral contract
+exit=1
