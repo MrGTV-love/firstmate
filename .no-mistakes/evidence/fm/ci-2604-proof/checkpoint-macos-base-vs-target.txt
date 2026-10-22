@@ -1,0 +1,10 @@
+=== base on Darwin  perl=/usr/bin/perl timeout=/opt/homebrew/bin/timeout
+code root: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.HhHllaxdqw/code root
+[1 quiet, spaced root+home] rc=124 elapsed=2s stdout=checkpoint: no actionable wake within 2s| stderr= lock=released
+[2 caller ignores INT] rc=124 elapsed=4s stdout=checkpoint: no actionable wake within 2s| stderr= lock=released
+[3 harness cancels checkpoint group with TERM] checkpoint_rc=143 watcher_pid=24235 watcher_alive_after=yes settle=27s lock=HELD(pid 24235)
+=== target on Darwin  perl=/usr/bin/perl timeout=/opt/homebrew/bin/timeout
+code root: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.m5SUWUab1H/code root
+[1 quiet, spaced root+home] rc=124 elapsed=3s stdout=checkpoint: no actionable wake within 2s| stderr= lock=released
+[2 caller ignores INT] rc=124 elapsed=4s stdout=checkpoint: no actionable wake within 2s| stderr= lock=released
+[3 harness cancels checkpoint group with TERM] checkpoint_rc=143 watcher_pid=17069 watcher_alive_after=no settle=1s lock=released

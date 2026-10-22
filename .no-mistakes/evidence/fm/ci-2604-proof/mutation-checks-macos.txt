@@ -1,0 +1,8 @@
+1
+[mutation: plain exec @ARGV (space fix removed)] suite rc=1; not ok - watch lock pid survived quiet checkpoint timeout
+1
+[mutation: no INT/TERM/HUP forwarding] suite rc=1; not ok - the watcher outlived its cancelled checkpoint
+0
+[mutation: no INT/TERM reset in child] suite rc=1; not ok - the bound must deliver INT despite its caller ignoring it (missing: 'interrupted')
+0
+[mutation: trust mkdir status again] transport-lanes rc=1; not ok - a platform mkdir that reports success for an existing claim duplicated a sequence: 1

@@ -1,0 +1,6 @@
+Linux ea10c67427cd 7.0.14-linuxkit #1 SMP PREEMPT Sun Sep 20 16:14:09 UTC 2026 aarch64 GNU/Linux
+mkdir (uutils coreutils) 0.10.0
+root=/home/tester/fm-base callers=40 rounds=20 duplicate_numbers=98 failed_callers=0
+reaper rc=0 claims_before=35 owner_markers_before=0 claims_after=0
+root=/home/tester/fm callers=40 rounds=20 duplicate_numbers=0 failed_callers=0
+reaper rc=0 claims_before=40 owner_markers_before=40 claims_after=0

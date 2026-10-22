@@ -1,0 +1,10 @@
+=== fm-base on Linux mkdir (uutils coreutils) 0.10.0 perl=/usr/bin/perl timeout=/usr/bin/timeout
+code root: /tmp/tmp.FOGJnVHb3f/code root
+[1 quiet, spaced root+home] rc=137 elapsed=2s stdout= stderr= lock=HELD(pid 40)
+[2 caller ignores INT] rc=137 elapsed=8s stdout= stderr= lock=HELD(pid 848)
+[3 harness cancels checkpoint group with TERM] checkpoint_rc=143 watcher_pid=2439 watcher_alive_after=yes settle=11s lock=HELD(pid 2439)
+=== fm on Linux mkdir (uutils coreutils) 0.10.0 perl=/usr/bin/perl timeout=/usr/bin/timeout
+code root: /tmp/tmp.wFLuTO7Ivw/code root
+[1 quiet, spaced root+home] rc=124 elapsed=2s stdout=checkpoint: no actionable wake within 2s| stderr= lock=released
+[2 caller ignores INT] rc=124 elapsed=3s stdout=checkpoint: no actionable wake within 2s| stderr= lock=released
+[3 harness cancels checkpoint group with TERM] checkpoint_rc=143 watcher_pid=6616 watcher_alive_after=no settle=0s lock=released

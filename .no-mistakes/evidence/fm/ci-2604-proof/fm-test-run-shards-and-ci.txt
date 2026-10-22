@@ -1,0 +1,46 @@
+$ bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=331 parallel=29 parallel_max_ms=1628090 parallel_imbalance_ms=52 parallel_unhinted=0 serial=284 serial_shards=18 serial_unhinted=4 serial_max_ms=1433371 serial_budget_ms=1500000 herdr=18
+rc=0
+
+$ bin/fm-test-run.sh --list --lane portable-serial-1of15  (stale count)
+fm-test-run: lane 'portable-serial-1of15' asks for 15 portable serial shards but this runner is configured for 18 (see --list-lanes)
+rc=
+
+$ bin/fm-test-run.sh --list --lane portable-serial-19of18  (out of range)
+fm-test-run: lane 'portable-serial-19of18' shard index is outside 1..18 (see --list-lanes)
+rc=
+
+# shard partition: each of 1..18 non-empty, disjoint, union == portable-serial
+shard  1: 1 scripts
+shard  2: 1 scripts
+shard  3: 1 scripts
+shard  4: 17 scripts
+shard  5: 18 scripts
+shard  6: 18 scripts
+shard  7: 19 scripts
+shard  8: 19 scripts
+shard  9: 19 scripts
+shard 10: 20 scripts
+shard 11: 19 scripts
+shard 12: 18 scripts
+shard 13: 18 scripts
+shard 14: 18 scripts
+shard 15: 20 scripts
+shard 16: 19 scripts
+shard 17: 19 scripts
+shard 18: 20 scripts
+union=284 unique=284 portable-serial=284
+partition == portable-serial: yes
+tests/fm-remote-secondmate-lifecycle-e2e.test.sh -> serial 4
+tests/fm-watch-triage-waits.test.sh -> serial 1
+tests/fm-watch-checkpoint.test.sh -> serial 5
+tests/fm-remote-transport-lanes.test.sh -> serial 17
+tests/fm-proc-guard.test.sh -> serial 17
+
+# ci.yml parsed with a YAML loader
+serial matrix shards: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] count: 18 runs-on: ubuntu-latest
+tests-portable-parallel-1 -> Install Pi and TypeScript for the Pi extension tests | npm install line: ['npm install -g @earendil-works/pi-coding-agent typescript']
+tests-portable-serial -> Install Pi for the Pi extension tests | npm install line: ['npm install -g @earendil-works/pi-coding-agent']
+portable-serial-1of15 refused rc=2
+portable-serial-19of18 refused rc=2
+tests/fm-pi-primary-types.test.sh is in lane portable-parallel-1

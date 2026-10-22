@@ -1,0 +1,5 @@
+=== Darwin /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5GGF64BXSRAM4GXWSBRAGEE
+[grace-1 short cleanup] ENGINE_GRACE=1 host_cleanup=25s -> cleanup FINISHED after 25s (host released its records); checkpoint_rc=143
+[grace-1 long cleanup] ENGINE_GRACE=1 host_cleanup=40s -> cleanup CUT SHORT: host KILLed after 32s, records not released; checkpoint_rc=143
+[default grace long cleanup] ENGINE_GRACE=default(30) host_cleanup=40s -> cleanup FINISHED after 40s (host released its records); checkpoint_rc=143
+[host killed by SIGKILL before bound] checkpoint_rc=137 stdout= stderr=
