@@ -1,0 +1,109 @@
+name: Machine-checked DoD
+
+# Dispatch uses a frozen snapshot from the task home, not a mutable file on the
+# PR branch. Run inputs and uploaded artifacts are GitHub's durable CI record.
+# Dispatch only on the default branch, supplying the PR's exact current head.
+# The merge checker binds the artifact's DoD digest to the dispatch-time record.
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        type: string
+      head:
+        description: Exact PR head commit
+        required: true
+        type: string
+      dod:
+        description: Frozen task DoD text
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dod-evidence-${{ inputs.pr }}-${{ inputs.head }}
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    name: Machine-checked DoD evidence
+    runs-on: ubuntu-latest
+    # Normal tier: docs/fm-test-portable-shards.md "Timeouts".
+    timeout-minutes: 60
+    steps:
+      - name: Resolve exact PR commits
+        id: pr
+        uses: actions/github-script@v8
+        env:
+          PR_NUMBER: ${{ inputs.pr }}
+          EXPECTED_HEAD: ${{ inputs.head }}
+        with:
+          script: |
+            if (context.ref !== `refs/heads/${context.payload.repository.default_branch}`) {
+              throw new Error('Dispatch the DoD workflow on the default branch, not PR code');
+            }
+            if (!/^[1-9][0-9]*$/.test(process.env.PR_NUMBER)) {
+              throw new Error('pr must be a positive pull request number');
+            }
+            const {data: pr} = await github.rest.pulls.get({
+              ...context.repo, pull_number: Number(process.env.PR_NUMBER)
+            });
+            if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_HEAD) {
+              throw new Error('PR is closed or head changed; dispatch with the current exact head');
+            }
+            core.setOutput('head', pr.head.sha);
+            core.setOutput('base', pr.base.sha);
+      - name: Load checker from the workflow commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Fetch exact candidate history
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Record frozen input
+        env:
+          FROZEN_DOD: ${{ inputs.dod }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          Path(os.environ['RUNNER_TEMP'], 'dod.md').write_text(os.environ['FROZEN_DOD'])
+          PY
+      - name: Run gate commands and fail-first proof
+        env:
+          DOD_BASE: ${{ steps.pr.outputs.base }}
+          DOD_HEAD: ${{ steps.pr.outputs.head }}
+        run: |
+          python3 trusted/bin/fm-dod-check.py run \
+            --dod "$RUNNER_TEMP/dod.md" --repo candidate \
+            --base "$DOD_BASE" --head "$DOD_HEAD" \
+            --output "$RUNNER_TEMP/dod-evidence"
+      - name: Flag weakened tests
+        if: ${{ always() && steps.pr.outcome == 'success' }}
+        env:
+          DOD_BASE: ${{ steps.pr.outputs.base }}
+          DOD_HEAD: ${{ steps.pr.outputs.head }}
+        run: |
+          python3 trusted/bin/fm-test-weakening.py --repo candidate \
+            --base "$DOD_BASE" --head "$DOD_HEAD" \
+            --output "$RUNNER_TEMP/weakening.json"
+      - name: Upload machine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fm-dod-evidence-${{ inputs.head }}
+          path: |
+            ${{ runner.temp }}/dod-evidence/
+            ${{ runner.temp }}/weakening.json
+            ${{ runner.temp }}/dod.md
+          if-no-files-found: error

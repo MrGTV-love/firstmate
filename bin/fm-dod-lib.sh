@@ -300,7 +300,11 @@ If the criteria live in a finished file instead, an unfenced line `DoD file: <ab
 Capability in plain words: {DOD_CAPABILITY}
 
 ### Mandatory items
-Each item has Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader).
+Each item starts with `- **ID** outcome` and has Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader).
+Items under Mandatory items, or marked `*(mandatory)*`, require Verify.
+A mandatory item with `Authority: gate` also requires a `  - Check: <exact single-line bash command>` sub-bullet, optionally wrapping the command in backticks.
+Name regression scripts as `tests/<name>.test.sh` in the item's fields so CI can run each new or changed named test against base and head.
+`bin/fm-dod-check.py --help` owns the checker interface and `bin/fm-test-weakening.py --help` owns the diff flags that require reviewer rulings.
 {DOD_MANDATORY_ITEMS}
 
 ### Supporting items
