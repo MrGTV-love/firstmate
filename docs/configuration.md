@@ -1788,7 +1788,7 @@ Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each
 - **Spawn.** `fm-spawn.sh` refuses to launch a stale model: it exits 1 with the stale line and the newer model to use instead.
   Only the captain may run a superseded model, and only for the task where the captain named that exact model.
   The caller passes `--captain-model-pin <model-id>`, which must equal the requested model, so a pin can never admit a different pick; a mismatched pin is its own error.
-  An admitted stale model prints `warning: stale model admitted by captain pin - ...` and is recorded as `model_stale=` in the task record, which `fm-crew-state.sh` repeats as a `model-stale:` component on that task's state line, so the exception stays visible after the launch output is gone.
+  An admitted stale model prints `warning: stale model admitted by captain pin - ...` and is recorded as `model_stale=` in the task record with an `(admitted by captain pin)` marker appended to the stale line, which `fm-crew-state.sh` repeats as a `model-stale:` component on that task's state line, so the authorized exception stays visible after the launch output is gone.
   The check reads the catalog from the spawn's own environment, under the worker account pin when one is set, so a pinned Claude account answers from its own catalog.
   It reads there even where the model-index check treats the worker account context as unavailable, such as an unpinned launch.
   It is skipped for a raw launch and for a Claude custom launcher.
