@@ -96,20 +96,11 @@ test_claude_effects() {
   denied "$out" || fail "destructive shell command was not denied"
   claude_hook "$(pre Bash '{"command":"ls -la"}')"
   [ -z "$out" ] || fail "read-only shell command did not proceed"
-  [ "$(requests)" -eq $((before + 1)) ] || fail "read-only shell command reached the provider"
-  for command in 'ps aux | grep firstmate' 'git status --short' 'git log --oneline -3' 'find . -name "*.ts"'; do
-    claude_hook "$(pre Bash "$(jq -cn --arg c "$command" '{command:$c}')")"
-    [ -z "$out" ] || fail "read-only shell command was refused: $command"
-  done
-  [ "$(requests)" -eq $((before + 1)) ] || fail "a read-only shell command reached the provider"
-  claude_hook "$(pre Bash '{"command":"ls; rm -rf build"}')"
-  denied "$out" || fail "a sequenced command was admitted as read-only"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "the sequenced command skipped judgment"
+  [ "$(requests)" -eq $((before + 2)) ] || fail "shell calls did not receive one judgment each"
   printf 'fm-lab-home v1\n' > "$HOME_DIR/.fm-lab-home"
-  before=$(requests)
   claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
-  [ -z "$out" ] || fail "an approved lab teardown was refused"
-  [ "$(requests)" -eq "$before" ] || fail "a lab home teardown reached the provider"
+  denied "$out" || fail "a healthy judge admitted a lab teardown it refused"
+  [ "$(requests)" -eq $((before + 3)) ] || fail "a lab shell command skipped a healthy judge"
   rm "$HOME_DIR/.fm-lab-home"
   before=$(requests)
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
@@ -148,6 +139,29 @@ test_outages_and_scope() {
   rm "$HOME_DIR/config/dispatch-never-send"
   claude_hook "$(pre Bash '{"command":"deploy"}')"
   denied "$out" || fail "missing credentials allowed active execution"
+  for command in 'ls -la' 'ps aux | grep firstmate' 'git status --short' 'git --no-pager log --oneline -3' 'find . -name x'; do
+    claude_hook "$(pre Bash "$(jq -cn --arg c "$command" '{command:$c}')")"
+    [ -z "$out" ] || fail "an outage refused a read-only shell command: $command"
+  done
+  jq -se '.[-1] | .branch == "read_only" and .decision == "allow" and .error_type == "CredentialUnavailableError"' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "read-only outage admission was not audited"
+  for command in 'sort -o x y' "find . -'delete'" 'find . "-exec" rm {} +' 'find . -de\lete' 'find . -fprint0 x' 'git branch -D main' \
+    'git reflog expire --expire=now --all' 'git --git-dir=/tmp/x/.git status' 'git diff --output=x' 'git log --out=x' \
+    'rg --pre rm x .' 'uniq a b' 'date -s now' 'ls; rm -rf build' 'ls | xargs rm' 'cat $HOME' 'find . -{delete,x}' 'rm -rf build'; do
+    claude_hook "$(pre Bash "$(jq -cn --arg c "$command" '{command:$c}')")"
+    denied "$out" || fail "an outage admitted an unproven shell command: $command"
+  done
+  printf 'fm-lab-home v1\n' > "$HOME_DIR/.fm-lab-home"
+  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  [ -z "$out" ] || fail "an outage refused an approved lab teardown"
+  jq -se '.[-1] | .branch == "lab" and .decision == "allow" and .error_type == "CredentialUnavailableError"' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "lab outage admission was not audited"
+  FM_STATE_OVERRIDE="$TMP_ROOT/elsewhere" claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  denied "$out" || fail "an outage admitted a lab teardown split by an override"
+  claude_hook "$(pre Write "$(jq -cn --arg path "$WT/src/lab.ts" '{file_path:$path,content:"plain text"}')")"
+  denied "$out" || fail "an outage admitted a lab write"
+  printf 'fm-lab-home v1-forged\n' > "$HOME_DIR/.fm-lab-home"
+  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  denied "$out" || fail "an outage admitted a teardown without the lab token"
+  rm "$HOME_DIR/.fm-lab-home"
   [ "$(requests)" -eq "$before" ] || fail "privacy or missing credentials sent a request"
   mv "$HOME_DIR/env.off" "$HOME_DIR/.env"
   printf 'OPENROUTER_API_KEY=fake-openrouter\n' >> "$HOME_DIR/.env"
@@ -1010,7 +1024,9 @@ assert.match(blocked.reason, /credential/);
 assert.doesNotMatch(blocked.reason, /Review required/);
 
 // The same holds for shell commands.
-assert.equal(await shell('echo ' + 'a '.repeat(20000)), undefined);
+before = sent().length;
+assert.equal(await shell('deploy ' + 'a '.repeat(20000)), undefined);
+assert.ok(sent().length - before > 1, 'a large benign shell command is screened in several pieces');
 blocked = await shell('echo ' + 'a '.repeat(20000) + '\nrm -rf build');
 assert.equal(blocked.block, true);
 assert.match(blocked.reason, /\(part \d+ of \d+\)/);

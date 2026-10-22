@@ -2359,11 +2359,6 @@ This is an operator-only migration, not an automated retrofit; isolated verifica
 Questions and numeric policy are code-owned:
 
 - Shell screening keeps the independent effect Choice and destructive-intent Noul and their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts).
-- A shell command proven read-only never reaches the judge.
-  [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns the program allowlist, the requirement that every pipeline segment be read-only, and the disqualifying operators: redirection, substitution, sequencing and background.
-  Anything not proven read-only is judged as before, so a directory listing or process check can never be refused by an unavailable review service.
-- A home carrying the `.fm-lab-home` token written by [`bin/fm-lab-home.sh`](../bin/fm-lab-home.sh) is a disposable lab, so its tool calls are admitted without a request and an approved lab teardown cannot be refused by an unavailable judge.
-  The marker grants nothing in a real home, and the deterministic outside-root and credential checks for writes run before this admission.
 - Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
 - Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
   The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
@@ -2465,12 +2460,19 @@ That setting is the pre-tool deadline, 30 seconds by default, and omp refuses th
 [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) raises it to 330 seconds, above the 300-second pre-tool budget, for worker launches through the existing per-launch `--config` overlay; no global or user omp setting is changed.
 A raw launch that omits the overlay keeps the 30-second default, so a pre-tool judgment slower than that is refused by the host rather than reviewed; that failure stays closed.
 Each call obtains its own bounded judgment; no outcome of one call is carried to another, so a slow or failed judgment never refuses a later call by itself.
-This is not sustained-outage permission to execute shell commands or write files.
+This is not sustained-outage permission to execute shell commands or write files beyond the read-only and lab shell admissions below.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
-Two effect-free admissions are not exceptions to that rule: a shell command proven read-only requests no judgment, and a marked disposable lab home admits its tool calls without one.
-Neither admits an unproven command or a write in a real home, so an unavailable review service still refuses everything it would have judged.
+A healthy judge still screens every shell command and write; two narrow shell-only admissions apply only when the judgment could not run, and never to a size refusal:
+
+- A shell command proven read-only is admitted with branch `read_only`.
+  [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns the program allowlist, the read-only git subcommands, the requirement that every pipeline segment be read-only, and the disqualifiers: redirection, substitution, expansion, quoting, sequencing, background, git options before the subcommand other than `--no-pager`, any `--output` option, and the writing or executing `find` actions.
+  Anything not proven read-only is refused on an outage as before.
+- A shell command in a home carrying the `.fm-lab-home` token written by [`bin/fm-lab-home.sh`](../bin/fm-lab-home.sh) is admitted with branch `lab` when every `FM_*_OVERRIDE` is empty, the same rule as `fm_gate_lab_permitted` in [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh), so an approved lab teardown is not refused by an unavailable judge.
+  Writes and edits in a lab home are screened and refused exactly as in a real home.
+
+Both admissions keep the failed judgment's error type in their audit row.
 Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
 On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude retains its existing advisory-only path.
 Clear scores at or below 0.20 pass without an advisory.
