@@ -293,6 +293,9 @@ publish_healthy_watcher_identity() { # <state> <home> <watch-script>
 }
 
 remote_env() {
+  # Keep this lifecycle fixture's inputs explicit: unrelated production defaults
+  # must not add remote jobs before its bounded inheritance/launch barriers.
+  FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json crew-harness backend' \
   FM_HOME="$PARENT" \
   FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
   FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
