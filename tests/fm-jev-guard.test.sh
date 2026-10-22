@@ -144,6 +144,8 @@ test_outages_and_scope() {
     [ -z "$out" ] || fail "an outage refused a read-only shell command: $command"
   done
   jq -se '.[-1] | .branch == "read_only" and .decision == "allow" and .error_type == "CredentialUnavailableError"' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "read-only outage admission was not audited"
+  # The fixtures stay literal on purpose so the classifier sees the exact characters.
+  # shellcheck disable=SC2016
   for command in 'sort -o x y' "find . -'delete'" 'find . "-exec" rm {} +' 'find . -de\lete' 'find . -fprint0 x' 'git branch -D main' \
     'git reflog expire --expire=now --all' 'git --git-dir=/tmp/x/.git status' 'git diff --output=x' 'git log --out=x' \
     'rg --pre rm x .' 'uniq a b' 'date -s now' 'ls; rm -rf build' 'ls | xargs rm' 'cat $HOME' 'find . -{delete,x}' 'rm -rf build'; do
