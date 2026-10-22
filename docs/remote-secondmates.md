@@ -124,7 +124,7 @@ It never touches a worker whose checkout still exists.
 Ubuntu 26.04's uutils coreutils `mkdir` can report success for a directory that a concurrent caller created.
 The sequence-number reservation in [`bin/fm-remote-job-lib.sh`](../bin/fm-remote-job-lib.sh) no longer trusts that status, because an exclusive owner marker decides the winner.
 The worker singleton lock in `worker_acquire_lock` and a job's `.claim` in `worker_claim` no longer trust it either: `fm_remote_job_mkdir_exclusive` takes a per-path mutex around the `mkdir`, so a later creator finds the directory and fails.
-These locks still treat a successful `mkdir` as exclusive ownership:
+The remaining locks still treat a successful `mkdir` as exclusive ownership:
 
 - `bin/fm-afk-launch.sh:180`, the AFK launch lock in `fm_afk_launch_lock_acquire`.
 - `bin/fm-busy-event.sh:124` and `:136`, the busy-state writer lock in `lock_acquire`.
