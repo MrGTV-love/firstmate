@@ -1,0 +1,24 @@
+## scenario D: the sanctioned helper, driven from the real omp shell, 800 appends of ~480 byte distinct lines, cap 262144
+final size: 261981 bytes (cap 262144)
+lines in log: 571
+exit codes by count: rc=75 x229  rc=0 x571  
+first refused iteration: 572
+last accepted line: working: step 571
+every iteration before the first refusal is in the log, in order, with none missing: yes (last=571, expected=571)
+refusal message (first):
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.RvkrzB/state/sane.status is 261981 bytes and this line would pass the limit of 262144 bytes (cap 262144, reserve 1048576 for decision and terminal lines)
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.RvkrzB/state/sane.status is 261981 bytes and this line would pass the limit of 262144 bytes (cap 262144, reserve 1048576 for decision and terminal lines)
+refusal messages total: 229
+--- terminal line still fits in the reserve:
+done: append rc=0
+--- working: line is refused at the cap:
+rc=
+tail of log:
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+done: finished the lab run
+working: one more
+final size: 262026
+## scenario D, part 2: with the log at 262026 bytes (cap 262144, reserve 1048576)
+long working: line rc=75 ; stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.RvkrzB/state/sane.status is 262026 bytes and this line would pass the limit of 
+long done: line rc=0 (reserve) ; size now 262452
+blocked: line rc=0

@@ -1,0 +1,16 @@
+## order the supervisor must follow: drain (presents rows) -> record action -> ack
+drain exit=0
+overdue row id=5f5c0b023bf61e5addce6331
+action: "5f5c0b023bf61e5addce6331"
+kind: escalated
+ack exit=0 
+queue rows left: 0
+quiet check: FAIL watcher exited: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+omp state=T    ; size before=1610809344 after=1610809344 ; over-cap rows in queue=0
+## second pass: park the lab-only ledger row, then quiet-check the watcher
+drain exit=0
+overdue row id=5f5c0b023bf61e5addce6331
+error: "waiting requires --recheck at a future UTC time within 24 hours"
+ack exit=1 
+quiet check: fresh watcher over the unchanged, still-stopped 1.6 GB log is still waiting after 25 s, no second wake: PASS
+omp state=T    ; size before=1610809344 after=1610809344 ; over-cap rows in queue=0

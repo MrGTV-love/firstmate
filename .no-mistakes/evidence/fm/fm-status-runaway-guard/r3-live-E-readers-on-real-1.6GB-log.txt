@@ -1,0 +1,8 @@
+## bounded readers on the real 1.6 GB lab log (victim.status), timed
+fm-wake-drain.sh exit=0 took 12 s
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 7800.1792685553.0d85st
+fm-status: victim.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+●━━━━━━━━━━━0000000   \n   t   e   x   t  \n   t   e   x   t  \n   t   e   x   t  \n
+0000020    t   e   x   t  \n   t   e   x   t  \n   t   e   x   t  \n   t
+tail -c took 0 s (the operator's documented way to read it)
+file over 1 MB in state: victim.status 1610809344

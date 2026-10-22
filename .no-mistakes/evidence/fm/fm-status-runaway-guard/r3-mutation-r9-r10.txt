@@ -1,0 +1,13 @@
+### M1: re-entry guard + skip list removed (the pre-d652ab833 behavior); expected: the one-wake case FAILS
+not ok - the wake does not say the writer is not omp: check: status-log-over-cap: file=.one-wake.home-appends.runaway size=1002500 bytes (cap 2048) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+exit=
+
+### M2: whole tick disabled inside the wake (the d652ab833 behavior); expected: the second-writer case FAILS
+not ok - the second writer was not stopped (state ); rows for lane B: 0
+exit=
+
+### CONTROL: the unmutated worktree runs the same two cases; expected: both PASS
+ok - a runaway that keeps growing through the over-cap wake raises exactly one wake and the watcher exits on it
+ok - a second writer that passes the cap while the over-cap wake flushes is stopped and queued, and raises no second wake
+exit=
+MUTATION_DONE

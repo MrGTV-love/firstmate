@@ -1,0 +1,12 @@
+omp pid=75422 state=T     size before=845545472
+first ack failed
+queue rows over-cap after ack: 1
+quiet check: FAIL watcher woke: signal: /Users/charlesabrooker/tmp/fm-lab.RvkrzB/state/victim.status
+SIGCONT sent; size=845545472 state=R   
+attempt 1: watcher exited at +3.0s size=1610809344 omp=T    wake='check: status-log-over-cap: file=victim.status size=1610809344 bytes (cap 262144) growth=479170767 bytes/s writer=pid 75422 omp; stopped pid 75422 (omp) with SI'
+=== resumed-writer second cap wake found=1 at +3.0s ===
+check: status-log-over-cap: file=victim.status size=1610809344 bytes (cap 262144) growth=479170767 bytes/s writer=pid 75422 omp; stopped pid 75422 (omp) with SIGSTOP; resume it with kill -CONT 75422; nothing was deleted, truncated or rewritten
+--- omp state: T    ; size 1610809344 ; grew since SIGCONT by 765263872 bytes
+--- 3 s later size=1610809344 (stopped writer grew: no)
+--- watchdog: not fired
+--- over-cap rows in queue now: 2

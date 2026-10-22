@@ -1,0 +1,21 @@
+omp pid=75422 comm=omp state=S+  
+watcher pid=52527 beat=yes
+loop sent at t0; log size now 0
+attempt 1: watcher exited at +3.3s, log size 845545472, omp state T   
+=== cap wake found=1 at +3.3s ===
+--- wake text:
+check: status-log-over-cap: file=victim.status size=845545472 bytes (cap 262144) growth=430850487 bytes/s writer=pid 75422 omp; stopped pid 75422 (omp) with SIGSTOP; resume it with kill -CONT 75422; nothing was deleted, truncated or rewritten
+--- omp state now: T    (T = stopped)
+--- log size at stop-check: 845545472 ; 3 s later: 845545472 ; grew while stopped: no
+--- watchdog fired: no
+--- wake-queue over-cap rows: 1
+--- log exists: yes; size=845545472 bytes (806 MiB)
+--- head of log:
+0000000    t   e   x   t  \n   t   e   x   t  \n   t   e   x   t  \n   t
+0000020    e   x   t  \n   t   e   x   t  \n   t   e   x   t  \n   t   e
+0000040    x   t  \n   t   e   x   t  \n                                
+--- lsof of log:
+COMMAND   PID            USER   FD   TYPE DEVICE  SIZE/OFF      NODE NAME
+omp     75422 charlesabrooker   44w   REG   1,16 845545472 823766814 /Users/charlesabrooker/tmp/fm-lab.RvkrzB/state/victim.status
+omp     75422 charlesabrooker   45w   REG   1,16 845545472 823766814 /Users/charlesabrooker/tmp/fm-lab.RvkrzB/state/victim.status
+--- disk avail: 377Gi
