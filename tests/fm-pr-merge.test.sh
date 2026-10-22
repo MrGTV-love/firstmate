@@ -3024,7 +3024,7 @@ test_review_record_validation_and_latest() {
   rc=0
   FM_HOME="$case_dir/no-such-home" "$ROOT/bin/fm-review-record.py" captain-word --pr "$url" --head "$head" \
     --words 'Merge it.' > "$case_dir/out" 2>&1 || rc=$?
-  [ "$rc" -ne 0 ] || fail "a missing home must refuse the write"
+  expect_code 2 "$rc" "a missing home must refuse the write"
   assert_grep 'does not exist' "$case_dir/out" "missing home named"
   [ ! -e "$case_dir/no-such-home" ] || fail "a missing home must not be created"
   record_review "$case_dir" "$url" "$head" --verdict FAIL > /dev/null || fail "record FAIL"
