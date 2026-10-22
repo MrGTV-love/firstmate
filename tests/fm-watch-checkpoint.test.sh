@@ -157,6 +157,85 @@ test_group_killed_checkpoint_still_stops_its_watcher() {
   pass "a group-killed checkpoint still stops its watcher and frees the next checkpoint"
 }
 
+monotonic_ms() {
+  perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%d\n", clock_gettime(CLOCK_MONOTONIC) * 1000'
+}
+
+# A busy host schedules a freshly forked bound child late. SlowPgrp.pm delays
+# only that child's own setpgrp(0, 0), by longer than the 5-second cleanup
+# grace, and records the child, the bound, and the owner the bound was given.
+# Killing the checkpoint's group then must still stop both within the grace,
+# or the watcher the child would go on to start runs with no bound at all.
+test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start() {
+  local home checkpoint_pid child watchdog owner watchdog_parent started deadline now gone
+  home=$(make_home slow-start)
+  mkdir -p "$home/root/bin" "$home/perl-lib"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  cat > "$home/perl-lib/SlowPgrp.pm" <<'PM'
+package SlowPgrp;
+BEGIN {
+  no warnings 'once';
+  my ($root, $owner, $mark) = ($$, $ARGV[0], $ENV{FM_SLOW_PGRP_MARK});
+  *CORE::GLOBAL::setpgrp = sub {
+    if (@_ == 2 && $_[0] == 0 && $$ != $root) {
+      open my $fh, '>', "$mark.tmp" or die "open mark: $!";
+      printf {$fh} "%s %s %s\n", $$, getppid(), $owner;
+      close $fh;
+      rename "$mark.tmp", $mark or die "rename mark: $!";
+      select undef, undef, undef, 8;
+    }
+    CORE::setpgrp($_[0], $_[1]);
+  };
+}
+1;
+PM
+  cat > "$home/root/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+fm_test_record_process "$FM_STUB_PIDFILE" || exit 1
+while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
+  fm_test_track_process "$home/watcher.pid" "$home/root/bin/fm-watch.sh"
+  TMPDIR="$home" FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    PERL5LIB="$home/perl-lib" PERL5OPT=-MSlowPgrp FM_SLOW_PGRP_MARK="$home/slow-pgrp.mark" \
+    FM_STUB_PIDFILE="$home/watcher.pid" \
+    perl -e 'setpgrp(0, 0); exec @ARGV' "$home/root/bin/fm-watch-checkpoint.sh" --seconds 180 \
+    >"$home/slow-out.txt" 2>"$home/slow-err.txt" &
+  checkpoint_pid=$!
+  fm_test_wait_until 5 test -s "$home/slow-pgrp.mark" || {
+    kill -KILL -- "-$checkpoint_pid" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "the bound child never reached its delayed process-group setup"
+  }
+  read -r child watchdog owner < "$home/slow-pgrp.mark"
+  watchdog_parent=$(ps -o ppid= -p "$watchdog" 2>/dev/null | tr -d ' ')
+  if [ "$owner" != "$checkpoint_pid" ] || [ "$watchdog_parent" != "$checkpoint_pid" ]; then
+    kill -KILL -- "-$checkpoint_pid" "-$watchdog" "-$child" 2>/dev/null || true
+    kill -KILL "$child" "$watchdog" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "the bound was not owned by the checkpoint being killed (owner $owner, bound parent $watchdog_parent, checkpoint $checkpoint_pid)"
+  fi
+  started=$(monotonic_ms)
+  deadline=$((started + 5000))
+  kill -KILL -- "-$checkpoint_pid"
+  wait "$checkpoint_pid" 2>/dev/null || true
+  while :; do
+    gone=1
+    kill -0 "$child" 2>/dev/null && gone=0
+    kill -0 "$watchdog" 2>/dev/null && gone=0
+    now=$(monotonic_ms)
+    if [ "$now" -gt "$deadline" ]; then
+      kill -KILL -- "-$watchdog" "-$child" 2>/dev/null || true
+      kill -KILL "$child" "$watchdog" 2>/dev/null || true
+      fail "the bound and its slow-starting child were not both gone within 5 seconds of the checkpoint's group-kill (gone=$gone, ${now}ms - ${started}ms)"
+    fi
+    [ "$gone" -eq 1 ] && break
+    sleep 0.05
+  done
+  pass "a group-killed checkpoint still stops a bound child that was slow to make its process group"
+}
+
 # A code root whose path holds a space must launch its watcher as one path.
 test_checkpoint_launches_a_watcher_under_a_spaced_root() {
   local home bin status
@@ -584,6 +663,7 @@ test_checkpoint_resets_an_inherited_ignored_interrupt
 test_checkpoint_launches_a_watcher_under_a_spaced_root
 test_cancelled_checkpoint_lets_its_watcher_release_the_lock
 test_group_killed_checkpoint_still_stops_its_watcher
+test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start
 test_announced_recovery_is_not_reannounced_by_next_checkpoint
 test_never_announced_recovery_is_announced_once
 test_queue_append_during_checkpoint_still_resurfaces

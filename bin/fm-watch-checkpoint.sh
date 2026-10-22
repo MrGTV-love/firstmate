@@ -125,6 +125,7 @@ run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...
       exec { $ARGV[0] } @ARGV;
       die "exec failed: $!\n";
     }
+    setpgrp($child, $child);
     $pid = $child;
     stop($pending) if $pending;
     alarm $seconds unless $stopping;
