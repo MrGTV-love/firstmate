@@ -102,7 +102,7 @@ export interface GuardTerminal {
   decision: "allow" | "block" | "clear" | "flag" | "review" | "inactive";
   enforcement: "pretool_allow" | "pretool_deny" | "result_pass" | "omp_replace"
     | "claude_advisory_only" | "inactive_no_protection";
-  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read";
+  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read" | "read_only" | "lab";
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
   /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */

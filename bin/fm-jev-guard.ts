@@ -248,6 +248,67 @@ function credentialShaped(content: string): boolean {
     || /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s/:@?#"'`<>()\[\]{}\\,;|]*:[^\s/@?#"'`<>()\[\]{}\\,;|]{8,}@/i.test(content);
 }
 
+// A disposable lab home is not a production fleet. Its marker is written by
+// bin/fm-lab-home.sh and carries the same token bin/fm-gate-refuse-lib.sh reads;
+// like fm_gate_lab_permitted, the home counts as a lab only while every
+// FM_*_OVERRIDE is empty, so no override can split the call onto a real fleet.
+// The guard consults it only when a shell judgment could not run, so an
+// approved lab teardown is not refused by an unavailable judge.
+const LAB_MARKER = ".fm-lab-home";
+const LAB_TOKEN = "fm-lab-home v1";
+
+function labPermitted(home: string): boolean {
+  if (Object.entries(process.env).some(([name, value]) => /^FM_.*_OVERRIDE$/.test(name) && value)) return false;
+  try {
+    return readFileSync(resolve(home, LAB_MARKER), "utf8").split("\n")[0] === LAB_TOKEN;
+  } catch {
+    return false;
+  }
+}
+
+// Read-only shell commands have no effect to judge, so an unavailable judge
+// must never refuse a directory listing, a process check or a repository
+// inspection. The test is deliberately conservative: any redirection,
+// substitution, expansion, quoting, sequencing or background operator
+// disqualifies the command, every pipeline segment must itself be a read-only
+// program, and options that write or execute disqualify it. Outside the lab
+// admission, anything not proven read-only is refused on an outage as before.
+const READ_ONLY_PROGRAMS = new Set([
+  "ls", "cat", "head", "tail", "wc", "stat", "du", "df", "pwd", "echo", "printf",
+  "grep", "egrep", "fgrep", "ps", "pgrep", "uname", "id", "whoami",
+  "which", "type", "uptime", "lsof", "cut", "basename", "dirname",
+  "realpath", "readlink", "jq", "true", "false",
+]);
+const READ_ONLY_GIT = new Set(["status", "log", "diff", "show", "rev-parse", "ls-files", "describe", "blame", "shortlog"]);
+const SHELL_MUTATION = /[<>`$'"\\*?[{}]|\n|;|&&|\|\||&/;
+
+function outputOption(token: string): boolean {
+  const name = token.split("=")[0];
+  return name.length > 2 && (name.startsWith("--output") || "--output".startsWith(name));
+}
+
+function readOnlyShell(command: string): boolean {
+  const text = command.trim();
+  if (text === "" || SHELL_MUTATION.test(text)) return false;
+  for (const segment of text.split("|")) {
+    const tokens = segment.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0 || tokens.some(outputOption)) return false;
+    const program = tokens[0];
+    if (program === "git") {
+      let sub = 1;
+      while (tokens[sub] === "--no-pager") sub++;
+      if (!READ_ONLY_GIT.has(tokens[sub] ?? "")) return false;
+      continue;
+    }
+    if (program === "find") {
+      if (tokens.some((token) => /^-(exec|execdir|ok|okdir|delete|fprint|fprint0|fprintf|fls)$/.test(token))) return false;
+      continue;
+    }
+    if (!READ_ONLY_PROGRAMS.has(program)) return false;
+  }
+  return true;
+}
+
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
@@ -359,8 +420,12 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
         enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
     } catch (error) {
-      return finishCall({ ...terminal, ...trail, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type: failureType(error),
-        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result });
+      const error_type = failureType(error);
+      const request_started = result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted);
+      const command = tool === "bash" && error_type !== "RequestTooLargeError" && object(event.input) ? event.input.command : undefined;
+      const admitted = typeof command !== "string" ? undefined : readOnlyShell(command) ? "read_only" : labPermitted(c.home) ? "lab" : undefined;
+      if (admitted) return finishCall({ ...terminal, ...trail, branch: admitted, error_type, request_started, result });
+      return finishCall({ ...terminal, ...trail, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type, request_started, result });
     }
   }, "tool_call", service.host));
 
