@@ -222,10 +222,10 @@ That is why the bound and the debounce are pinned by separate cases: a change tr
 The healthy-runner case requires the attached `start` to return status 143 (TERM); the printed retirement duration and sampled stop windows are supplementary evidence, not a timing-based pass condition.
 Separate cases pin the detection bound and read recovery: one reaps an orphaned listener within the lease term plus a single check interval, with the lease expiry deliberately placed late in that interval, and one fails exactly one lease-age command while all other age responses are zero.
 The recovery case waits for the source to start, which happens only after the guard proved the lease once, before it arms the failed read, then waits for the guard's next read after a successful recovery result before asserting runner survival, avoiding a fixed sleep that assumes recovery or lease freshness under load.
-Every case that needs a runner's PID reads it through one helper that accepts only a complete numeric marker line, because the runner truncates and rewrites that marker at startup and a read in between would otherwise yield an empty PID; an empty or non-numeric marker is a test failure, not a vacuous pass.
 Lease expiry remains covered by the real-clock bound case; the recovery fixture changes no production clock, interval, or stop bound.
-They fail for opposite reasons, which is the point of keeping them apart.
+The bound and recovery cases fail for opposite reasons, which is the point of keeping them apart.
 The crashed-leader cases separately pin refusal and claim preservation when a leader dies outside the stop's own signal, so successful escalation cannot be mistaken for closing that limit.
+Every case that reads a runner's PID from its `<id>.runner` marker reads it through one helper that accepts only a complete numeric marker line, because the runner truncates and rewrites that marker at startup and a read in between would otherwise yield an empty PID; an empty or non-numeric marker is a test failure, not a vacuous pass.
 Refresh the regressions with `bash tests/fm-procevent.test.sh`; the dated measurements above are recorded observations, not fixed timing thresholds.
 
 ### Output-reader lifetime after runner loss
