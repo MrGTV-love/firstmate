@@ -1,0 +1,18 @@
+# scratch copy: old Ctrl-C readiness probe + old helper + no remain-on-exit, in the slow-startup fixture (variantA-oldprobe-oldhelper)
+exit=1 seconds=228.275
+can't-find-window lines: 299
+--- first 8 lines ---
+@1
+ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+--- last 5 lines ---
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+not ok - the tmux task shell did not become ready

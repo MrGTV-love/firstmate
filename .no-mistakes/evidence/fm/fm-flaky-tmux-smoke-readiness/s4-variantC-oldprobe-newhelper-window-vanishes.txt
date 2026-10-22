@@ -1,0 +1,15 @@
+# scratch copy: old Ctrl-C probe + new helper, window removed on exit (variantC-oldprobe-newhelper-window-vanishes)
+exit=1 seconds=3.532
+pane-disappeared lines: 100
+--- first 6 lines ---
+@1
+ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+can't find window: fm-smoke1
+can't find window: fm-smoke1
+tmux pane disappeared: target=smoke:fm-smoke1 pane_dead_status=unavailable
+last captured output:
+--- last 4 lines ---
+tmux pane disappeared: target=smoke:fm-smoke1 pane_dead_status=unavailable
+last captured output:
+
+not ok - the tmux task shell did not become ready

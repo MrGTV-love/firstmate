@@ -1,0 +1,27 @@
+load: 12 busy-loop processes on 10 CPUs
+run 01 exit=0 ok_lines=10 seconds=2.09
+run 02 exit=0 ok_lines=10 seconds=2.04
+run 03 exit=0 ok_lines=10 seconds=2.03
+run 04 exit=0 ok_lines=10 seconds=2.15
+run 05 exit=0 ok_lines=10 seconds=2.07
+run 06 exit=0 ok_lines=10 seconds=1.94
+run 07 exit=0 ok_lines=10 seconds=1.86
+run 08 exit=0 ok_lines=10 seconds=2.06
+run 09 exit=0 ok_lines=10 seconds=2.13
+run 10 exit=0 ok_lines=10 seconds=2.04
+run 11 exit=0 ok_lines=10 seconds=1.97
+run 12 exit=0 ok_lines=10 seconds=1.95
+run 13 exit=0 ok_lines=10 seconds=2.32
+run 14 exit=0 ok_lines=10 seconds=1.99
+run 15 exit=0 ok_lines=10 seconds=2.10
+run 16 exit=0 ok_lines=10 seconds=2.16
+run 17 exit=0 ok_lines=10 seconds=2.09
+run 18 exit=0 ok_lines=10 seconds=2.06
+run 19 exit=0 ok_lines=10 seconds=2.27
+run 20 exit=0 ok_lines=10 seconds=2.02
+run 21 exit=0 ok_lines=10 seconds=1.76
+run 22 exit=0 ok_lines=10 seconds=2.08
+run 23 exit=0 ok_lines=10 seconds=2.10
+run 24 exit=0 ok_lines=10 seconds=2.06
+run 25 exit=0 ok_lines=10 seconds=2.51
+summary: pass=25 fail=0

@@ -1,0 +1,35 @@
+# scratch copy: old Ctrl-C readiness probe placed into the new slow-startup fixture (variantB-oldprobe-newhelper)
+exit=1 seconds=4.521
+can't-find-window lines: 0
+--- first 15 lines ---
+@1
+ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+tmux pane exited: target=smoke:fm-smoke1 pane_dead_status=unavailable pane_dead_signal=int
+captured output:
+^C
+
+
+
+
+
+
+
+
+
+
+--- last 15 lines ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (signal int, Thu Oct 22 14:28:27 2026)
+not ok - the tmux task shell did not become ready
