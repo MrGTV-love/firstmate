@@ -27,8 +27,8 @@
 # --captain-model-pin is relaunch-only. A replacement model that a newer model of
 # its own family and tier has passed in the harness catalog is refused before
 # the running agent stops, unless it is the model the task already records or
-# the pin names it exactly; the pin is passed through to fm-spawn, whose header
-# owns the model freshness gate.
+# the pin names it exactly; the pin is passed through to fm-spawn, and
+# docs/configuration.md#model-freshness owns the model freshness gate.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
