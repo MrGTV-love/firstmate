@@ -1,0 +1,10 @@
+## S3 (adversarial, review-r9-1): a writer the guard cannot stop (process name 'rogue', not omp) appends without pause; FM_STATUS_CAP_BYTES=2048
+writer pid 40710 (/Users/charlesabrooker/tmp/fm-lab.CjzcWV/bin/rogue)
+attempt 1: watcher exited after 4 s; wake: check: status-log-over-cap: file=rogue-lane.status size=915865 bytes (cap 2048) growth=369612 bytes/s writer=pid 40710 rogue; stopped nothing: pid 40710 (rogue) is not an omp process; nothing was deleted, truncated or rewritten 
+cycle exit 0; 4 s
+over-cap rows in .wake-queue: 1
+watcher processes left for this home: 1
+writer state (not stopped, by design): R   
+log still growing (named only, not stopped): 1624010 -> 2415130
+
+NOTE (tester): the "watcher processes left: 1" count above was grep matching its own command line; a direct ps check right after showed 0 watchers left for this home.

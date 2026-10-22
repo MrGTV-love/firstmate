@@ -1,0 +1,14 @@
+## S6: lane A (omp) passes the cap; while the watcher's over-cap wake flushes a 30000-line pending signal for a healthy lane (1.1 MB, under the cap), lane B (omp) passes the cap
+FM_STATUS_CAP_BYTES=2097152, other settings default
+healthy lane size: 1147803 bytes
+lane A over-cap row queued after 24 s; watcher still running (flushing): yes
+lane B writer pid 10867 started
+lane B passed the cap 6 s after start; watcher still running: yes
+watcher exited 201 s after lane A's row; printed wake text:
+check: status-log-over-cap: file=lane-a.status size=5688835 bytes (cap 2097152) growth=320024 bytes/s writer=pid 58888 omp; stopped pid 58888 (omp) with SIGSTOP; resume it with kill -CONT 58888; nothing was deleted, truncated or rewritten
+count of 'check: status-log-over-cap' wakes printed: 1
+over-cap rows in .wake-queue:
+check: status-log-over-cap: file=lane-a.status size=5688835 bytes (cap 2097152) growth=320024 bytes/s writer=pid 58888 omp; stopped pid 58888 (omp) with SIGSTOP; resume it with kill -CONT 58888; nothing was deleted, truncated or rewritten
+check: status-log-over-cap: file=lane-b.status size=5134630 bytes (cap 2097152) growth=188245 bytes/s writer=pid 10867 omp; stopped pid 10867 (omp) with SIGSTOP; resume it with kill -CONT 10867; nothing was deleted, truncated or rewritten
+lane A writer 58888 state: T   ; lane B writer 10867 state: T     (T = stopped)
+sizes: A=5688835 B=5134630

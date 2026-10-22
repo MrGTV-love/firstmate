@@ -1,0 +1,29 @@
+## S2: incident-shape runaway: an omp process holds state/d1-intake.status open and appends printf 'text\n' <epoch> without end
+defaults: FM_STATUS_CAP_BYTES unset (33554432), FM_POLL unset (15 s), writer hard limit ulimit -f 1048576 blocks
+writer pid 10435 (/Users/charlesabrooker/tmp/fm-lab.CjzcWV/bin/omp), bystander omp pid 10429 (sleep)
+attempt 1: watcher exited after 33 s; wake: signal: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/d1-intake.status 
+attempt 2: watcher exited after 33 s; wake: signal: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/d1-intake.status 
+attempt 3: watcher exited after 34 s; wake: signal: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/d1-intake.status 
+attempt 4: watcher exited after 39 s; wake: check: status-log-over-cap: file=d1-intake.status size=35683015 bytes (cap 33554432) growth=208685 bytes/s writer=pid 10435 omp; stopped pid 10435 (omp) with SIGSTOP; resume it with kill -CONT 10435; nothing was deleted, truncated or rewritten 
+cycle exit 0; elapsed from writer start to over-cap wake: 153 s
+writer state: T    (T = stopped); bystander omp state: S   
+log size: 35683015 bytes, 3 s later: 35683015 bytes (cap 33554432); file present: yes
+over-cap rows in .wake-queue (incl. the S1 one, already acked): 1
+marker state/.status-cap-alerted.d1-intake.status: 16777232:830639441:1792696980	/Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/d1-intake.status	35683015 
+--- firstmate drains the over-cap wake:
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7d5178a0241f5fad0778a642","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable; questions d1-intake.status: fm-status: refused to read d1-intake.status: a span of more than 32768 lines is past the line-by-line read limit; nothin; questions s1-incident.status: fm-status: refused to read s1-incident.status: a span of 
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792697132	21	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/d1-intake.status
+1792696304	12	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1792697129	19	check	status-log-over-cap-983968586	check: status-log-over-cap: file=d1-intake.status size=35683015 bytes (cap 33554432) growth=208685 bytes/s writer=pid 10435 omp; stopped pid 10435 (omp) with SIGSTOP; resume it with kill -CONT 10435; nothing was deleted, truncated or rewritten
+--- re-armed watcher over the same stopped (not growing) log must stay quiet for 45 s (3 polls)
+watcher exited: signal: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/d1-intake.status
+log size after quiet window: 35683015 bytes
+--- resume the writer with kill -CONT (the documented undo); the guard must wake and stop it again after one cap of growth
+attempt 1: watcher exited after 33 s; wake: check: rearm-resurface 
+attempt 2: watcher exited after 2 s; wake: signal: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/d1-intake.status 
+attempt 3: watcher exited after 69 s; wake: check: status-log-over-cap: file=d1-intake.status size=71825210 bytes (cap 33554432) growth=244643 bytes/s writer=pid 10435 omp; stopped pid 10435 (omp) with SIGSTOP; resume it with kill -CONT 10435; nothing was deleted, truncated or rewritten 
+writer state after resume cycle: T   ; log size: 71825210 bytes
+done

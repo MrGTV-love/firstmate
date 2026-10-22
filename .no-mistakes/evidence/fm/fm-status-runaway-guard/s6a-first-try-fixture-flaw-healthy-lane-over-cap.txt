@@ -1,0 +1,13 @@
+## S6: lane A (omp) passes the cap; while the watcher's over-cap wake flushes a 30000-line pending signal for a healthy lane, lane B (omp) passes the cap
+FM_STATUS_CAP_BYTES=65536, other settings default
+lane A over-cap row queued after 11 s; watcher still running (flushing): yes
+lane B writer pid 56745 started
+watcher exited 15 s after lane A's row; printed wake text:
+check: status-log-over-cap: file=healthy.status size=1147803 bytes (cap 65536) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=lane-a.status size=4157820 bytes (cap 65536) growth=309091 bytes/s writer=pid 24396 omp; stopped pid 24396 (omp) with SIGSTOP; resume it with k
+count of 'check: status-log-over-cap' wakes printed: 1
+over-cap rows in .wake-queue:
+check: status-log-over-cap: file=healthy.status size=1147803 bytes (cap 65536) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=lane-a.status size=4157820 bytes (cap 65536
+lane A writer 24396 state: T   ; lane B writer 56745 state: R     (T = stopped)
+sizes: A=4157820 B=1165005
+
+NOTE (tester): fixture flaw, not a product result. The 30000-line healthy lane (1.1 MB) was itself over the 64 KiB cap and past the read limit, so the wake had no long flush walk for lane B to land in. Re-run with a 2 MiB cap in s6-second-writer-during-wake-flush.txt.

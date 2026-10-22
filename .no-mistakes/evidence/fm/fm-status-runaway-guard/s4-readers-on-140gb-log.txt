@@ -1,0 +1,42 @@
+## S4: readers on a 140,000,000,000-byte status log (incident shape: 3000 events + an open needs-decision, a hole, 1.2M 'text' lines at the tail)
+each reader runs under a 240 s alarm and a 1 GiB write limit; a reader that read or copied the log whole could not finish
+-rw-r--r--  1 charlesabrooker  staff  140000000000 Oct 22 14:24 /Users/charlesabrooker/tmp/fm-lab.NEQ8hX/state/d1-intake.status
+
+$ bin/fm-fleet-snapshot.sh --json   (jq summary)
+{"schema":"fm-fleet-snapshot.v1","tasks":[{"id":"d1-intake","status_present":false,"hints":{"pending_decision":false,"blocked_event":false,"open_decisions":[],"open_decisions_unreadable":true,"scout_report_present":false,"last_event_text":""}},{"id":"healthy","status_present":false,"hints":{"pending_decision":true,"blocked_event":false,"open_decisions":[{"key":"q1","verb":"needs-decision","summary":"which colour?"}],"open_decisions_unreadable":false,"scout_report_present":false,"last_event_text":"needs-decision [key=q1]: which colour?"}}]}
+stderr: fm-status: refused to read d1-intake.status: a span of 140000000000 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+
+$ bin/fm-crew-state.sh d1-intake ; bin/fm-crew-state.sh healthy
+fm-status: refused to read d1-intake.status: a span of 140000000000 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+state: unknown · source: status-log · status log d1-intake.status is past the status read limits and cannot be read
+[exit 0 after 1 s]
+state: unknown · source: none · backend target gone: firstmate:fm-healthy
+[exit 0 after 0 s]
+
+$ bin/fm-inactive-reconcile.sh report d1-intake
+[exit 0 after 0 s]
+
+files over 1 MB created in the lab (besides the log): 
+log size unchanged: 140000000000
+lab disk use: 5.9M
+
+## S4b: the real watcher and wake drain on the same home (140 GB log + a healthy lane with an open needs-decision)
+watcher exit 0 after 10 s; printed wake:
+check: status-log-over-cap: file=d1-intake.status size=140000000000 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+watcher stderr (refusals): 
+
+$ bin/fm-wake-drain.sh
+drain exit 0 after 3 s
+1792697134	1	check	status-log-over-cap-1906738301	check: status-log-over-cap: file=d1-intake.status size=140000000000 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+1792697136	4	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.NEQ8hX/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.NEQ8hX/state/healthy.status
+1792697136	5	signal	healthy.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.NEQ8hX/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.NEQ8hX/state/healthy.status
+wake annotation: unread wake-EVENT since last drain, not current state: healthy.status: working: healthy lane
+wake annotation: latest wake-EVENT observed at drain, not current state: healthy.status: needs-decision [key=q1]: which colour?
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+healthy [key=q1] needs-decision: which colour?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+drain stderr: fm-status: refused to read d1-intake.status: a span of 140000000000 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: d1-intake.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+files over 1 MB created (besides the log): 
+log size unchanged: 140000000000
