@@ -2001,7 +2001,7 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
 }
 
 test_portable_serial_packing_budget_boundary() {
-  local tmp repo weight out rc
+  local tmp repo weight out rc base over
   tmp=$(fm_test_tmproot fm-test-run-packing-boundary)
   repo="$tmp/repo"
 
@@ -2013,6 +2013,33 @@ test_portable_serial_packing_budget_boundary() {
     assert_contains "$out" "serial_max_ms=${weight}" "fixture did not pack the seeded script"
     assert_contains "$out" "serial_budget_ms=1200000" "fixture changed the packing budget"
     assert_contains "$out" "serial_indivisible_ms=${weight}" "fixture did not report the indivisible floor"
+  done
+
+  # One shard holds the whole lane, so its sum is the seeded script plus the
+  # other members at their fixture weight. Read that base sum from the runner
+  # and seed the script so the shard sums to exactly the target, then one
+  # millisecond above it. The seeded script is the shard's largest, and the
+  # shard is still more than that script, so the packed edge is the target.
+  shard_fixture_init "$repo" 1
+  sed -i.bak 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' "$repo/bin/fm-test-run.sh"
+  out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) \
+    || fail "one-shard fixture must pass coverage before seeding: $out"
+  base=$(printf '%s\n' "$out" | sed -n 's/.*serial_max_ms=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$base" ] || fail "one-shard fixture did not report serial_max_ms: $out"
+  for over in 0 1; do
+    weight=$((1200000 - base + 1 + over))
+    shard_fixture_init "$repo" "$weight"
+    sed -i.bak 's/^PORTABLE_SERIAL_SHARDS=.*/PORTABLE_SERIAL_SHARDS=1/' "$repo/bin/fm-test-run.sh"
+    out=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) && rc=0 || rc=$?
+    if [ "$over" -eq 0 ]; then
+      expect_code 0 "$rc" "a packed shard summing exactly to the target must be accepted"
+      assert_contains "$out" "serial_max_ms=1200000" "fixture did not pack exactly at the target"
+    else
+      expect_code 1 "$rc" "a packed shard one millisecond above the target must be refused"
+      assert_contains "$out" "packs 1200001ms above the 1200000ms target and beyond its own largest script (${weight}ms)" \
+        "packed-shard refusal did not name the shard's own largest script"
+      assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-target packing reported success"
+    fi
   done
 
   # Three shards: the 1500000 ms script fills one alone, two of the three
@@ -2030,7 +2057,7 @@ test_portable_serial_packing_budget_boundary() {
   assert_contains "$out" "packs 1400000ms above the 1200000ms target and beyond its own largest script (700000ms)" \
     "packing refusal did not name the shard's own largest script"
   assert_not_contains "$out" "FM_TEST_COVERAGE ok" "over-budget packing reported success"
-  pass "serial packing accepts one script alone above the target and refuses a packed shard beside it"
+  pass "serial packing accepts a lone script above the target, accepts a packed shard at it, and refuses one a millisecond above"
 }
 
 # The serial shard lists are computed again for every shard and for the whole
