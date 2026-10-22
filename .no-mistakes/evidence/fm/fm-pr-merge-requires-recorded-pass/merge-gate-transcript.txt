@@ -1,0 +1,143 @@
+=== SCENARIO: S1 no review record at all (expect refuse)
+--- ledger /Users/charlesabrooker/tmp/fm-lab.yHNFTg/state/review-records.jsonl:
+(no ledger)
+$ FM_HOME=$LAB bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9
+--- exit: 1
+--- stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1111111111111111111111111111111111111111
+  error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+--- stdout:
+  armed: state/task-x1.check.sh
+--- forge merge calls:
+RESULT: PASS (S1 no review record at all)
+
+=== SCENARIO: S2 different-family PASS at live head (openai author, anthropic reader) (expect merge)
+--- ledger /Users/charlesabrooker/tmp/fm-lab.l6fh3O/state/review-records.jsonl:
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/9","at":1792690006,"head":"1111111111111111111111111111111111111111","verdict":"PASS","reader_model":"claude-opus-5-5","reader_family":"anthropic","author_groups":{"all":[{"model":"gpt-5.1-codex","family":"openai"}]},"report":"/tmp/lab-review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+$ FM_HOME=$LAB bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9
+--- exit: 0
+--- stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1111111111111111111111111111111111111111
+  review: PASS
+--- stdout:
+  armed: state/task-x1.check.sh
+  verified: https://github.com/example/repo/pull/9 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- forge merge calls:
+  pr merge 9 --repo example/repo --match-head-commit 1111111111111111111111111111111111111111 --squash
+RESULT: PASS (S2 different-family PASS at live head (openai author, anthropic reader))
+
+=== SCENARIO: S3 PASS names an older head (expect refuse)
+--- ledger /Users/charlesabrooker/tmp/fm-lab.H22i5w/state/review-records.jsonl:
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/9","at":1792690009,"head":"2222222222222222222222222222222222222222","verdict":"PASS","reader_model":"claude-opus-5-5","reader_family":"anthropic","author_groups":{"all":[{"model":"gpt-5.1-codex","family":"openai"}]},"report":"/tmp/lab-review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+$ FM_HOME=$LAB bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9
+--- exit: 1
+--- stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1111111111111111111111111111111111111111
+  error: head mismatch: review names 2222222222222222222222222222222222222222, live head is 1111111111111111111111111111111111111111; review the live head and record its PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+--- stdout:
+  armed: state/task-x1.check.sh
+--- forge merge calls:
+RESULT: PASS (S3 PASS names an older head)
+
+=== SCENARIO: S4 reader family equals one author family (expect refuse)
+--- ledger /Users/charlesabrooker/tmp/fm-lab.6ausal/state/review-records.jsonl:
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/9","at":1792690011,"head":"1111111111111111111111111111111111111111","verdict":"PASS","reader_model":"claude-opus-5-5","reader_family":"anthropic","author_groups":{"initial":[{"model":"gpt-5.1-codex","family":"openai"}],"fixes":[{"model":"claude-sonnet-5-5","family":"anthropic"}]},"report":"/tmp/lab-review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+$ FM_HOME=$LAB bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9
+--- exit: 1
+--- stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1111111111111111111111111111111111111111
+  error: reader_family anthropic (claude-opus-5-5) matches author_groups fixes (claude-sonnet-5-5); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+--- stdout:
+  armed: state/task-x1.check.sh
+--- forge merge calls:
+RESULT: PASS (S4 reader family equals one author family)
+
+=== SCENARIO: S5 newest record is FAIL after an earlier PASS (expect refuse)
+--- ledger /Users/charlesabrooker/tmp/fm-lab.k9MRPP/state/review-records.jsonl:
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/9","at":1792690013,"head":"1111111111111111111111111111111111111111","verdict":"PASS","reader_model":"claude-opus-5-5","reader_family":"anthropic","author_groups":{"all":[{"model":"gpt-5.1-codex","family":"openai"}]},"report":"/tmp/lab-review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/9","at":1792690013,"head":"1111111111111111111111111111111111111111","verdict":"FAIL","reader_model":"claude-opus-5-5","reader_family":"anthropic","author_groups":{"all":[{"model":"gpt-5.1-codex","family":"openai"}]},"report":"/tmp/lab-review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+$ FM_HOME=$LAB bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9
+--- exit: 1
+--- stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1111111111111111111111111111111111111111
+  error: verdict is FAIL; obtain and record a new PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+--- stdout:
+  armed: state/task-x1.check.sh
+--- forge merge calls:
+RESULT: PASS (S5 newest record is FAIL after an earlier PASS)
+
+=== SCENARIO: S6 reader model family unknown (expect refuse)
+--- ledger /Users/charlesabrooker/tmp/fm-lab.C8tiTa/state/review-records.jsonl:
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/9","at":1792690015,"head":"1111111111111111111111111111111111111111","verdict":"PASS","reader_model":"mistral-large","reader_family":"unknown","author_groups":{"all":[{"model":"gpt-5.1-codex","family":"openai"}]},"report":"/tmp/lab-review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+$ FM_HOME=$LAB bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9
+--- exit: 1
+--- stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1111111111111111111111111111111111111111
+  error: model family unknown for mistral-large; an unknown family is never independent, so obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+--- stdout:
+  armed: state/task-x1.check.sh
+--- forge merge calls:
+RESULT: PASS (S6 reader model family unknown)
+
+=== SCENARIO: S7 --attended-override does not replace a missing PASS (other PR only) (expect refuse)
+--- ledger /Users/charlesabrooker/tmp/fm-lab.ftTu9r/state/review-records.jsonl:
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/10","at":1792690017,"head":"1111111111111111111111111111111111111111","verdict":"PASS","reader_model":"claude-opus-5-5","reader_family":"anthropic","author_groups":{"all":[{"model":"gpt-5.1-codex","family":"openai"}]},"report":"/tmp/lab-review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+$ FM_HOME=$LAB bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9 --attended-override
+--- exit: 1
+--- stderr:
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  verified: https://github.com/example/repo/pull/9 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1111111111111111111111111111111111111111
+  error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+--- stdout:
+  armed: state/task-x1.check.sh
+--- forge merge calls:
+RESULT: PASS (S7 --attended-override does not replace a missing PASS (other PR only))
+
