@@ -3908,7 +3908,7 @@ cleanup_exit=0
 | --- | --- |
 | Launch | `dsh-tui --patch <launch patch> -- <brief>` started the interactive TUI and submitted the brief as its opening prompt; no folder-trust or approval dialog appeared under `DSH_PERMISSION_MODE=danger-full-access` |
 | Model and effort | no launch flags exist, so the launch patch and the launch-local `~/.dsh-tui/model.json` and `effort.json` selected `deepseek-v4-flash` at `high`; `/status` and the footer both reported that route |
-| Busy state | `bin/fm-dsh.py state` folded the launch's own `session.v4.jsonl`: the brief turn read `busy`, the completed steer read `idle`, and the pre-turn launch read `unknown`; no screen scrape was consulted |
+| Busy state | `bin/fm-dsh.py state` folded the launch's own JSONL session log: the brief turn read `busy`, the completed steer read `idle`, and the pre-turn launch read `unknown`; no screen scrape was consulted |
 | Composer | the rounded `⌸ … ⛶` frame holding `❯` classified `empty` on an idle busy pane and `pending` with typed text, with its two status rows and `esc to interrupt` treated as furniture |
 | Steer | `bin/fm-send.sh` delivered an inbox record mid-task and the worker replied with the requested token before the next interruption |
 | Interrupt and exit | For both workers, `bin/fm-control.sh <id> interrupt` reported `interrupt-delivered ... verified=agent-alive cancel=unconfirmed`; key delivery and agent survival were proven, but cancellation completion was not independently confirmed. `exit` reported `stopped` with Herdr then reporting the pane dead |

@@ -15,6 +15,9 @@ def call(*args, ok=True):
     result = subprocess.run([sys.executable, str(helper), *map(str, args)], capture_output=True, text=True)
     assert (result.returncode == 0) == ok, result.stderr
     return result.stdout.strip()
+def unknown(*args, check):
+    out = call('state', *args)
+    assert out.startswith('unknown: ') and check in out, f'expected unknown naming {check!r}, got {out!r}'
 for model, provider, expected in [
     ('deepseek/deepseek-v4-flash', '', 'dsh'),
     ('v4-pro', 'deepseek', 'dsh'),
@@ -74,6 +77,9 @@ def put(events, tail=''):
     log.write_text('\n'.join(json.dumps(event) for event in [header, *events]) + '\n' + tail)
 start = {'type':'turn/start','seq':1}
 end = {'type':'turn/end','seq':2}
+unknown(state, 'task', check='no depth-zero dsh session log yet')
+log.write_text(json.dumps(header) + '\n')
+unknown(state, 'task', check='no turn/start or turn/end yet')
 put([start])
 assert call('state', state, 'task') == 'busy'
 put([start], '{"type":"turn/end","seq":2}')
@@ -85,12 +91,12 @@ assert call('session-file',state,'task') == str(log)
 # is a turn that began beyond the position taken before launch.
 where = call('position',state,'task')
 assert json.loads(where) == [str(log), 2]
-assert call('state',state,'task','--since',where) == 'unknown', 'history alone is not a started turn'
+unknown(state,'task','--since',where, check='no turn started beyond the launch position')
 put([start,end,{'type':'turn/start','seq':3}])
 assert call('state',state,'task','--since',where) == 'busy'
 put([start,end,{'type':'turn/start','seq':3},{'type':'turn/end','seq':4}])
 assert call('state',state,'task','--since',where) == 'idle', 'a turn that already finished still proves the brief ran'
-assert call('state',state,'task','--since','{') == 'unknown', 'an unreadable position must not pass'
+assert call('state',state,'task','--since','{').startswith('unknown: '), 'an unreadable position must not pass'
 put([start,end])
 # The launch overlay replaces the stock profile patch's sessionId field, so
 # resume must write it explicitly into the bound launch patch.
@@ -105,7 +111,13 @@ missing_state = tmp / 'fresh-state'
 missing_state.mkdir()
 assert call('resume',missing_state,'task','deepseek/v4','high',cwd) == '', 'no binding must fall back quietly'
 put([start, end, start])
-assert call('state',state,'task') == 'unknown', 'nonmonotonic durable sequence is corrupt'
+unknown(state,'task', check='non-monotonic sequence: seq 1 after 2')
+put([start, {'type':'tool'}])
+unknown(state,'task', check='tool event without an integer seq')
+put([start, {'seq':2}])
+unknown(state,'task', check='event without a type')
+put([start], '{"type":\n')
+unknown(state,'task', check='unparseable event')
 # A turn that wrote more than the read window still reads busy: the fold starts
 # at its opening turn/start, found by a bounded backward scan, and an incomplete
 # append larger than one chunk does not hide the committed events before it.
@@ -122,7 +134,7 @@ assert json.loads(call('position',state,'task')) == [str(log), 7]
 put([start,end,second,*body,{'type':'turn/end','seq':8}])
 assert call('state',state,'task') == 'idle'
 assert call('state',state,'task','--since',where) == 'idle'
-assert call('state',state,'task','--since',json.dumps([str(log), 3])) == 'unknown', 'the oversized turn started at or before the position'
+unknown(state,'task','--since',json.dumps([str(log), 3]), check='no turn started beyond the launch position')
 put([start,end])
 child = runtime / 'dsh/sessions/workspace/child'
 child.mkdir()
@@ -135,9 +147,21 @@ assert call('state',state,'task') == 'busy', 'the newest depth-zero session owns
 assert call('state',state,'task','--since',where) == 'busy', 'a position on another log is history'
 assert call('session-file',state,'task') == str(child / 'session.v4.jsonl')
 (child / 'session.v4.jsonl').unlink()
-(store / 'session.v5.jsonl').write_text(json.dumps({**header,'version':5})+'\n')
-assert call('state',state,'task') == 'unknown', 'new unsupported generation must not fall back'
+# The highest-numbered log is read whatever its number; behavior, not schema
+# number, admits it.
+v5 = store / 'session.v5.jsonl'
+v5.write_text(json.dumps({**header,'version':5})+'\n'+json.dumps({'type':'turn/start','seq':1,'data':{'turn':1}})+'\n')
+assert call('state',state,'task') == 'busy', 'a well-formed newer log generation is read'
+assert call('session-file',state,'task') == str(v5)
+v5.write_text(v5.read_text()+json.dumps({'type':'turn/end','seq':2,'data':{'turn':1}})+'\n')
+assert call('state',state,'task') == 'idle'
+assert json.loads(call('position',state,'task')) == [str(v5), 2]
+v5.write_text(json.dumps({'type':'snapshot','version':5})+'\n')
+unknown(state,'task', check='does not open with a session header')
 call('position',state,'task',ok=False)
+v5.write_text(json.dumps({**header,'version':5})+'\n'+json.dumps({'type':'turn/start','seq':3})+'\n'+json.dumps({'type':'turn/end','seq':3})+'\n')
+unknown(state,'task', check='non-monotonic sequence: seq 3 after 3')
+v5.unlink()
 # A launch with no log yet has no position, so its first turn is the proof.
 no_log = tmp / 'no-log-state'
 no_log.mkdir()
@@ -171,7 +195,7 @@ outside.mkdir()
 (launches / 'task.dsh-session').write_text(json.dumps({'root':str(outside),'cwd':str(cwd)}))
 prepare('g3')
 assert (outside / 'keep').exists(), 'prepare must not remove a root outside the task generations'
-print('ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, unsupported-generation refusal and generation retirement')
+print('ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, any log generation admitted by behavior, named unknown checks and generation retirement')
 PY
 # shellcheck source=bin/fm-dsh-lib.sh
 . "$ROOT/bin/fm-dsh-lib.sh"
@@ -198,15 +222,24 @@ if out=$(PATH="$TMP/cli" fm_dsh_launch_check 2>&1); then
 fi
 case "$out" in *'dsh-tui executable not found on PATH'*) ;; *) echo "$out" >&2; exit 1 ;; esac
 printf 'ok - PATH-selected DSH probes accept arbitrary releases and refuse failed commands\n'
-fm_dsh_args_are_dsh 'node /opt/node_modules/@deepseek-ai/dsh/lib/bin.js --profile dsh-tui'
-if fm_dsh_args_are_dsh 'node /tmp/unrelated.js /opt/node_modules/@deepseek-ai/dsh/lib/bin.js'; then
-  echo 'the dsh script must occupy the interpreter argument slot' >&2
-  exit 1
-fi
-if fm_dsh_args_are_dsh 'bash -c node /opt/node_modules/@deepseek-ai/dsh/lib/bin.js'; then
-  echo 'a wrapped dsh script is not the pane foreground process' >&2
-  exit 1
-fi
+for args in \
+  'node /opt/homebrew/bin/dsh-tui --patch /state/t.dsh/g1/launch.yml -- brief' \
+  'node /opt/homebrew/lib/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch x' \
+  'node /state/t.dsh/g1/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch x' \
+  'node /state/t.dsh/g1/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/lib/relaid/entry.js'; do
+  fm_dsh_args_are_dsh "$args" || { echo "a dsh-tui launcher or package script must match: $args" >&2; exit 1; }
+done
+for args in \
+  'node /tmp/unrelated.js /opt/homebrew/bin/dsh-tui' \
+  'bash -c node /opt/homebrew/bin/dsh-tui' \
+  'node /opt/homebrew/bin/dsh web --no-open' \
+  'node /opt/homebrew/bin/dsh-tuix' \
+  'node /opt/lib/node_modules/@deepseek-harness-tui/dsh-tui-extra/bin/x.js'; do
+  if fm_dsh_args_are_dsh "$args"; then
+    echo "only a dsh-tui launcher or package script in the interpreter slot may match: $args" >&2
+    exit 1
+  fi
+done
 # shellcheck source=bin/fm-composer-lib.sh
 . "$ROOT/bin/fm-composer-lib.sh"
 dsh_frame_top="  ╭$(printf '─%.0s' $(seq 1 87))╮"

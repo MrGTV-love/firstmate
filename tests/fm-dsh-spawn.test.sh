@@ -41,16 +41,17 @@ KNOWN_EMAIL=operator-known@example.test
 
 # Processes whose kernel-recorded identity is a bare dsh name: symlinks to the
 # system shell, never copies (a copied platform binary fails macOS code
-# signing). A node-named symlink running a script under a @deepseek-ai/dsh path
-# proves the argv evidence a real node-hosted dsh carries.
+# signing). A node-named symlink running a script inside a
+# @deepseek-harness-tui/dsh-tui package directory proves the argv evidence a
+# real node-hosted dsh-tui carries.
 make_dsh_processes() {  # <dir> -> echoes <bindir>
   local dir=$1 name
-  mkdir -p "$dir/node_modules/@deepseek-ai/dsh/lib" "$dir/node_modules/other" "$dir/node_modules/claude-tool"
+  mkdir -p "$dir/node_modules/@deepseek-harness-tui/dsh-tui/bin" "$dir/node_modules/other" "$dir/node_modules/claude-tool"
   for name in dsh dsh-tui dshd node; do
     ln -sf /bin/bash "$dir/$name"
   done
   # shellcheck disable=SC2016 # the body expands inside the named shell
-  printf '%s\n' 'export FM_ANCESTRY_FIXTURE_PID=$$' '"$1"' ':' > "$dir/node_modules/@deepseek-ai/dsh/lib/bin.js"
+  printf '%s\n' 'export FM_ANCESTRY_FIXTURE_PID=$$' '"$1"' ':' > "$dir/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js"
   # shellcheck disable=SC2016 # the body expands inside the named shell
   printf '%s\n' 'export FM_ANCESTRY_FIXTURE_PID=$$' '"$1"' ':' > "$dir/node_modules/other/unrelated.js"
   # shellcheck disable=SC2016 # the body expands inside the named shell
@@ -81,7 +82,7 @@ SH
     out=$("${clean[@]}" PATH="$bin:$PATH" "$bin/$name" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
     [ "$out" = dsh ] || fail "a process named $name must detect as dsh, got '$out'"
   done
-  out=$("${clean[@]}" PATH="$bin:$PATH" "$bin/node" "$bin/node_modules/@deepseek-ai/dsh/lib/bin.js" "$HARNESS")
+  out=$("${clean[@]}" PATH="$bin:$PATH" "$bin/node" "$bin/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js" "$HARNESS")
   [ "$out" = dsh ] || fail "a node argv naming the dsh script must detect as dsh, got '$out'"
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$("${clean[@]}" PATH="$bin:$PATH" "$bin/dshd" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
@@ -111,8 +112,10 @@ test_lock_identity_and_tmux_liveness_name_dsh() {
   fm_harness_process_matches dsh '' || fail "session-lock identity must accept the exact dsh name"
   fm_harness_process_matches dsh-tui '' || fail "session-lock identity must accept the exact dsh-tui name"
   fm_harness_process_matches /opt/nvm/bin/dsh-tui '' || fail "session-lock identity must accept a dsh-tui path"
-  fm_harness_process_matches node 'node /opt/lib/node_modules/@deepseek-ai/dsh/lib/bin.js --profile dsh-tui' \
-    || fail "session-lock identity must accept a node argv naming the dsh script"
+  fm_harness_process_matches node 'node /opt/homebrew/bin/dsh-tui --patch launch.yml -- brief' \
+    || fail "session-lock identity must accept the Homebrew dsh-tui launcher argv"
+  fm_harness_process_matches node 'node /opt/lib/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch launch.yml' \
+    || fail "session-lock identity must accept a node argv running a dsh-tui package script"
   ! fm_harness_process_matches dshd '' || fail "session-lock identity must not accept dshd"
   ! fm_harness_process_matches node 'node /tmp/unrelated.js' || fail "session-lock identity must not accept an unrelated node argv"
   # shellcheck source=bin/fm-backend.sh
@@ -121,8 +124,8 @@ test_lock_identity_and_tmux_liveness_name_dsh() {
   [ "$(fm_agent_process_classify_name dsh)" = agent ] || fail "tmux liveness must classify dsh as an agent"
   [ "$(fm_agent_process_classify_name /opt/nvm/bin/dsh-tui)" = agent ] || fail "tmux liveness must classify a dsh-tui path as an agent"
   [ "$(fm_agent_process_classify_name dshd)" != agent ] || fail "tmux liveness must not classify dshd as an agent"
-  [ "$(fm_agent_process_classify node '' 'node /opt/lib/node_modules/@deepseek-ai/dsh/lib/bin.js')" = agent ] \
-    || fail "shared process classification must accept a node argv naming the dsh script"
+  [ "$(fm_agent_process_classify node '' 'node /opt/homebrew/bin/dsh-tui --patch launch.yml')" = agent ] \
+    || fail "shared process classification must accept the Homebrew dsh-tui launcher argv"
   pass "session lock and process classification: dsh is anchored, decoys stay out"
 }
 
@@ -176,9 +179,9 @@ SH
     out=$(PATH="$fb:$base" bash -c '. "$0/bin/fm-backend.sh"; fm_backend_agent_state tmux sess:win' "$ROOT")
     [ "$out" = alive ] || fail "a live $comm foreground process should classify as alive, got '$out'"
   done
-  fb=$(make_node_pane "$TMP_ROOT/tmux-dsh-argv" 'node /opt/lib/node_modules/@deepseek-ai/dsh/lib/bin.js --profile dsh-tui')
+  fb=$(make_node_pane "$TMP_ROOT/tmux-dsh-argv" 'node /opt/homebrew/bin/dsh-tui --patch launch.yml -- brief')
   out=$(PATH="$fb:$base" bash -c '. "$0/bin/fm-backend.sh"; fm_backend_agent_state tmux sess:win' "$ROOT")
-  [ "$out" = alive ] || fail "a node foreground process running the dsh script should classify as alive, got '$out'"
+  [ "$out" = alive ] || fail "a node foreground process running the dsh-tui launcher should classify as alive, got '$out'"
   fb=$(make_node_pane "$TMP_ROOT/tmux-node-other" 'node /opt/lib/node_modules/other/unrelated.js')
   out=$(PATH="$fb:$base" bash -c '. "$0/bin/fm-backend.sh"; fm_backend_agent_state tmux sess:win' "$ROOT")
   [ "$out" != alive ] || fail "a node foreground process running another script must not classify as alive"

@@ -3,6 +3,8 @@
 # fm_dsh_executable and fm_dsh_cli resolve the machine installation from PATH.
 # fm_dsh_launch_check is read-only: it never bootstraps a missing profile.
 # fm-dsh.py owns per-launch HOME/profile staging and the durable JSONL fold.
+# fm_dsh_script_path names dsh-tui by its launcher name or by any script in a
+# @deepseek-harness-tui/dsh-tui package directory, installed or launch-staged.
 
 fm_dsh_executable() {
   local executable
@@ -39,7 +41,7 @@ fm_dsh_launch_check() {  # [executable]
 
 fm_dsh_script_path() {  # <path>
   case "$1" in
-    */@deepseek-ai/dsh/lib/bin.js|*/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js|*/@deepseek-harness-tui/dsh-tui/lib/types/dsh-adapter/host-entry.js) return 0 ;;
+    */dsh-tui|*/@deepseek-harness-tui/dsh-tui/*) return 0 ;;
   esac
   return 1
 }

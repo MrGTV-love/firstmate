@@ -2041,7 +2041,7 @@ Native Claude's default-account quota is not a TeamClaude proxy ledger, so a Tea
 Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
 
 Each fallback profile requires `harness`, `model`, and `effort`.
-An OMP fallback uses a concrete non-DeepSeek catalog selector; a dsh fallback uses a concrete DeepSeek model and the verified dsh-tui runtime; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
+An OMP fallback uses a concrete non-DeepSeek catalog selector; a dsh fallback uses a concrete DeepSeek model and a `dsh-tui` launcher and `dsh` CLI whose version commands succeed; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 Every fallback destination must also satisfy the home's session launch policy.
 A bare `claude` executable or a shell alias is not proof of that route.
 For example, a rule may declare `"fallback": [{"harness": "dsh", "model": "deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only that declared model stand-in, reached through dsh-tui rather than omp.

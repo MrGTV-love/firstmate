@@ -21,10 +21,13 @@ position STATE ID prints the live session log and its last durable seq as JSON,
 or nothing before the launch has a log.
 state STATE ID [--since POSITION] folds only the newest depth-zero session in
 that launch's plain JSONL store, from its newest turn/start (or the last MiB,
-whichever reaches further back), however large that turn is. Missing, corrupt,
-or unsupported data is unknown. With --since, anything recorded at or before
-POSITION is history: a turn must have started beyond it, or the state is
-unknown.
+whichever reaches further back), however large that turn is. Each session
+directory's highest-numbered session.v*.jsonl is read whatever its number,
+and admitted by behavior: a session header, then events with a type and a
+strictly increasing integer seq. Missing data, or data that fails one of
+those checks, prints "unknown: <the failed check>". With --since, anything
+recorded at or before POSITION is history: a turn must have started beyond
+it, or the state is unknown.
 route MODEL [PROVIDER] prints the default model-family adapter.
 check HARNESS MODEL [PROVIDER] requires dsh for DeepSeek and refuses dsh
 unless the model is a concrete DeepSeek id: a deepseek/ prefix (or provider
@@ -174,13 +177,17 @@ def session_path(binding):
                 logs.append((int(version), path))
         if not logs:
             continue
-        version, path = max(logs)
+        path = max(logs)[1]
         with path.open("rb") as stream:
-            header = json.loads(stream.readline(65536))
+            line = stream.readline(65536)
+        try:
+            header = json.loads(line)
+        except ValueError:
+            header = None
+        if not isinstance(header, dict) or header.get("type") != "session":
+            raise ValueError(f"{path} does not open with a session header")
         if header.get("delegationDepth") != 0 or header.get("cwd") != binding["cwd"]:
             continue
-        if version != 4 or header.get("version") != 4 or header.get("type") != "session":
-            return "unknown"
         candidates.append(path)
     if not candidates:
         return None
@@ -223,7 +230,13 @@ def last_turn_start(stream, committed):
         if begin:
             carry = lines.pop(0)[1] + b"\n"
         for offset, line in reversed(lines):
-            if b"turn/start" in line and json.loads(line).get("type") == "turn/start":
+            if b"turn/start" not in line:
+                continue
+            try:
+                event = json.loads(line)
+            except ValueError:
+                raise ValueError(f"dsh session log has an unparseable event at byte {offset}") from None
+            if isinstance(event, dict) and event.get("type") == "turn/start":
                 return offset
         end = begin
     return 0
@@ -243,12 +256,19 @@ def fold(path):
         for line in stream:
             if not line.endswith(b"\n"):
                 break  # An incomplete append is not a committed event.
-            event = json.loads(line)
-            if event.get("type") == "session":
+            try:
+                event = json.loads(line)
+            except ValueError:
+                raise ValueError(f"dsh session log has an unparseable event after seq {last_seq}") from None
+            if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+                raise ValueError(f"dsh session log has an event without a type after seq {last_seq}")
+            if event["type"] == "session":
                 continue
             seq = event.get("seq")
-            if not isinstance(seq, int) or seq <= last_seq:
-                raise ValueError("dsh session log has a non-monotonic sequence")
+            if not isinstance(seq, int):
+                raise ValueError(f"dsh session log has a {event['type']} event without an integer seq after seq {last_seq}")
+            if seq <= last_seq:
+                raise ValueError(f"dsh session log has a non-monotonic sequence: seq {seq} after {last_seq}")
             last_seq = seq
             if event.get("type") == "turn/start":
                 result = "busy"
@@ -260,11 +280,13 @@ def fold(path):
 
 def turn_state(state, task, since=None):
     path = live_log(state, task)
-    if not isinstance(path, Path):
-        return "unknown"
+    if path is None:
+        raise ValueError("no depth-zero dsh session log yet")
     result, _, started = fold(path)
+    if result == "unknown":
+        raise ValueError("dsh session log has no turn/start or turn/end yet")
     if since is not None and started <= (since[1] if since[0] == str(path) else -1):
-        return "unknown"
+        raise ValueError("no turn started beyond the launch position")
     return result
 
 
@@ -272,8 +294,6 @@ def position(state, task):
     path = live_log(state, task)
     if path is None:
         return None
-    if not isinstance(path, Path):
-        raise ValueError("dsh session log is unreadable")
     return [str(path), fold(path)[1]]
 
 
@@ -289,7 +309,7 @@ def resume(args):
     if (binding.get("model"), binding.get("effort"), binding["cwd"]) != (model, effort, str(Path(cwd).resolve())):
         return
     path = session_path(binding)
-    if not isinstance(path, Path):
+    if path is None:
         return
     session = resume_target(path)
     root = Path(binding["root"])
@@ -300,7 +320,7 @@ def resume(args):
 def session_file(args):
     state, task = args
     path = live_log(state, task)
-    if isinstance(path, Path):
+    if path is not None:
         print(path)
 
 
@@ -351,8 +371,10 @@ def main():
         elif args.command == "state":
             try:
                 print(turn_state(args.state, args.task, json.loads(args.since) if args.since else None))
-            except (OSError, ValueError, KeyError, TypeError):
-                print("unknown")
+            except KeyError as error:
+                print(f"unknown: dsh session binding lacks {error}")
+            except (OSError, ValueError, TypeError) as error:
+                print(f"unknown: {error}")
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

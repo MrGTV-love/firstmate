@@ -5645,6 +5645,7 @@ dsh_wait_for_start() {
         fi
         DSH_START_ERROR=${parse_error#error: }
         ;;
+      unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;;
     esac
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"

@@ -231,7 +231,7 @@ if fm_dispatch_fallback_supported "$TMP_ROOT/config" '{"harness":"omp","model":"
 fi
 printf '#!/bin/sh\nprintf "probe-failed\n"\nexit 1\n' > "$FAKEBIN/dsh"
 if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$deepseek" '{"status":"exhausted"}' > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
-  fail "an unavailable verified dsh runtime must not fall back to omp"
+  fail "a dsh runtime whose CLI probe fails must not fall back to omp"
 fi
 pass "DeepSeek replacements require dsh-tui under the session policy and never fall back to omp"
 printf '# all fm-dispatch-capacity tests passed\n'
