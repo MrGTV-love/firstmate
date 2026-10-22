@@ -188,10 +188,12 @@ SH
 run_pr_merge() {  # <home> <id> <url>
   local home=$1
   shift
-  # Each fixture merge carries the captain's explicit words for the live head.
-  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-review-record.py" captain-word \
+  # Each fixture merge carries an independent PASS for the live head.
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-review-record.py" review \
     --pr "$2" --head 1111111111111111111111111111111111111111 \
-    --words 'Merge the approved pull request.' >/dev/null || return
+    --verdict PASS --reader-family anthropic --author-groups '{"all":["openai"]}' \
+    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
+    --report "$home/review.md" >/dev/null || return
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" FM_TEST_GH_LOG="$home/gh.log" \
