@@ -271,8 +271,8 @@ function labPermitted(home: string): boolean {
 // inspection. The test is deliberately conservative: any redirection,
 // substitution, expansion, quoting, sequencing or background operator
 // disqualifies the command, every pipeline segment must itself be a read-only
-// program, and options that write or execute disqualify it. Anything not
-// proven read-only is refused on an outage exactly as before.
+// program, and options that write or execute disqualify it. Outside the lab
+// admission, anything not proven read-only is refused on an outage as before.
 const READ_ONLY_PROGRAMS = new Set([
   "ls", "cat", "head", "tail", "wc", "stat", "du", "df", "pwd", "echo", "printf",
   "grep", "egrep", "fgrep", "ps", "pgrep", "uname", "id", "whoami",
