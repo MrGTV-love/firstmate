@@ -617,10 +617,10 @@ fm_remote_job_next_seq() { # [stage-dir destination]
     # created, and trusting that handed one sequence number to several callers.
     # bash's noclobber create is O_EXCL, so exactly one caller creates the
     # marker whatever mkdir claimed.
-    # Only this reservation is hardened. The worker singleton lock, a job's
-    # .claim, the AFK launch lock, and the busy-state writer lock still treat a
+    # The worker singleton lock and a job's .claim take fm_remote_job_mkdir_exclusive
+    # instead. The AFK launch lock and the busy-state writer lock still treat a
     # successful mkdir as exclusive ownership; their race window is far narrower
-    # and moving them to a shared exclusive-create helper is the follow-up in
+    # and moving them to that helper is the follow-up in
     # docs/remote-secondmates.md "Known limitation: mkdir-based locks".
     (umask 077; mkdir "$claim") 2>/dev/null || true
     if (umask 077; set -C; : > "$claim/owner") 2>/dev/null; then
@@ -1297,6 +1297,20 @@ fm_remote_job_reload_lock_release() { # <lock-link>
   fi
   rm -rf -- "$owner"
   FM_REMOTE_JOB_RELOAD_OWNER=
+  return "$status"
+}
+
+# Create a 0700 directory that is owned only by the caller whose mkdir created
+# it. A packaged mkdir may report success to every concurrent creator of one
+# path, so creators of the same path take that path's mutex around the mkdir;
+# serialized, a later creator always finds the directory and fails.
+fm_remote_job_mkdir_exclusive() { # <path>
+  local path=$1 status FM_REMOTE_JOB_RELOAD_OWNER=
+  [ ! -e "$path" ] && [ ! -L "$path" ] || return 1
+  fm_remote_job_reload_lock_acquire "$path.creating" || return 1
+  (umask 077; mkdir "$path")
+  status=$?
+  fm_remote_job_reload_lock_release "$path.creating" || true
   return "$status"
 }
 

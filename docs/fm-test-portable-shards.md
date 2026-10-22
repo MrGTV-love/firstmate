@@ -295,6 +295,7 @@ The bounds sit at true extremes, far above healthy duration, so a loaded runner 
 Inside `tests/fm-remote-secondmate-lifecycle-e2e.test.sh`, the remote recovery watcher wait allows 150 seconds of polling: the watcher's 120-second relaunch bound plus startup and wake overhead.
 It still requires a successful relaunch, exactly one captain-facing wake, the durable wake and relaunch records, a fresh live remote endpoint, and the preserved host route.
 This fixes the former 30-second observation window, which could stop a healthy relaunch before its own deadline; it does not change production relaunch bounds or CI job timeouts.
+The same test declares its inherited config inputs in `remote_env`, so adding unrelated production defaults cannot lengthen its bounded inheritance and launch-barrier setup.
 
 [`tests/fm-ci-workflow.test.sh`](../tests/fm-ci-workflow.test.sh) holds the policy against the parsed workflow: every job belongs to exactly one tier, the workflow carries exactly three distinct job-level values, the fast tier stays within 5-10 minutes, the normal jobs share one 60-minute budget, and the Herdr family-run step is the 60-minute tripwire below its 120-minute job backstop with an `always()` teardown after it.
 A passing coverage guard does not establish a healthy job duration; refresh the healthy figures above from the lanes' uploaded timing artifacts.
