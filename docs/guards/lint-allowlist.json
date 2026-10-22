@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "note": "Entries may only shrink. bin/fm-guard-lint.sh fails on a stale entry, so removing the last occurrence is how this file empties.",
+  "allowed": []
+}
