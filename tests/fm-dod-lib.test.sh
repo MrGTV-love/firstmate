@@ -71,7 +71,7 @@ EOF
 # Exercise the executable plan interface, including nested criteria and fenced
 # examples, rather than asserting the library's implementation text.
 test_verification_plan_keeps_criteria_separate_from_intent() {
-  local brief="$TMP_ROOT/plan-brief.md" plan criteria="$TMP_ROOT/plan-criteria.md"
+  local brief="$TMP_ROOT/plan-brief.md" plan out criteria="$TMP_ROOT/plan-criteria.md"
   cat > "$brief" <<'EOF'
 # Task
 ## Captain's intent
@@ -144,6 +144,40 @@ EOF
   assert_not_contains "$plan" 'Out-of-scope list: absent' 'present exclusions were reported absent'
   [ "$(printf '%s\n' "$plan" | grep -c 'Do not change the dashboard layout.')" -eq 1 ] \
     || fail 'a marker line inside the subsection was printed twice'
+
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+### Out of scope
+- Captain exclusion A.
+## Firstmate spec
+Keep the existing renderer.
+### Out of scope
+- Spec exclusion B.
+#### Detail
+- Spec exclusion C.
+### Implementation
+Build notes are not exclusions.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'multi-subsection exclusions failed'
+  assert_contains "$plan" 'Captain exclusion A.' 'the first Out of scope subsection was dropped'
+  assert_contains "$plan" 'Spec exclusion B.' 'a later Out of scope subsection was dropped'
+  assert_contains "$plan" 'Spec exclusion C.' 'a nested list inside an Out of scope subsection was dropped'
+  assert_not_contains "$plan" 'Build notes are not exclusions.' 'a following subsection leaked into exclusions'
+  [ "$(printf '%s\n' "$plan" | grep -c 'exclusion [ABC]\.')" -eq 3 ] \
+    || fail 'an Out of scope subsection was printed more than once'
+  case "$plan" in
+    *'Captain exclusion A.'*'Spec exclusion B.'*) ;;
+    *) fail 'Out of scope subsections were not printed in brief order' ;;
+  esac
+  plan=$(cd "$ROOT/bin" && bash fm-dod-lib.sh --verification-plan "$brief" 2>&1) \
+    || fail "a relative builder path could not find the shared rubric: $plan"
+  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'a relative builder path lost the rubric'
+  if out=$(fm_dod_block no-mistakes no-brief-task 2>&1); then
+    fail 'a no-mistakes contract rendered without its durable brief'
+  fi
+  assert_contains "$out" 'needs the durable task brief' 'missing-brief refusal was not actionable'
 
   printf 'A failed refresh retains the last known value.\n' > "$criteria"
   cat > "$brief" <<EOF
@@ -559,7 +593,7 @@ test_pr_based_dod_draft_check_uses_gh_axi() {
   local mode out
   for mode in direct-PR no-mistakes; do
     out="$TMP_ROOT/dod-$mode.md"
-    fm_dod_block "$mode" dod-draft-task > "$out"
+    fm_dod_block "$mode" dod-draft-task fm/dod-draft-task none '' '' "$TMP_ROOT/dod-draft-task/brief.md" > "$out"
     assert_no_grep 'gh pr view' "$out" "$mode: DoD must not document a raw gh draft check"
     # shellcheck disable=SC2016  # single quotes are deliberate: the backticks must stay literal
     assert_grep 'confirm it is not a draft (`gh-axi pr view <number>` must print `draft: no`' "$out" \
