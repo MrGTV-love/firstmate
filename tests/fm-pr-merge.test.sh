@@ -697,7 +697,7 @@ record_review() {
   shift 3
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
-      --verdict PASS --reader-family anthropic --author-groups '{"all":["openai"]}' \
+      --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
       --report "$case_dir/review.md" "$@"
 }
@@ -2997,7 +2997,7 @@ test_review_record_validation_and_latest() {
   case_dir=$(make_case review-record-fields)
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
-  for bad in missing-report invalid-verdict invalid-url empty-words empty-groups unknown-reader unknown-author captain-head; do
+  for bad in missing-report invalid-verdict invalid-url empty-words empty-groups blank-reader blank-author captain-head; do
     rc=0
     case "$bad" in
       missing-report) record_review "$case_dir" "$url" "$head" --report '' > "$case_dir/out" 2>&1 || rc=$? ;;
@@ -3005,8 +3005,8 @@ test_review_record_validation_and_latest() {
       invalid-url) record_review "$case_dir" nonsense "$head" > "$case_dir/out" 2>&1 || rc=$? ;;
       empty-words) review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words '' > "$case_dir/out" 2>&1 || rc=$? ;;
       empty-groups) record_review "$case_dir" "$url" "$head" --author-groups '{}' > "$case_dir/out" 2>&1 || rc=$? ;;
-      unknown-reader) record_review "$case_dir" "$url" "$head" --reader-family mistral > "$case_dir/out" 2>&1 || rc=$? ;;
-      unknown-author) record_review "$case_dir" "$url" "$head" --author-groups '{"all":["anthropic-ish"]}' > "$case_dir/out" 2>&1 || rc=$? ;;
+      blank-reader) record_review "$case_dir" "$url" "$head" --reader-model '' > "$case_dir/out" 2>&1 || rc=$? ;;
+      blank-author) record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt 5"]}' > "$case_dir/out" 2>&1 || rc=$? ;;
       captain-head) review_record_command "$case_dir" captain-word --pr "$url" --head main --words 'Merge it.' > "$case_dir/out" 2>&1 || rc=$? ;;
     esac
     expect_code 2 "$rc" "$bad must refuse invalid field"
@@ -3016,7 +3016,8 @@ test_review_record_validation_and_latest() {
       invalid-url) assert_grep pr "$case_dir/out" "invalid PR named" ;;
       empty-words) assert_grep words "$case_dir/out" "empty words named" ;;
       empty-groups) assert_grep author_groups "$case_dir/out" "empty authors named" ;;
-      unknown-reader|unknown-author) assert_grep 'family must be one of anthropic' "$case_dir/out" "$bad family named" ;;
+      blank-reader) assert_grep 'reader_model must be an exact model id' "$case_dir/out" "blank reader model named" ;;
+      blank-author) assert_grep 'author_groups model must be an exact model id' "$case_dir/out" "invalid author model named" ;;
       captain-head) assert_grep head "$case_dir/out" "captain-word head named" ;;
     esac
   done
@@ -3029,12 +3030,14 @@ test_review_record_validation_and_latest() {
   [ ! -e "$case_dir/no-such-home" ] || fail "a missing home must not be created"
   record_review "$case_dir" "$url" "$head" --verdict FAIL > /dev/null || fail "record FAIL"
   cp "$case_dir/state/review-records.jsonl" "$case_dir/first-record"
-  record_review "$case_dir" "$url" "$head" --reader-family Claude \
-    --author-groups '{"initial":["codex"],"fixes":["Gemini","gpt"]}' > /dev/null || fail "record grouped PASS"
+  record_review "$case_dir" "$url" "$head" --reader-model Claude-Sonnet-5-5 \
+    --author-groups '{"initial":["openai-codex/gpt-5.1-codex"],"fixes":["Gemini-3-Pro","o3"]}' > /dev/null || fail "record grouped PASS"
   review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read newest record"
   "$JQ_BIN" -e --arg pr "$url" --arg head "$head" --arg report "$case_dir/review.md" '
     .review | .pr == $pr and .head == $head and .verdict == "PASS"
-    and .reader_family == "anthropic" and .author_groups == {initial:["openai"],fixes:["google","openai"]}
+    and .reader_model == "Claude-Sonnet-5-5" and .reader_family == "anthropic"
+    and .author_groups == {initial:[{model:"openai-codex/gpt-5.1-codex",family:"openai"}],
+      fixes:[{model:"Gemini-3-Pro",family:"google"},{model:"o3",family:"openai"}]}
     and .loosens_deny_allow_list == "no" and .widens_guard == "no"
     and .customer_data_billing_spend == "no" and .report == $report' "$case_dir/latest" >/dev/null \
     || fail "latest must preserve all review fields and groups"
@@ -3046,18 +3049,40 @@ test_review_record_validation_and_latest() {
   pass "review helper validates fields, retains history, and returns newest canonical grouped evidence"
 }
 
+test_review_record_derives_model_families() {
+  local case_dir head url
+  case_dir=$(make_case review-model-families)
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  record_review "$case_dir" "$url" "$head" --reader-model openrouter/x-ai/grok-4 --author-groups '{
+    "a":["claude-opus-5-5[1m]","anthropic/claude-haiku-5-5"],"o":["gpt-5.1-codex","chatgpt-4o","o4-mini","codex-mini"],
+    "g":["gemini-3-pro","gemma-3"],"d":["deepseek-v4"],"m":["kimi-k2","moonshot-v1"],"l":["llama-4-maverick"],
+    "u":["mistral-large","opus-5"]}' > /dev/null || fail "record every family"
+  review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read derived families"
+  "$JQ_BIN" -e '.review | .reader_family == "xai" and (.author_groups | map_values(map(.family))) ==
+    {a:["anthropic","anthropic"],o:["openai","openai","openai","openai"],g:["google","google"],
+     d:["deepseek"],m:["moonshot","moonshot"],l:["meta"],u:["unknown","unknown"]}' "$case_dir/latest" >/dev/null \
+    || fail "model ids must derive their closed-set family, with unknown otherwise: $(cat "$case_dir/latest")"
+  pass "review helper derives each family from the exact model id and records unknown otherwise"
+}
+
 test_recorded_review_merge_conditions() {
   local case_dir head url scenario rc expected
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
-  for scenario in stale same-family alias-family fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail; do
+  for scenario in stale same-family same-family-model cross-family-model unknown-reader unknown-author-captain fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail; do
     case_dir=$(make_case "review-$scenario")
     : > "$case_dir/explicit-review"
     add_gh_mocks "$case_dir" "$head"
     case "$scenario" in
       stale) record_review "$case_dir" "$url" 2222222222222222222222222222222222222222 >/dev/null; expected='head mismatch' ;;
-      same-family) record_review "$case_dir" "$url" "$head" --author-groups '{"initial":["openai"],"fixes":["anthropic"]}' >/dev/null; expected=reader_family ;;
-      alias-family) record_review "$case_dir" "$url" "$head" --reader-family claude --author-groups '{"all":["anthropic"]}' >/dev/null; expected='reader_family anthropic' ;;
+      same-family) record_review "$case_dir" "$url" "$head" --author-groups '{"initial":["gpt-5.1-codex"],"fixes":["claude-opus-5-5"]}' >/dev/null; expected=reader_family ;;
+      same-family-model) record_review "$case_dir" "$url" "$head" --reader-model claude-sonnet-5-5 --author-groups '{"all":["claude-bridge/claude-opus-5-5"]}' >/dev/null; expected='reader_family anthropic (claude-sonnet-5-5) matches author_groups all (claude-bridge/claude-opus-5-5)' ;;
+      cross-family-model) record_review "$case_dir" "$url" "$head" --author-groups '{"all":["kimi-k2"]}' >/dev/null ;;
+      unknown-reader) record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null; expected='model family unknown for mistral-large' ;;
+      unknown-author-captain)
+        record_review "$case_dir" "$url" "$head" --author-groups '{"all":["mistral-large"]}' >/dev/null
+        review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9 despite the unknown author family.' >/dev/null ;;
       fail) record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null; expected=verdict ;;
       newest-fail)
         record_review "$case_dir" "$url" "$head" >/dev/null
@@ -3086,7 +3111,7 @@ test_recorded_review_merge_conditions() {
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|captain-word|captain-only)
+      valid|captain-word|captain-only|cross-family-model|unknown-author-captain)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -3115,6 +3140,7 @@ test_missing_review_record_refuses() {
 
 test_missing_review_record_refuses
 test_review_record_validation_and_latest
+test_review_record_derives_model_families
 test_recorded_review_merge_conditions
 test_github_zero_exit_queue_required_refuses_with_exact_retry
 test_github_closed_unqueued_outcome_omits_retry_flags

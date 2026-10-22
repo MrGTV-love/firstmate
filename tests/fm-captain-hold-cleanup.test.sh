@@ -2080,6 +2080,10 @@ test_released_merge_passes_the_entrypoint_and_lands() {
   show=$(tasks_in "$home" show "$id" --full) || fail "the released merge task disappeared"
   assert_not_contains "$show" "hold_kind: captain" \
     "the approved merge remained captain-held after its release"
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-review-record.py" captain-word \
+    --pr "$pr" --head 1111111111111111111111111111111111111111 \
+    --words "$(cat "$home/merge-answer.txt")" >/dev/null \
+    || fail "could not record the captain's released merge words"
   run_pr_merge "$home" "$id" "$pr" > "$home/merge.out" 2> "$home/merge.err" \
     || fail "the released merge was refused: $(cat "$home/merge.err")"
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
