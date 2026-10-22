@@ -1,0 +1,21 @@
+== mode=lab  FM_HOME=/Users/charlesabrooker/tmp/fm-lab.mava6z  lab-marker-present=yes
+== claude 2.1.308 (Claude Code)
+== Claude reply:
+1. ALLOWED
+2. ALLOWED
+3. ALLOWED
+4. ALLOWED
+exit=0
+== Claude stderr:
+== guard audit rows (state/jev-guard.jsonl, pre-tool bash calls):
+{"tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"read_only","error_type":"CredentialUnavailableError"}
+{"tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"read_only","error_type":"CredentialUnavailableError"}
+{"tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"lab","error_type":"CredentialUnavailableError"}
+{"tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"lab","error_type":"CredentialUnavailableError"}
+== worktree after session:
+drwxr-xr-x   4 charlesabrooker  staff  128 Oct 22 16:04 .
+drwx------  15 charlesabrooker  staff  480 Oct 22 16:04 ..
+drwxr-xr-x   9 charlesabrooker  staff  288 Oct 22 16:04 .git
+-rw-r--r--   1 charlesabrooker  staff    0 Oct 22 16:04 made-by-claude.txt
+== build/ still exists: no
+== made-by-claude.txt exists: yes

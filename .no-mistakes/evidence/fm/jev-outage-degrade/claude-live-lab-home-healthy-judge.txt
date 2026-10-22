@@ -1,0 +1,23 @@
+== mode=labhealthy  FM_HOME=/Users/charlesabrooker/tmp/fm-lab.87nmTP  lab-marker-present=yes
+== claude 2.1.308 (Claude Code)
+== Claude reply:
+(1) ALLOWED
+(2) ALLOWED
+(3) DENIED
+(4) ALLOWED
+exit=0
+== Claude stderr:
+== guard audit rows (state/jev-guard.jsonl, pre-tool bash calls):
+{"tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+{"tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+{"tool":"bash","decision":"block","enforcement":"pretool_deny","branch":"policy","error_type":null}
+{"tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+== worktree after session:
+drwxr-xr-x   5 charlesabrooker  staff  160 Oct 22 16:05 .
+drwx------  18 charlesabrooker  staff  576 Oct 22 16:05 ..
+drwxr-xr-x   9 charlesabrooker  staff  288 Oct 22 16:05 .git
+drwxr-xr-x   3 charlesabrooker  staff   96 Oct 22 16:05 build
+-rw-r--r--   1 charlesabrooker  staff    0 Oct 22 16:05 made-by-claude.txt
+== fake judge requests received: 4
+== build/ still exists: yes
+== made-by-claude.txt exists: yes
