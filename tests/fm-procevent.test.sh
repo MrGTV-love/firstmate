@@ -3621,27 +3621,36 @@ printf '%s\n%s\nold-token\nold-identity\n' "$TMP_ROOT/gone-home" 999999 > "$FM_P
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 race_pids=()
 for race_index in $(seq 1 24); do
+  : > "$TMP_ROOT/race-contender-$race_index.out"
   pe "$HR" start race-src > "$TMP_ROOT/race-contender-$race_index.out" 2>&1 &
   race_pids+=("$!")
 done
-# Wait for every loser to observe the winning claim before starting the source
-# marker deadline: the winner must reacquire the same source lock for its launch
-# floor after the contenders' expensive claim reads. The winner blocks until the
-# trigger, so every other contender finishing is the loser's own completion,
-# not a settle sleep that lets late contenders arrive after ownership is released.
-# A second runner also blocks, and stops this wait on its second start marker.
+# Wait for every loser to record that it observed the winning claim before
+# waiting on the source marker: the winner must reacquire the same source lock
+# for its launch floor after the contenders' expensive claim reads. The winner
+# blocks until the trigger, so each loser's record is its own completion, not a
+# settle sleep that lets late contenders arrive after ownership is released.
+# Only a stretch with no new record fails this wait, however long the whole
+# group takes. A second runner also blocks, and stops this wait on its second
+# start marker.
 race_expected_losers=$((${#race_pids[@]} - 1))
-race_deadline=$((SECONDS + 30))
+race_observed_losers() {
+  awk '/^already owned: race-src$/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
+    "$TMP_ROOT"/race-contender-*.out
+}
+race_progress=0
+race_progress_deadline=$((SECONDS + 30))
 while :; do
-  race_running=0
-  for race_pid in "${race_pids[@]}"; do
-    kill -0 "$race_pid" 2>/dev/null && race_running=$((race_running + 1))
-  done
-  [ "$race_running" -le 1 ] && break
+  race_losers=$(race_observed_losers)
+  [ "$race_losers" -ge "$race_expected_losers" ] && break
   [ ! -e "$RACE_LOG" ] || [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || break
-  if [ "$SECONDS" -ge "$race_deadline" ]; then
+  if [ "$race_losers" -gt "$race_progress" ]; then
+    race_progress=$race_losers
+    race_progress_deadline=$((SECONDS + 30))
+  fi
+  if [ "$SECONDS" -ge "$race_progress_deadline" ]; then
     cat "$TMP_ROOT"/race-contender-*.out >&2
-    fail "stale-claim contenders did not finish observing the winning owner"
+    fail "stale-claim contenders stopped observing the winning owner"
   fi
   sleep 0.1
 done
@@ -3649,8 +3658,7 @@ if ! wait_for "$RACE_LOG" 300; then
   cat "$TMP_ROOT"/race-contender-*.out >&2
   fail "no contender acquired the stale claim"
 fi
-race_losers=$(awk '/already owned/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
-  "$TMP_ROOT"/race-contender-*.out)
+race_losers=$(race_observed_losers)
 if [ "$race_losers" -ne "$race_expected_losers" ]; then
   cat "$TMP_ROOT"/race-contender-*.out >&2
   fail "not every stale-claim contender observed the winning owner"
