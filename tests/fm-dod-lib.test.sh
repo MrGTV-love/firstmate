@@ -743,4 +743,25 @@ test_worker_role_names_skill_and_fallback_file() {
 
 test_worker_role_names_skill_and_fallback_file
 
+# Independent review readers may not hold a read grant for the rubric owner, so
+# the emitted launch role must carry its full text and refuse without it.
+test_worker_role_renders_shared_rubric() {
+  local role_file line missing="$TMP_ROOT/rubric-less-root"
+  role_file="$TMP_ROOT/worker-role-rubric.txt"
+  fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$ROOT" >"$role_file"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    grep -qxF -- "$line" "$role_file" || fail "worker role did not render rubric line: $line"
+  done <"$ROOT/docs/review-rubric.md"
+  assert_grep "apply the shared review rubric below, rendered from \`$ROOT/docs/review-rubric.md\`" "$role_file" \
+    "worker role did not introduce the rendered rubric"
+  mkdir -p "$missing"
+  if fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$missing" >/dev/null 2>&1; then
+    fail "worker role rendered without the shared rubric"
+  fi
+  pass "worker role renders the shared rubric and refuses without it"
+}
+
+test_worker_role_renders_shared_rubric
+
 echo "all fm-dod-lib tests passed"

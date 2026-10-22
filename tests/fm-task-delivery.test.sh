@@ -1139,6 +1139,7 @@ EOF
     assert_not_contains "$out" 'has no concrete ask' 'substantive ask plus reference was refused'
     assert_present "$home/data/$id/launch-brief.md" 'substantive ask never reached launch rendering'
     assert_grep "$ROOT/docs/review-rubric.md" "$home/data/$id/launch-brief.md" 'independent readers did not receive the single rubric owner'
+    assert_grep 'Every factual claim in a PR body must be backed by a record' "$home/data/$id/launch-brief.md" 'independent readers did not receive the rendered rubric text'
   done
   # A marked pointer cannot be rescued by unmarked Firstmate build substance.
   id=ask-legacy-pointer
