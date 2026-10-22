@@ -2266,7 +2266,7 @@ test_teardown_after_a_joint_reassociation_refuses_what_it_cannot_prove() {
         out=$(run_case_teardown "$dir" "$ida") || fail "$shape: the first task's teardown failed: $out"
         add_copy "$dir" "$slot/.claude/worktrees/foreign" fm/foreign-copy
         # Uncommitted work keeps refusing the close; a copy held back only by
-        # unlanded commits is held instead (tests/fm-teardown.test.sh).
+        # unlanded commits is held instead (tests/fm-teardown-cleanup.test.sh).
         printf 'unsaved foreign work\n' > "$slot/.claude/worktrees/foreign/foreign.txt"
         joint_land "$nb"
         who=$idb

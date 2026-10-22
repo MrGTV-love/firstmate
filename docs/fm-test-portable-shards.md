@@ -156,11 +156,13 @@ Its 333 cases now run exactly once across three independently runnable files:
 All three source `tests/fm-teardown-helpers.sh`, which owns every fixture and assertion helper plus the working tree's temporary root, the birth-identity fixture registry, and the EXIT cleanup.
 Each invocation owns its temporary root, its registered cleanup, and its own process inspection, so the final `ok -` line appears once per file.
 Every case still builds and tears down its own sandbox through `make_case`, and selecting one case by name still works in the file that owns it.
-The three files stay serial: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md) records that its concurrent proof covered the former combined script.
+The three files stay serial in the CI lanes: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, which keeps them out of the mixed PORTABLE pool.
+A local `--family pr-forge` run at an admitted job count runs them concurrently with the family, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md#pr-forge-admitted) records the 2026-10-22 proof of that membership.
 `tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 333-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a shared-helper change to select its pr-forge family, and that family to keep all three.
 
 The first hints (272355, 439235, and 876070 ms) are the former combined 1587660 ms measurement apportioned by the groups' measured local Ubuntu 26.04 container times (199413, 321599, and 641441 ms of a 1162453 ms total), not by a CI measurement of the separate files.
-The intact suite and the three groups report the same 335 `ok -` lines and no failures in that container, which is the behavior-parity evidence for the split.
+On the pre-rebase 332-case inventory, the intact suite and the three groups reported the same 335 `ok -` lines and no failures in that container, which is the behavior-parity evidence for the split.
+The rebase then added upstream's `test_closeout_refusal_reports_tail_and_preserves_complete_output`, taken verbatim into `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 333; the 2026-10-22 pr-forge isolation proof ran all three group files to exit 0 on that 333-case head.
 Replace these hints from the groups' own `fm-test-timing-portable-serial-*` artifacts as soon as a CI run measures them.
 
 The same refresh raised the four successful measurements that grew by more than 30 seconds - `fm-teardown` (split above), `fm-pr-check-security` (342666 to 420272 ms), `fm-control-relaunch` (1318470 to 1358153 ms), and `fm-spawn-compact-adviser-disable-remote` (294998 to 352918 ms) - and added the four measured but previously unhinted serial members `fm-api-key-guard-lib` (3850), `fm-copy-sweep` (207702), `fm-friction-ledger` (2020), and `fm-jev-guard-audit` (1281 ms).
@@ -271,6 +273,7 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 `bin/fm-lint.sh` owns three canonical CI partitions, each attempting full source-aware ShellCheck analysis and running workflow validation and backend-purity checks.
 Its `fm_lint_partition_weight_hints` table contains the slowest successful per-root duration from the two partitions' `partition-N.roots.tsv` sidecars in the same three main runs used by the latest serial refresh.
 The seven captain-hold roots have no lint measurement of their own yet: their rows divide the former combined file's 12745 ms in proportion to each file's bytes, so refresh them from the next three main runs' sidecars.
+The four teardown rows (`tests/fm-teardown-cleanup.test.sh` 4219, `tests/fm-teardown-helpers.sh` 2194, `tests/fm-teardown-pool.test.sh` 2043, and `tests/fm-teardown.test.sh` 1830) divide the former combined file's measured 10286 ms by each file's line share; they are not measurements, so replace them from the lint sidecars of the next three Ubuntu main runs.
 The telemetry records ShellCheck 0.11.0 on Linux x86_64, Ubuntu 24, image `20261004.327.1`.
 Longest-processing-time packing uses those durations, not direct file bytes: equal byte totals previously carried 1240 and 1781 seconds of measured lint work in run 38312847224.
 The script header owns missing-root fallback and partition syntax; local worker balancing and its telemetry weight fields still use direct bytes.
