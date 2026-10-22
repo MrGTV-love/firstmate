@@ -38,6 +38,9 @@ fm_test_drop_file() {
 FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
 mkdir -p "$FIXTURE_ROOT"
 cp -R "$ROOT/bin" "$FIXTURE_ROOT/bin"
+# Worker launch roles render the code root's shared review rubric.
+mkdir -p "$FIXTURE_ROOT/docs"
+cp "$ROOT/docs/review-rubric.md" "$FIXTURE_ROOT/docs/review-rubric.md"
 git -C "$FIXTURE_ROOT" init -q
 # The self-repository publication gate needs a readable code-root history to
 # prove the unrelated fixture projects are not firstmate's own repository.
