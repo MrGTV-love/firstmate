@@ -99,6 +99,11 @@ EOF
   assert_not_contains "$plan" 'Firstmate-only build constraints' 'plan included mixed Firstmate specification'
   assert_not_contains "$plan" 'This grading prose' 'plan included the grading section'
   assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
+  assert_contains "$plan" 'Grade every DoD mandatory item pass or fail by its id, with the evidence' 'plan lost per-item grading'
+  assert_contains "$plan" 'A failed DoD mandatory item: block.' 'plan lost the failed-item outcome'
+  assert_contains "$plan" 'A real defect that breaks the stated intent, even when no DoD item names it: block.' 'plan lost the intent-defect outcome'
+  assert_contains "$plan" 'An improvement outside the DoD: a follow-up note, never a block.' 'plan lost the follow-up outcome'
+  assert_contains "$plan" 'A fix that would add scope beyond the intent: escalate to Main for the owner' 'plan lost the scope-escalation outcome'
   assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
 
   printf '# Task\nLegacy task.\n' > "$brief"
