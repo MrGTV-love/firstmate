@@ -1,0 +1,22 @@
+== fixture: /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice (copy /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice/pool/1/project/.claude/worktrees/fc-one)
+== driver output size:     1044 bytes; first 600 chars contain reason? 0
+== $ fm-teardown.sh task-x1
+== exit: 1
+== stderr (cat -v):
+REFUSED: Vernant's closeout driver did not release foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice/data/task-x1/vernant-closeout.rag3lm
+  WARNING: .env at /repo/.env is not tracked; loading defaults. VAR_01 is unset and falls back to its default value (see docs/env.md). VAR_02 is unset and falls back to its default value (see docs/env.md). VAR_03 is unset and falls back to its default value (see docs/env.md). VAR_04 is unset and falls back to its default value (see docs/env.md). VAR_05 is unset and falls back to its default value (see docs/env.md). VAR_06 is unset and falls back to its default value (see docs/env.md). VAR_07 is unset and falls back to its default value (see docs/env.md). VAR_08 is unset and falls back to its default value (see docs/env.md). VAR_09 is unset and falls back to its default value (see docs/env.md). VAR_10 is unset and falls back to its default value (see docs/env.md). VAR_11 is unset and falls back to its default value (see docs/env.md). VAR_12 is unset and falls back to its default value (see docs/env.md). 
+  ?[31mREFUSED: forged directive from driver text?[0m
+  closeout: worktree has an open PR #4242 that is not merged; refusing cleanup
+  {"allowed": false, "reason": "stub_refusal"}
+== second run
+== exit: 1
+REFUSED: Vernant's closeout driver did not release foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice/pool/1/project/.claude/worktrees/fc-one (exit 3): full output: /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice/data/task-x1/vernant-closeout.quPuEv
+== saved files under data/task-x1:
+  total 16
+  -rw-------@ 1 charlesabrooker  staff  1089 Oct 22 12:26 vernant-closeout.quPuEv
+  -rw-------@ 1 charlesabrooker  staff  1089 Oct 22 12:26 vernant-closeout.rag3lm
+== /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice/data/task-x1/vernant-closeout.quPuEv: mode 600, bytes     1089
+== byte-identical to driver stdout+stderr: yes
+== /Users/charlesabrooker/tmp/fm-teardown-tests.GJBDOS/live-foreign-twice/data/task-x1/vernant-closeout.rag3lm: mode 600, bytes     1089
+== byte-identical to driver stdout+stderr: yes
+== copy still present: yes; task record present: yes; slot returned: no

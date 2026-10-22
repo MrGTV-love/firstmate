@@ -1,0 +1,9 @@
+== fixture: /Users/charlesabrooker/tmp/fm-teardown-tests.ytwqGg/live-foreign-ok (copy /Users/charlesabrooker/tmp/fm-teardown-tests.ytwqGg/live-foreign-ok/pool/1/project/.claude/worktrees/fc-one)
+== driver output size:     1044 bytes; first 600 chars contain reason? 0
+== $ fm-teardown.sh task-x1
+== exit: 0
+== stderr (cat -v):
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.ytwqGg/live-foreign-ok/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.ytwqGg/live-foreign-ok/pool/1/project
+== saved files under data/task-x1:
+  ls: /Users/charlesabrooker/tmp/fm-teardown-tests.ytwqGg/live-foreign-ok/data/task-x1: No such file or directory
+== copy still present: no; task record present: no; slot returned: yes

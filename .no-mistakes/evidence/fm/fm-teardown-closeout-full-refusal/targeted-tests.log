@@ -1,0 +1,2 @@
+ok - own and foreign closeout refusals show the tail and save byte-identical full output; short output stays complete and successful output stays silent without a durable log
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place
