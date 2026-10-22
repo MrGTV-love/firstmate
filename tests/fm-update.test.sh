@@ -265,7 +265,10 @@ decode() { printf '%s' "$1" | base64 --decode 2>/dev/null || printf '%s' "$1" | 
 rargs=()
 while IFS= read -r -d '' a; do rargs+=("$a"); done < <(decode "$argv_b64")
 case "${rargs[1]:-}" in
-  update) printf 'synced: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' ;;
+  update)
+    if [ -n "${FM_TEST_UPDATE_REPLY:-}" ]; then cat "$FM_TEST_UPDATE_REPLY";
+    else printf 'synced: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'; fi
+    ;;
   state) printf 'alive\n' ;;
   *) exit 91 ;;
 esac
@@ -294,6 +297,16 @@ EOF
   assert_contains "$out" "nudge-secondmates: none" \
     "a restarted remote mate must not also be steered"
   pass "T3e a legacy remote advance still restarts the live remote mate"
+
+  # The original malformed update was not reproduced. This is the exact reply
+  # captured from an isolated gtt-cb home and worker, not the incident's bytes.
+  out=$(FM_TEST_UPDATE_REPLY="$ROOT/tests/fixtures/gtt-cb-fm-mini-scratch-update.txt" \
+    FM_TEST_SSH_BIN="$fake_ssh" run_update "$w")
+  assert_contains "$out" 'remote secondmate sm1: already current on remote-mac (93e65be73ad6289be95a8c02ee636dc19f2afd41)' \
+    "the captured gtt-cb current result was not accepted"
+  assert_contains "$out" 'restart-secondmates: fm-sm1' \
+    "the captured current result must retain the restart action"
+  pass "T3e captured gtt-cb scratch update is accepted without inventing an incident reproduction"
 }
 
 # --- T4: dirty secondmate is skipped, its edit preserved -------------------

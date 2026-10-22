@@ -33,7 +33,7 @@ TMUX_LOG="$TMP_ROOT/remote-tmux.log"
 TMUX_STATE="$TMP_ROOT/remote-tmux.state"
 CLAIMS="$TMP_ROOT/claims"
 mkdir -p "$PARENT/data" "$PARENT/state" "$PARENT/config" "$PARENT/projects" "$REMOTE_ROOT" "$CLAIMS"
-trap 'FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; rm -rf -- "$TMP_ROOT"' EXIT
+trap 'FM_HOME="$PARENT" FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true; if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then kill "$(cat "$TMP_ROOT/remote-jobs/worker.pid")" 2>/dev/null || true; fi; chmod -R u+w "$TMP_ROOT" 2>/dev/null || true; rm -rf -- "$TMP_ROOT"' EXIT
 
 # The remote host's tracked code root is this branch, as a real git repository:
 # fm-on and the remote entrypoint both require the dispatched command to be
@@ -125,6 +125,12 @@ cd "$FM_FAKE_REMOTE_CWD" || exit 93
 if printf '%s' "$4" | base64 --decode 2>/dev/null | tr '\0' '\n' | head -1 | grep -q '^fm-remote-doctor.sh$'; then
   printf 'ok: remote second-mate readiness confirmed on this host\n'
   exit 0
+fi
+decoded=$(printf '%s' "$4" | base64 --decode 2>/dev/null | tr '\0' '\n')
+if [ -n "${FM_TEST_ROUTE_REPLY:-}" ]; then
+  case "$decoded" in
+    fm-remote-secondmate-control.sh$'\n'launch$'\n'*) cat "$FM_TEST_ROUTE_REPLY"; exit 0 ;;
+  esac
 fi
 exec "$FM_FAKE_REMOTE_ENTRYPOINT" "$@"
 SH
@@ -282,6 +288,17 @@ assert_grep 'harness=omp' "$SECOND_HOME/state/parent-route/ios2.meta" "the remot
 assert_contains "$(remote_staged_launch)" '/bin/omp' "the remote pane was not told to run the omp executable"
 pass "omp: the remote host records the harness and its pane launches the omp executable"
 
+# A second --secondmate call must not masquerade as a restart. Keep the agent
+# and route intact even when the requested profile differs from the live one.
+REUSE_WRITES=$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)
+REUSE_OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex 2>&1); REUSE_RC=$?
+expect_code 0 "$REUSE_RC" "an existing remote agent should be reused"$'\n'"$REUSE_OUT"
+assert_contains "$REUSE_OUT" 'already-running ios2 harness=omp' "reuse must name its actual outcome and harness"
+assert_grep 'harness=omp' "$PARENT/state/ios2.meta" "the parent must reconcile to the live harness"
+[ "$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)" = "$REUSE_WRITES" ] \
+  || fail "reusing a remote endpoint sent pane or tab lifecycle input"
+pass "remote reuse: an existing agent is reported rather than claimed as a replacement"
+
 # The fixture's synthetic agent cannot prove live launch ownership, so the
 # relaunch must stop at that ordinary safety gate without typing into the pane.
 OMP_WRITES=$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)
@@ -346,5 +363,18 @@ try_flag 'requires a non-empty value' \
   "an empty carrier must be refused rather than silently ignored" \
   --secondmate --traceparent=
 pass "delivery: a parent-supplied carrier is accepted only for a secondmate launch and only as a strict W3C value"
+
+# The 2026-10-22 gtt-cb route was valid, but its alive agent ran omp while
+# the parent still requested codex. Reuse must report and record the endpoint's
+# actual identity without claiming to have replaced it.
+REPLAY_OUT=$(FM_TEST_ROUTE_REPLY="$ROOT/tests/fixtures/gtt-cb-r2-route.txt" \
+  remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex 2>&1); REPLAY_RC=$?
+expect_code 0 "$REPLAY_RC" "the captured gtt-cb route was rejected"$'\n'"$REPLAY_OUT"
+assert_grep 'harness=omp' "$PARENT/state/ios2.meta" "reuse must record the actual harness"
+assert_grep 'model=openai-codex/gpt-6.1-sol' "$PARENT/state/ios2.meta" "reuse must record the actual model"
+assert_grep 'effort=high' "$PARENT/state/ios2.meta" "reuse must record the actual effort"
+assert_grep 'remote_target=fm-remote:w3:p2' "$PARENT/state/ios2.meta" "reuse must preserve the reported route"
+assert_not_contains "$REPLAY_OUT" 'spawned ios2' "an older host without a launch disposition cannot prove replacement"
+pass "captured gtt-cb route: actual identity is reconciled without claiming replacement"
 
 echo "ALL TESTS PASSED"

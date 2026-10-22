@@ -424,6 +424,16 @@ The primary then takes these steps:
 4. It asks the remote host to launch on Herdr in `fm-remote`.
 
 All remote secondmates on one host share `fm-remote` and retain separate `2ndmate-<id>` workspaces inside it.
+A live agent is retained, not restarted, even when its running profile differs from the requested profile.
+The parent reconciles its record to the host's confirmed harness, model, effort, and endpoint.
+The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns the launch-outcome labels, including the conservative report for a host that does not yet emit a launch disposition.
+
+### Release a background-task exit picker
+
+Use the ordinary [`stay` lifecycle command](agent-control.md#exit-and-the-background-task-picker) for a remote Claude second mate parked on that picker.
+The parent delegates to the owning host's local control plane, so the same picker, launch-ownership, and agent-alive proofs run beside the actual endpoint.
+This preserves the agent, its background work, the route, and unread steering; it does not perform a relaunch.
+Other parent-side lifecycle verbs retain their remote-placement refusal.
 
 ### Refused and unsupported launches
 

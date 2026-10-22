@@ -2366,7 +2366,7 @@ Refusing an Enter that would confirm a dialog restores an existing safety path, 
 
 `fm-control exit` answers the picker for a finished task and `fm-control stay` closes it for a live one, both under the proof in [agent lifecycle control](../agent-control.md#exit-and-the-background-task-picker).
 The two keys, Enter on the selected "Exit and stop tasks" row and Escape, are chosen from the vendor's own bundled source, read on 2026-10-15 from the installed Claude Code 2.1.301.
-That is a source reading, not an observation of a live pane: no live Claude session was driven for these two keys, and nothing below was measured through a terminal.
+That 2026-10-15 extraction was a source reading, not a live-pane observation; the later live release evidence is recorded below.
 
 ```sh
 B=$(readlink -f "$(type -P claude)")
@@ -2396,7 +2396,19 @@ What those lines establish, in the component that renders "Background work is ru
 The names `L`, `rt`, `Qt`, and the offsets are minifier output of this build and will change; refresh the extraction after a Claude upgrade rather than pinning them.
 `tests/fm-control.test.sh` covers, against a stubbed session provider: a finished ship and scout stopped through the confirming Enter with the postcondition verified; refusal for working, parked, blocked, paused, failed, unknown, and unreadable states, a busy record, a busy record that reads unknown (missing, malformed, gen-mismatch, or an untrusted source), unread steering in the inbox (refused whether the picker opens after the exit or was already open, and answered once the record is handled), an ambiguous or unreadable endpoint, a secondmate, another adapter, and `relaunch`; an already-open picker closed with Stay and the composer read again, with a hidden draft preserved; no key on an unrecognised dialog; and `stay` closing the picker, refusing any other screen, harness, or stopped agent, and reporting a picker that did not close.
 Those cases prove the control plane's decisions and key sequences, not what the real pane does with the keys.
-A live check needs a Claude session with a background shell running and its `/exit` typed; until one is recorded here, the keys' effect on a real pane stays a source-derived expectation.
+On 2026-10-22, the opt-in remote-stay guard verified Claude Code 2.1.308 in a named isolated Herdr lab through the guarded lab helper.
+It waited for the real Claude Stop hook after starting a background shell, opened the actual picker through `fm-control exit`, then released it through the parent `fm-control` remote route and required the same agent to acknowledge a queued steering record.
+The manual lab launch explicitly registered its observed idle Herdr status; the ordinary kernel process and matching launch-generation proof still authorized every lifecycle action.
+The route and unread record survived the release, and lab teardown completed with the default-session tripwire unchanged.
+This proves the release path, not the confirming-Enter path, and does not claim a live fleet recovery.
+The guard's exact observed result was:
+
+```text
+ok - 2.1.308 (Claude Code): remote stay releases the real picker, preserves the route and queued record, and the same agent acknowledges steering
+```
+
+Refresh that evidence with `FM_REMOTE_STAY_LIVE=1 bash tests/fm-remote-secondmate-stay-live-e2e.test.sh`.
+The recorded run used the home-owned lab helper override and the process-budget/duration wrappers; task-local commands and captures remain in private task evidence.
 
 ### Prune and respawn
 

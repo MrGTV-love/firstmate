@@ -191,8 +191,9 @@
 # are all refused - a lifecycle command delivered to the wrong endpoint is far
 # worse than a loud refusal.
 #
-# A remotely placed secondmate is refused by name: its agent runs on another
-# host, so no postcondition this plane verifies could be read for it here.
+# For a remotely placed secondmate, stay delegates to the owning host's local
+# control plane, which verifies the picker and live agent there. Other lifecycle
+# verbs refuse by placement because their postconditions cannot be read here.
 #
 # Runtime lifecycle boundaries (metadata-only authorization follows
 # docs/agent-control.md "Recovering an exited instruction owner"):
@@ -1320,9 +1321,16 @@ fi
 # `window=remote:<id>` can never match a local backend's required shape, so
 # nothing can be delivered to a wrong endpoint either way. What that refusal
 # cannot say is WHY, and "malformed metadata" is the wrong thing to tell an
-# operator about a correctly configured remote route. Name the placement
-# instead, using the same `remote_host` signal bin/fm-send.sh routes on.
+# operator about a correctly configured remote route. The stay verb delegates
+# its complete proof to the owning host; other verbs name the placement instead,
+# using the same `remote_host` signal bin/fm-send.sh routes on.
 if [ -n "$(fm_meta_get "$META" remote_host)" ]; then
+  if [ "$VERB" = stay ] && [ "$(fm_meta_get "$META" kind)" = secondmate ]; then
+    # The host-local control plane owns every picker and agent postcondition.
+    # Never interpret a successful transport return as a local endpoint proof.
+    "$SCRIPT_DIR/fm-on.sh" "$ID" fm-remote-secondmate-control.sh stay "$ID"
+    exit $?
+  fi
   die "task $ID is a remotely placed secondmate on $(fm_meta_get "$META" remote_host); its agent runs outside this home, so no lifecycle action here could verify that it interrupted, stopped, or came back. Drive its lifecycle on that host, and reconcile it through the secondmate recovery path rather than this plane"
 fi
 

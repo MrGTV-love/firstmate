@@ -99,6 +99,8 @@ Every other case keeps the refusal and names how to close the picker: a task who
 The state read happens only while the picker is showing, is bounded by `FM_CONTROL_CREW_STATE_WAIT`, and skips the forge read.
 `stay` sends nothing on any screen that is not exactly the recognised picker, on any harness other than Claude, or to a stopped agent.
 It never sends Ctrl+C or Ctrl+D, which the picker is configured to treat as an exit request.
+For a remotely placed secondmate, the parent routes `stay` to the owning host's ordinary local control plane, which verifies those same postconditions there; no local endpoint is touched by the parent.
+The [remote operation guide](remote-secondmates.md#release-a-background-task-exit-picker) describes the retained route and steering behavior.
 The [verification record](verification/runtime-backends.md#claude-background-task-exit-picker) states what is measured and what is read from the vendor's source.
 
 ## Transactional relaunch
