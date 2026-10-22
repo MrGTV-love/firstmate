@@ -1,0 +1,15 @@
+## FM_HOME=<labhome> fm-spawn.sh route-scout-4280 <lab>/project --scout --model deepseek/deepseek-v4-flash --effort high --backend tmux   (no --harness)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+warning: task route-scout-4280: <labhome>/data/route-scout-4280/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for route-scout-4280: unavailable - no TypeSafe or OpenRouter key
+spawned route-scout-4280 harness=dsh kind=scout window=primary:fm-route-scout-4280 worktree=<lab>/copy
+exit=0
+## recorded meta:
+window=primary:fm-route-scout-4280
+harness=dsh
+kind=scout
+model=deepseek/deepseek-v4-flash
+## fm-control.sh route-scout-4280 exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+stopped route-scout-4280 harness=dsh backend=tmux endpoint=primary:fm-route-scout-4280 worktree=<lab>/copy
+exit=0

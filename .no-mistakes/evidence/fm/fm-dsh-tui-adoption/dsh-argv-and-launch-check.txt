@@ -1,0 +1,22 @@
+## fm_dsh_args_are_dsh <argv>
+dsh      node /opt/homebrew/bin/dsh-tui --resume
+dsh      /opt/homebrew/Cellar/node/26.4.0/bin/node /opt/homebrew/bin/dsh-tui
+dsh      node /Users/x/.nvm/versions/node/v24.4.1/bin/dsh-tui
+dsh      node /Users/x/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/dist/whatever/new-entry.js
+dsh      MainThread /some/state/t.dsh/1/dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/lib/x.js
+not-dsh  node /opt/homebrew/bin/omp
+not-dsh  node /usr/lib/node_modules/@other/dsh-tui-fake/index.js
+not-dsh  python3 /opt/homebrew/bin/dsh-tui
+not-dsh  node
+not-dsh  /opt/homebrew/bin/dsh-tui
+
+## fm_dsh_launch_check with fake installs on PATH (no release pin)
+future   rc=0 
+odd      rc=0 
+tuifail  rc=1 error: dsh-tui version failed; inspect the launcher and installed profile
+clifail  rc=1 error: dsh --version failed; inspect the installed CLI
+notui    rc=1 error: dsh-tui executable not found on PATH; install dsh-tui
+nocli    rc=1 error: dsh CLI not found on PATH; install @deepseek-ai/dsh
+
+## real install on PATH
+real: rc=0 (/opt/homebrew/bin/dsh-tui, 0.2.1-rc.2)

@@ -1,0 +1,12 @@
+v4 log, turn open                            state=busy
+v5 log, turn closed (no version pin)         state=idle
+v9 log, new turn open                        state=busy
+v4 + v12 in one dir: newest by number (v12)  state=idle
+v5, no turn events                           state=unknown: dsh session log has no turn/start or turn/end yet
+v5, repeated seq                             state=unknown: dsh session log has a non-monotonic sequence: seq 5 after 5
+v5, event without seq                        state=unknown: dsh session log has a turn/start event without an integer seq after seq -1
+v5, string seq                               state=unknown: dsh session log has a turn/start event without an integer seq after seq -1
+v5, event without type                       state=unknown: dsh session log has an event without a type after seq -1
+v5, unparseable event                        state=unknown: dsh session log has an unparseable event at byte 141
+v5, no session header                        state=unknown: /Users/charlesabrooker/tmp/fm-dsh-fold.BxIeFs/root-nohdr/dsh/sessions/a/b/session.v5.jsonl does not open with a session header
+session.vx.jsonl only (non-numeric)          state=unknown: no depth-zero dsh session log yet

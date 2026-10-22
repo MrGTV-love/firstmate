@@ -1,0 +1,37 @@
+## FM_HOME=<labhome> fm-spawn.sh refuse-omp-2550 --relaunch --harness omp --model deepseek/deepseek-v4-flash --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: task refuse-omp-2550's endpoint reads 'ambiguous'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh refuse-omp-2550 exit)
+exit=1
+pane command after refusal: zsh
+## FM_HOME=<labhome> fm-spawn.sh refuse-claude-6262 --relaunch --harness claude --model deepseek/deepseek-v4-flash --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: DeepSeek runs through dsh-tui, not claude; select --harness dsh
+exit=1
+pane command after refusal: zsh
+## FM_HOME=<labhome> fm-spawn.sh refuse-dsh-11343 --relaunch --harness dsh --model claude-opus-4 --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: dsh runs only DeepSeek models, not 'claude-opus-4'
+exit=1
+pane command after refusal: zsh
+## FM_HOME=<labhome> fm-spawn.sh refuse-dsh-23016 --relaunch --harness dsh --model openai/gpt-5 --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: dsh runs only DeepSeek models, not 'openai/gpt-5'
+exit=1
+pane command after refusal: zsh
+## FM_HOME=<labhome> fm-spawn.sh refuse-dsh-11404 --relaunch --harness dsh --model deepseek/ --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: dsh requires an explicit DeepSeek model id
+exit=1
+pane command after refusal: zsh
+
+# retry omp case after the pane shell settles
+## FM_HOME=<labhome> fm-spawn.sh refuse-omp-12939 --relaunch --harness omp --model deepseek/deepseek-v4-flash --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+exit=1
+pane command after refusal: zsh
+## FM_HOME=<labhome> fm-spawn.sh refuse-omp-23841 --relaunch --harness omp --model deepseek/deepseek-v4-pro --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+exit=1
+pane command after refusal: zsh

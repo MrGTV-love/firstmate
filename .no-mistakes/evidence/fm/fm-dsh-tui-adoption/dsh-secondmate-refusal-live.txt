@@ -1,0 +1,8 @@
+## FM_HOME=<labhome> fm-spawn.sh sm-dsh-31545 <labhome>/sm-home --harness dsh --model deepseek/deepseek-v4-flash --secondmate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: dsh is a verified crewmate/scout adapter only and cannot run a secondmate yet; it has no primary supervision protocol. Select a harness verified for secondmates.
+exit=1
+## FM_HOME=<labhome> fm-spawn.sh sm-dsh-30853 <labhome>/sm-home --model deepseek/deepseek-v4-flash --secondmate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <labhome>
+error: DeepSeek runs through dsh-tui, not claude; select --harness dsh
+exit=1

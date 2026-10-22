@@ -1,0 +1,24 @@
+    run any command.
+
+    # Skill selection
+
+    Existing mandatory skill triggers in these instructions and your skill
+    index still apply first and unchanged.
+    Skill selection was unavailable for this task (no TypeSafe or
+    OpenRouter key). This does not mean no skill applies: check your skill
+    index for skills that fit this task before starting work.
+
+  ⚓ Thinking · 1s (ctrl+o to expand)
+
+  ⏺ FMROUTEOK
+
+  ╭──────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                        ⛶
+  ╰──────────────────────────────────────────────────────────────────────────╯
+                                                               7.3k/1.0M 0.7%
+   deepseek-v4-f… ·  hi… · cache 87… · ≈¥0.00 p… · co…   ctx 0.7% (7.3k/1.0m)
+
+
+
+
+
