@@ -3453,10 +3453,19 @@ fi
 # rather than read a second time.
 MODEL_STALE=
 if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  # A check that produced no verdict must never read as a clean one. stderr is
+  # captured rather than discarded so an unreadable catalog (a missing tool, an
+  # unlisted provider, a pinned account answering differently) is announced
+  # instead of silently clearing the model.
   if [ -n "$MODEL_CATALOG_READ" ]; then
-    MODEL_STALE=$(printf '%s\n' "$MODEL_CATALOG_READ" | FM_MODEL_FRESHNESS_CATALOG=stdin fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>/dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
+    MODEL_FRESHNESS_RAW=$(printf '%s\n' "$MODEL_CATALOG_READ" | FM_MODEL_FRESHNESS_CATALOG=stdin fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>&1) || MODEL_FRESHNESS_RAW=
   else
-    MODEL_STALE=$(fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
+    MODEL_FRESHNESS_RAW=$(fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>&1 </dev/null) || MODEL_FRESHNESS_RAW=
+  fi
+  MODEL_STALE=$(printf '%s\n' "$MODEL_FRESHNESS_RAW" | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1)
+  MODEL_FRESHNESS_NOTICE=$(printf '%s\n' "$MODEL_FRESHNESS_RAW" | sed -n 's/^model-freshness: notice: //p' | head -n 1)
+  if [ -z "$MODEL_STALE" ] && [ -n "$MODEL_FRESHNESS_NOTICE" ]; then
+    echo "warning: model freshness unverified - $MODEL_FRESHNESS_NOTICE" >&2
   fi
   if [ -n "$MODEL_STALE" ]; then
     if [ "$CAPTAIN_MODEL_PIN" = "$MODEL" ]; then
