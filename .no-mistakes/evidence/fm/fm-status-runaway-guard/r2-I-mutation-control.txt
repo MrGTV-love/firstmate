@@ -1,0 +1,4 @@
+### control: unmutated copy of HEAD, same case
+ok - the watcher checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the classification is stopped long before the classification ends
+ok - a sidecar that passes the cap while the stale surface walks its lane's log is checked before the stale wake exits, and its writer is stopped
+ok - a log that passes the cap while the watcher classifies a short signaled span is checked before the signal wake exits, and its writer is stopped

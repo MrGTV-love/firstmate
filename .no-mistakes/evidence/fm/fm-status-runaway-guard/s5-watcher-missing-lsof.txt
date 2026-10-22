@@ -1,0 +1,3 @@
+real watcher, lab home, FM_STATUS_CAP_LSOF pointing at a path that does not exist; lonely.status is 300001 bytes over a 262144 cap
+--- watcher stdout:
+check: status-log-over-cap: file=lonely.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=unknown (lsof not available); stopped nothing; nothing was deleted, truncated or rewritten

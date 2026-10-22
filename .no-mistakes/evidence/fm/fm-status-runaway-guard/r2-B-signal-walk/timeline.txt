@@ -1,0 +1,59 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.3P4cLZ  walk=signal
+omp pid=5917 comm=omp
+watcher pid=11494 poll=1 grace=1 cap=default 33554432
+++8.6s: watcher alive, still walking ()
+t0: sent the incident command to omp, writing lane-b.status
+omp first seen STOPPED at t=+1.8s size=566951936
+over-cap row queued at t=+1.9s
+t=+1.9s lane-b=566951936 omp_state=T
+t=+4.3s lane-b=566951936 omp_state=T
+t=+6.6s lane-b=566951936 omp_state=T
+t=+9.0s lane-b=566951936 omp_state=T
+t=+11.3s lane-b=566951936 omp_state=T
+t=+13.6s lane-b=566951936 omp_state=T
+t=+15.9s lane-b=566951936 omp_state=T
+t=+18.2s lane-b=566951936 omp_state=T
+t=+20.5s lane-b=566951936 omp_state=T
+t=+22.9s lane-b=566951936 omp_state=T
+t=+25.2s lane-b=566951936 omp_state=T
+t=+27.5s lane-b=566951936 omp_state=T
+t=+29.9s lane-b=566951936 omp_state=T
+t=+32.2s lane-b=566951936 omp_state=T
+t=+34.6s lane-b=566951936 omp_state=T
+t=+36.9s lane-b=566951936 omp_state=T
+t=+39.3s lane-b=566951936 omp_state=T
+t=+41.6s lane-b=566951936 omp_state=T
+t=+43.9s lane-b=566951936 omp_state=T
+t=+46.3s lane-b=566951936 omp_state=T
+t=+48.6s lane-b=566951936 omp_state=T
+t=+51.0s lane-b=566951936 omp_state=T
+t=+53.2s lane-b=566951936 omp_state=T
+t=+55.5s lane-b=566951936 omp_state=T
+t=+57.9s lane-b=566951936 omp_state=T
+t=+60.2s lane-b=566951936 omp_state=T
+t=+62.6s lane-b=566951936 omp_state=T
+t=+65.0s lane-b=566951936 omp_state=T
+t=+67.4s lane-b=566951936 omp_state=T
+t=+70.1s lane-b=566951936 omp_state=T
+t=+72.6s lane-b=566951936 omp_state=T
+t=+75.3s lane-b=566951936 omp_state=T
+t=+77.7s lane-b=566951936 omp_state=T
+t=+80.0s lane-b=566951936 omp_state=T
+t=+82.4s lane-b=566951936 omp_state=T
+t=+84.8s lane-b=566951936 omp_state=T
+t=+87.2s lane-b=566951936 omp_state=T
+t=+89.6s lane-b=566951936 omp_state=T
+watcher exited at t=+90.8s
+RESULT omp_stopped_at=+1.8s over_cap_row_queued_at=+1.9s watcher_exited_at=+90.8s lane-b=566951936 -> 566951936 (3s later) omp_state=T
+--- watcher stdout
+check: status-log-over-cap: file=lane-b.status size=566951936 bytes (cap 33554432) growth=424859205 bytes/s writer=pid 5917 omp; stopped pid 5917 (omp) with SIGSTOP; resume it with kill -CONT 5917; nothing was deleted, truncated or rewritten
+--- watchdog
+watchdog never fired
+--- wake queue
+1792629301	1	check	status-log-over-cap-1717973623
+1792629388	2	signal	lane-a.status
+1792629389	3	signal	lane-b.status
+1792629389	4	signal	lane-a.status
+1792629389	5	signal	lane-b.status
+--- watcher stderr
+lab removed: yes

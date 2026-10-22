@@ -1,0 +1,7 @@
+fm-fleet-snapshot.sh on a home with a 253689889 byte runaway log: exit=0 wall=.45s
+             7208960  maximum resident set size
+--- stderr naming the log:
+fm-status: refused to read d1-intake.status: a span of 253689889 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+--- snapshot task entry (jq):
+{"id":"d1-intake","status_tail":null,"hints":{"pending_decision":false,"blocked_event":false,"open_decisions":[],"open_decisions_unreadable":true,"scout_report_present":false,"last_event_text":""}}
+--- big files in state besides the log:

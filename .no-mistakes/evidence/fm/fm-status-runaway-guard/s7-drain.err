@@ -1,0 +1,22 @@
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 60604.1792622361.kXmcW3
+fm-status: refused to read d1-intake.status: a span of 253689889 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: d1-intake.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+        1.72 real         0.42 user         0.81 sys
+            57294848  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              190578  page reclaims
+                 413  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                 268  signals received
+                 911  voluntary context switches
+               11229  involuntary context switches
+            25818879  instructions retired
+            21764658  cycles elapsed
+             1622448  peak memory footprint

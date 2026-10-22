@@ -1,0 +1,5 @@
+##### G worker brief carries the capped command
+brief exit=0
+33:   `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FV5QKAKW1TQ406TKH69FR4/bin/fm-status-append.sh' '/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state/t1.status' "{state} [at=<epoch>]: {one short line}" && { [ ! -e '/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/config/fleet-ledger' ] || '
+raw >> status lines in brief: 0
+lab removed: yes

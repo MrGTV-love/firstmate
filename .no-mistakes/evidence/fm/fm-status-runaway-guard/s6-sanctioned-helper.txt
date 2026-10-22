@@ -1,0 +1,9 @@
+Incident loop through the sanctioned helper (cap 262144 for the drive): while :; do fm-status-append.sh helper.status "working [at=$(date +%s)]: same line" x500; done
+call 11: exit=75 size=262128 (cap 262144)
+stderr (first): fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/helper.status is 262128 bytes and this line would pass the limit of 262144 bytes (cap 262144, reserve 1048576 for decision and terminal lines)
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/helper.status is 262128 bytes and this line would pass the limit of 262144 bytes (cap 262144, reserve 1048576 for decision and terminal lines)
+retry working line: exit=75 size=262128
+retry working line: exit=75 size=262128
+retry working line: exit=75 size=262128
+terminal done: line (reserve): exit=0 size=262163; last line: done: PR https://example.test/pr/9
+(the refusal line above was printed 39 times in total, once per refused line)

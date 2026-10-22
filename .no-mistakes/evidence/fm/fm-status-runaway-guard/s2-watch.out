@@ -1,0 +1,1 @@
+check: status-log-over-cap: file=d1-intake.status size=253689889 bytes (cap 33554432) growth=338059071 bytes/s writer=pid 59784 omp; stopped pid 59784 (omp) with SIGSTOP; resume it with kill -CONT 59784; nothing was deleted, truncated or rewritten

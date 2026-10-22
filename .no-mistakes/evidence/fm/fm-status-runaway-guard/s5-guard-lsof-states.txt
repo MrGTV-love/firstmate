@@ -1,0 +1,6 @@
+== lsof=real (system /usr/sbin/lsof) exit=0 wall=4.0s
+16777232:800409438:1792622785	/Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/lonely.status	300001	check: status-log-over-cap: file=lonely.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+== lsof=missing (FM_STATUS_CAP_LSOF=/Users/charlesabrooker/tmp/fm-drive.bvhj80/fakebin/no-such-lsof) exit=0 wall=1.9s
+16777232:800409438:1792622785	/Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/lonely.status	300001	check: status-log-over-cap: file=lonely.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=unknown (lsof not available); stopped nothing; nothing was deleted, truncated or rewritten
+== lsof=slow (FM_STATUS_CAP_LSOF=/Users/charlesabrooker/tmp/fm-drive.bvhj80/fakebin/slow-lsof) exit=0 wall=21.5s
+16777232:800409438:1792622785	/Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/lonely.status	300001	check: status-log-over-cap: file=lonely.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=unknown (lsof timed out); stopped nothing; nothing was deleted, truncated or rewritten

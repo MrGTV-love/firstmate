@@ -1,0 +1,22 @@
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 82347.1792630145.o9V3eZ
+fm-status: refused to read big.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: big.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+        3.50 real         0.40 user         0.91 sys
+            57065472  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              197979  page reclaims
+                 418  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                 270  signals received
+                 944  voluntary context switches
+               23874  involuntary context switches
+           606412304  instructions retired
+           428358228  cycles elapsed
+             4833760  peak memory footprint

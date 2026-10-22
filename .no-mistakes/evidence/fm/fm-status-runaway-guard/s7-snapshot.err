@@ -1,0 +1,19 @@
+fm-status: refused to read d1-intake.status: a span of 253689889 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+        0.43 real         0.16 user         0.23 sys
+             7208960  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               52021  page reclaims
+                  74  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                  70  signals received
+                 260  voluntary context switches
+                3034  involuntary context switches
+            25616393  instructions retired
+            14788337  cycles elapsed
+             1622448  peak memory footprint

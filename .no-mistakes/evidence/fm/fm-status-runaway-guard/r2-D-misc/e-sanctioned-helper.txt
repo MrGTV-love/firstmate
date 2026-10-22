@@ -1,0 +1,8 @@
+##### E sanctioned helper in the incident loop (cap 262144)
+call 15: exit=75 size=262115 (cap 262144)
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state/helper.status is 262115 bytes and this line would pass the limit of 262144 bytes (cap 262144, reserve 1048576 for decision and terminal lines)
+retry 1 working: exit=0 size=262137
+retry 2 working: exit=75 size=262137
+retry 3 working: exit=75 size=262137
+terminal done: (reserve): exit=0 size=262179; last: done [at=2]: PR https://example.test/pr/9
+first line kept: working [at=1792630085]: same line

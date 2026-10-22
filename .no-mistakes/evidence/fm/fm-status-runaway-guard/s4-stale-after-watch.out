@@ -1,0 +1,1 @@
+check: status-log-over-cap: file=lane-b.status size=272695296 bytes (cap 33554432) growth=448281673 bytes/s writer=pid 58565 omp; stopped pid 58565 (omp) with SIGSTOP; resume it with kill -CONT 58565; nothing was deleted, truncated or rewritten

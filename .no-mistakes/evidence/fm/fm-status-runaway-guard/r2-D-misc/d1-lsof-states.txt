@@ -1,0 +1,8 @@
+##### D1 guard scan with three lsof conditions (log 300001 bytes, cap 262144, no process holds it)
+== lsof=real exit=0 wall=6.0s
+check: status-log-over-cap: file=lonely.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+== lsof=missing exit=0 wall=1.4s
+check: status-log-over-cap: file=lonely.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=unknown (lsof not available); stopped nothing; nothing was deleted, truncated or rewritten
+== lsof=slow exit=0 wall=22.0s
+check: status-log-over-cap: file=lonely.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=unknown (lsof timed out); stopped nothing; nothing was deleted, truncated or rewritten
+log still there, size: 300001

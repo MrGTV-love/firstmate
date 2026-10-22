@@ -1,0 +1,3 @@
+### M2: pre-wake cap check removed before wake "stale: $w"
+not ok - the stale wake exited without a check of the cap that the sidecar had passed: stale: test:fm-short-stale
+exit=

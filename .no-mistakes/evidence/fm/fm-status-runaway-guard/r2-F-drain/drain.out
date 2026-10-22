@@ -1,0 +1,8 @@
+1792630145	1	check	status-log-over-cap-2457021064	check: status-log-over-cap: file=big.status size=2147483648 bytes (cap 268435456) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+1792630146	4	signal	big.status	signal: /Users/charlesabrooker/tmp/fm-lab.Tdmu7W/state/big.status /Users/charlesabrooker/tmp/fm-lab.Tdmu7W/state/small.status
+1792630146	5	signal	small.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.Tdmu7W/state/big.status /Users/charlesabrooker/tmp/fm-lab.Tdmu7W/state/small.status
+wake annotation: unread wake-EVENT since last drain, not current state: small.status: working [at=5]: small healthy lane
+wake annotation: latest wake-EVENT observed at drain, not current state: small.status: needs-decision [at=6] [key=q1]: which option?
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+small [key=q1] needs-decision: which option?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

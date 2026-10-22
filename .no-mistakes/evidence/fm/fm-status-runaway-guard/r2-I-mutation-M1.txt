@@ -1,0 +1,3 @@
+### M1: pre-wake cap check removed from signal_phase (both wake "$reason" exits)
+not ok - the status signal woke the watcher without a check of the cap that its log had passed: signal: /Users/charlesabrooker/tmp/fm-status-runaway-guard.ZYZUbf/short-span/state/short.status
+exit=

@@ -1,0 +1,17 @@
+lane-s: real tmux pane test:fm-lane-s (static text), meta kind=ship, log of 30000 five-byte lines + done:, recorded as already seen (150035 bytes)
+omp pid=58565 (omp) on the fm-lab socket
+watcher pid=60065 cmd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FV5QKAKW1TQ406TKH69FR4/bin/fm-watch.sh poll=1 cap=default(33554432)
++10.96s: stale row queued, watcher alive and walking lane-s from byte 0: stale	test:fm-lane-s	stale: test:fm-lane-s
+t0: sent the incident command to omp, writing lane-b.status
+t=+0.0s lane-b=4325376 omp_state=R
+t=+0.6s lane-b=272695296 omp_state=T
+t=+1.3s lane-b=272695296 omp_state=T
+t=+1.9s lane-b=272695296 omp_state=T
+RESULT: watcher exited at t=+2.48s; omp stopped (state T) first seen at t=+.65s; omp_state=T; lane-b size=272695296
+--- watcher stdout:
+check: status-log-over-cap: file=lane-b.status size=272695296 bytes (cap 33554432) growth=448281673 bytes/s writer=pid 58565 omp; stopped pid 58565 (omp) with SIGSTOP; resume it with kill -CONT 58565; nothing was deleted, truncated or rewritten
+--- wake queue:
+1792622957	1	stale	test:fm-lane-s
+1792622959	2	check	status-log-over-cap-3459738727
+1792622959	3	signal	lane-b.status
+1792622960	4	signal	lane-b.status

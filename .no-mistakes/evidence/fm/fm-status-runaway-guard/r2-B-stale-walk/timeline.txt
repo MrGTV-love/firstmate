@@ -1,0 +1,21 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.EhiekK  walk=stale
+omp pid=50431 comm=omp
+watcher pid=53567 poll=1 grace=1 cap=default 33554432
+++6.5s: watcher alive, still walking (stale test:fm-lane-s;)
+t0: sent the incident command to omp, writing lane-b.status
+omp first seen STOPPED at t=+1.2s size=419430400
+over-cap row queued at t=+1.2s
+t=+1.9s lane-b=419430400 omp_state=T
+watcher exited at t=+2.5s
+RESULT omp_stopped_at=+1.2s over_cap_row_queued_at=+1.2s watcher_exited_at=+2.5s lane-b=419430400 -> 419430400 (3s later) omp_state=T
+--- watcher stdout
+check: status-log-over-cap: file=lane-b.status size=419430400 bytes (cap 33554432) growth=467949838 bytes/s writer=pid 50431 omp; stopped pid 50431 (omp) with SIGSTOP; resume it with kill -CONT 50431; nothing was deleted, truncated or rewritten
+--- watchdog
+watchdog never fired
+--- wake queue
+1792629441	1	stale	test:fm-lane-s
+1792629443	2	check	status-log-over-cap-809000374
+1792629443	3	signal	lane-b.status
+1792629444	4	signal	lane-b.status
+--- watcher stderr
+lab removed: yes

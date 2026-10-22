@@ -1,0 +1,10 @@
+big.status apparent size 2147483648 bytes, real disk use 4.0K; small.status has one open decision (key q1)
+watcher round 1 exited; queue: check status-log-over-cap-2457021064;signal big.status;signal small.status;signal big.status;signal small.status;
+== fm-wake-drain.sh exit=0 wall=3.5s maxrss=54 MB
+--- drain stderr naming the refused log:
+fm-status: refused to read big.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: big.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+--- drain stdout (open decision of the healthy lane):
+5:wake annotation: latest wake-EVENT observed at drain, not current state: small.status: needs-decision [at=6] [key=q1]: which option?
+7:small [key=q1] needs-decision: which option?
+files over 1 MB made besides logs: 0

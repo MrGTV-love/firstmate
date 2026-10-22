@@ -1,0 +1,8 @@
+##### F readers on a sparse 2 GiB log (real scripts)
+4.0K	/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state/big.status
+apparent size: 2147483648
+== bin/fm-fleet-snapshot.sh exit=0 wall=0.6s maxrss=7 MB
+fm-status: refused to read big.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+== bin/fm-wake-drain.sh exit=0 wall=1.4s maxrss=5 MB
+files over 1 MB created besides logs: 0
+snapshot lists the other lane: 

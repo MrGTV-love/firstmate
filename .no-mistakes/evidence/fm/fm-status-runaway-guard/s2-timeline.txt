@@ -1,0 +1,19 @@
+omp pid=59784 (omp)
+watcher pid=60601 cmd=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FV5QKAKW1TQ406TKH69FR4/bin/fm-watch.sh poll=1 cap=default(33554432) grace=default 30
+t0=1792622360.25 sent incident command: printf 'text\n' "$(date +%s)" >> state/d1-intake.status
+t=+0.0s size=4128801 omp_state=R
+t=+0.6s size=214171681 omp_state=U
+t=+1.3s size=253689889 omp_state=T
+t=+1.9s size=253689889 omp_state=T
+t=+2.6s size=253689889 omp_state=T
+watcher exited at t=+3.38s; omp_state=T; size=253689889
+size 3 s later: 253689889 -> 253689889 (omp state T); file exists: yes
+--- watcher stdout:
+check: status-log-over-cap: file=d1-intake.status size=253689889 bytes (cap 33554432) growth=338059071 bytes/s writer=pid 59784 omp; stopped pid 59784 (omp) with SIGSTOP; resume it with kill -CONT 59784; nothing was deleted, truncated or rewritten
+--- wake queue rows:
+1792622361	1	check	status-log-over-cap-459721658	check: status-log-over-cap: file=d1-intake.status size=253689889 bytes (cap 33554432) growth=338059071 bytes/s writer=pid 59784 omp; stopped pid 59784 (omp) with SIGSTOP; resume it with kill -CONT 59784; nothing was deleted, truncated or rewritten
+1792622361	2	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/d1-intake.status
+1792622362	3	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/d1-intake.status
+--- over-cap markers:
+-rw-r--r--   1 charlesabrooker  staff        104 Oct 21 17:39 .status-cap-alerted.d1-intake.status
+OMP=59784

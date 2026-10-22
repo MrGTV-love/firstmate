@@ -1,0 +1,17 @@
+log: d1-intake.status size=253689889 bytes (written by the real omp incident writer in S2), lines=50737972
+fm-wake-drain.sh exit=0 wall=1.74s
+        1.72 real         0.42 user         0.81 sys
+            57294848  maximum resident set size
+--- drain stdout (first 40 lines):
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "27f12f18be977e6521ee8bc6","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792622361	1	check	status-log-over-cap-459721658	check: status-log-over-cap: file=d1-intake.status size=253689889 bytes (cap 33554432) growth=338059071 bytes/s writer=pid 59784 omp; stopped pid 59784 (omp) with SIGSTOP; resume it with kill -CONT 59784; nothing was deleted, truncated or rewritten
+1792622362	3	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.sMBnQc/state/d1-intake.status
+--- drain stderr (non-time lines):
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 60604.1792622361.kXmcW3
+fm-status: refused to read d1-intake.status: a span of 253689889 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: d1-intake.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+--- files over 1 MB in state other than the log:

@@ -1,0 +1,1 @@
+watchdog killed omp at 3019767808 bytes in /Users/charlesabrooker/tmp/fm-lab.MwlmjK/state/lane-b.status

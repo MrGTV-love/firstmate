@@ -1,0 +1,52 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.2BDjjG  (private tmux socket fm-lab, TMUX_TMPDIR=/Users/charlesabrooker/tmp/fm-lab.2BDjjG/tmux)
+omp pid=97894 comm=omp  parent=pane shell 96184
+omp/18.12.4
+watcher pid=4013 cmd=bash bin/fm-watch.sh poll=1 cap=default 33554432
+t0: sent the incident command into omp shell: printf 'text\n' "$(date +%s)" >> state/d1-intake.status
+t=+0.4s size=9830400 omp_state=R
+t=+1.0s size=147390464 omp_state=R
+t=+1.7s size=312672256 omp_state=R
+t=+2.3s size=500498432 omp_state=R
+t=+3.0s size=582090752 omp_state=T
+t=+3.6s size=582090752 omp_state=T
+t=+4.2s size=582090752 omp_state=T
+t=+4.9s size=582090752 omp_state=T
+t=+5.6s size=582090752 omp_state=T
+watcher exited at +5.6s
+t=+6.2s size=582090752 omp_state=T
+t=+6.9s size=582090752 omp_state=T
+t=+7.5s size=582090752 omp_state=T
+t=+8.1s size=582090752 omp_state=T
+t=+8.7s size=582090752 omp_state=T
+t=+9.3s size=582090752 omp_state=T
+t=+9.9s size=582090752 omp_state=T
+t=+10.5s size=582090752 omp_state=T
+t=+11.1s size=582090752 omp_state=T
+t=+11.7s size=582090752 omp_state=T
+t=+12.4s size=582090752 omp_state=T
+t=+13.0s size=582090752 omp_state=T
+t=+13.6s size=582090752 omp_state=T
+t=+14.2s size=582090752 omp_state=T
+t=+14.8s size=582090752 omp_state=T
+t=+15.4s size=582090752 omp_state=T
+t=+16.0s size=582090752 omp_state=T
+t=+16.6s size=582090752 omp_state=T
+t=+17.2s size=582090752 omp_state=T
+t=+17.8s size=582090752 omp_state=T
+t=+18.4s size=582090752 omp_state=T
+t=+19.0s size=582090752 omp_state=T
+RESULT watcher_exit=+5.6s omp_state=T size_at_stop=582090752 size_3s_later=582090752 log_exists=yes
+log head:
+text
+text
+--- watcher stdout
+check: status-log-over-cap: file=d1-intake.status size=582090752 bytes (cap 33554432) growth=353019047 bytes/s writer=pid 97894 omp; stopped pid 97894 (omp) with SIGSTOP; resume it with kill -CONT 97894; nothing was deleted, truncated or rewritten
+--- watchdog
+watchdog never fired
+--- wake queue
+1792628890	1	check	status-log-over-cap-792339491	check: status-log-over-cap: file=d1-intake.status size=582090752 bytes (cap 33554432) growth=353019047 bytes/s writer=pid 97894 omp; stopped pid 97894 (omp) with SIGSTOP; resume it with kill -CONT 97894; nothing
+1792628891	2	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.2BDjjG/state/d1-intake.status
+1792628891	3	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.2BDjjG/state/d1-intake.status
+--- watcher stderr
+after kill -CONT: omp_state=R (undo works; killing it now)
+lab removed: yes

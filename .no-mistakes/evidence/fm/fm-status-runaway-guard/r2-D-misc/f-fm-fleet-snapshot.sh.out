@@ -1,0 +1,239 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-22T00:48:08Z",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FV5QKAKW1TQ406TKH69FR4",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/config",
+    "projects": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/projects"
+  },
+  "backlog": {
+    "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/data/backlog.md",
+    "present": false,
+    "records": []
+  },
+  "tasks": [
+    {
+      "id": "big",
+      "kind": "ship",
+      "harness": "",
+      "mode": "",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state/big.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state/big.status",
+          "present": false,
+          "kind": "event_history",
+          "last_event": {
+            "state": "",
+            "note": "",
+            "raw": "",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/data/big/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown · source: none · worktree gone (torn down?)",
+        "observed_at": "2026-10-22T00:48:08Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "test:fm-big",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-22T00:48:08Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "open_decisions_unreadable": true,
+        "scout_report_present": false,
+        "last_event_text": ""
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-big",
+        "steer": "bin/fm-send.sh fm-big '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "small",
+      "kind": "ship",
+      "harness": "",
+      "mode": "",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state/small.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/state/small.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "needs-decision",
+            "note": "which option?",
+            "raw": "needs-decision [at=6] [key=q1]: which option?",
+            "age_seconds": 1792630082
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/data/small/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown · source: none · worktree gone (torn down?)",
+        "observed_at": "2026-10-22T00:48:08Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "test:fm-small",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-22T00:48:08Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": true,
+        "blocked_event": false,
+        "open_decisions": [
+          {
+            "key": "q1",
+            "verb": "needs-decision",
+            "summary": "which option?"
+          }
+        ],
+        "open_decisions_unreadable": false,
+        "scout_report_present": false,
+        "last_event_text": "needs-decision [at=6] [key=q1]: which option?"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-small",
+        "steer": "bin/fm-send.sh fm-small '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": false,
+    "proven_clear": false,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 1,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": {
+      "present": false,
+      "available": true,
+      "complete": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/tmp/fm-lab.5K3OsQ/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-10-22T00:48:08Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [],
+    "total_registered": 0,
+    "total": 0,
+    "shown": 0,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

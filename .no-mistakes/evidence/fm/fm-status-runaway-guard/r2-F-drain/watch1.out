@@ -1,0 +1,1 @@
+check: status-log-over-cap: file=big.status size=2147483648 bytes (cap 268435456) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten

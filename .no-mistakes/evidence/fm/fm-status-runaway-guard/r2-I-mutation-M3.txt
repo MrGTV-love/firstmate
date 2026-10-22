@@ -1,0 +1,2 @@
+### M3: status_cap_span_tick made a no-op (the per-line walk check)
+not ok - the writer was not stopped, and the over-cap wake not queued, within 20 s of the signal walk capturing a 20000 line span that the writer then pushed past the cap (writer state S)

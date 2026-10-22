@@ -1,0 +1,40 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.MwlmjK  walk=signal
+omp pid=75617 comm=omp
+watcher pid=82773 poll=1 grace=1 cap=default 33554432
+++9.2s: watcher alive, still walking ()
+t0: sent the incident command to omp, writing lane-b.status
+t=+2.0s lane-b=1102381056 omp_state=R
+t=+4.6s lane-b=2577006592 omp_state=R
+t=+7.3s lane-b=3019767808 omp_state=
+t=+9.8s lane-b=3019767808 omp_state=
+t=+12.5s lane-b=3019767808 omp_state=
+t=+15.1s lane-b=3019767808 omp_state=
+t=+17.7s lane-b=3019767808 omp_state=
+t=+20.4s lane-b=3019767808 omp_state=
+t=+23.2s lane-b=3019767808 omp_state=
+t=+25.9s lane-b=3019767808 omp_state=
+t=+28.6s lane-b=3019767808 omp_state=
+t=+31.2s lane-b=3019767808 omp_state=
+t=+33.8s lane-b=3019767808 omp_state=
+t=+36.6s lane-b=3019767808 omp_state=
+t=+39.2s lane-b=3019767808 omp_state=
+t=+41.9s lane-b=3019767808 omp_state=
+t=+44.5s lane-b=3019767808 omp_state=
+t=+47.2s lane-b=3019767808 omp_state=
+t=+49.8s lane-b=3019767808 omp_state=
+t=+52.5s lane-b=3019767808 omp_state=
+t=+55.1s lane-b=3019767808 omp_state=
+t=+57.7s lane-b=3019767808 omp_state=
+t=+60.4s lane-b=3019767808 omp_state=
+t=+63.0s lane-b=3019767808 omp_state=
+watcher exited at t=+64.3s
+RESULT omp_stopped_at=never over_cap_row_queued_at=never watcher_exited_at=+64.3s lane-b=3019767808 -> 3019767808 (3s later) omp_state=
+--- watcher stdout
+signal: /Users/charlesabrooker/tmp/fm-lab.MwlmjK/state/lane-a.status
+--- watchdog
+watchdog killed omp at 3019767808 bytes in /Users/charlesabrooker/tmp/fm-lab.MwlmjK/state/lane-b.status
+--- wake queue
+1792630872	1	signal	lane-a.status
+1792630872	2	signal	lane-a.status
+--- watcher stderr
+lab removed: yes

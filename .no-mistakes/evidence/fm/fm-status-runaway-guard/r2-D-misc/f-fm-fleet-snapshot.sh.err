@@ -1,0 +1,19 @@
+fm-status: refused to read big.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+        0.54 real         0.23 user         0.39 sys
+             7192576  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               77089  page reclaims
+                 103  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                 108  signals received
+                 373  voluntary context switches
+                4685  involuntary context switches
+          1831011421  instructions retired
+           611959640  cycles elapsed
+             5325280  peak memory footprint
