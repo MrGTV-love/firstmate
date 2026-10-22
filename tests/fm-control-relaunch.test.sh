@@ -4419,6 +4419,7 @@ test_recovery_fixture_claims_only_owned_temp_directories() {
     (
       # shellcheck disable=SC2030 # The child cleanup must track only its own claims, not the parent's.
       TASK_TMPS=()
+      # shellcheck disable=SC2030 # The child cleanup must remove only its own root, not the parent's.
       TMP_ROOT="$dir/child-cleanup"
       mkdir "$TMP_ROOT" || exit 1
       trap relaunch_remove_claims EXIT
@@ -5417,6 +5418,7 @@ test_concrete_ask_admission_completes_fresh_spawns() {
   local args=()
   for kind in ship scout; do
     id="ask-admitted-$kind"
+    # shellcheck disable=SC2031 # Only the ownership fixture's child subshell reassigns TMP_ROOT; this reads the parent's root.
     dir="$TMP_ROOT/$id"
     home="$dir/home" project="$dir/project" wt="$dir/wt"
     fakebin=$(fm_test_make_spawn_fakebin "$dir/tools" codex gh-axi)
