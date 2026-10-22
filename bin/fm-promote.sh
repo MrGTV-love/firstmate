@@ -12,8 +12,9 @@
 # mode-specific Definition of done, so a promoted worker receives exactly the same
 # delivery contract as a briefed one, including the no-mistakes mode's ask-user
 # escalation rule, --yes ban and separate verification-plan instructions.
-# The plan is built from the durable brief, preserving its original task DoD
-# and exclusions rather than treating promotion's build steps as captain intent.
+# The plan is built from the durable brief: it labels the original task DoD and
+# exclusions as scout-time context, says the promoted ship intent governs on
+# conflict, and never treats promotion's build steps as captain intent.
 # The instructions also carry `# Task` with
 # `## Captain's intent` preserved from the scout brief and promotion's ship-time
 # instructions under `## Firstmate spec`; the scout-time spec remains context but
