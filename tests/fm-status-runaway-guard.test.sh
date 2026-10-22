@@ -416,6 +416,9 @@ start_gated_tiny_writer() {  # <shell> <status-file> <gate-file> <pid-file> <bur
 # holds the read until the file the writer appends to (FM_TEST_GATE_GROWS, by default that log) is
 # larger than FM_TEST_GATE_SIZE, so the file passes the cap after the watcher has chosen to walk the
 # log and before it walks it, whatever the speed of the host.
+# With FM_TEST_GATE2 set, the first read of that log after the watcher has recorded an over-cap alert
+# (the read the over-cap wake's flush makes) does the same for a second gate and a second file
+# (FM_TEST_GATE2_GROWS, FM_TEST_GATE2_SIZE): a second writer passes the cap while that wake is in flight.
 make_gating_span_reader() {  # <path>
   cat > "$1" <<'SH'
 #!/usr/bin/env bash
@@ -426,6 +429,14 @@ if [ "$1" = "$FM_TEST_GATE_LOG" ]; then
     sleep 0.05
     waited=$((waited + 1))
   done
+  if [ -n "${FM_TEST_GATE2:-}" ] && ls "$FM_STATE_OVERRIDE"/.status-cap-alerted.* >/dev/null 2>&1; then
+    : > "$FM_TEST_GATE2"
+    waited=0
+    while [ "$(perl -e 'print -s $ARGV[0]' "$FM_TEST_GATE2_GROWS")" -le "$FM_TEST_GATE2_SIZE" ] && [ "$waited" -lt 400 ]; do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+  fi
 fi
 exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; defined(read $f, my $b, $ARGV[2]) or exit 1; print $b or exit 1' "$1" "$2" "$3"
 SH
@@ -563,6 +574,47 @@ test_a_runaway_that_keeps_growing_through_the_over_cap_wake_raises_exactly_one_w
 test_a_long_classification_checks_the_cap_every_poll() {
   stop_a_writer_during_a_long_walk long-span signal || return $?
   pass "the watcher checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the classification is stopped long before the classification ends"
+}
+
+test_a_second_writer_that_passes_the_cap_during_the_wake_flush_is_stopped_without_a_second_wake() {
+  local dir state status side out omp wpid w2pid watch_pid reader cap=16384 deadline rows_a rows_b
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case second-lane); state="$dir/state"; status="$state/lane-a.status"; side="$state/.lane-b.home-appends.runaway"; out="$dir/watch.out"
+  omp=$(make_named_shell "$dir" omp)
+  reader="$dir/gating-span-reader"
+  make_gating_span_reader "$reader"
+  # Lane A: 2500 five-byte lines are unread (12500 bytes, under the 16384 byte cap), so the watcher
+  # walks them for several seconds. Its writer passes the cap once the watcher holds the span; the check
+  # inside that walk stops it and raises the over-cap wake. That wake's flush walks the lane's pending
+  # signal again, 3500 lines, which is the window this case is about. Lane B is a per-task sidecar, so
+  # it raises no signal of its own: the first read the flush makes opens its writer's gate and holds the
+  # walk until lane B is past the cap. The check inside the flush walk must stop lane B's writer and
+  # queue its row, and must raise no second wake: a second wake would print lane B's reason and not
+  # lane A's, after a second flush walk of its own.
+  perl -e 'print "text\n" x 2500' > "$status"
+  : > "$side"
+  start_gated_tiny_writer "$omp" "$status" "$dir/gate" "$dir/writer.pid" 10 1
+  start_gated_tiny_writer "$omp" "$side" "$dir/gate2" "$dir/writer2.pid" 40 1
+  wait_for_file_nonempty "$dir/writer.pid" || fail "the first fake writer did not start"
+  wait_for_file_nonempty "$dir/writer2.pid" || fail "the second fake writer did not start"
+  wpid=$(cat "$dir/writer.pid"); w2pid=$(cat "$dir/writer2.pid")
+  watch_cap "$state" "$out" FM_STATUS_CAP_BYTES=$cap FM_STATUS_SPAN_READER="$reader" \
+    FM_TEST_GATE_LOG="$status" FM_TEST_GATE="$dir/gate" FM_TEST_GATE_SIZE=$cap \
+    FM_TEST_GATE2="$dir/gate2" FM_TEST_GATE2_GROWS="$side" FM_TEST_GATE2_SIZE=$cap
+  watch_pid=$!
+  wait_for_exit "$watch_pid" 1800 || { kill -9 "$wpid" "$w2pid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never printed its wake: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  rows_a=$(grep -c 'file=lane-a.status' "$state/.wake-queue" 2>/dev/null)
+  rows_b=$(grep -c 'file=.lane-b.home-appends.runaway' "$state/.wake-queue" 2>/dev/null)
+  [ -e "$dir/gate2" ] || { kill -9 "$wpid" "$w2pid" 2>/dev/null; fail "the over-cap wake never flushed the lane's signal: $(cat "$out")"; }
+  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" "$w2pid" 2>/dev/null; fail "the first writer was not stopped (state $(state_letter "$wpid"))"; }
+  [ "$(state_letter "$w2pid")" = T ] || { kill -9 "$wpid" "$w2pid" 2>/dev/null; fail "the second writer was not stopped (state $(state_letter "$w2pid")); rows for lane B: ${rows_b:-0}"; }
+  kill -9 "$wpid" "$w2pid" 2>/dev/null
+  [ "$(wc -l < "$out" | tr -d ' ')" -eq 1 ] || fail "the watcher printed more than one wake: $(cat "$out")"
+  grep -q 'check: status-log-over-cap: file=lane-a.status' "$out" || fail "the printed wake is not the one lane A raised: $(cat "$out")"
+  grep -q 'lane-b' "$out" && fail "a second wake for lane B was printed: $(cat "$out")"
+  [ "${rows_a:-0}" -eq 1 ] || fail "lane A was reported ${rows_a:-0} times, not once: $(cat "$state/.wake-queue")"
+  [ "${rows_b:-0}" -eq 1 ] || fail "lane B was reported ${rows_b:-0} times, not once: $(cat "$state/.wake-queue")"
+  pass "a second writer that passes the cap while the over-cap wake flushes is stopped and queued, and raises no second wake"
 }
 
 test_the_heartbeat_scan_checks_the_cap_every_poll() {
@@ -1234,6 +1286,7 @@ tests=(
   test_a_cap_crossing_after_the_span_is_captured_is_stopped_before_the_signal_wake_exits
   test_a_runaway_that_keeps_growing_through_the_over_cap_wake_raises_exactly_one_wake
   test_a_long_classification_checks_the_cap_every_poll
+  test_a_second_writer_that_passes_the_cap_during_the_wake_flush_is_stopped_without_a_second_wake
   test_the_heartbeat_scan_checks_the_cap_every_poll
   test_the_stale_surface_checks_the_cap_every_poll
   test_a_cap_crossing_during_a_short_stale_walk_is_stopped_before_the_stale_wake_exits
