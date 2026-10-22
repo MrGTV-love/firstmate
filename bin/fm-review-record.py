@@ -22,7 +22,9 @@ insensitively, and are stored by canonical name; any other family is refused.
 verify accepts the newest captain-word when it names the exact live head; it then
 stands in for the review and every trigger. Otherwise the newest review must be
 PASS at the exact live head with an independent reader, and any yes trigger is
-refused. Captain words waive no existing forge/hold guard.
+refused. Captain words waive no existing forge/hold guard. captain-word records only
+a current explicit captain merge instruction naming the concrete PR, given in the
+captain's own turn; away words are never recorded as captain-word.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
@@ -114,11 +116,13 @@ def ledger(write):
     home = os.environ.get("FM_HOME", "")
     if not home or not Path(home).is_absolute():
         raise RecordError("FM_HOME must explicitly name the absolute home holding the PR task record")
+    if not Path(home).is_dir():
+        raise RecordError(f"FM_HOME {home} does not exist; name the existing home holding the PR task record")
     state = Path(os.environ.get("FM_STATE_OVERRIDE") or Path(home) / "state")
     if not state.is_absolute() or state.is_symlink():
         raise RecordError("state directory must be absolute and not a symlink")
     if write:
-        state.mkdir(mode=0o700, parents=True, exist_ok=True)
+        state.mkdir(mode=0o700, exist_ok=True)
     flags = os.O_RDWR | os.O_APPEND | os.O_NOFOLLOW | os.O_NONBLOCK
     try:
         fd = os.open(state / "review-records.jsonl", flags | (os.O_CREAT if write else 0), 0o600)
