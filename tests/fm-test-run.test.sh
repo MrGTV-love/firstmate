@@ -1862,9 +1862,10 @@ test_portable_parallel_lanes_stay_duration_balanced() {
 }
 
 test_portable_parallel_lanes_run_bounded_and_concurrently() {
-  local out jobs makespan budget
+  local out jobs effective makespan budget
   out=$("$RUNNER" --check-coverage)
   jobs=$(printf '%s\n' "$out" | sed -n 's/.*parallel_jobs=\([0-9]*\).*/\1/p')
+  effective=$(printf '%s\n' "$out" | sed -n 's/.*parallel_effective_jobs=\([0-9]*\).*/\1/p')
   makespan=$(printf '%s\n' "$out" | sed -n 's/.*parallel_makespan_ms=\([0-9]*\).*/\1/p')
   budget=$(printf '%s\n' "$out" | sed -n 's/.*parallel_budget_ms=\([0-9]*\).*/\1/p')
   [ -n "$jobs" ] && [ -n "$makespan" ] && [ -n "$budget" ] \
@@ -1875,6 +1876,8 @@ test_portable_parallel_lanes_run_bounded_and_concurrently() {
     || fail "portable parallel lanes must run more than one script at a time, got $jobs"
   [ "$jobs" -le 4 ] \
     || fail "$jobs exceeds the recorded four-way isolation proof; re-prove the set before running wider"
+  [ -n "$effective" ] && [ "$effective" -ge 1 ] && [ "$effective" -le "$jobs" ] \
+    || fail "parallel_effective_jobs must be the bin count the model packed, between 1 and parallel_jobs=$jobs, got ${effective:-none}"
   [ "$makespan" -gt 0 ] || fail "parallel_makespan_ms must be a positive modeled duration, got $makespan"
   [ "$makespan" -le "$budget" ] \
     || fail "modeled parallel makespan ${makespan}ms exceeds the ${budget}ms budget"
