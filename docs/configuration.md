@@ -2471,6 +2471,7 @@ A healthy judge still screens every shell command and write; two narrow shell-on
   Outside the lab admission below, anything not proven read-only is refused on an outage as before.
 - A shell command in a home carrying the `.fm-lab-home` token written by [`bin/fm-lab-home.sh`](../bin/fm-lab-home.sh) is admitted with branch `lab` when every `FM_*_OVERRIDE` is empty, the same rule as `fm_gate_lab_permitted` in [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh), so an approved lab teardown is not refused by an unavailable judge.
   Writes and edits in a lab home are screened and refused exactly as in a real home.
+  The guard reads only the marker's first-line token, so the marker is deliberately spoofable under the confused-agent threat model that [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh) already accepts: a forged marker in a real home admits shell commands there only when their judgment failed as above, and grants nothing while the judge is healthy.
 
 Both admissions keep the failed judgment's error type in their audit row.
 Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
