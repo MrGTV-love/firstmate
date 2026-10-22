@@ -1,9 +1,14 @@
-== BEFORE (base ff899e92a)  (/Users/charlesabrooker/tmp/fm-base.Nlzvhu/bin/fm-open-loops.sh --json)
+=== [before (base b13c1b1b0)] status log ===
+done: PR https://github.com/example/repo/pull/1 checks green
+working: PR 1 withdrawn, replacement https://github.com/example/repo/pull/2
+=== [before (base b13c1b1b0)] $ FM_HOME=<lab> bin/fm-fleet-snapshot.sh --json | jq '.tasks[].pr' ===
+{"id":"replaced","pr":{"url":"https://github.com/example/repo/pull/1","source":"status_event","head":null}}
+=== [before (base b13c1b1b0)] $ FM_HOME=<lab> bin/fm-open-loops.sh --heartbeat ===
 exit=0
---- snapshot PR the ledger read for the task:
-{"id":"live-task","pr":{"url":"https://github.com/example/repo/pull/1","source":"status_event","head":null}}
---- forge endpoints the ledger asked for:
-   1 repos/example/repo/pulls/1
---- ledger complete flag and degraded coverage rows:
-{"complete":false}
-ledger degraded :: PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)
+=== [before (base b13c1b1b0)] published state/open-loops.json: complete + coverage rows ===
+{"complete":false,"coverage_rows":[{"subject":"ledger degraded","evidence":"PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)"}],"rows":[{"category":"coverage","subject":"ledger degraded","evidence":"PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)"},{"category":"silent_report","subject":"replaced","evidence":"last heard: status=1792698738; inbox acknowledgement=None; resolved reply=None"},{"category":"unlanded_commit","subject":"replaced","evidence":"1 commit(s) not on refs/remotes/origin/main; newest: replacement work"}]}
+=== [before (base b13c1b1b0)] forge requests ===
+/repos/example/repo/pulls/1
+/repos/example/repo/pulls?state=open&per_page=100
+=== [before (base b13c1b1b0)] $ bin/fm-open-loops.sh --check-actions (wake drain gate) ===
+exit=0

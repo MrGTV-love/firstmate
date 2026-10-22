@@ -1,0 +1,12 @@
+=== [before (base b13c1b1b0)] bash=/bin/bash GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)  LC_ALL=en_US.UTF-8 ===
+$ FM_HOME=<lab> LC_ALL=en_US.UTF-8 bin/fm-fleet-snapshot.sh --json | jq '.tasks[] | {id, url: .pr.url, source: .pr.source}'
+a-withdrawn-then-working   https://github.com/example/repo/pull/1   status_event
+b-withdrawn-then-decision  https://github.com/example/repo/pull/1   status_event
+c-same-line-first-url      https://github.com/example/repo/pull/2   status_event
+d-invalid-utf8-bytes       https://github.com/example/repo/pull/10  status_event
+e-nul-byte                 https://github.com/example/repo/pull/12  status_event
+f-no-url                   null                                     absent
+g-explicit-meta-pr         https://github.com/example/repo/pull/8   meta
+h-no-trailing-newline      https://github.com/example/repo/pull/20  status_event
+i-known-limit-incidental   https://github.com/example/repo/pull/30  status_event
+j-no-status-log            null                                     absent

@@ -1,8 +1,14 @@
-== AFTER (target 336a698b5)  (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5FSQD52TH0VFNAMBZ465PPP/bin/fm-open-loops.sh --json)
+=== [after (target c9f2a6dd1)] status log ===
+done: PR https://github.com/example/repo/pull/1 checks green
+working: PR 1 withdrawn, replacement https://github.com/example/repo/pull/2
+=== [after (target c9f2a6dd1)] $ FM_HOME=<lab> bin/fm-fleet-snapshot.sh --json | jq '.tasks[].pr' ===
+{"id":"replaced","pr":{"url":"https://github.com/example/repo/pull/2","source":"status_event","head":null}}
+=== [after (target c9f2a6dd1)] $ FM_HOME=<lab> bin/fm-open-loops.sh --heartbeat ===
 exit=0
---- snapshot PR the ledger read for the task:
-{"id":"live-task","pr":{"url":"https://github.com/example/repo/pull/2","source":"status_event","head":null}}
---- forge endpoints the ledger asked for:
-   1 repos/example/repo/pulls/2
---- ledger complete flag and degraded coverage rows:
-{"complete":true}
+=== [after (target c9f2a6dd1)] published state/open-loops.json: complete + coverage rows ===
+{"complete":true,"coverage_rows":[],"rows":[{"category":"silent_report","subject":"replaced","evidence":"last heard: status=1792698732; inbox acknowledgement=None; resolved reply=None"}]}
+=== [after (target c9f2a6dd1)] forge requests ===
+/repos/example/repo/pulls/2
+/repos/example/repo/pulls?state=open&per_page=100
+=== [after (target c9f2a6dd1)] $ bin/fm-open-loops.sh --check-actions (wake drain gate) ===
+exit=0
