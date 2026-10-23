@@ -353,6 +353,7 @@ emit_error() {
   log_result error "$reason"
   printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
   emit_telemetry
+  run_shadow error "$reason"
   exit 0
 }
 
@@ -366,8 +367,40 @@ TASK_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA"; die "mktemp failed"; }
 SEND_TEXT=$(mktemp) || { rm -f "$RESP_FILE" "$QUOTA" "$TASK_TEXT"; die "mktemp failed"; }
 trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"; rm -rf "$MODEL_CONFIG"' EXIT
 
+# ---- shadow model picker (observe only) ---------------------------------------
+# Off unless FM_MODEL_PICKER_SHADOW is an explicit on value; every other value leaves
+# dispatch untouched and reads no model-picker data. On, the picker runs AFTER this
+# resolver's own result is printed, behind a hard time bound, with all output discarded:
+# it can never change the status, the profile line, or the exit code. Its evidence goes
+# only to the calibration store in the picker's private data root.
+# measured: value=20 date=2026-10-23 host=Mac-Studio margin=1.3 (the shadow stage makes at most three bounded provider calls, each with a five-second deadline; one stalled-call run measured 5.2 s, so three fit inside this bound)
+SHADOW_TIMEOUT_SECONDS=20
+shadow_flag_enabled() {
+  case "${FM_MODEL_PICKER_SHADOW:-}" in
+    1|true|True|TRUE|on|On|ON|yes|Yes|YES|shadow|Shadow|SHADOW) return 0 ;;
+    *live*|*Live*|*LIVE*) return 1 ;;
+    *) return 1 ;;
+  esac
+}
+run_shadow() {  # <status> [reason]
+  local status=$1 reason=${2:-} result_file
+  shadow_flag_enabled || return 0
+  result_file=$(mktemp) || return 0
+  if [ -n "${RESULT:-}" ]; then printf '%s' "$RESULT" > "$result_file"; else printf '{}' > "$result_file"; fi \
+    || { rm -f "$result_file"; return 0; }
+  fm_run_timed "$SHADOW_TIMEOUT_SECONDS" "$SCRIPT_DIR/fm-model-picker-shadow.sh" --observe \
+    --brief "${BRIEF:-/dev/null}" --task-text "${TASK_TEXT:-/dev/null}" \
+    --rules "${RULES:-/dev/null}" --result "$result_file" --quota "${QUOTA:-/dev/null}" \
+    --status "$status" --reason "$reason" --never-send "${NEVER_SEND_PATH:-/dev/null}" \
+    --project "${PROJECT:-}" \
+    3< <(printf '%s' "${TYPESAFE_API_KEY_PRIVATE:-}") >/dev/null 2>/dev/null || true
+  rm -f "$result_file"
+  return 0
+}
+
 never_send_off() {
   echo "dispatch-resolve: off ($1; nothing sent)" >&2
+  run_shadow withheld "$1"
   exit 0
 }
 
@@ -803,4 +836,5 @@ TEXT=$(jq -r '
 log_result "$(jq -r '.status' <<<"$RESULT")" "$(jq -r '.reason // ""' <<<"$RESULT")" "$RESULT"
 printf '%s\n' "$TEXT"
 emit_telemetry
+run_shadow "$(jq -r '.status' <<<"$RESULT")" "$(jq -r '.reason // ""' <<<"$RESULT")"
 exit 0

@@ -946,7 +946,7 @@ At its default location the whole root is private and gitignored with `data/`.
 | `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
 | `projection/<slug>.json` | One wire-format projection per catalog model, written last |
 
-`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the current dispatch rule's choice.
+`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the current dispatch rule's choice; [Shadow model picker](#shadow-model-picker-fm_model_picker_shadow) owns the picker's additive columns and every row it writes.
 A matrix rebuild never touches `dispatch_log` or `outcomes`.
 The matrix is a pure function of the cache, so a rebuild gives the same row counts.
 A consumer must not read the matrix while `verdict.json` says `UNTRUSTED`.
@@ -962,6 +962,76 @@ In a projection, `as_of` is the newest `observed_at` across the model's metrics,
 Each metric's own `observed_at` is authoritative for freshness.
 For each canonical metric the newest observation wins, and a tie goes to the embedded full-precision value; a rounded eval-leaderboard value (`1803`) can therefore win over a full-precision value (`1802.99`) when it is newer.
 Run `bin/fm-model-picker.sh --selftest` for the fixture suite; [`tests/fm-model-picker.test.sh`](../tests/fm-model-picker.test.sh) covers the executable.
+
+## Shadow model picker (FM_MODEL_PICKER_SHADOW)
+
+`bin/fm-model-picker-shadow.sh` is Phase 2 of the model-picker chain: it observes a dispatch, decides what the picker WOULD have chosen from the trusted Artificial Analysis snapshot plus bounded Jev judgments, and records that beside the route `config/crew-dispatch.json` actually chose.
+It is SHADOW MODE ONLY: it never returns, prints or writes a dispatch route, and no dispatch or spawn path reads its output.
+Its header and `--help` own its flags, data-root resolution, output and exit codes; `bin/fm_model_picker/shadow.py` is the implementation and `bin/fm_model_picker/routes.json` is the route table.
+
+### The flag
+
+`FM_MODEL_PICKER_SHADOW` is off by default and accepts only shadow-enabled values.
+`1`, `true`, `on`, `yes` and `shadow` enable observation; empty, `0`, `false`, `off` and `no` leave every route untouched and read no model-picker data; any other non-empty value prints one warning and stays off.
+No value enables live behavior, and no code path writes a `mode 'live'` row.
+
+### Where it runs and why
+
+The picker runs inside `bin/fm-dispatch-resolve.sh`, after that resolver has computed and printed its own result.
+The resolver is the only intake that already holds the sanitized brief text, the resolved rule set and the one `quota-axi` snapshot the typed decision uses, so the picker never re-fetches any of them.
+It runs behind a hard `fm_run_timed` bound of 20 seconds, its output is discarded, and every failure is swallowed, so the printed status, profile line and exit code are the resolver's own.
+A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route.
+The picker is not called from `fm-spawn.sh`: a spawn does not own the sanitized task text or the resolver's quota snapshot, and a second quota read would break the single-snapshot contract.
+
+### What one shadow run does
+
+1. Every concrete `harness:model` route reachable from the rules (each rule's `use` and `fallback`, the `default` and `default_fallback`) is a candidate.
+   `bin/fm_model_picker/routes.json` maps each route to a projection slug, a model family and a currency (`subscription` or `api`), and asserts the projection's own `name` and `creator`.
+   A route the table cannot map, a missing projection, or an identity mismatch keeps the route as a candidate with its facts read as UNKNOWN; it is never dropped and never read as zero.
+2. The picker reads `verdict.json` first and reads no projection unless it is a regular, non-symlinked file saying `TRUSTED`.
+   `UNTRUSTED`, missing, unparseable or non-regular fails closed: no benchmark fact is read or sent, no pick is made, and the row records the reason.
+3. Hard gates prune first, using the classified work type: a declared resolver ineligibility, a fit floor, and the seed metric vetoes.
+   A quota-exhausted lane is not gated; it is carried as zero capacity in the facts.
+4. Strict Pareto dominance prunes next, inside one model family and one currency class only, elimination only.
+   No worse on every demanded metric and no pricier (AA cost per task in API dollars, or `spendPriority` on a subscription lane) is dominance; unknown on either side and an exact tie are not.
+   A crossing pair and a cross-currency pair both survive; a cross-currency trial is flagged in `gates.currency_trials` and never pruned across the subscription/API line.
+5. Code computes every number Jev sees: the demanded evals with eval id, raw unit and scale, direction, normalized 0-100 fit, and eval version; AA cost per task only on API lanes; token rates only on API lanes; the resolver's quota facts on subscription lanes; and the snapshot age from the oldest `observed_at` among the facts sent.
+   A metric whose eval version differs across candidates is excluded and flagged, never averaged.
+   Jev is asked only Choice, Score and Noul judgments: the work type, a complexity Score, the worker Choice over survivors, the effort Score, and a validator Choice whose options are the configured routes and whose evidence is the verification and code-review set.
+6. The pick is re-checked in code against the survivor list, the gates, and the chosen harness's effort levels.
+   A rejected pick records the failing check and is never replaced silently.
+7. The validator must come from a different model family; a same-family answer triggers one bounded second call over cross-family routes only, and a candidate set with a single family records a NULL validator with the reason.
+
+### The log
+
+Rows go to `dispatch_log` in `<data root>/aa.sqlite`, the same store Phase 1 shipped; the picker never creates a second store and never touches `outcomes`.
+Every row uses `mode 'shadow'` and records the picker's `chosen_worker`, `chosen_validator` and `effort`, the rule's `rule_worker`, `rule_validator` and `rule_effort`, the full Jev result (`jev_raw_payload` is the pick response byte for byte; `jev_raw_support` holds the classification and any validator-fallback bodies unchanged and in order), `jev_candidate_version`, `gates`, `pareto_pruned`, `spend_priority`, `snapshot_age`, `work_type`, `complexity_score`, and `policy_version`.
+The additive columns `policy_version`, `task_key`, `work_type_confidence`, `complexity_components`, `complexity_confidence`, `confidence_band`, `snapshot_stale`, `classification_uncertain`, `picker_status`, `reject_reason` and `jev_raw_support` were added in place; every shipped column keeps its name and every existing row survives.
+`validator_verdict`, `validator_disagreement`, `rework` and `captain_acceptance` stay NULL until real data arrives, and only `record_validator` with a verdict a real review supplied may fill a validator field.
+Shadow rows are routing evidence, never outcome labels: they show what the picker would have chosen, never how an unrun pick would have performed.
+
+### Policy version and the seed label
+
+`POLICY_VERSION` (`2026-10-19.1`) and the route table's `table_version` are recorded on every row.
+The work-type mixes, fit floors, metric vetoes, verification-evidence floor and complexity criteria are the board's "uncalibrated seed policy", labelled as such in code and in every row's `gates`; they are ours to change and are not fitted to data in this phase.
+The confidence bands are applied in code and only logged: `dispatch` at 0.85 or above, `ask` from 0.55 to below 0.85, `escalate` below 0.55, and `unknown` when the answer carries no confidence.
+
+### The shadow disagreement report
+
+`bin/fm-model-picker-shadow.sh --report` prints, per work type over `mode 'shadow'` rows, the run count, the rows with a rule route, the rows with no rule route, the worker/validator/effort disagreement counts, the confidence-band counts, the stale-snapshot count, the none-fit count and the rejected-pick count, with the disagreement denominators printed.
+It prints `0 shadow dispatches logged` for an empty log and never reports "zero disagreements" for an empty compared set.
+`--json` emits the same counts as one object.
+
+### Read-only route check
+
+`bin/fm-model-picker-shadow.sh --check-routes` resolves every concrete route in `config/crew-dispatch.json` through `bin/fm-model-index.sh profiles`, then lists each route's family, currency, projection slug and identity assertion against `bin/fm_model_picker/routes.json`.
+It exits 1 when a mapped projection is missing or its asserted name does not match, and names an unmapped route as UNKNOWN without dropping it.
+
+### Captain-owned later phases
+
+Paired runs, calibration and weight fitting, confidence-band curves, the ±0.1 stability test, re-clustering, flipping any work type live, OpenRouter and its key, the validator-lane currency decision, a mandatory validator scope per work type, and the paid Artificial Analysis Data API remain later, captain-gated phases.
+This section documents them only; none is built or enabled here.
+The extension points are a new route-table entry, a new seed mix or floor under a new `POLICY_VERSION`, and a later live phase that would need its own captain decision.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 

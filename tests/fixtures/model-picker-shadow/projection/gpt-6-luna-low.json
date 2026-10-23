@@ -1,0 +1,118 @@
+{
+ "as_of": "2026-10-16T03:01:12Z",
+ "creator": "OpenAI",
+ "metrics": {
+  "aa-briefcase-analytical-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "Analytical Quality & Presentation Elo",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 654.47
+  },
+  "aa-briefcase-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Briefcase v1.1",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 741.34
+  },
+  "aa-lcr": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-LCR v1.1",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.74
+  },
+  "automationbench-aa": {
+   "derived": false,
+   "estimated": false,
+   "label": "AutomationBench-AA",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.12049187272690505
+  },
+  "costpertask": {
+   "derived": false,
+   "estimated": false,
+   "label": "Cost per Task",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": null,
+   "value": 0.0045
+  },
+  "gdpval-aa-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "GDPval-AA v2.1",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1033.12
+  },
+  "omniscience-accuracy": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Accuracy",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.4076666666666667
+  },
+  "omniscience-non-hallucination-rate": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Non-Hallucination Rate",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.15700619020821605
+  },
+  "scicode": {
+   "derived": false,
+   "estimated": false,
+   "label": "SciCode",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.46875
+  },
+  "terminal-bench-4-0": {
+   "derived": false,
+   "estimated": false,
+   "label": "Terminal-Bench 4.0",
+   "observed_at": "2026-10-16T03:01:12Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.0
+  }
+ },
+ "name": "GPT-6 Luna (Low)",
+ "slug": "gpt-6-luna-low"
+}
