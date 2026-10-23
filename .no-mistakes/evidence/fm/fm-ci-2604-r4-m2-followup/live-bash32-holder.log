@@ -1,0 +1,7 @@
+$ nice -n 20 /bin/bash .gate-test-local/lock-live.sh .gate-test-local
+Bash=3.2.57(1)-release parent=59278 actual_subshell=59293 recorded_holder=59293
+live holder identity accepted
+dead holder rejected while parent=59278 remains alive
+reclaimed_by=59278 expected_parent=59278
+lock released; stale holder record removed
+exit=0

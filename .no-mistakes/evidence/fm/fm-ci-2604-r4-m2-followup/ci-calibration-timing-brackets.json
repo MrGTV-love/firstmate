@@ -1,0 +1,44 @@
+[
+  {
+    "run": "39838628417",
+    "url": "https://github.com/MrGTV-love/firstmate/actions/runs/39838628417",
+    "case_upper_bounds_ms": [
+      906,
+      249
+    ],
+    "log_lines": [
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T19:32:07.4305117Z ok - a cancelled checkpoint forwards the cancel so its watcher releases the lock",
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T19:32:08.3355951Z ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint",
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T19:32:08.3355951Z ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint",
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T19:32:08.5836545Z ok - a group-killed checkpoint still stops a bound child that was slow to make its process group"
+    ]
+  },
+  {
+    "run": "39765810014",
+    "url": "https://github.com/MrGTV-love/firstmate/actions/runs/39765810014",
+    "case_upper_bounds_ms": [
+      1074,
+      262
+    ],
+    "log_lines": [
+      "Behavior portable serial 15\tUNKNOWN STEP\t2026-10-22T11:11:09.8031189Z ok - a checkpoint restores ignored INT before launching its watcher",
+      "Behavior portable serial 15\tUNKNOWN STEP\t2026-10-22T11:11:10.8767454Z ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint",
+      "Behavior portable serial 15\tUNKNOWN STEP\t2026-10-22T11:11:10.8767454Z ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint",
+      "Behavior portable serial 15\tUNKNOWN STEP\t2026-10-22T11:11:11.1387123Z ok - a group-killed checkpoint still stops a bound child that was slow to make its process group"
+    ]
+  },
+  {
+    "run": "39832878710",
+    "url": "https://github.com/MrGTV-love/firstmate/actions/runs/39832878710",
+    "case_upper_bounds_ms": [
+      1286,
+      260
+    ],
+    "log_lines": [
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T18:54:15.3170793Z ok - a cancelled checkpoint forwards the cancel so its watcher releases the lock",
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T18:54:16.6024992Z ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint",
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T18:54:16.6024992Z ok - a group-killed checkpoint still stops its watcher and frees the next checkpoint",
+      "Behavior portable serial 5\tRun portable serial shard 5\t2026-10-22T18:54:16.8623675Z ok - a group-killed checkpoint still stops a bound child that was slow to make its process group"
+    ]
+  }
+]

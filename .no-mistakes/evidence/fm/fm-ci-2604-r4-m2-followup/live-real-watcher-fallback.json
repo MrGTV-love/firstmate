@@ -1,0 +1,32 @@
+[
+  {
+    "scenario": "usable-perl",
+    "POSIX_probe_exit": 0,
+    "command": "nice -n 20 bash bin/fm-watch-checkpoint.sh --seconds 1",
+    "exit": 124,
+    "elapsed_ms": 1389,
+    "stdout": "checkpoint: no actionable wake within 1s\n",
+    "stderr": "",
+    "watcher_lock_remaining": false
+  },
+  {
+    "scenario": "broken-perl-timeout",
+    "POSIX_probe_exit": 255,
+    "command": "nice -n 20 bash bin/fm-watch-checkpoint.sh --seconds 1",
+    "exit": 124,
+    "elapsed_ms": 1266,
+    "stdout": "checkpoint: no actionable wake within 1s\n",
+    "stderr": "",
+    "watcher_lock_remaining": false
+  },
+  {
+    "scenario": "broken-perl-gtimeout",
+    "POSIX_probe_exit": 255,
+    "command": "nice -n 20 bash bin/fm-watch-checkpoint.sh --seconds 1",
+    "exit": 124,
+    "elapsed_ms": 1267,
+    "stdout": "checkpoint: no actionable wake within 1s\n",
+    "stderr": "",
+    "watcher_lock_remaining": false
+  }
+]

@@ -1,0 +1,60 @@
+Driver appended to definitions from tests/fm-watch-checkpoint.test.sh before its invocation list.
+Runs via nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/.gate-m2-negative.test.sh.
+For each ordinary/delayed and never/late combination, FM_NEGATIVE_CASE and FM_NEGATIVE_MODE select the injected fault.
+FM_OWNER_DEATH_MODULE contains IgnoreOwnerDeath.pm; FM_NEGATIVE_PIDS points inside the disposable workspace.
+
+# Disposable fault injection disables the real Perl watchdog's owner-death
+# detector. The unchanged regression assertions must reject surviving children.
+perl() {
+  PERL5LIB="$FM_OWNER_DEATH_MODULE:${PERL5LIB:-}" command perl -MIgnoreOwnerDeath "$@"
+}
+export -f perl
+injected=0
+kill() {
+  if [ "$injected" = 0 ] && [ "$#" = 3 ] && [ "$1" = -KILL ] && [ "$2" = -- ] && [ "$3" = "-${checkpoint_pid:-none}" ]; then
+    if [ "$FM_NEGATIVE_CASE" = ordinary ]; then
+      victim=$watcher_pid
+      bound=$(ps -o ppid= -p "$victim" | tr -d ' ')
+    else
+      victim=$child
+      bound=$watchdog
+    fi
+    printf '%s %s\n' "$victim" "$bound" > "$FM_NEGATIVE_PIDS"
+    printf '# injected ignored owner death: child=%s bound=%s case=%s mode=%s\n' "$victim" "$bound" "$FM_NEGATIVE_CASE" "$FM_NEGATIVE_MODE"
+    injected=1
+  fi
+  builtin kill "$@"
+}
+sleep() {
+  if [ "$injected" = 1 ] && [ "$FM_NEGATIVE_MODE" = late ]; then
+    injected=2
+    command sleep 7.4
+    builtin kill -KILL -- "-$victim" "$bound" 2>/dev/null || true
+    command sleep 0.1
+    printf '# processes killed after the 7000ms deadline; next observation must fail\n'
+  else
+    command sleep "$@"
+  fi
+}
+(
+  if [ "$FM_NEGATIVE_CASE" = ordinary ]; then
+    test_group_killed_checkpoint_still_stops_its_watcher
+  else
+    test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start
+  fi
+)
+result=$?
+if [ -f "$FM_NEGATIVE_PIDS" ]; then
+  read -r victim bound < "$FM_NEGATIVE_PIDS"
+  builtin kill -KILL -- "-$victim" "$bound" 2>/dev/null || true
+fi
+exit "$result"
+
+IgnoreOwnerDeath.pm:
+package IgnoreOwnerDeath;
+BEGIN {
+  my ($root, $parent) = ($$, CORE::getppid());
+  no warnings 'redefine';
+  *CORE::GLOBAL::getppid = sub { $$ == $root ? $parent : CORE::getppid() };
+}
+1;

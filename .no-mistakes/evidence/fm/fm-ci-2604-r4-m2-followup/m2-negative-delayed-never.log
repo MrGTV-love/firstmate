@@ -1,0 +1,10 @@
+$ nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/.gate-m2-negative.test.sh
+FM_TEST_BEGIN 2026-10-23T10:08:49Z tests/.gate-m2-negative.test.sh family=unclassified expected_gate_skip=none
+# injected ignored owner death: child=16313 bound=16307 case=delayed mode=never
+not ok - the bound and its slow-starting child were not both gone within 7000ms of the checkpoint's group-kill (gone=0, 7064ms)
+FM_TEST_END 2026-10-23T10:08:58Z tests/.gate-m2-negative.test.sh exit=1 duration_ms=8567 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=8639
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=8567 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/.gate-m2-negative.test.sh duration_ms=8567
+
+exit=1

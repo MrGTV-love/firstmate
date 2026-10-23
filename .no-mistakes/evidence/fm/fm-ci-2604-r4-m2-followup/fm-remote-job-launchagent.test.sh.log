@@ -1,0 +1,21 @@
+$ nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/fm-remote-job-launchagent.test.sh
+FM_TEST_BEGIN 2026-10-23T10:01:03Z tests/fm-remote-job-launchagent.test.sh family=unclassified expected_gate_skip=none
+subshell holder identity and dead-holder reclaim passed (native; Bash 3.2.57(1)-release)
+ok - subshell repair-lock ownership and reclamation work on real Bash 3.2 or without BASHPID, and native Bash
+ok - a stale-code crash heartbeat cannot count as replacement readiness
+ok - the live worker recreates missing readiness independently of a blocked sweep
+ok - a slow sequence-claim sweep keeps readiness fresh and cannot trigger a LaunchAgent bootout
+ok - concurrent Darwin ensures serialize one reload and adopt its fresh worker
+ok - stale readiness logs the named condition without reloading a verified launchd-tracked live owner
+ok - Darwin stops an untracked stale-code owner and starts the current worker through launchd
+ok - Darwin replaces a current-code owner that the loaded agent does not track
+ok - a fresh spawn survives when the caller that started it dies before publication
+ok - a dead repair-lock holder is reclaimed by one caller at a time
+ok - Darwin reload waits for asynchronous bootout cleanup before bootstrap (2s)
+ALL TESTS PASSED
+FM_TEST_END 2026-10-23T10:02:41Z tests/fm-remote-job-launchagent.test.sh exit=0 duration_ms=98376 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=98451
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=98376 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-remote-job-launchagent.test.sh duration_ms=98376
+
+exit=0

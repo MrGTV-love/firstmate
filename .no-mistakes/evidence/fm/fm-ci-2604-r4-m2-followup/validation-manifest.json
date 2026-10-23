@@ -1,0 +1,41 @@
+{
+  "isolation": "HOME, FM_HOME, TMPDIR, CPU/test-slot caches confined to .gate-test-local; duration telemetry disabled; production overrides removed; tests serial under nice -n 20. No Herdr or primary session required for these script/library changes.",
+  "checks": {
+    "checkpoint_exit": 0,
+    "launchagent_exit": 0,
+    "transport_lanes_exit": 0
+  },
+  "live_honest_group_stop_ms": {
+    "ordinary": 211,
+    "delayed": 224
+  },
+  "adversarial_deadline_rejections": [
+    {
+      "case": "ordinary",
+      "mode": "never",
+      "exit": 1,
+      "deadline_rejected": true
+    },
+    {
+      "case": "ordinary",
+      "mode": "late",
+      "exit": 1,
+      "deadline_rejected": true
+    },
+    {
+      "case": "delayed",
+      "mode": "never",
+      "exit": 1,
+      "deadline_rejected": true
+    },
+    {
+      "case": "delayed",
+      "mode": "late",
+      "exit": 1,
+      "deadline_rejected": true
+    }
+  ],
+  "calibration": "Historical green CI logs independently confirm the exact 906/249, 1074/262 and 1286/260 ms conservative brackets stated in the test comments. Prior loaded-host samples are documented in the change; not remeasured merely for confirmation. Production INT 5 and lock acquisition 120 s unchanged in the inspected diff.",
+  "setup_correction": "An initial SIGSTOP-based never-stop injection allowed shutdown after 5339 ms instead of holding the children indefinitely. Replaced that ineffective injection with an owner-death detection fault; all four intended negative cases then reached the exact existing 7000 ms assertions and were rejected. No product failure was observed.",
+  "scope": "Only targeted test phase executed; no lint, full suite, CI triggering, pipeline control, publishing, credential changes, or permanent source/test edits."
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "command": "gh-axi api /repos/MrGTV-love/firstmate/actions/runs/39838628417 --jq {id,head_sha,conclusion,html_url,run_started_at}",
+    "exit": 0,
+    "stdout": "conclusion: success\nhead_sha: b13c1b1b0f0d99c4b540018a7e9540d06d9c3a2e\nhtml_url: \"https://github.com/MrGTV-love/firstmate/actions/runs/39838628417\"\nid: 39838628417\nrun_started_at: \"2026-10-22T19:16:24Z\"\n",
+    "stderr": ""
+  },
+  {
+    "command": "gh-axi api /repos/MrGTV-love/firstmate/actions/runs/39765810014 --jq {id,head_sha,conclusion,html_url,run_started_at}",
+    "exit": 0,
+    "stdout": "conclusion: success\nhead_sha: 839d9a47238abb83513071426e98b72de23dab4c\nhtml_url: \"https://github.com/MrGTV-love/firstmate/actions/runs/39765810014\"\nid: 39765810014\nrun_started_at: \"2026-10-22T10:48:08Z\"\n",
+    "stderr": ""
+  },
+  {
+    "command": "gh-axi api /repos/MrGTV-love/firstmate/actions/runs/39832878710 --jq {id,head_sha,conclusion,html_url,run_started_at}",
+    "exit": 0,
+    "stdout": "conclusion: success\nhead_sha: 64f2ae11a983b8730b97d925b2cfc47c9cf198ad\nhtml_url: \"https://github.com/MrGTV-love/firstmate/actions/runs/39832878710\"\nid: 39832878710\nrun_started_at: \"2026-10-22T18:36:32Z\"\n",
+    "stderr": ""
+  }
+]

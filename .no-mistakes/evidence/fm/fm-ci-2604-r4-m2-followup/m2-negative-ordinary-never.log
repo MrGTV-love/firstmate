@@ -1,0 +1,10 @@
+$ nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/.gate-m2-negative.test.sh
+FM_TEST_BEGIN 2026-10-23T10:08:30Z tests/.gate-m2-negative.test.sh family=unclassified expected_gate_skip=none
+# injected ignored owner death: child=95647 bound=95637 case=ordinary mode=never
+not ok - the watcher outlived its group-killed checkpoint's 7000ms cleanup limit (7188ms)
+FM_TEST_END 2026-10-23T10:08:40Z tests/.gate-m2-negative.test.sh exit=1 duration_ms=9504 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=9623
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=9504 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/.gate-m2-negative.test.sh duration_ms=9504
+
+exit=1
