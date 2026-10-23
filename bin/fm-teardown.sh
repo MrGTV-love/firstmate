@@ -237,6 +237,11 @@
 # the final project-lock wait, so the driver never runs while the lock is held,
 # except when teardown keeps project custody through the return. A lock in any
 # other format, a driver refusal, or a copy still registered afterwards refuses.
+# A driver refusal saves its complete combined output unchanged in a private
+# data/<task>/vernant-closeout.XXXXXX file, names that file (or the data/<task>
+# directory it could not save into), and prints the last 20 lines with control
+# characters sanitized. Successful closeouts print no driver output and create
+# no durable output file.
 # The task's own nested copy that Vernant's creation lock holds takes the same
 # driver route instead of a forced removal, before the final project-lock wait
 # like a foreign copy, after the clean and landed proof and the same ignored-file,

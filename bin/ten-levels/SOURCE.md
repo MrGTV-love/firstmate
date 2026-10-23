@@ -61,7 +61,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Its host response handling preserves answered middle-band results with an advisory and audit row.
   Native reads of task-owned data/state and tracked own-worktree files, including modified tracked files, pass immediately without a judge; cross-task roots are not trusted.
   Native source metadata normalizes numeric and database selectors before bounded path admission.
-  Untrusted flags at or above 0.80 remain withheld on omp; shell/write outages still deny.
+  Untrusted flags at or above 0.80 remain withheld on omp; write outages still deny, and shell outages deny except the narrow read-only and lab admissions the operator contract owns.
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.

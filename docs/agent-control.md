@@ -381,7 +381,7 @@ A task's own prior copies are not competing custody against the cleanup of its o
 2. **Retire, on every swept root.** Before any destructive step, teardown concludes a parked no-mistakes run, retires a task-private launch agent, and reaps leaked processes on the current copy, the slot and each nested copy, each as its own root.
 3. **Execute.** Teardown checks dirt and HEAD again with the project lock held, reusing only landing proofs tied to those same immutable commits; it refuses before removing anything if a new landing proof would be needed.
    Then it removes the nested copy (its branch stays), detaches the slot, returns it, drops the claim and removes the task record before releasing the project lock.
-   A nested copy that Vernant's creation lock holds is released by the closeout driver under the release rule above, never by a forced removal; a driver refusal stops teardown with the copy, the slot claim, Treehouse's lease and the task record in place.
+   A nested copy that Vernant's creation lock holds is released by the closeout driver under the release rule above, never by a forced removal; a driver refusal stops teardown with the copy, the slot claim, Treehouse's lease and the task record in place, and names its saved diagnostics under the teardown header's output-retention contract.
    If the return removes a stale `index.lock`, the slot is checked once more before the reset.
 
 The teardown header owns the state-only slot reservation and lock boundaries; process cleanup, endpoint closure, backlog completion and clone synchronization are outside those ordinary pool critical sections.

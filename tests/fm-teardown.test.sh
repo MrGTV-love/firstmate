@@ -10619,6 +10619,9 @@ printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout.log"
 if [ -n "\${FM_STUB_LOCK:-}" ]; then
   if [ -d "\$FM_STUB_LOCK" ]; then echo held; else echo free; fi >> "$case_dir/closeout.lock-state"
 fi
+if [ -n "\${FM_STUB_CLOSEOUT_OUTPUT:-}" ]; then
+  cat "\$FM_STUB_CLOSEOUT_OUTPUT" >&2
+fi
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
   echo '{"allowed": false, "reason": "stub_refusal"}'
   exit 3
@@ -13036,6 +13039,68 @@ SH
   pass "the closeout driver releases a locked own copy before the shared project lock is taken, and the slot return still runs under it"
 }
 
+test_closeout_refusal_reports_tail_and_preserves_complete_output() {
+  local rc ownership length n output_file line log
+  for ownership in foreign own; do
+    for length in long short; do
+      dead_launcher_pid
+      if [ "$ownership" = own ]; then
+        make_own_locked_copy_case "closeout-output-$ownership-$length" enclosing "$FOREIGN_DEAD_PID"
+      else
+        make_foreign_copy_case "closeout-output-$ownership-$length" "$FOREIGN_DEAD_PID"
+      fi
+      if [ "$length" = long ]; then
+        printf '.env warning: leading diagnostic must not hide the refusal\n' > "$FOREIGN_CASE/driver-output"
+        for n in $(seq 1 40); do
+          printf 'warning %s: %0100d\n' "$n" 0 >> "$FOREIGN_CASE/driver-output"
+        done
+      else
+        printf 'short closeout diagnostic\n' > "$FOREIGN_CASE/driver-output"
+      fi
+      printf 'actual refusal after warnings\n\n' >> "$FOREIGN_CASE/driver-output"
+      cp "$FOREIGN_CASE/driver-output" "$FOREIGN_CASE/expected-output"
+      printf '%s\n' '{"allowed": false, "reason": "stub_refusal"}' >> "$FOREIGN_CASE/expected-output"
+      run_foreign_teardown rc FM_STUB_CLOSEOUT=refuse FM_STUB_CLOSEOUT_OUTPUT="$FOREIGN_CASE/driver-output"
+      expect_code 1 "$rc" "$ownership-$length: driver refusal must retain teardown's exit code"
+      assert_grep '(exit 3)' "$FOREIGN_CASE/stderr" "$ownership-$length: driver exit code was lost"
+      assert_grep 'actual refusal after warnings' "$FOREIGN_CASE/stderr" "$ownership-$length: warning hid the real refusal"
+      if [ "$length" = long ]; then
+        assert_no_grep '.env warning: leading diagnostic' "$FOREIGN_CASE/stderr" "$ownership-$length: refusal printed the head instead of the tail"
+      else
+        assert_grep 'short closeout diagnostic' "$FOREIGN_CASE/stderr" "$ownership-$length: short output was truncated"
+      fi
+      output_file=
+      while IFS= read -r line; do
+        case "$line" in *'full output: '*) output_file=${line##*full output: } ;; esac
+      done < "$FOREIGN_CASE/stderr"
+      case "$output_file" in
+        "$FOREIGN_CASE/data/task-x1/"*) ;;
+        *) fail "$ownership-$length: refusal did not name output in the task's data directory" ;;
+      esac
+      assert_present "$output_file" "$ownership-$length: named output file is missing"
+      cmp -s "$FOREIGN_CASE/expected-output" "$output_file" || fail "$ownership-$length: saved output is not byte-identical to the driver's complete output"
+      assert_present "$FOREIGN_COPY/.git" "$ownership-$length: refusal removed the copy"
+      assert_present "$FOREIGN_CASE/state/task-x1.meta" "$ownership-$length: refusal removed the task record"
+      assert_absent "$FOREIGN_CASE/treehouse.log" "$ownership-$length: refusal returned the slot"
+    done
+    dead_launcher_pid
+    if [ "$ownership" = own ]; then
+      make_own_locked_copy_case "closeout-output-$ownership-success" enclosing "$FOREIGN_DEAD_PID"
+    else
+      make_foreign_copy_case "closeout-output-$ownership-success" "$FOREIGN_DEAD_PID"
+    fi
+    printf 'successful closeout diagnostic\n' > "$FOREIGN_CASE/driver-output"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT_OUTPUT="$FOREIGN_CASE/driver-output"
+    expect_code 0 "$rc" "$ownership: successful closeout must still succeed"
+    assert_no_grep 'successful closeout diagnostic' "$FOREIGN_CASE/stderr" "$ownership: successful driver output was printed"
+    assert_no_grep 'full output:' "$FOREIGN_CASE/stderr" "$ownership: successful closeout printed a refusal log"
+    for log in "$FOREIGN_CASE/data/task-x1"/vernant-closeout.*; do
+      assert_absent "$log" "$ownership: successful closeout left a durable output file"
+    done
+  done
+  pass 'own and foreign closeout refusals show the tail and save byte-identical full output; short output stays complete and successful output stays silent without a durable log'
+}
+
 test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
   local rc shape
   for shape in enclosing reverse; do
@@ -14699,6 +14764,7 @@ test_locked_own_nested_copy_that_is_not_proved_is_refused
 test_locked_own_nested_copy_with_unique_ignored_file_is_preserved_and_released
 test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused
 test_locked_own_nested_copy_is_released_before_the_project_lock_wait
+test_closeout_refusal_reports_tail_and_preserves_complete_output
 test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
 test_shared_nested_copy_concludes_only_its_own_runtime

@@ -77,15 +77,48 @@ ERR=$(mktemp "${TMPDIR:-/tmp}/fm-watch-checkpoint.err.XXXXXX") || {
 }
 trap 'rm -f "$OUT" "$ERR"' EXIT
 
+# The bound runs in a process group apart from both its caller and the command,
+# so a group-kill of the caller cannot also kill the deadline and orphan a
+# watcher that holds the watcher lock. An INT, TERM, or HUP sent to the bound,
+# unless it inherited that signal as ignored, is forwarded to the command group,
+# and losing the calling shell sends the deadline's own signal; either starts
+# the deadline's kill-after escalation. Both the bound and the command call
+# setpgrp for the command's group, so it exists before any signal can target it;
+# bin/fm-timeout-lib.sh owns the same rule. The timeout/gtimeout fallback bounds
+# only by deadline and kill-after; it does not track the calling shell.
 run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...>
   perl -e '
     use POSIX qw(:sys_wait_h);
+    my $owner = shift;
     my $seconds = shift;
     my $signal = shift;
     my $kill_after = shift;
-    my $pid = fork;
-    die "fork failed\n" unless defined $pid;
-    if (!$pid) {
+    my ($pid, $pending, $stopping, $timed_out) = (0, "", 0, 0);
+    sub finish {
+      exit($timed_out ? 124 : (($? & 127) ? 128 + ($? & 127) : $? >> 8));
+    }
+    sub stop {
+      my $sig = shift;
+      return $pending ||= $sig unless $pid;
+      kill $sig, -$pid;
+      alarm $kill_after unless $stopping++;
+    }
+    for my $sig (qw(INT TERM HUP)) {
+      $SIG{$sig} = sub { stop($sig) } unless ($SIG{$sig} // "") eq "IGNORE";
+    }
+    $SIG{ALRM} = sub {
+      if ($stopping) {
+        kill "KILL", -$pid;
+        waitpid $pid, 0;
+        finish();
+      }
+      $timed_out = 1;
+      stop($signal);
+    };
+    setpgrp(0, 0);
+    my $child = fork;
+    die "fork failed\n" unless defined $child;
+    if (!$child) {
       $SIG{$_} = "DEFAULT" for qw(INT TERM);
       setpgrp(0, 0);
       # The indirect-object form keeps a one-item command out of the shell: a
@@ -94,48 +127,20 @@ run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...
       exec { $ARGV[0] } @ARGV;
       die "exec failed: $!\n";
     }
-    my $timed_out = 0;
-    # Non-zero once the child has been signalled, so the re-armed alarm knows a
-    # KILL escalation is already armed and which status to report.
-    my $forced_exit = 0;
-    my $signal_child = sub {
-      my ($sig, $code) = @_;
-      return if $forced_exit;
-      $forced_exit = $code;
-      kill $sig, -$pid;
-      # Always re-arm: a child that cannot install its INT trap would otherwise
-      # be waited on forever.
-      alarm($kill_after);
-    };
-    local $SIG{ALRM} = sub {
-      if ($forced_exit) {
-        kill "KILL", -$pid;
-        waitpid $pid, 0;
-        exit $forced_exit;
-      }
-      $timed_out = 1;
-      $signal_child->($signal, 124);
-    };
-    # A harness cancels a checkpoint by signalling its process group, and the
-    # child owns a group of its own. Without these traps the parent would die on
-    # the default action and leave the watcher alive holding state/.watch.lock
-    # and writing to a deleted output path, so forward the cancel instead and
-    # let the same alarm escalate.
-    for my $sig (qw(INT TERM HUP)) {
-      $SIG{$sig} = sub {
-        $signal_child->($sig, 128 + ($sig eq "INT" ? 2 : $sig eq "TERM" ? 15 : 1));
-      };
-    }
-    alarm $seconds;
+    setpgrp($child, $child);
+    $pid = $child;
+    stop($pending) if $pending;
+    alarm $seconds unless $stopping;
     while (1) {
       my $waited = waitpid $pid, WNOHANG;
       if ($waited == $pid) {
         alarm 0;
-        exit($timed_out ? 124 : (($? & 127) ? 128 + ($? & 127) : $? >> 8));
+        finish();
       }
+      stop($signal) if !$stopping && getppid() != $owner;
       select undef, undef, undef, 0.05;
     }
-  ' "$@"
+  ' "${BASHPID:-$$}" "$@"
 }
 
 run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>

@@ -1862,9 +1862,10 @@ test_portable_parallel_lanes_stay_duration_balanced() {
 }
 
 test_portable_parallel_lanes_run_bounded_and_concurrently() {
-  local out jobs makespan budget
+  local out jobs effective makespan budget
   out=$("$RUNNER" --check-coverage)
   jobs=$(printf '%s\n' "$out" | sed -n 's/.*parallel_jobs=\([0-9]*\).*/\1/p')
+  effective=$(printf '%s\n' "$out" | sed -n 's/.*parallel_effective_jobs=\([0-9]*\).*/\1/p')
   makespan=$(printf '%s\n' "$out" | sed -n 's/.*parallel_makespan_ms=\([0-9]*\).*/\1/p')
   budget=$(printf '%s\n' "$out" | sed -n 's/.*parallel_budget_ms=\([0-9]*\).*/\1/p')
   [ -n "$jobs" ] && [ -n "$makespan" ] && [ -n "$budget" ] \
@@ -1875,10 +1876,45 @@ test_portable_parallel_lanes_run_bounded_and_concurrently() {
     || fail "portable parallel lanes must run more than one script at a time, got $jobs"
   [ "$jobs" -le 4 ] \
     || fail "$jobs exceeds the recorded four-way isolation proof; re-prove the set before running wider"
+  [ -n "$effective" ] && [ "$effective" -ge 1 ] && [ "$effective" -le "$jobs" ] \
+    || fail "parallel_effective_jobs must be the bin count the model packed, between 1 and parallel_jobs=$jobs, got ${effective:-none}"
   [ "$makespan" -gt 0 ] || fail "parallel_makespan_ms must be a positive modeled duration, got $makespan"
   [ "$makespan" -le "$budget" ] \
     || fail "modeled parallel makespan ${makespan}ms exceeds the ${budget}ms budget"
-  pass "portable parallel lanes are bounded by a modeled makespan at the CI job count"
+
+  # The reported bin count must be the one the model actually packed: no
+  # partition can beat total/bins, so a makespan below that bound means the
+  # reported count and the packing disagree.
+  local work
+  work=$(printf '%s\n' "$out" | sed -n 's/.*parallel_max_ms=\([0-9]*\).*/\1/p')
+  [ -n "$work" ] || fail "coverage summary must carry parallel_max_ms: $out"
+  [ "$((makespan * effective))" -ge "$work" ] \
+    || fail "modeled makespan ${makespan}ms over ${work}ms of hinted work is below the ${effective}-bin lower bound, so the reported bin count is not the one packed"
+
+  # A wider job count must not widen the model, and a budget below it must refuse
+  # with the packed bin count in the message.
+  local tmp repo rc wide narrow out2
+  tmp=$(fm_test_tmproot fm-test-run-parallel-bound)
+  repo="$tmp/repo"
+  shard_fixture_init "$repo" 1
+  sed -i.bak 's/^PORTABLE_PARALLEL_JOBS=.*/PORTABLE_PARALLEL_JOBS=4/' "$repo/bin/fm-test-run.sh"
+  rc=0
+  out2=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the fixture coverage check failed: $out2"
+  wide=$(printf '%s\n' "$out2" | sed -n 's/.*parallel_effective_jobs=\([0-9]*\).*/\1/p')
+  [ "${wide:-none}" = "$effective" ] \
+    || fail "raising PORTABLE_PARALLEL_JOBS to 4 changed the modeled bins from $effective to ${wide:-none}; the clamp must hold the effective count"
+  narrow=$(printf '%s\n' "$out2" | sed -n 's/.*parallel_makespan_ms=\([0-9]*\).*/\1/p')
+  [ "${narrow:-none}" = "$makespan" ] \
+    || fail "raising PORTABLE_PARALLEL_JOBS to 4 changed the makespan from $makespan to ${narrow:-none}; the model must not assume perfect scaling"
+
+  sed -i.bak 's/^PORTABLE_PARALLEL_MAX_MSPAN_MS=.*/PORTABLE_PARALLEL_MAX_MSPAN_MS=1/' "$repo/bin/fm-test-run.sh"
+  rc=0
+  out2=$(bash "$repo/bin/fm-test-run.sh" --check-coverage 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a budget below the modeled makespan must be refused"
+  printf '%s\n' "$out2" | grep -Fq "packed into ${effective} bins" \
+    || fail "the refusal must name the packed bin count: $out2"
+  pass "portable parallel lanes are bounded by a modeled makespan packed into the effective bin count"
 }
 
 # The makespan model packs a lane longest-first over its parallel hints, so the

@@ -4,9 +4,8 @@
 # and the cause of that growth is unproven.
 # The blocked-write waits below are 120-second wall-clock hang tripwires, not
 # slack for that growth, and they must not be raised further.
-# This suite, once in serial 7 of the old 15-shard layout, passed in
-# `portable-serial-4of20` (the CI job "Behavior portable serial 4", job 119751733879) in
-# [run 39757092565](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565) at head `2f5fd300`.
+# docs/fm-test-portable-shards.md records the CI run that passed this suite on
+# that image.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -295,6 +294,9 @@ publish_healthy_watcher_identity() { # <state> <home> <watch-script>
 }
 
 remote_env() {
+  # Keep this lifecycle fixture's inputs explicit: unrelated production defaults
+  # must not add remote jobs before its bounded inheritance/launch barriers.
+  FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json crew-harness backend' \
   FM_HOME="$PARENT" \
   FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
   FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \

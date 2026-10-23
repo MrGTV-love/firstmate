@@ -1728,13 +1728,32 @@ make_path("$tmp/slots");
 open(my $holder, '>>', "$tmp/slots/slot.0") or die "$!";
 flock($holder, LOCK_EX) or die "$!";
 local $ENV{FM_LINT_HOST_SLOTS} = 1;
+# The older waiter stops itself while it owns admission.lock with its ticket
+# queued, so the stop is reached by construction instead of by sampling the
+# short interval in which a polling gate holds the lock. Admission takes
+# non-blocking locks in this order: coordinator, ticket, then each slot.
+open(my $module, '>', "$tmp/StopOwner.pm") or die "$!";
+print {$module} <<'MODULE';
+package StopOwner;
+use Fcntl qw(LOCK_NB);
+my $locks = 0;
+BEGIN {
+    *CORE::GLOBAL::flock = sub {
+        my $locked = CORE::flock($_[0], $_[1]);
+        kill 'STOP', $$ if ($_[1] & LOCK_NB) && ++$locks == 2 && $locked;
+        return $locked;
+    };
+}
+1;
+MODULE
+close $module;
 sub spawn {
-    my ($run) = @_;
+    my ($run, @inject) = @_;
     my $pid = fork();
     die "fork: $!" unless defined $pid;
     if (!$pid) {
         close $holder;
-        exec $^X, $gate, 'gate', "$tmp/slots", 18, $run, "$tmp/$run.wait", '--', $^X, '-e',
+        exec $^X, @inject, $gate, 'gate', "$tmp/slots", 18, $run, "$tmp/$run.wait", '--', $^X, '-e',
             'open(my $fh, ">>", $ARGV[0]) or die "$!"; print {$fh} "$ARGV[1]\n"', "$tmp/order", $run;
         die "exec: $!";
     }
@@ -1754,25 +1773,26 @@ sub order {
     local $/;
     return <$fh>;
 }
+sub is_stopped {
+    open(my $ps, '-|', 'ps', '-o', 'stat=', '-p', $_[0]) or return 0;
+    my $stat = <$ps> // '';
+    close $ps;
+    return $stat =~ /\A\s*T/;
+}
 my ($stopped, $live);
 my $error;
 eval {
-    $stopped = spawn('stopped');
+    $stopped = spawn('stopped', "-I$tmp", '-MStopOwner');
     my $deadline = time() + 60;
-    until (grep { /\.$stopped\.stopped\z/ } glob "$tmp/slots/queue.*") {
-        die "the older waiter never queued\n" if time() > $deadline;
+    until (is_stopped($stopped)) {
+        die "the older waiter ended instead of stopping: status $?\n" if waitpid($stopped, WNOHANG) == $stopped;
+        die "the older waiter never stopped inside admission\n" if time() > $deadline;
         sleep 0.01;
     }
-    # Stop the queued gate until the signal lands while it owns admission.lock.
     open(my $coordinator, '>>', "$tmp/slots/admission.lock") or die "$!";
-    while (1) {
-        kill 'STOP', $stopped;
-        if (!flock($coordinator, LOCK_EX | LOCK_NB)) { last; }
-        flock($coordinator, LOCK_UN);
-        kill 'CONT', $stopped;
-        die "could not stop the older waiter inside admission\n" if time() > $deadline;
-        sleep 0.013;
-    }
+    die "the stopped waiter does not own admission.lock\n" if flock($coordinator, LOCK_EX | LOCK_NB);
+    die "the stopped waiter has no queued ticket\n"
+        unless grep { /\.$stopped\.stopped\z/ } glob "$tmp/slots/queue.*";
     $live = spawn('live');
     sleep 0.25;
     close $holder;

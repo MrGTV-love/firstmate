@@ -133,24 +133,24 @@ path=$("$GUARD" census --state-dir "$STATE/census" --limit 1000000) || fail "cen
 [ -f "$path" ] || fail "census did not print an existing file: $path"
 mode=$(python3 -I -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$path")
 [ "$mode" = 0o600 ] || fail "census file mode is $mode, not 0600"
-python3 -I - "$path" <<'PY' || fail "census did not describe the recursive tree"
-import json, re, sys
+python3 -I - "$path" "$NESTSLEEP" "$STANDIN" <<'PY' || fail "census did not describe the recursive tree"
+import json, os, re, sys
 c = json.load(open(sys.argv[1]))
 cmds = {e["command"]: e["count"] for e in c["by_command"]}
 # The kernel names a process after the binary it runs on macOS and after the path it
 # was started through on Linux, so the shell and sleeper may carry either name.
 shells = sum(n for name, n in cmds.items() if "bash" in name)
 assert shells >= 60, "bash-named processes: %d" % shells
-assert any("sleep" in name or "standin" in name for name in cmds), "no sleeper (sleep or standin) in by_command"
+# The sleeper is the stand-in started through the nestsleep symlink: one of its two
+# names is the process name and the other is the executable the guard reads.
+sleeper = {os.path.basename(sys.argv[2]), os.path.basename(os.path.realpath(sys.argv[3]))}
+assert any(name in sleeper for name in cmds), "no stand-in in by_command"
 assert any(re.search(r"bash\+", e["chain"]) and e["count"] >= 59 for e in c["by_parent_chain"]), \
     c["by_parent_chain"][:5]
 deepest = c["deepest_chains"]
 assert 1 <= len(deepest) <= 5, len(deepest)
 top = deepest[0]
-# The leaf runs the suite's own stand-in (a compiled spinner, or the host sleep
-# it symlinks when no compiler exists), so its executable carries either the
-# suite's sleep name or the stand-in's binary name, by the same kernel rule above.
-assert re.search(r"sleep|standin", top["leaf"]["executable"]) and top["leaf"]["script"] == "", top["leaf"]
+assert {top["leaf"]["command"], top["leaf"]["executable"]} == sleeper and top["leaf"]["script"] == "", top["leaf"]
 runs = [int(n) for n in re.findall(r"bash\(x(\d+)\)", top["chain"])]
 assert runs and max(runs) >= 60, top["chain"]
 assert top["run_length"] >= 60 and top["depth"] >= 61, top

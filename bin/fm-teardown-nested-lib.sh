@@ -745,8 +745,34 @@ teardown_run_closeout() {  # <slot> <copy>
     TEARDOWN_CLOSEOUT_OUT="Vernant's closeout driver $driver or its interpreter $py is not available"
     return 127
   fi
-  TEARDOWN_CLOSEOUT_OUT=$( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" --execute-cleanup 2>&1 ) || rc=$?
+  # The sentinel keeps command substitution from stripping the driver's trailing
+  # newlines, so a refusal can save exactly the output the driver produced.
+  TEARDOWN_CLOSEOUT_OUT=$(
+    local status=0
+    ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" --execute-cleanup ) 2>&1 || status=$?
+    printf '.'
+    exit "$status"
+  ) || rc=$?
+  TEARDOWN_CLOSEOUT_OUT=${TEARDOWN_CLOSEOUT_OUT%.}
   return "$rc"
+}
+
+# Saves a refused driver's full output privately, then shows its last 20 lines.
+# Prefix and sanitize each line so driver text cannot forge refusal directives.
+# Successful closeouts never call this helper and create no durable output file.
+teardown_closeout_refusal() {  # <foreign|own nested> <copy> <driver-exit>
+  local kind=$1 copy=$2 rc=$3 output_file line
+  if output_file=$(umask 077; mkdir -p "$DATA/$ID" && mktemp "$DATA/$ID/vernant-closeout.XXXXXX") \
+      && printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$output_file"; then
+    printf "REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output: %s\n" \
+      "$kind" "$(fm_refuse_text "$copy")" "$rc" "$(fm_refuse_text "$output_file")" >&2
+  else
+    printf "REFUSED: Vernant's closeout driver did not release %s copy %s (exit %s): full output could not be saved under %s\n" \
+      "$kind" "$(fm_refuse_text "$copy")" "$rc" "$(fm_refuse_text "$DATA/$ID")" >&2
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    printf '  %s\n' "$(fm_refuse_text "$line")" >&2
+  done < <(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tail -n 20)
 }
 
 # Is <copy> still on disk or registered in <slot>? Failure to list counts as yes.
@@ -798,7 +824,7 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
       rc=0
       teardown_run_closeout "$slot" "$copy" || rc=$?
       if [ "$rc" != 0 ]; then
-        echo "REFUSED: Vernant's closeout driver did not release foreign copy $(fm_refuse_text "$copy") (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
+        teardown_closeout_refusal foreign "$copy" "$rc"
         return 1
       fi
       ;;
@@ -904,7 +930,7 @@ teardown_own_copy_dispose() {  # <slot> <copy>
   rc=0
   teardown_run_closeout "$slot" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
-    echo "REFUSED: Vernant's closeout driver did not release own nested copy $(fm_refuse_text "$copy") (exit $rc): $(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")" >&2
+    teardown_closeout_refusal 'own nested' "$copy" "$rc"
     return 1
   fi
   if teardown_foreign_copy_present "$slot" "$copy"; then

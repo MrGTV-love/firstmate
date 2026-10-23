@@ -27,14 +27,14 @@ If every shard must return under 1200000 ms without that exception, splitting `t
 The two parallel lanes now pass `--jobs 3`, the `PORTABLE_PARALLEL_JOBS` count, because their membership is exactly the proven-isolated set.
 The recorded four-way proof of that set in [fm-test-isolation-proof.md](fm-test-isolation-proof.md) ran on a macOS host, where `tests/fm-pi-primary-types.test.sh` gate-skipped and `tests/fm-pr-merge.test.sh` failed, so those two members are not yet proven to pass concurrently.
 The first three-wide run on the 26.04 image is [run 39757092565](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565) of PR #198 at head `2f5fd300`: all 30 jobs passed, the workflow finished in 23 minutes, and the two parallel jobs took 20 and 13 minutes against 33 and 28 minutes when they ran serially in [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843) at head `12a9cef0`, before either job passed `--jobs`; both members the macOS proof missed exited zero there (`fm-pr-merge` in 907277 ms, `fm-pi-primary-types` in 4187 ms, no gate skip), which is one sample beside a proof rather than a replacement for it.
+The same run's `portable-serial-4of20` job, which holds `tests/fm-remote-secondmate-lifecycle-e2e.test.sh`, passed ([job 119751733879](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565/job/119751733879)), and the cause of that suite's growth on the 26.04 image is still unproven.
 The proven-isolation admission accepts or refuses an explicit `--jobs` on these lanes like any other selection, and `tests/fm-ci-workflow.test.sh` holds the workflow to `PORTABLE_PARALLEL_JOBS`.
-`--check-coverage` bounds the modeled makespan at that count, so the two parallel jobs now have a packing bound beside their 60-minute job timeouts.
-The makespan model packs a lane's hinted work over the raw job count, then stretches that packing by `PORTABLE_PARALLEL_JOBS` over `PORTABLE_PARALLEL_EFFECTIVE_JOBS`, because a four-vCPU runner saturates.
-The factor is calibrated so the model reproduces the one lane measured three abreast: lane 1 packs to 705697 ms over three bins at the hinted costs and ran 20 minutes, so three jobs deliver 1.764 jobs of throughput (3 x 705697 / 1200000).
-That lane's per-script wall times rose from a 33.5 to a 57.9 minute sum, a 1.73 times inflation against the 1.70 times the factor models.
-The model gives lane 1 1200164 ms and lane 2 1290486 ms.
-Lane 2 ran 13 minutes, because its one 758806 ms script gates it and its per-script times rose only 1.19 times, so one factor errs on the safe side for it.
-The 1500000 ms budget is a quarter again on top of lane 1's measured 20 minutes, and the guard compares the larger lane, so lane 1 has 25 percent of modeled headroom and lane 2 about 16 percent.
+`--check-coverage` bounds the modeled makespan packed into the effective bin count, so the two parallel jobs now have a packing bound beside their 60-minute job timeouts.
+The makespan model packs the lane's hinted work into `min(PORTABLE_PARALLEL_JOBS, PORTABLE_PARALLEL_EFFECTIVE_JOBS)` bins rather than into the raw job count, and `--check-coverage` reports that count as `parallel_effective_jobs`.
+A four-vCPU runner saturates: the lane that summed 33.5 minutes serially finished in 20 minutes three abreast and its recorded per-script wall times rose to a 57.9 minute sum, so three jobs deliver about two jobs of throughput.
+Raising `--jobs` past `PORTABLE_PARALLEL_EFFECTIVE_JOBS` therefore changes neither the model nor the guard; rebalancing or splitting the lanes, or refreshing the hints, does.
+The guard compares the modeled makespan with the 1200000 ms budget, and the model reads about sixteen percent below measured wall time: the lane that finished in 20 minutes models at 1004772 ms.
+So 1200000 ms bounds a real lane near 24 minutes, a fifth above the measured 20 minute lane, and the model now reports 983606 ms against it.
 A concurrent run starts its scripts in the `--list-scheduled` order, which is the order the makespan model packs.
 
 The earlier shared hint tables were refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
@@ -96,20 +96,21 @@ The CI cap follows the three-tier timeout policy in [Timeouts](#timeouts) below.
 Its scheduling regressions also check stored parallel lane order and preserve serial-weight scheduling for other selections.
 These checks do not detect a script outgrowing an existing hint or establish measured job headroom.
 Refresh `portable_parallel_weight_hints` with the slowest completed `duration_ms` per script from several green CI runs' `fm-test-timing-portable-parallel-*` artifacts whenever the parallel set gains scripts or a member grows materially.
-Since these lanes run three abreast, a concurrent artifact records each script's wall time under contention rather than its own cost, so take the serial-era sample (a run of the same lane before it passed `--jobs`) or divide a concurrent sample by the observed inflation; mixing the two units is what made the first three-wide budget pass while the lane ran over it.
+Since these lanes run three abreast, a concurrent artifact records each script's wall time under contention rather than its own cost, so take the serial-era sample (a run of the same lane before it passed `--jobs`, as the 2026-10-22 refresh below does) or divide a concurrent sample by the observed inflation, because a concurrent sample would otherwise count the contention twice.
 
-The parallel hints were refreshed on 2026-10-22 from the `fm-test-timing-portable-parallel-*` artifacts of one serial-era run on the 26.04 image: [39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843) at head `12a9cef0`, before either parallel job passed `--jobs`.
-Each of the 29 members carries its own `duration_ms` from that run, and every script exited zero with no gate skip, so a hint is a script's cost run alone rather than its wall time beside two others.
-In that run the two lanes summed 33.5 and 28.0 minutes, which broke the five percent balance rule, so `tests/fm-crew-state.test.sh` and `tests/fm-backend-herdr.test.sh` moved to the lighter lane and the lanes now sum 30.5 and 31.0 minutes.
-The refresh moved `tests/fm-lint.test.sh` from 737853 ms to 758806 ms, `tests/fm-test-run.test.sh` from 304481 ms to 444553 ms, and `tests/fm-pr-merge.test.sh` from 369918 ms to 461903 ms.
-The three-wide run [39757092565](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565) at head `2f5fd300` supplies no hint, because its artifacts record contention wall time: `tests/fm-pr-merge.test.sh` took 907277 ms there against the 461903 ms hint, and the lane sums rose to 57.9 and 33.4 minutes.
-That run supplies the calibration of `PORTABLE_PARALLEL_EFFECTIVE_JOBS` and the 20 and 13 minute lane times above.
+The parallel hints were last refreshed on 2026-10-22 from one run: the `fm-test-timing-portable-parallel-*` artifacts of [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843) at head `12a9cef0`, where both parallel jobs ran their scripts serially, before either passed `--jobs`.
+Each hint is that run's successful `duration_ms` for the script, and the lane sums of that run's membership were 2008808 ms and 1677716 ms (33.5 and 28.0 minutes).
+This is one sample per script, not the slowest of several green runs that the procedure above asks for, so a script that ran fast in that run is under-hinted until the next refresh.
+Serial-era durations are the right unit for this model because it applies its own contention factor: a concurrent artifact already contains the slowdown from sharing the four-vCPU runner, and `PORTABLE_PARALLEL_EFFECTIVE_JOBS` would count that slowdown a second time.
+Against the 2026-10-17 table below, `tests/fm-captain-hold-keyed-answers.test.sh` fell from 257148 ms to 185475 ms, `tests/fm-composer-lib.test.sh` from 218757 ms to 192576 ms, and `tests/fm-pi-primary-types.test.sh` from 5993 ms to 2395 ms.
+The other 26 hints rose, among them `tests/fm-lint.test.sh` from 737853 ms to 758806 ms and `tests/fm-test-run.test.sh` from 304481 ms to 444553 ms.
 
-The parallel hints were refreshed on 2026-10-17 from the `fm-test-timing-portable-parallel-*` artifacts of eight green main runs: [38904559722](https://github.com/MrGTV-love/firstmate/actions/runs/38904559722), [38957463780](https://github.com/MrGTV-love/firstmate/actions/runs/38957463780), [38979006411](https://github.com/MrGTV-love/firstmate/actions/runs/38979006411), [38979776735](https://github.com/MrGTV-love/firstmate/actions/runs/38979776735), [38990827989](https://github.com/MrGTV-love/firstmate/actions/runs/38990827989), [39001838488](https://github.com/MrGTV-love/firstmate/actions/runs/39001838488), [39010291930](https://github.com/MrGTV-love/firstmate/actions/runs/39010291930), [39013019461](https://github.com/MrGTV-love/firstmate/actions/runs/39013019461).
-Each retained member carries its slowest successful (`exit=0`, `gate_skip=false`) `duration_ms` across those runs.
-The refresh moved `tests/fm-lint.test.sh` from 252498 ms to 737853 ms, `tests/fm-composer-lib.test.sh` from 9521 ms to 218757 ms, and `tests/fm-test-run.test.sh` from 156781 ms to 304481 ms.
+The parallel hints were first refreshed on 2026-10-17 from the `fm-test-timing-portable-parallel-*` artifacts of eight green main runs: [38904559722](https://github.com/MrGTV-love/firstmate/actions/runs/38904559722), [38957463780](https://github.com/MrGTV-love/firstmate/actions/runs/38957463780), [38979006411](https://github.com/MrGTV-love/firstmate/actions/runs/38979006411), [38979776735](https://github.com/MrGTV-love/firstmate/actions/runs/38979776735), [38990827989](https://github.com/MrGTV-love/firstmate/actions/runs/38990827989), [39001838488](https://github.com/MrGTV-love/firstmate/actions/runs/39001838488), [39010291930](https://github.com/MrGTV-love/firstmate/actions/runs/39010291930), [39013019461](https://github.com/MrGTV-love/firstmate/actions/runs/39013019461).
+Each retained member then carried its slowest successful (`exit=0`, `gate_skip=false`) `duration_ms` across those runs.
+The 2026-10-22 refresh above replaced every hint from that table, so these values are history and not the provenance of the current hints.
+The 2026-10-17 refresh moved `tests/fm-lint.test.sh` from 252498 ms to 737853 ms, `tests/fm-composer-lib.test.sh` from 9521 ms to 218757 ms, and `tests/fm-test-run.test.sh` from 156781 ms to 304481 ms.
 Stale hints of that size made the two lanes look balanced while one carried over 1.2 times the other's real work.
-The six captain-hold group hints below are not slowest-run samples because the groups did not exist in those runs.
+The six captain-hold group hints of that table were not slowest-run samples because the groups did not exist in those runs.
 
 ## Captain-hold groups
 
@@ -132,9 +133,10 @@ Selecting one case by name still works in the file that owns it.
 `tests/fm-test-run.test.sh`, in `test_captain_hold_groups_share_helper_changed_selection`, requires every group to be independently selectable and a change to the shared helpers to select all six.
 The six files stay in the proven-isolated set and the parallel lanes; `bin/fm-test-isolation-proof.sh` lists them and [fm-test-isolation-proof.md](fm-test-isolation-proof.md) records the concurrent proof.
 
-The group hints (143236, 173175, 199013, 247202, 257148, and 264427 ms) come from the timestamped case completions in the job log of [run 39006546434](https://github.com/MrGTV-love/firstmate/actions/runs/39006546434), attempt 2, where the combined file finished in 1284127 ms.
+The first group hints (143236, 173175, 199013, 247202, 257148, and 264427 ms) came from the timestamped case completions in the job log of [run 39006546434](https://github.com/MrGTV-love/firstmate/actions/runs/39006546434), attempt 2, where the combined file finished in 1284127 ms.
 Successive timestamp differences between `ok -` reports assign every interval to its case, and the 31.7 s final cleanup interval is shared across the groups in proportion to their case time.
-This replays observed CI work and is not a measurement of independently launched groups; refresh the six hints from their own timing artifacts after CI exercises the split.
+This replayed observed CI work and was not a measurement of independently launched groups.
+The 2026-10-22 refresh above replaced those six hints with the groups' own timing artifacts.
 
 Five cases run their independent matrix cells at once through `run_cells_in_parallel`, the way the retry matrix already did: the origin-first matrix, and the keyed-release cases for interrupted releases, completed releases, repeated answers, and legacy releases.
 Each cell builds its own homes under unique names, and a failing cell fails the case with the tail of its log.
@@ -308,6 +310,7 @@ The bounds sit at true extremes, far above healthy duration, so a loaded runner 
 Inside `tests/fm-remote-secondmate-lifecycle-e2e.test.sh`, the remote recovery watcher wait allows 150 seconds of polling: the watcher's 120-second relaunch bound plus startup and wake overhead.
 It still requires a successful relaunch, exactly one captain-facing wake, the durable wake and relaunch records, a fresh live remote endpoint, and the preserved host route.
 This fixes the former 30-second observation window, which could stop a healthy relaunch before its own deadline; it does not change production relaunch bounds or CI job timeouts.
+The same test declares its inherited config inputs in `remote_env`, so adding unrelated production defaults cannot lengthen its bounded inheritance and launch-barrier setup.
 
 [`tests/fm-ci-workflow.test.sh`](../tests/fm-ci-workflow.test.sh) holds the policy against the parsed workflow: every job belongs to exactly one tier, the workflow carries exactly three distinct job-level values, the fast tier stays within 5-10 minutes, the normal jobs share one 60-minute budget, and the Herdr family-run step is the 60-minute tripwire below its 120-minute job backstop with an `always()` teardown after it.
 A passing coverage guard does not establish a healthy job duration; refresh the healthy figures above from the lanes' uploaded timing artifacts.

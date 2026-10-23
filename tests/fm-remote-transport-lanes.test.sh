@@ -185,6 +185,45 @@ assert_absent "$STATE_ROOT/.seq-claims/999997" "an expired sequence claim surviv
 rmdir "$STATE_ROOT/.seq-claims/999999"
 pass "atomic sequence claims remain unique and reap only after expiry"
 
+# The worker singleton lock and each job's claim take fm_remote_job_mkdir_exclusive.
+# The same packaged mkdir can report success to every concurrent creator of one
+# absent path. This shim does that: a caller that saw the path absent always
+# succeeds, and a caller that finds it present fails as mkdir does. Only the
+# helper's own mutex can then leave a single owner.
+EXCLUSIVE_DIR="$TMP_ROOT/exclusive-mkdir"
+command mkdir "$EXCLUSIVE_DIR"
+mkdir() {
+  local target=${!#}
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    command mkdir "$@"
+  else
+    sleep 0.2
+    command mkdir -p "$@"
+  fi
+}
+EXCLUSIVE_PIDS=()
+for i in $(seq 1 20); do
+  fm_remote_job_mkdir_exclusive "$EXCLUSIVE_DIR/claim" 2>/dev/null &
+  EXCLUSIVE_PIDS+=("$!")
+done
+EXCLUSIVE_WINNERS=0
+for pid in "${EXCLUSIVE_PIDS[@]}"; do
+  if wait "$pid"; then
+    EXCLUSIVE_WINNERS=$((EXCLUSIVE_WINNERS + 1))
+  fi
+done
+unset -f mkdir
+[ "$EXCLUSIVE_WINNERS" -eq 1 ] \
+  || fail "$EXCLUSIVE_WINNERS of 20 concurrent callers each took the exclusive directory; exactly one may"
+[ -d "$EXCLUSIVE_DIR/claim" ] && [ ! -L "$EXCLUSIVE_DIR/claim" ] \
+  || fail "the exclusive directory its owner created is missing"
+[ -n "$(find "$EXCLUSIVE_DIR/claim" -maxdepth 0 -perm 700)" ] \
+  || fail "the exclusive directory was not created owner-only"
+EXCLUSIVE_LITTER=$(find "$EXCLUSIVE_DIR" -mindepth 1 -maxdepth 1 ! -name claim)
+[ -z "$EXCLUSIVE_LITTER" ] \
+  || fail "concurrent exclusive creators left mutex litter: $EXCLUSIVE_LITTER"
+pass "exclusive directory creation leaves exactly one owner when mkdir reports success to every concurrent creator"
+
 fm_on() {
   FM_HOME="$LOCAL_HOME" \
   FM_ROOT_OVERRIDE="$REMOTE_ROOT" \

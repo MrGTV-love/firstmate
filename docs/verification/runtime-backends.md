@@ -728,7 +728,7 @@ The band case retained the original text plus an advisory, with a `review` / `po
 These sessions completed in 3.763 and 3.416 seconds respectively.
 Claude Code 2.1.302 consumed the delayed flag after 31,037 ms with the 330-second hook envelope, preserved the answered policy judgment rather than an outage, and delivered its advisory alongside the original text in the next model request.
 All providers and credentials in these native measurements were synthetic and local; each proof stopped its own fixture and proxy.
-The [operator contract](../configuration.md#jev-guard) owns the distinct host budgets, advisory band, trusted-read boundary and unchanged pre-tool outage denial.
+The [operator contract](../configuration.md#jev-guard) owns the distinct host budgets, advisory band, trusted-read boundary and pre-tool outage denial.
 These observations establish actual host delivery of controlled judgments, not live-model accuracy or production activation.
 Both maintained native entrypoints also passed their 20-case matrices on these installed versions, covering exact channel consistency, untracked copy withholding/advisory, newly trusted changed home-state reads, privacy, missing credentials, provider outage and audit outage.
 
