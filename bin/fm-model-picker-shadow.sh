@@ -3,16 +3,23 @@
 # Usage:
 #   fm-model-picker-shadow.sh --observe [--brief PATH] [--task-text PATH] [--rules PATH]
 #        [--result PATH] [--quota PATH] [--status STATUS] [--reason TEXT]
-#        [--never-send PATH] [--project NAME] [--data-root PATH]
+#        [--never-send PATH] [--project NAME] [--data-root PATH] [--hook spawn]
 #   fm-model-picker-shadow.sh --report
 #   fm-model-picker-shadow.sh --check-routes [--rules PATH]
 #
 # --observe records what the picker WOULD have chosen beside the route the current dispatch
-#   rules chose. It never prints, returns or writes a dispatch route, and never changes what
-#   dispatches: every failure exits 0 with one stderr warning. It is off unless
+#   rules chose, or with --hook spawn the route that actually launched. It never prints,
+#   returns or writes a dispatch route, and never changes what dispatches: every failure
+#   exits 0 with one stderr warning. It is off unless
 #   FM_MODEL_PICKER_SHADOW is an on value; bin/fm-model-picker-shadow-lib.sh owns that
 #   allowlist for this tool and the resolver. The resolver calls it after its own result is produced,
-#   bounded by bin/fm-timeout-lib.sh; this tool never becomes a dispatch dependency.
+#   bounded by bin/fm-timeout-lib.sh; this tool never becomes a dispatch dependency. A resolver
+#   row leaves a one-shot <data root>/resolver-rows/<task id> marker holding its row id, the
+#   brief's real path and content hash, and its creation time, and flags the task's earlier
+#   resolver row superseded; bin/fm-model-picker-shadow-spawn.sh passes --hook spawn, which
+#   consumes that marker and, when it is under an hour old and names the launch brief, sets
+#   that row's rule route to the route that actually launched; otherwise its own launch row
+#   supersedes the row the stale marker named, so one dispatch counts once.
 # --report prints the per-work-type shadow disagreement report from aa.sqlite. It is routing
 #   evidence, never outcome labels, and prints "0 shadow dispatches logged" for an empty log.
 # --check-routes is read-only: it resolves every concrete route in config/crew-dispatch.json
@@ -23,7 +30,8 @@
 #
 # Data root: FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else
 #   <FM_HOME>/data/model-picker. The calibration store is <data root>/aa.sqlite; this tool
-#   only inserts dispatch_log rows and never touches the benchmark matrix or verdict.json.
+#   only inserts dispatch_log rows and amends shadow rows it logged (a launched rule route, a
+#   superseded flag in gates), and never touches the benchmark matrix or verdict.json.
 #
 # Key handling: the TypeSafe key reaches bin/fm_model_picker/shadow.py on file descriptor 3,
 #   never on argv, never exported, never written. When no caller supplies fd 3, the shared

@@ -2,8 +2,9 @@
 Shadow benchmark-informed model picker.
 
 Observes one dispatch, decides what it WOULD have chosen from measured Artificial Analysis
-data plus bounded Jev judgments, and records that beside the route config/crew-dispatch.json
-actually chose. It never returns, prints or writes a dispatch route: the resolver ignores
+data plus bounded Jev judgments, and records that beside the dispatch's route: the route that
+actually launched, or the route config/crew-dispatch.json chose when no launch was attached.
+It never returns, prints or writes a dispatch route: the resolver and the spawn hook ignore
 every value this module computes.
 
 Contract: docs/configuration.md "Shadow model picker (FM_MODEL_PICKER_SHADOW)".
@@ -13,6 +14,7 @@ changes when a seed mix, floor or veto changes.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -20,6 +22,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from . import aadb
@@ -29,6 +32,8 @@ SEED_LABEL = "uncalibrated seed policy"
 # measured: value=1209600 date=2026-10-19 host=board margin=1.0 (the design card's fourteen-day freshness limit; stale is disclosed uncertainty, never a drop)
 STALE_AFTER_SECONDS = 1209600
 PROMPT_TASK_LIMIT = 16000
+# measured: value=3600 date=2026-10-23 host=Mac-Studio margin=1.0 (the user-set one-hour bound: a resolve and its launch run back to back in one firstmate turn; an older marker belongs to a dispatch that never launched)
+RESOLVER_MARK_FRESH_SECONDS = 3600
 
 EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"]
 HARNESS_EFFORTS = {
@@ -927,6 +932,112 @@ def task_key_for(brief_path):
     return path.stem or None
 
 
+def resolver_mark_path(data_root, task_key):
+    """One-shot marker naming the resolver row for this task, so the spawn hook attaches
+    the launch to that row and does not log the same dispatch twice; None when the task
+    key cannot name a file."""
+    if not task_key or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", task_key):
+        return None
+    return Path(data_root) / "resolver-rows" / task_key
+
+
+def brief_identity(brief_path):
+    """The brief's real path and content hash, so a marker matches only the brief it was
+    written for; None when the brief is not a readable regular file."""
+    try:
+        path = Path(brief_path).resolve()
+        if not path.is_file():
+            return None
+        return {"brief": str(path), "brief_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    except OSError:
+        return None
+
+
+def read_mark(mark):
+    try:
+        doc = json.loads(mark.read_text())
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def mark_row_id(doc):
+    row_id = doc.get("row_id") if doc else None
+    return row_id if isinstance(row_id, int) and not isinstance(row_id, bool) else None
+
+
+def take_mark(mark, identity):
+    """Consume the resolver's marker: its row id, and whether it was written for this same
+    brief within RESOLVER_MARK_FRESH_SECONDS. A stale marker's row is superseded by the
+    launch's own row, so the dispatch still counts once."""
+    doc = read_mark(mark)
+    try:
+        mark.unlink()
+    except OSError:
+        return None, False
+    row_id = mark_row_id(doc)
+    if row_id is None or identity is None \
+            or any(doc.get(name) != value for name, value in identity.items()):
+        return row_id, False
+    created = doc.get("created_at")
+    fresh = isinstance(created, (int, float)) and not isinstance(created, bool) \
+        and 0 <= time.time() - created <= RESOLVER_MARK_FRESH_SECONDS
+    return row_id, fresh
+
+
+def parse_gates(text):
+    try:
+        gates = json.loads(text or "{}")
+    except ValueError:
+        return {}
+    return gates if isinstance(gates, dict) else {}
+
+
+def amend_row(data_root, dispatch_id, amend):
+    """Change one logged shadow row: amend(row, gates) edits its parsed gates and returns
+    the other columns to set. False when there is no such row."""
+    conn = None
+    try:
+        conn = aadb.connect(Path(data_root) / "aa.sqlite")
+        aadb.init_calibration(conn)
+        row = conn.execute("SELECT rule_worker, rule_effort, gates FROM dispatch_log "
+                           "WHERE id = ? AND mode = 'shadow'", (dispatch_id,)).fetchone()
+        if row is None:
+            return False
+        gates = parse_gates(row["gates"])
+        columns = amend(row, gates)
+        aadb.amend_row(conn, dispatch_id, gates, **columns)
+        return True
+    except (sqlite3.Error, OSError, LookupError) as error:
+        warn("could not update shadow row %s (%s); dispatch unchanged" % (dispatch_id, error))
+        return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
+
+
+def attach_launch(data_root, dispatch_id, rule):
+    """Set the resolver row's rule route to the route that actually launched, keeping the
+    resolver's own route in gates.launch_attached."""
+    def amend(row, gates):
+        gates["launch_attached"] = {"resolver_worker": row["rule_worker"],
+                                    "resolver_effort": row["rule_effort"]}
+        return {"rule_worker": rule["worker"], "rule_effort": rule["effort"]}
+    return amend_row(data_root, dispatch_id, amend)
+
+
+def supersede(data_root, dispatch_id, by):
+    """Flag an earlier resolver row for the same task as replaced by a newer resolve, so
+    the report counts the dispatch once."""
+    def amend(row, gates):
+        gates["superseded_by"] = by
+        return {}
+    return amend_row(data_root, dispatch_id, amend)
+
+
 def _load_optional(path):
     if not path or not os.path.exists(path):
         return {}
@@ -962,29 +1073,57 @@ def observe(args, key, helper, data_root):
     quota_doc = _load_optional(args.get("quota"))
     rule_profile = (result.get("chosen") or {}).get("profile") or {}
     rule = {"worker": None, "validator": None, "effort": None}
-    if status not in ("withheld", "error") and isinstance(rule_profile, dict) \
+    launch = args.get("hook") == "spawn"
+    if (launch or status not in ("withheld", "error")) and isinstance(rule_profile, dict) \
             and isinstance(rule_profile.get("harness"), str):
         rule["worker"] = normalize_route(rule_profile.get("harness"), rule_profile.get("model"))
-        rule["effort"] = rule_profile.get("effort") if isinstance(rule_profile.get("effort"), str) else None
+        effort = rule_profile.get("effort")
+        rule["effort"] = effort if isinstance(effort, str) and effort else None
     task_key = task_key_for(brief) if brief else None
+    mark = resolver_mark_path(data_root, task_key)
+    identity = brief_identity(brief) if mark is not None else None
+    marked_row = None
+    if launch:
+        marked_row, fresh = take_mark(mark, identity) if mark is not None else (None, False)
+        if fresh and attach_launch(data_root, marked_row, rule):
+            return 0
+        mark = None
+    elif identity is None:
+        mark = None
+
+    def record(row):
+        dispatch_id = write_row(data_root, row)
+        if dispatch_id is None:
+            return
+        previous = mark_row_id(read_mark(mark)) if mark is not None else marked_row
+        if previous is not None:
+            supersede(data_root, previous, dispatch_id)
+        if mark is None:
+            return
+        try:
+            mark.parent.mkdir(parents=True, exist_ok=True)
+            mark.write_text(json.dumps(dict(identity, row_id=dispatch_id, created_at=time.time()),
+                                       sort_keys=True))
+        except OSError as error:
+            warn("could not leave the resolver row marker (%s); dispatch unchanged" % error)
 
     if status == "withheld":
-        write_row(data_root, simple_row("withheld", reason or "request withheld", task_key, rule))
+        record(simple_row("withheld", reason or "request withheld", task_key, rule))
         return 0
     if status == "error":
-        write_row(data_root, simple_row("resolver-error", reason or "resolver error", task_key, rule))
+        record(simple_row("resolver-error", reason or "resolver error", task_key, rule))
         return 0
 
     trusted, verdict_reason, _ = verdict_state(data_root)
     if not trusted:
-        write_row(data_root, simple_row("no-trusted-snapshot", verdict_reason, task_key, rule,
-                                        verdict_reason))
+        record(simple_row("no-trusted-snapshot", verdict_reason, task_key, rule,
+                          verdict_reason))
         return 0
 
     try:
         table = load_table(args["table"])
     except (OSError, ValueError) as error:
-        write_row(data_root, simple_row("error", "route table unusable: %s" % error, task_key, rule))
+        record(simple_row("error", "route table unusable: %s" % error, task_key, rule))
         return 0
 
     det_complexity, det_components = deterministic_complexity(task_text, rules_doc)
@@ -993,7 +1132,7 @@ def observe(args, key, helper, data_root):
     body, error = jev_call(request, key, never_send_path(args), helper, args["scratch"])
     if error:
         status = "withheld" if error.startswith("request withheld") else "picker-error"
-        write_row(data_root, simple_row(status, error, task_key, rule))
+        record(simple_row(status, error, task_key, rule))
         return 0
     responses = [("classification", body)]
     try:
@@ -1001,7 +1140,7 @@ def observe(args, key, helper, data_root):
     except ValueError as error:
         row = simple_row("invalid-response", str(error), task_key, rule)
         row["jev_raw_payload"] = body
-        write_row(data_root, row)
+        record(row)
         return 0
 
     option = classified["work_type"]["choice"]
@@ -1045,7 +1184,7 @@ def observe(args, key, helper, data_root):
                 [b.decode("utf-8", "replace") for _, b in responses]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
             spend=spend, snapshot_age=snapshot_age)
-        write_row(data_root, row)
+        record(row)
         return 0
 
     validators = [c for c in candidates
@@ -1062,7 +1201,7 @@ def observe(args, key, helper, data_root):
                 [b.decode("utf-8", "replace") for _, b in responses]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
             spend=spend, snapshot_age=snapshot_age)
-        write_row(data_root, row)
+        record(row)
         return 0
     responses.append(("pick", body))
     try:
@@ -1077,7 +1216,7 @@ def observe(args, key, helper, data_root):
             raw_support=json.dumps([b.decode("utf-8", "replace") for _, b in responses[:-1]]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
             spend=spend, snapshot_age=snapshot_age)
-        write_row(data_root, row)
+        record(row)
         return 0
 
     by_id = {c["id"]: c for c in candidates}
@@ -1139,7 +1278,7 @@ def observe(args, key, helper, data_root):
                      if support else None),
         candidate_version=candidate_version, gates=gates, pareto=pareto_pruned,
         spend=spend, snapshot_age=snapshot_age)
-    write_row(data_root, row)
+    record(row)
     return 0
 
 
@@ -1149,16 +1288,20 @@ def report(data_root):
         print("0 shadow dispatches logged")
         return 0
     try:
-        conn = sqlite3.connect(str(db_path))
+        # A Phase-1 store predates the picker's columns; run the same additive
+        # migration the write path runs before reading them.
+        conn = aadb.connect(str(db_path))
+        aadb.init_calibration(conn)
         conn.row_factory = sqlite3.Row
         rows = [dict(r) for r in conn.execute(
             "SELECT work_type, chosen_worker, chosen_validator, effort, rule_worker, "
             "rule_validator, rule_effort, confidence_band, snapshot_stale, "
-            "classification_uncertain, picker_status FROM dispatch_log WHERE mode='shadow'")]
+            "classification_uncertain, picker_status, gates FROM dispatch_log WHERE mode='shadow'")]
         conn.close()
     except sqlite3.Error as error:
         warn("could not read the shadow log: %s" % error)
         return 2
+    rows = [r for r in rows if "superseded_by" not in parse_gates(r.pop("gates"))]
     if not rows:
         print("0 shadow dispatches logged")
         return 0
@@ -1272,6 +1415,12 @@ Observe one dispatch in shadow mode. Never prints or returns a dispatch route.
   --reason TEXT      a coarse reason, never brief text
   --never-send PATH  never-send policy (default <FM_CONFIG_OVERRIDE or FM_HOME/config>/dispatch-never-send)
   --project NAME     project name
+  --hook spawn       launch-path observation: when the resolver logged this task within
+                     the last hour from the same brief, consume its marker and set that
+                     row's rule route to the launched route instead of writing a row;
+                     a stale marker's row is superseded by the launch's own row; a run
+                     without it leaves that marker and supersedes the task's earlier
+                     resolver row
   --data-root PATH   data root overriding FM_MODEL_PICKER_DATA
 
 The data root is FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else

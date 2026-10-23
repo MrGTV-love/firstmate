@@ -600,5 +600,119 @@ check '[ "$(calls)" -eq 0 ]' "a policy that cannot be read sends nothing"
 check '[ "$(row ".picker_status")" = withheld ]' "an unreadable policy withholds the request"
 finish
 
+
+# phase1_store: replaces the store with a Phase-1 one that predates the picker's columns.
+phase1_store() {
+rm -f "$DATA/aa.sqlite"
+python3 -I - "$DATA/aa.sqlite" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.execute("""CREATE TABLE dispatch_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('shadow','live')),
+  task_type TEXT, work_type TEXT, complexity_score REAL,
+  chosen_worker TEXT, chosen_validator TEXT, effort TEXT,
+  rule_worker TEXT, rule_validator TEXT, rule_effort TEXT,
+  jev_raw_payload BLOB, jev_candidate_version TEXT, gates TEXT,
+  pareto_pruned TEXT, spend_priority TEXT, snapshot_age REAL,
+  validator_verdict TEXT, validator_disagreement TEXT, rework INTEGER,
+  captain_acceptance TEXT)""")
+c.execute("CREATE TABLE outcomes (dispatch_id INTEGER PRIMARY KEY, quality REAL, rework INTEGER, time_s REAL, accepted INTEGER, notes TEXT)")
+c.commit(); c.close()
+PY
+}
+
+begin "the report migrates a Phase-1 store before reading its own columns"
+phase1_store
+OUT=$(FM_MODEL_PICKER_DATA="$DATA" bash "$BIN" --report 2>"$TMP_ROOT/report.err"); RC=$?
+check '[ "$RC" -eq 0 ]' "report exits 0 on a Phase-1 store"
+check '[ "$OUT" = "0 shadow dispatches logged" ]' "an unreadable-by-Phase-1 store reads as zero dispatches"
+cols=$(python3 -I -c 'import sqlite3,sys;print(" ".join(r[1] for r in sqlite3.connect(sys.argv[1]).execute("pragma table_info(dispatch_log)")))' "$DATA/aa.sqlite")
+check 'grep -q "confidence_band" <<<"$cols"' "the report applied the additive migration"
+finish
+
+# report_runs: the dispatches --report counts, the sum of its runs column.
+report_runs() {
+  FM_MODEL_PICKER_DATA="$DATA" bash "$BIN" --report 2>/dev/null \
+    | sed -n '/^work_type /,/^Denominators:/p' | sed '1d;$d' | cut -c35- | awk '{s+=$1} END {print s+0}'
+}
+# parallel_briefs <prefix>: one distinct task brief per parallel dispatch.
+parallel_briefs() {
+  local i
+  for i in 1 2 3 4 5; do
+    mkdir -p "$TMP_ROOT/home/data/$1-$i"
+    cp "$TMP_ROOT/brief.md" "$TMP_ROOT/home/data/$1-$i/brief.md"
+  done
+}
+
+begin "five parallel dispatches write five rows"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+rm -f "$DATA/aa.sqlite"
+parallel_briefs par
+pids=()
+for i in 1 2 3 4 5; do
+  ( FM_HOME="$TMP_ROOT/home" FM_MODEL_PICKER_DATA="$DATA" FM_MODEL_PICKER_SHADOW=1 \
+      FM_TEST_SEAM=1 FM_TYPESAFE_TEST_ENDPOINT="$ENDPOINT" \
+      bash "$BIN" --observe --brief "$TMP_ROOT/home/data/par-$i/brief.md" \
+        --task-text "$TMP_ROOT/home/data/par-$i/brief.md" \
+        --rules "$TMP_ROOT/rules-base.json" --result "$TMP_ROOT/result.json" \
+        --quota "$TMP_ROOT/quota.json" --status clear \
+        3< <(printf 'synthetic-canary-key\n') >"$TMP_ROOT/par.$i.out" 2>"$TMP_ROOT/par.$i.err" ) &
+  pids+=($!)
+done
+wait "${pids[@]}"
+count=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where mode=\"shadow\"").fetchone()[0])' "$DATA/aa.sqlite")
+check '[ "$count" = 5 ]' "five parallel dispatches give five rows"
+accepted=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where picker_status=\"accepted\"").fetchone()[0])' "$DATA/aa.sqlite")
+check '[ "$accepted" = 5 ]' "all five picks are accepted"
+check '[ "$(report_runs)" = 5 ]' "the report counts five parallel dispatches"
+finish
+
+begin "a migration that finds its column already added by another writer still completes"
+phase1_store
+race=$(python3 -I - "$ROOT/bin" "$DATA/aa.sqlite" <<'PY' 2>&1
+import sys
+sys.path.insert(0, sys.argv[1])
+from fm_model_picker import aadb
+conn = aadb.connect(sys.argv[2])
+aadb.init_calibration(conn)
+class StaleSchema:
+    """A writer whose PRAGMA read happened before another writer's ALTER."""
+    def __init__(self, conn):
+        self.conn = conn
+    def execute(self, sql, *args):
+        if sql.startswith("PRAGMA table_info"):
+            return iter([(0, "id")])
+        return self.conn.execute(sql, *args)
+    def commit(self):
+        self.conn.commit()
+aadb.init_calibration(StaleSchema(conn))
+print("migrated")
+PY
+)
+check '[ "$race" = migrated ]' "a duplicate column from a concurrent first open is not an error: $race"
+finish
+
+begin "five parallel first opens of a Phase-1 store write five rows"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+phase1_store
+parallel_briefs par1
+pids=()
+for i in 1 2 3 4 5; do
+  ( FM_HOME="$TMP_ROOT/home" FM_MODEL_PICKER_DATA="$DATA" FM_MODEL_PICKER_SHADOW=1 \
+      FM_TEST_SEAM=1 FM_TYPESAFE_TEST_ENDPOINT="$ENDPOINT" \
+      bash "$BIN" --observe --brief "$TMP_ROOT/home/data/par1-$i/brief.md" \
+        --task-text "$TMP_ROOT/home/data/par1-$i/brief.md" \
+        --rules "$TMP_ROOT/rules-base.json" --result "$TMP_ROOT/result.json" \
+        --quota "$TMP_ROOT/quota.json" --status clear \
+        3< <(printf 'synthetic-canary-key\n') >"$TMP_ROOT/par1.$i.out" 2>"$TMP_ROOT/par1.$i.err" ) &
+  pids+=($!)
+done
+wait "${pids[@]}"
+count=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where mode=\"shadow\" and picker_status=\"accepted\"").fetchone()[0])' "$DATA/aa.sqlite")
+check '[ "$count" = 5 ]' "five parallel first opens of a Phase-1 store give five accepted rows: $(cat "$TMP_ROOT"/par1.*.err)"
+check '[ "$(report_runs)" = 5 ]' "the report counts five parallel first-open dispatches"
+finish
+
 [ "$FAILED" -eq 0 ] || fail "$FAILED shadow picker case(s) failed"
 pass "shadow picker: gates, Pareto, currency separation, unknown routes, Jev failures, trusted data, re-check, validator pairing, report, privacy and flag"

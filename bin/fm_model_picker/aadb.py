@@ -83,7 +83,11 @@ def _ensure_columns(conn, table, columns):
     have = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
     for name, decl in columns.items():
         if name not in have:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+            except sqlite3.OperationalError as error:
+                if "duplicate column name" not in str(error):
+                    raise
 
 
 def init_calibration(conn):
@@ -137,6 +141,11 @@ def _update(conn, dispatch_id, **cols):
     if cur.rowcount != 1:
         raise LookupError(f"no dispatch_log row {dispatch_id}")
     conn.commit()
+
+
+def amend_row(conn, dispatch_id, gates, **cols):
+    """Replace a logged dispatch's gates, stored as sorted JSON, and any other columns."""
+    _update(conn, dispatch_id, gates=json.dumps(gates, sort_keys=True), **cols)
 
 
 def record_validator(conn, dispatch_id, verdict, disagreement):

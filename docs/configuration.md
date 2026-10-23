@@ -946,7 +946,7 @@ At its default location the whole root is private and gitignored with `data/`.
 | `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
 | `projection/<slug>.json` | One wire-format projection per catalog model, written last |
 
-`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the current dispatch rule's choice; [Shadow model picker](#shadow-model-picker-fm_model_picker_shadow) owns the picker's additive columns and every row it writes.
+`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the dispatch's own route; [Shadow model picker](#shadow-model-picker-fm_model_picker_shadow) owns the picker's additive columns and every row it writes.
 A matrix rebuild never touches `dispatch_log` or `outcomes`.
 The matrix is a pure function of the cache, so a rebuild gives the same row counts.
 A consumer must not read the matrix while `verdict.json` says `UNTRUSTED`.
@@ -965,23 +965,37 @@ Run `bin/fm-model-picker.sh --selftest` for the fixture suite; [`tests/fm-model-
 
 ## Shadow model picker (FM_MODEL_PICKER_SHADOW)
 
-`bin/fm-model-picker-shadow.sh` is Phase 2 of the model-picker chain: it observes a dispatch, decides what the picker WOULD have chosen from the trusted Artificial Analysis snapshot plus bounded Jev judgments, and records that beside the route `config/crew-dispatch.json` actually chose.
+`bin/fm-model-picker-shadow.sh` is Phase 2 of the model-picker chain: it observes a dispatch, decides what the picker WOULD have chosen from the trusted Artificial Analysis snapshot plus bounded Jev judgments, and records that beside the dispatch's route: the route that actually launched, or the route `config/crew-dispatch.json` chose when no launch was attached.
 It is SHADOW MODE ONLY: it never returns, prints or writes a dispatch route, and no dispatch or spawn path reads its output.
 Its header and `--help` own its flags, data-root resolution, output and exit codes; `bin/fm_model_picker/shadow.py` is the implementation and `bin/fm_model_picker/routes.json` is the route table.
 
 ### The flag
 
-`FM_MODEL_PICKER_SHADOW` is off by default and accepts only shadow-enabled values; `bin/fm-model-picker-shadow-lib.sh` is the one owner of the allowlist, shared by the resolver and the shadow tool.
+`FM_MODEL_PICKER_SHADOW` is off by default and accepts only shadow-enabled values; `bin/fm-model-picker-shadow-lib.sh` is the one owner of the allowlist, shared by the resolver, the spawn hook and the shadow tool.
 `1`, `true`, `on`, `yes` and `shadow` enable observation; empty, `0`, `false`, `off` and `no` leave every route untouched and read no model-picker data; any other non-empty value prints one warning and stays off.
 No value enables live behavior, and no code path writes a `mode 'live'` row.
 
 ### Where it runs and why
 
-The picker runs inside `bin/fm-dispatch-resolve.sh`, after that resolver has computed and printed its own result.
-The resolver is the only intake that already holds the sanitized brief text, the resolved rule set and the one `quota-axi` snapshot the typed decision uses, so the picker never re-fetches any of them.
-It runs behind a hard `fm_run_timed` bound of 20 seconds, its output is discarded, and every failure is swallowed, so the printed status, profile line and exit code are the resolver's own.
-A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.
-The picker is not called from `fm-spawn.sh`: a spawn does not own the sanitized task text or the resolver's quota snapshot, and a second quota read would break the single-snapshot contract.
+The picker observes from two places, because no single one sees every dispatch.
+Inside `bin/fm-dispatch-resolve.sh`, after that resolver has computed and printed its own result, it reuses the sanitized brief text, the resolved rules and the one `quota-axi` snapshot the typed decision uses, under a hard `fm_run_timed` bound of 20 seconds.
+Inside `bin/fm-spawn.sh`, after a ship or scout launch has been delivered, `bin/fm-model-picker-shadow-spawn.sh` observes the route that actually launched with the launch brief, the launch project and one quota read bounded at 5 seconds.
+It runs detached with every stream discarded, so the spawn command returns without waiting for it; its observe call has the resolver hook's 20-second bound, and the whole capture has an outer bound of 40 seconds that covers both inner bounds plus brief extraction, rule resolution and start-up.
+It resolves the TypeSafe key with the same `fm_typesafe_key` lookup the resolver uses (the environment, `<home>/.env`, then the primary home's `.env`); with no key it writes no row.
+A launch with no concrete `--model` (empty or `default`) records no rule route, and an empty or `default` effort records a NULL `rule_effort`.
+The spawn hook exists because real dispatches can bypass the typed resolver, and an unobserved dispatch cannot become calibration evidence.
+One dispatch counts once: each resolver row leaves a one-shot marker `<data root>/resolver-rows/<task id>` holding that row's id, the brief's real path and SHA-256 content hash, and its creation time.
+A resolve that runs again for the same task (after an edit, an `ambiguous` or `escalate` result, or an error) first flags the row the old marker names with `gates.superseded_by` (the newer row's id), then replaces the marker; `--report` leaves superseded rows out.
+The spawn hook always deletes the marker it finds.
+It attaches only when the marker names the same launch brief (real path and content hash) and is at most one hour old; it then writes no row of its own, sets that resolver row's `rule_worker` and `rule_effort` to the route and effort that actually launched, and records the resolver's own route under `gates.launch_attached` (`resolver_worker`, `resolver_effort`).
+A stale marker (older than one hour, or written for a different or edited brief) is deleted and the launch writes its own row, so a task id reused after a dropped dispatch never inherits the old row; that launch row supersedes the resolver row the stale marker named (`gates.superseded_by`), so the dispatch still counts once (a task id reused after a dropped dispatch also hides that dropped resolve).
+That holds for every resolver outcome, so an `ambiguous`, `escalate`, `error` or `withheld` resolve, and a `clear` result firstmate overrode, still end with the launched route on the row.
+A manual launch with no resolver row, or a marker whose row cannot be found, gets its own spawn-hook row, which always carries the launched route, even when the launch brief is withheld.
+A relaunch (`--relaunch`) is the same dispatch, so the spawn hook does not observe it again.
+Both hooks discard their output and swallow every failure, so the printed status, profile line, exit code and spawn result are never derived from the picker.
+A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route until a spawn hook attaches the launch, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.
+A spawn that never launches (a refused or failed launch) writes no spawn-hook row.
+The report applies the same additive migration the write path uses, so it reads a Phase-1 store without error; concurrent first opens of a Phase-1 store each finish that migration, because a column another process added first is not an error.
 
 ### What one shadow run does
 
@@ -1022,7 +1036,7 @@ The confidence bands are applied in code and only logged: `dispatch` at 0.85 or 
 
 ### The shadow disagreement report
 
-`bin/fm-model-picker-shadow.sh --report` prints, per work type over `mode 'shadow'` rows, the run count, the rows with a rule route, the rows with no rule route, the rows with no picker pick, the worker/validator/effort disagreement counts with their denominators, the confidence-band counts, the stale-snapshot count, the none-fit count and the rejected-pick count.
+`bin/fm-model-picker-shadow.sh --report` prints, per work type over `mode 'shadow'` rows that no later row superseded (`gates.superseded_by`), the run count, the rows with a rule route, the rows with no rule route, the rows with no picker pick, the worker/validator/effort disagreement counts with their denominators, the confidence-band counts, the stale-snapshot count, the none-fit count and the rejected-pick count.
 A row counts toward a disagreement denominator only when both the rule and the picker named that value, so a picker error or refusal is counted as no picker pick, never as agreement.
 It prints `0 shadow dispatches logged` for an empty log and never reports "zero disagreements" for an empty compared set.
 
@@ -3810,7 +3824,7 @@ FM_DATA_OVERRIDE=        # alternate data dir, mainly for tests
 FM_PROJECTS_OVERRIDE=    # alternate projects dir, mainly for tests
 FM_CONFIG_OVERRIDE=      # alternate config dir, mainly for tests
 FM_MODEL_PICKER_DATA=    # data root of the model-picker benchmark collector and shadow picker; unset means model-picker/ under the data directory (see "Model-picker benchmark data")
-FM_MODEL_PICKER_SHADOW=  # opt-in observe-only shadow model picker inside fm-dispatch-resolve.sh; unset means off (see "Shadow model picker")
+FM_MODEL_PICKER_SHADOW=  # opt-in observe-only shadow model picker inside fm-dispatch-resolve.sh and after fm-spawn.sh launches; unset means off (see "Shadow model picker")
 FM_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads in fm-wake-lib.sh and fm-teardown.sh, mainly for tests
 FM_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 FM_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"
