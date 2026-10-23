@@ -5,6 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
+#        fm-control.sh <task-id> adopt
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -67,6 +68,41 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
+# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
+# under the task's control and metadata locks. The lock-owning main Firstmate
+# alone may run it: a worker, the supervision branch, or a session that does
+# not own the home lock is refused, as for authorize-continuation and
+# reassociate. It refuses, naming the missing proof, unless all of these hold:
+#   (1) window and herdr_pane_id agree, and the worktree and pane exist;
+#   (2) the launch-proof owner resolves one foreground PID that classifies as
+#       an agent process;
+#   (3) that PID's kernel cwd is inside this task's recorded worktree and is
+#       not inside another task's worktree that is as deep or deeper;
+#   (4) no other local task claims the pane;
+#   (5) the existing record has the same nonempty spawn_gen as the metadata,
+#       and the live PID does not carry a launch pin for another generation.
+# The preserved task_session_file (or the pane's omp session-file reference
+# when the field is absent) must identify the same persisted file as that
+# reference. Publication also needs a positively readable live environment
+# without a usable launch pin; a matching or different pin and unreadable
+# probing refuse before staging or capture. Only a record whose process is
+# gone is repaired. A record naming the live PID or any other live process is
+# the omp extension's to maintain and is refused unchanged, including the
+# extension's empty unproven mark and an activation naming another file, even
+# when Herdr still registers the task file. The repair writes version=1, the
+# unchanged spawn_gen, the live pid, task_session_file, and
+# current_session_file by setting the record aside, comparing it with the
+# bytes the proofs were gathered from, and linking the
+# new record without replacing, so a record the extension publishes meanwhile
+# is kept. It never unlocks a session, touches project files, starts or stops
+# an agent, or sends lifecycle input.
+# This widens lifecycle authorization: a repaired record can authorize a
+# restored omp without the launch environment pin, only while the launch-proof
+# owner can recheck all adoption proofs and the same live PID and session
+# file. Ordinary empty or invalid session records still refuse, and other
+# harnesses and backends keep their existing proof rules.
+# docs/agent-control.md "Repairing a restored omp session record" owns the
+# operator contract and the residual risk of an unpinned adopted process.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -325,6 +361,8 @@ CONTROL_LOCK_HELD=0
 CONTROL_META_LOCK=
 CONTROL_META_LOCK_HELD=0
 CONTROL_META_TMP=
+CONTROL_ADOPT_RECORD=
+CONTROL_ADOPT_CAPTURE=
 CONTROL_PROJECT_LOCK=
 CONTROL_PROJECT_LOCK_HELD=0
 REASSOCIATE_ACTIVE=0
@@ -345,6 +383,15 @@ control_cleanup() {
   if [ "$REASSOCIATE_ACTIVE" = 1 ] \
      && declare -F reassociate_rollback >/dev/null 2>&1; then
     reassociate_rollback || true
+  fi
+  if [ -n "$CONTROL_ADOPT_CAPTURE" ]; then
+    # adopt sets the live record aside while it publishes. Give it back unless a
+    # newer one has appeared, so an interrupted adoption never leaves none.
+    ln -- "$CONTROL_ADOPT_CAPTURE" "$CONTROL_ADOPT_RECORD" 2>/dev/null \
+      || [ -e "$CONTROL_ADOPT_RECORD" ] \
+      || mv -- "$CONTROL_ADOPT_CAPTURE" "$CONTROL_ADOPT_RECORD" 2>/dev/null \
+      || true
+    rm -f -- "$CONTROL_ADOPT_CAPTURE"
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
   [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
@@ -1361,6 +1408,69 @@ if [ "$BACKEND" = herdr ]; then
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
   fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
+if [ "$VERB" = adopt ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot adopt a session record"
+  fm_lease_forbid_branch "session record adoption (fm-control)"
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "session record adoption requires the actual lock-owning main Firstmate"
+  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
+    || die "adopt needs a local Herdr omp task; no session record was changed"
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  adoption_prior=$(cat "$STATE/$ID.omp-session.json" 2>/dev/null) \
+    || die "adopt needs an existing readable session record with the metadata spawn_gen"
+  adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  # The omp extension rewrites the record of the process it runs in, by rename
+  # and without these locks, so a record naming a live process is the
+  # extension's evidence to keep. Only a record whose process is gone is repaired.
+  adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
+    | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
+  if [ -n "$adoption_recorded_pid" ] \
+    && { [ "$adoption_recorded_pid" = "$(printf '%s' "$adoption_record" | jq -r '.pid')" ] \
+      || ps -p "$adoption_recorded_pid" >/dev/null 2>&1; }; then
+    echo "adopt refused: record proof needs the recorded PID to be gone; $adoption_recorded_pid is a live process, so the omp extension owns this record and it was not changed" >&2
+    exit 1
+  fi
+  # Capture briefly removes the canonical task anchor. Only a positively
+  # readable unpinned process cannot run the extension's pinned publication
+  # path and rebind that missing anchor to a newly activated personal file.
+  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
+  fm_launch_proof_pid_unpinned "$adoption_pid" \
+    || die "adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates"
+  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
+    || die "adopt needs a writable session-record directory"
+  printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
+    || die "adopt could not stage the session record; original record preserved"
+  # Refuse a changing foreground, session registration, generation, or task
+  # record rather than publishing a proof gathered for a different activation.
+  adoption_recheck=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  [ "$adoption_record" = "$adoption_recheck" ] \
+    && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
+    || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+  # A rename cannot be made conditional on what it replaces, and the extension
+  # publishes by rename too. Set the record aside so the comparison covers the
+  # bytes actually taken, then publish with link(2), which never replaces: a
+  # record the extension writes meanwhile is kept and the adoption refuses.
+  CONTROL_ADOPT_RECORD="$STATE/$ID.omp-session.json"
+  CONTROL_ADOPT_CAPTURE="$CONTROL_META_TMP.prior"
+  mv -- "$CONTROL_ADOPT_RECORD" "$CONTROL_ADOPT_CAPTURE" \
+    || die "adopt could not set the session record aside; no session record was changed"
+  if [ "$adoption_prior" != "$(cat "$CONTROL_ADOPT_CAPTURE" 2>/dev/null)" ] \
+    || ! ln -- "$CONTROL_META_TMP" "$CONTROL_ADOPT_RECORD" 2>/dev/null; then
+    die "adopt needs the session record unchanged until publication; a newer record was kept and no session record was overwritten"
+  fi
+  rm -f -- "$CONTROL_ADOPT_CAPTURE" "$CONTROL_META_TMP"
+  CONTROL_ADOPT_CAPTURE=
+  CONTROL_META_TMP=
+  printf 'adopted: %s\n' "$ID"
+  exit 0
 fi
 
 # --- shared helpers ---------------------------------------------------------

@@ -133,6 +133,11 @@ SH
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
+  [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
+  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
+  exit 0
+fi
 encode_cwd() {
   local path=$1
   path=${path//\\/\\\\}
@@ -4140,6 +4145,11 @@ case "${1:-} ${2:-}" in
     fi
     exit 0 ;;
   'pane process-info')
+    if [ -f "$D/adoption-ambiguous" ]; then
+      jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+        '{result:{type:"pane_process_info",process_info:{pane_id:$pane,foreground_processes:[{pid:2000000000,name:"omp"},{pid:2000000001,name:"omp"}]}}}'
+      exit 0
+    fi
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/herdr-agent-live" ]; then
         pid=2000000000
@@ -6517,11 +6527,464 @@ SH
   pass "supervised OMP recovery enforces the typed route class and effort on stand-ins"
 }
 
+# Adoption fixtures reuse the existing fake Herdr process/registration model;
+# only the kernel cwd reader is additional, and no live server is contacted.
+prepare_omp_adoption() { # <case-name>
+  recovery_case_or_skip "adoption-$1" "adoption-$1" || fail "adoption needs jq"
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID meta
+  meta="$dir/home/state/$id.meta"
+  while IFS= read -r line; do
+    case "$line" in harness=*) printf 'harness=omp\n' ;; *) printf '%s\n' "$line" ;; esac
+  done < "$meta" > "$meta.new"
+  mv "$meta.new" "$meta"
+  printf 'spawn_gen=old\nlaunch_proof=env-v1\n' >> "$meta"
+  rm -f "$dir/fake/herdr-stopped"
+  printf '%s' "$id" > "$dir/fake/recovery-case-id"
+  : > "$dir/fake/herdr-agent-live"
+  : > "$dir/fake/recovery-spawn-gen"
+  printf 2000000000 > "$dir/fake/recovery-pid"
+  printf 2000000000 > "$dir/fake/holder-pid"
+  printf omp > "$dir/fake/holder-comm"
+  printf omp > "$dir/fake/holder-args"
+  printf '%s' "$dir/wt/recorded-session.jsonl" > "$dir/fake/recovery-session-ref"
+  mkdir -p "$dir/wt/subdirectory"
+  printf '%s' "$dir/wt/subdirectory" > "$dir/fake/adoption-cwd"
+  write_recovery_native_launch "$dir" "$dir/home" "$id" ship
+  # The recorded process is long gone; no host can hand this PID to a live one.
+  jq -nc --arg task "$dir/wt/recorded-session.jsonl" \
+    '{version:1,spawn_gen:"old",pid:2000000001,task_session_file:$task,current_session_file:""}' \
+    > "$dir/home/state/$id.omp-session.json"
+  make_continuation_owner_fixture "$dir"
+}
+
+assert_adoption_refused() { # <case-dir> <id> <named-proof>
+  local dir=$1 id=$2 expected=$3 before out rc=0
+  before=$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/state/$id.omp-session.json" \
+    "$dir/home/data/$id/brief.md" "$dir/wt/recorded-session.jsonl")
+  out=$(run_continuation_control "$dir" "$id" adopt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "unsafe adoption succeeded: $out"
+  assert_contains "$out" "$expected" "adoption must name the missing proof"
+  assert_equals "$before" "$(shasum -a 256 "$dir/home/state/$id.meta" "$dir/home/state/$id.omp-session.json" \
+    "$dir/home/data/$id/brief.md" "$dir/wt/recorded-session.jsonl")" "refusal must preserve record and task files"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "adoption must not deliver lifecycle input"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'server ' "adoption must not start a server"
+}
+
+test_omp_adoption_matching_workspace() {
+  prepare_omp_adoption matching
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0 meta_before
+  meta_before=$(cat "$dir/home/state/$id.meta")
+  out=$(run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "broken pre-adoption record authorized interrupt: $out"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "matching workspace must adopt: $out"
+  assert_contains "$out" "adopted: $id" "adoption reports its exact task"
+  jq -e --arg task "$dir/wt/recorded-session.jsonl" \
+    '. == {version:1,spawn_gen:"old",pid:2000000000,task_session_file:$task,current_session_file:$task}' \
+    "$dir/home/state/$id.omp-session.json" >/dev/null || fail "adoption did not preserve the task file and generation with live values"
+  assert_equals "$meta_before" "$(cat "$dir/home/state/$id.meta")" "adoption never changes metadata"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "successful adoption sends no lifecycle input"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "repaired record must allow fake interrupt: $out"
+  assert_contains "$out" "interrupt-delivered $id" "previously refused task becomes controllable"
+  pass "omp adoption: matching workspace adopted and fake interrupt works without a launch env pin"
+}
+
+test_omp_adoption_foreign_workspace() {
+  prepare_omp_adoption foreign
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  printf 'worktree=%s\n' "$dir/wt/subdirectory" > "$dir/home/state/foreign.meta"
+  assert_adoption_refused "$dir" "$id" 'unique deepest match; cwd belongs to foreign'
+  pass "omp adoption: workspace of another task refused, including a deeper nested worktree"
+}
+
+test_omp_adoption_duplicate_pane() {
+  prepare_omp_adoption duplicate
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  printf 'window=fmlab:%%7\nworktree=%s\nremote_host=\n' "$dir" > "$dir/home/state/duplicate.meta"
+  assert_adoption_refused "$dir" "$id" 'unique-claim proof'
+  pass "omp adoption: two metas claiming one pane refused"
+}
+
+test_omp_adoption_ambiguous_foreground() {
+  prepare_omp_adoption ambiguous
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  : > "$dir/fake/adoption-ambiguous"
+  assert_adoption_refused "$dir" "$id" 'foreground proof needs one uniquely resolved live process'
+  pass "omp adoption: ambiguous foreground refused"
+}
+
+test_omp_adoption_generation_mismatch() {
+  prepare_omp_adoption generation
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record
+  record="$dir/home/state/$id.omp-session.json"
+  jq '.spawn_gen="different"' "$record" > "$record.new" && mv "$record.new" "$record"
+  assert_adoption_refused "$dir" "$id" 'existing record spawn_gen to equal metadata spawn_gen'
+  pass "omp adoption: record generation mismatch refused"
+}
+
+test_omp_adoption_current_session_contradiction() {
+  prepare_omp_adoption current-session-contradiction
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record out rc=0
+  record="$dir/home/state/$id.omp-session.json"
+  write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
+  jq --arg current "$dir/wt/personal-session.jsonl" --argjson pid "$(cat "$dir/fake/recovery-pid")" \
+    '.pid=$pid | .current_session_file=$current' "$record" > "$record.new" && mv "$record.new" "$record"
+  # The launch environment pin still matches, but the extension's same-PID
+  # activation names a personal file while Herdr retains the task registration.
+  printf old > "$dir/fake/recovery-spawn-gen"
+  out=$(run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "contradictory current-session proof already authorized interrupt: $out"
+  assert_adoption_refused "$dir" "$id" 'current-session proof contradicts the registered task session for the live PID'
+  rc=0
+  out=$(run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adoption erased personal-session proof and authorized interrupt: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "contradictory activation must remain unauthorized"
+  pass "omp adoption: same-PID personal current session overrides stale task registration and remains refused"
+}
+
+test_omp_adoption_unproven_same_pid() {
+  local shape dir id record out rc
+  for shape in empty null; do
+    prepare_omp_adoption "unproven-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    jq --argjson pid "$(cat "$dir/fake/recovery-pid")" --arg shape "$shape" \
+      '.pid=$pid | .current_session_file=(if $shape == "null" then null else "" end)' \
+      "$record" > "$record.new" && mv "$record.new" "$record"
+    printf old > "$dir/fake/recovery-spawn-gen"
+    assert_adoption_refused "$dir" "$id" 'current-session proof for the live PID is empty or invalid'
+    rc=0
+    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+    [ "$rc" -ne 0 ] || fail "unproven same-PID record ($shape) authorized interrupt: $out"
+    assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "an unproven same-PID record must receive no lifecycle input"
+  done
+  pass "omp adoption: the extension's unproven mark for the live PID is not overwritten"
+}
+
+test_omp_adoption_non_agent_process() {
+  prepare_omp_adoption non-agent
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
+  : > "$dir/fake/recovery-foreign-foreground"
+  printf python3 > "$dir/fake/holder-comm"
+  printf 'python3 -c input()' > "$dir/fake/holder-args"
+  assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable agent process'
+  rm -f "$dir/fake/recovery-foreign-foreground"
+  printf omp > "$dir/fake/holder-comm"
+  printf omp > "$dir/fake/holder-args"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "agent process must adopt: $out"
+  printf python3 > "$dir/fake/holder-comm"
+  printf 'python3 -c input()' > "$dir/fake/holder-args"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input once the process stopped being an agent: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a non-agent process must receive no lifecycle input"
+  pass "omp adoption: non-agent foreground process refused at adoption and at the lifecycle recheck"
+}
+
+test_omp_adoption_unreadable_environment() {
+  prepare_omp_adoption unreadable-environment
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
+  : > "$dir/fake/recovery-env-unreadable"
+  assert_adoption_refused "$dir" "$id" 'launch-pin proof needs a positively readable environment without a usable launch pin'
+  rm -f "$dir/fake/recovery-env-unreadable"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "readable unpinned workspace must adopt: $out"
+  : > "$dir/fake/recovery-env-unreadable"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input over an unreadable launch environment: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "an unreadable launch environment must receive no lifecycle input"
+  rm -f "$dir/fake/recovery-env-unreadable"
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || fail "readable environment must restore the repaired authorization: $out"
+  assert_contains "$out" "interrupt-delivered $id" "repaired record controls the task once the environment is readable"
+  pass "omp adoption: unreadable launch environment stays unknown and is not promoted to managed"
+}
+
+test_omp_adoption_other_generation_pin() {
+  prepare_omp_adoption other-generation-pin
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
+  # A readable pin for another launch generation names a different launch, not
+  # a missing pin, so the live process is not this task's agent to adopt.
+  printf other > "$dir/fake/recovery-spawn-gen"
+  assert_adoption_refused "$dir" "$id" 'generation proof needs the live process not to be pinned to another launch generation'
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "process pinned to another generation authorized interrupt: $out"
+  # Without any pin the same record repairs, and a later foreign pin withdraws it.
+  : > "$dir/fake/recovery-spawn-gen"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "unpinned process must adopt: $out"
+  printf other > "$dir/fake/recovery-spawn-gen"
+  rc=0
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  [ "$rc" -ne 0 ] || fail "adopted record authorized a process now pinned to another generation: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "another launch's process must receive no lifecycle input"
+  pass "omp adoption: a live process pinned to another launch generation is not adopted"
+}
+
+test_omp_adoption_caller_gate() {
+  prepare_omp_adoption caller-gate
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+  FM_FAKE_TASK_ID=$id assert_adoption_refused "$dir" "$id" 'workers cannot adopt a session record'
+  FM_FAKE_ACTOR=branch assert_adoption_refused "$dir" "$id" 'the supervision branch never performs this action'
+  printf '1\n' > "$dir/home/state/.lock"
+  assert_adoption_refused "$dir" "$id" 'session record adoption requires the actual lock-owning main Firstmate'
+  pass "omp adoption: workers, the supervision branch, and a non-owning session are refused with the record unchanged"
+}
+
+test_omp_adoption_proof_boundaries() {
+  local shape dir id record out rc
+  for shape in missing-pane missing-worktree outside-cwd unreadable-cwd different-session missing-task-file ancestor-worktree alias-worktree unreadable-inventory; do
+    prepare_omp_adoption "$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    case "$shape" in
+      missing-pane)
+        printf '%%8' > "$dir/fake/herdr-pane"
+        assert_adoption_refused "$dir" "$id" 'endpoint proof needs the recorded pane' ;;
+      missing-worktree)
+        # A physically missing workspace cannot become authority through its pathname.
+        while IFS= read -r line; do
+          case "$line" in worktree=*) printf 'worktree=%s\n' "$dir/gone" ;; *) printf '%s\n' "$line" ;; esac
+        done < "$dir/home/state/$id.meta" > "$dir/home/state/$id.meta.new"
+        mv "$dir/home/state/$id.meta.new" "$dir/home/state/$id.meta"
+        assert_adoption_refused "$dir" "$id" 'workspace proof needs an existing absolute worktree' ;;
+      outside-cwd)
+        printf '%s' "$dir" > "$dir/fake/adoption-cwd"
+        assert_adoption_refused "$dir" "$id" "foreground cwd inside this task's recorded worktree" ;;
+      unreadable-cwd)
+        : > "$dir/fake/adoption-cwd-unreadable"
+        assert_adoption_refused "$dir" "$id" 'kernel cwd proof' ;;
+      different-session)
+        printf '{}\n' > "$dir/personal.jsonl"
+        printf '%s' "$dir/personal.jsonl" > "$dir/fake/recovery-session-ref"
+        assert_adoption_refused "$dir" "$id" 'live session file to identify the preserved task session' ;;
+      unreadable-inventory)
+        if [ "$(id -u)" != 0 ]; then
+          (
+            trap 'chmod 700 "$dir/home/state"' EXIT
+            chmod 300 "$dir/home/state"
+            assert_adoption_refused "$dir" "$id" 'unique-claim proof needs a readable complete inventory'
+          ) || fail "unreadable claim inventory did not refuse safely"
+        fi ;;
+      alias-worktree)
+        ln -s "$dir/wt" "$dir/alias"
+        printf 'worktree=%s\n' "$dir/alias" > "$dir/home/state/alias.meta"
+        assert_adoption_refused "$dir" "$id" 'unique deepest match' ;;
+      missing-task-file|ancestor-worktree)
+        if [ "$shape" = missing-task-file ]; then
+          jq 'del(.task_session_file)' "$record" > "$record.new" && mv "$record.new" "$record"
+        else
+          printf 'worktree=%s\n' "$dir" > "$dir/home/state/parent.meta"
+        fi
+        out=$(run_continuation_control "$dir" "$id" adopt) || fail "safe boundary $shape refused: $out"
+        jq -e --arg file "$dir/wt/recorded-session.jsonl" \
+          '.task_session_file==$file and .current_session_file==$file and .spawn_gen=="old"' "$record" >/dev/null \
+          || fail "safe boundary $shape wrote wrong session identity"
+        # A repair never licenses an agent once its workspace loses ownership.
+        printf 'worktree=%s\n' "$dir/wt/subdirectory" > "$dir/home/state/new-owner.meta"
+        rc=0
+        out=$(run_control "$dir" "$id" interrupt) || rc=$?
+        [ "$rc" -ne 0 ] || fail "adopted record authorized a now-foreign workspace: $out"
+        assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "lost workspace proof must send nothing" ;;
+    esac
+  done
+  pass "omp adoption: pane, workspace, session-file identity, aliases, and ongoing authorization boundaries"
+}
+
+test_omp_adoption_live_recorded_pid() {
+  local shape dir id record
+  for shape in other-live-process resolved-live-process; do
+    prepare_omp_adoption "live-recorded-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    # A record naming a live process belongs to the omp extension running in
+    # it. The shell test process stands in for another live recorded PID, and
+    # the resolved PID with an agreeing current session is a healthy record.
+    case "$shape" in
+      other-live-process) jq --argjson pid "$$" '.pid=$pid' "$record" > "$record.new" ;;
+      resolved-live-process)
+        jq --argjson pid "$(cat "$dir/fake/recovery-pid")" '.pid=$pid | .current_session_file=.task_session_file' \
+          "$record" > "$record.new" ;;
+    esac
+    mv "$record.new" "$record"
+    assert_adoption_refused "$dir" "$id" 'record proof needs the recorded PID to be gone'
+  done
+  pass "omp adoption: a record naming a live process is the extension's to maintain and is refused unchanged"
+}
+
+# The real omp extension, not a model of it, runs as the live process the fake
+# Herdr resolves. Commands and acknowledgements travel over FIFOs and the
+# adoption pause is a FIFO rendezvous, so every interleaving is ordered by
+# messages and never by sleeps.
+start_adoption_extension() { # <case-dir> <id> -> EXT_PROC_PID; fds 4 (commands) and 5 (acks)
+  local dir=$1 id=$2 line
+  mkdir -p "$dir/ext"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$dir/ext/fm-task-session.ts"
+  cat > "$dir/ext/driver.mjs" <<'JS'
+import { createInterface } from 'node:readline';
+import { pathToFileURL } from 'node:url';
+const { createTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+let active = process.env.SESSION;
+const manager = { getSessionFile: () => active };
+const session = { sessionManager: manager, waitForSessionTransition: () => Promise.resolve() };
+const proof = createTaskSessionProof(process.env.STATE, process.env.TASK, { list: () => [{ kind: 'main', session }] });
+const ctx = { sessionManager: manager, ui: { notify() {} } };
+console.log(`ready ${process.pid}`);
+for await (const event of createInterface({ input: process.stdin })) {
+  if (event === 'exit') process.exit(0);
+  try {
+    if (event === 'personal') { active = process.env.PERSONAL; proof.start(ctx); }
+    else proof[event](ctx);
+    console.log(`ok ${event}`);
+  } catch (error) { console.log(`error ${event} ${error.message}`); }
+}
+JS
+  mkfifo "$dir/ext/commands" "$dir/ext/acks"
+  FM_SPAWN_GEN=old EXT="$dir/ext/fm-task-session.ts" STATE="$dir/home/state" TASK="$id" \
+    SESSION="$dir/wt/recorded-session.jsonl" PERSONAL="$dir/wt/personal-session.jsonl" \
+    node --experimental-strip-types --no-warnings "$dir/ext/driver.mjs" \
+    < "$dir/ext/commands" > "$dir/ext/acks" 2> "$dir/ext/errors" &
+  exec 4> "$dir/ext/commands" 5< "$dir/ext/acks"
+  read -r line <&5
+  case "$line" in
+    'ready '*) EXT_PROC_PID=${line#ready } ;;
+    *) fail "the real omp extension process did not start: $line $(cat "$dir/ext/errors")" ;;
+  esac
+}
+
+extension_event() { # start|shutdown
+  local ack
+  printf '%s\n' "$1" >&4
+  read -r ack <&5
+  [ "$ack" = "ok $1" ] || fail "the real omp extension $1 failed: $ack"
+}
+
+stop_adoption_extension() {
+  printf 'exit\n' >&4
+  exec 4>&- 5<&-
+  wait "$EXT_PROC_PID" 2>/dev/null || true
+}
+
+# Wrap mv and ln: the first call naming the session record announces itself on
+# the events FIFO, then waits for the test to release it.
+arm_adoption_barrier() { # <case-dir> <id> <mv|ln>
+  local dir=$1 id=$2 op=$3 tool
+  mkfifo "$dir/fake/barrier-events" "$dir/fake/barrier-resume"
+  for tool in mv ln; do
+    cat > "$dir/fakebin/$tool" <<SH
+#!/usr/bin/env bash
+D=\$FM_FAKE_DIR
+if [ "\$(cat "\$D/barrier-op" 2>/dev/null)" = $tool ]; then
+  for arg in "\$@"; do
+    if [ "\${arg##*/}" = "$id.omp-session.json" ]; then
+      rm -f "\$D/barrier-op"
+      printf 'reached %s\n' $tool > "\$D/barrier-events"
+      read -r _ < "\$D/barrier-resume"
+      break
+    fi
+  done
+fi
+exec /bin/$tool "\$@"
+SH
+    chmod +x "$dir/fakebin/$tool"
+  done
+  printf '%s' "$op" > "$dir/fake/barrier-op"
+}
+
+test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
+  local shape=$1 dir id record line rc=0 out reached=0 before adopt_job absent=0
+  prepare_omp_adoption "personal-anchor-$shape"
+  dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+  write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
+  start_adoption_extension "$dir" "$id"
+  # The extension genuinely holds a matching pin, even when the external
+  # observer cannot read its environment. Its predecessor record names a dead PID.
+  printf '%s' "$EXT_PROC_PID" > "$dir/fake/recovery-pid"
+  printf '%s' "$EXT_PROC_PID" > "$dir/fake/holder-pid"
+  printf old > "$dir/fake/recovery-spawn-gen"
+  [ "$shape" != unreadable ] || : > "$dir/fake/recovery-env-unreadable"
+  before=$(cat "$record")
+  arm_adoption_barrier "$dir" "$id" ln
+  exec 6<> "$dir/fake/barrier-events"
+  (
+    rc=0
+    run_continuation_control "$dir" "$id" adopt > "$dir/adopt.out" || rc=$?
+    printf 'done %s\n' "$rc" > "$dir/fake/barrier-events"
+  ) &
+  adopt_job=$!
+  read -r line <&6
+  if [ "$line" = 'reached ln' ]; then
+    reached=1
+    # Before the fix this is the exact after-capture/before-link window.
+    # Activate a different persisted conversation through the REAL extension.
+    [ -e "$record" ] || absent=1
+    extension_event personal
+    printf 'go\n' > "$dir/fake/barrier-resume"
+    read -r line <&6
+  fi
+  case "$line" in 'done '*) rc=${line#done } ;; *) fail "adoption ended unexpectedly: $line" ;; esac
+  wait "$adopt_job"
+  out=$(cat "$dir/adopt.out")
+  exec 6>&-
+  if [ "$reached" = 0 ]; then
+    # The fixed path refuses before capture; the extension still sees T and
+    # preserves it as task_session_file when it subsequently activates S.
+    assert_equals "$before" "$(cat "$record")" "pin refusal must preserve the record before extension activation"
+    extension_event personal
+  fi
+  # Probe recovery must never turn a newly rebound personal anchor into managed.
+  rm -f "$dir/fake/recovery-env-unreadable"
+  local anchor_ok=0
+  jq -e --arg task "$dir/wt/recorded-session.jsonl" --arg personal "$dir/wt/personal-session.jsonl" \
+    --argjson pid "$EXT_PROC_PID" \
+    '.pid==$pid and .task_session_file==$task and .current_session_file==$personal' "$record" >/dev/null \
+    && anchor_ok=1
+  if [ "$anchor_ok" != 1 ]; then
+    stop_adoption_extension
+    fail "adoption ($shape) rebound the task anchor to a personal session (capture reached=$reached, canonical absent=$absent): $(cat "$record")"
+  fi
+  [ "$rc" -ne 0 ] || fail "adoption ($shape) accepted a pinned or unreadable process: $out"
+  [ "$reached" = 0 ] || fail "adoption ($shape) reached capture/link for a process not proven unpinned: $out"
+  assert_contains "$out" 'launch-pin proof needs a positively readable environment without a usable launch pin' "pin refusal must name the required proof"
+  assert_not_contains "$out" 'adopted:' "a refused adoption must not report success"
+  assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" \
+    "a pin refusal must leave no staged or captured record"
+  rc=0
+  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+  stop_adoption_extension
+  [ "$rc" -ne 0 ] || fail "adoption ($shape) authorized the personal conversation after probe recovery: $out"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the personal session must receive no lifecycle input"
+  pass "omp adoption: $shape pin proof refuses before capture and preserves the task anchor across real personal activation"
+}
+
+test_omp_adoption_personal_session_anchor() {
+  test_omp_adoption_personal_session_anchor_case matching
+}
+
+test_omp_adoption_unreadable_personal_session_anchor() {
+  test_omp_adoption_personal_session_anchor_case unreadable
+}
+
+test_omp_adoption_publication_race() {
+  test_omp_adoption_personal_session_anchor
+  test_omp_adoption_unreadable_personal_session_anchor
+}
+
+test_omp_adoption() {
+  test_omp_adoption_matching_workspace
+  test_omp_adoption_foreign_workspace
+  test_omp_adoption_duplicate_pane
+  test_omp_adoption_ambiguous_foreground
+  test_omp_adoption_generation_mismatch
+  test_omp_adoption_current_session_contradiction
+  test_omp_adoption_unproven_same_pid
+  test_omp_adoption_non_agent_process
+  test_omp_adoption_unreadable_environment
+  test_omp_adoption_other_generation_pin
+  test_omp_adoption_caller_gate
+  test_omp_adoption_proof_boundaries
+  test_omp_adoption_live_recorded_pid
+  test_omp_adoption_publication_race
+}
+
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
   exit "$?"
 fi
 
+test_omp_adoption
 test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
 test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once
 test_bounded_reboot_recovery_advances_after_interrupted_inspection
