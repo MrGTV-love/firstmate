@@ -1,0 +1,18 @@
+### Base bin (4d1dc7d5e) + HEAD tests
+== test_status_device_shift_does_not_resignal
+not ok - device-only shift re-signalled an unchanged status on pass 1
+rc=
+== test_status_device_shift_lagging_log_reads_only_new_bytes
+not ok - growth on a lagging log did not signal exactly once
+rc=
+== test_status_device_shift_keeps_owned_appends
+not ok - an owned append woke the watcher after a device shift
+rc=
+### HEAD with all-fields-equal rule restored for classified adoption
+== test_status_device_shift_lagging_log_reads_only_new_bytes
+not ok - a lagging log was reclassified from before its classified offset: 0 
+rc=
+== test_status_device_shift_does_not_resignal
+ok - device-only shift migrates seen and heartbeat markers; two passes enqueue no wake
+ok - a log that grows after device migration signals once
+rc=

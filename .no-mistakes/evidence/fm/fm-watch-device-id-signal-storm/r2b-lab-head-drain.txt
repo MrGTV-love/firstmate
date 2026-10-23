@@ -1,0 +1,87 @@
+=== drain 20:18:04
+OVERDUE:
+rows[26]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "0f34d6be12641ab2e4bb5d52","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable",false
+  "61eb7af8de11f00a6b3ae0e1","firstmate","task02:k02","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task02",false
+  "f20285d82b543e44b646e944","firstmate","task03:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task03",false
+  "9492d27e197e592691ac5ecd","firstmate","task05:k05","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task05",false
+  "5335f315acd4a9aaa7eb1fee","firstmate","task06:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task06",false
+  "d45acf5c057f7952e2fe2a95","firstmate","task08:k08","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task08",false
+  "30b359b633dd69e05b27870e","firstmate","task09:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task09",false
+  "7c2ffd70711121e4e3acd65e","firstmate","task11:k11","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task11",false
+  "db0df943dc18d053abe3bd7e","firstmate","task12:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task12",false
+  "2bbac9d932d0ad937f38d509","firstmate","task14:k14","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task14",false
+  "bea81c8848415859308a0245","firstmate","task15:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task15",false
+  "6b0527c003e7b29239f85b25","firstmate","task17:k17","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task17",false
+  "d59efee2627ee88a8ba18ee9","firstmate","task18:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task18",false
+  "dcec3c9d61c93aca8daea554","firstmate","task20:k20","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task20",false
+  "080acc0bf191443c218fc87b","firstmate","task21:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task21",false
+  "5958a0013a478015d3bb5fc7","firstmate","task23:k23","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task23",false
+  "3f296732d1c473fbcb2e7a5f","firstmate","task24:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task24",false
+  "5f8dec93dc3d1eaaa99fe195","firstmate","task26:k26","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task26",false
+  "7c516adbfa947b8002dc0243","firstmate","task27:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task27",false
+  "1afe469186c136723bc4503a","firstmate","task29:k29","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task29",false
+  "2f667ff331504377a9499217","firstmate","task30:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task30",false
+  "35320185ee2df51ccf710d9b","firstmate","task32:k32","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task32",false
+  "54d042f90ea1a2007f4b2fc7","firstmate","task33:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task33",false
+  "e9a9a3421d4440f35e8c0f8b","firstmate","task35:k35","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task35",false
+  "908de7329b67c38eb6b2ac3a","firstmate","task36:default","answer or close this question, or record why it no longer applies",null,"blocked: needs captain input on task36",false
+  "90f025e7076dc28f6dc43cd8","firstmate","task38:k38","answer or close this question, or record why it no longer applies",null,"needs-decision: pick option for task38",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792718275	44	signal	task08.status	signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task08.status /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task12.status
+1792718275	45	signal	task12.status	signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task08.status /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task12.status
+wake annotation: unread wake-EVENT since last drain, not current state: task08.status: working: step 1 of task08
+wake annotation: unread wake-EVENT since last drain, not current state: task08.status: working: step 2 of task08
+wake annotation: unread wake-EVENT since last drain, not current state: task08.status: working: step 3 of task08
+wake annotation: unread wake-EVENT since last drain, not current state: task08.status: working: step 4 of task08
+wake annotation: unread wake-EVENT since last drain, not current state: task08.status: working: step 5 of task08
+wake annotation: unread wake-EVENT since last drain, not current state: task08.status: needs-decision [key=k08]: pick option for task08
+wake annotation: latest wake-EVENT observed at drain, not current state: task08.status: done: new result after reboot 08
+wake annotation: unread wake-EVENT since last drain, not current state: task12.status: working: step 1 of task12
+wake annotation: unread wake-EVENT since last drain, not current state: task12.status: working: step 2 of task12
+wake annotation: unread wake-EVENT since last drain, not current state: task12.status: working: step 3 of task12
+wake annotation: unread wake-EVENT since last drain, not current state: task12.status: working: step 4 of task12
+wake annotation: unread wake-EVENT since last drain, not current state: task12.status: working: step 5 of task12
+wake annotation: unread wake-EVENT since last drain, not current state: task12.status: blocked: needs captain input on task12
+wake annotation: latest wake-EVENT observed at drain, not current state: task12.status: done: new result after reboot 12
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+task04 done: delivered task04
+task08 done: new result after reboot 08
+task12 done: new result after reboot 12
+task16 done: delivered task16
+task19 done: delivered task19
+task22 done: delivered task22
+task25 done: delivered task25
+task28 done: delivered task28
+task31 done: delivered task31
+task34 done: delivered task34
+task37 done: delivered task37
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task02 [key=k02] needs-decision: pick option for task02
+task03 blocked: needs captain input on task03
+task05 [key=k05] needs-decision: pick option for task05
+task06 blocked: needs captain input on task06
+task08 [key=k08] needs-decision: pick option for task08
+task09 blocked: needs captain input on task09
+task11 [key=k11] needs-decision: pick option for task11
+task12 blocked: needs captain input on task12
+task14 [key=k14] needs-decision: pick option for task14
+task15 blocked: needs captain input on task15
+task17 [key=k17] needs-decision: pick option for task17
+task18 blocked: needs captain input on task18
+task20 [key=k20] needs-decision: pick option for task20
+task21 blocked: needs captain input on task21
+task23 [key=k23] needs-decision: pick option for task23
+task24 blocked: needs captain input on task24
+task26 [key=k26] needs-decision: pick option for task26
+task27 blocked: needs captain input on task27
+task29 [key=k29] needs-decision: pick option for task29
+task30 blocked: needs captain input on task30
+task32 [key=k32] needs-decision: pick option for task32
+task33 blocked: needs captain input on task33
+task35 [key=k35] needs-decision: pick option for task35
+task36 blocked: needs captain input on task36
+task38 [key=k38] needs-decision: pick option for task38
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 45 --recovery-generation 86502.1792718275.nJADY2
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.

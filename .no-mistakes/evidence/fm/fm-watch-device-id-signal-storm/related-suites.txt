@@ -1,0 +1,49 @@
+== tests/fm-supervision-fork-budget.test.sh
+ok - a quiet scan of 12 status logs enters 17 subshells (bound 40)
+ok - a quiet heartbeat scan of 12 status logs starts no owned capture; one unread log starts one
+ok - the heartbeat marker path is byte-identical to the tr pipeline for every task id shape
+rc=
+== tests/fm-supervision-events.test.sh
+ok - handle_push_transition: a blocked crew enqueues a stale wake naming its window and wakes the supervisor
+ok - handle_push_transition: enqueue failure cannot commit the Herdr dedupe marker
+ok - handle_push_transition: a declared-pause crew is absorbed (no fast wake), left to the poll loop's long cadence
+ok - handle_push_transition: a captain-held crew is absorbed (no fast wake), left to the poll loop's long cadence
+ok - handle_push_transition: a device-shifted heartbeat marker keeps its classified offset
+ok - event_wait_or_sleep: a home with no push-capable window is inert (sleeps POLL, never touches the event path)
+ok - event_wait_or_sleep: consecutive event-path failures disable the fast-path and revert to pure polling (fail-closed)
+not ok - term recovery subprocess tree did not start
+not ok - recovery owned-subtree assertions failed
+rc=
+== tests/fm-daemon.test.sh
+ok - fm-afk-start.sh fails before daemon startup when the afk flag cannot be written
+ok - a failed unknown-wake acknowledgement write does not re-inject a delivered digest
+ok - housekeeping silences a captain hold only under an away record, never under quiet mode's
+ok - herdr idle busy-footer stale clears through capture corroboration
+ok - pane_input_pending preserves bright placeholder-like drafts in styled captures
+ok - daemon migrates device-only status identity without repeating an old result or swallowing growth
+ok - the daemon commits exactly the endpoint captured by classification
+ok - a stale span read failure surfaces without advancing its marker
+ok - a recreated status rejects the old captured identity
+ok - a status read failure surfaces without advancing the daemon suppressor
+ok - failed escalation writes retain durable wakes and classification positions
+ok - stuck inbox escalation reaches supervision in away mode and survives buffering failure
+ok - stuck inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - write inbox escalation reaches supervision in away mode and survives buffering failure
+ok - write inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - reset inbox escalation reaches supervision in away mode and survives buffering failure
+ok - reset inbox escalation reaches supervision in quiet mode and survives buffering failure
+ok - classification failure retains the complete durable wake batch
+ok - a permanent classification failure is reported, acknowledged, and never advances its position
+ok - a digest past its byte budget counts the omitted events and keeps them in the full text
+ok - an initial-send failure logs its stage, bytes, and stderr, and the wedge alarm names it
+ok - an Enter-confirmation failure logs its own stage and byte count
+ok - a bounded digest's full-text file survives a failure after typing, and a deferral writes none
+ok - command channel failures redact configured commands while logging their exit status
+ok - a failing channel logs and falls back to the next channel, never crashing the alarm
+ok - fm-send exits non-zero when initial text send fails
+ok - pane_is_busy: herdr native busy_state='busy' short-circuits without a capture fallback
+rc=
+
+# tests/fm-supervision-events.test.sh exits 1 at HEAD AND at base 4d1dc7d5e on this host with the same two lines:
+base: not ok - term recovery subprocess tree did not start
+base: not ok - recovery owned-subtree assertions failed

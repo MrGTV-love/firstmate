@@ -1,0 +1,16 @@
+# Daemon classify_signal (sourced bin/fm-supervise-daemon.sh, library mode) on the real APFS image across a real remount
+-- head prime on dev 16777325
+primed marker: 52@strong:16777325:17431:1792719020.511244819
+-- base prime on dev 16777325
+primed marker: 52@strong:16777325:17435:1792719020.594492093
+remounted: device 16777325 -> 16777329
+-- head after remount (dev 16777329)
+classify pass 1 -> self | offset=52 size=52
+classify pass 2 -> self | offset=52 size=52
+marker now: 52@strong:16777329:17431:1792719020.511244819
+after growth -> escalate | escalate|dtask.status: done: new result after reboot
+-- base after remount (dev 16777329)
+classify pass 1 -> escalate | offset=0 size=52
+classify pass 2 -> escalate | offset=0 size=52
+marker now: 52@strong:16777325:17435:1792719020.594492093
+after growth -> escalate | escalate|dtask.status: done: already delivered before reboot ; done: new result after reboot

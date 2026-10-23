@@ -1,0 +1,98 @@
+# Live remount scenario: real APFS disk image, real stat, real bin/fm-watch.sh
+# Two lab homes on one volume: lab-head (HEAD ef65ce221), lab-base (base 4d1dc7d5e). 38 status logs each, 6 of them ~1.6 MB.
+BEFORE remount: dev=16777277 ino=24 birth=1792716362 size=1613515
+lab-head .seen-task01_status classified field: 1613515@strong:16777277:24:1792716362.400574177
+lab-head .hb-surfaced-task01 classified field: 1613515@strong:16777277:24:1792716362.400574177
+AFTER remount:  dev=16777277 ino=24 birth=1792716362 size=1613515
+pass 1 head watcher: exited rc=0 ; queue rows=0
+pass 1 base watcher: exited rc=0 ; queue rows=0
+pass 2 head watcher: alive-after-15s (no actionable wake; stopped by harness) ; queue rows=0
+pass 2 base watcher: alive-after-15s (no actionable wake; stopped by harness) ; queue rows=0
+lab-head .seen-task01_status classified field: 1613515@strong:16777277:24:1792716362.400574177
+lab-head .hb-surfaced-task01 classified field: 1613515@strong:16777277:24:1792716362.400574177
+lab-head markers naming new device 16777277: seen=1 hb=38
+lab-base queue head:
+
+## Round R1: device-only remount, no log changed (earlier non-shifting remount attempt above changed nothing)
+now: dev=16777281 ino=24 birth=1792716362 size=1613515
+lab-head .seen-task01_status before: 1613515@strong:16777277:24:1792716362.400574177
+lab-base .seen-task01_status before: 1613515@strong:16777277:69:1792716362.551557644
+-- head
+  head pass 1: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head TOTAL signal wakes this round: 0
+-- base
+  base pass 1: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=19 ; all queued rows=19 ; last line: check: rearm-resurface
+  base pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=14 ; all queued rows=14 ; last line: check: rearm-resurface
+  base TOTAL signal wakes this round: 33
+lab-head .seen-task01_status after: 1613515@strong:16777281:24:1792716362.400574177
+lab-head .hb-surfaced-task01 after: 1613515@strong:16777281:24:1792716362.400574177
+lab-head markers naming new device 16777281: seen=38/38 hb=38/38
+-- base, continued (quiet now means alive AND zero rows queued)
+  base pass 1: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  base pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  base TOTAL signal wakes this round: 0
+-- head, continued (same quiet rule)
+  head pass 1: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head TOTAL signal wakes this round: 0
+
+## Round R2a: logs lag their markers across a remount; new bytes are routine working: lines only
+# crew state reported as working (FM_CREW_STATE_BIN canned verdict), heartbeat scans every 3s (FM_HEARTBEAT=3).
+# Old done:/blocked:/needs-decision: lines sit BEFORE each marker. Re-reading from byte 0 would wake on them; reading only new bytes must not.
+lab-head task07: size=221 seen-marker classified=178@strong:16777281:30:1792716362.495726739 hb-marker classified=153@strong:16777281:30:1792716362.495726739
+remounted: device 16777281 -> 16777285 (attempts 2)
+now: dev=16777285 ino=30 birth=1792716362 size=221
+-- head
+  head pass 1: exited rc=0 ; signal rows queued=4 ; all queued rows=4 ; last line: signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task01.status /tmp/fmdev.TlO7Q8/mnt/lab-head/
+  head pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task01.status /tmp/fmdev.TlO7Q8/mnt/lab-head/
+  head pass 3: exited rc=0 ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 4: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 5: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head TOTAL signal wakes this round: 4
+-- base
+  base pass 1: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=3 ; all queued rows=3 ; last line: check: rearm-resurface
+  base pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=14 ; all queued rows=14 ; last line: check: rearm-resurface
+  base pass 3: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=2 ; all queued rows=2 ; last line: check: rearm-resurface
+  base pass 4: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=22 ; all queued rows=22 ; last line: check: rearm-resurface
+  base pass 5: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=24 ; all queued rows=24 ; last line: check: rearm-resurface
+  base pass 6: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=14 ; all queued rows=14 ; last line: check: rearm-resurface
+  base TOTAL signal wakes this round: 79
+lab-head task07 after: size=221 seen-marker classified=221@strong:16777285:30:1792716362.495726739 hb-marker classified=221@strong:16777285:30:1792716362.495726739
+
+## Note on Round R2a: lab-head pass 1 queued one signal row for each of the 4 grown logs (then quiet). 9 later repeats of the same lag-plus-remount sequence (6 with a confirmed device change; see live-summary.md) were all absorbed with 0 rows. Cause of the first-run wake not determined; see testing summary.
+## Round R2b: two logs gain a NEW done: line, then the device changes (real crew-state, not working)
+lab-head task08 before: size=212 seen classified=179@strong:16777317:31:1792716362.496167991
+remounted: device 16777317 -> 16777321
+now: dev=16777321 ino=31 birth=1792716362 size=212
+-- head
+  head pass 1: exited rc=0 ; signal rows queued=2 ; all queued rows=2 ; last line: signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task08.status /tmp/fmdev.TlO7Q8/mnt/lab-head/
+  head pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task08.status /tmp/fmdev.TlO7Q8/mnt/lab-head/
+  head pass 3: exited rc=0 ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 4: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 5: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head TOTAL signal wakes this round: 2
+  head signal wake files: 
+-- base
+  base pass 1: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=20 ; all queued rows=20 ; last line: check: rearm-resurface
+  base pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=3 ; all queued rows=3 ; last line: check: rearm-resurface
+  base pass 3: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=20 ; all queued rows=20 ; last line: check: rearm-resurface
+  base pass 4: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=6 ; all queued rows=6 ; last line: check: rearm-resurface
+  base pass 5: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=24 ; all queued rows=24 ; last line: check: rearm-resurface
+  base pass 6: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=24 ; all queued rows=24 ; last line: check: rearm-resurface
+  base TOTAL signal wakes this round: 97
+  base signal wake files: 
+lab-head task08 after: size=212 seen classified=212@strong:16777321:31:1792716362.496167991
+
+## Round R3 (adversarial): task20 replaced by an identical-content copy (new inode + birth), then the device changes
+before: dev=16777329 ino=43 birth=1792716362 size=179 seen=179@strong:16777321:43:1792716362.498133417
+remounted: device 16777329 -> 16777333
+after:  dev=16777333 ino=17442 birth=1792716362 size=179
+  head pass 1: exited rc=0 ; signal rows queued=1 ; all queued rows=1 ; last line: signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task20.status
+  head pass 2: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: signal: /tmp/fmdev.TlO7Q8/mnt/lab-head/state/task20.status
+  head pass 3: exited rc=0 ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 4: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head pass 5: alive-after-15s (no actionable wake; stopped by harness) ; signal rows queued=0 ; all queued rows=0 ; last line: check: rearm-resurface
+  head TOTAL signal wakes this round: 1
+1792719049	46	signal	task20.status
+seen after: 179@strong:16777333:17442:1792716362.498218751
