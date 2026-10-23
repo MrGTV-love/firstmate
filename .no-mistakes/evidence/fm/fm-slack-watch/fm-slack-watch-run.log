@@ -1,0 +1,49 @@
+FM_TEST_BEGIN 2026-10-23T00:02:23Z tests/fm-slack-watch.test.sh family=unclassified expected_gate_skip=none
+ok - DOD-01
+ok - DOD-02
+ok - DOD-03
+ok - DOD-04
+ok - DOD-05
+ok - DOD-06
+ok - DOD-07
+ok - DOD-08
+ok - DOD-09
+ok - DOD-10
+ok - DOD-12
+ok - DOD-13
+ok - DOD-14
+ok - DOD-15
+ok - DOD-16
+ok - DOD-17
+ok - S1
+ok - S2
+ok - S3
+ok - X1
+ok - X2
+ok - X3
+ok - X4
+ok - X5
+ok - X6
+ok - X7
+ok - X8
+ok - X9
+ok - X10
+ok - X11
+ok - X12
+ok - X13
+ok - X14
+ok - X15
+ok - X16
+ok - X17
+ok - X18
+ok - X19
+ok - X20
+ok - X21
+ok - X22
+ok - all Slack watch checks
+FM_TEST_END 2026-10-23T00:12:48Z tests/fm-slack-watch.test.sh exit=0 duration_ms=624234 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JVKR0RNB23T4YAS3PM00SR/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=624732
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=624234 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-slack-watch.test.sh duration_ms=624234
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JVKR0RNB23T4YAS3PM00SR/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
