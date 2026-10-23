@@ -69,4 +69,4 @@ The installer bakes the `PATH` of the shell that runs it into the agent, because
 - It does not cover Pi or omp extension supervision, secondmate homes' own supervision, or the away-mode daemon's injection path.
 - The root cause of any particular death is out of scope here.
 
-`tests/fm-watchdog-check.test.sh` covers the fresh, idle, stale-watcher, dead-arm-owner, and missing-session verdicts, the home-scoped stop, the retry interval, the alarm threshold and rate limit, and the installer, all against a temporary home.
+`tests/fm-watchdog-check.test.sh` covers the fresh, idle, stale-watcher, dead-arm-owner, and missing-session verdicts, the home-scoped stop, the retry interval, the failed-recovery and no-op attempt wording, the alarm threshold, title, and rate limit, and the installer, all against a temporary home.

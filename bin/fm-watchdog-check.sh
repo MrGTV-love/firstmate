@@ -44,15 +44,18 @@
 #      command gets FM_HOME, FM_ROOT, and FM_WATCHDOG_REASON (the verdict).
 #      An absent file makes this step a recorded no-op.
 #   3. Re-read the verdict for up to FM_WATCHDOG_VERIFY_SECS (default 90).
-# A recovery that restores neither healthy nor idle is a failed attempt. At
-# most one attempt runs per FM_WATCHDOG_RETRY_SECS (default 240). After
-# FM_WATCHDOG_ALARM_AFTER (default 2) consecutive failed attempts the check
-# raises the existing wedge alarm channels (docs/wedge-alarm.md), at most once
-# per FM_WATCHDOG_ALARM_INTERVAL_SECS (default 3600). A healthy or idle verdict
+# An attempt that ran an action without restoring healthy or idle is a failed
+# recovery; one with no watcher to stop and no usable resume command is a
+# no-op. Only the current attempt is classified. At most one attempt runs per
+# FM_WATCHDOG_RETRY_SECS (default 240). After FM_WATCHDOG_ALARM_AFTER (default
+# 2) consecutive attempts of either kind, the check raises the existing wedge
+# alarm channels (docs/wedge-alarm.md) titled with the verdict, counting the
+# recovery checks and naming the latest attempt's kind, at most once per
+# FM_WATCHDOG_ALARM_INTERVAL_SECS (default 3600). A healthy or idle verdict
 # clears the episode.
 #
 # Exit 0: healthy, idle, recovered, or waiting out the retry interval.
-# Exit 1: the latest recovery attempt failed. Exit 2: usage.
+# Exit 1: still unhealthy after an attempt, including a no-op. Exit 2: usage.
 # State: state/.watchdog-episode (attempt count and times), state/.watchdog.log
 # (bounded), state/.watchdog.lock. Nothing outside this home is touched.
 #
@@ -64,7 +67,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 
-usage() { sed -n '2,64p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,63p' "$0" | sed 's/^# \{0,1\}//'; }
 
 case "${1:-}" in
   '') ;;
@@ -208,8 +211,8 @@ episode_write() {
 # the notifier seam to "discard" so tests cannot post. Production must fire the
 # real channels, so the default the source just set is withdrawn unless the
 # caller wired a seam itself.
-raise_alarm() {  # <summary>
-  local summary=$1 seam_set=0 seam_value=
+raise_alarm() {  # <summary> <verdict>
+  local summary=$1 verdict=$2 seam_set=0 seam_value=
   if [ -n "${FM_WEDGE_ALARM_EXEC:-}" ]; then
     seam_set=1
     seam_value=$FM_WEDGE_ALARM_EXEC
@@ -221,14 +224,17 @@ raise_alarm() {  # <summary>
   else
     unset FM_WEDGE_ALARM_EXEC
   fi
-  wedge_alarm_notify "$summary" "$LOG"
+  wedge_alarm_notify "$summary" "$LOG" "firstmate supervision is down ($verdict)"
 }
 
+RECOVERY_ACTION_RAN=0
+RESUME_UNAVAILABLE=
 stop_stale_watcher() {
   local pid
   pid=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
   fm_pid_alive "$pid" || return 0
   log "stopping the stale watcher pid=$pid through $(basename "$ARM") --stop"
+  RECOVERY_ACTION_RAN=1
   fm_run_timed "$STEP_BOUND" "$ARM" --stop >> "$LOG" 2>&1 \
     || log "watcher stop reported a failure"
 }
@@ -236,14 +242,17 @@ stop_stale_watcher() {
 run_resume() {  # <reason>
   local file="$CONFIG/watchdog-resume" cmd
   if [ ! -f "$file" ] || [ ! -r "$file" ]; then
-    log "no config/watchdog-resume; the session cannot be resumed from here"
+    RESUME_UNAVAILABLE="no config/watchdog-resume"
+    log "$RESUME_UNAVAILABLE; the session cannot be resumed from here"
     return 0
   fi
   cmd=$(grep -v '^[[:space:]]*#' "$file" | sed '/^[[:space:]]*$/d' | head -n 1)
   if [ -z "$cmd" ]; then
-    log "config/watchdog-resume holds no command"
+    RESUME_UNAVAILABLE="config/watchdog-resume holds no command"
+    log "$RESUME_UNAVAILABLE"
     return 0
   fi
+  RECOVERY_ACTION_RAN=1
   log "running config/watchdog-resume for $1"
   FM_WATCHDOG_REASON=$1 fm_run_timed "$STEP_BOUND" sh -c "$cmd" >> "$LOG" 2>&1 \
     || log "config/watchdog-resume exited non-zero"
@@ -260,7 +269,7 @@ wait_healthy() {
 }
 
 watchdog_main() {
-  local first now_epoch
+  local first now_epoch detail='' latest checks=checks
   watchdog_verdict
   first=$WATCHDOG_VERDICT
   case "$first" in
@@ -278,7 +287,7 @@ watchdog_main() {
     echo "watchdog: $first - waiting out the retry interval"
     return 0
   fi
-  log "verdict $first; recovery attempt $((EP_ATTEMPTS + 1))"
+  log "verdict $first; recovery check attempt $((EP_ATTEMPTS + 1))"
   stop_stale_watcher
   run_resume "$first"
   EP_LAST_ATTEMPT=$now_epoch
@@ -289,14 +298,22 @@ watchdog_main() {
     return 0
   fi
   EP_ATTEMPTS=$((EP_ATTEMPTS + 1))
-  log "recovery attempt $EP_ATTEMPTS failed; verdict now $WATCHDOG_VERDICT"
+  if [ "$RECOVERY_ACTION_RAN" -eq 1 ]; then
+    latest="recovery failed"
+    log "recovery attempt $EP_ATTEMPTS failed; verdict now $WATCHDOG_VERDICT"
+  else
+    latest="no-op"
+    detail=" - no live watcher to stop and $RESUME_UNAVAILABLE"
+    log "attempt $EP_ATTEMPTS was a no-op; verdict now $WATCHDOG_VERDICT"
+  fi
+  [ "$EP_ATTEMPTS" -eq 1 ] && checks=check
   if [ "$EP_ATTEMPTS" -ge "$ALARM_AFTER" ] \
     && { [ "$EP_LAST_ALARM" -eq 0 ] || [ $((now_epoch - EP_LAST_ALARM)) -ge "$ALARM_INTERVAL" ]; }; then
     EP_LAST_ALARM=$now_epoch
-    raise_alarm "firstmate supervision is down ($first) and $EP_ATTEMPTS automatic recoveries failed - see $LOG"
+    raise_alarm "firstmate supervision is down ($first): $EP_ATTEMPTS recovery $checks did not restore supervision; latest attempt: $latest$detail - see $LOG" "$first"
   fi
   episode_write
-  echo "watchdog: $first - recovery failed (attempt $EP_ATTEMPTS)"
+  echo "watchdog: $first - $latest (attempt $EP_ATTEMPTS)$detail"
   return 1
 }
 
