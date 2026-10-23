@@ -901,6 +901,50 @@ SH
   pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; after a preserved original changed in the copy the same refusal keeps its preserve of the old content and the next run still retries the copy; the same refusal after an unlock stays held with its preserve"
 }
 
+test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases() {
+  local run real_cp kept
+  make_locked_copy_case waiting-content dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'v0\n' > "$(copy_path locked)/unique.dat"
+  printf '{"allowed": false, "reason": "cleanup_skipped_live_or_unknown"}\n' > "$W/execute-output"
+  real_cp=$(command -v cp)
+  cat > "$FAKEBIN/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+printf 'v1\\n' > "$(copy_path locked)/unique.dat"
+SH
+  chmod +x "$FAKEBIN/cp"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a temporary refusal after a write should exit 1, got $RC: $OUT"
+  assert_contains "$OUT" "this run's preserve stays" "the first run did not keep its preserve of the old content"
+  rm -f "$FAKEBIN/cp"
+  for run in 2 3 4; do
+    printf 'v%s\n' "$run" > "$(copy_path locked)/unique.dat"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "run $run: a copy whose content still changes must not fail the run, got $RC: $OUT"
+    assert_class locked WAITING
+    assert_contains "$OUT" "content changing" "run $run: the WAITING reason is missing"
+    assert_contains "$OUT" "summary: WAITING=1" "run $run: the changing copy is not counted as waiting"
+    assert_contains "$OUT" "summary: HELD-LOCKED=0" "run $run: a copy whose content still changes was held"
+    assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "run $run: the driver was called for a copy whose content still changes"
+    assert_equals 1 "$(preserved_unique | grep -c .)" "run $run: a copy whose content still changes was preserved again"
+    assert_equals 'v0' "$(cat "$(preserved_unique)")" "run $run: the preserve of the old content changed"
+    registered locked || fail "run $run: a copy whose content still changes was removed"
+  done
+  rm -f "$W/execute-output"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the first quiet run failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the first quiet run did not release the copy"
+  ! registered locked || fail "the copy is still registered after the quiet run"
+  assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the quiet run did not plan and execute exactly once"
+  assert_equals 2 "$(preserved_unique | grep -c .)" "the quiet run did not preserve exactly once"
+  assert_equals "v0"$'\n'"v4" "$(preserved_unique | while IFS= read -r kept; do cat "$kept"; done | sort)" \
+    "the preserve of the old content or of the quiet content is missing"
+  [ -z "$(ls -A "$HOMED/data/copy-sweep/waiting" 2>/dev/null)" ] || fail "the release left its waiting record"
+  pass "a copy whose preserved content changed during a temporary refusal reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost"
+}
+
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
   local shape reason long line retained
   for shape in kept failed; do
@@ -2335,6 +2379,7 @@ run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_nothing
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal
 run_case test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
+run_case test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
 run_case test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 run_case test_a_failed_preservation_leaves_no_staging_directory

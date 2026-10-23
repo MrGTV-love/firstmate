@@ -61,6 +61,12 @@
 #   HELD-UNPUSHED      its HEAD holds a commit that is on no remote and whose
 #                      content is not already in the default branch (a locked
 #                      copy has no such fallback; see REAPABLE-DRIVER).
+#   WAITING            it passes every REAPABLE-DRIVER proof, but its waiting
+#                      record (see below) holds a different fingerprint of its
+#                      preservable ignored content: that content is still
+#                      changing, so the copy is not idle. It gets no new preserve
+#                      and no driver call, and each run reports it with the reason,
+#                      until a run sees the same fingerprint as the run before.
 #   REAPABLE-PROVEN    clean, HEAD contained in a remote branch (the whole-slot
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
@@ -145,9 +151,16 @@
 # plan's lock bytes. Either way the preserve is discarded only while every
 # preserved file, symlink and directory is still in the copy with the same bytes
 # or target; when any original is missing, different or cannot be compared, the
-# preserve stays because it holds the old content, the copy is still retried by
-# the next run, and that run adds a new preserve only because the content changed.
-# A preserve from an earlier run is never removed or replaced.
+# preserve stays because it holds the old content, and the fingerprint of the
+# copy's current preservable ignored content (the SHA-256 over each entry's path,
+# type and bytes or link target) goes to a waiting record under
+# data/copy-sweep/waiting/<sha256 of the path>, beside the receipts. The copy is
+# never held for it: each later run that finds a different fingerprint classes it
+# WAITING and --apply records the new one, and the first run that finds the same
+# fingerprint as the run before plans, preserves once and executes the copy as
+# usual. A successful removal clears the record; --apply silently removes a record
+# whose copy is gone or is a different copy. A preserve from an earlier run is
+# never removed or replaced.
 # Other execution failures exit 1, record the driver's text, and retain the copy.
 # Never a force flag, hand unlock, lock-file write, recursive deletion of a copy,
 # or Treehouse call. Only the preservation library cleans its own staging data;
@@ -164,7 +177,8 @@
 # so GiB/freed are lower bounds when sizing was skipped.
 # Each removal appends one line to data/copy-sweep.log (append-only).
 # An outer copy whose inner copy was removed in the same run is removed by the
-# next run. Report mode reads the cache and receipts and writes nothing;
+# next run. Report mode reads the cache, receipts and waiting records and writes
+# nothing;
 # `check` writes only the size cache and the record (budgets and live copies).
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
@@ -699,6 +713,87 @@ receipt_is_stale() {  # <receipt>
   RECEIPT_STALE_WHY="the copy there now has a different creation lock"
 }
 
+# A copy whose preserve stayed after a retryable refusal, because an original
+# changed in it, gets a waiting record: its path, its identity and the
+# fingerprint of its preservable ignored content.
+waiting_record() {  # <copy>
+  local hash
+  hash=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
+  printf '%s/%s/waiting/%s\n' "$DATA_DIR" "$CHECK_ID" "$hash"
+}
+
+# Prints one SHA-256 over the path, type and bytes or link target of every
+# preservable ignored entry of <copy>. Fails when any of it cannot be read.
+content_fingerprint() {  # <copy>
+  local entries entry rel want out=''
+  entries=$(teardown_preservable_ignored "$1") || return 1
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    while IFS= read -r -d '' rel; do
+      case "$rel" in
+        ./*) ;;
+        0) continue ;;
+        *) return 1 ;;
+      esac
+      if [ -L "$1/$rel" ]; then
+        want=l$(readlink "$1/$rel") || return 1
+      elif [ -d "$1/$rel" ]; then
+        want=d
+      elif [ -f "$1/$rel" ]; then
+        want=f$(teardown_ignored_sha256 "$1/$rel") || return 1
+      else
+        return 1
+      fi
+      out="$out$rel"$'\t'"$want"$'\n'
+    done < <(cd "$1" && find "./$entry" -print0; printf '%s\0' "$?")
+  done <<< "$entries"
+  printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
+}
+
+record_waiting() {  # <copy> <identity> <fingerprint>
+  local dest tmp
+  dest=$(waiting_record "$1") || return 1
+  mkdir -p "${dest%/*}" || return 1
+  tmp=$(mktemp "${dest%/*}/.waiting.XXXXXX") || return 1
+  if ! printf 'copy=%s\nidentity=%s\nfingerprint=%s\n' "$1" "$2" "$3" > "$tmp" || ! mv -- "$tmp" "$dest"; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+# Prints the fingerprint waiting <record> holds when it names <copy> with
+# <identity>; fails for any other record.
+recorded_fingerprint() {  # <record> <copy> <identity>
+  local copy='' identity='' fingerprint=''
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  { IFS= read -r copy && IFS= read -r identity && IFS= read -r fingerprint; } < "$1" || return 1
+  [ "$copy" = "copy=$2" ] && [ "$identity" = "identity=$3" ] || return 1
+  fingerprint=${fingerprint#fingerprint=}
+  [[ $fingerprint =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s\n' "$fingerprint"
+}
+
+# Returns 1 with WAIT_WHY set while the preservable ignored content of <copy>
+# differs from the fingerprint its waiting record holds; --apply then records the
+# new fingerprint, so the next run can see the content quiet. A copy with no
+# record for this same copy is quiet. Returns 2 when the content cannot be read.
+WAIT_WHY=
+content_quiet() {  # <copy>
+  local record identity before now
+  WAIT_WHY=
+  record=$(waiting_record "$1") || return 2
+  [ -e "$record" ] || [ -L "$record" ] || return 0
+  identity=$(copy_identity "$1") || return 2
+  before=$(recorded_fingerprint "$record" "$1" "$identity") || return 0
+  now=$(content_fingerprint "$1") || return 2
+  [ "$now" != "$before" ] || return 0
+  WAIT_WHY="content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged"
+  if [ "$APPLY" = 1 ] && ! record_waiting "$1" "$identity" "$now"; then
+    WAIT_WHY="$WAIT_WHY; its new fingerprint could not be recorded"
+  fi
+  return 1
+}
+
 # Sets CLASS and REASON for <copy>, registered by <clone> of <pool> and
 # <container>. A clone under a Firstmate home other than this one is judged as
 # that home would judge it.
@@ -857,6 +952,20 @@ classify() {  # <copy> <clone> <pool> <container>
   fi
   if [ "$count" = 0 ]; then
     if [ "$locked" = 1 ]; then
+      rc=0
+      content_quiet "$copy" || rc=$?
+      case "$rc" in
+        1)
+          CLASS=WAITING
+          REASON=$WAIT_WHY
+          return 0
+          ;;
+        2)
+          CLASS=ORPHAN-NO-RECORD
+          REASON="its preservable ignored content cannot be read"
+          return 0
+          ;;
+      esac
       CLASS=REAPABLE-DRIVER
       REASON="clean, no process, no record, HEAD contained in a remote branch, Vernant launcher $launcher is gone"
       if [ "$APPLY" != 1 ]; then
@@ -1244,6 +1353,21 @@ discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
   rmdir "$dir" "$DATA_DIR/$4" 2>/dev/null || true
 }
 
+# After a retryable refusal, discards this run's preserve as discard_run_preserve
+# allows. When the preserve has to stay, it holds the old content, and the copy's
+# current fingerprint is recorded so later runs hold the copy WAITING while that
+# content keeps changing. Sets RETRY_PRESERVE to what happened.
+RETRY_PRESERVE=
+retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
+  local now
+  RETRY_PRESERVE="this run's preserve was discarded"
+  discard_run_preserve "$1" "$2" "$3" "$4" && return 0
+  RETRY_PRESERVE="this run's preserve stays with the old content, because not every preserved original is still unchanged in the copy; later runs hold the copy WAITING while that content keeps changing"
+  if ! now=$(content_fingerprint "$1") || ! record_waiting "$1" "$2" "$now"; then
+    RETRY_PRESERVE="$RETRY_PRESERVE, but its content fingerprint could not be recorded"
+  fi
+}
+
 # Preserves the ignored entries of a REAPABLE-DRIVER copy, then releases and
 # removes it through Vernant's own closeout driver, which is the only supported
 # release for its creation lock. The preservation lands under this sweep's data
@@ -1253,7 +1377,7 @@ discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
 # REFUSED line on stderr, because the library's envelope names a teardown command
 # built from the release id, which is no task id.
 teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity kept
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity
   shown=$(fm_refuse_text "$copy")
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
   if ! identity=$(copy_identity "$copy"); then
@@ -1270,7 +1394,8 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
     return 1
   fi
   if ! release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7"; then
-    discard_run_preserve "$copy" "$identity" "$7" "$3" || true
+    retry_after_preserve "$copy" "$identity" "$7" "$3"
+    echo "$RETRY_PRESERVE; the next sweep run plans it again." >&2
     return 1
   fi
   if ! copy_still_holds "$copy" "$identity" "$7" \
@@ -1283,11 +1408,9 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   if [ "$rc" != 0 ]; then
     words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
     if execute_refusal_is_temporary "$rc" && copy_still_holds "$copy" "$identity" "$7"; then
-      kept="this run's preserve was discarded"
-      discard_run_preserve "$copy" "$identity" "$7" "$3" \
-        || kept="this run's preserve stays, because not every preserved original is still unchanged in the copy"
+      retry_after_preserve "$copy" "$identity" "$7" "$3"
       if rm -f -- "$(retained_receipt "$copy")"; then
-        echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $kept and the next sweep run plans it again." >&2
+        echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $RETRY_PRESERVE; the next sweep run plans it again." >&2
         return 1
       fi
     fi
@@ -1301,9 +1424,10 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
 }
 
 # Removes each stale driver-retention receipt and lists it. Only a receipt that
-# receipt_is_stale proves no longer describes its path is removed.
+# receipt_is_stale proves no longer describes its path is removed. Also removes,
+# without listing, each waiting record whose copy is gone or is a different copy.
 clear_stale_receipts() {
-  local receipt
+  local receipt copy identity
   for receipt in "$DATA_DIR/$CHECK_ID/retained"/*; do
     [ -e "$receipt" ] || [ -L "$receipt" ] || continue
     receipt_is_stale "$receipt" || continue
@@ -1313,6 +1437,15 @@ clear_stale_receipts() {
       FAILED_COUNT=$((FAILED_COUNT + 1))
       REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"${RECEIPT_STALE_COPY:-$receipt}"$'\t'"its stale driver-retention receipt could not be removed"$'\n'
     fi
+  done
+  for receipt in "$DATA_DIR/$CHECK_ID/waiting"/*; do
+    [ -e "$receipt" ] || [ -L "$receipt" ] || continue
+    copy=$(sed -n '1s/^copy=//p' "$receipt" 2>/dev/null) || continue
+    if [ -n "$copy" ] && { [ -e "$copy" ] || [ -L "$copy" ]; }; then
+      identity=$(copy_identity "$copy") || continue
+      ! recorded_fingerprint "$receipt" "$copy" "$identity" >/dev/null || continue
+    fi
+    rm -f -- "$receipt" 2>/dev/null || true
   done
 }
 
@@ -1398,6 +1531,7 @@ apply_removals() {
       FAILED_COUNT=$((FAILED_COUNT + 1))
       REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"removed but its retention receipt could not be cleared"$'\n'
     fi
+    receipt=$(waiting_record "$copy") && rm -f -- "$receipt" 2>/dev/null
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
     gone="$gone$copy"$'\n'
     preserved=0
@@ -1721,7 +1855,7 @@ print_report() {  # <mode>
     printf 'note: %s\n' "$line"
   done <<< "$NOTES"
   [ "$SCAN_CUT" != 1 ] || printf 'note: the scan stopped at its time bound; unmeasured copies show ? GiB\n'
-  for class in REAPABLE-PROVEN REAPABLE-DRIVER PENDING-DRIVER HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
+  for class in REAPABLE-PROVEN REAPABLE-DRIVER PENDING-DRIVER WAITING HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
     count=$(printf '%s\n' "$COPIES" | awk -F '\t' -v c="$class" '$5 == c { n++ } END { print n + 0 }')
     printf 'summary: %s=%s\n' "$class" "$count"
   done
