@@ -119,7 +119,7 @@ for line in open(sys.argv[1]):
 sys.exit(1)
 PY
 }
-wait_reply() { local i; for i in $(seq 1 120); do assistant_has "$1" && return 0; sleep 1; done; lab pane read "$PANE" --source visible; return 1; }
+wait_reply() { local i=0; while [ "$i" -lt 120 ]; do assistant_has "$1" && return 0; sleep 1; i=$((i + 1)); done; lab pane read "$PANE" --source visible; return 1; }
 wait_reply FMPRIMARYREADY
 # Capture actual emitted startup context and a task-owned binding so the
 # existing control plane can drive this primary exactly as a secondmate.
