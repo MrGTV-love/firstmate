@@ -1,0 +1,5 @@
+### env=clone cwd=/Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone .git=
+### toplevel: /Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone
+ok - the shared project lock path is the same from an unresolvable git directory and from the recorded project
+ok - a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally
+ok - an interrupted legacy pool teardown keeps its record through session start and its retry returns the slot once

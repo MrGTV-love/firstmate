@@ -1,0 +1,11 @@
+### env=clone cwd=/Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone .git=
+### toplevel: /Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone
+ok - a steer to another task completes while a cleanup holds its own task's lease lock
+ok - the lane-registry scan reads each distinct registry once however many records name it
+ok - task teardown completes without reaping another home's abandoned worker
+ok - a missing teardown startup source refuses before cleanup
+ok - an unreadable teardown startup source refuses before cleanup
+ok - a missing adapter sibling refuses before cleanup
+ok - a forced descendant with a missing adapter sibling refuses before cleanup
+ok - a forced secondmate with a missing own adapter sibling refuses before child cleanup
+ok - present required sources still reach the ordinary teardown refusal

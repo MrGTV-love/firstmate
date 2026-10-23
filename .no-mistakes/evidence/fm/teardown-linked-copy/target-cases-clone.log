@@ -1,0 +1,19 @@
+### env=clone cwd=/Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone
+### .git: 
+### git rev-parse --show-toplevel: /Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone
+### HEAD bin diff vs parent? fm-teardown.sh sha=1af1c96c3c95 fm-wake-lib.sh sha=f6b0ece3ab91
+### RUN bash tests/fm-teardown.test.sh test_squash_merged_pr_allows_replayed_unpushed_patch
+ok - squash-merged PR accepts replayed unpushed local patches contained in the PR head
+### EXIT 0 (test_squash_merged_pr_allows_replayed_unpushed_patch)
+### RUN bash tests/fm-teardown.test.sh test_landed_proof_ignores_unresolvable_git_directory_in_cwd
+ok - the landed-patch proof ignores an unresolvable git directory in the caller's working directory
+### EXIT 0 (test_landed_proof_ignores_unresolvable_git_directory_in_cwd)
+### RUN bash tests/fm-teardown-pool.test.sh test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
+ok - a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally
+### EXIT 0 (test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap)
+### RUN bash tests/fm-teardown-pool.test.sh test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
+ok - the shared project lock path is the same from an unresolvable git directory and from the recorded project
+### EXIT 0 (test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd)
+### RUN bash tests/fm-teardown-cleanup.test.sh test_process_refusal_has_no_close_replay_authority
+ok - process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay
+### EXIT 0 (test_process_refusal_has_no_close_replay_authority)

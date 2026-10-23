@@ -1,0 +1,27 @@
+### env=pre cwd=/Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/pre
+### .git: gitdir: /Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/no-such-parent-repo/worktrees/x
+### git rev-parse --show-toplevel: fatal: not a git repository: (null)
+### HEAD bin diff vs parent? fm-teardown.sh sha=1ad0f3c42a2f fm-wake-lib.sh sha=9eaee0bec698
+### RUN bash tests/fm-teardown.test.sh test_squash_merged_pr_allows_replayed_unpushed_patch
+not ok - squash-replayed-patch: teardown should succeed when unpushed local patch is in the merged PR head: expected exit 0, got 1
+### EXIT 1 (test_squash_merged_pr_allows_replayed_unpushed_patch)
+### RUN bash tests/fm-teardown.test.sh test_landed_proof_ignores_unresolvable_git_directory_in_cwd
+not ok - landed-proof-cwd: teardown should succeed when the caller's working directory names an unresolvable git directory: REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+68eb9f6 add feature
+commits whose change is not proven present in the merged PR head:
+68eb9f6 add feature
+1143efd local parent
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes state database at /Users/charlesabrooker/tmp/fm-teardown-tests.PSP7Xa/landed-proof-dangling-cwd/nm/state.sqlite, so no run record ties this copy to https://github.com/example/repo/pull/7
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.: expected exit 0, got 1
+### EXIT 1 (test_landed_proof_ignores_unresolvable_git_directory_in_cwd)
+### RUN bash tests/fm-teardown-pool.test.sh test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
+not ok - the refusal came before the pending close was published
+### EXIT 1 (test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap)
+### RUN bash tests/fm-teardown-pool.test.sh test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
+not ok - project-lock-cwd: the shared project lock path could not be resolved from an unresolvable git directory
+### EXIT 1 (test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd)
+### RUN bash tests/fm-teardown-cleanup.test.sh test_process_refusal_has_no_close_replay_authority
+not ok - refusal-replay-tasktmp: wrong gate
+### EXIT 1 (test_process_refusal_has_no_close_replay_authority)

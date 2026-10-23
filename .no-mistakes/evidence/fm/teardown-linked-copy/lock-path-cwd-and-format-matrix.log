@@ -1,0 +1,22 @@
+# fm_treehouse_project_lock_path driven from different caller CWDs; pre = parent e9e48e1a lib, fix = ae403841 lib
+# caller CWD: healthy = the project itself; sha1repo = a SHA-1 repo; sha256repo = a SHA-256 repo; dangling = dir with .git -> missing gitdir; root = /
+p-sha1    pre  cwd=healthy    -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha1    pre  cwd=sha1repo   -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha1    pre  cwd=sha256repo -> $L/home/state/.treehouse-project-12410bff400c2fdf47064ffe44ed4415114a739654b11302950c137956dd9907.lock rc=0 
+p-sha1    pre  cwd=dangling   -> rc=1 
+p-sha1    pre  cwd=root       -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha1    fix  cwd=healthy    -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha1    fix  cwd=sha1repo   -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha1    fix  cwd=sha256repo -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha1    fix  cwd=dangling   -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha1    fix  cwd=root       -> $L/home/state/.treehouse-project-19ca40ca26f840781572e447ecdf1a90d293e6df.lock rc=0 
+p-sha256  pre  cwd=healthy    -> $L/home/state/.treehouse-project-48b67afa0329cf1115209c6ebefd1b5f1917ef2ae634de013fafd3bd4e1cee7e.lock rc=0 
+p-sha256  pre  cwd=sha1repo   -> $L/home/state/.treehouse-project-22ba9e1de9208c17774f5173cddc003e0b7b1c95.lock rc=0 
+p-sha256  pre  cwd=sha256repo -> $L/home/state/.treehouse-project-48b67afa0329cf1115209c6ebefd1b5f1917ef2ae634de013fafd3bd4e1cee7e.lock rc=0 
+p-sha256  pre  cwd=dangling   -> rc=1 
+p-sha256  pre  cwd=root       -> $L/home/state/.treehouse-project-22ba9e1de9208c17774f5173cddc003e0b7b1c95.lock rc=0 
+p-sha256  fix  cwd=healthy    -> $L/home/state/.treehouse-project-22ba9e1de9208c17774f5173cddc003e0b7b1c95.lock rc=0 
+p-sha256  fix  cwd=sha1repo   -> $L/home/state/.treehouse-project-22ba9e1de9208c17774f5173cddc003e0b7b1c95.lock rc=0 
+p-sha256  fix  cwd=sha256repo -> $L/home/state/.treehouse-project-22ba9e1de9208c17774f5173cddc003e0b7b1c95.lock rc=0 
+p-sha256  fix  cwd=dangling   -> $L/home/state/.treehouse-project-22ba9e1de9208c17774f5173cddc003e0b7b1c95.lock rc=0 
+p-sha256  fix  cwd=root       -> $L/home/state/.treehouse-project-22ba9e1de9208c17774f5173cddc003e0b7b1c95.lock rc=0 

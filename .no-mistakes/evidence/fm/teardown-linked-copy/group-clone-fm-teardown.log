@@ -1,0 +1,8 @@
+### env=clone cwd=/Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone .git=
+### toplevel: /Users/charlesabrooker/tmp/fm-tdtest.ghllWQ/clone
+ok - local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed
+ok - teardown does not wait for the home summary refresh
+ok - teardown closes its own backlog item before reporting success
+ok - ledger on: a completed teardown records one task.closed with the PR, and a repeat records none
+ok - ledger on: the closed record names local main and a captain's drop as its evidence
+ok - a refused teardown records nothing, and an unwritable ledger costs one stderr line without changing teardown
