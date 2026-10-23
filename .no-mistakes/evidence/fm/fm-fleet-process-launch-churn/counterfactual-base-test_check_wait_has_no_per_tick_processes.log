@@ -1,0 +1,24 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+not ok - bounded check lost output/status or launched poll sleeps: 0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1

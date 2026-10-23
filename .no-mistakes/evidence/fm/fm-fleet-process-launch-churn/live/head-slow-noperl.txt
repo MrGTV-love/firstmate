@@ -1,0 +1,12 @@
+label=head scenario=slow watcher_pid=75475 noperl=noperl
+startup_dirname_launches_before_check=12
+max_beat_age_during_check_s=2 (grace 6)
+watcher_exited_after_check status=0
+watch.out: check: /Users/charlesabrooker/tmp/fm-lab.RuqepG/state/live.check.sh: live-slow-check-output|
+watcher_child_sleep_launches_during_check_window=0 window_s=15
+watcher_child_perl_launches_during_check_window=0
+sleep_args_from_watcher_in_window: 
+check_output_delivered_in: <lab>/state/.watch-deliveries.log
+check_output_delivered_in: <lab>/state/.wake-queue
+watcher stopped on TERM
+leftover_processes_referencing_lab=0

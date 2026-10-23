@@ -1,0 +1,12 @@
+label=base scenario=descendant watcher_pid=5440 noperl=no
+startup_dirname_launches_before_check=39
+TERM-ignoring descendant 7500 removed
+watcher_exited_after_check status=0
+watch.out: check: /Users/charlesabrooker/tmp/fm-lab.MOdk0i/state/live.check.sh: leader-finished|
+watcher_child_sleep_launches_during_check_window=21 window_s=4
+watcher_child_perl_launches_during_check_window=0
+sleep_args_from_watcher_in_window:   20 0.01;   1 0.1;
+check_output_delivered_in: <lab>/state/.watch-deliveries.log
+check_output_delivered_in: <lab>/state/.wake-queue
+watcher stopped on TERM
+leftover_processes_referencing_lab=0

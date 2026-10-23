@@ -1,0 +1,10 @@
+label=base scenario=deadline watcher_pid=86950 noperl=no
+startup_dirname_launches_before_check=39
+stopped_check_pid=88386 gone after 3s (timeout 3)
+watcher_exited_after_check status=0
+watch.out: check: /Users/charlesabrooker/tmp/fm-lab.WMGehF/state/live.check.sh: must-not-complete|
+watcher_child_sleep_launches_during_check_window=15 window_s=5
+watcher_child_perl_launches_during_check_window=0
+sleep_args_from_watcher_in_window:   15 0.1;
+watcher stopped on TERM
+leftover_processes_referencing_lab=0

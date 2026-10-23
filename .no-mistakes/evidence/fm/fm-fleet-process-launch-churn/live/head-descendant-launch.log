@@ -1,0 +1,15 @@
+1792784118 dirname 13566 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-open-loops.sh
+1792784118 dirname 13559 /Users/charlesabrooker/tmp/fm-lab.F6xNz5/state
+1792784118 dirname 13567 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-home-summary-refresh.sh
+1792784118 dirname 13671 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-home-summary-refresh.sh
+1792784118 dirname 13921 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-fleet-snapshot.sh
+1792784118 dirname 13925 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-fleet-snapshot.sh
+1792784118 dirname 13982 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-ff-lib.sh
+1792784118 dirname 13992 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-ff-lib.sh
+1792784118 dirname 14241 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-contributions.sh
+1792784118 dirname 14256 /Users/charlesabrooker/tmp/fm-lab.F6xNz5/state
+1792784118 dirname 14294 /Users/charlesabrooker/tmp/fm-lab.F6xNz5/state
+1792784118 dirname 14474 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N3HGEA455JY77H4E2GBPD4/bin/fm-home-summary-refresh.sh
+1792784120 perl 13080 -e my ($group, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, -$group); ++$i) { select undef, undef, undef, 0.01 } 14454 20
+1792784121 dirname 16174 /Users/charlesabrooker/tmp/fm-lab.F6xNz5/state
+1792784121 dirname 16194 /Users/charlesabrooker/tmp/fm-lab.F6xNz5/state
