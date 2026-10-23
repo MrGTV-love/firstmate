@@ -3887,6 +3887,7 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 Verified on 2026-10-21 on macOS arm64 (Darwin 27.0.0) through `bin/fm-herdr-lab.sh` in a named non-default lab session.
 Observed on the PATH-selected Homebrew `dsh-tui` 0.16.1 (launcher and installed profile), `dsh` CLI 0.2.1-rc.2, and Node v26.4.0; these release numbers record the measurement, not an admission requirement.
 Fixture: a disposable scratch project and its isolated linked copy, registered only in the guard's private home with local-only delivery and no push.
+Both live guards now read the model under test at run time through `bin/fm-dsh.py preferred-model`, from `.dsh-tui/model.json` in `FM_DSH_OPERATOR_HOME`, else `HOME`, and fail before any lab step when it names no `deepseek-official` model; the model ids in the observed output below record those runs, not a requirement.
 
 ```sh
 FM_DSH_LIVE=1 \
