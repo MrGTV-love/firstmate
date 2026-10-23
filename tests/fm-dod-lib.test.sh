@@ -817,8 +817,11 @@ test_worker_role_names_skill_and_fallback_file() {
   pass "worker role names the skill and its fallback skill file"
 }
 
-# Revert 992ed7d6d removed external-forge delivery; reject it before rendering
-# or publishing instructions rather than promising an unsupported upload path.
+# This fork never had a forge=external implementation in bin/fm-dod-lib.sh.
+# Merges a5f1fa1ef and 9f16517ff imported upstream's external-forge tests
+# without their implementation, and revert 992ed7d6d removed only
+# docs/external-review-forge.md, so an external forge is refused before
+# rendering or publishing instructions.
 test_external_forge_direct_pr_is_refused() {
   local rc=0 out="$TMP_ROOT/external-forge.out" err="$TMP_ROOT/external-forge.err"
   fm_forge_valid_for_mode external direct-PR test >"$out" 2>"$err" || rc=$?
