@@ -738,6 +738,67 @@ test_off_written_while_parked_passes_the_next_attended_close_to_main() {
   pass "host: an off written while the host is parked sends the next attended close to main, naming the opt-out"
 }
 
+# The host has no successor readiness deadline: the arm owns startup no-progress
+# detection. The host runs from a bin whose arm wrapper changes only the
+# successor (the second arm the host starts); every other call is the real arm.
+host_bin_with_successor() {  # <home> <successor commands>
+  local bin="$1/host-bin" f
+  mkdir -p "$bin"
+  for f in "$ROOT"/bin/*; do ln -s "$f" "$bin/${f##*/}"; done
+  rm -f "$bin/fm-watch-arm.sh"
+  cat > "$bin/fm-watch-arm.sh" <<SH
+#!/usr/bin/env bash
+case " \$* " in *' --stop '*|*' --handling-delivered '*) exec "$ROOT/bin/fm-watch-arm.sh" "\$@" ;; esac
+n=\$(( \$(cat "\$FM_HOME/arm-calls" 2>/dev/null || echo 0) + 1 ))
+printf '%s\n' "\$n" > "\$FM_HOME/arm-calls"
+if [ "\$n" -eq 2 ]; then
+  $2
+fi
+exec "$ROOT/bin/fm-watch-arm.sh" "\$@"
+SH
+  chmod +x "$bin/fm-watch-arm.sh"
+  printf '%s\n' "$bin/fm-supervision-host.sh"
+}
+
+# A successor that starts later than the removed 25-second readiness default
+# (its old knob still set to 1 second here) is awaited and left for main.
+test_slow_successor_is_awaited_not_retired() {
+  local home host pid
+  home=$(make_home slow-successor attended)
+  host=$(host_bin_with_successor "$home" 'sleep 3')
+  FM_SUPERVISION_HOST_READY_TIMEOUT=1 HOST="$host" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "slow successor: the host never started a watcher cycle"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 300 host_exited "$home" || fail "slow successor: the decision close did not reach main: $(cat "$home/state/.supervision-host.log")"
+  expect_code 0 "$(cat "$home/host.rc")" "a main-only close must exit 0"
+  [ "$(cat "$home/arm-calls")" = 2 ] || fail "slow successor: the host did not start exactly one successor"
+  assert_no_re 'successor-unverified' "$home/state/.supervision-host.log" "a slow successor must not be reported unverified"
+  watcher_live "$home" || fail "slow successor: the host retired the slow successor: $(cat "$home/state/.supervision-host.log")"
+  pid=$(cat "$home/state/.watch.lock/pid")
+  sleep 1
+  kill -0 "$pid" 2>/dev/null || fail "slow successor: the successor watcher exited after the pass-through (pid $pid)"
+  pass "host: a successor slower than the removed readiness deadline is awaited and left running"
+}
+
+# A successor that reports its own startup failure ends the wait at once, even
+# while that arm process lingers.
+test_failed_successor_fails_fast() {
+  local home host started elapsed
+  home=$(make_home failed-successor attended)
+  host=$(host_bin_with_successor "$home" "printf 'watcher: FAILED - fixture startup failure\\n'; sleep 30; exit 1")
+  HOST="$host" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "failed successor: the host never started a watcher cycle"
+  started=$SECONDS
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 150 host_exited "$home" || fail "failed successor: the host waited on a failed successor: $(cat "$home/state/.supervision-host.log")"
+  elapsed=$((SECONDS - started))
+  [ "$elapsed" -lt 15 ] || fail "failed successor: the host took ${elapsed}s to see the reported failure"
+  expect_code 0 "$(cat "$home/host.rc")" "a main-only close must exit 0"
+  assert_re 'pass-through	successor-unverified' "$home/state/.supervision-host.log" "a failed successor must be reported unverified"
+  assert_re '^signal: .*demo.status' "$home/host.out" "the close must still reach main"
+  pass "host: a successor that reports failure ends the readiness wait at once"
+}
+
 # The live failure this guards: a main-only pass-through used to exit without
 # a watcher, so nothing restarted short-lived listeners until the session
 # armed again. The close still reaches main unchanged, and the successor
@@ -2131,6 +2192,8 @@ run_host_case test_quiet_record_without_its_daemon_is_a_present_captain
 run_host_case test_attended_main_only_close_passes_straight_to_main
 run_host_case test_off_written_while_parked_passes_the_next_attended_close_to_main
 run_host_case test_main_only_pass_through_leaves_the_successor_watcher_running
+run_host_case test_slow_successor_is_awaited_not_retired
+run_host_case test_failed_successor_fails_fast
 run_host_case test_attended_close_with_unidentified_main_session_passes_to_main
 run_host_case test_close_accepted_away_that_turns_attended_passes_to_main
 run_host_case test_attended_close_that_turns_main_only_before_its_turn_passes_to_main

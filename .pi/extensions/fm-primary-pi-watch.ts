@@ -169,13 +169,6 @@ const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(exte
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
 const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
-// 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
-// bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
-// SIGTERMed mid-confirmation. Conditioned on win32 so other platforms keep 12s.
-const armReadyTimeoutMs = positiveInteger(
-  "FM_PI_ARM_READY_TIMEOUT_MS",
-  process.platform === "win32" ? 35000 : 12000,
-);
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const successorGraceMs = positiveInteger("FM_PI_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy";
@@ -1081,22 +1074,9 @@ export default function (pi: ExtensionAPI) {
   function waitForReadiness(armChild: ChildProcess): Promise<boolean> {
     const readiness = armReadiness.get(armChild);
     if (!readiness) return Promise.resolve(false);
-    return new Promise((resolveReady) => {
-      const timer = setLifecycleDeadline(() => {
-        lifecycle("bound-expired", {
-          waiter: "pi-watch-extension",
-          "waited-on": "arm-readiness",
-          bound: `${armReadyTimeoutMs}ms`,
-          actual: `${timer.elapsedMs()}ms`,
-        });
-        resolveReady(false);
-      }, armReadyTimeoutMs);
-      timer.unref();
-      void readiness.then((ready) => {
-        timer.cancel();
-        resolveReady(ready);
-      });
-    });
+    // The arm owns startup progress/death detection and reports its own
+    // result, so no wall-clock deadline here retires a productive child.
+    return readiness;
   }
 
   async function retireArm(armChild: ChildProcess | null): Promise<boolean> {
@@ -1139,7 +1119,7 @@ export default function (pi: ExtensionAPI) {
         return { failure: "", recovery: armRecovery.get(successorChild) };
       }
       if (replacement.ok) {
-        appendExtensionLog(`restore attempt=${attempt} readiness=timeout pid=${successorChild?.pid ?? "none"}`);
+        appendExtensionLog(`restore attempt=${attempt} readiness=failed pid=${successorChild?.pid ?? "none"}`);
         failure = "watcher: FAILED - Pi extension could not verify a ready successor watcher";
         if (!(await retireArm(successorChild))) {
           return {
@@ -1248,6 +1228,8 @@ export default function (pi: ExtensionAPI) {
       if (recovery) armRecovery.set(armChild, { watcherPid: recovery[1], generation: recovery[2] });
       if (/^watcher: (?:started|attached)\b/m.test(combined)) {
         settleReadiness(true);
+      } else if (/^watcher: FAILED\b/m.test(combined)) {
+        settleReadiness(false);
       }
       const reason = completedActionableLine(stdout) || completedActionableLine(stderr);
       if (reason && !armPendingActionable.has(armChild)) {

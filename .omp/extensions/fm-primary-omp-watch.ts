@@ -33,9 +33,9 @@
 //     the close is injected. Every other host close is a queue-read mark under
 //     docs/watcher-continuity.md#omp-stale-wake-gating. The host
 //     prints the first cycle's status line as soon as it is verified, so
-//     readiness and the handling handoff work as they do for the arm, with a
-//     longer readiness budget for the host's own startup. On a home that does
-//     not run the host nothing below changes.
+//     readiness and the handling handoff work as they do for the arm, with no
+//     readiness deadline for either. On a home that does not run the host
+//     nothing below changes.
 //
 // Session-generation ownership (stated once here):
 // Current task-session proof handles switch events separately in

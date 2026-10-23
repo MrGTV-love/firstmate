@@ -12,15 +12,10 @@ import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.js";
 // wake line, and the delivered message carries every such line in order while
 // wake lines keep an eight-line cap. The host prints the first cycle's status
 // line as soon as it is verified, so readiness and the handling handoff work
-// as they do for the arm, with a longer readiness budget for the host's own
-// startup. On a home that does not run the host nothing below changes.
+// as they do for the arm. Neither has a readiness deadline: the arm owns
+// startup no-progress detection and reports its own result. On a home that
+// does not run the host nothing below changes.
 const COORDINATOR_KEY = "__firstmateOpenCodeWatchArm";
-// 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
-// bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
-// SIGTERMed mid-confirmation. Conditioned on win32 so other platforms keep 12s.
-const ARM_READY_TIMEOUT_DEFAULT_MS = process.platform === "win32" ? 35000 : 12000;
-const ARM_READY_TIMEOUT_MS = positiveInteger("FM_OPENCODE_ARM_READY_TIMEOUT_MS", ARM_READY_TIMEOUT_DEFAULT_MS);
-const HOST_READY_TIMEOUT_MS = Math.max(ARM_READY_TIMEOUT_MS, 30000);
 const WAKE_LINE = /^(signal:|stale:|check:|heartbeat($|:))/;
 const HOST_LINE = /^supervision-host:/;
 const ARM_RETIRE_TIMEOUT_MS = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
@@ -37,7 +32,6 @@ let restorationInFlight = null;
 let armClose = new WeakMap();
 let armReadiness = new WeakMap();
 let armRecovery = new WeakMap();
-let armHostMode = new WeakMap();
 
 function positiveInteger(name, fallback) {
   const value = Number(process.env[name]);
@@ -50,17 +44,7 @@ function setArmStatus(status) {
 }
 
 function waitForArmReady(armChild) {
-  const readiness = armReadiness.get(armChild);
-  if (!readiness) return Promise.resolve("failed");
-  const timeout = armHostMode.get(armChild) ? HOST_READY_TIMEOUT_MS : ARM_READY_TIMEOUT_MS;
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve("timeout"), timeout);
-    timer.unref();
-    void readiness.then((status) => {
-      clearTimeout(timer);
-      resolve(status);
-    });
-  });
+  return armReadiness.get(armChild) ?? Promise.resolve("failed");
 }
 
 function runProcess(command, args, options = {}) {
@@ -430,7 +414,6 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  armHostMode.set(armChild, hostMode);
   child = armChild;
   let stdout = "";
   let stderr = "";

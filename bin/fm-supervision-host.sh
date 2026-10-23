@@ -162,8 +162,9 @@
 # registration lets turns run past the boundary up to it, any other value is
 # the boundary), FM_SUPERVISION_HOST_TURN_TIMEOUT (1200), FM_SUPERVISION_HOST_ROTATE_TURNS (20:
 # a new engine conversation after this many turns; every main session start
-# also opens a new one), FM_SUPERVISION_HOST_READY_TIMEOUT (25: how long a
-# successor cycle may take to verify), FM_SUPERVISION_HOST_POLL (1).
+# also opens a new one), FM_SUPERVISION_HOST_POLL (1). A successor cycle has
+# no readiness deadline: the arm owns startup no-progress detection and reports
+# started, attached or FAILED itself.
 # Park duration uses Bash's process-relative SECONDS counter (including Bash
 # 3.2), while durable timestamps still use epoch time. This is not a portable
 # monotonic-clock guarantee. Arm exit probes use ordinary 0.5-second child
@@ -217,7 +218,6 @@ PARK_LIMIT=$(numeric_or "${FM_SUPERVISION_HOST_PARK_LIMIT:-}" "$PARK_SECONDS")
 { [ "$PARK_LIMIT" -lt 28800 ] && [ "$PARK_LIMIT" -ge "$PARK_SECONDS" ]; } 2>/dev/null || PARK_LIMIT=$PARK_SECONDS
 TURN_TIMEOUT=$(numeric_or "${FM_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200)
 ROTATE_TURNS=$(numeric_or "${FM_SUPERVISION_HOST_ROTATE_TURNS:-}" 20)
-READY_TIMEOUT=$(numeric_or "${FM_SUPERVISION_HOST_READY_TIMEOUT:-}" 25)
 POLL=$(numeric_or "${FM_SUPERVISION_HOST_POLL:-}" 1)
 COOLDOWN=$FM_SUPERVISION_HOST_COOLDOWN
 COOLDOWN_MAX=3600
@@ -650,16 +650,16 @@ stand_down() {  # <why>
   exit 0
 }
 
-# Start the successor cycle and wait until it proves a live watcher. Sets
-# SUCCESSOR_WATCHER and SUCCESSOR_GENERATION (empty when the arm attached).
+# Start the successor cycle and wait until it proves a live watcher or reports
+# its own failure. Sets SUCCESSOR_WATCHER and SUCCESSOR_GENERATION (empty when
+# the arm attached).
 start_successor() {  # <predecessor-arm-pid>
-  local deadline line
+  local line
   SUCCESSOR_WATCHER=
   SUCCESSOR_GENERATION=
   start_arm "$1" || return 1
   SUCCESSOR_PID=$STARTED_ARM_PID
   SUCCESSOR_OUT=$STARTED_ARM_OUT
-  deadline=$(( $(date +%s) + READY_TIMEOUT ))
   while :; do
     line=$(grep -E '^watcher: (started|attached) pid=[0-9]+' "$SUCCESSOR_OUT" 2>/dev/null | head -n 1)
     if [ -n "$line" ]; then
@@ -671,7 +671,7 @@ start_successor() {  # <predecessor-arm-pid>
       return 0
     fi
     fm_pid_alive "$SUCCESSOR_PID" || return 1
-    [ "$(date +%s)" -lt "$deadline" ] || return 1
+    ! grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null || return 1
     sleep 0.2
   done
 }

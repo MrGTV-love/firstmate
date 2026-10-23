@@ -90,7 +90,7 @@ These logs are evidence, not proof of a healthy arm or permission to use a retir
 `tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, repeated binding predecessor release, and owner-marker publication failures.
 `tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, and wake delivery after recovery.
 Both suites use `tests/watch-lifecycle-expiry.mjs` for explicit shutdown child-close expiry evidence and deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
-Pi also exercises its remaining successor-readiness and unready-arm retirement expiries; `tests/fm-work-progress.test.sh` instead proves that a slow omp successor remains alive until readiness.
+Pi also exercises its unready-arm retirement expiry for a successor that reported failure but does not exit; `tests/fm-work-progress.test.sh` proves that a slow omp successor remains alive until readiness, and `tests/fm-pi-watch-extension.test.sh` and `tests/fm-supervision-host.test.sh` prove the same for Pi, OpenCode and the supervision host.
 
 ### omp stale wake gating
 
@@ -235,19 +235,20 @@ A failed confirmation is a restoration failure: the adapter classifies the error
 Pi retires the current successor only when the failed token names its exact watcher pid and generation and that pid is no longer alive, while omp and OpenCode retire the current successor whenever the restoration's watcher pid is no longer alive.
 On Pi a generation mismatch means a newer pipeline superseded this delivery mid-restore, so the wake routes like a confirmed delivery, with no failure appendix, and nothing is retired.
 An already-acknowledged episode confirms as a no-op when the confirmation names its generation, because the drain acknowledged it after the successor started but before the confirmation ran.
-The Pi extension diagnostic log is opt-in and off by default: only a positive FM_WATCH_EXTENSION_LOG_KEEP_LINES value appends restore attempts, readiness timeouts, and confirmation targets and results to state/.watch-extension.log, a bounded record that never changes supervision behavior.
+The Pi extension diagnostic log is opt-in and off by default: only a positive FM_WATCH_EXTENSION_LOG_KEEP_LINES value appends restore attempts, readiness failures, and confirmation targets and results to state/.watch-extension.log, a bounded record that never changes supervision behavior.
 docs/configuration.md owns the knob's default and accepted values.
 A failed confirmation is never swallowed.
 
-### Readiness timeout and retry
+### Readiness and retry
 
-omp waits for the successor's readiness or actual failure, with startup no-progress detection owned by `bin/fm-watch-arm.sh`; it has no separate arm or host readiness clock that can terminate productive work.
-Its separate idle queue-read deadline remains fixed at 10000ms.
-Pi and OpenCode retain their adapter-owned readiness timeout per attempt, followed by TERM and a bounded retirement confirmation before the next lock-verified exponential retry.
+Pi, omp, OpenCode and the supervision host wait for the successor's own result (started or attached; OpenCode also healthy or a wake) or its actual failure: a `watcher: FAILED` line or the arm's exit.
+Startup no-progress detection is owned by `bin/fm-watch-arm.sh`, so no adapter or host has a readiness clock that can terminate productive work.
+omp's separate idle queue-read deadline remains fixed at 10000ms.
+A successor that reported failure gets TERM and a bounded retirement confirmation before the next lock-verified exponential retry.
 
-If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds watcher work until idle and reads current main-owned queued rows before delivery.
+If that failed arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds watcher work until idle and reads current main-owned queued rows before delivery.
 When that retained arm later closes, its actual close is classified as a new supervised event without replaying the earlier fallback.
-After the configured retry bound is exhausted, Pi and OpenCode deliver the original wake with a typed continuity-restoration failure, even if every successor arm hung without reporting readiness.
+After the configured retry bound is exhausted, Pi and OpenCode deliver the original wake with a typed continuity-restoration failure.
 omp surfaces that failure separately from watcher work, which still follows its [queue-read delivery boundary](#omp-stale-wake-gating).
 
 This is deliberate Option B ordering.
