@@ -1,0 +1,12 @@
+### Scenario B: gates + within-family Pareto prune before Jev; Jev sees only survivors
+picker request questions: ['complexity', 'work_type']
+picker request questions: ['effort', 'validator', 'worker']
+  worker options : {'candidate_3': 'claude:opus (anthropic, subscription). demanded-mix fit 58.8', 'candidate_5': 'omp:openai-codex/gpt-6.1-sol (openai, subscription). demande'}
+  state.candidates routes: ['claude:opus', 'omp:openai-codex/gpt-6.1-sol']
+  validator options: ['candidate_1', 'candidate_2', 'candidate_3', 'candidate_4', 'candidate_5']
+  one candidate summary: claude:opus (anthropic, subscription). demanded-mix fit 58.81/100; AA-Briefcase raw 1687.39 elo -> fit 59.37 (version 1.1); SciCode raw 0.604166666666667 fraction -> fit 60.42 (version unknown); Terminal-Bench 4.0 raw 0.565656565656566 fraction -> fit 56.57 (version unknown); quota spendPriority 0.8, headroom 80%, runway through_reset, capacity usable; snapshot age 610054 s
+
+### Scenario J: key never leaves on argv / store; only in Authorization header
+key in aa.sqlite: 0 matches
+key inside any request body: False
+auth header prefixes seen: ['Bearer CANAR']

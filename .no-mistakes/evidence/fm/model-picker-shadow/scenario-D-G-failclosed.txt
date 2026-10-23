@@ -1,0 +1,25 @@
+columns: id|picker_status|chosen_worker|chosen_validator|rule_worker|work_type|snapshot_stale|reject_reason
+### Scenario D: picker Jev returns HTTP 500
+resolver exit=0; stdout same as flag-off: yes; picker calls=1
+8|picker-error|||omp:openai-codex/gpt-6.1-sol|||Jev HTTP 500
+
+### Scenario E: verdict.json says UNTRUSTED
+resolver exit=0; stdout same: yes; picker calls=0
+9|no-trusted-snapshot|||omp:openai-codex/gpt-6.1-sol|||verdict.json does not say TRUSTED
+### Scenario E2: verdict.json is a symlink to a TRUSTED file
+resolver exit=0; picker calls=0
+10|no-trusted-snapshot|||omp:openai-codex/gpt-6.1-sol|||verdict.json is not a readable regular file in the data root
+### Scenario E3: verdict.json missing
+resolver exit=0; picker calls=0
+11|no-trusted-snapshot|||omp:openai-codex/gpt-6.1-sol|||verdict.json is missing
+
+### Scenario F: projection identity mismatch (Opus projection creator changed) -> route quarantined as UNKNOWN, kept
+resolver exit=0; stdout same: yes
+12|accepted|omp:openai-codex/gpt-6.1-sol|claude:claude-haiku-5-5|omp:openai-codex/gpt-6.1-sol|Feature / capability|0|
+opus offered as worker? True
+gate pruned: [('claude:claude-haiku-5-5', ['fit 46.96 below the uncalibrated seed policy fit floor 48.14']), ('omp:openai-codex/gpt-6-luna', ['fit 21.77 below the uncalibrated seed policy fit floor 48.14'])]
+
+### Scenario G: flag values live / 0 / garbage
+FM_MODEL_PICKER_SHADOW=live: exit=0 stdout same: yes new rows=0 picker calls=0 stderr: model-picker-shadow: FM_MODEL_PICKER_SHADOW cannot enable live mode; shadow stays off
+FM_MODEL_PICKER_SHADOW=0: exit=0 stdout same: yes new rows=0 picker calls=0 stderr: (none)
+FM_MODEL_PICKER_SHADOW=banana: exit=0 stdout same: yes new rows=0 picker calls=0 stderr: model-picker-shadow: unrecognized FM_MODEL_PICKER_SHADOW value; shadow stays off

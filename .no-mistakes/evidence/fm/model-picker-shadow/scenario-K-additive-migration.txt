@@ -1,0 +1,7 @@
+### Scenario K: an existing Phase-1 aa.sqlite (old schema, one prior row, one outcome) gets the additive migration
+before: columns = 22  rows = 1
+resolver exit=0
+after: columns = 33 ; new: ['policy_version', 'task_key', 'work_type_confidence', 'complexity_components', 'complexity_confidence', 'confidence_band', 'snapshot_stale', 'classification_uncertain', 'picker_status', 'reject_reason', 'jev_raw_support']
+ row (1, 'Phase-1 row', 'claude:opus', 'accepted', None)
+ row (2, 'Feature / capability', 'claude:opus', None, 'accepted')
+ outcomes: [(1, 0.9, None, None, 1, None)]

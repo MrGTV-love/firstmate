@@ -1,0 +1,45 @@
+### Scenario L1: --report on the log the resolver runs above wrote
+--- what the rows are (id|picker_status|work_type|rule_worker|chosen_worker|rule_effort|effort|rule_validator|chosen_validator) ---
+1|accepted|Feature / capability|omp:openai-codex/gpt-6.1-sol|claude:opus|high|high||omp:openai-codex/gpt-6.1-sol
+2|rejected|Feature / capability|omp:openai-codex/gpt-6.1-sol||high|||
+3|rejected|Feature / capability|omp:openai-codex/gpt-6.1-sol||high|||
+4|accepted|Feature / capability|omp:openai-codex/gpt-6.1-sol|claude:opus|high|high||omp:openai-codex/gpt-6.1-sol
+5|invalid-response|Feature / capability|omp:openai-codex/gpt-6.1-sol||high|||
+6|invalid-response|NULL|omp:openai-codex/gpt-6.1-sol||high|||
+7|rejected|Feature / capability|omp:openai-codex/gpt-6.1-sol||high|||
+8|picker-error|NULL|omp:openai-codex/gpt-6.1-sol||high|||
+9|no-trusted-snapshot|NULL|omp:openai-codex/gpt-6.1-sol||high|||
+10|no-trusted-snapshot|NULL|omp:openai-codex/gpt-6.1-sol||high|||
+11|no-trusted-snapshot|NULL|omp:openai-codex/gpt-6.1-sol||high|||
+12|accepted|Feature / capability|omp:openai-codex/gpt-6.1-sol|omp:openai-codex/gpt-6.1-sol|high|high||claude:claude-haiku-5-5
+13|accepted|Feature / capability|omp:openai-codex/gpt-6.1-sol|omp:openai-codex/gpt-6.1-sol|high|high||claude:claude-haiku-5-5
+14|picker-error|NULL|omp:openai-codex/gpt-6.1-sol||high|||
+15|withheld|NULL||||||
+16|resolver-error|NULL||||||
+17|picker-error|NULL|omp:openai-codex/gpt-6.1-sol||high|||
+18|picker-error|Feature / capability|omp:openai-codex/gpt-6.1-sol||high|||
+--- report ---
+Shadow disagreement report - routing evidence, not outcome labels.
+These rows show what the picker would have chosen; they cannot show how an unrun pick would have performed.
+work_type                           runs  rule noRte noPick  wDen wDiff  vDen vDiff  eDen eDiff dispatch   ask escal stale
+Feature / capability                   9     9     0      5     4     2     0     0     4     0        7     0     0     0
+unclassified                           9     7     2      9     0     0     0     0     0     0        0     0     0     0
+Denominators: worker disagreement over 4 rows where both the rule and the picker named a worker; validator disagreement over 0 rows where both named a validator; effort disagreement over 4 rows where both named an effort. 14 rows have no picker pick; 2 rows have no rule route.
+Bands: dispatch=7 ask=0 escalate=0 unknown=11; stale snapshots=0; none-fit=0; rejected picks=3.
+exit=0
+
+### Scenario L2: --report on an empty data root
+0 shadow dispatches logged
+exit=0
+
+### Scenario L3: --report when every shadow row is a picker failure that still has a rule route
+1|no-trusted-snapshot|omp:openai-codex/gpt-6.1-sol|
+2|no-trusted-snapshot|omp:openai-codex/gpt-6.1-sol|
+3|no-trusted-snapshot|omp:openai-codex/gpt-6.1-sol|
+Shadow disagreement report - routing evidence, not outcome labels.
+These rows show what the picker would have chosen; they cannot show how an unrun pick would have performed.
+work_type                           runs  rule noRte noPick  wDen wDiff  vDen vDiff  eDen eDiff dispatch   ask escal stale
+unclassified                           3     3     0      3     0     0     0     0     0     0        0     0     0     0
+Denominators: worker disagreement over 0 rows where both the rule and the picker named a worker; validator disagreement over 0 rows where both named a validator; effort disagreement over 0 rows where both named an effort. 3 rows have no picker pick; 0 rows have no rule route.
+Bands: dispatch=0 ask=0 escalate=0 unknown=3; stale snapshots=0; none-fit=0; rejected picks=0.
+exit=0

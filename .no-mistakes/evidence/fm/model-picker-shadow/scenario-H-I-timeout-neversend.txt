@@ -1,0 +1,28 @@
+columns: id|picker_status|chosen_worker|rule_worker|work_type|classification_uncertain|reject_reason
+### Scenario H: picker Jev stalls 30 s per call; the resolver stays bounded
+resolver exit=0; total wall time=5.9s (flag-off run took ~0.6s; hard bound 20s); stdout same: yes; picker calls=1
+14|picker-error||omp:openai-codex/gpt-6.1-sol|||Jev HTTP 000
+
+### Scenario I: home never-send policy matches a literal in the brief
+resolver exit=0; requests sent (any)=0
+resolver stderr: dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-shadow-live.lS7IPX/home/config/dispatch-never-send line 1; nothing sent)
+resolver stdout: 
+15|withheld|||||brief text matches /Users/charlesabrooker/tmp/fm-shadow-live.lS7IPX/home/config/dispatch-never-send line 1
+### Scenario I2: never-send literal appears only in picker requests ("Terminal-Bench", a benchmark name only the picker sends)
+resolver exit=0; stdout same as flag-off: NO
+requests that reached the provider: []
+any request body containing Terminal-Bench: 0
+columns: id|picker_status|chosen_worker|rule_worker|work_type|reject_reason
+16|resolver-error||||Level 5 API request failed
+### Scenarios H and I2, re-run with a threaded fake Jev server.
+### (The first I2 run failed only because the old single-thread fake server was still busy with the stalled 30 s call from H. That was a test-setup fault.)
+columns: id|picker_status|chosen_worker|rule_worker|work_type|classification_uncertain|reject_reason
+### Scenario H (re-run): picker Jev stalls 30 s per call; the resolver stays bounded
+resolver exit=0; total wall time=5.8s (hard bound 20s); stdout same as flag-off: yes; picker calls=1
+17|picker-error||omp:openai-codex/gpt-6.1-sol|||Jev HTTP 000
+
+### Scenario I2 (re-run): never-send literal appears only in picker requests ("Terminal-Bench")
+resolver exit=0; stdout same as flag-off: yes
+requests that reached the provider: [('resolver', ['rule', 'profile', 'ambiguity', 'needs_desktop', 'model', 'effort']), ('picker', ['complexity', 'work_type'])]
+request bodies containing Terminal-Bench: 0
+18|picker-error||omp:openai-codex/gpt-6.1-sol|Feature / capability|0|request withheld by the never-send policy: brief text matches /Users/charlesabrooker/tmp/fm-shadow-live.lS7IPX/home/config/dispatch-never-send line 1

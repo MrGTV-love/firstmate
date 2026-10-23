@@ -1,0 +1,18 @@
+### Scenario M: --check-routes over the lab rules
+route                              family     currency      projection                         asserted
+claude:claude-haiku-5-5            anthropic  subscription  claude-haiku-5-5                   yes
+claude:claude-sonnet-5-5[1m]       anthropic  subscription  claude-sonnet-5-5-high             yes
+claude:opus                        anthropic  subscription  claude-opus-5-5-high               yes
+omp:openai-codex/gpt-6-luna        openai     subscription  gpt-6-luna-low                     yes
+omp:openai-codex/gpt-6.1-sol       openai     subscription  gpt-6-1-sol-high                   yes
+exit=0
+--- with the Opus projection removed ---
+route                              family     currency      projection                         asserted
+claude:claude-haiku-5-5            anthropic  subscription  claude-haiku-5-5                   yes
+claude:claude-sonnet-5-5[1m]       anthropic  subscription  claude-sonnet-5-5-high             yes
+claude:opus                        anthropic  subscription  claude-opus-5-5-high               REFUSED: projection claude-opus-5-5-high is missing or not a regular file
+omp:openai-codex/gpt-6-luna        openai     subscription  gpt-6-luna-low                     yes
+omp:openai-codex/gpt-6.1-sol       openai     subscription  gpt-6-1-sol-high                   yes
+exit=1
+--- --observe with the flag unset: no store, no output ---
+exit=0 files in data root: 0

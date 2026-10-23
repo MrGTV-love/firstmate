@@ -1,0 +1,115 @@
+### Scenario A: same resolve, FM_MODEL_PICKER_SHADOW unset vs =1
+flag off: exit=0 elapsed=0.6s  aa.sqlite exists? no  picker calls=0
+--- resolver stdout (flag off) ---
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 12   tokens: 100/20
+  rule: rule_3 (Non-Vernant ship task that is well understood.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 rule_4=0 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":0,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0}
+  note: rule matched
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.8  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom"]  -> eligible
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={"status":"usable","accounts":[{"status":"usable","headroomKnown":true,"remaining":90,"savedResets":0}],"bestAccountHeadroom":90}  quota_score=0.9000000000000001  parts={"headroom":0.9,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=["headroom"]  -> eligible, quota-scored; economic rank unknown: OMP pooled Codex capacity usable; no pool spendPriority
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+  timings: api_ms=12 quota_ms=13 local_ms=466 total_ms=491
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+flag on: exit=0 elapsed=0.8s  picker calls=2  resolver calls=1
+--- diff of stdout off vs on (timings/usage/model lines stripped) ---
+IDENTICAL
+--- stderr on ---
+--- the shadow row ---
+{
+ "at": "2026-10-23T04:26:07Z",
+ "captain_acceptance": null,
+ "chosen_validator": "omp:openai-codex/gpt-6.1-sol",
+ "chosen_worker": "claude:opus",
+ "classification_uncertain": 0,
+ "complexity_components": {
+  "classification_confidence": 0.9,
+  "classification_score": 3,
+  "decomposability": 1.0,
+  "horizon": 0.5,
+  "model_perceived": 0.6,
+  "paths": 1,
+  "steps": 0,
+  "structural": 0.13,
+  "subsystems": [
+   "bin"
+  ],
+  "task_horizon_minutes": 240
+ },
+ "complexity_confidence": 0.9,
+ "complexity_score": 0.507,
+ "confidence_band": "dispatch",
+ "effort": "high",
+ "gates": {
+  "classification": {
+   "confidence": 0.9,
+   "uncertain": false,
+   "work_type": "Feature / capability"
+  },
+  "currency_trials": [],
+  "floor": 50.14,
+  "policy_version": "2026-10-19.1",
+  "pruned": [
+   {
+    "reasons": [
+     "fit 46.96 below the uncalibrated seed policy fit floor 50.14"
+    ],
+    "route": "claude:claude-haiku-5-5"
+   },
+   {
+    "reasons": [
+     "fit 21.77 below the uncalibrated seed policy fit floor 50.14"
+    ],
+    "route": "omp:openai-codex/gpt-6-luna"
+   }
+  ],
+  "recheck": {
+   "accepted": true,
+   "effort": "high",
+   "problems": [],
+   "validator": "candidate_5",
+   "worker": "candidate_3"
+  },
+  "seed_label": "uncalibrated seed policy",
+  "stale": false,
+  "table_version": "2026-10-19.1",
+  "tradeoffs": [],
+  "validator_reason": null,
+  "version_conflicts": []
+ },
+ "id": 1,
+ "jev_candidate_version": "jev-1.13.0",
+ "jev_raw_payload": "<625 bytes> {\"model\": \"jev-1.13.0\", \"answers\": {\"effort\": {\"type\": \"score\", \"score\": 2, \"con...",
+ "jev_raw_support": "<1013 bytes> [\"{\\\"model\\\": \\\"jev-1.13.0\\\", \\\"answers\\\": {\\\"complexity\\\": {\\\"type\\\": \\\"score\\\"...",
+ "mode": "shadow",
+ "pareto_pruned": [
+  {
+   "dominated_by": [
+    "claude:opus"
+   ],
+   "reason": "strict Pareto dominance within anthropic / subscription",
+   "route": "claude:claude-sonnet-5-5[1m]"
+  }
+ ],
+ "picker_status": "accepted",
+ "policy_version": "2026-10-19.1",
+ "reject_reason": null,
+ "rework": null,
+ "rule_effort": "high",
+ "rule_validator": null,
+ "rule_worker": "omp:openai-codex/gpt-6.1-sol",
+ "snapshot_age": 610061.845140934,
+ "snapshot_stale": 0,
+ "spend_priority": {
+  "claude:opus": 0.8
+ },
+ "task_key": "fm-shadow-live.lS7IPX",
+ "task_type": null,
+ "validator_disagreement": null,
+ "validator_verdict": null,
+ "work_type": "Feature / capability",
+ "work_type_confidence": 0.9
+}
+outcomes rows: 0

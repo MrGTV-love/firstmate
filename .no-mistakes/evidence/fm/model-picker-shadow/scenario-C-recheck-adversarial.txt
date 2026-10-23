@@ -1,0 +1,27 @@
+columns: id|picker_status|chosen_worker|chosen_validator|effort|rule_worker|rule_effort|reject_reason
+### Scenario C1: Jev answers a Pareto-pruned worker (candidate_1 = claude-haiku-5-5, gate-pruned), not offered
+resolver exit=0; stdout same as flag-off: yes
+2|rejected||||omp:openai-codex/gpt-6.1-sol|high|worker claude:claude-haiku-5-5 is outside the survivor list (pruned); worker claude:claude-haiku-5-5 is below the fit floor on re-check; worker claude:claude-haiku-5-5 is not a survivor of the authoritative mix
+recheck: {"accepted": false, "effort": "high", "problems": ["worker claude:claude-haiku-5-5 is outside the survivor list (pruned)", "worker claude:claude-haiku-5-5 is below the fit floor on re-check", "worker claude:claude-haiku-5-5 is not a survivor of the authoritative mix"], "validator": "candidate_5", "worker": "candidate_1"}
+
+### Scenario C2: Jev answers a gate-pruned worker (candidate_4 = gpt-6-luna, below fit floor)
+resolver exit=0; stdout same: yes
+3|rejected||||omp:openai-codex/gpt-6.1-sol|high|worker omp:openai-codex/gpt-6-luna is outside the survivor list (pruned); worker omp:openai-codex/gpt-6-luna is below the fit floor on re-check; worker omp:openai-codex/gpt-6-luna is not a survivor of the authoritative mix
+
+### Scenario C3: Jev answers a same-family validator (opus worker + haiku validator) -> one cross-family fallback call
+resolver exit=0; picker calls=3
+fallback validator options: ['omp:openai-codex/gpt-6-luna', 'omp:openai-codex/gpt-6.1-sol']
+4|accepted|claude:opus|omp:openai-codex/gpt-6.1-sol|high|omp:openai-codex/gpt-6.1-sol|high|
+validator_reason: None
+
+### Scenario C4: Jev effort Score out of range (score 9 on a 0..4 scale)
+resolver exit=0; stdout same: yes
+5|invalid-response||||omp:openai-codex/gpt-6.1-sol|high|malformed Jev payload: effort score 9 is outside 0..4
+
+### Scenario C5: malformed Jev body on picker calls
+resolver exit=0; stdout same: yes
+6|invalid-response||||omp:openai-codex/gpt-6.1-sol|high|malformed Jev payload: no answers object
+raw body retained: 28B / 0B support
+### Scenario C1b: Jev answers the Pareto-pruned worker (candidate_2 = Sonnet, dominated by Opus within anthropic/subscription)
+resolver exit=0; stdout same as flag-off: yes
+7|rejected||||omp:openai-codex/gpt-6.1-sol|high|worker claude:claude-sonnet-5-5[1m] is outside the survivor list (pruned); worker claude:claude-sonnet-5-5[1m] is not a survivor of the authoritative mix
