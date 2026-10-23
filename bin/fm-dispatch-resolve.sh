@@ -105,7 +105,10 @@
 #   log") owns the fields and the block-rate measurement.
 #
 # Environment:
-#   TYPESAFE_API_KEY is the only resolver-specific environment setting.
+#   TYPESAFE_API_KEY is the only setting that changes resolution.
+#   FM_MODEL_PICKER_SHADOW, when on, runs the observe-only shadow picker after
+#   the result is printed; it never changes the status, output or exit code
+#   (docs/configuration.md "Shadow model picker (FM_MODEL_PICKER_SHADOW)").
 #
 # Authority: this tool never replaces firstmate's judgment, quota-array-dispatch,
 #   the captain-approval gate, or fm-spawn.sh validation; it publishes one
