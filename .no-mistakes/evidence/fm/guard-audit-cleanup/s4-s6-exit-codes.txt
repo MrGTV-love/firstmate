@@ -1,0 +1,13 @@
+# S4a clean fixture root + out-of-tree registry
+exit=0
+# S4b owner file removed from fixture root
+exit=1
+# S4c missing registry path
+exit=1
+# S5 default invocation (this repo, its one registry)
+INFO inventory: active=28 retired=1 beyond_audit=0 excluded=1 unregistered=0 audited=30
+LINT_SUMMARY mode=enforce guards=28 violations=0 allowlisted=0 stale=0 shown=0
+exit=0
+# S6 refcheck on this repo
+REFCHECK_SUMMARY registrations=52 paths=109 missing=0 registry_missing=0 retired=1 resurrected=0
+exit=0

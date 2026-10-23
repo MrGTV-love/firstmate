@@ -1,0 +1,6 @@
+ok - report mode prints a violation and exits 0
+ok - new-or-touched ignores an unchanged offending guard
+ok - new-or-touched fails for a touched guard
+ok - a malformed registry fails
+ok - fm-guard-lint
+exit=0

@@ -1,0 +1,9 @@
+# BASE b76299e6, FM_VERNANT_ROOT unset
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+skip: FM_VERNANT_ROOT unset, cross-repo closure check not run
+ok - fm-guard-audit-closure
+# BASE b76299e6, FM_VERNANT_ROOT=<empty dir>
+VIOLATION R7 code-review-required: retirement test tests/hooks/test_retired_code_review_required.py does not exist
+VIOLATION R7 set-required: retirement test tests/hooks/test_retired_set_required.py does not exist
+LINT_SUMMARY mode=enforce guards=8 violations=28 allowlisted=0 stale=0 shown=28
+exit=

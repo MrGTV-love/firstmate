@@ -1,0 +1,6 @@
+$ ls docs/guards
+lint-allowlist.json
+registry.json
+retired.json
+$ git grep -nE "(registry|retired|lint-allowlist)-vernant|FM_VERNANT_ROOT|G-25"
+matches_exit=1 (1 = none)

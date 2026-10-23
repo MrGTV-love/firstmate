@@ -1,0 +1,16 @@
+# S4a: lint a registry outside the tree against a fixture root (copy of HEAD)
+$ bin/fm-guard-lint.sh --root <fixture> --mode enforce --counts --registry <tmp>/reg.json --allowlist <tmp>/allow.json --retired <tmp>/ret.json
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=28 retired=1 beyond_audit=0 excluded=1 unregistered=0 audited=30
+LINT_SUMMARY mode=enforce guards=28 violations=0 allowlisted=0 stale=0 shown=0
+exit=
+
+# S4b: adversarial - delete one owner file (bin/fm-turnend-guard.sh) in the fixture root, same registry
+VIOLATION R7 turnend-supervision-block: nonexistent owner file bin/fm-turnend-guard.sh
+VIOLATION R8 turnend-supervision-block: instrumented guard never calls the guard event writer in bin/fm-turnend-guard.sh
+LINT_SUMMARY mode=enforce guards=28 violations=2 allowlisted=0 stale=0 shown=2
+exit=
+
+# S4c: adversarial - registry path that does not exist
+error: registry not found: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.2B42mDKEnU/none.json
+exit=
