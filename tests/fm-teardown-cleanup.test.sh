@@ -2751,6 +2751,27 @@ test_docker_differently_named_metadata_hardlinks_preserve_longer_siblings() {
   pass "differently named metadata hardlinks preserve longer sibling stacks in top-level and forced-child cleanup"
 }
 
+test_teardown_retires_the_dsh_launch_state() {
+  local case_dir rc wt_head
+  case_dir=$(make_case dsh-launch-state)
+  write_meta "$case_dir" local-only ship
+  wt_commit_file "$case_dir" feature.txt landed "merged work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+  mkdir -p "$case_dir/state/task-x1.dsh/g1/dsh/sessions" "$case_dir/state/task-x1.dsh/g2/dsh" "$case_dir/state/task-x2.dsh/g1"
+  printf 'secret\n' > "$case_dir/state/task-x1.dsh/g2/dsh/.credentials.yaml"
+  printf '{}\n' > "$case_dir/state/task-x1.dsh-session"
+  printf '{}\n' > "$case_dir/state/task-x2.dsh-session"
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "dsh-launch-state: teardown refused: $(cat "$case_dir/stderr")"
+  [ ! -e "$case_dir/state/task-x1.dsh" ] && [ ! -e "$case_dir/state/task-x1.dsh-session" ] \
+    || fail "dsh-launch-state: teardown left the task's dsh credentials copy, session logs, or binding"
+  [ -d "$case_dir/state/task-x2.dsh/g1" ] && [ -f "$case_dir/state/task-x2.dsh-session" ] \
+    || fail "dsh-launch-state: teardown removed another task's dsh launch state"
+  pass "teardown retires the task's own dsh launch state and no other task's"
+}
+
 test_teardown_removes_the_tasks_own_docker_stacks() {
   local case_dir rc
   case_dir=$(make_docker_case docker-own-stacks)
@@ -6139,6 +6160,7 @@ test_forced_secondmate_cleans_each_child_docker_before_retirement_and_retries
 test_forced_orca_children_clean_docker_before_worktree_removal
 test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_retries
 test_docker_container_arriving_during_resource_cleanup_blocks_retirement
+test_teardown_retires_the_dsh_launch_state
 )
 
 # Validate the complete selection before running any behavioral case.

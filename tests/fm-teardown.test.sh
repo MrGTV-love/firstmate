@@ -371,27 +371,6 @@ test_local_only_merged_to_local_main_allows() {
   pass "local main landing succeeds independently of pushed and remote availability"
 }
 
-test_teardown_retires_the_dsh_launch_state() {
-  local case_dir rc wt_head
-  case_dir=$(make_case dsh-launch-state)
-  write_meta "$case_dir" local-only ship
-  wt_commit_file "$case_dir" feature.txt landed "merged work"
-  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
-  mkdir -p "$case_dir/state/task-x1.dsh/g1/dsh/sessions" "$case_dir/state/task-x1.dsh/g2/dsh" "$case_dir/state/task-x2.dsh/g1"
-  printf 'secret\n' > "$case_dir/state/task-x1.dsh/g2/dsh/.credentials.yaml"
-  printf '{}\n' > "$case_dir/state/task-x1.dsh-session"
-  printf '{}\n' > "$case_dir/state/task-x2.dsh-session"
-  rc=0
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "dsh-launch-state: teardown refused: $(cat "$case_dir/stderr")"
-  [ ! -e "$case_dir/state/task-x1.dsh" ] && [ ! -e "$case_dir/state/task-x1.dsh-session" ] \
-    || fail "dsh-launch-state: teardown left the task's dsh credentials copy, session logs, or binding"
-  [ -d "$case_dir/state/task-x2.dsh/g1" ] && [ -f "$case_dir/state/task-x2.dsh-session" ] \
-    || fail "dsh-launch-state: teardown removed another task's dsh launch state"
-  pass "teardown retires the task's own dsh launch state and no other task's"
-}
-
 test_no_mistakes_pushed_branch_without_merge_refuses() {
   local case_dir rc words
   case_dir=$(make_case nm-origin)
@@ -2688,7 +2667,6 @@ test_transient_index_lock_clears_after_first_attempt_and_retry_succeeds
 test_persistent_index_lock_exhausts_retries_and_refuses_loudly
 test_empty_retry_wait_uses_default_without_aborting
 test_fractional_legacy_retry_wait_refuses_without_arithmetic_error
-test_teardown_retires_the_dsh_launch_state
 )
 
 # Validate the complete selection before running any behavioral case.
