@@ -977,11 +977,14 @@ No value enables live behavior, and no code path writes a `mode 'live'` row.
 
 ### Where it runs and why
 
-The picker runs inside `bin/fm-dispatch-resolve.sh`, after that resolver has computed and printed its own result.
-The resolver is the only intake that already holds the sanitized brief text, the resolved rule set and the one `quota-axi` snapshot the typed decision uses, so the picker never re-fetches any of them.
-It runs behind a hard `fm_run_timed` bound of 20 seconds, its output is discarded, and every failure is swallowed, so the printed status, profile line and exit code are the resolver's own.
+The picker observes from two places, because no single one sees every dispatch.
+Inside `bin/fm-dispatch-resolve.sh`, after that resolver has computed and printed its own result, it reuses the sanitized brief text, the resolved rules and the one `quota-axi` snapshot the typed decision uses, under a hard `fm_run_timed` bound of 20 seconds.
+Inside `bin/fm-spawn.sh`, after the launch has been delivered, `bin/fm-model-picker-shadow-spawn.sh` observes the route that actually launched with the launch brief and one bounded quota read, under a 30-second bound that delays only the spawn command's return because the worker is already running.
+The spawn hook exists because real dispatches can bypass the typed resolver, and an unobserved dispatch cannot become calibration evidence.
+Both hooks discard their output and swallow every failure, so the printed status, profile line, exit code and spawn result are never derived from the picker.
 A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.
-The picker is not called from `fm-spawn.sh`: a spawn does not own the sanitized task text or the resolver's quota snapshot, and a second quota read would break the single-snapshot contract.
+A spawn that never launches (a refused or failed launch) writes no spawn-hook row.
+The report applies the same additive migration the write path uses, so it reads a Phase-1 store without error.
 
 ### What one shadow run does
 

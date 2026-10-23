@@ -600,5 +600,51 @@ check '[ "$(calls)" -eq 0 ]' "a policy that cannot be read sends nothing"
 check '[ "$(row ".picker_status")" = withheld ]' "an unreadable policy withholds the request"
 finish
 
+
+begin "the report migrates a Phase-1 store before reading its own columns"
+rm -f "$DATA/aa.sqlite"
+python3 -I - "$DATA/aa.sqlite" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.execute("""CREATE TABLE dispatch_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('shadow','live')),
+  task_type TEXT, work_type TEXT, complexity_score REAL,
+  chosen_worker TEXT, chosen_validator TEXT, effort TEXT,
+  rule_worker TEXT, rule_validator TEXT, rule_effort TEXT,
+  jev_raw_payload BLOB, jev_candidate_version TEXT, gates TEXT,
+  pareto_pruned TEXT, spend_priority TEXT, snapshot_age REAL,
+  validator_verdict TEXT, validator_disagreement TEXT, rework INTEGER,
+  captain_acceptance TEXT)""")
+c.execute("CREATE TABLE outcomes (dispatch_id INTEGER PRIMARY KEY, quality REAL, rework INTEGER, time_s REAL, accepted INTEGER, notes TEXT)")
+c.commit(); c.close()
+PY
+OUT=$(FM_MODEL_PICKER_DATA="$DATA" bash "$BIN" --report 2>"$TMP_ROOT/report.err"); RC=$?
+check '[ "$RC" -eq 0 ]' "report exits 0 on a Phase-1 store"
+check '[ "$OUT" = "0 shadow dispatches logged" ]' "an unreadable-by-Phase-1 store reads as zero dispatches"
+cols=$(python3 -I -c 'import sqlite3,sys;print(" ".join(r[1] for r in sqlite3.connect(sys.argv[1]).execute("pragma table_info(dispatch_log)")))' "$DATA/aa.sqlite")
+check 'grep -q "confidence_band" <<<"$cols"' "the report applied the additive migration"
+finish
+
+begin "five parallel dispatches write five rows"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+rm -f "$DATA/aa.sqlite"
+pids=()
+for i in 1 2 3 4 5; do
+  ( FM_HOME="$TMP_ROOT/home" FM_MODEL_PICKER_DATA="$DATA" FM_MODEL_PICKER_SHADOW=1 \
+      FM_TEST_SEAM=1 FM_TYPESAFE_TEST_ENDPOINT="$ENDPOINT" \
+      bash "$BIN" --observe --brief "$TMP_ROOT/brief.md" --task-text "$TMP_ROOT/brief.md" \
+        --rules "$TMP_ROOT/rules-base.json" --result "$TMP_ROOT/result.json" \
+        --quota "$TMP_ROOT/quota.json" --status clear \
+        3< <(printf 'synthetic-canary-key\n') >"$TMP_ROOT/par.$i.out" 2>"$TMP_ROOT/par.$i.err" ) &
+  pids+=($!)
+done
+wait "${pids[@]}"
+count=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where mode=\"shadow\"").fetchone()[0])' "$DATA/aa.sqlite")
+check '[ "$count" = 5 ]' "five parallel dispatches give five rows"
+accepted=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where picker_status=\"accepted\"").fetchone()[0])' "$DATA/aa.sqlite")
+check '[ "$accepted" = 5 ]' "all five picks are accepted"
+finish
+
 [ "$FAILED" -eq 0 ] || fail "$FAILED shadow picker case(s) failed"
 pass "shadow picker: gates, Pareto, currency separation, unknown routes, Jev failures, trusted data, re-check, validator pairing, report, privacy and flag"

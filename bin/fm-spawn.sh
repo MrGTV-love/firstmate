@@ -7393,4 +7393,20 @@ SPAWN_ACCOUNT=
 if [ "$DISPATCH_SWITCHED" = true ]; then
   printf 'working [at=%s]: model-matrix fallback launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
 fi
+# Shadow model picker (observe only): the launch is already delivered, so this can
+# only append routing evidence to the picker's private store. It never prints, and
+# every failure exits 0. It closes the manual-intake gap the resolver hook cannot
+# see; docs/configuration.md "Shadow model picker" owns the contract.
+if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
+  # shellcheck source=bin/fm-model-picker-shadow-lib.sh
+  . "$SCRIPT_DIR/fm-model-picker-shadow-lib.sh"
+  if fm_model_picker_shadow_enabled; then
+    # measured: value=30 date=2026-10-23 host=Mac-Studio margin=1.2 (three bounded provider calls at five seconds, one quota read at ten seconds, helper and SQLite overhead; the launch is already delivered, so this bound delays only this command's return)
+    fm_run_timed 30 "$SCRIPT_DIR/fm-model-picker-shadow-spawn.sh" \
+      --brief "${SOURCE_BRIEF:-$BRIEF}" --harness "$HARNESS" --model "$MODEL" \
+      --effort "${EFFORT:-}" --rules "$CONFIG/crew-dispatch.json" \
+      --never-send "$CONFIG/dispatch-never-send" --kind "$KIND" \
+      >/dev/null 2>&1 || true
+  fi
+fi
 echo "spawned $ID harness=$HARNESS kind=$KIND$SPAWN_DELIVERY window=$META_WINDOW worktree=$WT$SPAWN_ACCOUNT"

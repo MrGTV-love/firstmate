@@ -1149,7 +1149,10 @@ def report(data_root):
         print("0 shadow dispatches logged")
         return 0
     try:
-        conn = sqlite3.connect(str(db_path))
+        # A Phase-1 store predates the picker's columns; run the same additive
+        # migration the write path runs before reading them.
+        conn = aadb.connect(str(db_path))
+        aadb.init_calibration(conn)
         conn.row_factory = sqlite3.Row
         rows = [dict(r) for r in conn.execute(
             "SELECT work_type, chosen_worker, chosen_validator, effort, rule_worker, "
