@@ -1,0 +1,152 @@
+
+==================== E1 card with command placeholder, ampersand, angle brackets and a literal entity is posted escaped ====================
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-mirror.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/card-payload/transcript.json
+[exit 0]
+--- exact Slack text of the posted card (what the API receives) ---
+Task: literal-card
+Decision: R&amp;D &lt;beta&gt; rollout
+Question: Run fm-captain-hold.sh bind &lt;source-id&gt; &amp; confirm
+Recommendation: type &amp;lt; literally
+Evidence: /tmp/a&amp;b&lt;c&gt;.md
+Options:
+1. Keep &lt;old&gt; &amp; new (keep) - when a &gt; b
+2. Wait (wait)
+Affordance: reaction
+React with one/two or reply in this thread with the option number.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+--- entity integrity ---
+raw < or > count: 0 | bare & (split/unescaped entity) count: 0
+--- same card as Slack renders it to the owner (entities decoded once) ---
+Task: literal-card
+Decision: R&D <beta> rollout
+Question: Run fm-captain-hold.sh bind <source-id> & confirm
+Recommendation: type &lt; literally
+Evidence: /tmp/a&b<c>.md
+Options:
+1. Keep <old> & new (keep) - when a > b
+2. Wait (wait)
+Affordance: reaction
+React with one/two or reply in this thread with the option number.
+Messages typed in the main DM window are not read.
+If you both tap and type: a disagreement surfaces to the captain and neither signal is recorded as the answer.
+Full decision remains in the local backlog.
+
+
+==================== E2 adversarial: raw card under 38,000 but escaped over it (9,400 '<') is budgeted, fields kept, no split entity ====================
+raw question length: 9405 chars; escaped card length: 37998 (limit 38000)
+present: Task: near-limit
+present: Decision: Near limit
+present: Question: Pick &lt;&lt;
+present: Options:
+present: 1. Keep &lt;old&gt; &amp; new (keep)
+present: 2. Wait (wait)
+present: Recommendation: type &amp;lt; literally
+present: Evidence: /tmp/a&amp;b&lt;c&gt;.md
+present: If you both tap and type:
+present: Messages typed in the main DM window are not read.
+present: Full decision remains in the local backlog.
+question line length: 37514 | ends: ;&lt;&lt;...
+raw < or > count: 0 | bare & (split/unescaped entity) count: 0
+cut-9401: card length 37999; raw < or > count: 0 | bare & (split/unescaped entity) count: 0
+cut-9402: card length 37999; raw < or > count: 0 | bare & (split/unescaped entity) count: 0
+cut-9403: card length 37999; raw < or > count: 0 | bare & (split/unescaped entity) count: 0
+
+==================== E3 under-budget card with specials is posted whole ====================
+card length 4530; question whole: yes
+cut marker "..." present: 0
+
+==================== E4 oversized post (45,000 chars of '&amp;') is cut at the post bound without splitting an entity ====================
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/card-payload/transcript.json
+check: slack 903.000001 - oversized notice
+[exit 0]
+posted thread text length: 38038
+ends with: 'amp;&amp;&amp;&amp;\nFull text remains in the local backlog.\n'
+raw < or > count: 0 | bare & (split/unescaped entity) count: 0
+
+==================== E5 conflict between two typed replies: thread notice escaped, wake line plain ====================
+(owner typed "use <source-id> & go" and "skip & wait"; Slack delivers them escaped)
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/resolution/transcript.json
+check: slack 900.000001 - conflicting signals: skip & wait vs use <source-id> & go. Please reply once.
+[exit 0]
+--- notice posted to the thread (exact Slack text) ---
+Conflicting signals: skip &amp; wait vs use &lt;source-id&gt; &amp; go. No answer was recorded. Please reply once.
+
+call resolve-call: OPEN
+
+==================== E6 owner types a reply with < & > (delivered escaped by Slack): recorded answer is literal, ack + resolution posted ====================
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/resolution/transcript.json
+closed: resolve-call
+[exit 0]
+call resolve-call: CLOSED
+Answer: run bind <source-id> && confirm a > b
+--- thread posts ---
+Conflicting signals: skip &amp; wait vs use &lt;source-id&gt; &amp; go. No answer was recorded. Please reply once.
+Answer recorded.
+Resolved: resolve-call
+The decision is no longer open. Full resolution remains in the local backlog.
+
+
+==================== E7 regression: tap :two: plus typed 3 still yields bounded remedy wake, nothing recorded ====================
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/contradiction/transcript.json
+armed: state/slack.check.sh
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-check.sh check --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/contradiction/transcript.json
+check: slack 900.000001 - conflicting signals: Abort vs Wait. Remove the :two: reaction and reply again, or type 2.
+[exit 0]
+call conflict-call: OPEN
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-check.sh check --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/contradiction/transcript.json
+[exit 0]
+
+==================== E8 regression: reaction and single-character answers still close calls ====================
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/reaction-answer/transcript.json
+closed: reaction-call
+[exit 0]
+call reaction-call: CLOSED
+Answer: wait
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N4KX5D8PNABX6D0YNC0NRQ/tests/fixtures/slack/single-char-answer/transcript.json
+slack: missing reaction scope: reactions:read, users:read
+closed: single-call
+[exit 0]
+call single-call: CLOSED
+Answer: wait
+
+==================== E2b adversarial: budget cut lands at every offset inside an &amp; / &lt; entity ====================
+mirror exit 0
+phase-amp-1 card len 38000 | question tail 'p;&amp;...' | raw <>  0 | bare & 0 | all fields True
+phase-amp-2 card len 38001 | question tail 'p;&amp;...' | raw <>  0 | bare & 0 | all fields True
+phase-amp-3 card len 37997 | question tail 'p;&amp;...' | raw <>  0 | bare & 0 | all fields True
+phase-amp-4 card len 37998 | question tail 'p;&amp;...' | raw <>  0 | bare & 0 | all fields True
+phase-amp-5 card len 37999 | question tail 'p;&amp;...' | raw <>  0 | bare & 0 | all fields True
+phase-lt-1 card len 38000 | question tail 'lt;&lt;...' | raw <>  0 | bare & 0 | all fields True
+phase-lt-2 card len 38001 | question tail 'lt;&lt;...' | raw <>  0 | bare & 0 | all fields True
+phase-lt-3 card len 37998 | question tail 'lt;&lt;...' | raw <>  0 | bare & 0 | all fields True
+phase-lt-4 card len 37999 | question tail 'lt;&lt;...' | raw <>  0 | bare & 0 | all fields True
+phase-lt-5 card len 38000 | question tail 'lt;&lt;...' | raw <>  0 | bare & 0 | all fields True
+
+Note: card-text prints a trailing newline, so "card len" above is one more than the posted text.
+Exact posted message lengths read from the replay Slack state:
+  phase-amp-1 posted length 37999 (limit 38000)
+  phase-amp-2 posted length 38000 (limit 38000)
+  phase-amp-3 posted length 37996 (limit 38000)
+  phase-amp-4 posted length 37997 (limit 38000)
+  phase-amp-5 posted length 37998 (limit 38000)
+  phase-lt-1 posted length 37999 (limit 38000)
+  phase-lt-2 posted length 38000 (limit 38000)
+  phase-lt-3 posted length 37997 (limit 38000)
+  phase-lt-4 posted length 37998 (limit 38000)
+  phase-lt-5 posted length 37999 (limit 38000)
