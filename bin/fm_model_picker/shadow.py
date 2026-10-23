@@ -1039,6 +1039,7 @@ def observe(args, key, helper, data_root):
     by_id = {c["id"]: c for c in candidates}
     worker = by_id.get(picked["worker"]["choice"])
     validator = by_id.get(picked["validator"]["choice"])
+    unknown_validator = picked["validator"]["choice"] not in by_id
     effort = pick_effort(picked["effort"]["score"])
     band = confidence_band(picked["worker"]["confidence"])
     chosen_validator = validator if validator is not None and validator.get("family") else None
@@ -1071,6 +1072,8 @@ def observe(args, key, helper, data_root):
 
     pruned_routes = {p["route"] for p in pruned} | {p["route"] for p in pareto_pruned}
     problems = recheck(worker, chosen_validator, effort, pruned_routes, spec, complexity)
+    if unknown_validator:
+        problems.append("validator answer names no listed route")
     if worker is not None and worker["route"] not in {c["route"] for c in kept}:
         problems.append("worker %s is not a survivor of the authoritative mix" % worker["route"])
     result_status = "rejected" if problems else "accepted"
