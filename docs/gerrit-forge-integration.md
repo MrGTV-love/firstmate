@@ -6,6 +6,7 @@ Every question it raises is answered, and each decision is stated in the body wh
 
 The mechanics it reasons about have their own owners.
 [`bin/fm-pr-lib.sh`](../bin/fm-pr-lib.sh) owns the provider-tagged identity and the merge-poll artifacts, [`bin/fm-pr-merge.sh`](../bin/fm-pr-merge.sh) owns merging, [`bin/fm-project-mode.sh`](../bin/fm-project-mode.sh) owns the registered delivery posture, and [`bin/fm-dod-lib.sh`](../bin/fm-dod-lib.sh) owns what a delivery mode tells a worker.
+[`tests/fm-dod-lib.test.sh`](../tests/fm-dod-lib.test.sh) verifies CI-ready completion references, including Gerrit change URLs.
 This note asserts the design that the changes following it implement, so it states what the forge field in the registry and the delivery-mode rules that consume it are for, not what they were before.
 
 ## 1. Gerrit is not a forge variant

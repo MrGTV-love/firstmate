@@ -493,6 +493,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "docs/guard-spec.md",
+      "audience": "maintainer-architecture"
+    },
+    {
       "path": "docs/host-guards.md",
       "audience": "maintainer-architecture"
     },

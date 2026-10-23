@@ -99,7 +99,7 @@ info() { [ "$JSON" -eq 1 ] || printf 'INFO %s: %s\n' "$1" "$2"; }
 # spec names: bin/, tests/, docs/, config/, state/, plus a bare script name.
 check_remedy_paths() {  # <id> <remedy>
   local id=$1 remedy=$2 tok
-  for tok in $(printf '%s' "$remedy" | tr ' ()`",;' '\n\n\n\n\n\n\n\n' | grep -E '^(bin|scripts|tests|docs|config|state|\.claude|\.codex|\.github|\.pi|\.grok|\.omp|\.cursor|\.opencode|\.tac)/' || true); do
+  for tok in $(printf '%s' "$remedy" | tr ' ()`",;' '[\n*]' | grep -E '^(bin|scripts|tests|docs|config|state|\.claude|\.codex|\.github|\.pi|\.grok|\.omp|\.cursor|\.opencode|\.tac)/' || true); do
     tok=${tok%"${tok##*[!.,;:]}"}
     case "$tok" in
       config/*|state/*|projects/*) continue ;;
@@ -111,6 +111,7 @@ check_remedy_paths() {  # <id> <remedy>
 has_executable_token() {  # <remedy>
   local r=$1
   printf '%s' "$r" | grep -Eq '(^|[[:space:]"(])(bin|scripts|tests|docs|config|state|\.claude|\.codex|\.github|\.tac)/' && return 0
+  # shellcheck disable=SC2016 # Match literal Markdown backticks, not command substitution.
   printf '%s' "$r" | grep -Eq '`[^`]+`' && return 0
   printf '%s' "$r" | grep -Eq '(^|[[:space:](])env -u ' && return 0
   printf '%s' "$r" | grep -Eq '(^|[[:space:](])git [a-z]' && return 0

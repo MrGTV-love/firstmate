@@ -249,9 +249,9 @@ test_claude_hooks_semantic_lifecycle() {
   done
   jq -e '.hooks.Stop | length == 1 and (.[0].hooks | length == 1 and .[0].timeout == 25)' \
     "$settings" >/dev/null || fail "Stop must have one combined command with its timeout"
-  jq -e '.hooks.PreToolUse[0].matcher == "^(Bash|Write|Edit)$" and .hooks.PostToolUse[0].matcher == "^(Bash|Read)$"
-    and .hooks.PreToolUse[0].hooks[0].command == .hooks.PostToolUse[0].hooks[0].command' "$settings" >/dev/null \
-    || fail "claude hook settings lack the jev-guard tool hooks"
+  jq -e '.hooks.PreToolUse[0].matcher == "^(Bash|Write|Edit)$"
+    and (.hooks | has("PostToolUse") | not)' "$settings" >/dev/null \
+    || fail "claude hook settings must register the PreToolUse guard without PostToolUse"
   out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
     | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE sh -c "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")" 2>&1) \
     || fail "the generated jev-guard hook must exit 0 without a key"
