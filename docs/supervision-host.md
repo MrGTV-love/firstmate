@@ -74,8 +74,8 @@ The host's header owns the output contract they read.
 | Grok | the model's tracked background call, rendered as `bin/fm-supervision-host.sh park` at session start | the background task's completion notification |
 | Codex | the foreground checkpoint, `bin/fm-watch-checkpoint.sh`, in the watcher's place | the checkpoint's own output |
 
-Hook, plugin, extension, and checkpoint owners pass their harness as the primary pin.
-Grok's model-owned call relies on primary detection.
+Hook, extension, and checkpoint owners and the OpenCode plugin pass their harness as the primary pin.
+Grok's model-owned call and the DSH plugin rely on primary detection.
 The host pins dispatched work to the primary's crew harness rather than the engine's.
 
 Grok's arm command is fixed when the session-start block renders.
@@ -418,6 +418,7 @@ Each arm owner's own suite covers its host mode against a stub host.
 | `tests/fm-cursor-primary.test.sh` | The Cursor arm owner's host mode against a stub host. |
 | `tests/fm-pi-watch-extension.test.sh` | The OpenCode plugin's host mode against a stub host. |
 | `tests/fm-omp-harness.test.sh` | The omp arm owner's host mode against a stub host. |
+| `tests/fm-dsh-primary.test.sh` | The DSH plugin's host mode against a stub host, gated by the real `bin/fm-dsh-primary.sh inspect` verdict. |
 | `tests/fm-watch-checkpoint.test.sh` | The Codex checkpoint's host mode against a stub host. |
 | `tests/fm-supervision-instructions.test.sh` | The rendered protocol, including Grok's arm command. |
 | `tests/fm-host-mirror.test.sh` | The dialog mirror's writers through the tracked Claude and Cursor registrations, the home gate, the feed, and the verified-writer list. |

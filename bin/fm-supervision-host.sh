@@ -13,12 +13,14 @@
 # (bin/fm-claude-stop-autoarm.sh), the Cursor stop-hook park
 # (bin/fm-turnend-guard-cursor.sh), the OpenCode TUI plugin
 # (.opencode/plugins/fm-primary-watch-arm.js), the omp watch extension
-# (.omp/extensions/fm-primary-omp-watch.ts), Grok's model-owned background arm
+# (.omp/extensions/fm-primary-omp-watch.ts), the DSH native primary plugin
+# (.dsh/fm-primary.mjs), Grok's model-owned background arm
 # (docs/supervision-protocols/grok.md), and Codex's foreground checkpoint
 # (bin/fm-watch-checkpoint.sh). To that owner it IS an arm: it prints the
 # arm's own lines and exits only when main is needed, and stays parked across
-# every close it handled itself. Each owner passes its harness as
-# FM_SUPERVISION_HOST_PRIMARY, which the engine carries as the primary pin.
+# every close it handled itself. An owner passes its harness as
+# FM_SUPERVISION_HOST_PRIMARY, which the engine carries as the primary pin, or
+# leaves it to detection (docs/supervision-host.md "Arm owners" names which).
 #
 # OUTPUT, the contract every owner reads. The first cycle's status line
 # ("watcher: started ..." or "watcher: attached ...") is printed as soon as the

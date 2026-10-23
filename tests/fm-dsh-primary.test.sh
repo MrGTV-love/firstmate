@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Portable native-plugin lifecycle edges; vendor callbacks are separately
-# exercised by fm-dsh-primary-live-e2e.test.sh against real dsh-tui.
+# Portable native-plugin lifecycle edges, including supervision-host mode
+# through the real inspect verdict against a stub host; vendor callbacks are
+# separately exercised by fm-dsh-primary-live-e2e.test.sh against real dsh-tui.
 set -eu
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 node --input-type=module - "$ROOT" "$TMP" <<'JS'
 import assert from 'node:assert/strict';
-import {mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync} from 'node:fs';
-import {spawn} from 'node:child_process';
+import {mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, readdirSync, rmSync} from 'node:fs';
+import {spawn, execFileSync} from 'node:child_process';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 const [root, tmp] = process.argv.slice(2);
@@ -293,5 +294,147 @@ try {
   for (const pid of ownedPids) {try {process.kill(pid, 'SIGKILL');} catch {}}
   crash.stop();
 }
-console.log('ok - DSH primary enters its digest ahead of the brief in the first step, reports startup failure there, bounds guard follow-ups, preserves wake acknowledgement, excludes children, and retires watcher descendants on disposal and native SIGKILL');
+// Supervision-host mode. The owner is a separate node process whose argv is
+// `node <dir>/dsh-tui`, the shape bin/fm-dsh-lib.sh recognizes, so the real
+// bin/fm-dsh-primary.sh inspect proves this session owns the home's lock and
+// decides host or watch from the real config gate. Only the arm, the host, the
+// session start, the turn-end guard and the queue read are stubs.
+const stripped = ['CLAUDECODE', 'PI_CODING_AGENT', 'GROK_AGENT', 'FM_PI_HARNESS', 'FM_OMP_HARNESS', 'GEMINI_CLI',
+  'CURSOR_AGENT', 'CURSOR_INVOKED_AS', 'ATLASSIAN_AGENT_TYPE', 'ROVODEV_CLI', 'FM_TEST_SEAM', 'FM_TEST_HARNESS'];
+function hostFixture(name, {config = [], lock = 'self'} = {}) {
+  const dir = join(tmp, name);
+  const bin = join(dir, 'bin');
+  const home = join(dir, 'home');
+  mkdirSync(bin, {recursive: true});
+  for (const entry of readdirSync(join(root, 'bin'))) symlinkSync(join(root, 'bin', entry), join(bin, entry));
+  const stub = (file, body) => {
+    rmSync(join(bin, file));
+    writeFileSync(join(bin, file), '#!/usr/bin/env bash\nset -eu\n' + body + '\n', {mode: 0o700});
+  };
+  stub('fm-sessionstart-run.sh', "printf 'SESSION START - fixture\\n'");
+  stub('fm-turnend-guard.sh', 'exit 0');
+  stub('fm-wake-drain.sh', ': > "$FM_HOME/state/queue-read"');
+  stub('fm-watch-arm.sh', `
+    printf 'arm pid=%s\\n' "\${BASHPID:-$$}" >> "$FM_HOME/state/runs"
+    trap 'exit 0' TERM INT
+    echo 'watcher: started pid=fixture (beacon fresh)'
+    while :; do sleep 0.05; done
+  `);
+  stub('fm-supervision-host.sh', `
+    . "$(dirname "$0")/fm-supervision-engine-lib.sh"
+    printf 'host pid=%s args=%s home=%s cwd=%s primary=%s\\n' "\${BASHPID:-$$}" "$*" "$FM_HOME" "$(pwd -P)" "\${FM_SUPERVISION_HOST_PRIMARY:-$(fm_supervision_host_primary)}" >> "$FM_HOME/state/runs"
+    trap 'exit 0' TERM INT
+    echo 'watcher: started pid=fixture (beacon fresh)'
+    while [ ! -f "$FM_HOME/state/close" ]; do sleep 0.05; done
+    rm "$FM_HOME/state/close"
+    echo 'check: fixture wake'
+    echo 'supervision-host: outcome 1 for demo [captain]: fixture'
+  `);
+  mkdirSync(join(home, 'bin'), {recursive: true});
+  mkdirSync(join(home, 'state'), {recursive: true});
+  mkdirSync(join(home, 'config'), {recursive: true});
+  execFileSync('git', ['init', '-q', home]);
+  writeFileSync(join(home, 'AGENTS.md'), 'fixture\n');
+  // An in-flight task is what makes this home need supervision at all.
+  writeFileSync(join(home, 'state/demo.meta'), 'fixture\n');
+  for (const file of config) writeFileSync(join(home, 'config', file), '');
+  const launcher = join(dir, 'dsh-tui');
+  writeFileSync(launcher, `(async () => {
+    const {appendFileSync, existsSync, rmSync, writeFileSync} = require('node:fs');
+    const {apply} = await import(${JSON.stringify(pathToFileURL(join(root, '.dsh/fm-primary.mjs')).href)});
+    const home = ${JSON.stringify(home)};
+    writeFileSync(home + '/state/.lock', ${lock === 'self' ? 'String(process.pid)' : JSON.stringify(lock)});
+    const handlers = new Map();
+    const stops = [];
+    apply({on: (event, fn) => handlers.set(event, fn), effect: fn => stops.push(fn())}, ${JSON.stringify({root: dir, home})});
+    const agent = {id: 'host', session: {header: {cwd: home}}, inject() {},
+      followup: input => appendFileSync(home + '/state/followups', JSON.stringify(input.content[0].text) + '\\n')};
+    process.on('SIGTERM', () => { for (const stop of stops) stop(); process.exit(0); });
+    setInterval(() => {
+      if (existsSync(home + '/state/dispose')) { rmSync(home + '/state/dispose'); for (const stop of stops) stop(); }
+      if (!existsSync(home + '/state/turn-end')) return;
+      rmSync(home + '/state/turn-end');
+      handlers.get('session/event')(agent.session, {type: 'turn/end', seq: 1});
+    }, 50);
+    await handlers.get('agent/created')({agent});
+  })();
+`);
+  const env = {...process.env, FM_DSH_HARNESS: 'dsh'};
+  for (const key of stripped) delete env[key];
+  const child = spawn(process.execPath, [launcher], {env, stdio: 'ignore'});
+  const exited = new Promise(resolve => child.once('exit', resolve));
+  const runs = () => existsSync(join(home, 'state/runs')) ? readFileSync(join(home, 'state/runs'), 'utf8').split('\n').filter(Boolean) : [];
+  const followups = () => existsSync(join(home, 'state/followups')) ? readFileSync(join(home, 'state/followups'), 'utf8').split('\n').filter(Boolean).map(row => JSON.parse(row)) : [];
+  const events = () => existsSync(join(home, 'state/.dsh-primary-events.jsonl')) ? readFileSync(join(home, 'state/.dsh-primary-events.jsonl'), 'utf8') : '';
+  const pidOf = row => Number(row.replace(/^\w+ pid=([0-9]+).*/, '$1'));
+  const retire = async () => { child.kill('SIGTERM'); await exited; };
+  return {home: execFileSync('pwd', ['-P'], {cwd: home, encoding: 'utf8'}).trim(), runs, followups, events, pidOf, retire, child};
+}
+const alive = pid => {try {process.kill(pid, 0); return true;} catch (error) {if (error.code === 'ESRCH') return false; throw error;}};
+// An opted-in home parks the supervision host in the arm's place, scoped to
+// this home, and relays the host's own lines when it closes.
+const hosted = hostFixture('host-mode', {config: ['supervision-host']});
+let hostPids = [];
+try {
+  await until(() => hosted.runs().length === 1);
+  const [parked] = hosted.runs();
+  assert.match(parked, /^host /, `an opted-in home must park the supervision host, not the plain arm: ${parked}`);
+  assert.match(parked, / args=park home=/, `the host must run as a plain park: ${parked}`);
+  assert.ok(parked.includes(` home=${join(tmp, 'host-mode', 'home')} cwd=${hosted.home} `), `the host must be scoped to the primary's home: ${parked}`);
+  assert.match(parked, / primary=dsh$/, `the host must resolve this primary as dsh: ${parked}`);
+  hostPids.push(hosted.pidOf(parked));
+  writeFileSync(join(hosted.home, 'state/close'), '');
+  await until(() => hosted.followups().length === 1);
+  const [relay] = hosted.followups();
+  assert.match(relay, /Firstmate watcher notification/, `a host close must reach the session as a watcher notification: ${relay}`);
+  assert.ok(relay.includes('supervision-host: outcome 1 for demo [captain]: fixture'), `the notification must carry the host line: ${relay}`);
+  assert.ok(!relay.includes('check: fixture wake'), `the notification must not replay the close headline: ${relay}`);
+  assert.equal(alive(hostPids[0]), false, 'the closed host must have exited');
+  // The next turn end parks a fresh host. Plugin disposal retires it while
+  // the owner process lives on; owner exit alone would hide a disposal leak
+  // behind the owner-bound watchdog the native-crash case covers.
+  writeFileSync(join(hosted.home, 'state/turn-end'), '');
+  await until(() => hosted.runs().length === 2);
+  const reparked = hosted.runs()[1];
+  assert.match(reparked, /^host .* args=park home=/, `a turn end must park the host again: ${reparked}`);
+  hostPids.push(hosted.pidOf(reparked));
+  assert.equal(alive(hostPids[1]), true, 'the re-parked host must be running before disposal');
+  writeFileSync(join(hosted.home, 'state/dispose'), '');
+  await until(() => !alive(hostPids[1]));
+  assert.equal(hosted.child.exitCode, null, 'disposal, not owner exit, must retire the host');
+  await hosted.retire();
+  assert.equal(hosted.runs().filter(row => row.startsWith('arm ')).length, 0, 'a host home must never park the plain arm');
+} finally {
+  hosted.child.kill('SIGKILL');
+  for (const pid of hostPids) {try {process.kill(pid, 'SIGKILL');} catch {}}
+}
+// The attended boundary: with no supervision-host file, or with the opt-out
+// beside it, the same owner parks only the plain arm.
+for (const [label, config] of [['none', []], ['off', ['supervision-host', 'supervision-host-off']]]) {
+  const plain = hostFixture(`host-gate-${label}`, {config});
+  let armPid;
+  try {
+    await until(() => plain.runs().length === 1);
+    const [row] = plain.runs();
+    assert.match(row, /^arm /, `${label}: a home that does not run the host must park the plain arm: ${row}`);
+    armPid = plain.pidOf(row);
+    await plain.retire();
+    await until(() => !alive(armPid));
+    assert.equal(plain.runs().length, 1, `${label}: the plain home must never start the host`);
+  } finally {
+    plain.child.kill('SIGKILL');
+    if (armPid) {try {process.kill(armPid, 'SIGKILL');} catch {}}
+  }
+}
+// A home whose session lock this owner does not hold stays read-only: the
+// inspect refuses ownership and neither the host nor the arm parks.
+const foreign = hostFixture('host-foreign-lock', {config: ['supervision-host'], lock: '1'});
+try {
+  await until(() => /"event":"read-only"/.test(foreign.events()));
+  assert.deepEqual(foreign.runs(), [], 'a home this session does not own must not park the host');
+  await foreign.retire();
+} finally {
+  foreign.child.kill('SIGKILL');
+}
+console.log('ok - DSH primary enters its digest ahead of the brief in the first step, reports startup failure there, bounds guard follow-ups, preserves wake acknowledgement, excludes children, retires watcher descendants on disposal and native SIGKILL, and parks the supervision host only on an opted-in home it owns');
 JS

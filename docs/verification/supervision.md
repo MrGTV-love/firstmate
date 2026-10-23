@@ -918,6 +918,12 @@ The live guards gave the same results in both trees:
 
 The Grok stop guard was last verified on 0.2.112 and has drifted from Grok 1.0.41 in both trees.
 
+The 2026-09-24 measurement predates the DSH primary, so its routing rests on `tests/fm-dsh-primary.test.sh` alone.
+On 2026-10-23, on Node 26.4.0, `nice -n 20 bin/fm-proc-budget.sh -- bash tests/fm-dsh-primary.test.sh` passed its host-mode cases.
+They run the plugin in an owner process shaped as `node <dir>/dsh-tui` that holds the home's lock, behind the real `bin/fm-dsh-primary.sh inspect` verdict; the arm, the host, session start, the turn-end guard and the queue read are stubs.
+The host's own primary detection named the primary `dsh`, because the plugin passes no pin.
+No DSH primary has run the host against a real engine.
+
 Deterministic entry points:
 
 ```sh
@@ -927,6 +933,7 @@ tests/fm-wake-queue.test.sh
 tests/fm-cursor-primary.test.sh
 tests/fm-pi-watch-extension.test.sh
 tests/fm-omp-harness.test.sh
+tests/fm-dsh-primary.test.sh
 tests/fm-watch-checkpoint.test.sh
 tests/fm-supervision-instructions.test.sh
 tests/fm-afk-launch.test.sh
