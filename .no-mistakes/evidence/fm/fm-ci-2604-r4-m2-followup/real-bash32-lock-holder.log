@@ -1,0 +1,12 @@
+$ nice -n 20 /bin/bash real-lock-holder.sh <tracked-library-root> <isolated-state>
+interpreter=/bin/bash version=3.2.57(1)-release BASHPID=absent parent=42054
+actual subshell pid=42056 recorded lock pid=42056 parent pid=42054
+persisted holder identity:
+42056
+Fri Oct 23 15:09:31 2026    
+/bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/real-lock-holder.sh /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/real-lock
+live holder protected: contender pid=42121 still waiting=yes
+after holder death: parent pid=42054 alive=yes contender actual=42121 recorded=42121 acquired=yes
+dead holder record removed=yes lock released=yes
+
+exit=0

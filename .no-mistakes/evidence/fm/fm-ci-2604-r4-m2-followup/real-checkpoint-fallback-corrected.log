@@ -1,0 +1,37 @@
+$ nice -n 20 /bin/bash real-checkpoint-fallback.sh <tracked-root> <fresh-isolated-state> <installed-timeout> <installed-gtimeout>
+
+=== real checkpoint with unusable POSIX and timeout only ===
+Perl executable still works
+live probe: POSIX module unavailable
+Compilation failed in require.
+BEGIN failed--compilation aborted.
+checkpoint exit=0
+signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live-corrected/timeout-home/state/fallback-proof.status
+selected: timeout
+selected: timeout
+selected: timeout
+selected: timeout
+selected: timeout
+persisted wake queue:
+1792786003	1	signal	fallback-proof.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live-corrected/timeout-home/state/fallback-proof.status
+1792786003	2	signal	fallback-proof.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live-corrected/timeout-home/state/fallback-proof.status
+watcher lock released=yes
+
+=== real checkpoint with unusable POSIX and gtimeout only ===
+Perl executable still works
+live probe: POSIX module unavailable
+Compilation failed in require.
+BEGIN failed--compilation aborted.
+checkpoint exit=0
+signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live-corrected/gtimeout-home/state/fallback-proof.status
+selected: gtimeout
+selected: gtimeout
+selected: gtimeout
+selected: gtimeout
+selected: gtimeout
+persisted wake queue:
+1792786006	1	signal	fallback-proof.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live-corrected/gtimeout-home/state/fallback-proof.status
+1792786006	2	signal	fallback-proof.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live-corrected/gtimeout-home/state/fallback-proof.status
+watcher lock released=yes
+
+exit=0

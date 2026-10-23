@@ -1,0 +1,102 @@
+{
+  "target_commit": "188cb8f8771dc4c76eebc75f05f34f475b4a2fa9",
+  "scope": "Local Test only; no lint, broad suite, publication, pipeline control, or CI operations.",
+  "suite_runs": [
+    {
+      "suite": "fm-watch-checkpoint",
+      "exit": 0,
+      "seconds": 50.842
+    },
+    {
+      "suite": "fm-remote-job-launchagent",
+      "exit": 0,
+      "seconds": 94.338
+    },
+    {
+      "suite": "fm-remote-transport-lanes",
+      "exit": 0,
+      "seconds": 88.001
+    },
+    {
+      "suite": ".local-checkpoint-adversarial",
+      "exit": 1,
+      "seconds": 9.054
+    },
+    {
+      "suite": ".local-checkpoint-adversarial",
+      "exit": 0,
+      "seconds": 38.198
+    }
+  ],
+  "environment": {
+    "PATH": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin:/opt/homebrew/Cellar/pyenv/2.6.6/libexec:/opt/homebrew/Cellar/pyenv/2.6.6/plugins/python-build/bin:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources",
+    "HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/home",
+    "TMPDIR": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/tmp",
+    "TMP": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/tmp",
+    "LC_ALL": "C",
+    "FM_CPU_POOL_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/cpu-pool",
+    "FM_DURATION_FILE": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/data/durations.jsonl",
+    "FM_DURATION_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test",
+    "XDG_CACHE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/cache",
+    "XDG_CONFIG_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/config",
+    "XDG_DATA_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/data",
+    "XDG_STATE_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/state",
+    "XDG_RUNTIME_DIR": "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/runtime"
+  },
+  "manual_commands": [
+    [
+      "nice",
+      "-n",
+      "20",
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/real-checkpoint-fallback.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live",
+      "/opt/homebrew/bin/timeout",
+      "/opt/homebrew/bin/gtimeout"
+    ],
+    [
+      "nice",
+      "-n",
+      "20",
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/real-checkpoint-fallback.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live-corrected",
+      "/opt/homebrew/bin/timeout",
+      "/opt/homebrew/bin/gtimeout"
+    ],
+    [
+      "nice",
+      "-n",
+      "20",
+      "/bin/bash",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/real-lock-holder.sh",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6",
+      "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/real-lock"
+    ]
+  ],
+  "observed": {
+    "ordinary_stop_ms": 195,
+    "delayed_stop_ms": 464,
+    "guard_limit_ms": 7000,
+    "frozen_ordinary_rejected_ms": 7032,
+    "frozen_delayed_rejected_ms": 7192,
+    "late_ordinary_rejected_ms": 8777,
+    "late_delayed_rejected_ms": 8547,
+    "bash32_holder_pid": 42056,
+    "bash32_parent_pid": 42054,
+    "bash32_contender_pid": 42121
+  },
+  "corrected_disposable_setup": [
+    "Initial checkpoint-suite telemetry destination was outside the isolated home data subdirectory; recording refused without affecting suite result. Later commands used .local-phase-test/data/durations.jsonl; no repository suite was rerun.",
+    "Initial manual fallback wrapper incorrectly emitted literal %q. Corrected the disposable wrapper and drove the real CLI against fresh isolated state; both fallback branches passed.",
+    "Initial frozen-process injection ran before checkpoint orphaning; the kernel resumed the stopped process group and the product honestly stopped at 5350ms. Corrected fault setup to stop the private processes after reaping the checkpoint; both tests rejected real survivors past 7000ms. The original repository suites each ran once."
+  ],
+  "repeatable_drivers": [
+    "real-checkpoint-fallback.sh",
+    "real-lock-holder.sh",
+    "checkpoint-adversarial-driver.test.sh"
+  ],
+  "cleanup": "pgrep -fl <disposable-state-path> returned 1 (no remaining matching processes) before removing disposable scripts and state."
+}

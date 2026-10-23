@@ -1,0 +1,12 @@
+$ nice -n 20 /bin/bash real-checkpoint-fallback.sh <tracked-root> <isolated-state> <installed-timeout> <installed-gtimeout>
+
+=== real checkpoint with unusable POSIX and timeout only ===
+Perl executable still works
+live probe: POSIX module unavailable
+Compilation failed in require.
+BEGIN failed--compilation aborted.
+checkpoint exit=127
+/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5N3K6DG2Z5DVVYW98TGCGH6/.local-phase-test/fallback-live/tools/timeout: line 3: exec: %q: not found
+selected: timeout
+
+exit=1

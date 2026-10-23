@@ -1,0 +1,801 @@
+#!/usr/bin/env bash
+# Tests for bounded foreground watcher checkpoints used by Codex supervision.
+set -u
+
+# shellcheck source=tests/wake-helpers.sh
+. "$(dirname "${BASH_SOURCE[0]}")/wake-helpers.sh"
+
+CHECKPOINT="$ROOT/bin/fm-watch-checkpoint.sh"
+TMP_ROOT=$(fm_test_tmproot fm-watch-checkpoint)
+
+make_home() {
+  local name=$1 home
+  home="$TMP_ROOT/$name"
+  mkdir -p "$home/state" "$home/data" "$home/config"
+  printf '%s\n' "$home"
+}
+
+wait_for_checkpoint_lock() {
+  local home=$1 i=0
+  while [ "$i" -lt 100 ]; do
+    if [ -s "$home/state/.watch.lock/pid" ] \
+      && [ -e "$home/state/.last-watcher-beat" ]; then
+      return 0
+    fi
+    sleep 0.05
+    i=$((i + 1))
+  done
+  return 1
+}
+
+test_quiet_checkpoint_exits_124_cleanly() {
+  local home out err status
+  home=$(make_home quiet)
+  out="$home/out.txt"
+  err="$home/err.txt"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 "$CHECKPOINT" --seconds 1 >"$out" 2>"$err" || status=$?
+  expect_code 124 "$status" "quiet checkpoint exit"
+  assert_contains "$(cat "$out")" "checkpoint: no actionable wake within 1s" "quiet checkpoint line missing"
+  assert_absent "$home/state/.watch.lock/pid" "watch lock pid survived quiet checkpoint timeout"
+  pass "quiet checkpoint exits 124 with a clean checkpoint line and no live lock"
+}
+
+test_perl_timeout_fallback_honors_cleanup_bound_before_escalating() {
+  local home fallback_bin tool tool_path status watcher_pid
+  home=$(make_home perl-fallback)
+  fallback_bin="$home/fallback-bin"
+  mkdir -p "$home/root/bin" "$fallback_bin"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  for tool in bash dirname mktemp rm perl grep cat; do
+    tool_path=$(command -v "$tool") || fail "could not locate $tool for the Perl fallback fixture"
+    ln -s "$tool_path" "$fallback_bin/$tool"
+  done
+  cat > "$home/root/bin/fm-watch.sh" <<'PL'
+#!/usr/bin/env perl
+use strict;
+use warnings;
+$SIG{INT} = 'IGNORE';
+open my $pid_file, '>', "$ENV{FM_HOME}/watcher.pid" or die "open pid file: $!";
+printf {$pid_file} "%s\n", $$;
+close $pid_file;
+sleep 7;
+open my $cleanup_file, '>', "$ENV{FM_HOME}/cleanup-reached" or die "open cleanup marker: $!";
+print {$cleanup_file} "reached\n";
+close $cleanup_file;
+END {
+  if (open my $exit_file, '>', "$ENV{FM_HOME}/natural-exit") {
+    print {$exit_file} "natural\n";
+  }
+}
+sleep 20;
+PL
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
+
+  status=0
+  PATH="$fallback_bin" FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_WATCHER_CLEANUP_LOCK_BOUND=8 \
+    "$home/root/bin/fm-watch-checkpoint.sh" --seconds 1 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+
+  expect_code 124 "$status" "Perl fallback checkpoint exit"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 1s" \
+    "Perl fallback did not return a quiet checkpoint"
+  [ -e "$home/cleanup-reached" ] || fail "the Perl fallback killed the watcher before its 8-second cleanup bound"
+  [ ! -e "$home/natural-exit" ] || fail "the INT-ignoring watcher exited naturally instead of being killed"
+  [ -s "$home/watcher.pid" ] || fail "the INT-ignoring watcher did not start"
+  watcher_pid=$(cat "$home/watcher.pid")
+  if kill -0 "$watcher_pid" 2>/dev/null; then
+    fail "the INT-ignoring watcher survived the Perl fallback escalation"
+  fi
+  pass "Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher"
+}
+
+test_unusable_perl_uses_non_perl_timeout() {
+  local home fallback_bin tool tool_path status timeout_path
+  home=$(make_home unusable-perl)
+  fallback_bin="$home/fallback-bin"
+  mkdir -p "$home/root/bin" "$fallback_bin" "$home/perl-lib"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  # The executable works, but its required module cannot load.
+  cat > "$home/perl-lib/POSIX.pm" <<'PL'
+die "POSIX module unavailable\n";
+PL
+  ln -s "$(type -P perl)" "$fallback_bin/perl"
+  PERL5LIB="$home/perl-lib" "$fallback_bin/perl" -e 'exit 0' \
+    || fail "the unusable-module fixture broke Perl itself"
+  timeout_path=$(type -P timeout || type -P gtimeout) || fail "no non-Perl timeout installed"
+  for tool in bash dirname mktemp rm grep cat; do
+    tool_path=$(type -P "$tool") || fail "could not locate $tool for the unusable-Perl fixture"
+    ln -s "$tool_path" "$fallback_bin/$tool"
+  done
+  cat > "$home/root/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'signal: unusable-perl.status\n'
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
+  for tool in timeout gtimeout; do
+    # Preserve the installed tool's argv[0]; multicall coreutils reject aliases.
+    printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$timeout_path" > "$fallback_bin/$tool"
+    chmod +x "$fallback_bin/$tool"
+    status=0
+    PATH="$fallback_bin" PERL5LIB="$home/perl-lib" FM_HOME="$home" "$home/root/bin/fm-watch-checkpoint.sh" --seconds 5 \
+      >"$home/out.txt" 2>"$home/err.txt" || status=$?
+    expect_code 0 "$status" "unusable Perl with $tool fallback: $(cat "$home/err.txt")"
+    assert_contains "$(cat "$home/out.txt")" 'signal: unusable-perl.status' \
+      "unusable Perl prevented the watcher from running via $tool"
+    rm "$fallback_bin/$tool"
+  done
+  pass "an unusable Perl falls back to timeout or gtimeout and still runs the watcher"
+}
+
+# An async caller may pass SIGINT ignored. The bound must still interrupt the
+# watcher and let its cleanup run, not KILL it and strand the watcher lock.
+test_checkpoint_resets_an_inherited_ignored_interrupt() {
+  local home fallback_bin tool tool_path status
+  home=$(make_home ignored-interrupt)
+  fallback_bin="$home/fallback-bin"
+  mkdir -p "$home/root/bin" "$fallback_bin"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  for tool in bash dirname mktemp rm perl grep cat sleep; do
+    tool_path=$(command -v "$tool") || fail "could not locate $tool for the ignored-interrupt fixture"
+    ln -s "$tool_path" "$fallback_bin/$tool"
+  done
+  cat > "$home/root/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+trap 'printf "interrupted\n" > "$FM_HOME/cleanup-reached"; exit 0' INT
+sleep 20
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
+  status=0
+  PATH="$fallback_bin" FM_HOME="$home" perl -e '$SIG{INT} = "IGNORE"; exec @ARGV' \
+    "$home/root/bin/fm-watch-checkpoint.sh" --seconds 1 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 124 "$status" "inherited ignored interrupt checkpoint exit"
+  assert_contains "$(cat "$home/cleanup-reached" 2>/dev/null)" "interrupted" \
+    "the bound must deliver INT despite its caller ignoring it"
+  pass "a checkpoint restores ignored INT before launching its watcher"
+}
+
+# A harness stops a foreground checkpoint by killing its process group. The
+# bound must outlive that kill and still interrupt its watcher, or the orphaned
+# watcher keeps the lock and every later checkpoint reports it as foreign.
+test_group_killed_checkpoint_still_stops_its_watcher() {
+  local home checkpoint_pid watcher_pid status started deadline now gone
+  home=$(make_home group-killed)
+  TMPDIR="$home" FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    perl -e 'setpgrp(0, 0); exec @ARGV' "$CHECKPOINT" --seconds 180 \
+    >"$home/killed-out.txt" 2>"$home/killed-err.txt" &
+  checkpoint_pid=$!
+  wait_for_checkpoint_lock "$home" || {
+    kill -KILL -- "-$checkpoint_pid" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "group-killed checkpoint did not take the watcher lock"
+  }
+  watcher_pid=$(cat "$home/state/.watch.lock/pid")
+  started=$(monotonic_ms)
+  deadline=$((started + GROUP_KILL_LIMIT_MS))
+  kill -KILL -- "-$checkpoint_pid"
+  wait "$checkpoint_pid" 2>/dev/null || true
+  while :; do
+    gone=1
+    kill -0 "$watcher_pid" 2>/dev/null && gone=0
+    now=$(monotonic_ms)
+    if [ "$now" -gt "$deadline" ]; then
+      kill -KILL "$watcher_pid" 2>/dev/null || true
+      fail "the watcher outlived its group-killed checkpoint's ${GROUP_KILL_LIMIT_MS}ms cleanup limit ($((now - started))ms)"
+    fi
+    [ "$gone" -eq 1 ] && break
+    sleep 0.05
+  done
+  printf '# group-kill ordinary stop_ms=%s\n' "$((now - started))"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    "$CHECKPOINT" --seconds 1 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  assert_not_contains "$(cat "$home/err.txt")" "watcher is already running outside this foreground checkpoint" \
+    "the next checkpoint found the group-killed checkpoint's watcher still holding the lock"
+  case "$status" in
+    0|124) ;;
+    *) fail "the next checkpoint did not run its own watcher (exit $status): $(cat "$home/out.txt" "$home/err.txt")" ;;
+  esac
+  pass "a group-killed checkpoint still stops its watcher and frees the next checkpoint"
+}
+
+# Measured 2026-10-22: five serial nice-20 runs under live fleet load on macOS
+# (1-minute load 7.60-9.95; 603-619 user processes) observed ordinary stops of
+# 410/567/420/393/398 ms and delayed-child stops of 417/330/391/347/372 ms.
+# Green main CI run 39838628417 bracketed the complete ordinary/delayed cases
+# at <=906/249 ms; green CI runs 39765810014 and 39832878710 measured upper
+# bounds of <=1074/1286 ms ordinary and <=262/260 ms delayed (adjacent log
+# timestamps, including setup and the ordinary case's next-checkpoint check;
+# conservative upper bounds, not precise signal-to-exit measurements).
+# Orphaned stopped-group stress also stopped honestly in 5158/5305 ms;
+# the 2000 ms margin covers that worst 305 ms overrun of the 5-second grace.
+# The 2000 ms margin rounds ABOVE the worst 1286 ms CI-case upper bound, on top of
+# the unchanged production INT 5-second grace. Both monotonic limits reject
+# a never-stopping watcher/bound or one lingering beyond 7 seconds, including
+# a process first observed gone after the deadline; poll counts cannot stretch it.
+GROUP_KILL_MARGIN_MS=2000
+GROUP_KILL_LIMIT_MS=$((5000 + GROUP_KILL_MARGIN_MS))
+
+monotonic_ms() {
+  perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%d\n", clock_gettime(CLOCK_MONOTONIC) * 1000'
+}
+
+# A busy host schedules a freshly forked bound child late. SlowPgrp.pm delays
+# only that child's own setpgrp(0, 0), by longer than the 5-second cleanup
+# grace, and records the child, the bound, and the owner the bound was given.
+# Killing the checkpoint's group must stop both within GROUP_KILL_LIMIT_MS above,
+# or the watcher the child would go on to start runs with no bound at all.
+test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start() {
+  local home checkpoint_pid child watchdog owner watchdog_parent started deadline now gone
+  home=$(make_home slow-start)
+  mkdir -p "$home/root/bin" "$home/perl-lib"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  cat > "$home/perl-lib/SlowPgrp.pm" <<'PM'
+package SlowPgrp;
+BEGIN {
+  no warnings 'once';
+  my ($root, $owner, $mark) = ($$, $ARGV[0], $ENV{FM_SLOW_PGRP_MARK});
+  *CORE::GLOBAL::setpgrp = sub {
+    if (@_ == 2 && $_[0] == 0 && $$ != $root) {
+      open my $fh, '>', "$mark.tmp" or die "open mark: $!";
+      printf {$fh} "%s %s %s\n", $$, getppid(), $owner;
+      close $fh;
+      rename "$mark.tmp", $mark or die "rename mark: $!";
+      select undef, undef, undef, 8;
+    }
+    CORE::setpgrp($_[0], $_[1]);
+  };
+}
+1;
+PM
+  cat > "$home/root/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+fm_test_record_process "$FM_STUB_PIDFILE" || exit 1
+while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
+  fm_test_track_process "$home/watcher.pid" "$home/root/bin/fm-watch.sh"
+  TMPDIR="$home" FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    PERL5LIB="$home/perl-lib" PERL5OPT=-MSlowPgrp FM_SLOW_PGRP_MARK="$home/slow-pgrp.mark" \
+    FM_STUB_PIDFILE="$home/watcher.pid" \
+    perl -e 'setpgrp(0, 0); exec @ARGV' "$home/root/bin/fm-watch-checkpoint.sh" --seconds 180 \
+    >"$home/slow-out.txt" 2>"$home/slow-err.txt" &
+  checkpoint_pid=$!
+  fm_test_wait_until 5 test -s "$home/slow-pgrp.mark" || {
+    kill -KILL -- "-$checkpoint_pid" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "the bound child never reached its delayed process-group setup"
+  }
+  read -r child watchdog owner < "$home/slow-pgrp.mark"
+  watchdog_parent=$(ps -o ppid= -p "$watchdog" 2>/dev/null | tr -d ' ')
+  if [ "$owner" != "$checkpoint_pid" ] || [ "$watchdog_parent" != "$checkpoint_pid" ]; then
+    kill -KILL -- "-$checkpoint_pid" "-$watchdog" "-$child" 2>/dev/null || true
+    kill -KILL "$child" "$watchdog" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "the bound was not owned by the checkpoint being killed (owner $owner, bound parent $watchdog_parent, checkpoint $checkpoint_pid)"
+  fi
+  started=$(monotonic_ms)
+  deadline=$((started + GROUP_KILL_LIMIT_MS))
+  kill -KILL -- "-$checkpoint_pid"
+  wait "$checkpoint_pid" 2>/dev/null || true
+  while :; do
+    gone=1
+    kill -0 "$child" 2>/dev/null && gone=0
+    kill -0 "$watchdog" 2>/dev/null && gone=0
+    now=$(monotonic_ms)
+    if [ "$now" -gt "$deadline" ]; then
+      kill -KILL -- "-$watchdog" "-$child" 2>/dev/null || true
+      kill -KILL "$child" "$watchdog" 2>/dev/null || true
+      fail "the bound and its slow-starting child were not both gone within ${GROUP_KILL_LIMIT_MS}ms of the checkpoint's group-kill (gone=$gone, $((now - started))ms)"
+    fi
+    [ "$gone" -eq 1 ] && break
+    sleep 0.05
+  done
+  printf '# group-kill delayed stop_ms=%s\n' "$((now - started))"
+  pass "a group-killed checkpoint still stops a bound child that was slow to make its process group"
+}
+
+# A code root whose path holds a space must launch its watcher as one path.
+test_checkpoint_launches_a_watcher_under_a_spaced_root() {
+  local home bin status
+  home=$(make_home spaced-root)
+  bin="$home/code root/bin"
+  mkdir -p "$bin"
+  cp "$CHECKPOINT" "$bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$bin/fm-supervision-engine-lib.sh"
+  cat > "$bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'signal: spaced-root.status\n'
+SH
+  chmod +x "$bin/fm-watch-checkpoint.sh" "$bin/fm-watch.sh"
+  status=0
+  FM_HOME="$home" "$bin/fm-watch-checkpoint.sh" --seconds 5 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 0 "$status" "spaced-root checkpoint exit: $(cat "$home/err.txt")"
+  assert_contains "$(cat "$home/out.txt")" "signal: spaced-root.status" \
+    "the watcher under a spaced code root did not run"
+  pass "a checkpoint launches its watcher from a code root whose path holds a space"
+}
+
+# A harness cancels a checkpoint by signalling its process group, which does
+# not hold the watcher's own group. The cancel must still reach the watcher, so
+# its EXIT cleanup releases state/.watch.lock instead of leaving it held.
+test_cancelled_checkpoint_lets_its_watcher_release_the_lock() {
+  local home checkpoint_pid watcher_pid i=0
+  home=$(make_home cancelled)
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    perl -e 'setpgrp(0, 0); exec @ARGV' "$CHECKPOINT" --seconds 30 >"$home/out.txt" 2>"$home/err.txt" &
+  checkpoint_pid=$!
+  wait_for_checkpoint_lock "$home" || {
+    kill -KILL -- "-$checkpoint_pid" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "cancelled checkpoint did not take the watcher lock"
+  }
+  watcher_pid=$(cat "$home/state/.watch.lock/pid")
+  kill -TERM -- "-$checkpoint_pid" || fail "could not signal the checkpoint's process group"
+  wait "$checkpoint_pid" 2>/dev/null || true
+  while [ "$i" -lt 100 ]; do
+    if ! kill -0 "$watcher_pid" 2>/dev/null && [ ! -e "$home/state/.watch.lock/pid" ]; then
+      break
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if kill -0 "$watcher_pid" 2>/dev/null; then
+    fail "the watcher outlived its cancelled checkpoint"
+  fi
+  assert_absent "$home/state/.watch.lock/pid" "the cancelled checkpoint's watcher did not release its lock"
+  pass "a cancelled checkpoint forwards the cancel so its watcher releases the lock"
+}
+
+test_announced_recovery_is_not_reannounced_by_next_checkpoint() {
+  local home out err status marker
+  home=$(make_home announced-recovery)
+  out="$home/out.txt"
+  err="$home/err.txt"
+  append_wake "$home/state" check buried 'check: unacknowledged durable wake' \
+    || fail "could not append the unacknowledged durable wake"
+
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    "$CHECKPOINT" --seconds 5 >"$out" 2>"$err" || status=$?
+  expect_code 0 "$status" "first recovery checkpoint exit"
+  assert_contains "$(cat "$out")" "check: rearm-resurface" \
+    "first checkpoint did not announce the pending recovery"
+  marker=$(cat "$home/state/.watcher-down")
+  case "$marker" in
+    announced:downtime:*) ;;
+    *) fail "first checkpoint did not leave an announced generation: $marker" ;;
+  esac
+  [ -s "$home/state/.wake-queue" ] \
+    || fail "durable wake did not stay unacknowledged after the announcement"
+
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    "$CHECKPOINT" --seconds 1 >"$out" 2>"$err" || status=$?
+
+  expect_code 124 "$status" "announced recovery checkpoint exit"
+  assert_contains "$(cat "$out")" "checkpoint: no actionable wake within 1s" \
+    "announced recovery checkpoint did not supervise for its bound"
+  assert_not_contains "$(cat "$out")" "check: rearm-resurface" \
+    "announced recovery was reannounced by the next checkpoint"
+  [ "$(cat "$home/state/.watcher-down")" = "$marker" ] \
+    || fail "announced recovery checkpoint changed the outstanding generation"
+  grep "$(printf '\tcheck\tburied\tcheck: unacknowledged durable wake')" \
+    "$home/state/.wake-queue" >/dev/null \
+    || fail "unacknowledged durable wake was not retained"
+  pass "an announced recovery is not reannounced by the next foreground checkpoint"
+}
+
+test_never_announced_recovery_is_announced_once() {
+  local home out err status
+  home=$(make_home pending-recovery)
+  out="$home/out.txt"
+  err="$home/err.txt"
+  printf 'pending:downtime:unreported.1.aaa\n' > "$home/state/.watcher-down"
+
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    "$CHECKPOINT" --seconds 5 >"$out" 2>"$err" || status=$?
+
+  expect_code 0 "$status" "pending recovery checkpoint exit"
+  [ "$(grep -c '^check: rearm-resurface$' "$out" || true)" -eq 1 ] \
+    || fail "never-announced recovery did not surface exactly once: $(cat "$out")"
+  [ "$(cat "$home/state/.watcher-down")" = 'announced:downtime:unreported.1.aaa' ] \
+    || fail "never-announced recovery did not retain its announced generation"
+  pass "a never-announced recovery still surfaces once from a foreground checkpoint"
+}
+
+test_queue_append_during_checkpoint_still_resurfaces() {
+  local home out err status checkpoint_pid
+  home=$(make_home queue-append)
+  out="$home/out.txt"
+  err="$home/err.txt"
+
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
+    "$CHECKPOINT" --seconds 5 >"$out" 2>"$err" &
+  checkpoint_pid=$!
+  wait_for_checkpoint_lock "$home" || {
+    kill "$checkpoint_pid" 2>/dev/null || true
+    wait "$checkpoint_pid" 2>/dev/null || true
+    fail "queue-append checkpoint did not take the watcher lock"
+  }
+  append_wake "$home/state" check concurrent 'check: appended during checkpoint' \
+    || fail "could not append a durable wake during the checkpoint"
+  status=0
+  wait "$checkpoint_pid" || status=$?
+
+  expect_code 0 "$status" "queue-append checkpoint exit"
+  assert_contains "$(cat "$out")" "check: rearm-resurface" \
+    "queue append during checkpoint did not resurface"
+  grep "$(printf '\tcheck\tconcurrent\tcheck: appended during checkpoint')" \
+    "$home/state/.wake-queue" >/dev/null \
+    || fail "queue append was not retained durably after checkpoint recovery"
+  pass "a queue append during a foreground checkpoint still resurfaces"
+}
+
+test_signal_passes_through_and_exits_zero() {
+  local home out err status drained
+  home=$(make_home signal)
+  out="$home/out.txt"
+  err="$home/err.txt"
+  (
+    sleep 1
+    printf 'done: synthetic wake\n' > "$home/state/demo.status"
+  ) &
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 "$CHECKPOINT" --seconds 8 >"$out" 2>"$err" || status=$?
+  expect_code 0 "$status" "signal checkpoint exit"
+  assert_contains "$(cat "$out")" "signal:" "signal wake was not passed through"
+  drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh")
+  assert_contains "$drained" $'\tsignal\tdemo.status\t' "signal wake was not queued durably"
+  pass "checkpoint passes through a real watcher wake and leaves the queue for drain"
+}
+
+test_registered_check_uses_preserved_watcher_environment() {
+  local home out err status
+  home=$(make_home check-env)
+  out="$home/out.txt"
+  err="$home/err.txt"
+  cat > "$home/state/env-check.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'env check fired with FM_CHECK_INTERVAL=%s\n' "${FM_CHECK_INTERVAL:-missing}"
+SH
+  chmod 0700 "$home/state/env-check.check.sh"
+  FM_HOME="$home" "$ROOT/bin/fm-check-register.sh" env-check >/dev/null \
+    || fail "could not register checkpoint custom check"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=1 "$CHECKPOINT" --seconds 5 >"$out" 2>"$err" || status=$?
+  expect_code 0 "$status" "check checkpoint exit"
+  assert_contains "$(cat "$out")" "check:" "check wake was not passed through"
+  assert_contains "$(cat "$out")" "FM_CHECK_INTERVAL=1" "watcher environment was not preserved"
+  pass "checkpoint preserves watcher environment for registered custom checks"
+}
+
+test_due_checks_precede_repeated_unmanaged_recovery() {
+  local home bin file status cycle drained notice expected_checks='' expected_recoveries=''
+  local sequence generation
+  local -a fixture_env
+  home=$(make_home recovery-order)
+  bin="$home/root/bin"
+  mkdir -p "$bin" "$home/tools" "$home/tmp" "$home/runtime"
+  chmod 0700 "$home/runtime"
+  for file in "$ROOT/bin/"*; do
+    [ "${file##*/}" != fm-reboot-recover.sh ] || continue
+    ln -s "$file" "$bin/${file##*/}"
+  done
+  cat > "$bin/fm-reboot-recover.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_HOME/recovery-calls"
+printf 'REBOOT_RECOVERY: restored: live launch is unmanaged; no lifecycle action taken\n'
+SH
+  cat > "$home/tools/herdr" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "status --json"*)
+    printf '{"server":{"running":true},"client":{"protocol":16,"version":"0.9.0"}}\n'
+    ;;
+  "pane get "*)
+    printf '{"error":{"code":"pane_not_found"}}\n'
+    exit 1
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  cat > "$home/state/due-check.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'due-check\n' >> "$FM_HOME/check-calls"
+printf 'due-check result: ordinary supervision progressed\n'
+SH
+  chmod 0700 "$bin/fm-reboot-recover.sh" "$home/tools/herdr" "$home/state/due-check.check.sh"
+  fixture_env=(env -i "PATH=$home/tools:$PATH" "HOME=$home" "TMPDIR=$home/tmp"
+    "XDG_CONFIG_HOME=$home/config" "XDG_DATA_HOME=$home/data" "XDG_STATE_HOME=$home/state"
+    "XDG_CACHE_HOME=$home/cache" "XDG_RUNTIME_DIR=$home/runtime"
+    "FM_HOME=$home" "FM_ROOT_OVERRIDE=$home/root" "FM_STATE_OVERRIDE=$home/state"
+    "FM_CONFIG_OVERRIDE=$home/config" "FM_PROCEVENT_CLAIM_ROOT=$home/procevent-claims"
+    FM_GATE_REFUSE_BYPASS=1 FM_TEST_SEAM=1 FM_OPEN_LOOPS_BIN=/usr/bin/true
+    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999
+    FM_HEARTBEAT_MAX=999999 FM_HOME_SUMMARY_INTERVAL=999999)
+  fm_write_meta "$home/state/restored.meta" "backend=herdr" "kind=ship" \
+    "window=checkpoint-fixture:pane-absent" "worktree=$home"
+  : > "$home/check-calls"
+  : > "$home/recovery-calls"
+  touch "$home/state/home-summary.json" "$home/state/.last-heartbeat"
+  "${fixture_env[@]}" "$bin/fm-check-register.sh" due-check >/dev/null \
+    || fail "could not register recovery-order custom check"
+  notice='REBOOT_RECOVERY: restored: live launch is unmanaged; no lifecycle action taken'
+  for cycle in 1 2; do
+    touch -t 200001010000 "$home/state/.last-check" "$home/state/.reboot-recovery-tick"
+    status=0
+    "${fixture_env[@]}" "$bin/fm-watch-checkpoint.sh" --seconds 8 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+    expect_code 0 "$status" "due check checkpoint exit, cycle $cycle"
+    expected_checks="${expected_checks:+$expected_checks$'\n'}due-check"
+    assert_equals "$expected_checks" "$(cat "$home/check-calls")" "due check did not execute, cycle $cycle"
+    assert_contains "$(cat "$home/out.txt")" "due-check result: ordinary supervision progressed" \
+      "due check result was not surfaced, cycle $cycle"
+    assert_not_contains "$(cat "$home/out.txt")" "$notice" "recovery notice preceded due check, cycle $cycle"
+    assert_equals "$expected_recoveries" "$(cat "$home/recovery-calls")" \
+      "recovery ran before due check, cycle $cycle"
+    drained=$("${fixture_env[@]}" "$bin/fm-wake-drain.sh" 2>"$home/drain.err")
+    assert_contains "$drained" $'\tcheck\t'"$home/state/due-check.check.sh"$'\t' \
+      "due check wake was not queued durably, cycle $cycle"
+    assert_contains "$drained" "due-check result: ordinary supervision progressed" \
+      "durable due check wake lost its result, cycle $cycle"
+    assert_not_contains "$drained" "$notice" "recovery was queued before due check, cycle $cycle"
+    sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$home/drain.err")
+    generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$home/drain.err")
+    [ -n "$sequence" ] && [ -n "$generation" ] || fail "due check drain omitted acknowledgement token, cycle $cycle"
+    "${fixture_env[@]}" "$bin/fm-wake-drain.sh" --ack-through "$sequence" --recovery-generation "$generation" \
+      >"$home/ack.out" 2>"$home/ack.err" || fail "could not acknowledge due check wake, cycle $cycle"
+
+    touch "$home/state/.last-check"
+    touch -t 200001010000 "$home/state/.reboot-recovery-tick"
+    status=0
+    "${fixture_env[@]}" "$bin/fm-watch-checkpoint.sh" --seconds 8 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+    expect_code 0 "$status" "unmanaged recovery checkpoint exit, cycle $cycle"
+    expected_recoveries="${expected_recoveries:+$expected_recoveries$'\n'}recover --one"
+    assert_equals "$expected_recoveries" "$(cat "$home/recovery-calls")" \
+      "recovery did not receive recover --one, cycle $cycle"
+    assert_equals "$expected_checks" "$(cat "$home/check-calls")" "quiet check executed again, cycle $cycle"
+    assert_contains "$(cat "$home/out.txt")" "check: Herdr reboot launch recovery: $notice" \
+      "unmanaged recovery notice was not surfaced, cycle $cycle"
+    drained=$("${fixture_env[@]}" "$bin/fm-wake-drain.sh" 2>"$home/drain.err")
+    assert_contains "$drained" $'\tcheck\treboot-launch-recovery-' \
+      "recovery wake was not queued durably, cycle $cycle"
+    assert_contains "$drained" "check: Herdr reboot launch recovery: $notice" \
+      "durable recovery wake lost its payload, cycle $cycle"
+    sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$home/drain.err")
+    generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$home/drain.err")
+    [ -n "$sequence" ] && [ -n "$generation" ] || fail "recovery drain omitted acknowledgement token, cycle $cycle"
+    "${fixture_env[@]}" "$bin/fm-wake-drain.sh" --ack-through "$sequence" --recovery-generation "$generation" \
+      >"$home/ack.out" 2>"$home/ack.err" || fail "could not acknowledge recovery wake, cycle $cycle"
+  done
+  status=0
+  "${fixture_env[@]}" "$bin/fm-watch-checkpoint.sh" --seconds 2 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 124 "$status" "immediate recovery rearm respects cooldown"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 2s" \
+    "recovery cooldown checkpoint was not quiet"
+  assert_equals "$expected_recoveries" "$(cat "$home/recovery-calls")" "recovery ran again during cooldown"
+  assert_equals "$expected_checks" "$(cat "$home/check-calls")" "quiet check ran during recovery cooldown"
+  drained=$("${fixture_env[@]}" "$bin/fm-wake-drain.sh" 2>"$home/drain.err")
+  assert_equals "" "$drained" "recovery cooldown published another wake"
+  pass "checkpoint: due checks progress before repeated unmanaged recovery, whose durable notice and cooldown survive"
+}
+
+test_existing_singleton_watcher_is_not_success() {
+  local home out err status
+  home=$(make_home singleton)
+  out="$home/out.txt"
+  err="$home/err.txt"
+  mkdir "$home/state/.watch.lock"
+  printf '%s\n' "$$" > "$home/state/.watch.lock/pid"
+  status=0
+  FM_HOME="$home" FM_GUARD_GRACE=300 "$CHECKPOINT" --seconds 5 >"$out" 2>"$err" || status=$?
+  expect_code 1 "$status" "singleton checkpoint exit"
+  assert_contains "$(cat "$out")" "watcher: already running" "singleton watcher output was not passed through"
+  assert_contains "$(cat "$err")" "outside this foreground checkpoint" "singleton watcher failure was not explained"
+  pass "checkpoint rejects an existing watcher singleton as unowned"
+}
+
+# A home opted into the supervision host whose checkpoint runs a stub host in
+# a fixture code root: the stub records the bound it was given, then closes
+# the way $FM_HOME/host-kind says.
+make_host_home() {  # <name>
+  local home
+  home=$(make_home "$1")
+  mkdir -p "$home/root/bin"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  cat > "$home/root/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'args=%s\nprimary=%s\npark=%s\nlimit=%s\n' "$*" "${FM_SUPERVISION_HOST_PRIMARY:-}" \
+  "${FM_SUPERVISION_HOST_PARK_SECONDS:-}" "${FM_SUPERVISION_HOST_PARK_LIMIT:-}" > "$FM_HOME/host-env"
+case "$(cat "$FM_HOME/host-kind")" in
+  boundary) printf 'supervision-host: cycle boundary - fixture\n' ;;
+  handback)
+    printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+    printf 'signal: demo.status\nsupervision-host: the away session could not take this wake: fixture; this wake is yours\n'
+    ;;
+  stood-down) printf 'supervision-host stood down: this session no longer owns supervision\n' ;;
+  killed) kill -KILL "$$" ;;
+esac
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-supervision-host.sh"
+  : > "$home/config/supervision-host"
+  printf '%s\n' "$home"
+}
+
+run_host_checkpoint() {  # <home> <kind> [checkpoint args...]; sets STATUS
+  local home=$1
+  printf '%s\n' "$2" > "$home/host-kind"
+  shift 2
+  STATUS=0
+  FM_HOME="$home" "$home/root/bin/fm-watch-checkpoint.sh" "$@" >"$home/out.txt" 2>"$home/err.txt" || STATUS=$?
+}
+
+test_host_checkpoint_bounds_the_park_by_posture() {
+  local home f
+  home=$(make_host_home host-bound)
+  run_host_checkpoint "$home" boundary --seconds 5
+  expect_code 124 "$STATUS" "a host park that reached its bound is a quiet checkpoint"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 5s" "the boundary must read as the ordinary quiet line"
+  assert_contains "$(cat "$home/host-env")" $'args=park\nprimary=codex\npark=5\nlimit=1235' \
+    "attended, the host must park for the checkpoint's own bound with the codex pin and a turn limit past it"
+  : > "$home/state/.afk-contract"
+  run_host_checkpoint "$home" boundary --seconds 5
+  expect_code 124 "$STATUS" "an away park that reached its bound is a quiet checkpoint"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 3600s" "away, the bound must be raised"
+  assert_contains "$(cat "$home/host-env")" 'park=3600' "away, the host must park for the away bound"
+  FM_CODEX_WATCH_CHECKPOINT_AWAY=900 run_host_checkpoint "$home" boundary --seconds 5
+  assert_contains "$(cat "$home/host-env")" 'park=900' "the away bound must be configurable"
+  FM_CODEX_WATCH_CHECKPOINT_AWAY=900 run_host_checkpoint "$home" boundary --seconds 1000
+  assert_contains "$(cat "$home/host-env")" 'park=1000' "the away bound must never shorten a longer checkpoint"
+  # Quiet mode's record is a present captain (bin/fm-afk-contract.sh AWAY OR
+  # QUIET), so the checkpoint keeps its attended bound beside it.
+  for f in fm-afk-contract.sh fm-classify-lib.sh fm-timeout-lib.sh; do cp "$ROOT/bin/$f" "$home/root/bin/$f"; done
+  rm -f "$home/state/.afk-contract"
+  FM_HOME="$home" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+    || fail "fixture: could not record quiet mode"
+  run_host_checkpoint "$home" boundary --seconds 5
+  expect_code 124 "$STATUS" "a park beside a quiet record that reached its bound is a quiet checkpoint"
+  assert_contains "$(cat "$home/host-env")" 'park=5' "beside a quiet record the host must park for the attended bound"
+  pass "checkpoint: an opted-in home runs the host for the checkpoint's bound, raised only while away"
+}
+
+test_host_checkpoint_passes_a_handback_and_reports_a_stand_down() {
+  local home
+  home=$(make_host_home host-handback)
+  run_host_checkpoint "$home" handback --seconds 5
+  expect_code 0 "$STATUS" "a handed-back wake is an actionable checkpoint"
+  assert_contains "$(cat "$home/out.txt")" $'signal: demo.status\nsupervision-host: the away session could not take this wake' \
+    "the wake and its host line must pass through"
+  assert_not_contains "$(cat "$home/out.txt")" "watcher: started" "the host's cycle status is not part of the wake"
+  run_host_checkpoint "$home" stood-down --seconds 5
+  expect_code 1 "$STATUS" "a host that stood down is a failed checkpoint"
+  assert_contains "$(cat "$home/out.txt")" "supervision-host stood down" "the stand-down must be shown"
+  run_host_checkpoint "$home" killed --seconds 5
+  expect_code 137 "$STATUS" "a host killed before the bound must preserve its signal status"
+  assert_not_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake" \
+    "a killed host must not be reported as a quiet checkpoint"
+  pass "checkpoint: a handed-back wake passes through, and a host stand-down or signal death is a failure"
+}
+
+# The Codex owner stays file-gated: without config/supervision-host, or with
+# config/supervision-host-off, the checkpoint never runs the host.
+test_host_checkpoint_needs_the_file_and_honors_off() {
+  local home line
+  home=$(make_host_home host-gate)
+  for line in - off; do
+    rm -f "$home/config/supervision-host" "$home/config/supervision-host-off" "$home/host-env"
+    [ "$line" = - ] || : > "$home/config/supervision-host-off"
+    run_host_checkpoint "$home" boundary --seconds 1
+    [ ! -e "$home/host-env" ] || fail "a Codex home whose config/supervision-host is ${line/-/absent} ran the supervision host"
+  done
+  pass "checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host"
+}
+
+# The real host under a fake Codex harness that holds the home's session lock.
+# shellcheck disable=SC2016 # the fake harness's script expands in its own shell
+test_real_host_checkpoint_ends_quietly_at_its_bound() {
+  local home fakebin status
+  home=$(make_home host-real)
+  : > "$home/config/supervision-host"
+  fakebin="$TMP_ROOT/host-real-bin"
+  mkdir -p "$fakebin"
+  ln -s /bin/bash "$fakebin/codex"
+  status=0
+  FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$fakebin/codex" -c '
+    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    "$0" --seconds 4
+  ' "$CHECKPOINT" >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 124 "$status" "a quiet host checkpoint: $(cat "$home/out.txt" "$home/err.txt")"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 4s" "the real host's boundary must read as the quiet line"
+  assert_grep '	boundary	' "$home/state/.supervision-host.log" "the host must have ended its own park"
+  if [ -e "$home/state/.watch.lock/pid" ] && kill -0 "$(cat "$home/state/.watch.lock/pid")" 2>/dev/null; then
+    fail "a host checkpoint left its watcher running"
+  fi
+  pass "checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint"
+}
+
+
+# Temporary runtime fault injection: freeze only this test's private processes,
+# or deschedule the observer after its first genuinely failed liveness probe.
+if [ "$#" -eq 2 ]; then
+  PROBE_CASE=$1
+  PROBE_MODE=$2
+  FROZEN_FILE="$TMP_ROOT/frozen-pids"
+  : > "$FROZEN_FILE"
+  LATE_INJECTED=0
+  cleanup_probe() {
+    local pid
+    while read -r pid; do
+      command kill -KILL "$pid" 2>/dev/null || true
+    done < "$FROZEN_FILE"
+    fm_test_cleanup
+  }
+  trap cleanup_probe EXIT
+  kill() {
+    local pid parent status
+    if [ "$#" -eq 3 ] && [ "$1" = -KILL ] && [ "$2" = -- ] \
+      && [ "$3" = "-${checkpoint_pid:-none}" ] && [ "$PROBE_MODE" = frozen ]; then
+      if [ "$PROBE_CASE" = ordinary ]; then
+        while read -r pid parent; do
+          [ "$parent" = "$checkpoint_pid" ] || continue
+          printf '%s\n' "$pid" >> "$FROZEN_FILE"
+          command kill -STOP "$pid" || return 1
+          printf '# fault: paused bound pid=%s\n' "$pid"
+        done < <(ps -axo pid=,ppid=)
+        printf '%s\n' "$watcher_pid" >> "$FROZEN_FILE"
+        command kill -STOP "$watcher_pid" || return 1
+        printf '# fault: paused real watcher pid=%s\n' "$watcher_pid"
+      else
+        printf '%s\n%s\n' "$watchdog" "$child" >> "$FROZEN_FILE"
+        command kill -STOP "$watchdog" "$child" || return 1
+        printf '# fault: paused bound pid=%s delayed child pid=%s\n' "$watchdog" "$child"
+      fi
+      command kill "$@" || return 1
+      wait "$checkpoint_pid" 2>/dev/null || true
+      # The kernel resumes newly orphaned stopped groups; pause AFTER reaping
+      # the checkpoint so this fault actually holds the private bound stopped.
+      while read -r pid; do
+        command kill -STOP "$pid" || return 1
+        ps -p "$pid" -o pid=,ppid=,state=,command=
+      done < "$FROZEN_FILE"
+      return 0
+    fi
+    if [ "$#" -eq 2 ] && [ "$1" = -0 ] && [ "$PROBE_MODE" = late ]; then
+      status=0
+      command kill "$@" 2>/dev/null || status=$?
+      if [ "$status" -ne 0 ] && [ "$LATE_INJECTED" -eq 0 ]; then
+        LATE_INJECTED=1
+        printf '# fault: first real disappearance observed; observer descheduled 8s\n'
+        sleep 8
+      fi
+      return "$status"
+    fi
+    command kill "$@"
+  }
+  case "$PROBE_CASE" in
+    ordinary) test_group_killed_checkpoint_still_stops_its_watcher ;;
+    delayed) test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start ;;
+  esac
+  fail 'the seven-second guard accepted the injected over-limit observation'
+fi
+
+for probe_case in ordinary delayed; do
+  for probe_mode in frozen late; do
+    output="$TMP_ROOT/$probe_case-$probe_mode.log"
+    status=0
+    started_probe=$(monotonic_ms)
+    /bin/bash "$0" "$probe_case" "$probe_mode" > "$output" 2>&1 || status=$?
+    ended_probe=$(monotonic_ms)
+    printf '\n=== %s / %s: regression guard output ===\n' "$probe_case" "$probe_mode"
+    cat "$output"
+    printf '# probe exit=%s full scenario elapsed_ms=%s\n' "$status" "$((ended_probe-started_probe))"
+    [ "$status" -eq 1 ] || fail 'expected guard rejection did not exit 1'
+    grep -q '7000ms' "$output" || fail 'failure was not the unchanged seven-second guard'
+    pass "$probe_case rejects $probe_mode over-limit observation"
+  done
+done
