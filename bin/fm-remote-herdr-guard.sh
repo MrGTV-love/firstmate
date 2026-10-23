@@ -40,6 +40,8 @@
 #                                          re-checking, with no deadline, and
 #                                          never start while status fails or
 #                                          absence is unproven
+#   a different server comes up during the takeover (under the start lock, or
+#   a new socket owner)                -> re-run this ownership decision
 # Each exec first asks herdr-server-start.py --hold-for-exec for permission.
 # That helper takes the session's Firstmate start lock, the same lock every
 # other Firstmate starter holds, re-proves absence under it, and keeps holding
@@ -118,9 +120,21 @@ start_server() {
       log "starting the herdr server for session $SESSION inside this launch agent (pid $$)"
       exec "$HERDR_BIN" server --session "$SESSION"
       ;;
-    running) log "session $SESSION came up under the start lock; not starting a second server" ;;
+    running)
+      log "session $SESSION came up under the start lock; not starting a second server"
+      return 0
+      ;;
     *) log "the start lock refused to start session $SESSION; re-checking" ;;
   esac
+  return 1
+}
+
+# owner_replaced: the session socket is positively owned by a pid other than
+# the OWNER this takeover stopped.
+owner_replaced() {
+  local current
+  current=$(fm_remote_herdr_socket_owner "$SOCKET") || return 1
+  [ -n "$current" ] && [ "$current" != "$OWNER" ]
 }
 
 while :; do
@@ -138,39 +152,47 @@ while :; do
   sleep 1
 done
 
-SOCKET=$(printf '%s' "$STATUS" | jq -r '.server.socket // empty' 2>/dev/null)
-OWNER=$(fm_remote_herdr_socket_owner "$SOCKET"); OWNER_RC=$?
-if [ "$OWNER_RC" -eq 2 ]; then
-  log "session $SESSION is running but lsof does not resolve, so its server's birth cannot be proven"
-  BIRTH=unknown
-elif [ -z "$OWNER" ]; then
-  log "session $SESSION is running but no herdr process could be proven to own ${SOCKET:-its socket}"
-  BIRTH=unknown
-else
-  BIRTH=$(fm_remote_herdr_owner_birth "$OWNER")
-fi
-
-if fm_remote_herdr_birth_is_aqua "$BIRTH"; then
-  log "session $SESSION is served by pid $OWNER born in the Aqua login session ($BIRTH); nothing to do"
-  exit 0
-fi
-
-log "session $SESSION is served by ${OWNER:+pid }${OWNER:-an unproven process} born outside the Aqua login session ($BIRTH); its panes cannot reach the login keychain, taking the session over"
-HERDR_SESSION="$SESSION" "$HERDR_BIN" server stop --session "$SESSION" >/dev/null 2>&1 \
-  || log "herdr server stop for session $SESSION did not succeed; waiting for the socket anyway"
-i=0
 while :; do
-  read_state
-  case "$STATE" in
-    absent)
-      log "session $SESSION released its socket after $i tenths of a second"
-      start_server
-      ;;
-    running) ;;
-    *) wait_note "$STATE" ;;
-  esac
-  [ "$i" -ne "$STOP_WAIT_TENTHS" ] \
-    || log "the foreign server for session $SESSION has not released its socket after $STOP_WAIT_TENTHS tenths of a second; still waiting and re-checking rather than starting a second server"
-  sleep 0.1
-  i=$((i + 1))
+  SOCKET=$(printf '%s' "$STATUS" | jq -r '.server.socket // empty' 2>/dev/null)
+  OWNER=$(fm_remote_herdr_socket_owner "$SOCKET"); OWNER_RC=$?
+  if [ "$OWNER_RC" -eq 2 ]; then
+    log "session $SESSION is running but lsof does not resolve, so its server's birth cannot be proven"
+    BIRTH=unknown
+  elif [ -z "$OWNER" ]; then
+    log "session $SESSION is running but no herdr process could be proven to own ${SOCKET:-its socket}"
+    BIRTH=unknown
+  else
+    BIRTH=$(fm_remote_herdr_owner_birth "$OWNER")
+  fi
+
+  if fm_remote_herdr_birth_is_aqua "$BIRTH"; then
+    log "session $SESSION is served by pid $OWNER born in the Aqua login session ($BIRTH); nothing to do"
+    exit 0
+  fi
+
+  log "session $SESSION is served by ${OWNER:+pid }${OWNER:-an unproven process} born outside the Aqua login session ($BIRTH); its panes cannot reach the login keychain, taking the session over"
+  HERDR_SESSION="$SESSION" "$HERDR_BIN" server stop --session "$SESSION" >/dev/null 2>&1 \
+    || log "herdr server stop for session $SESSION did not succeed; waiting for the socket anyway"
+  i=0
+  FRESH=0
+  while :; do
+    read_state
+    case "$STATE" in
+      absent)
+        log "session $SESSION released its socket after $i tenths of a second"
+        if start_server; then FRESH=1; fi
+        ;;
+      running)
+        if [ "$FRESH" = 1 ] || owner_replaced; then
+          log "session $SESSION is now served by a server this takeover did not stop; re-running the ownership decision"
+          break
+        fi
+        ;;
+      *) wait_note "$STATE" ;;
+    esac
+    [ "$i" -ne "$STOP_WAIT_TENTHS" ] \
+      || log "the foreign server for session $SESSION has not released its socket after $STOP_WAIT_TENTHS tenths of a second; still waiting and re-checking rather than starting a second server"
+    sleep 0.1
+    i=$((i + 1))
+  done
 done

@@ -87,6 +87,17 @@ case "$*" in
         exit 1
       fi
     fi
+    if [ -f "$FM_FAKE_STATE/comes-back-after" ]; then
+      left=$(cat "$FM_FAKE_STATE/comes-back-after")
+      if [ "$left" -gt 0 ]; then
+        printf '%s\n' "$((left - 1))" > "$FM_FAKE_STATE/comes-back-after"
+      else
+        rm -f "$FM_FAKE_STATE/comes-back-after"
+        printf 'true\n' > "$FM_FAKE_HERDR_RUNNING"
+        cp "$FM_FAKE_STATE/comes-back-owner" "$FM_FAKE_SOCKET_OWNER"
+        running=true
+      fi
+    fi
     if [ -f "$FM_FAKE_STATE/release-after" ]; then
       left=$(cat "$FM_FAKE_STATE/release-after")
       if [ "$left" -gt 0 ]; then
@@ -101,7 +112,14 @@ case "$*" in
       "$running" "$FM_FAKE_HERDR_SOCKET"
     ;;
   "server stop --session "*)
-    if [ -f "$FM_FAKE_STATE/stop-fails" ]; then
+    if [ -f "$FM_FAKE_STATE/stop-comes-back-once" ]; then
+      cp "$FM_FAKE_STATE/stop-comes-back-once" "$FM_FAKE_STATE/comes-back-after"
+      rm "$FM_FAKE_STATE/stop-comes-back-once"
+      printf 'false\n' > "$FM_FAKE_HERDR_RUNNING"
+    elif [ -f "$FM_FAKE_STATE/stop-replaced-by" ]; then
+      cp "$FM_FAKE_STATE/stop-replaced-by" "$FM_FAKE_SOCKET_OWNER"
+      rm "$FM_FAKE_STATE/stop-replaced-by"
+    elif [ -f "$FM_FAKE_STATE/stop-fails" ]; then
       cp "$FM_FAKE_STATE/stop-fails" "$FM_FAKE_STATE/status-fail-count"
       exit 1
     elif [ -f "$FM_FAKE_STATE/stop-fails-stopped" ]; then
@@ -539,6 +557,46 @@ stop_guard
 assert_contains "$(herdr_calls)" "server stop --session $SESSION" "the guard never asked the foreign server to stop"
 [ "$(grep -c "$UNRELEASED_NOTICE" "$CASE_STATE/guard.out")" = 1 ] || fail "the long-wait notice was not logged exactly once"
 pass "a foreign server that never releases the socket leaves the guard waiting, with one notice"
+
+# --- a different server during a takeover re-runs the ownership decision -----
+
+# The released session passes the guard's own absence read, then a server comes
+# up before the start-lock holder re-reads status: another starter won the lock.
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+load_job gui dev.firstmate.herdr.fm-remote "$LAUNCHD_PID"
+printf '1\n' > "$CASE_STATE/stop-comes-back-once"
+printf '%s\n' "$LAUNCHD_PID" > "$CASE_STATE/comes-back-owner"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not settle on an Aqua server that came up under the start lock"
+assert_not_started "the guard started a second server beside one that came up under the start lock"
+assert_contains "$GUARD_OUT" "came up under the start lock" "the guard did not report the server that won the start lock"
+assert_contains "$GUARD_OUT" "pid $LAUNCHD_PID born in the Aqua login session (launchd); nothing to do" \
+  "the guard did not re-run the ownership decision for the server that won the start lock"
+
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+printf '1\n' > "$CASE_STATE/stop-comes-back-once"
+printf '%s\n' "$SSH_PID" > "$CASE_STATE/comes-back-owner"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not take over a foreign server that came up under the start lock"
+assert_contains "$GUARD_OUT" "pid $SSH_PID born outside the Aqua login session (ssh)" \
+  "the guard did not re-run the ownership decision for the foreign server that won the start lock"
+[ "$(grep -c "^server stop --session $SESSION$" "$CASE_LOG")" = 2 ] || fail "the guard did not take the new foreign server over"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard did not start exactly one server after the second takeover"
+pass "a server that wins the start lock during a takeover gets a fresh ownership decision"
+
+# A reconnecting SSH attach replaces the stopped server before the re-check.
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+printf '%s\n' "$SSH_PID" > "$CASE_STATE/stop-replaced-by"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not take over the server that replaced the stopped one"
+assert_contains "$GUARD_OUT" "did not stop; re-running the ownership decision" "the guard did not notice the replaced socket owner"
+assert_contains "$GUARD_OUT" "pid $SSH_PID born outside the Aqua login session (ssh)" "the guard did not judge the replacing server"
+[ "$(grep -c "^server stop --session $SESSION$" "$CASE_LOG")" = 2 ] || fail "the guard did not take the replacing server over"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard did not start exactly one server after taking the replacement over"
+pass "a foreign server that replaces the stopped one between stop and re-check is taken over"
 
 # --- the release wait is polled, not assumed ---------------------------------
 
