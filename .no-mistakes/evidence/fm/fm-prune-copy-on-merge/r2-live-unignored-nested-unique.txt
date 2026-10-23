@@ -1,0 +1,76 @@
+tmux pane shell pid 54802 (cwd /Users/charlesabrooker/tmp/fm-mp-live.3FiprY); idle shell in copy pid 54814
+lab home: /Users/charlesabrooker/tmp/fm-lab.rQuHzl
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project
+copy HEAD: 35789fa65325b8f96456c6f65e938e758cd67c86   origin/main: 442b5fc873ecddcf77d25c15ea30d9a29839a9ed
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project  [fm/t1]  (held by t1)
+                   bash (54814)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? .claude/private/unique.bin
+?? .claude/worktrees/n1/
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717820
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717820
+--- nested copy before outcome check: see below
+
+$ two more forced attempts (must not raise a second wake)
+
+===== OUTCOME (unignored-nested-unique) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:10:20Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:10:21Z retained /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project: /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project has changed or untracked files (1 entries, first: ?? .claude/private/unique.bin)
+--- state/t1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=3
+next_at=1792739424
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project has changed or untracked files (1 entries, first: ?? .claude/private/unique.bin)
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project
+armed_at=1792717820
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- slot HEAD: 35789fa
+--- copy branch: fm/t1
+--- copy status:
+?? .claude/private/unique.bin
+?? .claude/worktrees/n1/
+--- nested copy /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project/.claude/worktrees/n1: present
+--- nested HEAD log:
+442b5fc task work (#7)
+4a98bbc base
+--- root unique file .claude/private/unique.bin: present (only copy)
+--- git worktree list of the pool's base repo:
+/Users/charlesabrooker/tmp/fm-mp-live.3FiprY/project                                4a98bbc [main]
+/Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project 35789fa [fm/t1]
+/Users/charlesabrooker/tmp/fm-mp-live.3FiprY/project                                4a98bbc [main]
+/Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project 35789fa [fm/t1]
+--- tmux pane shell 54802 alive: yes; idle shell 54814 alive: yes
+--- tmux pane content (lab server):
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$
+--- wakes naming merge-prune:t1: 1
+1792717821	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project for t1: /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project has changed or untracked files (1 entries, first: ?? .claude/private/unique.bin)
+--- real treehouse calls made by teardown and the prune
+(absent)
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.3FiprY/th/.treehouse/project-1a0c43/1/project  [fm/t1]  (held by t1)
+                   bash (54814)

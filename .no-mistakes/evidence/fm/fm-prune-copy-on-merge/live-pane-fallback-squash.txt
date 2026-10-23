@@ -1,0 +1,50 @@
+pane process tree:
+  PID  PPID COMMAND
+65438 65424 bash --noprofile --norc -c "/Users/charlesabrooker/.local/bin/treehouse" get -b fm/t1; exec sleep 3600
+65450 65438 /Users/charlesabrooker/.local/bin/treehouse get -b fm/t1
+66206 65450 /bin/bash -i -l
+tmux pane shell pid 65438 (cwd /Users/charlesabrooker/tmp/fm-mp-live.VMyqpC); idle shell in copy pid 66206
+lab home: /Users/charlesabrooker/tmp/fm-lab.kMkDoV
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.VMyqpC/th/.treehouse/project-9a27be/1/project
+copy HEAD: fac92a2c797c7d36c9b7ac0a5785ff538b6d8121   origin/main: 7adeb019011ae592f31e31c42800d4827d114600
+
+$ treehouse status
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-mp-live.VMyqpC/th/.treehouse/project-9a27be/1/project  [fm/t1]
+                   bash (66206)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792715148
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792715148
+
+===== OUTCOME (fallback-squash) =====
+--- data/t1/merge-prune.log
+2026-10-23T00:25:48Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T00:25:58Z fallback destroyed /Users/charlesabrooker/tmp/fm-mp-live.VMyqpC/th/.treehouse/project-9a27be/1/project (head fac92a2); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.kMkDoV/data/t1/merge-prune-preserved/1792715148
+2026-10-23T00:26:02Z reaped: removed by fallback, teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: gone
+--- tmux pane shell 65438 alive: no; idle shell 66206 alive: no
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+destroy /Users/charlesabrooker/tmp/fm-mp-live.VMyqpC/th/.treehouse/project-9a27be/1/project --include-leased --yes
+
+$ treehouse status
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- preserved files:
+data/t1/merge-prune-preserved/1792715148/root/.claude/bug-evidence/slot.json
+data/t1/merge-prune-preserved/1792715148/root/SHA256SUMS

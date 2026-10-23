@@ -1,0 +1,55 @@
+tmux pane shell pid 92772 (cwd /Users/charlesabrooker/tmp/fm-mp-live.j77lsr); idle shell in copy pid 92791
+lab home: /Users/charlesabrooker/tmp/fm-lab.WFGCGP
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project
+copy HEAD: 014771ef1234c15f029ed0d1b9e51f33a2f855ee   origin/main: 681be4dba240adba633daca386a001cdc2311302
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project  [fm/t1]  (held by t1)
+                   bash (92791)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792715023
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792715023
+
+$ two more forced attempts (must not raise a second wake)
+
+===== OUTCOME (follow-up) =====
+--- data/t1/merge-prune.log
+2026-10-23T00:23:43Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T00:23:47Z retained /Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project: /Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project has commits that are not in the merged pull request: its HEAD aa7b94677757 is not in the pull request's head and the defau...
+--- state/t1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=3
+next_at=1792736633
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project has commits that are not in the merged pull request: its HEAD aa7b94677757 is not in the pull request's head and the default branch does not carry its content
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project
+armed_at=1792715023
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- copy branch: fm/t1
+--- copy status:
+--- tmux pane shell 92772 alive: yes; idle shell 92791 alive: yes
+--- wakes naming merge-prune:t1: 1
+1792715027	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project for t1: /Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project has commits that are not in the merged pull request: its HEAD aa7b94677757 is not in the pull request's head and the default branch does not carry its content
+--- real treehouse calls made by teardown and the prune
+(absent)
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.j77lsr/th/.treehouse/project-bb987a/1/project  [fm/t1]  (held by t1)
+                   bash (92791)

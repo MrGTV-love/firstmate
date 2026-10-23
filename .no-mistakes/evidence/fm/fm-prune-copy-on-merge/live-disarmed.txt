@@ -1,0 +1,49 @@
+pane process tree:
+  PID  PPID COMMAND
+71741 71728 bash --noprofile --norc -c "/Users/charlesabrooker/.local/bin/treehouse" get -b fm/t1; exec sleep 3600
+71753 71741 /Users/charlesabrooker/.local/bin/treehouse get -b fm/t1
+72968 71753 /bin/bash -i -l
+tmux pane shell pid 71741 (cwd /Users/charlesabrooker/tmp/fm-mp-live.8WaOPO); idle shell in copy pid 72968
+lab home: /Users/charlesabrooker/tmp/fm-lab.4lkMc6
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.8WaOPO/th/.treehouse/project-d34567/1/project
+copy HEAD: b87811e82ddf3d25c7fccd603eab8724b91dc51c   origin/main: b87811e82ddf3d25c7fccd603eab8724b91dc51c
+
+$ treehouse status
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-mp-live.8WaOPO/th/.treehouse/project-d34567/1/project  [fm/t1]
+                   bash (72968)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+(absent)
+
+===== OUTCOME (disarmed) =====
+--- data/t1/merge-prune.log
+(absent)
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- slot HEAD: b87811e
+--- copy branch: fm/t1
+--- copy status:
+--- tmux pane shell 71741 alive: yes; idle shell 72968 alive: yes
+--- tmux pane content (lab server):
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/tmp/fm-mp-live.8WaOPO/th/.treehouse/project-d34567/1/project. Type 'exit' to return.
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:project charlesabrooker$
+--- treehouse get process 71753 alive: yes
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+(absent)
+
+$ treehouse status
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-mp-live.8WaOPO/th/.treehouse/project-d34567/1/project  [fm/t1]
+                   bash (72968)

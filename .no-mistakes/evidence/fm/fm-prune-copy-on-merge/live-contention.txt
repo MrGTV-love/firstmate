@@ -1,0 +1,68 @@
+pane process tree:
+  PID  PPID COMMAND
+34503 34490 bash --noprofile --norc -c "/Users/charlesabrooker/.local/bin/treehouse" get -b fm/t1; exec sleep 3600
+34514 34503 /Users/charlesabrooker/.local/bin/treehouse get -b fm/t1
+35484 34514 /bin/bash -i -l
+tmux pane shell pid 34503 (cwd /Users/charlesabrooker/tmp/fm-mp-live.JOcfQX); idle shell in copy pid 35484
+lab home: /Users/charlesabrooker/tmp/fm-lab.SamoaI
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.JOcfQX/th/.treehouse/project-46c7b1/1/project
+copy HEAD: a94812e524d1500284dfed34bd1b990e955d6d46   origin/main: a94812e524d1500284dfed34bd1b990e955d6d46
+
+$ treehouse status
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-mp-live.JOcfQX/th/.treehouse/project-46c7b1/1/project  [fm/t1]
+                   bash (35484)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792715387
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792715387
+--- state/t1.merge-prune while another lifecycle action holds the task lock
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1792715448
+state=pending
+reason=error: another lifecycle action is already running for task t1; nothing was changed
+wake_sent=0
+copy=
+armed_at=1792715387
+
+$ release the co-tenant lock, make the record due, run the sweep (what the watcher tick starts)
+/Users/charlesabrooker/.no-mistakes/evidence/01M5K1789VJYS187MC9DV7GG7D/live-lab.sh: line 249: 41298 Terminated: 15          sleep 300
+rc=0
+
+===== OUTCOME (contention) =====
+--- data/t1/merge-prune.log
+2026-10-23T00:29:48Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T00:29:48Z retry in 60s (attempt 1): error: another lifecycle action is already running for task t1; nothing was changed
+2026-10-23T00:30:02Z reaped: teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: present
+--- slot HEAD: a94812e
+--- copy branch: detached
+--- copy status:
+--- tmux pane shell 34503 alive: no; idle shell 35484 alive: no
+--- tmux pane content (lab server):
+--- treehouse get process 34514 alive: no
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+lease --help
+lease 1 --lease-holder t1
+return --force /Users/charlesabrooker/tmp/fm-mp-live.JOcfQX/th/.treehouse/project-46c7b1/1/project
+
+$ treehouse status
+base  main  (repository default)
+1     available    /Users/charlesabrooker/tmp/fm-mp-live.JOcfQX/th/.treehouse/project-46c7b1/1/project  (detached)

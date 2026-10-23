@@ -1,0 +1,63 @@
+tmux pane shell pid 45342 (cwd /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD); idle shell in copy pid 45351
+lab home: /Users/charlesabrooker/tmp/fm-lab.3IygaU
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project
+copy HEAD: 369dd52b4aba92c33cd9c78d84f4d724515d850b   origin/main: d1da87225a0d6017e2933bb3d2ac74bb28888763
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project  [fm/t1]  (held by t1)
+                   bash (45351)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? notes-only-here.txt
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717901
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717901
+
+$ two more forced attempts (must not raise a second wake)
+
+===== OUTCOME (dirty-untracked) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:11:41Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:11:43Z retained /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project: REFUSED: worktree /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project has uncommitted changes.
+--- state/t1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=3
+next_at=1792739507
+state=retained
+reason=REFUSED: worktree /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project has uncommitted changes.
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project
+armed_at=1792717901
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- slot HEAD: 369dd52
+--- copy branch: fm/t1
+--- copy status:
+?? notes-only-here.txt
+--- tmux pane shell 45342 alive: yes; idle shell 45351 alive: yes
+--- tmux pane content (lab server):
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$
+--- wakes naming merge-prune:t1: 1
+1792717903	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project for t1: REFUSED: worktree /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project has uncommitted changes.
+--- real treehouse calls made by teardown and the prune
+(absent)
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.2TLVrD/th/.treehouse/project-e13d59/1/project  [fm/t1]  (held by t1)
+                   bash (45351)

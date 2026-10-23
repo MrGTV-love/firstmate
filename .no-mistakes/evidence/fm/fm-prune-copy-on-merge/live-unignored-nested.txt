@@ -1,0 +1,54 @@
+tmux pane shell pid 19006 (cwd /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R); idle shell in copy pid 19012
+lab home: /Users/charlesabrooker/tmp/fm-lab.AkEp2a
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project
+copy HEAD: 649259d499ced42c110341cf3e736d4c44768ca0   origin/main: 3436de9cd647dd1ee2df8fc94268e9105322358a
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project  [fm/t1]  (held by t1)
+                   bash (19012)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? .claude/worktrees/n1/
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792715041
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792715041
+
+===== OUTCOME (unignored-nested) =====
+--- data/t1/merge-prune.log
+2026-10-23T00:24:01Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T00:24:08Z retained /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project: treehouse destroy refused or failed: 🌳 Destroyed 0 worktrees in /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project. 🌳 Skipped 1 worktree:   1     [leased,dirty]  /User...
+--- state/t1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1792736642
+state=retained
+reason=treehouse destroy refused or failed: 🌳 Destroyed 0 worktrees in /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project. 🌳 Skipped 1 worktree:   1     [leased,dirty]  /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project  re-run with --...
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project
+armed_at=1792715041
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- copy branch: fm/t1
+--- copy status:
+?? .claude/worktrees/n1/
+--- tmux pane shell 19006 alive: yes; idle shell 19012 alive: no
+--- wakes naming merge-prune:t1: 1
+1792715048	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project for t1: treehouse destroy refused or failed: 🌳 Destroyed 0 worktrees in /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project. 🌳 Skipped 1 worktree:   1     [leased,dirty]  /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treeho
+--- real treehouse calls made by teardown and the prune
+destroy /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project --include-leased --yes
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.kI6z0R/th/.treehouse/project-60efa7/1/project  [fm/t1]  (held by t1)

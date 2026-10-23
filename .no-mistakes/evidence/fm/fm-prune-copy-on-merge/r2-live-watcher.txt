@@ -1,0 +1,64 @@
+tmux pane shell pid 5616 (cwd /Users/charlesabrooker/tmp/fm-mp-live.OBjN2r); idle shell in copy pid 5624
+lab home: /Users/charlesabrooker/tmp/fm-lab.zT5tjL
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.OBjN2r/th/.treehouse/project-86bfda/1/project
+copy HEAD: 478bb9951a3f984a1c4b3e7d241c6a7ce0cae4d1   origin/main: 478bb9951a3f984a1c4b3e7d241c6a7ce0cae4d1
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.OBjN2r/th/.treehouse/project-86bfda/1/project  [fm/t1]  (held by t1)
+                   bash (5624)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1   (the exact arm-only call the watcher's merge poll makes)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717953
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717953
+--- data/t1/merge-prune.log before the watcher starts (arm only: no attempt yet)
+2026-10-23T01:12:33Z armed for https://github.com/acme/widget/pull/7
+
+$ start the REAL bin/fm-watch.sh on the lab home (merge-prune tick every 1s; idle reap off)
+--- watcher runs (stdout):
+watcher run 1 start 01:12:36
+signal: /Users/charlesabrooker/tmp/fm-lab.zT5tjL/state/t1.status
+watcher run 1 exit rc=0 01:12:38
+watcher run 2 start 01:12:38
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+watcher run 2 exit rc=0 01:12:39
+watcher run 3 start 01:12:39
+check: rearm-resurface
+watcher run 3 exit rc=0 01:12:40
+watcher run 4 start 01:12:40
+check: rearm-resurface
+watcher run 4 exit rc=0 01:12:49
+--- watcher stderr (last lines):
+
+===== OUTCOME (watcher) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:12:33Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:12:48Z reaped: teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: present
+--- slot HEAD: 478bb99
+--- copy branch: detached
+--- copy status:
+--- tmux pane shell 5616 alive: no; idle shell 5624 alive: no
+--- tmux pane content (lab server):
+--- wakes naming merge-prune:t1: 0
+0
+--- real treehouse calls made by teardown and the prune
+return --force /Users/charlesabrooker/tmp/fm-mp-live.OBjN2r/th/.treehouse/project-86bfda/1/project
+
+$ treehouse status
+base  main  (repository default)
+1     available    /Users/charlesabrooker/tmp/fm-mp-live.OBjN2r/th/.treehouse/project-86bfda/1/project  (detached)

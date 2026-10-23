@@ -1,0 +1,45 @@
+tmux pane shell pid 95002 (cwd /Users/charlesabrooker/tmp/fm-mp-live.0GgTSa); idle shell in copy pid 95016
+lab home: /Users/charlesabrooker/tmp/fm-lab.ewHRSC
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.0GgTSa/th/.treehouse/project-88bfe0/1/project
+copy HEAD: 349192b345dfd7d2f2fd0ba155f53340bdfe4bca   origin/main: 349192b345dfd7d2f2fd0ba155f53340bdfe4bca
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.0GgTSa/th/.treehouse/project-88bfe0/1/project  [fm/t1]  (held by t1)
+                   bash (95016)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717855
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717855
+
+===== OUTCOME (normal-merge) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:10:55Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:11:03Z reaped: teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: present
+--- slot HEAD: 349192b
+--- copy branch: detached
+--- copy status:
+--- tmux pane shell 95002 alive: no; idle shell 95016 alive: no
+--- tmux pane content (lab server):
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+return --force /Users/charlesabrooker/tmp/fm-mp-live.0GgTSa/th/.treehouse/project-88bfe0/1/project
+
+$ treehouse status
+base  main  (repository default)
+1     available    /Users/charlesabrooker/tmp/fm-mp-live.0GgTSa/th/.treehouse/project-88bfe0/1/project  (detached)

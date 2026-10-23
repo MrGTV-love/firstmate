@@ -1,0 +1,45 @@
+tmux pane shell pid 45954 (cwd /Users/charlesabrooker/tmp/fm-mp-live.aPSvjK); idle shell in copy pid 45963
+lab home: /Users/charlesabrooker/tmp/fm-lab.upI1RD
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.aPSvjK/th/.treehouse/project-5ed44c/1/project
+copy HEAD: b2f80e758748aed8d5ecee659a52a64d21d9b3ee   origin/main: 753869ea3803064cf71042a34e8c34283e0ec0ba
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.aPSvjK/th/.treehouse/project-5ed44c/1/project  [fm/t1]  (held by t1)
+                   bash (45963)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792714990
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792714990
+
+===== OUTCOME (fallback-squash) =====
+--- data/t1/merge-prune.log
+2026-10-23T00:23:10Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T00:23:17Z fallback destroyed /Users/charlesabrooker/tmp/fm-mp-live.aPSvjK/th/.treehouse/project-5ed44c/1/project (head b2f80e7); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.upI1RD/data/t1/merge-prune-preserved/1792714990
+2026-10-23T00:23:20Z reaped: removed by fallback, teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: gone
+--- tmux pane shell 45954 alive: no; idle shell 45963 alive: no
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+destroy /Users/charlesabrooker/tmp/fm-mp-live.aPSvjK/th/.treehouse/project-5ed44c/1/project --include-leased --yes
+
+$ treehouse status
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- preserved files:
+data/t1/merge-prune-preserved/1792714990/root/.claude/bug-evidence/slot.json
+data/t1/merge-prune-preserved/1792714990/root/SHA256SUMS

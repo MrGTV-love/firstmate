@@ -1,0 +1,2 @@
+ok - a merge seen by the poll arms the pool-copy prune without running it under the poll's lock
+rc=0

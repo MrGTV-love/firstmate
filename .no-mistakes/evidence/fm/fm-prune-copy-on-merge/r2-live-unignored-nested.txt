@@ -1,0 +1,48 @@
+tmux pane shell pid 39823 (cwd /Users/charlesabrooker/tmp/fm-mp-live.FXcp0r); idle shell in copy pid 39831
+lab home: /Users/charlesabrooker/tmp/fm-lab.x6XFYh
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.FXcp0r/th/.treehouse/project-3090b9/1/project
+copy HEAD: 3bfc318f568dc805d0f190dee45f4f77e0696ef9   origin/main: 88b57302004c56855d437ece4db8b92cae50153f
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.FXcp0r/th/.treehouse/project-3090b9/1/project  [fm/t1]  (held by t1)
+                   bash (39831)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? .claude/worktrees/n1/
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717808
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717808
+--- nested copy before outcome check: see below
+
+===== OUTCOME (unignored-nested) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:10:08Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:10:13Z fallback destroyed /Users/charlesabrooker/tmp/fm-mp-live.FXcp0r/th/.treehouse/project-3090b9/1/project (head 3bfc318); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.x6XFYh/data/t1/merge-prune-preserved/1792717808
+2026-10-23T01:10:15Z reaped: removed by fallback, teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: gone
+--- nested copy /Users/charlesabrooker/tmp/fm-mp-live.FXcp0r/th/.treehouse/project-3090b9/1/project/.claude/worktrees/n1: gone
+--- git worktree list of the pool's base repo:
+/Users/charlesabrooker/tmp/fm-mp-live.FXcp0r/project 88b5730 [main]
+--- tmux pane shell 39823 alive: no; idle shell 39831 alive: no
+--- tmux pane content (lab server):
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+destroy /Users/charlesabrooker/tmp/fm-mp-live.FXcp0r/th/.treehouse/project-3090b9/1/project --include-leased --yes
+
+$ treehouse status
+base  main  (repository default)
+🌳 No worktrees in pool.

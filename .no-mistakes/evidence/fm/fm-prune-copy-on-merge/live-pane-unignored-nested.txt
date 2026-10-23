@@ -1,0 +1,69 @@
+pane process tree:
+  PID  PPID COMMAND
+44583 44563 bash --noprofile --norc -c "/Users/charlesabrooker/.local/bin/treehouse" get -b fm/t1; exec sleep 3600
+44598 44583 /Users/charlesabrooker/.local/bin/treehouse get -b fm/t1
+47094 44598 /bin/bash -i -l
+tmux pane shell pid 44583 (cwd /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ); idle shell in copy pid 47094
+lab home: /Users/charlesabrooker/tmp/fm-lab.kE84dK
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project
+copy HEAD: 73a913cbbfb55b421cbbe29a5197bdab7be8e02c   origin/main: 55df628f657bc1858f8aea99abc97d6541754bcd
+
+$ treehouse status
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project  [fm/t1]
+                   bash (47094)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? .claude/worktrees/n1/
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792715184
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792715184
+
+===== OUTCOME (unignored-nested) =====
+--- data/t1/merge-prune.log
+2026-10-23T00:26:24Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T00:26:31Z retained /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project: treehouse destroy refused or failed: 🌳 Destroyed 0 worktrees in /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project. 🌳 Skipped 1 worktree:   1     [in-use,dirty]  /User...
+--- state/t1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1792736784
+state=retained
+reason=treehouse destroy refused or failed: 🌳 Destroyed 0 worktrees in /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project. 🌳 Skipped 1 worktree:   1     [in-use,dirty]  /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project  re-run with --...
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project
+armed_at=1792715184
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- slot HEAD: 73a913c
+--- copy branch: detached
+--- copy status:
+?? .claude/worktrees/n1/
+--- tmux pane shell 44583 alive: yes; idle shell 47094 alive: no
+--- tmux pane content (lab server):
+🌳 Setting up worktree...
+🌳 Entered worktree at /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project. Type 'exit' to return.
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:project charlesabrooker$ 🌳 Worktree has uncommitted changes.
+Clean worktree and return to pool? [Y/n]
+--- treehouse get process 44598 alive: yes
+--- wakes naming merge-prune:t1: 1
+1792715191	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project for t1: treehouse destroy refused or failed: 🌳 Destroyed 0 worktrees in /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project. 🌳 Skipped 1 worktree:   1     [in-use,dirty]  /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treeho
+--- real treehouse calls made by teardown and the prune
+destroy /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project --include-leased --yes
+
+$ treehouse status
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-mp-live.UcgDOQ/th/.treehouse/project-4ebe30/1/project  (detached)

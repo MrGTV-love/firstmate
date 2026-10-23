@@ -1,0 +1,60 @@
+tmux pane shell pid 29367 (cwd /Users/charlesabrooker/tmp/fm-mp-live.9quyEW); idle shell in copy pid 29372
+lab home: /Users/charlesabrooker/tmp/fm-lab.TbdAi7
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.9quyEW/th/.treehouse/project-47f9c1/1/project
+copy HEAD: 167078fa21235db49c56c33456d7ed86954a117b   origin/main: 167078fa21235db49c56c33456d7ed86954a117b
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.9quyEW/th/.treehouse/project-47f9c1/1/project  [fm/t1]  (held by t1)
+                   bash (29372)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717886
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717886
+--- state/t1.merge-prune while another lifecycle action holds the task lock
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1792717946
+state=pending
+reason=error: another lifecycle action is already running for task t1; nothing was changed
+wake_sent=0
+copy=
+armed_at=1792717886
+
+$ release the co-tenant lock, make the record due, run the sweep (what the watcher tick starts)
+/Users/charlesabrooker/.no-mistakes/evidence/01M5K1789VJYS187MC9DV7GG7D/live-lab-r2.sh: line 269: 30254 Terminated: 15          sleep 300
+rc=0
+
+===== OUTCOME (contention) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:11:26Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:11:27Z retry in 60s (attempt 1): error: another lifecycle action is already running for task t1; nothing was changed
+2026-10-23T01:11:38Z reaped: teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: present
+--- slot HEAD: 167078f
+--- copy branch: detached
+--- copy status:
+--- tmux pane shell 29367 alive: no; idle shell 29372 alive: no
+--- tmux pane content (lab server):
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+return --force /Users/charlesabrooker/tmp/fm-mp-live.9quyEW/th/.treehouse/project-47f9c1/1/project
+
+$ treehouse status
+base  main  (repository default)
+1     available    /Users/charlesabrooker/tmp/fm-mp-live.9quyEW/th/.treehouse/project-47f9c1/1/project  (detached)

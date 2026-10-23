@@ -1,0 +1,54 @@
+pane process tree:
+  PID  PPID COMMAND
+34050 34044 bash --noprofile --norc -c "/Users/charlesabrooker/.local/bin/treehouse" get -b fm/t1; exec sleep 3600
+34056 34050 /Users/charlesabrooker/.local/bin/treehouse get -b fm/t1
+34562 34056 /bin/bash -i -l
+tmux pane shell pid 34050 (cwd /Users/charlesabrooker/tmp/fm-mp-live.y61Onl); idle shell in copy pid 34562
+lab home: /Users/charlesabrooker/tmp/fm-lab.ibxhJs
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.y61Onl/th/.treehouse/project-594bd2/1/project
+copy HEAD: db1190a93ea09c57562c7b35e7b3b0e0a7348045   origin/main: 0ff4512df58202a5d4f19f515cb88bb88a5438f9
+
+$ treehouse status
+base  main  (repository default)
+1     in-use       /Users/charlesabrooker/tmp/fm-mp-live.y61Onl/th/.treehouse/project-594bd2/1/project  [fm/t1]
+                   bash (34562)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? .claude/worktrees/n1/
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717978
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717978
+--- nested copy before outcome check: see below
+
+===== OUTCOME (unignored-nested-wt) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:12:58Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:13:03Z fallback destroyed /Users/charlesabrooker/tmp/fm-mp-live.y61Onl/th/.treehouse/project-594bd2/1/project (head 0ff4512); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.ibxhJs/data/t1/merge-prune-preserved/1792717978
+2026-10-23T01:13:05Z reaped: removed by fallback, teardown completed
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: gone
+--- pool copy dir: gone
+--- nested copy /Users/charlesabrooker/tmp/fm-mp-live.y61Onl/th/.treehouse/project-594bd2/1/project/.claude/worktrees/n1: gone
+--- git worktree list of the pool's base repo:
+/Users/charlesabrooker/tmp/fm-mp-live.y61Onl/project 0ff4512 [main]
+--- tmux pane shell 34050 alive: no; idle shell 34562 alive: no
+--- tmux pane content (lab server):
+--- treehouse get process 34056 alive: no
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+destroy /Users/charlesabrooker/tmp/fm-mp-live.y61Onl/th/.treehouse/project-594bd2/1/project --include-leased --yes
+
+$ treehouse status
+base  main  (repository default)
+🌳 No worktrees in pool.

@@ -1,0 +1,74 @@
+tmux pane shell pid 64171 (cwd /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg); idle shell in copy pid 64182
+lab home: /Users/charlesabrooker/tmp/fm-lab.9tlu2C
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project
+copy HEAD: 4221610a87920315bf87945c77693b4fd6180436   origin/main: 899cd0c91ff0a991424c252d1ecdb5b80a2d8daa
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project  [fm/t1]  (held by t1)
+                   bash (64182)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? .claude/worktrees/n1/
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717828
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717828
+--- nested copy before outcome check: see below
+
+$ two more forced attempts (must not raise a second wake)
+
+===== OUTCOME (unignored-nested-unpushed) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:10:28Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:10:29Z retained /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project: /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project/.claude/worktrees/n1 has 1 commit(s) on no remote
+--- state/t1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=3
+next_at=1792739433
+state=retained
+reason=/Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project/.claude/worktrees/n1 has 1 commit(s) on no remote
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project
+armed_at=1792717828
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- slot HEAD: 4221610
+--- copy branch: fm/t1
+--- copy status:
+?? .claude/worktrees/n1/
+--- nested copy /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project/.claude/worktrees/n1: present
+--- nested HEAD log:
+c3f6125 unpushed nested work
+899cd0c task work (#7)
+4f468bd base
+--- git worktree list of the pool's base repo:
+/Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/project                                4f468bd [main]
+/Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project 4221610 [fm/t1]
+/Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/project                                4f468bd [main]
+/Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project 4221610 [fm/t1]
+--- tmux pane shell 64171 alive: yes; idle shell 64182 alive: yes
+--- tmux pane content (lab server):
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$
+--- wakes naming merge-prune:t1: 1
+1792717829	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project for t1: /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project/.claude/worktrees/n1 has 1 commit(s) on no remote
+--- real treehouse calls made by teardown and the prune
+(absent)
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.BdGZLg/th/.treehouse/project-7720f9/1/project  [fm/t1]  (held by t1)
+                   bash (64182)

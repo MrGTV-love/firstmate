@@ -1,0 +1,75 @@
+tmux pane shell pid 75197 (cwd /Users/charlesabrooker/tmp/fm-mp-live.oDByDm); idle shell in copy pid 75201
+lab home: /Users/charlesabrooker/tmp/fm-lab.bzF3it
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project
+copy HEAD: edf9ffa797b84302b80e74b916c27c517e151d86   origin/main: 1fc9a75ccd7fde2cf8d2465f8a3461ef697ae4d9
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project  [fm/t1]  (held by t1)
+                   bash (75201)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+?? .claude/worktrees/n1/
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=0
+next_at=1792717838
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792717838
+--- nested copy before outcome check: see below
+
+$ two more forced attempts (must not raise a second wake)
+
+===== OUTCOME (unignored-nested-wt-locked) =====
+--- data/t1/merge-prune.log
+2026-10-23T01:10:38Z armed for https://github.com/acme/widget/pull/7
+2026-10-23T01:10:41Z retained /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project: could not remove the nested copy /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project/.claude/worktrees/n1, which the status of /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th...
+--- state/t1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=3
+next_at=1792739448
+state=retained
+reason=could not remove the nested copy /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project/.claude/worktrees/n1, which the status of /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project shows as an untracked directory
+wake_sent=1
+copy=/Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project
+armed_at=1792717838
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- slot HEAD: edf9ffa
+--- copy branch: fm/t1
+--- copy status:
+?? .claude/worktrees/n1/
+--- nested copy /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project/.claude/worktrees/n1: present
+--- nested HEAD log:
+edf9ffa task work
+2585427 base
+--- git worktree list of the pool's base repo:
+/Users/charlesabrooker/tmp/fm-mp-live.oDByDm/project                                                     2585427 [main]
+/Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project                      edf9ffa [fm/t1]
+/Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project/.claude/worktrees/n1 edf9ffa (detached HEAD) locked
+/Users/charlesabrooker/tmp/fm-mp-live.oDByDm/project                                                     2585427 [main]
+/Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project                      edf9ffa [fm/t1]
+/Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project/.claude/worktrees/n1 edf9ffa (detached HEAD) locked
+--- tmux pane shell 75197 alive: yes; idle shell 75201 alive: yes
+--- tmux pane content (lab server):
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$
+--- wakes naming merge-prune:t1: 1
+1792717841	1	check	merge-prune:t1	check: merge-prune kept /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project for t1: could not remove the nested copy /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project/.claude/worktrees/n1, which the status of /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project shows a
+--- real treehouse calls made by teardown and the prune
+(absent)
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.oDByDm/th/.treehouse/project-b55a79/1/project  [fm/t1]  (held by t1)
+                   bash (75201)

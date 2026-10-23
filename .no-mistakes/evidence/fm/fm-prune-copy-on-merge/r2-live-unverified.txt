@@ -1,0 +1,41 @@
+tmux pane shell pid 19547 (cwd /Users/charlesabrooker/tmp/fm-mp-live.tQfl7j); idle shell in copy pid 19557
+lab home: /Users/charlesabrooker/tmp/fm-lab.e77YnV
+pool slot (real treehouse): /Users/charlesabrooker/tmp/fm-mp-live.tQfl7j/th/.treehouse/project-6d3d38/1/project
+copy HEAD: 6b5ee3957cbaa775abe3da0d5da375f88b0532dd   origin/main: 6b5ee3957cbaa775abe3da0d5da375f88b0532dd
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.tQfl7j/th/.treehouse/project-6d3d38/1/project  [fm/t1]  (held by t1)
+                   bash (19557)
+
+$ git -C <copy> status --porcelain --untracked-files=all
+
+$ fm-merge-prune.sh arm t1 --run   (the exact call bin/fm-pr-merge.sh makes after a verified merge)
+rc=0
+--- state/t1.merge-prune right after arm
+(absent)
+
+===== OUTCOME (unverified) =====
+--- data/t1/merge-prune.log
+(absent)
+--- state/t1.merge-prune
+(absent)
+--- task record state/t1.meta: present
+--- pool copy dir: present
+--- slot HEAD: 6b5ee39
+--- copy branch: fm/t1
+--- copy status:
+--- tmux pane shell 19547 alive: yes; idle shell 19557 alive: yes
+--- tmux pane content (lab server):
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+bash-3.2$
+--- wakes naming merge-prune:t1: 0
+--- real treehouse calls made by teardown and the prune
+(absent)
+
+$ treehouse status
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-mp-live.tQfl7j/th/.treehouse/project-6d3d38/1/project  [fm/t1]  (held by t1)
+                   bash (19557)
