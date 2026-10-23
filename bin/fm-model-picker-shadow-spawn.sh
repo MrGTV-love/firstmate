@@ -50,6 +50,7 @@ export FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}"
 fm_typesafe_key "$FM_HOME" || exit 0
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-shadow-spawn.XXXXXX") || exit 0
+# shellcheck disable=SC2329 # Invoked by the EXIT trap.
 cleanup() { rm -rf "$TMP"; }
 trap cleanup EXIT
 TEXT="$TMP/task.txt"
