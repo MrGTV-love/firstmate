@@ -1,0 +1,12 @@
+label=head-worktree tree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N730KKXZ5NGD255WDEW0QB
+watcher_pid=87883 time_to_check=1s alive_during_check=yes
+startup_dirname_launches_before_check=12 startup_uname_launches_before_check=15
+watcher_main_shell_sleep_launches_during_check=0 over 26s
+max_beat_age_during_check=2s (FM_GUARD_GRACE=6)
+after_TERM: watcher_gone=yes check_child_gone=yes leftover_check_sleep=0
+--- watcher stderr tail
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N730KKXZ5NGD255WDEW0QB/bin/fm-watch.sh: line 2254: 88786 Terminated: 15          ( eval "exec $FM_CHECK_WAIT_FD<&-"; if [ "$capture_stderr" = discard ]; then
+    "$@" 2> /dev/null;
+else
+    "$@" 2>&1;
+fi ) > "$FM_CHECK_OUTPUT"

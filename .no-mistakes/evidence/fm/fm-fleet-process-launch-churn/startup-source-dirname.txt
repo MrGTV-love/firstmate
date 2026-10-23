@@ -1,0 +1,6 @@
+base run1: dirname launches while sourcing fm-watch.sh = 21 (SCRIPT_DIR=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/base/bin)
+base run2: dirname launches while sourcing fm-watch.sh = 21 (SCRIPT_DIR=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/base/bin)
+base run3: dirname launches while sourcing fm-watch.sh = 21 (SCRIPT_DIR=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/base/bin)
+head run1: dirname launches while sourcing fm-watch.sh = 0 (SCRIPT_DIR=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/head/bin)
+head run2: dirname launches while sourcing fm-watch.sh = 0 (SCRIPT_DIR=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/head/bin)
+head run3: dirname launches while sourcing fm-watch.sh = 0 (SCRIPT_DIR=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/head/bin)

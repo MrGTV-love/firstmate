@@ -1,0 +1,10 @@
+label=mid-leftover-noperl tree=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/mid mode=leftover perl=noperl FM_CHECK_TIMEOUT=30
+check_descendant_pid=39870 killed_after=1s
+watcher_alive_4s_after_cleanup=no check_sweep_completed(.last-check)=yes
+watcher_exit_status_if_exited=0
+--- watcher stdout
+check: /Users/charlesabrooker/tmp/fm-lab.EOCcTz/state/stop.check.sh: leader-done
+watcher_main_shell_sleep_launches:
+  (none)
+--- watcher stderr (filtered job-kill notices)
+/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/mid/bin/fm-watch.sh: line 2255: perl: command not found

@@ -1,18 +1,16 @@
-# Live validation: watcher check wait without per-tick process launches
+# Live validation: watcher check-wait process launches (head 95417c6a6 vs base 3da01711e)
 
-All runs used the real `bin/fm-watch.sh` in a disposable lab home made by `bin/fm-lab-home.sh create`.
-"base" = commit 4d1dc7d5e (git archive snapshot). "target" = 62c6fd2af (this worktree).
-A PATH shim logged each `sleep`, `dirname`, and `perl` launch with its parent PID.
+All runs: real bin/fm-watch.sh, fresh marked lab FM_HOME (bin/fm-lab-home.sh create), private TMUX_TMPDIR, one registered custom check, PATH shims log each sleep/dirname/uname launch with its parent PID.
 
-| Scenario | base | target |
+| Scenario | base 3da01711e | head 95417c6a6 |
 |---|---|---|
-| 12 s custom check: `sleep` launches by watcher main shell | 80 (`sleep 0.1`) | 0 |
-| 12 s custom check: unique watcher descendants seen by 10 ms `ps` sampling | 169 | 62 |
-| 12 s custom check: `dirname` launches, whole run | 41 | 14 (all in child scripts outside scope) |
-| 12 s custom check: wake output delivered | yes (14.2 s) | yes (13.7 s) |
-| Hung TERM-ignoring check, 3 s timeout: leader + child killed | yes | yes (perl and no-perl) |
-| Hung check: `sleep` launches by watcher main shell | 20x `0.01` + 17x `0.1` + 1x poll `15` | 1x poll `15` (+1 perl); no-perl: 1x `0.20` + poll `15` |
-| Check leaves TERM-ignoring descendant: output delivered, descendant killed | n/a | yes (perl: 1 perl, 0 sleep; no-perl: 1x `0.20` + 1x `1.00`) |
-| Watcher started as `bash fm-watch.sh` from bin/ and `bash bin/fm-watch.sh` | n/a | wakes with check output, rc 0 |
-| 15 changed libs x 3 source modes (absolute/relative/bare): dir vars, rc, function count | identical | identical |
-| New tests from tests/fm-watcher-lock.test.sh run against base code | both FAIL | both pass (whole file rc 0, 0 not ok) |
+| Watcher main-shell `sleep` launches while one slow check runs | 107 in 27 s | 0 in 26 s (export), 0 in 26 s (worktree), 0 in 11 s (relative path) |
+| Max beat age during that check (grace 6 s) | 1 s | 2-3 s |
+| `dirname` launches from watcher start to first check | 39 | 12 |
+| `dirname` launches while sourcing fm-watch.sh (3 runs each) | 21, 21, 21 | 0, 0, 0 |
+| Leftover TERM-ignoring descendant, no Perl on PATH | killed, 21 sleep launches in cleanup | killed, 1 `sleep 0.20`, no perl error, exit 0 |
+| Same, intermediate rev 5dc166289 (pre review fix) | - | `perl: command not found` (grace lost) |
+| Hung check past FM_CHECK_TIMEOUT=3, with/without Perl | - | killed at ~3 s, watcher exit 0 (normal wake) |
+| Lib dir resolution, 13 files x 6 path forms | identical to head | identical to base |
+
+Files: live-wait-*.txt, live-wait-*.launches.log, live-stop-*.txt, startup-source-dirname.txt, lib-dir-resolution-base-vs-head.txt, targeted-tests.log, harness/.

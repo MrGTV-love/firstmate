@@ -1,0 +1,12 @@
+label=base-1 tree=/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/base
+watcher_pid=77073 time_to_check=1s alive_during_check=yes
+startup_dirname_launches_before_check=39 startup_uname_launches_before_check=16
+watcher_main_shell_sleep_launches_during_check=107 over 27s
+max_beat_age_during_check=1s (FM_GUARD_GRACE=6)
+after_TERM: watcher_gone=yes check_child_gone=yes leftover_check_sleep=0
+--- watcher stderr tail
+/Users/charlesabrooker/tmp/fm-lab.XANDKc/trees/base/bin/fm-watch.sh: line 2222: 78183 Terminated: 15          ( if [ "$capture_stderr" = discard ]; then
+    "$@" 2> /dev/null;
+else
+    "$@" 2>&1;
+fi ) > "$FM_CHECK_OUTPUT"

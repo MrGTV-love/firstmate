@@ -1,0 +1,9 @@
+label=head-hang-perl tree=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N730KKXZ5NGD255WDEW0QB mode=hang perl=perl FM_CHECK_TIMEOUT=3
+check_descendant_pid=21978 killed_after=3s
+watcher_alive_4s_after_cleanup=no check_sweep_completed(.last-check)=yes
+watcher_exit_status_if_exited=0
+--- watcher stdout
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+watcher_main_shell_sleep_launches:
+1792787969 20982 sleep 1
+--- watcher stderr (filtered job-kill notices)
