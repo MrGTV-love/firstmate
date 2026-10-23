@@ -139,6 +139,15 @@ fm_is_gate_agent() {
   return 1
 }
 
+# fm_gate_refuse_event: record the refusal as guard telemetry. bin/fm-guard-event.sh
+# always exits 0, and the fallback keeps a missing or broken writer from
+# changing the refusal's exit code under set -e.
+fm_gate_refuse_event() {
+  local dir
+  dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd) || return 0
+  "$dir/fm-guard-event.sh" gate-agent-containment deny --source-ok true 2>/dev/null || true
+}
+
 # fm_refuse_if_gate_agent: exit FM_GATE_REFUSE_EXIT with a clear stderr message if
 # this process looks like a no-mistakes gate agent without a permitted lab home.
 # Call before any fleet mutation. No-ops (returns 0) for a normal firstmate
@@ -155,5 +164,8 @@ fm_refuse_if_gate_agent() {
   else
     echo "error: refusing fleet lifecycle from inside a no-mistakes gate worktree ($FM_GATE_REFUSE_COMMON)" >&2
   fi
+  echo 'error: the one permitted escape is a disposable lab home: LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"); bin/fm-lab-home.sh create "$LAB"; FM_HOME=$LAB <command>' >&2
+  echo 'error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.' >&2
+  fm_gate_refuse_event
   exit "$FM_GATE_REFUSE_EXIT"
 }
