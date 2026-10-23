@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the real adapter with intercepted Herdr launches, never the real CLI."""
 
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -30,12 +31,18 @@ if cmd == "status":
         if mode == "error": sys.exit(1)
         if mode == "timeout": sys.exit(124)
         if mode == "empty": sys.exit(0)
-    print(json.dumps({"server": {"running": (root / "pid").exists(),
-        "socket": str(root / "herdr.sock"), "session": root.name}}))
+    server = {"running": (root / "pid").exists(), "session": root.name}
+    if not os.environ.get("START_NO_STATUS_SOCKET"):
+        server["socket"] = str(root / "herdr.sock")
+    print(json.dumps({"server": server}))
 elif cmd == "session":
-    print(json.dumps({"sessions": [{"name": root.name, "running": False,
-        "socket_path": str(root / "herdr.sock")}]}))
-elif cmd == "server":
+    entry = {"name": root.name, "running": False}
+    if not os.environ.get("START_NO_LIST_SOCKET"):
+        entry["socket_path"] = str(root / "herdr.sock")
+    print(json.dumps({"sessions": [entry]}))
+elif cmd == "server" and args[1:2] == ["--session"]:
+    if os.environ.get("START_SERVER_FAILS"):
+        sys.exit(1)
     with (root / "servers").open("a") as servers:
         servers.write(str(os.getpid()) + "\n")
     (root / "pid").write_text(str(os.getpid()))
@@ -246,6 +253,85 @@ class StartupSafety(unittest.TestCase):
         self.listen()
         self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "unreadable"),
                          "an accepting socket behind a stopped status is not proven absence")
+        self.assertEqual(self.starts(), [])
+
+    def servers(self):
+        path = self.dir / "servers"
+        return path.read_text().splitlines() if path.exists() else []
+
+    def lock_path(self):
+        return str(self.dir / "herdr.sock") + ".firstmate-start.lock"
+
+    def lock_is_free(self):
+        with open(self.lock_path(), "a") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return False
+            return True
+
+    def guard(self, **env):
+        child = subprocess.Popen([str(ROOT / "bin" / "fm-remote-herdr-guard.sh"), str(self.bin / "herdr"),
+                                  self.dir.name],
+                                 env=dict(self.env, FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS="5", **env),
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        self.children.append(child)
+        return child
+
+    def wait_for(self, predicate):
+        for _ in range(200):
+            if predicate():
+                return
+            time.sleep(.05)
+        self.fail("condition never held")
+
+    def test_guard_and_adapter_starts_race_to_one_server(self):
+        with open(self.lock_path(), "a") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            self.guard()
+            ensure = subprocess.Popen(
+                ["bash", "-c", '. "$1/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure "$2"',
+                 "fixture", str(ROOT), self.dir.name], env=self.env,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.children.append(ensure)
+            time.sleep(2)
+            self.assertEqual(self.servers(), [], "a starter launched while another held the start lock")
+        out, err = ensure.communicate(timeout=20)
+        self.assertEqual(ensure.returncode, 0, err)
+        self.wait_for(lambda: (self.dir / "pid").exists())
+        time.sleep(2)
+        self.assertEqual(len(self.servers()), 1, "the guard and the adapter both launched a server")
+
+    def test_guard_releases_the_start_lock_once_its_server_runs(self):
+        self.guard()
+        self.wait_for(lambda: (self.dir / "pid").exists())
+        rc, _ = self.ensure()
+        self.assertEqual(rc, 0, "a later ensure blocked on the guard's start lock")
+        self.assertEqual(len(self.servers()), 1)
+        self.wait_for(self.lock_is_free)
+
+    def test_guard_releases_the_start_lock_when_its_server_fails(self):
+        out, _ = self.guard(START_SERVER_FAILS="1").communicate(timeout=20)
+        self.assertIn("exited before reporting running; releasing the start lock", out)
+        self.assertEqual(self.servers(), [])
+        self.assertTrue(self.lock_is_free())
+
+    def test_session_list_supplies_a_missing_status_socket(self):
+        self.env["START_NO_STATUS_SOCKET"] = "1"
+        self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "missing"))
+        self.listen()
+        self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "unreadable"),
+                         "the listed socket was not the one probed for absence")
+        self.listener.close()
+        self.listener = None
+        self.assertEqual(self.ensure()[0], 0)
+        self.assertEqual(len(self.servers()), 1)
+
+    def test_no_socket_from_status_or_session_list_refuses(self):
+        self.env["START_NO_STATUS_SOCKET"] = "1"
+        self.env["START_NO_LIST_SOCKET"] = "1"
+        self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "unreadable"))
+        self.assertNotEqual(self.ensure()[0], 0)
         self.assertEqual(self.starts(), [])
 
     def test_crew_state_reads_without_starting(self):

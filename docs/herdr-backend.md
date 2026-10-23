@@ -589,6 +589,8 @@ An environment variable alone is not reliable when another Herdr server is runni
 
 A failed, empty, or malformed status is unknown and refuses startup.
 A successful stopped status is necessary but not sufficient: [`herdr-server-start.py`](../bin/backends/herdr-server-start.py) owns serialized startup after proving both process absence for the session and a non-accepting session socket.
+The session socket comes from the status `.server.socket`, or from `session list --json` `.socket_path` when status omits it; with neither, startup and the absence proof refuse.
+The [fm-remote guard](../bin/fm-remote-herdr-guard.sh) execs its own server only after the helper's `--hold-for-exec` mode takes the same start lock and proves absence; that helper process holds the lock until the server reports running or exits.
 A `herdr server` process without `--session` serves the session named by its inherited `HERDR_SESSION`, or `default` when that variable is absent; the helper reads that environment with `ps -E` on macOS or `/proc/<pid>/environ` on Linux.
 When that environment cannot be read, the process's session is unknown and it blocks startup.
 A live process, accepting socket, or unreadable proof refuses rather than replacing a server.

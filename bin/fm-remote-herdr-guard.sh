@@ -37,6 +37,12 @@
 #                                          reconnecting SSH attach can start
 #                                          another foreign server
 #   the foreign server does not release the socket in time -> exit 1
+# Each exec first asks herdr-server-start.py --hold-for-exec for permission.
+# That helper takes the session's Firstmate start lock, the same lock every
+# other Firstmate starter holds, re-proves absence under it, and keeps holding
+# it in its own process until the exec'd server reports running or exits, so
+# this guard and an adapter start can never both launch. A server that came up
+# under the lock is not started again; the guard re-checks instead.
 # A takeover closes every pane in that session; the parent firstmate's
 # secondmate liveness sweep relaunches its mates into the Aqua-born server.
 # bin/fm-remote-herdr-owner-lib.sh owns the owner discovery and the birth
@@ -98,8 +104,19 @@ wait_note() { # <reason>
 }
 
 start_server() {
-  log "starting the herdr server for session $SESSION inside this launch agent (pid $$)"
-  exec "$HERDR_BIN" server --session "$SESSION"
+  local verdict=
+  exec 3< <(printf '%s' "$STATUS" | python3 "$SCRIPT_DIR/backends/herdr-server-start.py" \
+    --hold-for-exec "$SESSION" "$HERDR_BIN" "$$")
+  IFS= read -r verdict <&3 || verdict=
+  exec 3<&-
+  case "$verdict" in
+    go)
+      log "starting the herdr server for session $SESSION inside this launch agent (pid $$)"
+      exec "$HERDR_BIN" server --session "$SESSION"
+      ;;
+    running) log "session $SESSION came up under the start lock; not starting a second server" ;;
+    *) log "the start lock refused to start session $SESSION; re-checking" ;;
+  esac
 }
 
 while :; do
@@ -109,6 +126,8 @@ while :; do
     absent)
       log "no server owns session $SESSION"
       start_server
+      sleep 1
+      continue
       ;;
   esac
   wait_note "$STATE"

@@ -2,13 +2,20 @@
 """Prove Herdr session process and socket absence, and cold-start only after it.
 
 Usage: herdr-server-start.py [--prove-absent] <session> <client-binary>
+       herdr-server-start.py --hold-for-exec <session> <client-binary> <pid>
 Read the successful stopped status JSON on stdin. --prove-absent only proves
 absence and starts nothing. Otherwise wait for the start lock beside that
 status's canonical socket, then re-read status under the lock; a server that a
 competing starter brought up is reused, never launched twice.
+--hold-for-exec serves a starter that execs the server itself as <pid>: under
+the lock it prints `running` for a server already up, or proves absence and
+prints `go`, then keeps holding the lock in this process until that session
+reports running or <pid> is gone.
+The socket comes from status `.server.socket`, else from `session list --json`
+`.socket_path`, the adapter's own socket lookup.
 Unknown status, process inventory, socket identity, or socket errors refuse.
 The lock file stays in place so competing starters cannot lock different inodes.
-The detached server inherits neither this lock nor any caller pipe descriptor.
+The server inherits neither this lock nor any caller pipe descriptor.
 """
 
 import errno
@@ -39,13 +46,20 @@ def status(client, session):
     return json.loads(result.stdout)
 
 
-def socket_path(body, session):
+def socket_path(body, session, client):
     server = body["server"]
     if server.get("session", session) != session:
         raise ValueError("status names a different session")
     path = server.get("socket")
     if not isinstance(path, str) or not os.path.isabs(path):
-        raise ValueError("status did not identify an absolute session socket")
+        listed = subprocess.run([client, "session", "list", "--json", "--session", session],
+                                check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                text=True, timeout=STARTUP_SECONDS,
+                                env=dict(os.environ, HERDR_SESSION=session))
+        path = next((entry.get("socket_path") for entry in json.loads(listed.stdout).get("sessions", [])
+                     if isinstance(entry, dict) and entry.get("name") == session), None)
+    if not isinstance(path, str) or not os.path.isabs(path):
+        raise ValueError("neither status nor session list identified an absolute session socket")
     return os.path.realpath(path)
 
 
@@ -163,28 +177,84 @@ def prove_socket_absence(path):
     raise ValueError("the session socket still accepts connections")
 
 
-def main(prove_only, session, client):
+def notice_after(started, noticed, message):
+    if not noticed and time.monotonic() - started >= STARTUP_SECONDS:
+        print(f"notice: {message}", file=sys.stderr, flush=True)
+        return True
+    return noticed
+
+
+def process_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    state = subprocess.run(["ps", "-o", "stat=", "-p", pid], stdout=subprocess.PIPE,
+                           stderr=subprocess.DEVNULL, text=True, timeout=STARTUP_SECONDS).stdout.strip()
+    return bool(state) and not state.startswith("Z")
+
+
+def lock_with_notice(session, lock):
+    started, noticed = time.monotonic(), False
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            noticed = notice_after(started, noticed, f"still waiting for the Herdr start lock of session {session}")
+            time.sleep(POLL_SECONDS)
+
+
+def main(mode, session, client, pid=None):
+    if (mode == "--hold-for-exec") != (pid is not None) or (pid is not None and not pid.isdecimal()):
+        raise TypeError("invalid arguments")
     initial = json.load(sys.stdin)
     if initial["server"].get("running") is not False:
         raise ValueError("absence requires a successful stopped status")
-    path = socket_path(initial, session)
-    if prove_only:
+    path = socket_path(initial, session, client)
+    if mode == "--prove-absent":
         prove_process_absence(session, client)
         prove_socket_absence(path)
         return
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path + ".firstmate-start.lock", "a", encoding="utf-8") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        if mode == "--hold-for-exec":
+            lock_with_notice(session, lock)
+        else:
+            fcntl.flock(lock, fcntl.LOCK_EX)
         current = status(client, session)
-        if socket_path(current, session) != path:
+        if socket_path(current, session, client) != path:
             raise ValueError("the session socket changed during startup")
         running = current["server"].get("running")
         if running is True:
+            if mode == "--hold-for-exec":
+                print("running", flush=True)
             return
         if running is not False:
             raise ValueError("server status is unknown")
         prove_process_absence(session, client)
         prove_socket_absence(path)
+        if mode == "--hold-for-exec":
+            print("go", flush=True)
+            with open(os.devnull, "wb") as null:
+                os.dup2(null.fileno(), sys.stdout.fileno())
+            started, noticed = time.monotonic(), False
+            while True:
+                if not process_alive(pid):
+                    print(f"error: the Herdr server for session {session} exited before reporting running; "
+                          "releasing the start lock", file=sys.stderr, flush=True)
+                    sys.exit(1)
+                try:
+                    if status(client, session)["server"].get("running") is True:
+                        return
+                except (ValueError, KeyError, TypeError, subprocess.SubprocessError):
+                    pass
+                noticed = notice_after(started, noticed,
+                                       f"the Herdr server for session {session} has not reported running yet; "
+                                       "still holding the start lock")
+                time.sleep(POLL_SECONDS)
         with open(os.devnull, "r+b") as null:
             subprocess.Popen([client, "server", "--session", session],
                              stdin=null, stdout=null, stderr=null, close_fds=True,
@@ -198,10 +268,10 @@ def main(prove_only, session, client):
 
 
 if __name__ == "__main__":
-    prove_only = sys.argv[1:2] == ["--prove-absent"]
+    mode = sys.argv[1] if sys.argv[1:2] in (["--prove-absent"], ["--hold-for-exec"]) else None
     try:
-        main(prove_only, *sys.argv[1 + prove_only:])
+        main(mode, *sys.argv[1 + (mode is not None):])
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
-        action = "Herdr session absence is unproven" if prove_only else "refusing Herdr server startup"
+        action = "Herdr session absence is unproven" if mode == "--prove-absent" else "refusing Herdr server startup"
         print(f"error: {action}: {error}", file=sys.stderr)
         sys.exit(1)
