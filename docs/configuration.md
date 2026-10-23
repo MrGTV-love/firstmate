@@ -984,7 +984,10 @@ It runs detached with every stream discarded, so the spawn command returns witho
 It resolves the TypeSafe key with the same `fm_typesafe_key` lookup the resolver uses (the environment, `<home>/.env`, then the primary home's `.env`); with no key it writes no row.
 A launch with no concrete `--model` (empty or `default`) records no rule route, and an empty or `default` effort records a NULL `rule_effort`.
 The spawn hook exists because real dispatches can bypass the typed resolver, and an unobserved dispatch cannot become calibration evidence.
-One dispatch gets one row: each resolver row leaves a one-shot marker `<data root>/resolver-rows/<task id>`, and the spawn hook that finds the marker deletes it and writes nothing, while a manual launch with no resolver row still gets its spawn-hook row.
+One dispatch gets one row: each resolver row leaves a one-shot marker `<data root>/resolver-rows/<task id>` holding that row's id.
+The spawn hook that finds the marker deletes it and writes no row of its own; it sets that resolver row's `rule_worker` and `rule_effort` to the route and effort that actually launched, and records the resolver's own route under `gates.launch_attached` (`resolver_worker`, `resolver_effort`).
+That holds for every resolver outcome, so an `ambiguous`, `escalate`, `error` or `withheld` resolve, and a `clear` result firstmate overrode, still end with the launched route on the row.
+A manual launch with no resolver row, or a marker whose row cannot be found, gets its own spawn-hook row, which always carries the launched route, even when the launch brief is withheld.
 A relaunch (`--relaunch`) is the same dispatch, so the spawn hook does not observe it again.
 Both hooks discard their output and swallow every failure, so the printed status, profile line, exit code and spawn result are never derived from the picker.
 A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.

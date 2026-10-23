@@ -928,11 +928,51 @@ def task_key_for(brief_path):
 
 
 def resolver_mark_path(data_root, task_key):
-    """One-shot marker a resolver row leaves so the spawn hook does not log the same
-    dispatch twice; None when the task key cannot name a file."""
+    """One-shot marker holding the resolver row's id, so the spawn hook attaches the
+    launch to that row and does not log the same dispatch twice; None when the task key
+    cannot name a file."""
     if not task_key or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", task_key):
         return None
     return Path(data_root) / "resolver-rows" / task_key
+
+
+def attach_launch(data_root, mark, rule):
+    """Consume the resolver's marker and set its row's rule route to the route that
+    actually launched, keeping the resolver's own route in gates.launch_attached.
+    False when there is no usable resolver row, so the launch gets its own row."""
+    try:
+        text = mark.read_text()
+        mark.unlink()
+        dispatch_id = int(text.strip())
+    except (OSError, ValueError):
+        return False
+    conn = None
+    try:
+        conn = aadb.connect(Path(data_root) / "aa.sqlite")
+        aadb.init_calibration(conn)
+        row = conn.execute("SELECT rule_worker, rule_effort, gates FROM dispatch_log "
+                           "WHERE id = ? AND mode = 'shadow'", (dispatch_id,)).fetchone()
+        if row is None:
+            return False
+        try:
+            gates = json.loads(row["gates"] or "{}")
+        except ValueError:
+            gates = {}
+        if not isinstance(gates, dict):
+            gates = {}
+        gates["launch_attached"] = {"resolver_worker": row["rule_worker"],
+                                    "resolver_effort": row["rule_effort"]}
+        aadb.record_launch(conn, dispatch_id, rule["worker"], rule["effort"], gates)
+        return True
+    except (sqlite3.Error, OSError, LookupError) as error:
+        warn("could not attach the launch to the resolver row (%s); dispatch unchanged" % error)
+        return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
 
 
 def _load_optional(path):
@@ -970,27 +1010,25 @@ def observe(args, key, helper, data_root):
     quota_doc = _load_optional(args.get("quota"))
     rule_profile = (result.get("chosen") or {}).get("profile") or {}
     rule = {"worker": None, "validator": None, "effort": None}
-    if status not in ("withheld", "error") and isinstance(rule_profile, dict) \
+    launch = args.get("hook") == "spawn"
+    if (launch or status not in ("withheld", "error")) and isinstance(rule_profile, dict) \
             and isinstance(rule_profile.get("harness"), str):
         rule["worker"] = normalize_route(rule_profile.get("harness"), rule_profile.get("model"))
         effort = rule_profile.get("effort")
         rule["effort"] = effort if isinstance(effort, str) and effort else None
     task_key = task_key_for(brief) if brief else None
     mark = resolver_mark_path(data_root, task_key)
-    if args.get("hook") == "spawn":
-        if mark is not None:
-            try:
-                mark.unlink()
-                return 0
-            except OSError:
-                pass
+    if launch:
+        if mark is not None and attach_launch(data_root, mark, rule):
+            return 0
         mark = None
 
     def record(row):
-        if write_row(data_root, row) is not None and mark is not None:
+        dispatch_id = write_row(data_root, row)
+        if dispatch_id is not None and mark is not None:
             try:
                 mark.parent.mkdir(parents=True, exist_ok=True)
-                mark.touch()
+                mark.write_text(str(dispatch_id))
             except OSError as error:
                 warn("could not leave the resolver row marker (%s); dispatch unchanged" % error)
 
@@ -1301,8 +1339,9 @@ Observe one dispatch in shadow mode. Never prints or returns a dispatch route.
   --reason TEXT      a coarse reason, never brief text
   --never-send PATH  never-send policy (default <FM_CONFIG_OVERRIDE or FM_HOME/config>/dispatch-never-send)
   --project NAME     project name
-  --hook spawn       launch-path observation: skipped, consuming the marker, when the
-                     resolver already logged this task; any other run leaves that marker
+  --hook spawn       launch-path observation: when the resolver already logged this task,
+                     consume its marker and set that row's rule route to the launched
+                     route instead of writing a row; any other run leaves that marker
   --data-root PATH   data root overriding FM_MODEL_PICKER_DATA
 
 The data root is FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else

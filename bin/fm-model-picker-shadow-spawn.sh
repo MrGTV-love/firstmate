@@ -8,7 +8,8 @@
 # picker observes dispatches that never pass through the typed resolver. It builds the
 # launch observation (the sanitized launch-brief task text, the actual route, one
 # bounded quota snapshot) and hands it to bin/fm-model-picker-shadow.sh --observe
-# --hook spawn, which skips a task whose resolver run already wrote its row.
+# --hook spawn. When the resolver already wrote this task's row, that hook sets the
+# row's rule route to the launched route instead of writing a second row.
 #
 # Shadow only: it prints nothing, exits 0 on every failure, and no caller reads its
 # output. bin/fm-spawn.sh runs it detached under fm_run_timed; this tool also bounds
@@ -67,8 +68,16 @@ observe() {  # <status> [reason]
   exit 0
 }
 
+[ "$EFFORT" != default ] || EFFORT=''
+if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  jq -cn --arg harness "$HARNESS" --arg model "$MODEL" --arg effort "$EFFORT" \
+    '{status:"clear", chosen:{profile:({harness:$harness, model:$model} + (if $effort == "" then {} else {effort:$effort} end))}, candidates:[]}' \
+    > "$RESULT" 2>/dev/null || exit 0
+else
+  printf '%s' '{"status":"clear","candidates":[]}' > "$RESULT"
+fi
+
 if ! fm_typesafe_brief_task "$BRIEF" "$NEVER_SEND" "$TEXT" "$KIND" 2>/dev/null; then
-  printf '%s' '{}' > "$RESULT"
   : > "$RESOLVED"
   : > "$QUOTA"
   observe withheld "${FM_TYPESAFE_WITHHELD_REASON:-never-send policy withheld the launch text}"
@@ -78,15 +87,6 @@ printf '%s' '{}' > "$RESOLVED"
 if [ -n "$RULES" ] && [ -r "$RULES" ] && resolved=$(FM_CONFIG_OVERRIDE="${FM_CONFIG_OVERRIDE:-$(dirname "$RULES")}" \
     "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES" 2>/dev/null); then
   printf '%s' "$resolved" > "$RESOLVED"
-fi
-
-[ "$EFFORT" != default ] || EFFORT=''
-if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
-  jq -cn --arg harness "$HARNESS" --arg model "$MODEL" --arg effort "$EFFORT" \
-    '{status:"clear", chosen:{profile:({harness:$harness, model:$model} + (if $effort == "" then {} else {effort:$effort} end))}, candidates:[]}' \
-    > "$RESULT" 2>/dev/null || exit 0
-else
-  printf '%s' '{"status":"clear","candidates":[]}' > "$RESULT"
 fi
 
 : > "$QUOTA"

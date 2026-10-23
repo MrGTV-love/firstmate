@@ -13,8 +13,9 @@
 #   FM_MODEL_PICKER_SHADOW is an on value; bin/fm-model-picker-shadow-lib.sh owns that
 #   allowlist for this tool and the resolver. The resolver calls it after its own result is produced,
 #   bounded by bin/fm-timeout-lib.sh; this tool never becomes a dispatch dependency. A resolver
-#   row leaves a one-shot <data root>/resolver-rows/<task id> marker; bin/fm-model-picker-shadow-spawn.sh
-#   passes --hook spawn, which consumes that marker and writes nothing, so one dispatch is one row.
+#   row leaves a one-shot <data root>/resolver-rows/<task id> marker holding its row id;
+#   bin/fm-model-picker-shadow-spawn.sh passes --hook spawn, which consumes that marker and sets
+#   that row's rule route to the route that actually launched, so one dispatch is one row.
 # --report prints the per-work-type shadow disagreement report from aa.sqlite. It is routing
 #   evidence, never outcome labels, and prints "0 shadow dispatches logged" for an empty log.
 # --check-routes is read-only: it resolves every concrete route in config/crew-dispatch.json

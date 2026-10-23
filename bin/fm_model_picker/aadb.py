@@ -143,6 +143,13 @@ def _update(conn, dispatch_id, **cols):
     conn.commit()
 
 
+def record_launch(conn, dispatch_id, rule_worker, rule_effort, gates):
+    """The route that actually launched a logged dispatch, replacing its rule route;
+    gates is stored as sorted JSON."""
+    _update(conn, dispatch_id, rule_worker=rule_worker, rule_effort=rule_effort,
+            gates=json.dumps(gates, sort_keys=True))
+
+
 def record_validator(conn, dispatch_id, verdict, disagreement):
     """The validator's verdict, and whether it disagreed with the worker (bool or text)."""
     _update(conn, dispatch_id, validator_verdict=verdict, validator_disagreement=_flag(disagreement))
