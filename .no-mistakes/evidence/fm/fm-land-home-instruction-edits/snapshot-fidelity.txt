@@ -1,0 +1,111 @@
+# Snapshot fidelity: frozen archive vs target commit 06b57d94aa1814b0d87595edc70dedba656183c6
+# archive: /Users/charlesabrooker/firstmate/data/fm-land-home-instruction-edits/home-edits.tar
+## sha256 check of archive contents against sha256.txt
+.agents/skills/away-quiet-supervision/SKILL.md: OK
+.agents/skills/backlog-maintenance/SKILL.md: OK
+.agents/skills/captain-facing-wording/SKILL.md: OK
+.agents/skills/check-result-handling/SKILL.md: OK
+.agents/skills/crew-brief-authoring/SKILL.md: OK
+.agents/skills/dispatch-profile-intake/SKILL.md: OK
+.agents/skills/harness-adapters/SKILL.md: OK
+.agents/skills/knowledge-routing/SKILL.md: OK
+.agents/skills/operational-home-layout/SKILL.md: OK
+.agents/skills/quota-array-dispatch/SKILL.md: OK
+.agents/skills/scout-completion/SKILL.md: OK
+.agents/skills/ship-landing/SKILL.md: OK
+.agents/skills/stow/SKILL.md: OK
+.agents/skills/stuck-crewmate-recovery/SKILL.md: OK
+.agents/skills/task-delivery/SKILL.md: OK
+.agents/skills/validation-supervision/SKILL.md: OK
+.agents/skills/worker-steering/SKILL.md: OK
+.backpassrc.json: OK
+AGENTS.md: OK
+## per-path comparison (archive file vs HEAD blob)
+IDENTICAL .agents/skills/away-quiet-supervision/SKILL.md
+IDENTICAL .agents/skills/backlog-maintenance/SKILL.md
+IDENTICAL .agents/skills/captain-facing-wording/SKILL.md
+DIFFERS   .agents/skills/check-result-handling/SKILL.md
+IDENTICAL .agents/skills/crew-brief-authoring/SKILL.md
+DIFFERS   .agents/skills/dispatch-profile-intake/SKILL.md
+IDENTICAL .agents/skills/harness-adapters/SKILL.md
+IDENTICAL .agents/skills/knowledge-routing/SKILL.md
+IDENTICAL .agents/skills/operational-home-layout/SKILL.md
+DIFFERS   .agents/skills/quota-array-dispatch/SKILL.md
+IDENTICAL .agents/skills/scout-completion/SKILL.md
+IDENTICAL .agents/skills/ship-landing/SKILL.md
+IDENTICAL .agents/skills/stow/SKILL.md
+IDENTICAL .agents/skills/stuck-crewmate-recovery/SKILL.md
+IDENTICAL .agents/skills/task-delivery/SKILL.md
+IDENTICAL .agents/skills/validation-supervision/SKILL.md
+IDENTICAL .agents/skills/worker-steering/SKILL.md
+IDENTICAL .backpassrc.json
+IDENTICAL AGENTS.md
+## full diff for differing paths
+--- archive/.agents/skills/check-result-handling/SKILL.md
++++ HEAD/.agents/skills/check-result-handling/SKILL.md
+@@ -10,6 +10,6 @@
+ 
+ Resolve repository-relative paths and links below from the Firstmate repository root.
+ 
+-3. For `check:`, act on the named poll result, including merges, contribution signals, Relay events, process-to-event source results, open-work ledger rows (route each overdue row in `state/open-loops.json` to its owner; [`docs/configuration.md`](docs/configuration.md#open-work-ledger-configopen-loopsjson) owns the contract), and captain inbox notes; a handled inbox note is also acknowledged with `bin/fm-inbox.sh drain --ack <id>`, or it stays counted as still waiting for firstmate.
++3. For `check:`, act on the named poll result, including merges, contribution signals, Relay events, process-to-event source results, open-work ledger rows (route each overdue row in `state/open-loops.json` to its owner; [`docs/configuration.md`](../../../docs/configuration.md#open-work-ledger-configopen-loopsjson) owns the contract), and captain inbox notes; a handled inbox note is also acknowledged with `bin/fm-inbox.sh drain --ack <id>`, or it stays counted as still waiting for firstmate.
+    A `check: secondmate <id> auto-relaunched` or `check: <id> auto-relaunched after session-end` wake records a recovery that already completed - reconcile the task's current state rather than relaunching again, and treat a repeat, failed, or paused wake as the signal to investigate why the agent keeps exiting.
+    When the note needs a durable answer the submitter can read, publish it with `bin/fm-inbox.sh reply <id>` (the script header owns the reply contract) rather than leaving the answer only in this transcript.
+--- archive/.agents/skills/dispatch-profile-intake/SKILL.md
++++ HEAD/.agents/skills/dispatch-profile-intake/SKILL.md
+@@ -10,7 +10,7 @@
+ 
+ Resolve repository-relative paths and links below from the Firstmate repository root.
+ 
+-When dispatch profiles exist, consult them at every crewmate or scout intake and pass the selected profile under the [fleet model-index contract](docs/configuration.md#fleet-model-index-configmodel-indexjson) to `fm-spawn`.
++When dispatch profiles exist, consult them at every crewmate or scout intake and pass the selected profile under the [fleet model-index contract](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson) to `fm-spawn`.
+ Routing precedence is an explicit per-task captain override, then the best-fit configured rule, then the configured default, then the static crewmate harness.
+ Account for every candidate with the catalog evidence, provider relationship, applicable quota and authentication facts, remaining uncertainty, fit and reasoning class, and the spendPriority and runway evidence used in selection; never omit a candidate, guess, fall back silently, or call the result quota-informed without them.
+ Preserve malformed profile configuration as an actionable error rather than selecting around it.
+--- archive/.agents/skills/quota-array-dispatch/SKILL.md
++++ HEAD/.agents/skills/quota-array-dispatch/SKILL.md
+@@ -153,7 +153,7 @@
+ Paths and links in this extracted contract are relative to the repository root.
+ 
+ Firstmate alone resolves a matched profile array: begin with `quota-axi`'s default TOON at that intake, using the skill's narrow TOON-then-`--json` fallback only for genuine ambiguity, evaluate every configured candidate against that current output, and choose with inspectable `spendPriority` as the one quota-perspective ranker after the skill's eligibility, reasoning-class, and runway-feasibility gates.
+-Establish model support and provider family from that harness's own authoritative catalog, then apply the [account and scope matching rules in `quota-array-dispatch`](.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
++Establish model support and provider family from that harness's own authoritative catalog, then apply the [account and scope matching rules in `quota-array-dispatch`](../../../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
+ Missing model-level quota, a missing authentication source, unmeasurable headroom, or unmodeled authentication is disclosed uncertainty, never by itself a candidate exclusion or a credential or login escalation.
+-Candidate eligibility follows [`quota-array-dispatch`](.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility); never infer a credential store, provider family, or quota mapping from a harness, model, or source name, and never launch another harness's CLI to judge a candidate.
++Candidate eligibility follows [`quota-array-dispatch`](../../../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility); never infer a credential store, provider family, or quota mapping from a harness, model, or source name, and never launch another harness's CLI to judge a candidate.
+ `quota-axi` owns how model or product windows relate to bounding account windows and remains data-only.
+## files touched by snapshot commit c9f422381 vs base
+.agents/skills/away-quiet-supervision/SKILL.md
+.agents/skills/backlog-maintenance/SKILL.md
+.agents/skills/captain-facing-wording/SKILL.md
+.agents/skills/check-result-handling/SKILL.md
+.agents/skills/crew-brief-authoring/SKILL.md
+.agents/skills/dispatch-profile-intake/SKILL.md
+.agents/skills/harness-adapters/SKILL.md
+.agents/skills/knowledge-routing/SKILL.md
+.agents/skills/operational-home-layout/SKILL.md
+.agents/skills/quota-array-dispatch/SKILL.md
+.agents/skills/scout-completion/SKILL.md
+.agents/skills/ship-landing/SKILL.md
+.agents/skills/stow/SKILL.md
+.agents/skills/stuck-crewmate-recovery/SKILL.md
+.agents/skills/task-delivery/SKILL.md
+.agents/skills/validation-supervision/SKILL.md
+.agents/skills/worker-steering/SKILL.md
+.backpassrc.json
+AGENTS.md
+docs/documentation-audiences.json
+## frozen paths touched by later review commits (c9f422381..HEAD)
+(none)
+## tracked.diff applies cleanly to base
+apply OK
+tracked.diff result == archive: .agents/skills/away-quiet-supervision/SKILL.md
+tracked.diff result == archive: .agents/skills/harness-adapters/SKILL.md
+tracked.diff result == archive: .agents/skills/operational-home-layout/SKILL.md
+tracked.diff result == archive: .agents/skills/quota-array-dispatch/SKILL.md
+tracked.diff result == archive: .agents/skills/scout-completion/SKILL.md
+tracked.diff result == archive: .agents/skills/ship-landing/SKILL.md
+tracked.diff result == archive: .agents/skills/stow/SKILL.md
+tracked.diff result == archive: .agents/skills/stuck-crewmate-recovery/SKILL.md
+tracked.diff result == archive: .agents/skills/validation-supervision/SKILL.md
+tracked.diff result == archive: AGENTS.md

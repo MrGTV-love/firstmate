@@ -1,0 +1,80 @@
+
+
+⏺ Captain, here is the skill check. I did not spawn, send, or edit anything.
+
+  Step 1: Skill list check
+
+  All 8 skills are PRESENT. Each line below shows the first 12 words of the description. If a description is shorter than 12 words, I show all of it and say so.
+
+  ┌─────┬─────────────────────────┬─────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  #  │          Skill          │ Status  │                                            First 12 words of description                                            │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 1   │ backlog-maintenance     │ PRESENT │ "Load before filing, holding, updating, archiving, or handing off backlog items or"                                 │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 2   │ captain-facing-wording  │ PRESENT │ "Load before translating worker or supervision evidence into captain-facing chat, including PR"                     │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 3   │ check-result-handling   │ PRESENT │ "Load on any check: wake before acting on its named result." (11 words, all of it)                                  │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 4   │ crew-brief-authoring    │ PRESENT │ "Load before creating or changing a ship, scout, or secondmate brief, and"                                          │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 5   │ dispatch-profile-intake │ PRESENT │ "Load at every crewmate or scout intake before resolving dispatch profiles." (11 words, all of it)                  │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 6   │ knowledge-routing       │ PRESENT │ "Load before recording durable knowledge, captain preferences, learnings, or project memory." (11 words, all of it) │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 7   │ task-delivery           │ PRESENT │ "Load before selecting, executing, supervising, or reviewing a task's delivery path." (11 words, all of it)         │
+  ├─────┼─────────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 8   │ worker-steering         │ PRESENT │ "Load before steering a worker or secondmate, answering a keyed worker decision,"                                   │
+  └─────┴─────────────────────────┴─────────┴─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  Step 2: Skill tool call
+
+  I called the Skill tool one time with dispatch-profile-intake. It loaded. This is the exact sentence:
+
+  ▎ "Routing precedence is an explicit per-task captain override, then the best-fit configured rule, then the configured default, then the static crewmate harness."
+
+  Step 3
+
+  LAB_SKILL_CHECK_DONE
+
+✻ Churned for 17s · done 6:16 PM
+
+❯ LAB Q2, no tools: using only the AGENTS.md text already in your context, name the skill AGENTS.md tells you to load for each of these moments: (a) a check: wake, (b) a crewmate or scout intake with
+  dispatch profiles, (c) writing a ship or scout brief, (d) recording durable knowledge, (e) filing or holding a backlog item, (f) steering a worker. Quote the AGENTS.md pointer line for each. End
+  with LAB_Q2_DONE.
+
+⏺ Captain, here are the six answers. I used only the AGENTS.md text in my context. I used no tools.
+
+  ┌─────┬────────────────────────────────────────────┬─────────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  #  │                   Moment                   │          Skill          │                                        AGENTS.md pointer line (exact quote)                                        │
+  ├─────┼────────────────────────────────────────────┼─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ a   │ A check: wake                              │ check-result-handling   │ Section 8: "3. For check:, load check-result-handling and act on the named result."                                │
+  ├─────┼────────────────────────────────────────────┼─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ b   │ Crewmate or scout intake with dispatch     │ dispatch-profile-intake │ Section 4: "Load dispatch-profile-intake at every crewmate or scout intake before selecting a profile."            │
+  │     │ profiles                                   │                         │                                                                                                                    │
+  ├─────┼────────────────────────────────────────────┼─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ c   │ Writing a ship or scout brief              │ crew-brief-authoring    │ Section 11: "Load crew-brief-authoring before creating or changing a brief, and before spawning or promoting work  │
+  │     │                                            │                         │ from one."                                                                                                         │
+  ├─────┼────────────────────────────────────────────┼─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ d   │ Recording durable knowledge                │ knowledge-routing       │ Section 6: "Load knowledge-routing before recording durable knowledge."                                            │
+  ├─────┼────────────────────────────────────────────┼─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ e   │ Filing or holding a backlog item           │ backlog-maintenance     │ Section 10: "Load backlog-maintenance before filing, holding, updating, archiving, or handing off backlog items or │
+  │     │                                            │                         │  task notes."                                                                                                      │
+  ├─────┼────────────────────────────────────────────┼─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ f   │ Steering a worker                          │ worker-steering         │ Section 7: "Load worker-steering before sending or retrying a steer or relaying a changed task request."           │
+  └─────┴────────────────────────────────────────────┴─────────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  Two notes:
+
+  1. Item (c) has a second pointer in Section 7: "Load crew-brief-authoring before classifying work or resolving its delivery mode." That line is about intake. The Section 11 line is the one about
+     writing the brief.
+  2. Item (b): the AGENTS.md line does not say "when dispatch profiles exist." It says to load the skill at every intake. The skill text adds the words "When dispatch profiles exist."
+
+  LAB_Q2_DONE
+
+✻ Brewed for 8s · done 6:17 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 5% 50k/1.0M 01M5NDFJRPWJX27XDWEBHYJ9M0:221984a8
+  ⏵⏵ auto mode on (shift+tab to cycle)

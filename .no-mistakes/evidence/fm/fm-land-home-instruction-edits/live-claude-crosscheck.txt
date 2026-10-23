@@ -1,0 +1,9 @@
+# Cross-check: quoted pointer lines exist in AGENTS.md at HEAD
+92:Load `dispatch-profile-intake` at every crewmate or scout intake before selecting a profile.
+127:Load `knowledge-routing` before recording durable knowledge.
+152:Load `crew-brief-authoring` before classifying work or resolving its delivery mode.
+174:Load `worker-steering` before sending or retrying a steer or relaying a changed task request.
+226:3. For `check:`, load `check-result-handling` and act on the named result.
+293:Load `backlog-maintenance` before filing, holding, updating, archiving, or handing off backlog items or task notes.
+300:Load `crew-brief-authoring` before creating or changing a brief, and before spawning or promoting work from one.
+# Lab home: disposable marked lab created by bin/fm-lab-home.sh create; primary ran on private tmux socket fm-lab with FM_HOME=<lab>; the SessionStart hook wrote nothing into the lab state dir (not part of this change's surface). Lab removed after capture.

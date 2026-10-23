@@ -1,0 +1,19 @@
+# bin/fm-doc-audience-check.sh against target commit 06b57d94a
+$ bash bin/fm-doc-audience-check.sh
+fm-doc-audience-check: ok surfaces=153 local_links=1562
+exit=0
+
+# Control: disposable git copy of HEAD (git archive + git init + git add)
+$ bash bin/fm-doc-audience-check.sh --root <copy>
+fm-doc-audience-check: ok surfaces=153 local_links=1562
+exit=0
+
+# Adversarial A: same copy with the 3 corrected skill files replaced by the raw archive bytes (4 link prefixes reverted)
+$ bash bin/fm-doc-audience-check.sh --root <copy>
+fm-doc-audience-check: unresolved local link in .agents/skills/check-result-handling/SKILL.md: docs/configuration.md#open-work-ledger-configopen-loopsjson
+exit=1
+
+# Adversarial B: same copy with docs/documentation-audiences.json restored to the base commit (8 new-skill classifications removed)
+$ bash bin/fm-doc-audience-check.sh --root <copy>
+fm-doc-audience-check: unclassified: .agents/skills/backlog-maintenance/SKILL.md, .agents/skills/captain-facing-wording/SKILL.md, .agents/skills/check-result-handling/SKILL.md, .agents/skills/crew-brief-authoring/SKILL.md, .agents/skills/dispatch-profile-intake/SKILL.md, .agents/skills/knowledge-routing/SKILL.md, .agents/skills/task-delivery/SKILL.md, .agents/skills/worker-steering/SKILL.md
+exit=1

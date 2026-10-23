@@ -1,0 +1,135 @@
+# Simulated primary home: base commit + uncommitted snapshot edits, then fast-forward to the landed branch head
+## home dirty state (like /Users/charlesabrooker/firstmate today)
+ M .agents/skills/away-quiet-supervision/SKILL.md
+ M .agents/skills/harness-adapters/SKILL.md
+ M .agents/skills/operational-home-layout/SKILL.md
+ M .agents/skills/quota-array-dispatch/SKILL.md
+ M .agents/skills/scout-completion/SKILL.md
+ M .agents/skills/ship-landing/SKILL.md
+ M .agents/skills/stow/SKILL.md
+ M .agents/skills/stuck-crewmate-recovery/SKILL.md
+ M .agents/skills/validation-supervision/SKILL.md
+ M AGENTS.md
+?? .agents/skills/backlog-maintenance/
+?? .agents/skills/captain-facing-wording/
+?? .agents/skills/check-result-handling/
+?? .agents/skills/crew-brief-authoring/
+?? .agents/skills/dispatch-profile-intake/
+?? .agents/skills/knowledge-routing/
+?? .agents/skills/task-delivery/
+?? .agents/skills/worker-steering/
+?? .backpassrc.json
+
+## 1. ff before deciding what to do with the local edits
+$ git merge --ff-only landed
+error: Your local changes to the following files would be overwritten by merge:
+	.agents/skills/away-quiet-supervision/SKILL.md
+	.agents/skills/harness-adapters/SKILL.md
+	.agents/skills/operational-home-layout/SKILL.md
+	.agents/skills/quota-array-dispatch/SKILL.md
+	.agents/skills/scout-completion/SKILL.md
+	.agents/skills/ship-landing/SKILL.md
+	.agents/skills/stow/SKILL.md
+	.agents/skills/stuck-crewmate-recovery/SKILL.md
+	.agents/skills/validation-supervision/SKILL.md
+	AGENTS.md
+Please commit your changes or stash them before you merge.
+error: The following untracked working tree files would be overwritten by merge:
+	.agents/skills/backlog-maintenance/SKILL.md
+	.agents/skills/captain-facing-wording/SKILL.md
+	.agents/skills/check-result-handling/SKILL.md
+	.agents/skills/crew-brief-authoring/SKILL.md
+	.agents/skills/dispatch-profile-intake/SKILL.md
+	.agents/skills/knowledge-routing/SKILL.md
+	.agents/skills/task-delivery/SKILL.md
+exit=1
+
+## 2. what the home would lose if it discarded its local edits in favour of the landed head
+$ git diff --stat adc0d608ca7b2d29ed132e2aa2e86494feb502cd  (working tree vs landed head, 19 snapshot paths)
+ .agents/skills/check-result-handling/SKILL.md   | 2 +-
+ .agents/skills/dispatch-profile-intake/SKILL.md | 2 +-
+ .agents/skills/quota-array-dispatch/SKILL.md    | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+-3. For `check:`, act on the named poll result, including merges, contribution signals, Relay events, process-to-event source results, open-work ledger rows (ro...
++3. For `check:`, act on the named poll result, including merges, contribution signals, Relay events, process-to-event source results, open-work ledger rows (ro...
+-When dispatch profiles exist, consult them at every crewmate or scout intake and pass the selected profile under the [fleet model-index contract](../../../docs...
++When dispatch profiles exist, consult them at every crewmate or scout intake and pass the selected profile under the [fleet model-index contract](docs/configur...
+-Establish model support and provider family from that harness's own authoritative catalog, then apply the [account and scope matching rules in `quota-array-dis...
++Establish model support and provider family from that harness's own authoritative catalog, then apply the [account and scope matching rules in `quota-array-dis...
+-Candidate eligibility follows [`quota-array-dispatch`](../../../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility); never infer a credential store, pr...
++Candidate eligibility follows [`quota-array-dispatch`](.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility); never infer a credential store, provider fa...
+
+## 3. discard local copies (landed head carries every edit) and fast-forward
+$ git merge --ff-only landed
+Updating 6580f3b..adc0d60
+Fast-forward
+ .agents/skills/agent-skill-trigger-index/SKILL.md |  10 +-
+ .agents/skills/away-quiet-supervision/SKILL.md    |   4 +
+ .agents/skills/backlog-maintenance/SKILL.md       |  29 ++++
+ .agents/skills/bootstrap-diagnostics/SKILL.md     |   2 +-
+ .agents/skills/captain-facing-wording/SKILL.md    |  31 ++++
+ .agents/skills/captain-hold-lifecycle/SKILL.md    |   2 +-
+ .agents/skills/check-result-handling/SKILL.md     |  15 ++
+ .agents/skills/crew-brief-authoring/SKILL.md      |  40 +++++
+ .agents/skills/dispatch-profile-intake/SKILL.md   |  20 +++
+ .agents/skills/firstmate-codexapp/SKILL.md        |   2 +-
+ .agents/skills/harness-adapters/SKILL.md          |   6 +
+ .agents/skills/knowledge-routing/SKILL.md         |  18 +++
+ .agents/skills/operational-home-layout/SKILL.md   |  10 ++
+ .agents/skills/project-management/SKILL.md        |   2 +-
+ .agents/skills/quota-array-dispatch/SKILL.md      |  10 ++
+ .agents/skills/scout-completion/SKILL.md          |   4 +
+ .agents/skills/secondmate-provisioning/SKILL.md   |   2 +-
+ .agents/skills/ship-landing/SKILL.md              |   4 +
+ .agents/skills/stow/SKILL.md                      |   4 +
+ .agents/skills/stuck-crewmate-recovery/SKILL.md   |  13 +-
+ .agents/skills/task-delivery/SKILL.md             |  20 +++
+ .agents/skills/updatefirstmate/SKILL.md           |   2 +-
+ .agents/skills/validation-supervision/SKILL.md    |   6 +-
+ .agents/skills/worker-steering/SKILL.md           |  16 ++
+ .backpassrc.json                                  |   6 +
+ AGENTS.md                                         | 173 +++++-----------------
+ bin/fm-backlog-transition-lib.sh                  |   2 +-
+ bin/fm-bootstrap.sh                               |   2 +-
+ bin/fm-project-mode.sh                            |   3 +-
+ bin/fm-promote.sh                                 |   2 +-
+ bin/fm-quota-choose.sh                            |   2 +-
+ bin/fm-session-start.sh                           |   4 +-
+ bin/fm-spawn.sh                                   |   2 +-
+ docs/architecture.md                              |   6 +-
+ docs/configuration.md                             |   6 +-
+ docs/documentation-audiences.json                 |  32 ++++
+ tests/fm-brief.test.sh                            |   2 +-
+ 37 files changed, 348 insertions(+), 166 deletions(-)
+ create mode 100644 .agents/skills/backlog-maintenance/SKILL.md
+ create mode 100644 .agents/skills/captain-facing-wording/SKILL.md
+ create mode 100644 .agents/skills/check-result-handling/SKILL.md
+ create mode 100644 .agents/skills/crew-brief-authoring/SKILL.md
+ create mode 100644 .agents/skills/dispatch-profile-intake/SKILL.md
+ create mode 100644 .agents/skills/knowledge-routing/SKILL.md
+ create mode 100644 .agents/skills/task-delivery/SKILL.md
+ create mode 100644 .agents/skills/worker-steering/SKILL.md
+ create mode 100644 .backpassrc.json
+exit=0
+$ git status --short (expect empty)
+HEAD == landed: yes
+## every 19 snapshot path now equals archive, except the documented link fixes
+IDENTICAL .agents/skills/away-quiet-supervision/SKILL.md
+IDENTICAL .agents/skills/backlog-maintenance/SKILL.md
+IDENTICAL .agents/skills/captain-facing-wording/SKILL.md
+DIFFERS   .agents/skills/check-result-handling/SKILL.md (1 line(s))
+IDENTICAL .agents/skills/crew-brief-authoring/SKILL.md
+DIFFERS   .agents/skills/dispatch-profile-intake/SKILL.md (1 line(s))
+IDENTICAL .agents/skills/harness-adapters/SKILL.md
+IDENTICAL .agents/skills/knowledge-routing/SKILL.md
+IDENTICAL .agents/skills/operational-home-layout/SKILL.md
+DIFFERS   .agents/skills/quota-array-dispatch/SKILL.md (2 line(s))
+IDENTICAL .agents/skills/scout-completion/SKILL.md
+IDENTICAL .agents/skills/ship-landing/SKILL.md
+IDENTICAL .agents/skills/stow/SKILL.md
+IDENTICAL .agents/skills/stuck-crewmate-recovery/SKILL.md
+IDENTICAL .agents/skills/task-delivery/SKILL.md
+IDENTICAL .agents/skills/validation-supervision/SKILL.md
+IDENTICAL .agents/skills/worker-steering/SKILL.md
+IDENTICAL .backpassrc.json
+IDENTICAL AGENTS.md
