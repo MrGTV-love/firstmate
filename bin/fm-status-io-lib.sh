@@ -354,18 +354,23 @@ _status_reported_identity_into() {  # <signature> <identity-out> <other-fields-o
 # digit pairs or "size-error", which cannot hold the hex of "strong:" at any
 # nibble offset, so its first occurrence opens the identity; device digits are
 # "3<digit>" pairs, so the first 3a after it is the colon that ends the device.
-# Any other shape fails, and the caller takes the full decode.
-_status_signature_device_into() {  # <signature> <device-out>
-  local __fm_sd_hex=${1#r1:} __fm_sd_dev='' __fm_sd_i
+# <remainder-out> receives the signature without those device digits, so two
+# signatures differ only in their device exactly when their remainders match.
+# Any other shape fails: the signature holds no strong numeric device.
+_status_signature_device_into() {  # <signature> <device-out> <remainder-out>
+  local __fm_sd_hex=${1#r1:} __fm_sd_head __fm_sd_tail __fm_sd_dev='' __fm_sd_i
   case "$1" in r1:*7374726f6e673a*) ;; *) return 1 ;; esac
+  __fm_sd_head=${__fm_sd_hex%%7374726f6e673a*}
   __fm_sd_hex=${__fm_sd_hex#*7374726f6e673a}
   case "$__fm_sd_hex" in *3a*) ;; *) return 1 ;; esac
+  __fm_sd_tail=${__fm_sd_hex#*3a}
   __fm_sd_hex=${__fm_sd_hex%%3a*}
   [ -n "$__fm_sd_hex" ] && [ -z "${__fm_sd_hex//3[0-9]/}" ] || return 1
   for ((__fm_sd_i = 1; __fm_sd_i < ${#__fm_sd_hex}; __fm_sd_i += 2)); do
     __fm_sd_dev="$__fm_sd_dev${__fm_sd_hex:__fm_sd_i:1}"
   done
   printf -v "$2" '%s' "$__fm_sd_dev"
+  printf -v "$3" '%s:%s' "$__fm_sd_head" "$__fm_sd_tail"
 }
 
 # A strong identity (device:inode:birth) that differs from another only in its
@@ -384,13 +389,14 @@ _fm_status_ident_device_shifted() {  # <recorded-identity> <current-identity>
 # its old signature and signals once. Never advance a classified offset or turn
 # a reported-but-unclassified state into a classified one. Revalidate the file
 # and marker immediately before atomic publication; failure leaves detection
-# conservative. A marker whose reported signature already equals the current one,
-# or whose reported and classified identities already share the current device,
-# is left alone without the per-byte signature decode. Every scan that reads a
+# conservative. The per-byte signature decode runs only when one of those
+# migrations is possible: the current signature holds a strong numeric device,
+# and either the reported signature differs from it in that device alone or the
+# classified identity is strong on another device. Every scan that reads a
 # marker calls this first.
 status_presentation_marker_adopt_device() {  # <marker> <status-file> [current-signature]
   local marker=$1 file=$2 current=${3-} raw reported classified old_ident new_ident old_other new_other
-  local new_reported new_classified offset fresh fresh_ident='' fresh_size='' tmp new_dev old_dev classified_dev
+  local new_reported new_classified offset fresh fresh_ident='' fresh_size='' tmp new_dev old_dev new_rest old_rest classified_dev migratable=0
   [ -f "$marker" ] && [ -r "$marker" ] && [ ! -L "$marker" ] || return 1
   { IFS= read -r -d '' raw || :; } 2>/dev/null < "$marker" || return 1
   while [ "${raw%$'\n'}" != "$raw" ]; do raw=${raw%$'\n'}; done
@@ -399,16 +405,21 @@ status_presentation_marker_adopt_device() {  # <marker> <status-file> [current-s
   classified=$STATUS_PRESENTATION_CLASSIFIED
   [ -n "$current" ] || current=$(status_observed_signature "$file") || return 1
   [ "$reported" != "$current" ] || return 0
-  if _status_signature_device_into "$current" new_dev \
-    && _status_signature_device_into "$reported" old_dev \
-    && [ "$new_dev" = "$old_dev" ]; then
+  _status_signature_device_into "$current" new_dev new_rest || return 0
+  if _status_signature_device_into "$reported" old_dev old_rest \
+    && [ "$old_dev" != "$new_dev" ] && [ "$old_rest" = "$new_rest" ]; then
+    migratable=1
+  fi
+  if [ "$classified" != - ]; then
     classified_dev=${classified#*@}
     case "$classified_dev" in
-      strong:*) classified_dev=${classified_dev#strong:}; classified_dev=${classified_dev%%:*} ;;
-      *) classified_dev=$new_dev ;;
+      strong:*)
+        classified_dev=${classified_dev#strong:}; classified_dev=${classified_dev%%:*}
+        [ "$classified_dev" = "$new_dev" ] || migratable=1
+        ;;
     esac
-    [ "$classified_dev" != "$new_dev" ] || return 0
   fi
+  [ "$migratable" -eq 1 ] || return 0
   _status_reported_identity_into "$current" new_ident new_other || return 1
   new_reported=$reported
   new_classified=$classified
