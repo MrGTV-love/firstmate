@@ -4108,9 +4108,9 @@ test_relocation_flag_is_scoped_to_relaunch() {
 #
 # Stopping and restarting a named Herdr server preserves workspace, tab, pane
 # and label ids; only the harness processes and their registrations die
-# (docs/herdr-backend.md "Restart and liveness behavior"). Passive classification
-# reports unreadable until an explicit recovery safely restores the server;
-# recovery must then adopt the preserved pane rather than open a second tab.
+# (docs/herdr-backend.md "Restart and liveness behavior"). A stopped session
+# with proven process and socket absence reads missing; recovery then restores
+# the server and must adopt the preserved pane rather than open a second tab.
 #
 # Canned/stateful fake only - never a real herdr session.
 make_herdr_stub() {  # <case-dir>

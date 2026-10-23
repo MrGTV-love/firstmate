@@ -270,6 +270,7 @@ case "${1:-} ${2:-}" in
     printf '{"client":{"version":"0.7.5","protocol":16},"server":{"running":%s,"socket":"%s"}}\n' "$running" "$FM_FAKE_HERDR_SOCKET"
     ;;
   "server "*|"server ")
+    [ ! -f "$FM_FAKE_STATE/herdr-server-fails" ] || exit 1
     printf 'true\n' > "$FM_FAKE_HERDR_RUNNING"
     ;;
 esac
@@ -1013,6 +1014,29 @@ assert_contains "$DOCTOR_OUT" 'fix herdr-server=applied:' "--fix did not report 
 assert_contains "$DOCTOR_OUT" 'check herdr-server=ok:' "the started server was not confirmed by the re-check"
 [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "the linux path invoked launchctl"
 pass "a non-darwin host skips launch agents and starts its herdr server directly"
+
+new_case Linux with-herdr no-gui
+python3 -c 'import socket, sys, time
+s = socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen(8); time.sleep(120)' "$CASE_STATE/herdr.sock" &
+listener=$!
+for _ in $(seq 1 100); do [ ! -S "$CASE_STATE/herdr.sock" ] || break; /bin/sleep 0.05; done
+doctor --fix
+kill "$listener" 2>/dev/null || true
+wait "$listener" 2>/dev/null || true
+expect_code 1 "$DOCTOR_RC" "a refused server start was reported ready"
+assert_contains "$DOCTOR_OUT" "fix herdr-server=failed: refused to start the herdr server for session fm-remote to protect a live or unknown server: " \
+  "a refusal that protects a live socket was not reported as a refusal"
+assert_contains "$DOCTOR_OUT" "the session socket still accepts connections" "the refusal reason was discarded"
+assert_not_contains "$DOCTOR_OUT" "did not come up" "a refusal was reported as a failed start"
+
+new_case Linux with-herdr no-gui
+touch "$CASE_STATE/herdr-server-fails"
+doctor --fix
+expect_code 1 "$DOCTOR_RC" "a server that failed to start was reported ready"
+assert_contains "$DOCTOR_OUT" "fix herdr-server=failed: the herdr server for session fm-remote was launched but did not come up: " \
+  "a launched server that exited was not reported as a failed start"
+assert_not_contains "$DOCTOR_OUT" "refused to start" "a failed start was reported as a refusal"
+pass "linux repair tells a protective refusal from a server that did not come up"
 
 for running in true false; do
   new_case Linux with-herdr no-gui

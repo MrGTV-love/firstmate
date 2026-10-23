@@ -11,6 +11,9 @@ competing starter brought up is reused, never launched twice.
 the lock it prints `running` for a server already up, or proves absence and
 prints `go`, then keeps holding the lock in this process until that session
 reports running or <pid> is gone.
+After a launch, readiness polls back off from 0.1s to 5s with no deadline; a
+failed status read is not fatal, but a launched server that exits before
+reporting running exits 3, distinct from a refusal's exit 1.
 The socket comes from status `.server.socket`, else from `session list --json`
 `.socket_path`, the adapter's own socket lookup.
 Unknown status, process inventory, socket identity, or socket errors refuse.
@@ -23,14 +26,14 @@ import fcntl
 import json
 import os
 from pathlib import Path
-import shlex
 import socket
 import subprocess
 import sys
 import time
 
-# Retain server_ensure's existing readiness cap; five intercepted cold starts
-# took at most 1.215s on this host, not a live-Herdr startup measurement.
+# Bounds each Herdr/ps call and delays the one long-wait notice; it is no longer
+# a readiness deadline. Five intercepted cold starts took at most 1.215s on this
+# host, not a live-Herdr startup measurement.
 # measured: value=10 date=2026-10-23 host=Mac-Studio.local margin=3
 STARTUP_SECONDS = 10
 # Retain the poll cadence; 15 real local socket probes took at most 0.017ms.
@@ -104,15 +107,21 @@ def prove_process_absence(session, client):
     if any(char.isspace() for char in session):
         raise ValueError("cannot prove process absence for a whitespace-containing session")
     # comm is kernel executable identity, not an agent's potentially enormous
-    # argv containing instructions that happen to mention `herdr server`.
+    # argv containing instructions that happen to mention `herdr server`. A pid
+    # missing from the later comm read exited between reads and serves nothing.
+    commands = process_table("command")
     names = process_table("comm")
-    for pid, command in process_table("command").items():
-        name = Path(names.get(pid, "")).name.lower()
-        interpreter = name in ("bash", "sh", "zsh", "dash", "ksh") or name.startswith(("python", "pypy"))
-        if name and name != "herdr" and name != Path(client).name.lower() and not interpreter:
+    for pid, command in commands.items():
+        if pid not in names:
             continue
-        # ps flattens argv without quoting. For interpreters, only the actual
-        # script can identify Herdr, never a later argument holding agent text.
+        name = Path(names[pid]).name.lower()
+        interpreter = name in ("bash", "sh", "zsh", "dash", "ksh") or name.startswith(("python", "pypy"))
+        if name != "herdr" and name != Path(client).name.lower() and not interpreter:
+            continue
+        # ps flattens argv without quoting, so only whitespace words are read;
+        # quote characters in agent text never make a command unreadable. For
+        # interpreters, only the actual script can identify Herdr, never a later
+        # argument holding agent text.
         if interpreter:
             prefix = names[pid] + " "
             script = command[len(prefix):] if command.startswith(prefix) else command.split(None, 1)[-1]
@@ -125,10 +134,7 @@ def prove_process_absence(session, client):
                 continue
             options = words[executable + 1:]
         else:
-            try:
-                args = shlex.split(command)
-            except ValueError:
-                raise ValueError(f"unreadable Herdr process command for pid {pid}") from None
+            args = command.split()
             executable = next((index for index, arg in enumerate(args)
                                if Path(arg).name == "herdr" or arg == client), None)
             if executable is None:
@@ -196,6 +202,26 @@ def process_alive(pid):
     return bool(state) and not state.startswith("Z")
 
 
+def wait_until_running(client, session, alive):
+    started, noticed, delay = time.monotonic(), False, 0.1
+    while True:
+        gone = not alive()
+        try:
+            if status(client, session)["server"].get("running") is True:
+                return
+        except (ValueError, KeyError, TypeError, subprocess.SubprocessError):
+            pass
+        if gone:
+            print(f"error: the launched Herdr server for session {session} exited before reporting running; "
+                  "releasing the start lock", file=sys.stderr, flush=True)
+            sys.exit(3)
+        noticed = notice_after(started, noticed,
+                               f"the launched Herdr server for session {session} has not reported running yet; "
+                               "still holding the start lock")
+        time.sleep(delay)
+        delay = min(delay * 2, 5)
+
+
 def lock_with_notice(session, lock):
     started, noticed = time.monotonic(), False
     while True:
@@ -240,31 +266,13 @@ def main(mode, session, client, pid=None):
             print("go", flush=True)
             with open(os.devnull, "wb") as null:
                 os.dup2(null.fileno(), sys.stdout.fileno())
-            started, noticed = time.monotonic(), False
-            while True:
-                if not process_alive(pid):
-                    print(f"error: the Herdr server for session {session} exited before reporting running; "
-                          "releasing the start lock", file=sys.stderr, flush=True)
-                    sys.exit(1)
-                try:
-                    if status(client, session)["server"].get("running") is True:
-                        return
-                except (ValueError, KeyError, TypeError, subprocess.SubprocessError):
-                    pass
-                noticed = notice_after(started, noticed,
-                                       f"the Herdr server for session {session} has not reported running yet; "
-                                       "still holding the start lock")
-                time.sleep(POLL_SECONDS)
+            wait_until_running(client, session, lambda: process_alive(pid))
+            return
         with open(os.devnull, "r+b") as null:
-            subprocess.Popen([client, "server", "--session", session],
-                             stdin=null, stdout=null, stderr=null, close_fds=True,
-                             start_new_session=True, env=dict(os.environ, HERDR_SESSION=session))
-        deadline = time.monotonic() + STARTUP_SECONDS
-        while time.monotonic() < deadline:
-            if status(client, session)["server"].get("running") is True:
-                return
-            time.sleep(POLL_SECONDS)
-        raise ValueError("started server did not report running within 10s")
+            server = subprocess.Popen([client, "server", "--session", session],
+                                      stdin=null, stdout=null, stderr=null, close_fds=True,
+                                      start_new_session=True, env=dict(os.environ, HERDR_SESSION=session))
+        wait_until_running(client, session, lambda: server.poll() is None)
 
 
 if __name__ == "__main__":

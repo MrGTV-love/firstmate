@@ -868,16 +868,25 @@ wait_for_herdr_server() {
   return 1
 }
 
+# The ensure exits 3 when a server it launched exited before reporting running;
+# every other failure is a refusal that protects a live or unknown server.
 start_herdr_server() {
+  local err rc=0
   if ! herdr_adapter_load; then
     fix_report herdr-server failed "herdr and jq must both resolve before the server can be started"
     return 1
   fi
-  if fm_backend_herdr_server_ensure "$HERDR_SESSION_NAME" >/dev/null 2>&1; then
+  err=$(fm_backend_herdr_server_ensure "$HERDR_SESSION_NAME" 2>&1 >/dev/null) || rc=$?
+  err=${err//$'\n'/ }
+  if [ "$rc" -eq 0 ]; then
     fix_report herdr-server applied "started the herdr server for session $HERDR_SESSION_NAME"
     return 0
   fi
-  fix_report herdr-server failed "the herdr server for session $HERDR_SESSION_NAME did not come up"
+  if [ "$rc" -eq 3 ]; then
+    fix_report herdr-server failed "the herdr server for session $HERDR_SESSION_NAME was launched but did not come up: $err"
+  else
+    fix_report herdr-server failed "refused to start the herdr server for session $HERDR_SESSION_NAME to protect a live or unknown server: $err"
+  fi
   return 1
 }
 

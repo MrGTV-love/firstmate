@@ -595,6 +595,8 @@ A `herdr server` process without `--session` serves the session named by its inh
 When that environment cannot be read, the process's session is unknown and it blocks startup.
 A live process, accepting socket, or unreadable proof refuses rather than replacing a server.
 A competing starter waits for the start lock, then re-reads status and reuses the server the first starter brought up, so only one launch happens.
+After a launch, the starter polls status from 0.1 seconds, doubling to a 5-second cap, with no deadline; a failed status read is not fatal, but a launched server that exits before reporting running fails with exit status 3, distinct from a refusal's exit status 1.
+The absence proof reads process arguments as whitespace words, so quote characters in a client's arguments never block startup; only a server process whose session cannot be read refuses.
 The detached launch closes inherited file descriptors so neither a background starter shell nor a caller's capture pipe survives for the server's lifetime.
 
 When absence is proven, the adapter launches the server without these inherited values:

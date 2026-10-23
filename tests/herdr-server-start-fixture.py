@@ -31,6 +31,12 @@ if cmd == "status":
         if mode == "error": sys.exit(1)
         if mode == "timeout": sys.exit(124)
         if mode == "empty": sys.exit(0)
+    failures = root / "post-launch-failures"
+    if (root / "pid").exists() and os.environ.get("START_STATUS_FAILS_AFTER_LAUNCH"):
+        failed = int(failures.read_text()) if failures.exists() else 0
+        if failed < int(os.environ["START_STATUS_FAILS_AFTER_LAUNCH"]):
+            failures.write_text(str(failed + 1))
+            sys.exit(1)
     server = {"running": (root / "pid").exists(), "session": root.name}
     if not os.environ.get("START_NO_STATUS_SOCKET"):
         server["socket"] = str(root / "herdr.sock")
@@ -315,6 +321,41 @@ class StartupSafety(unittest.TestCase):
         self.assertIn("exited before reporting running; releasing the start lock", out)
         self.assertEqual(self.servers(), [])
         self.assertTrue(self.lock_is_free())
+
+    def sleeper(self, name):
+        binary = self.dir / name / "herdr"
+        binary.parent.mkdir()
+        binary.write_text(f"#!{sys.executable}\nimport time; time.sleep(60)\n")
+        binary.chmod(0o755)
+        return binary
+
+    def test_failed_status_after_launch_keeps_polling(self):
+        self.env["START_STATUS_FAILS_AFTER_LAUNCH"] = "2"
+        rc, out = self.invoke('. "$1/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure "$2" && echo continued')
+        self.assertEqual((rc, out.strip()), (0, "continued"))
+        self.assertEqual(len(self.servers()), 1)
+        self.assertEqual((self.dir / "post-launch-failures").read_text(), "2")
+
+    def test_launched_server_exit_is_distinct_from_a_refusal(self):
+        self.env["START_SERVER_FAILS"] = "1"
+        self.assertEqual(self.ensure()[0], 3)
+        self.assertEqual(self.servers(), [])
+        self.assertTrue(self.lock_is_free())
+
+    def test_quoted_client_argv_does_not_block_cold_start(self):
+        words = ["pane", "send-text", "w1:p2", "don't", "stop", "--session", self.dir.name]
+        quiet = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.children.append(subprocess.Popen(["herdr", "-c", "import time; time.sleep(60)", *words],
+                                              executable=sys.executable, **quiet))
+        self.children.append(subprocess.Popen([str(self.sleeper("client")), *words], **quiet))
+        self.assertEqual(self.ensure()[0], 0)
+        self.assertEqual(len(self.servers()), 1)
+
+    def test_server_with_unreadable_session_refuses(self):
+        self.children.append(subprocess.Popen([str(self.sleeper("broken")), "server", "--session"],
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        self.assertNotEqual(self.ensure()[0], 0)
+        self.assertEqual(self.starts(), [])
 
     def test_session_list_supplies_a_missing_status_socket(self):
         self.env["START_NO_STATUS_SOCKET"] = "1"

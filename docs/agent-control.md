@@ -460,6 +460,8 @@ Absence is proven and never inferred from a failed read; whether it is provable 
   No workspace or tab is created by that server ensure.
   `dead` means the pane survived the restart and can be adopted; `alive` means an agent came back and refuses replacement; `missing` from an answering running server proves the pane itself did not survive.
   Passive classification reads a stopped session as `missing` only after proving that no server process or accepting socket remains, and never starts a server; that `missing` does not license re-creating the endpoint until the recheck reads the pane from a running server.
+  `exit` and `relaunch` reach that proof only when the recorded endpoint reads `missing`, so they start a server only when the recorded session's server is proven absent.
+  That server start is a real side effect: when the restarted pane holds no agent (`already-stopped`) or did not survive (`endpoint-gone`), `exit` leaves the restarted server running and idle.
 - **tmux proves absence for the recorded endpoint only.**
   The record names a session and window but carries no socket identity, so the proof uses what the record does name: the exact recorded session on the server this process addresses, plus the recorded worktree.
   The addressed server must answer definitively, on two reads, that the whole server or the exact session is absent, or list the session without the recorded window.
