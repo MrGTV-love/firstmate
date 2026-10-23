@@ -207,12 +207,8 @@ EOF
 }
 
 phase_recovery() {
-  # Simulate a restart after the endpoint exited: remove the fake window and
-  # drop the live meta, then respawn from the registry + persistent home (no
-  # explicit home argument).
-  PATH="$FAKEBIN:$PATH" FM_FAKE_TMUX_LOG="$LOG" \
-    tmux kill-window -t firstmate:fm-design >/dev/null \
-    || fail "could not retire the fake endpoint before recovery"
+  # Simulate a restart: drop the live meta, then respawn from the registry +
+  # persistent home (no explicit home argument).
   rm -f "$HOME_DIR/state/design.meta"
   PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_FAKE_TMUX_LOG="$LOG" FM_FAKE_TMUX_CAPTURE="$PANE" \
     "$ROOT/bin/fm-spawn.sh" design "echo relaunch" --secondmate >/dev/null 2>&1 \
