@@ -14,13 +14,14 @@ It invokes the real `fm-captain-hold.sh` intake and `tasks-axi` against each dis
 No repository-wide test run is claimed; each section below records the targeted command and observed result for one guarantee.
 The 2026-10-22 targeted replay refresh ran `bash /Users/charlesabrooker/firstmate/bin/fm-proc-budget.sh -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1`.
 It printed `ok - all Slack watch checks` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1444534`.
-The 2026-10-23 test phase at commit `ca4fcbe71` ran `tests/fm-slack-watch.test.sh`, `tests/fm-slack-intake-unchanged.test.sh`, and `tests/fm-slack-secret-scan.test.sh` one after another under `nice -n 20` through `bin/fm-test-run.sh`, one suite per run.
+The latest 2026-10-23 test phase, at commit `3bf5a372d`, ran `tests/fm-slack-watch.test.sh`, `tests/fm-slack-intake-unchanged.test.sh`, and `tests/fm-slack-secret-scan.test.sh` one after another under `nice -n 20` through `bin/fm-test-run.sh`, one suite per run.
 Its logs record each suite's markers and results but not the full command line, so no command line is quoted for that run.
-`tests/fm-slack-watch.test.sh` ran from 2026-10-23T06:50:14Z to 06:58:17Z, printed an `ok -` line for every check listed below and `ok - all Slack watch checks`, and ended with `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=483340`.
-`tests/fm-slack-intake-unchanged.test.sh` printed `ok - intake refusals hold` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=13029`.
-`tests/fm-slack-secret-scan.test.sh` printed `ok - scan redacted and detected both planted copies` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=26574`.
-The same phase also drove the real entry points by hand against replay transcripts: removing the `:two:` reaction alone left the call open, a fresh typed `3` then recorded `abort` once, and the widest conflict wake line measured 473 characters.
-The suite exercised DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3, and X1 through X22; DOD-11, S4, and ACT-1 were not run.
+`tests/fm-slack-watch.test.sh` ran from 2026-10-23T20:04:35Z to 20:13:35Z, printed an `ok -` line for every check listed below and `ok - all Slack watch checks`, and ended with `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=540861`.
+`tests/fm-slack-intake-unchanged.test.sh` printed `ok - intake refusals hold` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=18679`.
+`tests/fm-slack-secret-scan.test.sh` printed `ok - scan redacted and detected both planted copies` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=34577`.
+The same phase also drove the real entry points by hand against replay transcripts: a card carrying `<source-id>`, `&`, `>`, and a literal `&lt;` was posted with every one escaped and no raw `<` or `>`; cards whose budget cut fell at each offset inside an `&amp;` or `&lt;` stayed at or under 38,000 characters with no split entity; a 45,000-character post of `&amp;` was cut without splitting an entity; a typed-reply conflict posted its candidates escaped while its wake line stayed plain; and reaction, single-character, and tap-versus-typed answers behaved as before.
+An earlier 2026-10-23 test phase, at commit `ca4fcbe71`, passed the same three suites and drove by hand the removal of the `:two:` reaction alone, which left the call open, then a fresh typed `3`, which recorded `abort` once; its widest conflict wake line measured 473 characters.
+The suite exercised DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3, and X1 through X23; DOD-11, S4, and ACT-1 were not run.
 The targeted commands below are the DoD's Verify commands with the fixture home exported as `FM_HOME`, `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, and `FM_CONFIG_OVERRIDE`.
 
 ## Live read-only probe
@@ -244,7 +245,7 @@ Result: pass.
 Not built and not run.
 Deferred with DOD-11 to `fm-slack-watch-renotify-digest`; this PR lands step 1 without it.
 
-## X1..X22 - review-round regressions
+## X1..X23 - review-round regressions
 
 Each runs against replay transcripts and the real intake; none opens a socket.
 
@@ -271,6 +272,7 @@ Each runs against replay transcripts and the real intake; none opens a socket.
 - X20: an owner reply carrying only `subtype: thread_broadcast` closed the call with the typed words as the answer, while replies from the owner's id carrying `bot_id`, `app_id`, or `bot_profile` answered nothing and closed nothing.
 - X21: with stdout and stderr captured apart, an explicit `arm` named its failure on stderr, wrote nothing to stdout, and exited nonzero on every run: after `FM_SLACK_DM_USER` changed (`dm_user_changed`, run twice with the failure already recorded by the standing check in between), with a state file of the wrong schema (`invalid_state_schema`), with a symlinked state directory (`unsafe_state_path`), and with a missing transcript (`replay_transcript_unreadable`). The standing `check` was silent on both streams with exit 0 while healthy, reported `dm_user_changed` once on stdout when it changed, and was silent on the repeat.
 - X22: with `FM_SLACK_POLL_MAX_ANSWERS=1`, a live thread with an owner reply and a thread whose call was closed in the terminal after the owner replied late: the first poll answered the live thread and did not retire the closed one (no `Resolved:` post, `retired` false); the second poll emitted `unmatched reply` for the late reply; the third poll posted `Resolved:` and retired the thread.
+- X23: a card whose title, held question, and option text carried `R&D <beta>`, `bind <source-id> & confirm`, and `Keep <old> & new ... a > b` reached Slack as `R&amp;D &lt;beta&gt;`, `bind &lt;source-id&gt; &amp; confirm`, and `Keep &lt;old&gt; &amp; new ... a &gt; b`, with no raw angle bracket and no bare ampersand; an oversized card whose question held 45,000 `<` stayed within 38,000 characters, kept the disagreement rule, and split no entity; a staged 9,000-copy `&amp;` notice was cut at the post bound without splitting an entity; two typed replies `use &lt;source-id&gt; &amp; go` and `skip &amp; wait` posted the notice `Conflicting signals: skip &amp; wait vs use &lt;source-id&gt; &amp; go. No answer was recorded. Please reply once.`, emitted the plain wake line `conflicting signals: skip & wait vs use <source-id> & go. Please reply once.`, and recorded nothing.
 
 ## ACT-1 - live answer
 
