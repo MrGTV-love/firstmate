@@ -257,7 +257,7 @@ SCOUT_BRIEF="$DATA/$ID/brief.md"
 # promotion does not re-litigate it. The helper still lists both leftover
 # bodies in one pass instead of stopping at the first.
 if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$SCOUT_BRIEF" task-only); then
-  echo "error: $SCOUT_BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; every unfinished item is listed once:" >&2
+  echo "error: $SCOUT_BRIEF cannot be promoted; every unfinished Task body or malformed input is listed once:" >&2
   while IFS= read -r line; do
     printf '  %s\n' "$line" >&2
   done <<EOF

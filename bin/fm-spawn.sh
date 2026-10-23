@@ -23,9 +23,10 @@
 #   placeholders, an empty Task, an incomplete pair of Task subsections, or a
 #   `## Captain's intent` line opening with a Captain label or address.
 #   Fresh ships and scouts additionally refuse intent with no substantive lines
-#   after blank lines, ATX headings and standalone HTML comments are removed,
-#   or with only standalone file paths, HTTP(S) URLs or Markdown links (optionally
-#   prefixed See, Read or Refer to). This is a mechanical minimum, not a semantic
+#   after blank lines, ATX headings, fence delimiters and standalone HTML comments
+#   are removed, or with only standalone path-shaped tokens (a slash or filename
+#   extension), HTTP(S) URLs or Markdown links (optionally prefixed See, Read or
+#   Refer to). This is a mechanical minimum, not a semantic
 #   classifier: other prose is accepted. Legacy briefs use marked captain words
 #   when present, otherwise their Task body. Relaunches and secondmate charters
 #   do not run this concrete-ask check; bin/fm-dod-lib.sh owns the helper.
@@ -4272,8 +4273,10 @@ print_brief_dispatch_refusal() { # <brief> <problem-lines>
     echo "error: $brief still contains {TASK} or {FIRSTMATE_SPEC}, and has an unfinished task Definition of Done; every unfinished item is listed once:" >&2
   elif [ "$dod_bad" -eq 1 ]; then
     echo "error: $brief has an unfinished task Definition of Done; every unfinished item is listed once:" >&2
-  else
+  elif [ "$task_bad" -eq 1 ]; then
     echo "error: $brief still contains {TASK} or {FIRSTMATE_SPEC}; every unfinished item is listed once:" >&2
+  else
+    echo "error: $brief cannot be dispatched; every input problem is listed once:" >&2
   fi
   while IFS= read -r line; do
     printf '  %s\n' "$line" >&2
@@ -4357,7 +4360,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
       fm_brief_worker_role "$STATE" "$ID" "$FM_ROOT" &&
         printf '\n' &&
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
-        cat "$SOURCE_BRIEF" &&
+        awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
           fm_brief_intent_overlay "$CAPTAIN_INTENT" "$SOURCE_BRIEF"

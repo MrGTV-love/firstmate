@@ -2205,6 +2205,41 @@ EOF
   pass "fm-spawn --relaunch: the task Definition of Done check and its missing-section warning belong to a fresh spawn only"
 }
 
+test_relaunch_refuses_scaffold_spec_placeholder() {
+  local dir id=rl-spec-placeholder brief out rc
+  dir=$(new_case spec-placeholder "$id")
+  add_ship_task "$dir" "$id" claude
+  brief="$dir/home/data/$id/brief.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+See report.md.
+## Firstmate spec
+{FIRSTMATE_SPEC}
+### Out of scope
+- Keep the renderer.
+EOF
+  printf 'zsh' > "$dir/fake/command"
+  out=$(run_spawn "$dir" "$id" --relaunch); rc=$?
+  expect_code 1 "$rc" 'relaunch must refuse a scaffold spec placeholder'
+  assert_contains "$out" '## Firstmate spec still holds {FIRSTMATE_SPEC}' 'relaunch lost the shared placeholder verdict'
+  assert_not_contains "$out" 'has no concrete ask' 'relaunch re-judged preserved intent'
+  [ "$(cat "$dir/fake/command")" = zsh ] || fail 'unfinished spec launched a replacement'
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+See report.md.
+## Firstmate spec
+Preserve the already-dispatched task.
+### Out of scope
+- Keep the renderer.
+EOF
+  out=$(run_spawn "$dir" "$id" --relaunch) || fail "finished relaunch failed: $out"
+  assert_contains "$out" "spawned $id" 'finished relaunch did not launch'
+  assert_not_contains "$out" 'has no concrete ask' 'finished relaunch re-judged preserved intent'
+  pass 'relaunch rejects a standalone spec placeholder beside scaffold headings without re-judging its ask'
+}
+
 # fm-spawn arms per-task wiring on harness PREFIXES, because a task launched
 # from a raw command records that command's basename rather than the exact
 # adapter name. Retirement must resolve the same way, or a task recorded as
@@ -6771,6 +6806,7 @@ test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
 test_spawn_relaunch_of_promoted_scout_uses_the_recorded_branch
 test_promoted_scout_relaunch_receives_the_current_delivery_contract
 test_relaunch_never_runs_the_task_definition_of_done_check
+test_relaunch_refuses_scaffold_spec_placeholder
 test_prefixed_prior_harness_wiring_is_still_retired
 test_muse_session_binding_is_retired_on_a_harness_switch
 test_cursor_session_binding_is_retired_on_a_harness_switch

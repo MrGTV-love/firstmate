@@ -480,6 +480,31 @@ $description
 
 ## Firstmate spec
 Verify projected workspace behavior for $id.
+
+## Definition Of Done (task)
+Capability in plain words: The isolated Herdr fixture $id exhibits its scenario's expected workspace presentation and lifecycle behavior.
+
+### Mandatory items
+- Source: $description
+  Expected: $id reaches the spawn, flat fallback, refusal, teardown, or recovery outcome specified by its owning test case.
+  Verify: run tests/fm-backend-herdr-presentation-e2e.test.sh through bin/fm-test-run.sh and satisfy every applicable existing assertion.
+  Edge/negative: failed operations and lock contention preserve the asserted exact endpoint ownership and captain focus.
+  Evidence place: the runner output and the fixture's stdout, stderr, Herdr call log, move log, and focus audit under $TMP_ROOT.
+  Authority: grader.
+
+### Supporting items
+None.
+
+### Hard gates
+Use only the guarded named isolated Herdr lab session.
+Keep every worktree allocation under $TMP_ROOT; never mutate the shared worktree pool or the default Herdr session.
+Retain every existing assertion and isolation guard.
+
+### Honesty rule
+Report only observed outcomes and recorded evidence; a skipped or unexecuted assertion is not a pass.
+
+## How You're Graded
+The owning E2E test's existing assertions determine pass or fail; every mandatory item and hard gate must pass.
 EOF
 }
 

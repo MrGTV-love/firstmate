@@ -119,6 +119,7 @@
 # governs where they conflict.
 # Absent criteria/exclusions are explicit; unreadable briefs, criteria files or
 # the shared rubric refuse construction rather than silently dropping evidence.
+# CRLF briefs and criteria are accepted; NUL-bearing input is refused by path.
 # Every heredoc here stays outside a command substitution: `VAR=$(cat <<EOF ...)`
 # breaks parsing of the whole file on Bash 3.2 (tests/fm-brief.test.sh).
 # fm_brief_worker_role owns the ship/scout role scope. bin/fm-spawn.sh is its one
@@ -265,6 +266,7 @@ fm_base_branch_valid() {  # <base> <mode> <forge> <caller>
 # none. Any other "Base branch:" line is prose and ignored.
 fm_brief_base_branches() {  # <brief>
   awk '
+    { sub(/\r$/, "") }
     setup && sub(/^Base branch: /, "") { print; n++ }
     { setup = /^You are in a disposable git worktree of .*, at a detached HEAD on a clean copy of its base branch\.$/ }
     END { exit !n }
@@ -296,22 +298,6 @@ fm_ship_rule_one() {  # <no-mistakes|direct-PR|local-only> <task-id> [branch] [<
       return 1
       ;;
   esac
-}
-
-# Return 0 when a Task subsection still consists only of its scaffold
-# placeholder. A missing file and legacy briefs carry no such placeholders.
-fm_brief_task_placeholders_present() {  # <file>
-  local file=$1 intent spec
-  [ -f "$file" ] || return 1
-  intent=$(fm_brief_task_heading_body "$file" "## Captain's intent")
-  spec=$(fm_brief_task_heading_body "$file" "## Firstmate spec")
-  [ "$(printf '%s' "$intent" | tr -d '[:space:]')" = '{TASK}' ] && return 0
-  fm_brief_heading_parse - "## Firstmate spec" unfenced-body <<<"## Firstmate spec
-$spec" | awk '
-    /^[[:space:]]*\{FIRSTMATE_SPEC\}[[:space:]]*$/ { found = 1 }
-    END { exit !found }
-  ' && return 0
-  return 1
 }
 
 # The task Definition of Done placeholders, in scaffold order, as
@@ -409,8 +395,8 @@ fm_dod_text_problem_list() {  # <text>
 
 # Print every reason a ship or scout brief cannot be dispatched, one line per
 # problem, and return 0 when at least one exists; return 1 when none does.
-# Covers, in the order an operator fills them, a `## Captain's intent` body that
-# is exactly {TASK}, a `## Firstmate spec` body that is exactly {FIRSTMATE_SPEC},
+# Covers, in the order an operator fills them, unfenced standalone {TASK} and
+# {FIRSTMATE_SPEC} lines in their respective Task subsections,
 # every DoD token from FM_TASK_DOD_PLACEHOLDERS still standing in its section,
 # and an unfenced `DoD file:` line naming a missing, unreadable, or empty file,
 # or one that still holds a token. Each file problem names the path to edit.
@@ -424,13 +410,19 @@ fm_dod_text_problem_list() {  # <text>
 fm_brief_dispatch_problems() {  # <brief> [task-only]
   local brief=$1 scope=${2:-all} intent spec span dod_file more line problems=1
   [ -f "$brief" ] || return 1
-  intent=$(fm_brief_task_heading_body "$brief" "## Captain's intent")
-  spec=$(fm_brief_task_heading_body "$brief" "## Firstmate spec")
-  if [ "$(printf '%s' "$intent" | tr -d '[:space:]')" = '{TASK}' ]; then
+  if more=$(fm_brief_file_problem "$brief"); then
+    printf '%s\n' "$more"
+    return 0
+  fi
+  intent=$(fm_brief_heading_parse - "## Captain's intent" unfenced-body <<<"## Captain's intent
+$(fm_brief_task_heading_body "$brief" "## Captain's intent")")
+  spec=$(fm_brief_heading_parse - "## Firstmate spec" unfenced-body <<<"## Firstmate spec
+$(fm_brief_task_heading_body "$brief" "## Firstmate spec")")
+  if printf '%s\n' "$intent" | grep -Eq '^[[:space:]]*\{TASK\}[[:space:]]*$'; then
     printf '%s\n' "## Captain's intent still holds {TASK}"
     problems=0
   fi
-  if [ "$(printf '%s' "$spec" | tr -d '[:space:]')" = '{FIRSTMATE_SPEC}' ]; then
+  if printf '%s\n' "$spec" | grep -Eq '^[[:space:]]*\{FIRSTMATE_SPEC\}[[:space:]]*$'; then
     printf '%s\n' "## Firstmate spec still holds {FIRSTMATE_SPEC}"
     problems=0
   fi
@@ -443,6 +435,10 @@ fm_brief_dispatch_problems() {  # <brief> [task-only]
   if [ -n "$dod_file" ]; then
     if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
       printf 'DoD file %s is not a readable file\n' "$dod_file"
+      return 0
+    fi
+    if more=$(fm_brief_file_problem "$dod_file"); then
+      printf '%s\n' "$more"
       return 0
     fi
     if [ -z "$(tr -d '[:space:]' < "$dod_file")" ]; then
@@ -496,7 +492,7 @@ $task" | awk '
 }
 
 fm_brief_verification_plan() {  # <brief>
-  local brief=$1 rubric dod scope dod_file context=''
+  local brief=$1 rubric dod scope dod_file problem context=''
   rubric="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)/docs/review-rubric.md"
   [ -f "$brief" ] && [ -r "$brief" ] || {
     printf 'error: verification-plan brief is not a readable file: %s\n' "$brief" >&2
@@ -506,6 +502,10 @@ fm_brief_verification_plan() {  # <brief>
     printf 'error: shared review rubric is not a readable file: %s; restore it before building the verification plan\n' "$rubric" >&2
     return 1
   }
+  if problem=$(fm_brief_file_problem "$brief"); then
+    printf 'error: %s\n' "$problem" >&2
+    return 1
+  fi
   dod=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   dod_file=$(fm_brief_task_dod_file "$brief")
   if [ -n "$dod_file" ]; then
@@ -513,7 +513,11 @@ fm_brief_verification_plan() {  # <brief>
       printf 'error: verification-plan DoD file is not a readable file: %s\n' "$dod_file" >&2
       return 1
     }
-    dod=$(cat "$dod_file")
+    if problem=$(fm_brief_file_problem "$dod_file"); then
+      printf 'error: %s\n' "$problem" >&2
+      return 1
+    fi
+    dod=$(awk '{ sub(/\r$/, ""); print }' "$dod_file")
   fi
   scope=$(fm_brief_out_of_scope "$brief")
   printf '# Verification plan\nAuthor-supplied verification evidence, not captain intent or authorization to broaden scope.\n\n'
@@ -543,6 +547,10 @@ fm_brief_verification_plan() {  # <brief>
 fm_brief_task_dod_problem() {  # <brief>
   local brief=$1 span dod_file found
   [ -f "$brief" ] || return 1
+  if found=$(fm_brief_file_problem "$brief"); then
+    printf '%s\n' "$found"
+    return 0
+  fi
   fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return 1
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
@@ -551,6 +559,10 @@ fm_brief_task_dod_problem() {  # <brief>
   if [ -n "$dod_file" ]; then
     if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
       printf 'DoD file %s is not a readable file\n' "$dod_file"
+      return 0
+    fi
+    if found=$(fm_brief_file_problem "$dod_file"); then
+      printf '%s\n' "$found"
       return 0
     fi
     if [ -z "$(tr -d '[:space:]' < "$dod_file")" ]; then
@@ -618,8 +630,9 @@ fm_brief_intent_address_line() {  # <file>
 
 # This is a mechanical minimum, not a natural-language judgment of the ask:
 # refuse no substantive lines, or only standalone path/URL/Markdown-link lines
-# (optionally introduced by See, Read, or Refer to). Ignore blank lines, ATX
-# headings and standalone HTML comments. Other prose remains the author's ask.
+# (optionally introduced by See, Read, or Refer to). Path-shaped tokens contain
+# a slash or a filename extension. Ignore blank lines, ATX headings, fence
+# delimiters and standalone HTML comments. Other prose remains the author's ask.
 fm_brief_intent_ask_problem() {  # <brief>
   local intent
   if fm_brief_task_heading_present "$1" "## Captain's intent"; then
@@ -647,19 +660,19 @@ fm_brief_intent_ask_problem() {  # <brief>
       }
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
       if (line == "" || line ~ /^#+([[:space:]]|$)/) next
+      if (line ~ /^(```+|~~~+)/) next
       lines++
       sub(/^[-*+] +/, "", line)
       sub(/[.!]$/, "", line)
       sub(/^([Ss]ee|[Rr]ead|[Rr]efer to)[[:space:]]+/, "", line)
       if (line ~ /^\[[^]]+\]\([^[:space:]]+\)$/) next
       gsub(/`/, "", line)
-      if (line ~ /^(https?:\/\/|\/|\.\/|\.\.\/|~\/)[^[:space:]]+$/) next
-      if (line ~ /^[^[:space:]]+\.(md|txt|pdf|rst|json|ya?ml)$/) next
+      if (line ~ /^[^[:space:]]*\/[^[:space:]]*$/ || line ~ /^[^[:space:]]+\.[[:alnum:]_-]+$/) next
       substantive = 1
     }
     END {
       if (substantive) exit 1
-      if (!lines) print "no substantive ask after blank lines, headings and standalone comments"
+      if (!lines) print "no substantive ask after blank lines, headings, fence delimiters and standalone comments"
       else print "only file or report pointers, with no ask written in"
     }
   '
@@ -1194,7 +1207,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     -h|--help)
       printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
         'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
-        'Legacy briefs state absent sections; unreadable inputs refuse construction.'
+        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; legacy briefs state absent sections.'
       ;;
     *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief> (or --help)' >&2; exit 2 ;;
   esac
