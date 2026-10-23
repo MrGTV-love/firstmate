@@ -21,7 +21,7 @@
 # daemon keeps its escalation-digest seen-markers; the watcher keeps its .seen-*
 # signatures).
 #
-# There are five documented exceptions. The absorb classification
+# There are six documented exceptions. The absorb classification
 # (crew_absorb_class and its working/paused wrappers) is NOT a pure status-file
 # read: it reuses bin/fm-crew-state.sh, which may make a bounded no-mistakes call,
 # to decide whether a crew that just stopped its turn or went stale is working,
@@ -34,6 +34,8 @@
 # status_home_appends_record writes the per-task home-owned
 # append ledger documented in fm-status-wake-lib.sh so the wake scan can treat
 # this home's own bookkeeping bytes as already owned.
+# status_presentation_marker_adopt_device rewrites a reported/classified marker
+# after a device-only remount; fm-status-io-lib.sh owns that migration rule.
 # crew_worktree_written_since reads the task's meta file and walks a bounded slice
 # of its worktree instead of a status file, so callers run it only at the moment
 # they would otherwise escalate.
