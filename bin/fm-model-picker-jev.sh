@@ -25,7 +25,7 @@ export -n TYPESAFE_API_KEY_PRIVATE
 unset TYPESAFE_API_KEY
 [ -r "$REQUEST_FILE" ] || { printf 'error: request file not readable\n' >&2; exit 4; }
 REQUEST=$(cat "$REQUEST_FILE") || { printf 'error: request file not readable\n' >&2; exit 4; }
-if [ -n "$NEVER_SEND" ] && ! fm_typesafe_permitted "$REQUEST" "$NEVER_SEND" "$SCRATCH"; then
+if [ -z "$NEVER_SEND" ] || ! fm_typesafe_permitted "$REQUEST" "$NEVER_SEND" "$SCRATCH"; then
   printf '%s\n' "${FM_TYPESAFE_WITHHELD_REASON:-never-send policy refused the request}" >&2
   exit 3
 fi

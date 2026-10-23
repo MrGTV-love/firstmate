@@ -13,7 +13,6 @@ changes when a seed mix, floor or veto changes.
 
 from __future__ import annotations
 
-import calendar  # noqa: F401  (kept for callers reading aadb.snapshot_age_seconds semantics)
 import json
 import os
 import re
@@ -233,6 +232,22 @@ def load_projection(data_root, slug):
     return doc, None
 
 
+def asserted_projection(table, entry, chosen, data_root):
+    """Load a mapped projection and assert its identity: the table's asserted name and the
+    family's creator must both match, else the projection is refused."""
+    projection, why = load_projection(data_root, chosen["slug"])
+    if projection is None:
+        return None, why
+    if projection.get("name") != chosen.get("name"):
+        return None, ("projection identity refused: %s is %r, table asserts %r"
+                      % (chosen["slug"], projection.get("name"), chosen.get("name")))
+    creator = ((table.get("families") or {}).get(entry.get("family")) or {}).get("creator")
+    if projection.get("creator") != creator:
+        return None, ("projection creator %r does not match family %r"
+                      % (projection.get("creator"), entry.get("family")))
+    return projection, None
+
+
 def _profile_list(value):
     if isinstance(value, list):
         return value
@@ -282,7 +297,34 @@ def resolver_assessment(result, route):
     return None
 
 
-def quota_facts(entry, route, quota_doc, pools, assessment):
+def quota_lane(harness, model):
+    """The candidate's quota account key, as bin/fm-quota-axi-lib.sh's quota_lane binds it."""
+    if harness == "codex":
+        return "codex-home"
+    if harness in ("pi", "pi-signed") and "/" in (model or ""):
+        lane = model.split("/", 1)[0]
+        return "codex-home" if lane == "codex-native" else lane
+    return ""
+
+
+def quota_row(quota_doc, provider, lane):
+    """The one provider row a candidate binds to, as bin/fm-quota-axi-lib.sh's quota_row does."""
+    rows = [p for p in quota_doc.get("providers") or []
+            if isinstance(p, dict) and p.get("provider") == provider]
+    if quota_doc.get("schemaVersion") == 6:
+        for key in (lane, "default"):
+            for row in rows:
+                if row.get("accountKey") == key:
+                    return row
+        return None
+    return rows[0] if rows else None
+
+
+def _number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def quota_facts(entry, harness, model, quota_doc, assessment):
     """Quota evidence for one route from the resolver's one snapshot (never a second probe).
     API routes carry no quota row: their lane is priced in dollars and gets no quota field."""
     if entry.get("currency") != "subscription":
@@ -303,30 +345,33 @@ def quota_facts(entry, route, quota_doc, pools, assessment):
     if not provider or not isinstance(quota_doc, dict):
         return {"spendPriority": None, "headroom_pct": None, "runway": None,
                 "capacity": "unknown", "source": "no-quota-row"}
-    rows = [p for p in quota_doc.get("providers") or []
-            if isinstance(p, dict) and p.get("provider") == provider]
-    row = rows[0] if rows else None
+    row = quota_row(quota_doc, provider, quota_lane(harness, model))
     if row is None:
         return {"spendPriority": None, "headroom_pct": None, "runway": None,
                 "capacity": "unknown", "source": "no-quota-row"}
+    bare = (model or "").split("/")[-1]
+    scopes = {"all_models", "all_products"}
+    if model:
+        scopes |= {"model:" + bare, "product:" + bare}
     availability = ((row.get("quotaSemantics") or {}).get("effectiveAvailability") or [])
-    evidence = [r for r in availability if isinstance(r, dict)]
+    evidence = [r for r in availability if isinstance(r, dict) and r.get("scope") in scopes]
     if not evidence:
         return {"spendPriority": None, "headroom_pct": None, "runway": None,
                 "capacity": "unknown", "source": "no-applicable-row"}
-    priorities = [r.get("selection", {}).get("spendPriority") for r in evidence]
-    priorities = [p for p in priorities if isinstance(p, (int, float)) and not isinstance(p, bool)]
+    ranked = [r for r in evidence if _number((r.get("selection") or {}).get("spendPriority"))]
+    limiting = (min(ranked, key=lambda r: r["selection"]["spendPriority"])
+                if ranked and len(ranked) == len(evidence) else None)
     pcts = [r.get("effectivePercentRemaining") for r in evidence]
-    pcts = [p for p in pcts if isinstance(p, (int, float)) and not isinstance(p, bool)]
-    runway = evidence[0].get("runway")
-    return {"spendPriority": min(priorities) if priorities else None,
+    pcts = [p for p in pcts if _number(p)]
+    runway = limiting.get("runway") if limiting is not None else None
+    return {"spendPriority": limiting["selection"]["spendPriority"] if limiting is not None else None,
             "headroom_pct": min(pcts) if pcts else None,
             "runway": runway.get("status") if isinstance(runway, dict) else None,
             "capacity": "usable" if (pcts and min(pcts) > 0) else "unknown",
             "source": "quota-snapshot"}
 
 
-def build_candidates(rules_doc, table, data_root, quota_doc, pools, result):
+def build_candidates(rules_doc, table, data_root, quota_doc, result):
     """One candidate per concrete route. A route the table cannot map stays a candidate
     with its facts read as UNKNOWN: never dropped, never zero."""
     routes = routes_from_rules(rules_doc)
@@ -355,22 +400,9 @@ def build_candidates(rules_doc, table, data_root, quota_doc, pools, result):
             candidate["unknown_reason"] = why
             candidates.append(candidate)
             continue
-        projection, why = load_projection(data_root, chosen["slug"])
+        projection, why = asserted_projection(table, entry, chosen, data_root)
         if projection is None:
             candidate["unknown_reason"] = why
-            candidates.append(candidate)
-            continue
-        if projection.get("name") != chosen.get("name"):
-            candidate["unknown_reason"] = (
-                "projection identity refused: %s is %r, table asserts %r"
-                % (chosen["slug"], projection.get("name"), chosen.get("name")))
-            candidates.append(candidate)
-            continue
-        creator = ((table.get("families") or {}).get(entry.get("family")) or {}).get("creator")
-        if projection.get("creator") != creator:
-            candidate["unknown_reason"] = (
-                "projection creator %r does not match family %r"
-                % (projection.get("creator"), entry.get("family")))
             candidates.append(candidate)
             continue
         candidate["projection"] = {"slug": chosen["slug"], "name": projection.get("name"),
@@ -387,7 +419,8 @@ def build_candidates(rules_doc, table, data_root, quota_doc, pools, result):
                     "exhausted_now" in reason or "0% remaining" in reason):
                 candidate["configured_eligible"] = True
                 candidate["configured_capacity_zero"] = True
-        candidate["quota"] = quota_facts(entry, route, quota_doc, pools, assessment)
+        candidate["quota"] = quota_facts(entry, profile["harness"], profile["model"],
+                                         quota_doc, assessment)
         if entry.get("currency") == "api":
             cost = projection["metrics"].get("costpertask")
             if isinstance(cost, dict) and isinstance(cost.get("value"), (int, float)):
@@ -540,11 +573,6 @@ def apply_pareto(survivors, mix):
                                  % (target["family"], target["currency"])})
     pruned_routes = {p["route"] for p in pruned}
     kept = [c for c in survivors if c["route"] not in pruned_routes]
-    for candidate in survivors:
-        group = [c for c in kept if c["family"] == candidate["family"]
-                 and c["currency"] == candidate["currency"]]
-        if not group:
-            kept.append(candidate)
     tradeoffs = []
     trials = []
     for i, a in enumerate(kept):
@@ -706,6 +734,16 @@ def validator_request(task_text, worker, alternatives):
                 "criteria": {c["id"]: validator_summary(c) for c in alternatives}}}}
 
 
+def _confidence(answer, qid):
+    confidence = answer.get("confidence")
+    if not _number(confidence):
+        return None
+    if not 0 <= confidence <= 1:
+        raise ValueError("malformed Jev payload: %s confidence %s is outside 0..1"
+                         % (qid, confidence))
+    return confidence
+
+
 def parse_answers(raw, request):
     doc = json.loads(raw)
     if not isinstance(doc, dict) or not isinstance(doc.get("answers"), dict):
@@ -726,19 +764,18 @@ def parse_answers(raw, request):
             probabilities = answer.get("probabilities")
             if not isinstance(probabilities, dict):
                 raise ValueError("malformed Jev payload: %s has no probabilities" % qid)
-            confidence = answer.get("confidence")
-            if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
-                confidence = None
+            confidence = _confidence(answer, qid)
             parsed[qid] = {"choice": choice, "confidence": confidence,
                            "probabilities": probabilities}
         else:
             score = answer.get("score")
-            if not isinstance(score, (int, float)) or isinstance(score, bool):
+            if not _number(score):
                 raise ValueError("malformed Jev payload: %s score missing" % qid)
+            if not 0 <= score <= len(question["criteria"]) - 1:
+                raise ValueError("malformed Jev payload: %s score %s is outside 0..%d"
+                                 % (qid, score, len(question["criteria"]) - 1))
             legend = answer.get("legend")
-            confidence = answer.get("confidence")
-            if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
-                confidence = None
+            confidence = _confidence(answer, qid)
             parsed[qid] = {"score": score, "confidence": confidence,
                            "legend": legend if isinstance(legend, dict) else {}}
     version = doc.get("model")
@@ -811,6 +848,9 @@ def recheck(worker, validator, effort, pruned_routes, spec, complexity):
             problems.append("worker %s fails the %s veto on re-check"
                             % (worker["route"], METRICS[metric_id]["eval"]))
     if validator is not None:
+        if not validator["configured_eligible"]:
+            problems.append("validator %s is not eligible: %s"
+                            % (validator["route"], validator["configured_reason"]))
         if validator.get("family") == worker.get("family"):
             problems.append("validator %s is the worker's own family" % validator["route"])
         record = (validator.get("metrics") or {}).get("omniscience-non-hallucination-rate")
@@ -826,10 +866,7 @@ def recheck(worker, validator, effort, pruned_routes, spec, complexity):
 
 
 def pick_effort(score):
-    if not isinstance(score, (int, float)) or isinstance(score, bool):
-        return None
-    index = max(0, min(len(EFFORT_LEVELS) - 1, int(round(score))))
-    return EFFORT_LEVELS[index]
+    return EFFORT_LEVELS[int(round(score))]
 
 
 def row_from_pick(*, status, reason, task_key, rule, work_type, work_type_conf,
@@ -848,8 +885,8 @@ def row_from_pick(*, status, reason, task_key, rule, work_type, work_type_conf,
         "snapshot_age": snapshot_age, "policy_version": POLICY_VERSION,
         "task_key": task_key, "work_type_confidence": work_type_conf,
         "complexity_components": components, "complexity_confidence": complexity_conf,
-        "confidence_band": band, "snapshot_stale": 1 if stale else 0,
-        "classification_uncertain": 1 if uncertain else 0,
+        "confidence_band": band, "snapshot_stale": None if stale is None else int(bool(stale)),
+        "classification_uncertain": None if uncertain is None else int(bool(uncertain)),
         "picker_status": status, "reject_reason": reason,
         "jev_raw_support": raw_support,
     }
@@ -874,9 +911,9 @@ def write_row(data_root, row):
 
 def simple_row(status, reason, task_key, rule, verdict_reason=None):
     return row_from_pick(
-        status=status, reason=reason, task_key=task_key, rule=rule, work_type="none-fit",
+        status=status, reason=reason, task_key=task_key, rule=rule, work_type=None,
         work_type_conf=None, complexity=None, components=None, complexity_conf=None,
-        band=None, stale=False, uncertain=True, chosen_worker=None, chosen_validator=None,
+        band=None, stale=None, uncertain=None, chosen_worker=None, chosen_validator=None,
         effort=None, raw_payload=None, raw_support=None, candidate_version=None,
         gates={"policy_version": POLICY_VERSION, "seed_label": SEED_LABEL,
                "verdict": verdict_reason or reason},
@@ -901,10 +938,13 @@ def _load_optional(path):
 
 
 def never_send_path(args):
-    path = args.get("never_send") or ""
-    if not path or path == "/dev/null":
-        return ""
-    return path
+    """The never-send policy every request is checked against: --never-send, else the home's
+    config/dispatch-never-send. There is no way to skip the check."""
+    if args.get("never_send"):
+        return args["never_send"]
+    home = os.environ.get("FM_HOME") or str(Path(__file__).resolve().parent.parent.parent)
+    config_dir = os.environ.get("FM_CONFIG_OVERRIDE") or os.path.join(home, "config")
+    return os.path.join(config_dir, "dispatch-never-send")
 
 
 def observe(args, key, helper, data_root):
@@ -920,10 +960,10 @@ def observe(args, key, helper, data_root):
     rules_doc = _load_optional(args.get("rules"))
     result = _load_optional(args.get("result"))
     quota_doc = _load_optional(args.get("quota"))
-    pools = _load_optional(args.get("pools"))
     rule_profile = (result.get("chosen") or {}).get("profile") or {}
     rule = {"worker": None, "validator": None, "effort": None}
-    if isinstance(rule_profile, dict) and isinstance(rule_profile.get("harness"), str):
+    if status not in ("withheld", "error") and isinstance(rule_profile, dict) \
+            and isinstance(rule_profile.get("harness"), str):
         rule["worker"] = normalize_route(rule_profile.get("harness"), rule_profile.get("model"))
         rule["effort"] = rule_profile.get("effort") if isinstance(rule_profile.get("effort"), str) else None
     task_key = task_key_for(brief) if brief else None
@@ -942,13 +982,13 @@ def observe(args, key, helper, data_root):
         return 0
 
     try:
-        table = load_table(args.get("table") or Path(__file__).with_name("routes.json"))
+        table = load_table(args["table"])
     except (OSError, ValueError) as error:
         write_row(data_root, simple_row("error", "route table unusable: %s" % error, task_key, rule))
         return 0
 
     det_complexity, det_components = deterministic_complexity(task_text, rules_doc)
-    candidates = build_candidates(rules_doc, table, data_root, quota_doc, pools, result)
+    candidates = build_candidates(rules_doc, table, data_root, quota_doc, result)
     request = classify_request(task_text, args.get("project"))
     body, error = jev_call(request, key, never_send_path(args), helper, args["scratch"])
     if error:
@@ -973,7 +1013,7 @@ def observe(args, key, helper, data_root):
     if work_type_conf is not None and work_type_conf < 0.60:
         uncertain = True
     complexity_score = classified["complexity"]["score"]
-    complexity_norm = max(0.0, min(1.0, complexity_score / (len(COMPLEXITY_LEVELS) - 1)))
+    complexity_norm = complexity_score / (len(COMPLEXITY_LEVELS) - 1)
     complexity = round(0.5 * det_complexity + 0.5 * complexity_norm, 3)
     components = dict(det_components, classification_score=complexity_score,
                       classification_confidence=classified["complexity"]["confidence"],
@@ -983,6 +1023,9 @@ def observe(args, key, helper, data_root):
     mix, conflicts = demanded_metrics(spec, candidates)
     for candidate in candidates:
         compute_facts(candidate, mix)
+    ages = [c["snapshot_age_seconds"] for c in candidates if c["snapshot_age_seconds"] is not None]
+    snapshot_age = max(ages) if ages else None
+    stale = bool(snapshot_age is not None and snapshot_age > STALE_AFTER_SECONDS)
     survivors, pruned, floor = apply_gates(candidates, spec, complexity)
     kept, pareto_pruned, tradeoffs, trials, spend = apply_pareto(survivors, mix)
     gates_base = {"policy_version": POLICY_VERSION, "table_version": table.get("table_version"),
@@ -996,28 +1039,29 @@ def observe(args, key, helper, data_root):
             status="no-survivors", reason="no candidate survived the hard gates and Pareto pruning",
             task_key=task_key, rule=rule, work_type=spec["label"],
             work_type_conf=work_type_conf, complexity=complexity, components=components,
-            complexity_conf=complexity_conf, band=None, stale=False, uncertain=uncertain,
+            complexity_conf=complexity_conf, band=None, stale=stale, uncertain=uncertain,
             chosen_worker=None, chosen_validator=None, effort=None,
             raw_payload=None, raw_support=json.dumps(
                 [b.decode("utf-8", "replace") for _, b in responses]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
-            spend=spend, snapshot_age=None)
+            spend=spend, snapshot_age=snapshot_age)
         write_row(data_root, row)
         return 0
 
-    validators = [c for c in candidates if c.get("family") and c.get("projection")]
+    validators = [c for c in candidates
+                  if c.get("family") and c.get("projection") and c["configured_eligible"]]
     request = pick_request(task_text, args.get("project"), kept, validators, spec)
     body, error = jev_call(request, key, never_send_path(args), helper, args["scratch"])
     if error:
         row = row_from_pick(
             status="picker-error", reason=error, task_key=task_key, rule=rule,
             work_type=spec["label"], work_type_conf=work_type_conf, complexity=complexity,
-            components=components, complexity_conf=complexity_conf, band=None, stale=False,
+            components=components, complexity_conf=complexity_conf, band=None, stale=stale,
             uncertain=uncertain, chosen_worker=None, chosen_validator=None, effort=None,
             raw_payload=None, raw_support=json.dumps(
                 [b.decode("utf-8", "replace") for _, b in responses]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
-            spend=spend, snapshot_age=None)
+            spend=spend, snapshot_age=snapshot_age)
         write_row(data_root, row)
         return 0
     responses.append(("pick", body))
@@ -1027,22 +1071,21 @@ def observe(args, key, helper, data_root):
         row = row_from_pick(
             status="invalid-response", reason=str(error), task_key=task_key, rule=rule,
             work_type=spec["label"], work_type_conf=work_type_conf, complexity=complexity,
-            components=components, complexity_conf=complexity_conf, band=None, stale=False,
+            components=components, complexity_conf=complexity_conf, band=None, stale=stale,
             uncertain=uncertain, chosen_worker=None, chosen_validator=None, effort=None,
             raw_payload=body,
             raw_support=json.dumps([b.decode("utf-8", "replace") for _, b in responses[:-1]]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
-            spend=spend, snapshot_age=None)
+            spend=spend, snapshot_age=snapshot_age)
         write_row(data_root, row)
         return 0
 
     by_id = {c["id"]: c for c in candidates}
     worker = by_id.get(picked["worker"]["choice"])
-    validator = by_id.get(picked["validator"]["choice"])
-    unknown_validator = picked["validator"]["choice"] not in by_id
+    chosen_validator = {c["id"]: c for c in validators}.get(picked["validator"]["choice"])
+    unknown_validator = chosen_validator is None
     effort = pick_effort(picked["effort"]["score"])
     band = confidence_band(picked["worker"]["confidence"])
-    chosen_validator = validator if validator is not None and validator.get("family") else None
     validator_reason = None
     if chosen_validator is not None and worker is not None \
             and chosen_validator.get("family") == worker.get("family"):
@@ -1062,10 +1105,9 @@ def observe(args, key, helper, data_root):
             else:
                 try:
                     picked2, _ = parse_answers(body2, fallback)
-                    chosen_validator = by_id.get(picked2["validator"]["choice"])
-                    if chosen_validator is not None and chosen_validator.get("family") == worker.get("family"):
-                        chosen_validator = None
-                        validator_reason = "cross-family fallback returned the worker's own family"
+                    chosen_validator = {c["id"]: c for c in alternatives}.get(
+                        picked2["validator"]["choice"])
+                    unknown_validator = chosen_validator is None
                 except ValueError as error3:
                     chosen_validator = None
                     validator_reason = "cross-family validator fallback malformed: %s" % error3
@@ -1078,9 +1120,6 @@ def observe(args, key, helper, data_root):
         problems.append("worker %s is not a survivor of the authoritative mix" % worker["route"])
     result_status = "rejected" if problems else "accepted"
     result_reason = "; ".join(problems) if problems else validator_reason
-    ages = [c["snapshot_age_seconds"] for c in candidates if c["snapshot_age_seconds"] is not None]
-    snapshot_age = max(ages) if ages else None
-    stale = bool(snapshot_age is not None and snapshot_age > STALE_AFTER_SECONDS)
     gates = dict(gates_base)
     gates["recheck"] = {"accepted": not problems, "problems": problems,
                         "worker": picked["worker"]["choice"],
@@ -1104,11 +1143,10 @@ def observe(args, key, helper, data_root):
     return 0
 
 
-def report(data_root, as_json=False):
+def report(data_root):
     db_path = Path(data_root) / "aa.sqlite"
     if not db_path.is_file():
-        print(json.dumps({"runs": 0, "message": "0 shadow dispatches logged"})
-              if as_json else "0 shadow dispatches logged")
+        print("0 shadow dispatches logged")
         return 0
     try:
         conn = sqlite3.connect(str(db_path))
@@ -1122,33 +1160,30 @@ def report(data_root, as_json=False):
         warn("could not read the shadow log: %s" % error)
         return 2
     if not rows:
-        print(json.dumps({"runs": 0, "message": "0 shadow dispatches logged"})
-              if as_json else "0 shadow dispatches logged")
+        print("0 shadow dispatches logged")
         return 0
+    counters = ("runs", "rule", "no_rule_route", "no_pick", "worker_den", "worker_diff",
+                "validator_den", "validator_diff", "effort_den", "effort_diff", "dispatch",
+                "ask", "escalate", "unknown_band", "stale", "none_fit", "rejected")
+    compared = (("worker_den", "worker_diff", "rule_worker", "chosen_worker"),
+                ("validator_den", "validator_diff", "rule_validator", "chosen_validator"),
+                ("effort_den", "effort_diff", "rule_effort", "effort"))
     groups = {}
     for row in rows:
         key = row.get("work_type") or "unclassified"
-        group = groups.setdefault(key, {"runs": 0, "rule": 0, "no_rule_route": 0,
-                                        "worker_diff": 0, "validator_den": 0,
-                                        "validator_diff": 0, "effort_den": 0,
-                                        "effort_diff": 0, "dispatch": 0, "ask": 0,
-                                        "escalate": 0, "unknown_band": 0, "stale": 0,
-                                        "none_fit": 0, "rejected": 0})
+        group = groups.setdefault(key, dict.fromkeys(counters, 0))
         group["runs"] += 1
         if row.get("rule_worker"):
             group["rule"] += 1
-            if row.get("chosen_worker") and row["chosen_worker"] != row["rule_worker"]:
-                group["worker_diff"] += 1
         else:
             group["no_rule_route"] += 1
-        if row.get("rule_worker") and row.get("rule_validator"):
-            group["validator_den"] += 1
-            if row.get("chosen_validator") and row["chosen_validator"] != row["rule_validator"]:
-                group["validator_diff"] += 1
-        if row.get("rule_worker") and row.get("rule_effort"):
-            group["effort_den"] += 1
-            if row.get("effort") and row["effort"] != row["rule_effort"]:
-                group["effort_diff"] += 1
+        if not row.get("chosen_worker"):
+            group["no_pick"] += 1
+        for den, diff, rule_col, pick_col in compared:
+            if row.get(rule_col) and row.get(pick_col):
+                group[den] += 1
+                if row[pick_col] != row[rule_col]:
+                    group[diff] += 1
         group[row.get("confidence_band") or "unknown_band"] += 1
         if row.get("snapshot_stale"):
             group["stale"] += 1
@@ -1156,40 +1191,34 @@ def report(data_root, as_json=False):
             group["none_fit"] += 1
         if row.get("picker_status") == "rejected":
             group["rejected"] += 1
-    if as_json:
-        print(json.dumps({"work_types": groups,
-                          "note": "routing evidence, not outcome labels"},
-                         indent=1, sort_keys=True))
-        return 0
     print("Shadow disagreement report - routing evidence, not outcome labels.")
     print("These rows show what the picker would have chosen; they cannot show how an unrun pick would have performed.")
-    print("%-34s %5s %5s %5s %8s %8s %8s %8s %8s %8s %6s %8s %8s"
-          % ("work_type", "runs", "rule", "noRte", "wDiff", "vDen", "vDiff",
+    print("%-34s %5s %5s %5s %6s %5s %5s %5s %5s %5s %5s %8s %5s %5s %5s"
+          % ("work_type", "runs", "rule", "noRte", "noPick", "wDen", "wDiff", "vDen", "vDiff",
              "eDen", "eDiff", "dispatch", "ask", "escal", "stale"))
-    totals = {"runs": 0, "rule": 0, "no_rule_route": 0, "worker_diff": 0,
-              "validator_den": 0, "validator_diff": 0, "effort_den": 0, "effort_diff": 0,
-              "dispatch": 0, "ask": 0, "escalate": 0, "unknown_band": 0, "stale": 0,
-              "none_fit": 0, "rejected": 0}
+    totals = dict.fromkeys(counters, 0)
     for key in sorted(groups):
         g = groups[key]
         for name in totals:
             totals[name] += g[name]
-        print("%-34s %5d %5d %5d %8d %8d %8d %8d %8d %8d %6d %8d %8d"
-              % (key, g["runs"], g["rule"], g["no_rule_route"], g["worker_diff"],
-                 g["validator_den"], g["validator_diff"], g["effort_den"],
+        print("%-34s %5d %5d %5d %6d %5d %5d %5d %5d %5d %5d %8d %5d %5d %5d"
+              % (key, g["runs"], g["rule"], g["no_rule_route"], g["no_pick"], g["worker_den"],
+                 g["worker_diff"], g["validator_den"], g["validator_diff"], g["effort_den"],
                  g["effort_diff"], g["dispatch"], g["ask"], g["escalate"], g["stale"]))
-    print("Denominators: worker disagreement over %d rows with a rule route (%d have no rule route); "
-          "validator disagreement over %d rows where the rule named a validator; effort disagreement "
-          "over %d rows where the rule named an effort."
-          % (totals["rule"], totals["no_rule_route"], totals["validator_den"], totals["effort_den"]))
+    print("Denominators: worker disagreement over %d rows where both the rule and the picker named "
+          "a worker; validator disagreement over %d rows where both named a validator; effort "
+          "disagreement over %d rows where both named an effort. %d rows have no picker pick; "
+          "%d rows have no rule route."
+          % (totals["worker_den"], totals["validator_den"], totals["effort_den"],
+             totals["no_pick"], totals["no_rule_route"]))
     print("Bands: dispatch=%d ask=%d escalate=%d unknown=%d; stale snapshots=%d; none-fit=%d; rejected picks=%d."
           % (totals["dispatch"], totals["ask"], totals["escalate"], totals["unknown_band"],
              totals["stale"], totals["none_fit"], totals["rejected"]))
     return 0
 
 
-def check_routes(data_root, rules_path, bin_dir, table_path=None):
-    table = load_table(table_path or Path(__file__).with_name("routes.json"))
+def check_routes(data_root, rules_path, bin_dir, table_path):
+    table = load_table(table_path)
     if rules_path:
         rules_doc = load_json(rules_path)
     else:
@@ -1221,24 +1250,16 @@ def check_routes(data_root, rules_path, bin_dir, table_path=None):
                   % (route, entry.get("family"), entry.get("currency"), "-", "REFUSED: %s" % why))
             ok = False
             continue
-        projection, why = load_projection(data_root, chosen["slug"])
-        if projection is None:
-            print("%-34s %-10s %-13s %-34s %s"
-                  % (route, entry.get("family"), entry.get("currency"), chosen["slug"],
-                     "REFUSED: %s" % why))
-            ok = False
-            continue
-        asserted = projection.get("name") == chosen.get("name")
+        projection, why = asserted_projection(table, entry, chosen, data_root)
         print("%-34s %-10s %-13s %-34s %s"
               % (route, entry.get("family"), entry.get("currency"), chosen["slug"],
-                 "yes" if asserted else "REFUSED: name %r != %r"
-                 % (projection.get("name"), chosen.get("name"))))
-        ok = ok and asserted
+                 "yes" if projection is not None else "REFUSED: %s" % why))
+        ok = ok and projection is not None
     return 0 if ok else 1
 
 
 HELP = """usage: fm-model-picker-shadow.sh --observe [options]
-       fm-model-picker-shadow.sh --report [--json]
+       fm-model-picker-shadow.sh --report
        fm-model-picker-shadow.sh --check-routes [--rules PATH]
 
 Observe one dispatch in shadow mode. Never prints or returns a dispatch route.
@@ -1247,25 +1268,23 @@ Observe one dispatch in shadow mode. Never prints or returns a dispatch route.
   --rules PATH       resolved crew-dispatch rules snapshot
   --result PATH      resolver result JSON carrying the rule's chosen profile
   --quota PATH       the resolver's one quota-axi JSON snapshot
-  --pools PATH       the resolver's OMP pool report (optional)
   --status STATUS    resolver status (clear, ambiguous, escalate, error, withheld)
   --reason TEXT      a coarse reason, never brief text
-  --never-send PATH  config/dispatch-never-send path
+  --never-send PATH  never-send policy (default <FM_CONFIG_OVERRIDE or FM_HOME/config>/dispatch-never-send)
   --project NAME     project name
   --data-root PATH   data root overriding FM_MODEL_PICKER_DATA
-  --table PATH       route table overriding bin/fm_model_picker/routes.json
 
-The data root is FM_MODEL_PICKER_DATA, else <FM_HOME>/data/model-picker, else
-<FM_DATA_OVERRIDE>/model-picker. Exit 0 for every observe run: the dispatch is unchanged
+The data root is FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else
+<FM_HOME>/data/model-picker. Exit 0 for every observe run: the dispatch is unchanged
 whatever happens here. --check-routes exits 1 when a mapped projection is missing or its
-asserted identity does not match. --report exits 2 only when the log cannot be read.
+asserted name or creator does not match. --report exits 2 only when the log cannot be read.
+Under FM_TEST_SEAM=1 only, --table PATH replaces bin/fm_model_picker/routes.json.
 """
 
 
 def main(argv):
     action = None
     args = {}
-    as_json = False
     i = 0
     while i < len(argv):
         token = argv[i]
@@ -1278,8 +1297,6 @@ def main(argv):
             action = "report"
         elif token == "--check-routes":
             action = "check-routes"
-        elif token == "--json":
-            as_json = True
         elif token.startswith("--"):
             if i + 1 >= len(argv):
                 warn("flag %s needs a value" % token)
@@ -1293,12 +1310,16 @@ def main(argv):
     if action is None:
         print(HELP, end="")
         return 2
+    if "table" in args and os.environ.get("FM_TEST_SEAM") != "1":
+        warn("--table is a test seam honored only under FM_TEST_SEAM=1")
+        return 2
+    args["table"] = args.get("table") or str(Path(__file__).with_name("routes.json"))
     data_root = args.get("data_root") or resolve_data_root()
     if action == "report":
-        return report(data_root, as_json)
+        return report(data_root)
     if action == "check-routes":
         return check_routes(data_root, args.get("rules"),
-                            Path(__file__).resolve().parent.parent, args.get("table"))
+                            Path(__file__).resolve().parent.parent, args["table"])
     helper = str(Path(__file__).resolve().parent.parent / "fm-model-picker-jev.sh")
     scratch = tempfile.mkdtemp(prefix="fm-model-picker-shadow.")
     args["scratch"] = scratch

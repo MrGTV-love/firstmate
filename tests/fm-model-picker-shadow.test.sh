@@ -105,8 +105,9 @@ for _ in {1..100}; do [ ! -f "$TMP_ROOT/port" ] || break; sleep .05; done
 ENDPOINT="http://127.0.0.1:$(cat "$TMP_ROOT/port")"
 
 run_observe() {  # <status> [extra args...]
-  local status=$1
+  local status=$1 never_send=()
   shift
+  [ -z "${NEVER_SEND:-}" ] || never_send=(--never-send "$NEVER_SEND")
   [ "${KEEP_DB:-0}" = 1 ] || rm -f "$DATA/aa.sqlite"
   : > "$CALLS"
   OUT='' ERR='' CODE=0
@@ -115,7 +116,7 @@ run_observe() {  # <status> [extra args...]
     bash "$BIN" --observe --brief "$TMP_ROOT/brief.md" --task-text "$TMP_ROOT/brief.md" \
       --rules "${RULES_FILE:-$TMP_ROOT/rules-base.json}" \
       --result "${RESULT_FILE:-$TMP_ROOT/result.json}" --quota "$TMP_ROOT/quota.json" \
-      --status "$status" --never-send "${NEVER_SEND:-/dev/null}" \
+      --status "$status" ${never_send[@]+"${never_send[@]}"} \
       3< <(printf 'synthetic-canary-key\n') "$@" >"$TMP_ROOT/out" 2>"$TMP_ROOT/err" || CODE=$?
   OUT=$(cat "$TMP_ROOT/out")
   ERR=$(cat "$TMP_ROOT/err")
@@ -155,6 +156,18 @@ mv "$DATA/projection/claude-opus-5-5-high.json" "$TMP_ROOT/opus.saved"
 OUT=$("$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" 2>&1); RC=$?
 mv "$TMP_ROOT/opus.saved" "$DATA/projection/claude-opus-5-5-high.json"
 check '[ "$RC" -eq 1 ]' "a missing projection refuses the route table"
+cp "$DATA/projection/deepseek-v4-flash.json" "$TMP_ROOT/deepseek.saved"
+jq '.creator = "Someone Else"' "$TMP_ROOT/deepseek.saved" > "$DATA/projection/deepseek-v4-flash.json"
+OUT=$("$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" 2>&1); RC=$?
+check '[ "$RC" -eq 1 ]' "a creator mismatch refuses the route table"
+check 'grep -q "omp:deepseek/deepseek-v4-flash .*REFUSED: projection creator" <<<"$OUT"' "the creator refusal names the route"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+run_observe clear
+check 'grep -q "projection creator" "$CALLS"' "observe refuses the same projection"
+cp "$TMP_ROOT/deepseek.saved" "$DATA/projection/deepseek-v4-flash.json"
+OUT=$(FM_TEST_SEAM=0 "$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" \
+  --table "$ROOT/bin/fm_model_picker/routes.json" 2>&1); RC=$?
+check '[ "$RC" -eq 2 ]' "--table is refused outside the test seam"
 finish
 
 begin "one shadow run records both picks, the raw Jev body and the classification"
@@ -188,7 +201,9 @@ run_observe clear
 check '[ "$(jq -r ".pareto_pruned[0].route" "$TMP_ROOT/row.json")" = "claude:claude-sonnet-5-5[1m]" ]' "Sonnet is pruned"
 check '[ "$(jq -r ".pareto_pruned[0].dominated_by[0]" "$TMP_ROOT/row.json")" = "claude:opus" ]' "Opus dominates it"
 check '[ "$(jq -r ".gates.pruned | length" "$TMP_ROOT/row.json")" -ge 1 ]' "gate pruning is recorded beside Pareto"
-check '! grep -q "Claude Sonnet 5.5" <<<"$OUT"' "the pruned route is absent from stdout"
+worker_options=$(jq -r 'select(.questions.worker) | .state.candidates[].route' "$CALLS")
+check '! grep -qx "claude:claude-sonnet-5-5\[1m\]" <<<"$worker_options"' "the pruned route is not offered as a worker"
+check 'grep -qx "claude:opus" <<<"$worker_options"' "the dominating route is offered as a worker"
 finish
 
 begin "a cross-currency pair is flagged as a trial and never pruned"
@@ -285,13 +300,6 @@ check '[ "$(jq -r ".gates.validator_reason" "$TMP_ROOT/row.json")" = "no cross-f
 finish
 
 begin "the shadow path never writes outcomes, rework or captain acceptance"
-python3 -I - "$DATA/aa.sqlite" <<'PY'
-import sqlite3, sys
-conn = sqlite3.connect(sys.argv[1])
-print(conn.execute('select count(*) from outcomes').fetchone()[0])
-print(conn.execute('select count(*) from dispatch_log where rework is not null or captain_acceptance is not null').fetchone()[0])
-assert conn.execute('select count(*) from dispatch_log where picker_status = "error" and mode != "shadow"').fetchone()[0] == 0
-PY
 check '[ "$(python3 -I -c "import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute(\"select count(*) from outcomes\").fetchone()[0])" "$DATA/aa.sqlite")" -eq 0 ]' "outcomes stays empty"
 check '[ "$(python3 -I -c "import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute(\"select count(*) from dispatch_log where rework is not null or captain_acceptance is not null\").fetchone()[0])" "$DATA/aa.sqlite")" -eq 0 ]' "rework and acceptance stay NULL"
 finish
@@ -312,17 +320,37 @@ rows = [
     dict(work_type='Verification', rule_worker='c', rule_validator='x', rule_effort='low', chosen_worker='c', chosen_validator='z', effort='low', confidence_band='dispatch'),
     dict(work_type='Verification', rule_worker='c', rule_validator=None, rule_effort='low', chosen_worker='d', chosen_validator=None, effort='high', confidence_band='dispatch'),
     dict(work_type='none-fit', rule_worker='a', rule_validator='x', rule_effort='high', chosen_worker='b', chosen_validator='y', effort='high', confidence_band='dispatch'),
+    dict(work_type='Feature / capability', rule_worker='a', rule_validator='x', rule_effort='high', chosen_worker=None, chosen_validator=None, effort=None, picker_status='rejected'),
 ]
 for row in rows:
     aadb.log_dispatch(conn, mode='shadow', **row)
 conn.close()
 PY
 OUT=$(FM_MODEL_PICKER_DATA="$DATA" bash "$BIN" --report 2>/dev/null)
-check 'grep -q "Feature / capability .*3 .*2 .*1 .*2 .*2 .*1" <<<"$OUT"' "feature counts match the seeded rows"
-check 'grep -q "Verification .*2 .*2 .*0 .*1 .*2 .*1" <<<"$OUT"' "verification counts match the seeded rows"
+counts() { grep "^$1 " <<<"$OUT" | cut -c35- | tr -s ' ' | sed 's/^ //'; }
+# runs rule noRte noPick wDen wDiff vDen vDiff eDen eDiff dispatch ask escal stale
+check '[ "$(counts "Feature / capability")" = "4 3 1 1 2 1 2 1 2 0 1 1 1 0" ]' "feature counts match the seeded rows"
+check '[ "$(counts "Verification")" = "2 2 0 0 2 1 1 1 2 1 2 0 0 0" ]' "verification counts match the seeded rows"
 check 'grep -q "routing evidence, not outcome labels" <<<"$OUT"' "the report labels itself routing evidence"
-check 'grep -q "no rule route" <<<"$OUT"' "the no-rule-route denominator is printed"
-check '! grep -q "0 disagreements" <<<"$OUT"' "an empty compared set is never called zero disagreements"
+check 'grep -q "worker disagreement over 5 rows where both" <<<"$OUT"' "a rejected pick is not in the worker denominator"
+check 'grep -q "1 rows have no picker pick; 1 rows have no rule route" <<<"$OUT"' "the no-pick and no-rule-route counts are printed"
+rm -f "$DATA/aa.sqlite"
+python3 - "$ROOT/bin" "$DATA/aa.sqlite" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from fm_model_picker import aadb
+conn = aadb.connect(sys.argv[2]); aadb.init_calibration(conn)
+for status in ('picker-error', 'no-trusted-snapshot'):
+    aadb.log_dispatch(conn, mode='shadow', work_type=None, rule_worker='a', rule_validator='x',
+                      rule_effort='high', picker_status=status)
+conn.close()
+PY
+OUT=$(FM_MODEL_PICKER_DATA="$DATA" bash "$BIN" --report 2>/dev/null)
+check '[ "$(counts "unclassified")" = "2 2 0 2 0 0 0 0 0 0 0 0 0 0" ]' "rows with no picker pick compare nothing"
+check 'grep -q "worker disagreement over 0 rows where both" <<<"$OUT"' "an empty compared set prints a zero denominator"
+check 'grep -q "validator disagreement over 0 rows" <<<"$OUT"' "the validator denominator is zero"
+check 'grep -q "effort disagreement over 0 rows" <<<"$OUT"' "the effort denominator is zero"
+check 'grep -q "2 rows have no picker pick" <<<"$OUT"' "the rows with no picker pick are counted"
 finish
 
 begin "the never-send filter withholds the request and the key never leaks"
@@ -448,13 +476,12 @@ candidate = pick['state']['candidates'][0]
 raw = json.dumps(pick)
 print(int(types <= {'choice', 'score', 'noul'}))
 print(int('metrics' not in candidate and 'summary' in candidate))
-print(int('"value"' not in json.dumps(candidate)))
 print(int('fit' in candidate['summary']))
 PY
 )
 check 'grep -qx 1 <<<"$(sed -n 1p <<<"$assertions")"' "only Choice, Score and Noul questions are sent"
 check 'grep -qx 1 <<<"$(sed -n 2p <<<"$assertions")"' "candidates are code-computed summaries, not raw projections"
-check 'grep -qx 1 <<<"$(sed -n 4p <<<"$assertions")"' "the normalized fit is in the facts Jev sees"
+check 'grep -qx 1 <<<"$(sed -n 3p <<<"$assertions")"' "the normalized fit is in the facts Jev sees"
 finish
 
 begin "the tool documents itself"
@@ -488,6 +515,89 @@ KEEP_DB=1 run_observe clear
 KEEP_DB=1 run_observe clear
 count=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log").fetchone()[0])' "$DATA/aa.sqlite")
 check '[ "$count" = 2 ]' "two dispatches give two rows"
+finish
+
+begin "a resolver error or withheld resolve records no rule route and no classification"
+for status in error withheld; do
+  settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+  run_observe "$status" --reason 'worker account pin failed'
+  check '[ "$(row ".rule_worker")" = null ]' "a $status row carries no rule route"
+  check '[ "$(row ".rule_effort")" = null ]' "a $status row carries no rule effort"
+  check '[ "$(row ".work_type")" = null ]' "a $status row is not a none-fit classification"
+  check '[ "$(row ".classification_uncertain")" = null ]' "a $status row has no classification flag"
+  check '[ "$(row ".snapshot_stale")" = null ]' "a $status row has no staleness claim"
+  check '[ "$(calls)" -eq 0 ]' "a $status resolve sends nothing"
+done
+finish
+
+begin "a route outside the resolver's candidates reads only its applicable quota rows"
+cp "$TMP_ROOT/quota.json" "$TMP_ROOT/quota.saved"
+printf '%s\n' '{"schemaVersion":5,"providers":[{"provider":"claude","quotaSemantics":{"status":"known","effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":80,"runway":{"status":"through_reset"},"selection":{"spendPriority":0.8}},{"scope":"model:opus","status":"known","effectivePercentRemaining":5,"runway":{"status":"projected_exhaustion"},"selection":{"spendPriority":0.05}}]}}]}' > "$TMP_ROOT/quota.json"
+printf '%s\n' '{"rules":[{"when":"Any task.","use":[{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$TMP_ROOT/rules-quota.json"
+printf '%s\n' '{"status":"clear","chosen":{"profile":{"harness":"claude","model":"claude-haiku-5-5","effort":"max"}},"candidates":[]}' > "$TMP_ROOT/result-quota.json"
+settings '{"work_type":"writing","worker":"candidate_1","validator":"candidate_2","complexity_score":0}'
+RULES_FILE="$TMP_ROOT/rules-quota.json" RESULT_FILE="$TMP_ROOT/result-quota.json" run_observe clear
+cp "$TMP_ROOT/quota.saved" "$TMP_ROOT/quota.json"
+haiku=$(jq -r 'select(.questions.worker) | .state.candidates[] | select(.route == "claude:claude-haiku-5-5") | .summary' "$CALLS")
+check 'grep -q "quota spendPriority 0.8, headroom 80%, runway through_reset" <<<"$haiku"' "Haiku is not charged the Opus-scoped row"
+finish
+
+begin "a validator answer outside the offered options or a bad range is rejected, never clamped"
+settings '{"work_type":"feature","worker":"candidate_1","validator":"candidate_1","force_question":"validator","force_choice":"candidate_2"}'
+RULES_FILE="$TMP_ROOT/rules-unknown.json" run_observe clear
+check '[ "$(row ".picker_status")" = rejected ]' "an unmapped validator id is rejected"
+check 'grep -q "validator answer names no listed route" <<<"$(row ".reject_reason")"' "the reason names the unlisted validator"
+check '[ "$(row ".chosen_validator")" = null ]' "no validator is accepted"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_3","force_question":"validator","force_choice":"candidate_2"}'
+run_observe clear
+check '[ "$(row ".picker_status")" = rejected ]' "a same-family id outside the fallback options is rejected"
+check 'grep -q "validator answer names no listed route" <<<"$(row ".reject_reason")"' "the fallback reason names the unlisted validator"
+check '[ "$(calls)" -eq 3 ]' "the fallback call was made"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6","effort_score":7}'
+run_observe clear
+check '[ "$(row ".picker_status")" = invalid-response ]' "an effort Score outside the criteria is malformed"
+check 'grep -q "outside 0..4" <<<"$(row ".reject_reason")"' "the range is named"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6","complexity_score":-1}'
+run_observe clear
+check '[ "$(row ".picker_status")" = invalid-response ]' "a complexity Score below zero is malformed"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6","worker_confidence":1.5}'
+run_observe clear
+check '[ "$(row ".picker_status")" = invalid-response ]' "a confidence above 1 is malformed"
+check '[ "$(row ".confidence_band")" = null ]' "no band is logged for a malformed confidence"
+finish
+
+begin "a validator must pass the same eligibility gate as a worker"
+python3 -I - "$TMP_ROOT/result.json" "$TMP_ROOT/result-inelig.json" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+for candidate in doc['candidates']:
+    if candidate['profile']['model'] == 'openai-codex/gpt-6.1-sol':
+        candidate.pop('capacity', None)
+        candidate['eligible'] = False
+        candidate['reason'] = 'harness not permitted by launch policy'
+json.dump(doc, open(sys.argv[2], 'w'))
+PY
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6","force_question":"validator","force_choice":"candidate_6"}'
+RESULT_FILE="$TMP_ROOT/result-inelig.json" run_observe clear
+validator_options=$(jq -r 'select(.questions.worker) | .questions.validator.criteria | keys[]' "$CALLS")
+check '! grep -qx candidate_6 <<<"$validator_options"' "an ineligible route is not offered as a validator"
+check '[ "$(row ".picker_status")" = rejected ]' "an ineligible validator answer is rejected"
+check '[ "$(row ".chosen_validator")" = null ]' "no ineligible validator is accepted"
+finish
+
+begin "a standalone observe run checks the home never-send policy by default"
+mkdir -p "$TMP_ROOT/home/config"
+printf '%s\n' 'stale lock' > "$TMP_ROOT/home/config/dispatch-never-send"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+run_observe clear
+check '[ "$(calls)" -eq 0 ]' "no request is sent without --never-send"
+check '[ "$(row ".picker_status")" = withheld ]' "the home policy withholds the request"
+rm -f "$TMP_ROOT/home/config/dispatch-never-send"
+mkdir "$TMP_ROOT/home/config/dispatch-never-send"
+run_observe clear
+rmdir "$TMP_ROOT/home/config/dispatch-never-send"
+check '[ "$(calls)" -eq 0 ]' "a policy that cannot be read sends nothing"
+check '[ "$(row ".picker_status")" = withheld ]' "an unreadable policy withholds the request"
 finish
 
 [ "$FAILED" -eq 0 ] || fail "$FAILED shadow picker case(s) failed"

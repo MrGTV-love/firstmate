@@ -136,6 +136,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-brief-heading-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
+# shellcheck source=bin/fm-model-picker-shadow-lib.sh
+. "$SCRIPT_DIR/fm-model-picker-shadow-lib.sh"
 
 CONFIDENCE_FLOOR=0.6
 TS_INPUT_USD_PER_MILLION=0.042
@@ -375,23 +377,16 @@ trap 'rm -f "$RULES" "$RESP_FILE" "$QUOTA" "$TASK_TEXT" "$SEND_TEXT"; rm -rf "$M
 # only to the calibration store in the picker's private data root.
 # measured: value=20 date=2026-10-23 host=Mac-Studio margin=1.3 (the shadow stage makes at most three bounded provider calls, each with a five-second deadline; one stalled-call run measured 5.2 s, so three fit inside this bound)
 SHADOW_TIMEOUT_SECONDS=20
-shadow_flag_enabled() {
-  case "${FM_MODEL_PICKER_SHADOW:-}" in
-    1|true|True|TRUE|on|On|ON|yes|Yes|YES|shadow|Shadow|SHADOW) return 0 ;;
-    *live*|*Live*|*LIVE*) return 1 ;;
-    *) return 1 ;;
-  esac
-}
 run_shadow() {  # <status> [reason]
   local status=$1 reason=${2:-} result_file
-  shadow_flag_enabled || return 0
+  fm_model_picker_shadow_enabled || return 0
   result_file=$(mktemp) || return 0
   if [ -n "${RESULT:-}" ]; then printf '%s' "$RESULT" > "$result_file"; else printf '{}' > "$result_file"; fi \
     || { rm -f "$result_file"; return 0; }
   fm_run_timed "$SHADOW_TIMEOUT_SECONDS" "$SCRIPT_DIR/fm-model-picker-shadow.sh" --observe \
     --brief "${BRIEF:-/dev/null}" --task-text "${TASK_TEXT:-/dev/null}" \
     --rules "${RULES:-/dev/null}" --result "$result_file" --quota "${QUOTA:-/dev/null}" \
-    --status "$status" --reason "$reason" --never-send "${NEVER_SEND_PATH:-/dev/null}" \
+    --status "$status" --reason "$reason" --never-send "$NEVER_SEND_PATH" \
     --project "${PROJECT:-}" \
     3< <(printf '%s' "${TYPESAFE_API_KEY_PRIVATE:-}") >/dev/null 2>/dev/null || true
   rm -f "$result_file"

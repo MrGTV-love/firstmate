@@ -1932,6 +1932,7 @@ for slug in claude-sonnet-5-5-high claude-opus-5-5-high claude-haiku-5-5 \
 done
 printf '%s\n' '{"verdict":"TRUSTED"}' > "$SHADOW_DATA/verdict.json"
 printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_5"}' > "$SETTINGS"
+node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({reports:[{provider:"openai-codex",fetchedAt:Date.now(),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}},limits:[{scope:{tier:"chat"},amount:{remainingFraction:.9}}]}]}))' "$POOL"
 run_shadow() {  # <flag-value>
   OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key \
     FM_MODEL_PICKER_SHADOW="$1" FM_MODEL_PICKER_DATA="$SHADOW_DATA" \
@@ -1966,6 +1967,7 @@ assert_equals 'accepted' "$(shadow_sql "select picker_status from dispatch_log")
 rule_worker=$(sed -n 's/^  profile:.*--harness \([^ ]*\) --model \([^ ]*\).*/\1:\2/p' <<<"$ON" | tr -d "'")
 assert_equals "$rule_worker" "$(shadow_sql "select rule_worker from dispatch_log")" 'the row records the route the resolver chose'
 [ -n "$(shadow_sql "select chosen_worker from dispatch_log")" ] || fail 'the row records the picker pick'
+assert_equals 'omp:openai-codex/gpt-6.1-sol' "$(shadow_sql "select chosen_validator from dispatch_log")" 'the row records the eligible cross-family validator'
 [ -n "$(shadow_sql "select jev_raw_payload from dispatch_log")" ] || fail 'the row retains the raw Jev result'
 
 # A picker-only Jev failure must not move the resolver result.

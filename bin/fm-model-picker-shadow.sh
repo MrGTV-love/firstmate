@@ -2,33 +2,35 @@
 # fm-model-picker-shadow.sh - benchmark-informed model picker in SHADOW MODE ONLY.
 # Usage:
 #   fm-model-picker-shadow.sh --observe [--brief PATH] [--task-text PATH] [--rules PATH]
-#        [--result PATH] [--quota PATH] [--pools PATH] [--status STATUS] [--reason TEXT]
+#        [--result PATH] [--quota PATH] [--status STATUS] [--reason TEXT]
 #        [--never-send PATH] [--project NAME] [--data-root PATH]
-#   fm-model-picker-shadow.sh --report [--json]
+#   fm-model-picker-shadow.sh --report
 #   fm-model-picker-shadow.sh --check-routes [--rules PATH]
 #
 # --observe records what the picker WOULD have chosen beside the route the current dispatch
 #   rules chose. It never prints, returns or writes a dispatch route, and never changes what
 #   dispatches: every failure exits 0 with one stderr warning. It is off unless
-#   FM_MODEL_PICKER_SHADOW is 1/true/on/yes/shadow; empty, 0, false, off, no and every
-#   unrecognized value stay off (a non-empty unrecognized value prints one warning), and no
-#   value enabling live is accepted. The resolver calls it after its own result is produced,
+#   FM_MODEL_PICKER_SHADOW is an on value; bin/fm-model-picker-shadow-lib.sh owns that
+#   allowlist for this tool and the resolver. The resolver calls it after its own result is produced,
 #   bounded by bin/fm-timeout-lib.sh; this tool never becomes a dispatch dependency.
 # --report prints the per-work-type shadow disagreement report from aa.sqlite. It is routing
 #   evidence, never outcome labels, and prints "0 shadow dispatches logged" for an empty log.
 # --check-routes is read-only: it resolves every concrete route in config/crew-dispatch.json
 #   through the fleet model index, then asserts each mapped projection's identity against
 #   bin/fm_model_picker/routes.json. Exit 1 when a mapped route's projection is missing or its
-#   asserted name does not match; an unmapped route is listed as UNKNOWN and is not dropped.
+#   asserted name or creator does not match; an unmapped route is listed as UNKNOWN and is not
+#   dropped.
 #
-# Data root: FM_MODEL_PICKER_DATA, else <FM_HOME>/data/model-picker, else
-#   <FM_DATA_OVERRIDE>/model-picker. The calibration store is <data root>/aa.sqlite; this tool
+# Data root: FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else
+#   <FM_HOME>/data/model-picker. The calibration store is <data root>/aa.sqlite; this tool
 #   only inserts dispatch_log rows and never touches the benchmark matrix or verdict.json.
 #
 # Key handling: the TypeSafe key reaches bin/fm_model_picker/shadow.py on file descriptor 3,
 #   never on argv, never exported, never written. When no caller supplies fd 3, the shared
 #   accessor fm_typesafe_key resolves it exactly as the resolver does. Every request passes
-#   bin/fm-typesafe-lib.sh's never-send filter before it leaves the machine.
+#   bin/fm-typesafe-lib.sh's never-send filter before it leaves the machine: --never-send, else
+#   <FM_CONFIG_OVERRIDE or FM_HOME/config>/dispatch-never-send; a policy that cannot be checked
+#   withholds the request.
 #
 # Exit codes: --observe always 0 (a picker failure never changes a dispatch);
 #   --report 2 only when the log cannot be read; --check-routes 1 on a missing or
@@ -67,16 +69,9 @@ else
 fi
 
 if [ "$ACTION" = observe ]; then
-  case "${FM_MODEL_PICKER_SHADOW:-}" in
-    ''|0|false|False|FALSE|off|Off|OFF|no|No|NO) exit 0 ;;
-    *live*|*Live*|*LIVE*)
-      printf 'model-picker-shadow: FM_MODEL_PICKER_SHADOW cannot enable live mode; shadow stays off\n' >&2
-      exit 0 ;;
-    1|true|True|TRUE|on|On|ON|yes|Yes|YES|shadow|Shadow|SHADOW) ;;
-    *)
-      printf 'model-picker-shadow: unrecognized FM_MODEL_PICKER_SHADOW value; shadow stays off\n' >&2
-      exit 0 ;;
-  esac
+  # shellcheck source=bin/fm-model-picker-shadow-lib.sh
+  . "$SCRIPT_DIR/fm-model-picker-shadow-lib.sh"
+  fm_model_picker_shadow_enabled || exit 0
   if [ ! -e /dev/fd/3 ]; then
     # shellcheck source=bin/fm-typesafe-lib.sh
     . "$SCRIPT_DIR/fm-typesafe-lib.sh"
@@ -88,5 +83,5 @@ if [ "$ACTION" = observe ]; then
   fi
 fi
 
-PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 \
+FM_HOME="$FM_HOME" PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 \
   exec python3 -m fm_model_picker.shadow --data-root "$DATA_ROOT" "$@"

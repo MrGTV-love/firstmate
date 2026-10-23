@@ -971,7 +971,7 @@ Its header and `--help` own its flags, data-root resolution, output and exit cod
 
 ### The flag
 
-`FM_MODEL_PICKER_SHADOW` is off by default and accepts only shadow-enabled values.
+`FM_MODEL_PICKER_SHADOW` is off by default and accepts only shadow-enabled values; `bin/fm-model-picker-shadow-lib.sh` is the one owner of the allowlist, shared by the resolver and the shadow tool.
 `1`, `true`, `on`, `yes` and `shadow` enable observation; empty, `0`, `false`, `off` and `no` leave every route untouched and read no model-picker data; any other non-empty value prints one warning and stays off.
 No value enables live behavior, and no code path writes a `mode 'live'` row.
 
@@ -980,13 +980,14 @@ No value enables live behavior, and no code path writes a `mode 'live'` row.
 The picker runs inside `bin/fm-dispatch-resolve.sh`, after that resolver has computed and printed its own result.
 The resolver is the only intake that already holds the sanitized brief text, the resolved rule set and the one `quota-axi` snapshot the typed decision uses, so the picker never re-fetches any of them.
 It runs behind a hard `fm_run_timed` bound of 20 seconds, its output is discarded, and every failure is swallowed, so the printed status, profile line and exit code are the resolver's own.
-A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route.
+A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.
 The picker is not called from `fm-spawn.sh`: a spawn does not own the sanitized task text or the resolver's quota snapshot, and a second quota read would break the single-snapshot contract.
 
 ### What one shadow run does
 
 1. Every concrete `harness:model` route reachable from the rules (each rule's `use` and `fallback`, the `default` and `default_fallback`) is a candidate.
    `bin/fm_model_picker/routes.json` maps each route to a projection slug, a model family and a currency (`subscription` or `api`), and asserts the projection's own `name` and `creator`.
+   A route outside the resolver's assessed candidates reads its quota facts from the same snapshot with the resolver's own binding: the account lane's provider row, and only its `all_models`, `all_products`, `model:<bare>` and `product:<bare>` rows.
    A route the table cannot map, a missing projection, or an identity mismatch keeps the route as a candidate with its facts read as UNKNOWN; it is never dropped and never read as zero.
 2. The picker reads `verdict.json` first and reads no projection unless it is a regular, non-symlinked file saying `TRUSTED`.
    `UNTRUSTED`, missing, unparseable or non-regular fails closed: no benchmark fact is read or sent, no pick is made, and the row records the reason.
@@ -1000,7 +1001,10 @@ The picker is not called from `fm-spawn.sh`: a spawn does not own the sanitized 
    Jev is asked only Choice, Score and Noul judgments: the work type, a complexity Score, the worker Choice over survivors, the effort Score, and a validator Choice whose options are the configured routes and whose evidence is the verification and code-review set.
 6. The pick is re-checked in code against the survivor list, the gates, and the chosen harness's effort levels.
    A rejected pick records the failing check and is never replaced silently.
-7. The validator must come from a different model family; a same-family answer triggers one bounded second call over cross-family routes only, and a candidate set with a single family records a NULL validator with the reason.
+   A choice outside the options that request offered, a Score outside its criteria, or a confidence outside 0..1 is a malformed answer, never clamped.
+7. The validator options are the mapped routes that pass the same configured eligibility gate as a worker, and the re-check applies that gate again to the validator.
+   The validator must come from a different model family; a same-family answer triggers one bounded second call over cross-family routes only, and a candidate set with a single family records a NULL validator with the reason.
+8. Every request passes the never-send filter: `--never-send`, else `<FM_CONFIG_OVERRIDE or FM_HOME/config>/dispatch-never-send`; a policy that cannot be checked withholds the request.
 
 ### The log
 
@@ -1014,18 +1018,18 @@ Shadow rows are routing evidence, never outcome labels: they show what the picke
 
 `POLICY_VERSION` (`2026-10-19.1`) and the route table's `table_version` are recorded on every row.
 The work-type mixes, fit floors, metric vetoes, verification-evidence floor and complexity criteria are the board's "uncalibrated seed policy", labelled as such in code and in every row's `gates`; they are ours to change and are not fitted to data in this phase.
-The confidence bands are applied in code and only logged: `dispatch` at 0.85 or above, `ask` from 0.55 to below 0.85, `escalate` below 0.55, and `unknown` when the answer carries no confidence.
+The confidence bands are applied in code and only logged: `dispatch` at 0.85 or above, `ask` from 0.55 to below 0.85, `escalate` below 0.55, and NULL when the answer carries no confidence.
 
 ### The shadow disagreement report
 
-`bin/fm-model-picker-shadow.sh --report` prints, per work type over `mode 'shadow'` rows, the run count, the rows with a rule route, the rows with no rule route, the worker/validator/effort disagreement counts, the confidence-band counts, the stale-snapshot count, the none-fit count and the rejected-pick count, with the disagreement denominators printed.
+`bin/fm-model-picker-shadow.sh --report` prints, per work type over `mode 'shadow'` rows, the run count, the rows with a rule route, the rows with no rule route, the rows with no picker pick, the worker/validator/effort disagreement counts with their denominators, the confidence-band counts, the stale-snapshot count, the none-fit count and the rejected-pick count.
+A row counts toward a disagreement denominator only when both the rule and the picker named that value, so a picker error or refusal is counted as no picker pick, never as agreement.
 It prints `0 shadow dispatches logged` for an empty log and never reports "zero disagreements" for an empty compared set.
-`--json` emits the same counts as one object.
 
 ### Read-only route check
 
 `bin/fm-model-picker-shadow.sh --check-routes` resolves every concrete route in `config/crew-dispatch.json` through `bin/fm-model-index.sh profiles`, then lists each route's family, currency, projection slug and identity assertion against `bin/fm_model_picker/routes.json`.
-It exits 1 when a mapped projection is missing or its asserted name does not match, and names an unmapped route as UNKNOWN without dropping it.
+It applies the same identity assertion as an observe run, so it exits 1 when a mapped projection is missing or its asserted name or creator does not match, and names an unmapped route as UNKNOWN without dropping it.
 
 ### Captain-owned later phases
 
