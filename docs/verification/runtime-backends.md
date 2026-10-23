@@ -3975,12 +3975,15 @@ cleanup_exit=0
 The complete live guard took a measured 217.94 seconds; this is an observation, not a launch or watcher deadline.
 That run injected the digest without awaiting it, so its Startup row proves the digest reached the log but not that it preceded the first provider turn.
 Primary and secondmate launches now pass the opening prompt or brief positionally, and the plugin's awaited `agent/pre-step` waterfall enters the digest ahead of it in the first step.
-A 2026-10-22 refresh of the same guard on that shape, with the `dsh-tui` 0.16.1 launcher and profile, DSH CLI 0.2.1-rc.2 and Node v26.4.0, passed in a measured 133 seconds with `cleanup_exit=0`.
+A 2026-10-23 refresh of the same guard on that shape, with the `dsh-tui` 0.16.1 launcher and profile, DSH CLI 0.2.1-rc.2 and Node v26.4.0, passed in a measured 249 seconds with `cleanup_exit=0`.
 Its final checks read the real session logs: in the primary and in the fresh secondmate, the startup digest was the first user message and the positional opening prompt or charter followed it before any assistant reply.
-The primary passed wake delivery and acknowledgement, guard recovery after typed steering, interrupt mid-tool (`verified=agent-alive cancel=unconfirmed`), exit, two same-endpoint relaunches through the secondmate spawn path that recovered the earlier conversation's secret word, and forced native SIGKILL cleanup of the private arm and watcher.
-The guard then ran a real `fm-spawn.sh --secondmate --backend herdr` into a new lab home through `prepare-primary`, with no prior conversation; the spawn's start proof and composer check passed, its first reply arrived, a same-endpoint relaunch recovered its charter's secret word, and exit stopped it.
-That spawn returned after 16 seconds, when the digest had already entered the log, so this run does not show the start proof passing while the first step was still held; `tests/fm-dsh-primary.test.sh` covers the held step, including cancellation.
-Earlier attempts that day are not evidence; each was stopped by the environment, by a guard defect fixed before the passing run, or by the model:
+The primary passed wake delivery and acknowledgement, guard recovery after typed steering, an interrupt asserted to land after the model started the requested sleep tool (`verified=agent-alive cancel=unconfirmed`), exit, two same-endpoint relaunches through the secondmate spawn path that recovered the earlier conversation's secret word, and forced native SIGKILL cleanup of the private arm and watcher.
+The guard then ran a real `fm-spawn.sh --secondmate --backend herdr` into a new lab home through `prepare-primary`, with no prior conversation, while a lab-only `bash` wrapper first on that spawn's `PATH` held just that home's `fm-sessionstart-run.sh` at a FIFO barrier.
+While held, no turn had started and the spawn had not yet passed its start proof: the installed DSH awaits the plugin's `agent/created` startup before it publishes the session, so a held digest holds the whole start, and the start proof and composer check passed only after release.
+After release the spawn returned, the secondmate replied, a same-endpoint relaunch recovered its charter's secret word, and exit stopped it.
+That run also printed a non-fatal `fm-home-summary-refresh.sh: child setpgid ... Operation not permitted` warning during the relaunch.
+Because the installed runtime awaits `agent/created`, the adapter's first-step hold and its cancellation handling are a defence for runtimes that do not; `tests/fm-dsh-primary.test.sh` covers them with modeled steps, including Escape and non-user cancels.
+Earlier attempts on 2026-10-22 and 2026-10-23 are not evidence; each was stopped by the environment, by a guard defect fixed before the passing run, or by the model:
 
 - One stopped at the `bin/fm-herdr-lab.sh` default-session tripwire.
 - One at a pane line over the terminal's 1024-byte canonical limit, so the guard now launches from a file.
@@ -3990,6 +3993,7 @@ Earlier attempts that day are not evidence; each was stopped by the environment,
 - One fresh spawn met the guard's own Herdr wrapper refusing the session-less client preflight, which the wrapper now answers through the lab helper.
 - Three ended at the primary relaunch because the interrupt had cancelled a turn before the model answered, and on relaunch the model ran that unanswered request instead of the relaunch note, so the guard now interrupts only after the model has started the requested tool.
 - One put the secondmate's instruction in the parent's brief file, where a secondmate does not read it.
+- Two held the secondmate's digest indefinitely and expected the start proof to pass during the hold; the runtime does not publish the session until startup settles, so the guard now asserts that no turn starts during the hold and that the spawn passes after release.
 
 `tests/fm-dsh-primary.test.sh` separately exercises failed-arm follow-up budgets, native `user/message` identity, consumed-but-unacknowledged rows, delegated-child exclusion, ordinary disposal and forced native SIGKILL with a TERM-resistant descendant.
 `tests/fm-timeout-lib.test.sh` proves the shared owner-bound runner has no deadline, preserves natural command exit/output and refuses a deadline-only fallback when Perl is unavailable, alongside the existing timed-runner regressions.

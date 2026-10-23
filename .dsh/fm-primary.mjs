@@ -209,14 +209,14 @@ export function apply(ctx, config) {
     failedArm = false;
     wakeConsumed = pendingRows.size > 0;
     const source = started ? 'clear' : 'startup';
-    // DSH does not await this callback and submits the positional opening
-    // prompt at once. The first pre-step of a fresh process holds until this
+    // The installed DSH awaits this callback before it publishes the session
+    // and submits the positional opening prompt; a runtime that does not is
+    // covered too: the first pre-step of a fresh process holds until this
     // resolves, so the digest enters that step ahead of the opening prompt.
     let lead;
-    if (source === 'startup') {
-      leading = new Promise(accept => { lead = input => accept(input ? [input] : []); });
-      launchInput = true;
-    }
+    leading = undefined;
+    launchInput = source === 'startup';
+    if (launchInput) leading = new Promise(accept => { lead = input => accept(input ? [input] : []); });
     const own = text => {
       const input = message(text);
       ownMessages.add(input.id);
@@ -245,22 +245,24 @@ export function apply(ctx, config) {
     }
   });
   // The held step's claimed launch input is this adapter's own, so it never
-  // resets the failure budget. Cancellation drops an aborted step's batch and
-  // clears the inbox; the held messages then lead the next step instead.
+  // resets the failure budget. The downstream pre-step runs first: DSH's
+  // checkpoint there makes the open turn durable before the digest wait.
+  // Cancellation drops an aborted step's claimed batch (a non-user cancel also
+  // clears the inbox); the held messages then lead the next step instead.
   ctx.on('agent/pre-step', async (payload, next) => {
     if (payload.agent !== agent || !leading) return next();
     const pending = leading;
     leading = undefined;
     if (launchInput) for (const input of payload.messages) ownMessages.add(input.id);
     launchInput = false;
+    const decision = await next();
+    if (decision.kind !== 'enter') {
+      leading = pending;
+      return decision;
+    }
     const first = await Promise.race([pending, aborted(payload.signal)]);
     if (payload.signal.aborted) {
       leading = pending.then(held => [...held, ...payload.messages]);
-      return {kind: 'reject'};
-    }
-    const decision = await next();
-    if (decision.kind !== 'enter' || payload.signal.aborted) {
-      leading = Promise.resolve(decision.kind === 'enter' ? [...first, ...payload.messages] : first);
       return decision;
     }
     return {kind: 'enter', messages: [...first, ...decision.messages]};
@@ -270,7 +272,9 @@ export function apply(ctx, config) {
     if (event.type === 'user/message') {
       const id = event.data?.id;
       if (wakeMessages.delete(id)) wakeConsumed = true;
-      if (!ownMessages.delete(id)) { guardNudged = false; failedArm = false; }
+      // DSH also logs its own runtime context as user/message; only real
+      // user input reopens the bounded follow-up budget.
+      if (!ownMessages.delete(id) && event.data?.source?.kind === 'user') { guardNudged = false; failedArm = false; }
     }
     if (event.type === 'turn/end') {
       failedArm = false;

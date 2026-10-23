@@ -18,7 +18,7 @@ When this session owns supervision:
 
 DSH exposes passive durable turn-end events, not a blocking Stop hook.
 The strongest verified equivalent is the shared guard plus at most one native follow-up for a failed supervision episode; it does not claim to prevent the terminal from becoming idle.
-A later external user message resets that bounded follow-up budget.
+A later external user message resets that bounded follow-up budget; DSH's own context messages do not.
 The plugin retires its own tracked process group on unload and never signals another home's watcher.
 Its shared owner-bound Perl watchdog also retires that private subtree when the native process dies without running disposal; it imposes no watcher lifetime deadline.
 [Turn-end guard](../turnend-guard.md) owns the shared predicate and passive-adapter limit.

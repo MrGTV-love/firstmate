@@ -55,10 +55,10 @@ function setup(name, {failArm = false, failStart = false, slowStart = false} = {
     async () => ({kind: 'enter', messages}));
   // DSH's own step: claim the whole inbox, run the waterfall, then drop the
   // batch if the turn was cancelled meanwhile.
-  const run = async (inbox, signal) => {
+  const run = async (inbox, signal, owner = agent, downstream = () => {}) => {
     const claimed = inbox.splice(0);
-    const decision = await handlers.get('agent/pre-step')({agent, messages: claimed, turn: 1, step: 1, signal},
-      async () => ({kind: 'enter', messages: claimed}));
+    const decision = await handlers.get('agent/pre-step')({agent: owner, messages: claimed, turn: 1, step: 1, signal},
+      async () => { downstream(); return {kind: 'enter', messages: claimed}; });
     signal.throwIfAborted();
     return decision.kind === 'enter' ? decision.messages : [];
   };
@@ -67,7 +67,11 @@ function setup(name, {failArm = false, failStart = false, slowStart = false} = {
   const stop = () => {for (const fn of stops) fn();};
   return {home, agent, followups, injected, emit, step, run, end, consume, stop};
 }
-// DSH submits the positional brief at once and does not await agent/created.
+// DSH logs its own request context as user/message events with these source
+// kinds, beside the real user input.
+const contextKinds = ['agent-instructions', 'runtime-context', 'skill-catalog', 'time-context'];
+const context = label => contextKinds.map(kind => ({id: `${label}-${kind}`, role: 'user', source: {kind}, content: [{type: 'text', text: kind}]}));
+// A runtime may submit the positional brief before agent/created settles.
 // The awaited pre-step of the first step must enter the digest ahead of it.
 const brief = {id: 'brief', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'opening brief'}]};
 const opened = setup('startup-order');
@@ -79,8 +83,9 @@ assert.deepEqual((await opened.step([brief])).messages, [brief], 'later steps mu
 await openedStart;
 assert.equal(opened.followups.length + opened.injected.length, 0, 'startup must not queue a second turn or park the digest');
 opened.stop();
-// Cancelling the held first step drops its batch and clears the inbox, as
-// DSH does. The digest and the claimed brief must lead the next step once.
+// A non-user cancel of the held first step drops its claimed batch and clears
+// the inbox, as DSH does. The digest and the claimed brief must lead the next
+// step once.
 const cancelled = setup('startup-cancel', {slowStart: true});
 const cancelledStart = cancelled.emit('agent/created', {agent: cancelled.agent});
 const inbox = [brief];
@@ -99,6 +104,45 @@ assert.equal(new Set(resumed.map(input => input.id)).size, resumed.length, 'noth
 inbox.push(typed);
 assert.deepEqual(await cancelled.run(inbox, new AbortController().signal), [typed], 'the held messages must be delivered only once');
 cancelled.stop();
+// Escape cancels with keepInbox: input queued during the held step survives
+// and enters after the held digest and brief.
+const escaped = setup('startup-escape', {slowStart: true});
+const escapedStart = escaped.emit('agent/created', {agent: escaped.agent});
+const kept = [brief];
+const escape = new AbortController();
+// DSH's own checkpoint runs downstream in this waterfall; it must make the
+// open turn durable while the digest is still held.
+let checkpointed = false;
+const escapedStep = escaped.run(kept, escape.signal, escaped.agent, () => { checkpointed = true; });
+await delay(100);
+assert.equal(checkpointed, true, 'the downstream checkpoint must run before the digest wait');
+const early = {id: 'early', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'queued during the hold'}]};
+kept.push(early);
+escape.abort();
+await assert.rejects(escapedStep, {name: 'AbortError'}, 'the escaped step must enter nothing');
+await escapedStart;
+const afterEscape = await escaped.run(kept, new AbortController().signal);
+assert.deepEqual(afterEscape.map(input => input.content[0].text), ['SESSION START - fixture\n', 'opening brief', 'queued during the hold'], 'the kept inbox must follow the held digest and brief');
+assert.equal(new Set(afterEscape.map(input => input.id)).size, afterEscape.length, 'nothing may be delivered twice after Escape');
+escaped.stop();
+// A same-process session replacement must not inherit the old session's
+// parked startup digest or launch brief.
+const replaced = setup('startup-replaced', {slowStart: true});
+const replacedStart = replaced.emit('agent/created', {agent: replaced.agent});
+const replacedInbox = [brief];
+const replacedCancel = new AbortController();
+const replacedStep = replaced.run(replacedInbox, replacedCancel.signal);
+await delay(100);
+replacedCancel.abort();
+replacedInbox.length = 0;
+await assert.rejects(replacedStep, {name: 'AbortError'});
+await replacedStart;
+const fresh = {id: 'fresh', session: {header: {cwd: replaced.home}}, inject(value) {replaced.injected.push(value);}, followup(value) {replaced.followups.push(value);}};
+await replaced.emit('agent/created', {agent: fresh});
+assert.equal(replaced.injected.length, 1, 'the replacement session must receive its own clear digest');
+replacedInbox.push(typed);
+assert.deepEqual(await replaced.run(replacedInbox, new AbortController().signal, fresh), [typed], 'the replacement must not receive the old digest or brief');
+replaced.stop();
 const broken = setup('startup-failure', {failStart: true, failArm: true});
 const brokenStart = broken.emit('agent/created', {agent: broken.agent});
 const failedStep = await broken.step([brief]);
@@ -109,10 +153,10 @@ assert.equal(broken.followups.length, 0, 'a failed startup must not queue anothe
 assert.match(readFileSync(join(broken.home, 'state/.dsh-primary-events.jsonl'), 'utf8'), /"event":"error"/, 'a failed startup must be recorded');
 // DSH logs each entered message. The launch brief is not new external input,
 // so it must not reopen the failure budget the startup notice used.
-for (const input of failedStep.messages) broken.consume(input);
+for (const input of [...failedStep.messages, ...context('failed-start')]) broken.consume(input);
 broken.end();
 await delay(1000);
-assert.equal(broken.followups.length, 0, 'the launch brief must not reset the startup failure budget');
+assert.equal(broken.followups.length, 0, 'the launch brief and DSH context must not reset the startup failure budget');
 broken.consume({id: 'external-after-failure', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'Retry.'}]});
 broken.end();
 await until(() => broken.followups.length === 1);
@@ -123,6 +167,7 @@ await until(() => fail.followups.length === 1);
 // DSH commits UserMessage directly as event.data, including synthetic input.
 // Consuming the forced continuation must not classify it as a new human turn.
 fail.consume(fail.followups[0]);
+for (const input of context('failed-arm')) fail.consume(input);
 fail.end();
 await delay(1000);
 fail.end();
@@ -157,6 +202,7 @@ wake.end();
 await until(() => wake.followups.length === 2);
 assert.match(wake.followups[1].content[0].text, /generation-bound acknowledgement/, 'a consumed but unacknowledged wake requires the bounded guard continuation');
 wake.consume(wake.followups[1]);
+for (const input of context('wake')) wake.consume(input);
 wake.end();
 await delay(500);
 assert.equal(wake.followups.length, 2, 'consuming the synthetic guard continuation must not reset its budget');

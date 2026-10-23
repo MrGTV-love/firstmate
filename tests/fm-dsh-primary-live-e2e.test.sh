@@ -26,6 +26,11 @@ SECOND=$(cd "$SECOND" && pwd -P)
 cleanup() {
   local rc=$?
   trap - EXIT
+  if [ -p "$TASK/second-hold/release" ]; then
+    exec 3<>"$TASK/second-hold/release"
+    echo release >&3
+    exec 3>&-
+  fi
   # Retire the native owner first: stopping only its watcher while the TUI
   # remains alive permits a legitimate turn-end callback to re-arm it.
   PATH="$ORIGINAL_PATH" "$HELPER" teardown "$SESSION" || rc=1
@@ -167,6 +172,7 @@ for _ in $(seq 1 120); do
   [ "$(python3 "$ROOT/bin/fm-dsh.py" state "$PARENT/state" "$ID")" = idle ] && break
   sleep 1
 done
+[ "$(python3 "$ROOT/bin/fm-dsh.py" state "$PARENT/state" "$ID")" = idle ] || { echo 'the primary never went idle before the interrupt probe' >&2; exit 1; }
 CALLS=$(sleep_calls)
 lab pane send-text "$PANE" 'Run sleep 40 with Bash, then reply FMINTERUPTPROBE. Do not do anything else.'
 lab pane send-keys "$PANE" enter
@@ -174,6 +180,7 @@ for _ in $(seq 1 60); do
   [ "$(python3 "$ROOT/bin/fm-dsh.py" state "$PARENT/state" "$ID")" = busy ] && [ "$(sleep_calls)" -gt "$CALLS" ] && break
   sleep 1
 done
+[ "$(python3 "$ROOT/bin/fm-dsh.py" state "$PARENT/state" "$ID")" = busy ] && [ "$(sleep_calls)" -gt "$CALLS" ] || { echo 'the model never started the requested sleep' >&2; exit 1; }
 control "$ID" interrupt
 control "$ID" exit
 BEFORE=$(python3 "$ROOT/bin/fm-dsh.py" position "$PARENT/state" "$ID")
@@ -231,9 +238,13 @@ assert before and 'Mode: DSH native Cordis supervision.' in before[0], 'the star
 assert any('ORCHID73' in words for words in before[1:]), 'the positional opening prompt must follow the digest before any reply'
 print('ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume')
 PY
-# A fresh secondmate: the real spawn prepares a new home's private runtime,
-# loads the plugin with no prior conversation, and must pass its start proof
-# and composer check while its first step still waits on the digest.
+# A fresh secondmate: the real spawn prepares a new home's private runtime and
+# loads the plugin with no prior conversation. A lab-only bash wrapper, first
+# on that spawn's PATH, holds just this home's session-start digest at a FIFO
+# barrier. DSH awaits the plugin's startup before it publishes the session, so
+# while held no turn may start and the spawn may not yet pass its start proof;
+# after release the spawn's start proof and composer check must pass and the
+# digest, then the charter, must enter ahead of any reply.
 SECOND_ID="dsh-second-$$"
 "$LAB_HELPER" create "$SECOND"
 mkdir "$SECOND/operator-home"
@@ -249,18 +260,41 @@ printf 'off\n' > "$SECOND/config/supervision-host-off"
 printf '# Backlog\n\n## Queued\n\n## In flight\n\n## Done\n' > "$SECOND/data/backlog.md"
 # A secondmate's launch brief is its home charter.
 printf '%s\n' 'This is an isolated Firstmate runtime lab secondmate, not real operational work. Do not investigate, read outside this home, load skills, edit code or dispatch work. Ignore startup diagnostics. Remember the word TULIP42 only in this conversation, then reply exactly FMSECONDREADY. On resuming this conversation reply FMSECONDRESUMED and the secret word remembered earlier, without inspecting files.' > "$SECOND/data/charter.md"
-spawned_at=$(date +%s)
-FM_POLL=1 FM_CHECK_INTERVAL=1 FM_DSH_OPERATOR_HOME="$SECOND/operator-home" HERDR_SESSION="$SESSION" FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$ROOT" \
+HOLD="$TASK/second-hold"
+mkdir -p "$HOLD/bin"
+mkfifo "$HOLD/release"
+REAL_BASH=$(command -v bash)
+cat > "$HOLD/bin/bash" <<EOF
+#!$REAL_BASH
+case "\${1:-}" in
+  */bin/fm-sessionstart-run.sh)
+    if [ "\${FM_HOME:-}" = '$SECOND' ]; then
+      : > '$HOLD/reached'
+      read -r _ < '$HOLD/release'
+    fi
+    ;;
+esac
+exec '$REAL_BASH' "\$@"
+EOF
+chmod +x "$HOLD/bin/bash"
+PATH="$HOLD/bin:$PATH" FM_POLL=1 FM_CHECK_INTERVAL=1 FM_DSH_OPERATOR_HOME="$SECOND/operator-home" HERDR_SESSION="$SESSION" FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$ROOT" \
   FM_STATE_OVERRIDE="$PARENT/state" FM_CONFIG_OVERRIDE="$PARENT/config" FM_SPAWN_NO_GUARD=1 \
-  bash "$ROOT/bin/fm-spawn.sh" "$SECOND_ID" "$SECOND" dsh --secondmate --backend herdr --model deepseek/deepseek-v4-flash --effort high
-printf 'secondmate spawn returned after %ss\n' "$(( $(date +%s) - spawned_at ))"
+  bash "$ROOT/bin/fm-spawn.sh" "$SECOND_ID" "$SECOND" dsh --secondmate --backend herdr --model deepseek/deepseek-v4-flash --effort high &
+SPAWN_PID=$!
+for _ in $(seq 1 120); do
+  [ -e "$HOLD/reached" ] && break
+  kill -0 "$SPAWN_PID" 2>/dev/null || break
+  sleep 1
+done
+[ -e "$HOLD/reached" ] || { echo 'the secondmate session start never reached the lab barrier' >&2; exit 1; }
+sleep 5
+kill -0 "$SPAWN_PID" || { echo 'the secondmate spawn ended while its session start was held' >&2; exit 1; }
+HELD_LOG=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND_ID")
+[ -z "$HELD_LOG" ] || ! grep -q '"type":"turn/start"' "$HELD_LOG" || { echo 'a turn started before the held session-start digest' >&2; exit 1; }
+echo 'ok - while the session start was held, no turn started and the spawn had not passed its start proof'
+echo release > "$HOLD/release"
+wait "$SPAWN_PID" || { echo 'the secondmate spawn failed after its session start was released' >&2; exit 1; }
 SECOND_LOG=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND_ID")
-python3 - "$SECOND_LOG" <<'PY'
-import json,sys
-events=[json.loads(line) for line in open(sys.argv[1]) if line.strip()]
-types=[event.get('type') for event in events]
-print('secondmate log at spawn return: turn/start=%s user/message=%s' % ('turn/start' in types, 'user/message' in types))
-PY
 [ "$(sed -n 's/^backend=//p' "$PARENT/state/$SECOND_ID.meta")" = herdr ] && [ "$(sed -n 's/^herdr_session=//p' "$PARENT/state/$SECOND_ID.meta")" = "$SESSION" ] || { echo 'the secondmate spawn left the named Herdr lab' >&2; exit 1; }
 SECOND_PANE=$(sed -n 's/^herdr_pane_id=//p' "$PARENT/state/$SECOND_ID.meta")
 LOG="$SECOND_LOG" PANE="$SECOND_PANE" wait_reply FMSECONDREADY

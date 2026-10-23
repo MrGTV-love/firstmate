@@ -379,11 +379,12 @@ A later in-process `clear` re-emits only when this lock owner completed a full s
 ### DSH
 
 `bin/fm-dsh-primary.sh` and DSH secondmate launches add the tracked `.dsh/fm-primary.mjs` Cordis plugin to a private launch patch.
-The launch passes its opening prompt or secondmate brief to `dsh-tui` positionally, so the first turn starts at once.
-DSH does not await the `agent/created` callback, which invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry; the plugin's awaited `agent/pre-step` waterfall holds the fresh process's first step until that finishes and enters the digest ahead of the opening prompt in that step.
+The launch passes its opening prompt or secondmate brief to `dsh-tui` positionally.
+The installed DSH (the `dsh` CLI's own agent runtime) awaits the `agent/created` callback, which invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry, before it publishes the session; no turn starts, and a spawn's start proof cannot pass, until the digest is ready.
+The plugin's awaited `agent/pre-step` waterfall then enters the digest ahead of the opening prompt in the first step, and would hold that step for the digest under a runtime that did not await the callback; DSH's own checkpoint runs first in that waterfall, so an open turn is durable during such a hold.
 A failed or empty startup is recorded in `state/.dsh-primary-events.jsonl` and enters that step as the supervision-failure notice instead of the digest.
-The launch input entering that step is the adapter's own, so that notice spends the failure episode's one follow-up; only a later external message reopens it.
-If that held step is interrupted, DSH drops its batch and clears the inbox, so the adapter keeps the digest and the launch input and enters them, once, ahead of the next step's input.
+The launch input entering that step is the adapter's own, so that notice spends the failure episode's one follow-up; only a later user-sourced message reopens it, never DSH's own runtime-context, skill-catalog, time-context or instruction messages.
+If that held step is interrupted, DSH drops the step's claimed batch (a non-user cancel also clears the inbox; an Escape keeps it), so the adapter keeps the digest and the launch input and enters them, once, ahead of the next step's input.
 Top-level same-process session replacements use the shared `clear` source and inject the digest into the running session; delegated children never receive the primary digest or take over the watcher.
 A fresh process resuming a conversation takes the helm again through the same idempotent startup owner.
 Bare `dsh-tui` launches do not discover this plugin, and automatic in-place compaction has no separate tracked re-emit callback.
