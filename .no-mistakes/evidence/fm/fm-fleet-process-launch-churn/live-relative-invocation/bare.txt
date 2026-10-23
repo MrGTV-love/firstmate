@@ -1,0 +1,4 @@
+mode=bare cwd=<worktree>/bin command='bash fm-watch.sh'
+check: <lab>/state/q.check.sh: quick-check-bare
+rc=0
+stderr:

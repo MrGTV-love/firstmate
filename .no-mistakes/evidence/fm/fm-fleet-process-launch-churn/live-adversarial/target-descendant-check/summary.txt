@@ -1,0 +1,14 @@
+label=target-descendant-check code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG noperl=no check_timeout=10 observe=12s
+perl visible on watcher PATH: /Users/charlesabrooker/tmp/fm-lab.hbQmsK/shim/perl
+watcher exited on its own at: 4s ; alive at end of observation: no ; beat age then: 4s
+check pid probes before TERM:
+<lab>/state/check-descendant.pid:86520 gone
+after: watcher exited after TERM exit=0
+check pid probes after watcher stop:
+<lab>/state/check-descendant.pid:86520 gone
+sleep launches by watcher main shell (PPID=83756): 
+perl launches by watcher main shell: 1
+watcher stdout:
+check: <lab>/state/hard.check.sh: leader-finished-leaving-descendant
+watcher stderr (tail):
+leftover .fm-check-output* files: 0

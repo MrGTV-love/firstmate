@@ -1,0 +1,46 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+not ok - bounded check lost output/status or launched poll sleeps: 0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+0.1
+RESULT: per-tick test FAILED on base
+not ok - group cleanup without perl lost its bound or launched poll sleeps (status 25): 0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+0.01
+RESULT: no-perl test FAILED on base

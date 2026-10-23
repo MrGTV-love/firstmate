@@ -1,0 +1,45 @@
+fm-afk-contract.sh	absolute	rc=0 funcs=30 FM_AFK_CONTRACT_DIR=<root>/bin
+fm-afk-contract.sh	relative	rc=0 funcs=30 FM_AFK_CONTRACT_DIR=<root>/bin
+fm-afk-contract.sh	bare	rc=0 funcs=30 FM_AFK_CONTRACT_DIR=<root>/bin
+fm-backend.sh	absolute	rc=0 funcs=46 FM_BACKEND_LIB_DIR=<root>/bin
+fm-backend.sh	relative	rc=0 funcs=46 FM_BACKEND_LIB_DIR=<root>/bin
+fm-backend.sh	bare	rc=0 funcs=46 FM_BACKEND_LIB_DIR=<root>/bin
+fm-backlog-transition-lib.sh	absolute	rc=0 funcs=120 _FM_BACKLOG_TRANSITION_LIB_DIR=<root>/bin
+fm-backlog-transition-lib.sh	relative	rc=0 funcs=120 _FM_BACKLOG_TRANSITION_LIB_DIR=<root>/bin
+fm-backlog-transition-lib.sh	bare	rc=0 funcs=120 _FM_BACKLOG_TRANSITION_LIB_DIR=<root>/bin
+fm-config-inherit-lib.sh	absolute	rc=0 funcs=89
+fm-config-inherit-lib.sh	relative	rc=0 funcs=89
+fm-config-inherit-lib.sh	bare	rc=0 funcs=89
+fm-duration-lib.sh	absolute	rc=0 funcs=5 FM_DURATION_HELPER=<root>/bin/fm-duration.py
+fm-duration-lib.sh	relative	rc=0 funcs=5 FM_DURATION_HELPER=<root>/bin/fm-duration.py
+fm-duration-lib.sh	bare	rc=0 funcs=5 FM_DURATION_HELPER=<root>/bin/fm-duration.py
+fm-marker-lib.sh	absolute	rc=0 funcs=23
+fm-marker-lib.sh	relative	rc=0 funcs=23
+fm-marker-lib.sh	bare	rc=0 funcs=23
+fm-merge-authority-lib.sh	absolute	rc=0 funcs=94 FM_AFK_CONTRACT_DIR=<root>/bin _FM_MERGE_AUTHORITY_LIB_DIR=<root>/bin
+fm-merge-authority-lib.sh	relative	rc=0 funcs=94 FM_AFK_CONTRACT_DIR=<root>/bin _FM_MERGE_AUTHORITY_LIB_DIR=<root>/bin
+fm-merge-authority-lib.sh	bare	rc=0 funcs=94 FM_AFK_CONTRACT_DIR=<root>/bin _FM_MERGE_AUTHORITY_LIB_DIR=<root>/bin
+fm-merge-outcome-lib.sh	absolute	rc=0 funcs=77 _FM_MERGE_OUTCOME_LIB_DIR=<root>/bin
+fm-merge-outcome-lib.sh	relative	rc=0 funcs=77 _FM_MERGE_OUTCOME_LIB_DIR=<root>/bin
+fm-merge-outcome-lib.sh	bare	rc=0 funcs=77 _FM_MERGE_OUTCOME_LIB_DIR=<root>/bin
+fm-pending-reply-lib.sh	absolute	rc=0 funcs=284 FM_BACKEND_LIB_DIR=<root>/bin _FM_PENDING_REPLY_LIB_DIR=<root>/bin
+fm-pending-reply-lib.sh	relative	rc=0 funcs=284 FM_BACKEND_LIB_DIR=<root>/bin _FM_PENDING_REPLY_LIB_DIR=<root>/bin
+fm-pending-reply-lib.sh	bare	rc=0 funcs=284 FM_BACKEND_LIB_DIR=<root>/bin _FM_PENDING_REPLY_LIB_DIR=<root>/bin
+fm-procevent-lib.sh	absolute	rc=0 funcs=76 FM_PROCEVENT_LIB_ROOT=<root>
+fm-procevent-lib.sh	relative	rc=0 funcs=76 FM_PROCEVENT_LIB_ROOT=<root>
+fm-procevent-lib.sh	bare	rc=0 funcs=76 FM_PROCEVENT_LIB_ROOT=<root>
+fm-push-transition-lib.sh	absolute	rc=0 funcs=324 FM_BACKEND_LIB_DIR=<root>/bin FM_PUSH_TRANSITION_LIB_DIR=<root>/bin
+fm-push-transition-lib.sh	relative	rc=0 funcs=324 FM_BACKEND_LIB_DIR=<root>/bin FM_PUSH_TRANSITION_LIB_DIR=<root>/bin
+fm-push-transition-lib.sh	bare	rc=0 funcs=324 FM_BACKEND_LIB_DIR=<root>/bin FM_PUSH_TRANSITION_LIB_DIR=<root>/bin
+fm-secondmate-liveness-lib.sh	absolute	rc=0 funcs=170 FM_BACKEND_LIB_DIR=<root>/bin FM_DURATION_HELPER=<root>/bin/fm-duration.py FM_SM_LIVE_LIB_DIR=<root>/bin
+fm-secondmate-liveness-lib.sh	relative	rc=0 funcs=170 FM_BACKEND_LIB_DIR=<root>/bin FM_DURATION_HELPER=<root>/bin/fm-duration.py FM_SM_LIVE_LIB_DIR=<root>/bin
+fm-secondmate-liveness-lib.sh	bare	rc=0 funcs=170 FM_BACKEND_LIB_DIR=<root>/bin FM_DURATION_HELPER=<root>/bin/fm-duration.py FM_SM_LIVE_LIB_DIR=<root>/bin
+fm-session-launch-policy-lib.sh	absolute	rc=0 funcs=93
+fm-session-launch-policy-lib.sh	relative	rc=0 funcs=93
+fm-session-launch-policy-lib.sh	bare	rc=0 funcs=93
+fm-task-inbox-lib.sh	absolute	rc=0 funcs=226 FM_BACKEND_LIB_DIR=<root>/bin _FM_TASK_INBOX_LIB_DIR=<root>/bin
+fm-task-inbox-lib.sh	relative	rc=0 funcs=226 FM_BACKEND_LIB_DIR=<root>/bin _FM_TASK_INBOX_LIB_DIR=<root>/bin
+fm-task-inbox-lib.sh	bare	rc=0 funcs=226 FM_BACKEND_LIB_DIR=<root>/bin _FM_TASK_INBOX_LIB_DIR=<root>/bin
+fm-x-lib.sh	absolute	rc=0 funcs=168 _FM_BACKLOG_TRANSITION_LIB_DIR=<root>/bin _FM_X_LIB_DIR=<root>/bin
+fm-x-lib.sh	relative	rc=0 funcs=168 _FM_BACKLOG_TRANSITION_LIB_DIR=<root>/bin _FM_X_LIB_DIR=<root>/bin
+fm-x-lib.sh	bare	rc=0 funcs=168 _FM_BACKLOG_TRANSITION_LIB_DIR=<root>/bin _FM_X_LIB_DIR=<root>/bin

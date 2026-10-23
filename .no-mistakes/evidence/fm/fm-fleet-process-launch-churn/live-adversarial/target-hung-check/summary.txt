@@ -1,0 +1,15 @@
+label=target-hung-check code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG noperl=no check_timeout=3 observe=15s
+perl visible on watcher PATH: /Users/charlesabrooker/tmp/fm-lab.iMORS7/shim/perl
+watcher exited on its own at: did-not-exits ; alive at end of observation: yes ; beat age then: 8s
+check pid probes before TERM:
+<lab>/state/check-child.pid:48089 gone
+<lab>/state/check-leader.pid:48082 gone
+after: watcher exited after TERM exit=143
+check pid probes after watcher stop:
+<lab>/state/check-child.pid:48089 gone
+<lab>/state/check-leader.pid:48082 gone
+sleep launches by watcher main shell (PPID=45665):    1 15;
+perl launches by watcher main shell: 1
+watcher stdout:
+watcher stderr (tail):
+leftover .fm-check-output* files: 0

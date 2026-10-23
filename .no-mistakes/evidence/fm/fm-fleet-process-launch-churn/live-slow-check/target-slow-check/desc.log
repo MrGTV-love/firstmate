@@ -1,0 +1,62 @@
+0.273	56808	56384	(bash)
+0.396	56939	56384	(bash)
+0.522	57024	57020	(bash)
+0.522	57027	57024	(dirname)
+0.522	56977	56384	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-home-summary-refresh.sh --best-effort
+0.522	56978	56384	bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-exec python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm_op
+0.522	57043	56384	(bash)
+0.522	57047	57043	(bash)
+0.522	57049	57047	(bash)
+0.522	57020	56978	(bash)
+0.522	57021	56977	(bash)
+0.522	57023	57021	(bash)
+0.682	57097	57066	timeout -k 1 60 bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf 
+0.682	57066	56977	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-home-summary-refresh.sh --best-effort
+0.682	57324	56384	(bash)
+0.682	57102	57097	bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf "%s\n" "$command
+0.682	56978	56384	/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm_open_loop
+0.682	57105	57102	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-home-summary-refresh.sh --_worker
+0.682	57329	57105	(bash)
+0.827	57414	56384	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-watch.sh
+0.827	57417	57414	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-inactive-reconcile.sh scan
+0.827	57483	57417	(bash)
+0.827	57484	57402	(bash)
+0.827	57402	57105	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-fleet-snapshot.sh --secondmate-home-summary
+0.827	57404	56978	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-fleet-snapshot.sh --home-input
+0.928	57603	57595	bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG/bin/fm-inactive-reconcile.sh _scan-locked 0
+0.928	57583	57417	timeout -k 1 11 bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf 
+0.928	57595	57583	bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf "%s\n" "$command
+1.020	57603	57595	(bash)
+1.020	57414	56384	(bash)
+1.020	57768	57603	(rm)
+1.020	57417	57414	(bash)
+1.020	57769	57404	(bash)
+1.020	57583	57417	(gtimeout)
+1.020	56978	56384	(python3.13)
+1.020	57595	57583	(bash)
+1.020	57404	56978	(bash)
+1.117	57804	57402	(bash)
+1.117	57909	57804	(jq)
+1.117	57402	57105	(bash)
+1.117	57916	56384	(bash)
+1.202	58051	57105	(bash)
+1.202	58020	58014	bash /Users/charlesabrooker/tmp/fm-lab.iy4DSj/state/.fm-custom-check.Y0jMhg
+1.202	57097	57066	(gtimeout)
+1.202	57066	56977	(bash)
+1.202	58028	58020	/bin/sleep 12
+1.202	57102	57097	(bash)
+1.202	57105	57102	(bash)
+1.202	58014	56384	timeout 30 bash /Users/charlesabrooker/tmp/fm-lab.iy4DSj/state/.fm-custom-check.Y0jMhg
+1.293	58177	58175	(bash)
+1.293	58178	58177	(readlink)
+1.293	56977	56384	(bash)
+1.293	58071	56977	(gtimeout)
+1.293	58072	58071	(bash)
+1.293	58073	58072	(bash)
+1.293	58175	58073	(bash)
+13.173	58028	58020	(sleep)
+13.173	58020	58014	(bash)
+13.173	58014	56384	(gtimeout)
+13.282	68700	56384	(bash)
+13.382	68821	56384	(bash)
+13.475	68921	56384	(bash)

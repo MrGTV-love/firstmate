@@ -1,0 +1,10 @@
+label=base-slow-check code=/Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U watcher_pid=77568 exit=0 elapsed=14.182
+sleep launches by watcher main shell (PPID=77568): 80
+sleep launches by watcher main shell with arg 0.1: 80
+all sleep launches (any parent): 80
+all dirname launches (any parent): 41
+unique descendant processes observed by ps sampling: 169
+  of which 'sleep 0.1': 43
+watcher stdout:
+check: /Users/charlesabrooker/tmp/fm-lab.Zhg7hN/state/slow.check.sh: slow-check-finished
+leftover state files matching .fm-check-output*: 0

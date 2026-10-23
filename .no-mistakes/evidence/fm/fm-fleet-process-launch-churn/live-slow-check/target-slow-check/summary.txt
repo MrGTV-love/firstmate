@@ -1,0 +1,10 @@
+label=target-slow-check code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5K1FSK9N05TTY033P3YHDTG watcher_pid=56384 exit=0 elapsed=13.656
+sleep launches by watcher main shell (PPID=56384): 0
+sleep launches by watcher main shell with arg 0.1: 0
+all sleep launches (any parent): 0
+all dirname launches (any parent): 14
+unique descendant processes observed by ps sampling: 62
+  of which 'sleep 0.1': 0
+watcher stdout:
+check: /Users/charlesabrooker/tmp/fm-lab.iy4DSj/state/slow.check.sh: slow-check-finished
+leftover state files matching .fm-check-output*: 0

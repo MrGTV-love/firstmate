@@ -1,0 +1,4 @@
+mode=relative cwd=<worktree> command='bash bin/fm-watch.sh'
+check: <lab>/state/q.check.sh: quick-check-relative
+rc=0
+stderr:

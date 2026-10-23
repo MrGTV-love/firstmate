@@ -1,0 +1,169 @@
+0.195	78096	78094	(bash)
+0.195	78091	77568	(bash)
+0.195	78094	78091	(bash)
+0.415	78606	77568	(bash)
+0.415	78609	78606	(bash)
+0.415	78610	78609	(bash)
+0.415	78615	78610	(perl)
+0.534	78928	77568	(bash)
+0.712	79276	77568	(bash)
+0.712	79278	79276	(bash)
+0.825	79612	77568	(bash)
+0.940	79928	77568	(touch)
+1.053	79968	77568	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-home-summary-refresh.sh --best-effort
+1.053	80227	77568	(bash)
+1.053	80100	79968	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-home-summary-refresh.sh --best-effort
+1.053	79972	77568	/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm_open_loops.py --heartbeat
+1.053	80228	80170	(bash)
+1.053	80170	80159	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-home-summary-refresh.sh --_worker
+1.053	80145	80100	timeout -k 1 60 bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf 
+1.053	80220	79972	(bash)
+1.053	80159	80145	bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf "%s\n" "$command
+1.190	80598	80170	(bash)
+1.190	80599	80598	(mktemp)
+1.307	80900	80894	bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf "%s\n" "$command
+1.307	80904	80625	(bash)
+1.307	80907	80900	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-inactive-reconcile.sh _scan-locked 0
+1.307	80921	80619	(bash)
+1.307	80924	80921	(bash)
+1.307	80929	80924	(bash)
+1.307	80938	80929	(perl)
+1.307	80946	80907	(bash)
+1.307	80619	80170	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-fleet-snapshot.sh --secondmate-home-summary
+1.307	80625	79972	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-fleet-snapshot.sh --home-input
+1.307	80629	77568	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-watch.sh
+1.307	80633	80629	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-inactive-reconcile.sh scan
+1.307	80894	80633	timeout -k 1 11 bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf 
+1.424	81216	80907	(bash)
+1.424	80900	80894	(bash)
+1.424	80907	80900	(bash)
+1.424	80629	77568	(bash)
+1.424	80633	80629	(bash)
+1.424	80894	80633	(gtimeout)
+1.533	79972	77568	(python3.13)
+1.533	81445	80619	(bash)
+1.533	81446	77568	(bash)
+1.533	81448	80625	(rm)
+1.533	81449	81445	(jq)
+1.533	81450	81446	(stat)
+1.533	80625	79972	(bash)
+1.645	80100	79968	(bash)
+1.645	81639	81628	bash /Users/charlesabrooker/tmp/fm-lab.Zhg7hN/state/.fm-custom-check.euG1oU
+1.645	81671	80170	(bash)
+1.645	81673	81671	(cat)
+1.645	80170	80159	(bash)
+1.645	81642	77568	/bin/sleep 0.1
+1.645	81646	81639	/bin/sleep 12
+1.645	80145	80100	(gtimeout)
+1.645	81628	77568	timeout 30 bash /Users/charlesabrooker/tmp/fm-lab.Zhg7hN/state/.fm-custom-check.euG1oU
+1.645	80159	80145	(bash)
+1.760	81893	81846	(bash)
+1.760	81642	77568	(sleep)
+1.760	81835	79968	timeout -k 1 4 bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf "
+1.760	81841	81835	bash -c \012    wfd=$1\012    rfd=$2\012    shift 2\012    eval "exec $rfd<&-"\012    eval "\"\$@\" $wfd>&-"\012    command_rc=$?\012    printf "%s\n" "$command
+1.760	81846	81841	bash /Users/charlesabrooker/tmp/fm-test-scratch.ONaW9U/bin/fm-home-summary-refresh.sh --_release-lock
+1.867	81968	77568	(sleep)
+1.984	82167	77568	(sleep)
+2.073	82387	77568	/bin/sleep 0.1
+2.167	82387	77568	(sleep)
+2.254	82601	77568	/bin/sleep 0.1
+2.341	82823	77568	/bin/sleep 0.1
+2.458	82823	77568	(sleep)
+2.548	83037	77568	(sleep)
+2.679	83216	77568	/bin/sleep 0.1
+2.800	83449	77568	/bin/sleep 0.1
+2.938	83449	77568	(sleep)
+3.118	83761	77568	/bin/sleep 0.1
+3.118	83765	83761	(bash)
+3.347	83903	77568	/bin/sleep 0.1
+3.478	84098	77568	/bin/sleep 0.1
+3.588	84216	77568	/bin/sleep 0.1
+3.685	84216	77568	(sleep)
+3.826	84299	77568	(sleep)
+3.969	84388	77568	/bin/sleep 0.1
+4.116	84474	77568	/bin/sleep 0.1
+4.232	84474	77568	(sleep)
+4.336	84582	77568	(sleep)
+4.439	84657	77568	/bin/sleep 0.1
+4.544	84657	77568	(sleep)
+4.683	84782	77568	(sleep)
+4.808	84984	77568	(sleep)
+4.929	85057	77568	(sleep)
+5.061	85152	77568	(sleep)
+5.233	85277	77568	(sleep)
+5.346	85392	77568	(sleep)
+5.473	85493	77568	(sleep)
+5.597	85584	77568	/bin/sleep 0.1
+5.684	85670	77568	/bin/sleep 0.1
+5.798	85670	77568	(sleep)
+5.916	85768	77568	(sleep)
+6.012	85852	77568	/bin/sleep 0.1
+6.122	85952	85950	(bash)
+6.122	85950	77568	/bin/sleep 0.1
+6.313	86071	77568	/bin/sleep 0.1
+6.409	86071	77568	(sleep)
+6.504	86157	77568	/bin/sleep 0.1
+6.600	86157	77568	(sleep)
+6.726	86289	77568	(sleep)
+6.827	86371	77568	/bin/sleep 0.1
+6.959	86371	77568	(sleep)
+7.074	86496	77568	(sleep)
+7.180	86589	77568	/bin/sleep 0.1
+7.303	86732	77568	/bin/sleep 0.1
+7.400	86822	77568	/bin/sleep 0.1
+7.400	86825	86822	(bash)
+7.529	86822	77568	(sleep)
+7.647	86966	77568	(sleep)
+7.745	87020	77568	/bin/sleep 0.1
+7.912	87061	77568	(sleep)
+8.040	87088	77568	(sleep)
+8.137	87156	77568	/bin/sleep 0.1
+8.376	87326	77568	(sleep)
+8.513	87416	77568	(sleep)
+8.688	87473	77568	(sleep)
+8.815	87557	77568	(sleep)
+8.917	87590	77568	(sleep)
+9.005	87635	77568	/bin/sleep 0.1
+9.476	87741	77568	/bin/sleep 0.1
+9.660	87800	77568	/bin/sleep 0.1
+9.743	87800	77568	(sleep)
+9.849	87921	77568	/bin/sleep 0.1
+10.298	88077	77568	/bin/sleep 0.1
+10.404	88148	77568	/bin/sleep 0.1
+10.501	88148	77568	(sleep)
+10.690	88255	77568	(sleep)
+10.823	88363	77568	(sleep)
+10.939	88527	77568	/bin/sleep 0.1
+11.045	88705	77568	/bin/sleep 0.1
+11.134	88705	77568	(sleep)
+11.235	88831	77568	/bin/sleep 0.1
+11.621	89082	77568	(sleep)
+11.717	89225	77568	/bin/sleep 0.1
+11.810	89379	77568	/bin/sleep 0.1
+11.810	89385	89379	(perl)
+11.931	89379	77568	(sleep)
+12.035	89470	77568	(sleep)
+12.157	89562	77568	(sleep)
+12.246	89618	77568	/bin/sleep 0.1
+12.329	89618	77568	(sleep)
+12.442	89686	77568	/bin/sleep 0.1
+12.542	89686	77568	(sleep)
+12.629	89785	77568	/bin/sleep 0.1
+12.719	89785	77568	(sleep)
+12.840	89879	77568	/bin/sleep 0.1
+12.923	89982	77568	/bin/sleep 0.1
+13.015	89982	77568	(sleep)
+13.106	90027	77568	/bin/sleep 0.1
+13.207	90027	77568	(sleep)
+13.314	90135	77568	(sleep)
+13.433	90176	77568	(sleep)
+13.549	90265	77568	/bin/sleep 0.1
+13.661	90357	77568	(bash)
+13.863	90648	90646	(bash)
+13.863	90646	77568	(bash)
+13.863	90649	90648	(bash)
+13.976	90730	77568	(bash)
+13.976	90731	90730	(bash)
+13.976	90732	90731	(readlink)
+14.095	90860	77568	(bash)
+14.095	90861	90860	(bash)
