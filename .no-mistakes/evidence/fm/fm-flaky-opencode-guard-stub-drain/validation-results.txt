@@ -1,0 +1,15 @@
+Commands executed serially through the owning-home fm-proc-budget.sh wrapper:
+  python3 .gate-test-validation.py suite
+  python3 .gate-test-validation.py regression
+Exact child commands and complete output are retained in targeted-serial-suite.txt and synchronized-regression.txt. The temporary driver and each disposable test variant are retained as separate evidence files for reproducibility.
+
+Observed outcomes:
+- Targeted tests/fm-pi-watch-extension.test.sh completed with exit 0, no gate skips, in approximately 113 seconds. Both external-healthy variants printed their successful behavioral assertion.
+- Restored original non-draining guard fixture: synchronized delayed write failed with actual unhandled write EPIPE and Node exit 1 in 5/5 attempts. Each shell assertion displayed the captured Node stack trace.
+- Unchanged committed draining test function: 60/60 delayed attempts and 60/60 immediate attempts exited 0. No deadlock occurred.
+- Guard exit mutated from 2 to 0: both immediate and delayed variants exited 1 with missing blind-turn prompt. The mutation was correctly rejected.
+- Load measurement used two disposable CPU workers at nice 20, while all test commands ran at nice 20, one at a time. Host 1-minute load started at 3.876 and finished at 5.418; 10 logical CPUs were reported. This is controlled contention, not a claim of CPU saturation.
+
+Conclusion: the retained late-write case adds reproducible original-fixture failure coverage beyond main's immediate-path drain. All targeted expectations were met. This does not establish a historical CI cause.
+
+No live product scenario is claimed: only test code changed, and fixture execution is not live validation. The recorded human decision already authorizes this no-runtime-surface exception. No UI changes or screenshots apply. No full suite, linter, formatter, static analysis, production session, pipeline-control, push, PR or CI command was run. No permanent source/test files were edited during this phase.

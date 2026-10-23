@@ -1,0 +1,11 @@
+Scope: git diff --stat e9e48e1a201a1cb6e96be7743737cc1e61f3a43a 9bd991e33e050c0bf9ccffefc06f85f4f3b54e8a showed only tests/fm-pi-watch-extension.test.sh changed (52 insertions, 9 deletions). No production/plugin change.
+
+Base already consumes guard stdin with cat >/dev/null. Target retains that drain, exit 2, ownership assertions and the five-second polling allowance. It adds FIFO-synchronized delayed writes and captured Node output in the exit assertion diagnostic. No sleep, timeout extension, skip, retry or test relocation is introduced.
+
+Selected checks: targeted serial test file; old non-draining guard fixture fails with unhandled write EPIPE 5/5 under load; unchanged drained test function passes 60 delayed and 60 immediate attempts; exit-0 guard mutation is rejected in both variants. These are expectations to be checked, not claimed results. Measurements use fixture guards, so they are not live product validation.
+
+Additional coverage over main: main already fixes the immediate-path fixture; target adds explicit child-fd synchronization to force late parent writes against the old fixture, plus failure diagnostics. The before/after measurement evaluates that added regression coverage. No historical CI cause claim is made.
+
+This test-only change has no changed runtime product surface. Recorded human decisions explicitly authorize proceeding without live validation. No primary session or credentials are touched. There is no UI change requiring visual evidence.
+
+Isolation: scaffolding and lock/cache roots stay inside the worktree; FM_DURATION_FILE=off prevents owning-home timing ledger writes. Read-only owning-home duration and process-budget helpers wrap serial nice -n 20 test commands. Evidence is retained in this run's authorized evidence directory. Disposable CPU workers run only during regression measurement after the targeted file finishes.
