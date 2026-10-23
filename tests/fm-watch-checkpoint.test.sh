@@ -221,7 +221,7 @@ monotonic_ms() {
 # A busy host schedules a freshly forked bound child late. SlowPgrp.pm delays
 # only that child's own setpgrp(0, 0), by longer than the 5-second cleanup
 # grace, and records the child, the bound, and the owner the bound was given.
-# Killing the checkpoint's group then must still stop both within the grace,
+# Killing the checkpoint's group must stop both within GROUP_KILL_LIMIT_MS above,
 # or the watcher the child would go on to start runs with no bound at all.
 test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start() {
   local home checkpoint_pid child watchdog owner watchdog_parent started deadline now gone
