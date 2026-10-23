@@ -1,0 +1,11 @@
+== ADVERSARIAL: drained stub mutated to exit 0 (guard says OK) ==
+FAIL iter 1:
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (immediate hook write): missing blind-turn prompt: : expected exit 0, got 1
+FAIL iter 2:
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (immediate hook write): missing blind-turn prompt: : expected exit 0, got 1
+stub=fn-mutant-exit0.sh mode=immediate iterations=3 pass=0 fail=3
+FAIL iter 1:
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): missing blind-turn prompt: : expected exit 0, got 1
+FAIL iter 2:
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): missing blind-turn prompt: : expected exit 0, got 1
+stub=fn-mutant-exit0.sh mode=delayed iterations=3 pass=0 fail=3

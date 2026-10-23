@@ -1,0 +1,63 @@
+== BEFORE fix: old stub (no stdin drain), delayed hook write ==
+FAIL iter 3:
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: write EPIPE
+    at afterWriteDispatched (node:internal/stream_base_commons:138:10)
+    at writeGeneric (node:internal/stream_base_commons:126:10)
+    at Socket._writeGeneric (node:net:1324:11)
+    at Socket._write (node:net:1336:8)
+    at writeOrBuffer (node:internal/streams/writable:574:12)
+    at _write (node:internal/streams/writable:503:10)
+    at Writable.end (node:internal/streams/writable:862:17)
+    at Socket.end (node:net:1088:31)
+    at child.stdin.end (file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/[eval1]:18:16)
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/.opencode/plugins/fm-primary-turnend-guard.js:25:17
+Emitted 'error' event on Socket instance at:
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  errno: -32,
+  code: 'EPIPE',
+  syscall: 'write'
+}
+
+Node.js v26.11.1: expected exit 0, got 1
+FAIL iter 4:
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: write EPIPE
+    at afterWriteDispatched (node:internal/stream_base_commons:138:10)
+    at writeGeneric (node:internal/stream_base_commons:126:10)
+    at Socket._writeGeneric (node:net:1324:11)
+    at Socket._write (node:net:1336:8)
+    at writeOrBuffer (node:internal/streams/writable:574:12)
+    at _write (node:internal/streams/writable:503:10)
+    at Writable.end (node:internal/streams/writable:862:17)
+    at Socket.end (node:net:1088:31)
+    at child.stdin.end (file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/[eval1]:18:16)
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/.opencode/plugins/fm-primary-turnend-guard.js:25:17
+Emitted 'error' event on Socket instance at:
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  errno: -32,
+  code: 'EPIPE',
+  syscall: 'write'
+}
+
+Node.js v26.11.1: expected exit 0, got 1
+stub=fn-before.sh mode=delayed iterations=5 pass=2 fail=3
+
+== BEFORE fix: old stub, immediate hook write ==
+stub=fn-before.sh mode=immediate iterations=10 pass=10 fail=0
+
+== AFTER fix: drained stub, delayed hook write ==
+stub=fn-after.sh mode=delayed iterations=30 pass=30 fail=0
+
+== AFTER fix: drained stub, immediate hook write ==
+stub=fn-after.sh mode=immediate iterations=30 pass=30 fail=0

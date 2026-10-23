@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# loop.sh <worktree> <stub: fixed|old|old-literal> <mode: immediate|delayed> <iterations>
+set -u
+wt=$1 stub=$2 mode=$3 n=$4
+fn=/tmp/fm-sync-harness-t2/fn-$stub.sh
+sed -n '/^test_opencode_healthy_arm_output_does_not_suppress_guard() {$/,/^test_watch_instance_rebind_releases_predecessors() {$/p' "$wt/tests/fm-pi-watch-extension.test.sh" | sed '$d' > "$fn"
+case "$stub" in
+  fixed) ;;
+  # Old non-draining guard: the drain (fd 3 close + cat) removed, sync plumbing kept.
+  old) sed -i '' -e '/^exec 3>&-$/d' -e '/^cat > \/dev\/null$/d' "$fn" ;;
+  # Base-commit stub byte for byte: no trap, no drain.
+  # Adversarial: drained guard that does not block (exit 0); the ownership assertions must still fail.
+  exit0) sed -i '' -e 's/^exit 2$/exit 0/' "$fn" ;;
+  nofd3close) sed -i '' -e '/^exec 3>&-$/d' "$fn" ;;
+  old-literal) sed -i '' -e '/^trap /d' -e '/^exec 3>&-$/d' -e '/^cat > \/dev\/null$/d' -e '/^# The delayed variant/d' -e '/^# stdin before fd 3/d' -e '/^# Consume the hook/d' "$fn" ;;
+esac
+echo "--- guard stub ($stub) ---"
+sed -n "/fm-turnend-guard.sh\" <<'SH'/,/^SH$/p" "$fn"
+pass=0 fail=0
+for i in $(seq 1 "$n"); do
+  out=$(/tmp/fm-sync-harness-t2/one.sh "$wt" "$fn" "$mode" 2>&1)
+  rc=$?
+  if [ $rc -eq 0 ]; then pass=$((pass+1)); else fail=$((fail+1)); fi
+  printf 'run %s rc=%s %s\n' "$i" "$rc" "$(printf '%s' "$out" | grep -E '^(ok|not ok)' | head -1 | cut -c1-100) $(printf '%s' "$out" | grep -oE 'Error: write EPIPE|missing blind-turn prompt|guard hook payload write was not delayed' | head -1)"
+  if [ $rc -ne 0 ] && [ $fail -eq 1 ]; then printf '%s\n' "$out" | grep -E 'EPIPE|throw er|fm-primary-turnend-guard.js|code:|syscall|expected exit' | head -8; fi
+done
+echo "stub=$stub mode=$mode iterations=$n pass=$pass fail=$fail load=\"$(uptime | sed 's/.*load averages*: //')\""

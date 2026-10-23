@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Runs every step one at a time. No overlap.
+set -u
+cd "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP"
+B=/Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh
+{
+echo "$ git rev-parse HEAD"; git rev-parse HEAD
+echo "$ nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/fm-pi-watch-extension.test.sh"
+nice -n 20 bash bin/fm-test-run.sh --jobs 1 tests/fm-pi-watch-extension.test.sh; echo "exit=$?"
+echo "load=\"$(uptime | sed 's/.*load averages*: //')\""
+} > "/Users/charlesabrooker/.no-mistakes/evidence/01M5JGZZ93GKHWH700MNVBZ4ZP/round2-targeted-suite.txt" 2>&1
+{
+echo "Harness: /tmp/fm-sync-harness-t2/loop.sh (copy of harness-loop.sh.txt plus a nofd3close probe). Each run extracts the committed test function, edits only the guard stub, and runs it in a fresh temp root."
+for spec in "old delayed 5" "old-literal delayed 5" "fixed delayed 60" "fixed immediate 60" "exit0 delayed 2" "exit0 immediate 2"; do
+  echo; echo "$ nice -n 20 $B -- /tmp/fm-sync-harness-t2/loop.sh <worktree> $spec"
+  nice -n 20 "$B" -- /tmp/fm-sync-harness-t2/loop.sh "/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP" $spec
+done
+} > "/Users/charlesabrooker/.no-mistakes/evidence/01M5JGZZ93GKHWH700MNVBZ4ZP/round2-regression-repeat.txt" 2>&1
+echo DONE >> "/Users/charlesabrooker/.no-mistakes/evidence/01M5JGZZ93GKHWH700MNVBZ4ZP/round2-regression-repeat.txt"

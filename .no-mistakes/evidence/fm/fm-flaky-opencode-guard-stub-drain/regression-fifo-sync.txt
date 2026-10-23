@@ -1,0 +1,228 @@
+Harness: /tmp/fm-sync-harness/loop.sh extracts test_opencode_healthy_arm_output_does_not_suppress_guard from the worktree test, edits only the guard stub, and runs it in a fresh physical temp root each run (/tmp/fm-sync-harness/one.sh).
+old = drain lines (exec 3>&- and cat > /dev/null) removed; old-literal = base-commit stub byte for byte; fixed = committed stub.
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> old delayed 5
+--- guard stub (old) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+# The delayed variant writes the hook payload once fd 3 closes. Exit closes
+# stdin before fd 3, so a stub that skips the drain has closed it by then.
+trap 'exec 0<&- 3>&-' EXIT
+# Consume the hook payload before exiting, even when the parent writes late.
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 2
+SH
+run 1 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+    throw er; // Unhandled 'error' event
+Error: write EPIPE
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/.opencode/plugins/fm-primary-turnend-guard.js:25:17
+  code: 'EPIPE',
+  syscall: 'write'
+Node.js v26.11.1: expected exit 0, got 1
+run 2 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+run 3 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+run 4 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+run 5 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+stub=old mode=delayed iterations=5 pass=0 fail=5 load="10.80 9.11 8.07"
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> old-literal delayed 5
+--- guard stub (old-literal) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 2
+SH
+run 1 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+    throw er; // Unhandled 'error' event
+Error: write EPIPE
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/.opencode/plugins/fm-primary-turnend-guard.js:25:17
+  code: 'EPIPE',
+  syscall: 'write'
+Node.js v26.11.1: expected exit 0, got 1
+run 2 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+run 3 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+run 4 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+run 5 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): node:events:505
+stub=old-literal mode=delayed iterations=5 pass=0 fail=5 load="10.73 9.15 8.10"
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> fixed delayed 30
+--- guard stub (fixed) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+# The delayed variant writes the hook payload once fd 3 closes. Exit closes
+# stdin before fd 3, so a stub that skips the drain has closed it by then.
+trap 'exec 0<&- 3>&-' EXIT
+# Consume the hook payload before exiting, even when the parent writes late.
+exec 3>&-
+cat > /dev/null
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 2
+SH
+run 1 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 2 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 3 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 4 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 5 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 6 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 7 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 8 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 9 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 10 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 11 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 12 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 13 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 14 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 15 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 16 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 17 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 18 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 19 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 20 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 21 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 22 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 23 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 24 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 25 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 26 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 27 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 28 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 29 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+run 30 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (delayed hook write)
+stub=fixed mode=delayed iterations=30 pass=30 fail=0 load="9.06 8.92 8.05"
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> fixed immediate 30
+--- guard stub (fixed) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+# The delayed variant writes the hook payload once fd 3 closes. Exit closes
+# stdin before fd 3, so a stub that skips the drain has closed it by then.
+trap 'exec 0<&- 3>&-' EXIT
+# Consume the hook payload before exiting, even when the parent writes late.
+exec 3>&-
+cat > /dev/null
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 2
+SH
+run 1 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 2 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 3 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 4 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 5 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 6 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 7 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 8 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 9 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 10 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 11 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 12 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 13 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 14 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 15 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 16 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 17 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 18 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 19 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 20 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 21 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 22 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 23 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 24 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 25 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 26 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 27 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 28 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 29 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+run 30 rc=0 ok - OpenCode healthy arm output does not suppress the turn-end guard (immediate hook write)
+stub=fixed mode=immediate iterations=30 pass=30 fail=0 load="8.83 8.81 8.05"
+
+=== Re-run of the old stubs with the error signature printed on every run, plus the adversarial exit-0 guard ===
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> old delayed 5
+--- guard stub (old) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+# The delayed variant writes the hook payload once fd 3 closes. Exit closes
+# stdin before fd 3, so a stub that skips the drain has closed it by then.
+trap 'exec 0<&- 3>&-' EXIT
+# Consume the hook payload before exiting, even when the parent writes late.
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 2
+SH
+run 1 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+    throw er; // Unhandled 'error' event
+Error: write EPIPE
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/.opencode/plugins/fm-primary-turnend-guard.js:25:17
+  code: 'EPIPE',
+  syscall: 'write'
+Node.js v26.11.1: expected exit 0, got 1
+run 2 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+run 3 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+run 4 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+run 5 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+stub=old mode=delayed iterations=5 pass=0 fail=5 load="7.53 8.50 7.96"
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> old-literal delayed 5
+--- guard stub (old-literal) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 2
+SH
+run 1 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+    throw er; // Unhandled 'error' event
+Error: write EPIPE
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5JGZZ93GKHWH700MNVBZ4ZP/.opencode/plugins/fm-primary-turnend-guard.js:25:17
+  code: 'EPIPE',
+  syscall: 'write'
+Node.js v26.11.1: expected exit 0, got 1
+run 2 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+run 3 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+run 4 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+run 5 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  Error: write EPIPE
+stub=old-literal mode=delayed iterations=5 pass=0 fail=5 load="7.25 8.43 7.94"
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> exit0 delayed 3
+--- guard stub (exit0) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+# The delayed variant writes the hook payload once fd 3 closes. Exit closes
+# stdin before fd 3, so a stub that skips the drain has closed it by then.
+trap 'exec 0<&- 3>&-' EXIT
+# Consume the hook payload before exiting, even when the parent writes late.
+exec 3>&-
+cat > /dev/null
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 0
+SH
+run 1 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  missing blind-turn prompt
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook write): missing blind-turn prompt: : expected exit 0, got 1
+run 2 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  missing blind-turn prompt
+run 3 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (delayed hook  missing blind-turn prompt
+stub=exit0 mode=delayed iterations=3 pass=0 fail=3 load="7.31 8.42 7.94"
+
+$ nice -n 20 /Users/charlesabrooker/fleet/fm-mini-home/bin/fm-proc-budget.sh -- /tmp/fm-sync-harness/loop.sh <worktree> exit0 immediate 3
+--- guard stub (exit0) ---
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+# The delayed variant writes the hook payload once fd 3 closes. Exit closes
+# stdin before fd 3, so a stub that skips the drain has closed it by then.
+trap 'exec 0<&- 3>&-' EXIT
+# Consume the hook payload before exiting, even when the parent writes late.
+exec 3>&-
+cat > /dev/null
+printf 'guard\n' >> "${FM_GUARD_LOG:?}"
+printf 'guard ran after external healthy watcher\n' >&2
+exit 0
+SH
+run 1 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (immediate hoo missing blind-turn prompt
+not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (immediate hook write): missing blind-turn prompt: : expected exit 0, got 1
+run 2 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (immediate hoo missing blind-turn prompt
+run 3 rc=1 not ok - OpenCode watch plugin must not treat external healthy output as an owned arm (immediate hoo missing blind-turn prompt
+stub=exit0 mode=immediate iterations=3 pass=0 fail=3 load="7.28 8.40 7.93"

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# one.sh <worktree> <fn-file> <mode>: run the extracted test function once in a fresh temp root.
+. "$1/tests/lib.sh"
+export NODE_NO_WARNINGS=1
+TMP_ROOT=$(cd -P "$(mktemp -d /tmp/fm-sync-harness/run.XXXXXX)" && pwd -P)
+. "$2"
+rc=0
+( test_opencode_healthy_arm_output_does_not_suppress_guard "$3" ) 2>&1 || rc=$?
+rm -rf "$TMP_ROOT"
+exit $rc
