@@ -1,0 +1,11 @@
+--- notifier calls from the executed daemon ---
+osascript argv: [-e] [on run argv] [-e] [display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"] [-e] [end run] [away-mode escalations WEDGED 1792783011s undelivered - see /Users/charlesabrooker/tmp/fm-lab.77Y0tk/state/.subsuper-inject-wedged] [firstmate: away-mode escalations WEDGED]
+herdr argv: [notification] [show] [firstmate: away-mode escalations WEDGED] [--body] [away-mode escalations WEDGED 1792783011s undelivered - see /Users/charlesabrooker/tmp/fm-lab.77Y0tk/state/.subsuper-inject-wedged] [--sound] [request]
+--- marker ---
+fm away-mode inject WEDGED: 1792783011s undelivered as of 2026-10-23T14:33:31-0500
+Last delivery failure: deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+The supervisor pane could not accept an escalation. Buffered items:
+--- daemon log (wedge lines) ---
+[2026-10-23T14:33:31-0500] ERROR: away-mode escalation undelivered 1792783011s; last delivery failure: deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane). Buffer + wake-queue preserved; alarm marker written.
+--- daemon stdout ---
+lab removed: yes

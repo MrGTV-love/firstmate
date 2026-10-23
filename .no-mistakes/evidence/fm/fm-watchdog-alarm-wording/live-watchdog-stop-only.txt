@@ -1,0 +1,12 @@
+=== S6: a live stale watcher is stopped, no resume command -> recovery failed (not no-op) ===
+watchdog: session-missing - recovery failed (attempt 1)
+exit=1
+--- notifier calls ---
+osascript argv: [-e] [on run argv] [-e] [display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"] [-e] [end run] [firstmate supervision is down (session-missing): 1 recovery check did not restore supervision; latest attempt: recovery failed - see /Users/charlesabrooker/tmp/fm-lab.RsW1D8/state/.watchdog.log] [firstmate supervision is down (session-missing)]
+--- log ---
+[2026-10-23T14:34:27-0500] verdict session-missing; recovery check attempt 1
+[2026-10-23T14:34:27-0500] stopping the stale watcher pid=63995 through fm-watch-arm.sh --stop
+watcher: none running
+[2026-10-23T14:34:27-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-23T14:34:30-0500] recovery attempt 1 failed; verdict now session-missing
+lab removed: yes

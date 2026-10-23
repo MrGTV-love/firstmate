@@ -1,0 +1,1 @@
+item1=summary text | item2=firstmate supervision is down (session-missing)

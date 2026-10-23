@@ -1,0 +1,23 @@
+ok - fresh state reads healthy and acts on nothing
+ok - a home with no work reads idle even with a stale beacon
+ok - a missing home reads idle and is not created
+ok - a bound rewake is healthy at 1000 seconds and stale at 3700 seconds
+ok - a stale watcher with a live session is resumed and recovers
+ok - a hung watcher is stopped through the arm's home-scoped --stop only
+ok - an arming ledger with a dead owner reads dead-arm-owner and recovers
+ok - an arming ledger with a live owner is not called a dead arm owner
+ok - a dead session lock is resumed through the configured command
+ok - an absent session lock reads session-missing
+ok - a failing recovery alarms after the threshold and then rate limits
+ok - an absent resume command is recorded without changing the unhealthy exit
+ok - no-op and real failed recoveries are distinct without changing alarm timing
+ok - a watcher stop that does not restore health is a real failed recovery
+ok - an empty resume command is a no-op that keeps the alarm schedule
+ok - watchdog alarm has its own title while away-mode keeps its original title
+ok - a healthy verdict after failures clears the episode
+ok - reused and unbound watchdog pids are reclaimed for both lock layouts
+ok - a reused elected reaper pid cannot block watchdog recovery
+ok - a live identity-bound watchdog excludes contenders and releases normally
+ok - install renders the plist for the home and bootstraps it
+ok - installer resolves relative roots before rendering and identity generation
+ok - uninstall boots the agent out and deletes its plist

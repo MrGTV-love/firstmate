@@ -1,0 +1,72 @@
+=== S1: no-op attempts (no watcher, no config/watchdog-resume) ===
+$ FM_HOME=$LAB bin/fm-watchdog-check.sh   (attempt 1, no-op)
+watchdog: session-missing - no-op (attempt 1) - no live watcher to stop and no config/watchdog-resume
+exit=1
+episode: attempts=1 last_attempt=1792784034 last_alarm=0
+notifications so far: 0
+
+$ FM_HOME=$LAB bin/fm-watchdog-check.sh   (attempt 2, no-op -> alarm)
+watchdog: session-missing - no-op (attempt 2) - no live watcher to stop and no config/watchdog-resume
+exit=1
+episode: attempts=2 last_attempt=1792784039 last_alarm=1792784039
+notifications so far: 3
+
+--- notifier calls ---
+osascript argv: [-e] [on run argv] [-e] [display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"] [-e] [end run] [firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and no config/watchdog-resume - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log] [firstmate supervision is down (session-missing)]
+herdr argv: [notification] [show] [firstmate supervision is down (session-missing)] [--body] [firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and no config/watchdog-resume - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log] [--sound] [request]
+command channel $1: firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and no config/watchdog-resume - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log
+
+=== S2: retry interval still holds (immediate rerun) ===
+watchdog: session-missing - waiting out the retry interval
+exit=0
+
+=== S3: resume command that runs but does not heal -> recovery failed ===
+$ FM_HOME=$LAB bin/fm-watchdog-check.sh   (attempt 3, resume ran; alarm rate-limited by 3600s interval)
+watchdog: session-missing - recovery failed (attempt 3)
+exit=1
+episode: attempts=3 last_attempt=1792784044 last_alarm=1792784039
+notifications so far: 0
+
+--- notifier calls (expect none: rate limit) ---
+
+--- rerun with FM_WATCHDOG_ALARM_INTERVAL_SECS=1 to see the failed-recovery alarm ---
+watchdog: session-missing - recovery failed (attempt 4)
+exit=1
+--- notifier calls ---
+osascript argv: [-e] [on run argv] [-e] [display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"] [-e] [end run] [firstmate supervision is down (session-missing): 4 recovery checks did not restore supervision; latest attempt: recovery failed - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log] [firstmate supervision is down (session-missing)]
+herdr argv: [notification] [show] [firstmate supervision is down (session-missing)] [--body] [firstmate supervision is down (session-missing): 4 recovery checks did not restore supervision; latest attempt: recovery failed - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log] [--sound] [request]
+command channel $1: firstmate supervision is down (session-missing): 4 recovery checks did not restore supervision; latest attempt: recovery failed - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log
+
+=== S4: comment-only config/watchdog-resume is a no-op ===
+watchdog: session-missing - no-op (attempt 5) - no live watcher to stop and config/watchdog-resume holds no command
+exit=1
+--- notifier calls ---
+osascript argv: [-e] [on run argv] [-e] [display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"] [-e] [end run] [firstmate supervision is down (session-missing): 5 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and config/watchdog-resume holds no command - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log] [firstmate supervision is down (session-missing)]
+herdr argv: [notification] [show] [firstmate supervision is down (session-missing)] [--body] [firstmate supervision is down (session-missing): 5 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and config/watchdog-resume holds no command - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log] [--sound] [request]
+command channel $1: firstmate supervision is down (session-missing): 5 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and config/watchdog-resume holds no command - see /Users/charlesabrooker/tmp/fm-lab.HAtKoV/state/.watchdog.log
+
+=== S5: work finishes (no task left) -> idle clears the episode ===
+$ FM_HOME=$LAB bin/fm-watchdog-check.sh   (idle)
+watchdog: idle
+exit=0
+episode: <none>
+notifications so far: 3
+
+=== watchdog log ===
+[2026-10-23T14:33:54-0500] verdict session-missing; recovery check attempt 1
+[2026-10-23T14:33:54-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-23T14:33:56-0500] attempt 1 was a no-op; verdict now session-missing
+[2026-10-23T14:33:59-0500] verdict session-missing; recovery check attempt 2
+[2026-10-23T14:33:59-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-23T14:34:01-0500] attempt 2 was a no-op; verdict now session-missing
+[2026-10-23T14:34:04-0500] verdict session-missing; recovery check attempt 3
+[2026-10-23T14:34:04-0500] running config/watchdog-resume for session-missing
+[2026-10-23T14:34:06-0500] recovery attempt 3 failed; verdict now session-missing
+[2026-10-23T14:34:08-0500] verdict session-missing; recovery check attempt 4
+[2026-10-23T14:34:08-0500] running config/watchdog-resume for session-missing
+[2026-10-23T14:34:10-0500] recovery attempt 4 failed; verdict now session-missing
+[2026-10-23T14:34:13-0500] verdict session-missing; recovery check attempt 5
+[2026-10-23T14:34:13-0500] config/watchdog-resume holds no command
+[2026-10-23T14:34:15-0500] attempt 5 was a no-op; verdict now session-missing
+[2026-10-23T14:34:16-0500] verdict idle; episode cleared
+lab removed: yes
