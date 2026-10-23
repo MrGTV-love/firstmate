@@ -2469,7 +2469,7 @@ test_idle_reap_retries_a_closed_task_whose_return_stalled() {
 # it could not, teardown refused at the project-lock gate before its pending
 # close was published, which is the wrong gate for every pool-slot task.
 test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd() {
-  local case_dir dangling lock
+  local case_dir dangling lock healthy
   case_dir=$(make_case project-lock-dangling-cwd)
   mkdir -p "$case_dir/primary-home/state"
   dangling="$case_dir/unresolvable-git-cwd"
@@ -2488,7 +2488,13 @@ test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd() {
     "$case_dir/primary-home/state/.treehouse-project-"*.lock) ;;
     *) fail "project-lock-cwd: unexpected shared project lock path $lock" ;;
   esac
-  pass "the shared project lock path comes from the recorded project, not the caller's working directory"
+  healthy=$( cd "$case_dir/project" && FM_HOME="$case_dir/primary-home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_treehouse_project_lock_path "$2"
+  ' _ "$ROOT" "$case_dir/project" ) || healthy=
+  [ "$lock" = "$healthy" ] \
+    || fail "project-lock-cwd: the shared project lock path depends on the caller working directory: dangling=$lock healthy=$healthy"
+  pass "the shared project lock path is the same from an unresolvable git directory and from the recorded project"
 }
 
 # An endpoint that refuses to close after the slot was reserved and the

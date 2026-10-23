@@ -1680,9 +1680,11 @@ fm_treehouse_project_lock_path() {  # <project-dir>
   # git hash-object reads only stdin but still resolves a repository from the
   # caller's CWD, so a caller inside a task copy whose git directory cannot be
   # resolved made this return 1 and teardown refused before its pending close
-  # was published. Anchor it at the recorded project, which is already proved
-  # to be a git work tree above.
-  hash=$(printf '%s' "$identity" | git -C "$project" hash-object --stdin 2>/dev/null) || return 1
+  # was published. The digest is deliberately taken outside a repository so
+  # neither the caller's CWD nor the project's object format can rename the
+  # shared lock: outside a repository git hashes in its default SHA-1 format,
+  # and / is used because it is not a git work tree.
+  hash=$(printf '%s' "$identity" | ( cd / && git hash-object --stdin ) 2>/dev/null) || return 1
   [ -d "$root/state" ] || return 1
   printf '%s/.treehouse-project-%s.lock\n' "$root/state" "$hash"
 }
