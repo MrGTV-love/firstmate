@@ -1,6 +1,6 @@
 ---
 name: validation-supervision
-description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, when a failed or aborted run or a passing Gerrit run needs branch custody returned (status offers `recover_custody` or `inspect_and_reconcile_manually`), and before deciding or answering any ask-user finding.
+description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, before retrying or reattaching after a wait timeout or output-review refusal, when a failed or aborted run or a passing Gerrit run needs branch custody returned (status offers `recover_custody` or `inspect_and_reconcile_manually`), and before deciding or answering any ask-user finding.
 user-invocable: false
 metadata:
   internal: true
@@ -62,3 +62,7 @@ Run every git command directly, never inside a script, alias, subshell, or other
    A merge commit in the range cannot be picked without a mainline: stop and report it rather than choose one.
 6. Prove `git merge-base --is-ancestor <S> HEAD` exits 0, `git range-diff <B>..refs/heads/archive/<task>-pipeline-<P8> <S>..HEAD` shows every commit as `=`, and `no-mistakes axi sync --check` offers `run_pipeline`.
    Then start exactly one fresh run with the original intent; its rebase step restores a newer main base.
+
+### Validate
+
+Load `validation-supervision` when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, and when a failed or aborted run or a passing Gerrit run needs branch custody returned.

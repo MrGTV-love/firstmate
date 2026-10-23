@@ -147,3 +147,13 @@ Report duplicate concrete profiles as a configuration error.
 Account for every candidate visibly before selecting or escalating, naming its catalog evidence, provider relation, applicable quota and authentication facts, remaining uncertainty, fit and reasoning class, `spendPriority`, and runway-versus-horizon result.
 A blocked credential report must name `harness`, `model`, authentication surface, and concrete failure evidence; never emit a bare `Grok unauthenticated` statement.
 Never conclude with an unexplained "best quota" label.
+
+## Extracted intake contract
+
+Paths and links in this extracted contract are relative to the repository root.
+
+Firstmate alone resolves a matched profile array: begin with `quota-axi`'s default TOON at that intake, using the skill's narrow TOON-then-`--json` fallback only for genuine ambiguity, evaluate every configured candidate against that current output, and choose with inspectable `spendPriority` as the one quota-perspective ranker after the skill's eligibility, reasoning-class, and runway-feasibility gates.
+Establish model support and provider family from that harness's own authoritative catalog, then apply the [account and scope matching rules in `quota-array-dispatch`](../../../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
+Missing model-level quota, a missing authentication source, unmeasurable headroom, or unmodeled authentication is disclosed uncertainty, never by itself a candidate exclusion or a credential or login escalation.
+Candidate eligibility follows [`quota-array-dispatch`](../../../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility); never infer a credential store, provider family, or quota mapping from a harness, model, or source name, and never launch another harness's CLI to judge a candidate.
+`quota-axi` owns how model or product windows relate to bounding account windows and remains data-only.
