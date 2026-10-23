@@ -290,11 +290,6 @@ watchdog_main() {
   log "verdict $first; recovery check attempt $((EP_ATTEMPTS + 1))"
   stop_stale_watcher
   run_resume "$first"
-  if [ "$RECOVERY_ACTION_RAN" -eq 0 ]; then
-    detail=" - no live watcher to stop and $RESUME_UNAVAILABLE"
-  elif [ -n "$RESUME_UNAVAILABLE" ]; then
-    detail=" - $RESUME_UNAVAILABLE; the session cannot be resumed from here"
-  fi
   EP_LAST_ATTEMPT=$now_epoch
   if wait_healthy; then
     log "recovered from $first"
@@ -308,6 +303,7 @@ watchdog_main() {
     log "recovery attempt $EP_ATTEMPTS failed; verdict now $WATCHDOG_VERDICT"
   else
     latest="no-op"
+    detail=" - no live watcher to stop and $RESUME_UNAVAILABLE"
     log "attempt $EP_ATTEMPTS was a no-op; verdict now $WATCHDOG_VERDICT"
   fi
   [ "$EP_ATTEMPTS" -eq 1 ] && checks=check

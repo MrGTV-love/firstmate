@@ -345,7 +345,7 @@ test_stop_only_attempt_is_a_failed_recovery() {
   run_check "$home" FM_WATCHDOG_NOW=1000 FM_WATCHDOG_ALARM_AFTER=1
   expect_code 1 "$CODE" "stop-only unhealthy exit"
   assert_equals --stop "$(cat "$dir/arm.calls")" "stop-only attempt ran a real action"
-  assert_contains "$(cat "$dir/alarm.calls")" '1 recovery check did not restore supervision; latest attempt: recovery failed - no config/watchdog-resume; the session cannot be resumed from here' "watcher-stop action counts even without resume"
+  assert_contains "$(cat "$dir/alarm.calls")" '1 recovery check did not restore supervision; latest attempt: recovery failed - see' "watcher-stop action counts even without resume"
   pass "a watcher stop that does not restore health is a real failed recovery"
 }
 
