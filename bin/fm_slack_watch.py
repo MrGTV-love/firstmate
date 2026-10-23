@@ -688,7 +688,7 @@ class Watch:
                 if len(tapped) > 1:
                     remedy = 'Remove all but one reaction.'
                 elif tapped:
-                    remedy = 'Remove the :%s: reaction, or type %d.' % (
+                    remedy = 'Remove the :%s: reaction and reply again, or type %d.' % (
                         taps[0]['name'], REACTIONS.index(taps[0]['name']) + 1)
                 else:
                     remedy = 'Please reply once.'

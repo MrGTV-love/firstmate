@@ -2960,7 +2960,7 @@ A typed reply and a reaction seen in the same poll are compared: agreement recor
 Two contradictory typed replies, or two different reactions, likewise record nothing and surface once.
 A conflicted thread stays blocked until a fresh typed reply arrives or the reaction set changes; every typed reply in the conflict is consumed and is never recorded later.
 Conflict notices and notifications show bounded previews of the first two candidate labels, name any additional candidates by count, and retain the remedy instead of truncating it behind the conflicting text.
-When a reaction is part of the conflict, both surfaces tell the captain to remove it or to type its option number, since a fresh reply alone cannot outvote a standing reaction.
+When a reaction is part of the conflict, both surfaces tell the captain to remove it and reply again, or to type its option number, since a fresh reply alone cannot outvote a standing reaction and removing the reaction alone records nothing.
 Notices (conflicts and unmatched replies) surface in the order they arose, and a poll emits only as many of their lines as fit the wake line with room left for a queue marker; a notice is posted to its thread, reported, and marked seen only when its line is emitted, along with the replies that caused it.
 The notices that do not fit stay pending unchanged for the next poll, and the emitted line ends with `; +N queued` while N wait, so one long reply cannot push other pending conditions out of the wake line.
 A reply or reaction on a thread whose call has closed, or whose task was held again under a newer hold, is never applied; the old thread is retired and a typed reply there is surfaced as unmatched.

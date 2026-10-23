@@ -104,14 +104,15 @@ Result: pass.
 
 ## DOD-08 - contradiction surfaces
 
-Commands: `fm-slack-poll.sh` with `contradiction` and `contradiction-typed`, each polled again, then answered with a fresh typed reply; `reaction-answer` with a second reaction added and then removed; and `reaction-skipped` polled twice.
+Commands: `fm-slack-poll.sh` with `contradiction` and `contradiction-typed`, each polled again, then answered with a fresh typed reply, and `contradiction` again with its reaction removed before the fresh reply; `reaction-answer` with a second reaction added and then removed; and `reaction-skipped` polled twice.
 
-Observed: one `check: slack 900.000001 - conflicting signals: Abort vs Wait. Remove the :two: reaction, or type 2.`, zero `closed:` lines, and the call still open.
+Observed: one `check: slack 900.000001 - conflicting signals: Abort vs Wait. Remove the :two: reaction and reply again, or type 2.`, zero `closed:` lines, and the call still open.
 (a) Two contradictory typed replies produced one check line; the next poll printed nothing and recorded nothing; a fresh typed `3` then recorded `abort`.
 (b) A typed reply plus a reaction produced one check line; the next poll printed nothing and posted nothing; a fresh typed `2` then recorded `wait`.
+In a second home, removing the `:two:` reaction alone printed nothing, posted nothing, and left the call open; a fresh typed `3` then recorded `abort` exactly once, and the next poll recorded nothing.
 (c) Two different reactions produced one check line and one notice; later polls stayed silent; removing one reaction changed the reaction set and recorded the remaining option.
 (d) A reaction the intake refused (`refused: typed-call`, call still open) was not submitted again by the next poll, and no second acknowledgement was posted.
-The conflict notice in the thread named the remedy: `Remove the :two: reaction, or type 2.` for a reaction against a typed reply, `Please reply once.` for two typed replies, and `Remove all but one reaction.` for two reactions.
+The conflict notice in the thread named the remedy: `Remove the :two: reaction and reply again, or type 2.` for a reaction against a typed reply, `Please reply once.` for two typed replies, and `Remove all but one reaction.` for two reactions.
 Two conflicting typed replies of 45,000 characters each produced one readable outbound notice under 1,200 characters and one notification no longer than 480 characters, both naming previews of both candidates and retaining `Please reply once.`.
 The notice was measured from the outbound log, not from the incoming full-length replies sharing the thread.
 No transport failure or answer was recorded.

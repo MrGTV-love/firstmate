@@ -212,7 +212,7 @@ assert_eq "$(closed_count "$out")" 0 "DOD-08 no answer"
 assert_contains "$out" 'Wait' "DOD-08 names option 2"
 assert_contains "$out" 'Abort' "DOD-08 names option 3"
 assert_open conflict-call 0 "DOD-08 call stays open"
-assert_contains "$(thread_texts 900.000001)" 'Remove the :two: reaction, or type 2.' "DOD-08 tap-versus-typed remedy"
+assert_contains "$(thread_texts 900.000001)" 'Remove the :two: reaction and reply again, or type 2.' "DOD-08 tap-versus-typed remedy"
 sent=$(outbound_count chat.postMessage 900.000001)
 out=$(poll contradiction)
 assert_eq "$(closed_count "$out")" 0 "DOD-08 (b) a later poll records neither signal"
@@ -223,6 +223,23 @@ reply_to 900.000001 900.000009 2
 out=$(poll contradiction)
 assert_eq "$(closed_count "$out")" 1 "DOD-08 (b) a fresh typed reply clears the block"
 assert_eq "$(answer_line conflict-call)" "wait" "DOD-08 (b) fresh reply recorded"
+new_home contradiction
+bind
+poll contradiction >/dev/null
+python3 "$HELPER" unreact "$(replay_file)" 900.000001 two U0TESTOWNER
+sent=$(outbound_count chat.postMessage 900.000001)
+out=$(poll contradiction)
+assert_eq "$(closed_count "$out")" 0 "DOD-08 (b) removing the reaction alone records nothing"
+assert_eq "$(check_count "$out")" 0 "DOD-08 (b) removing the reaction alone is quiet"
+assert_eq "$(outbound_count chat.postMessage 900.000001)" "$sent" "DOD-08 (b) removing the reaction alone posts nothing"
+assert_open conflict-call 0 "DOD-08 (b) call open after the reaction is removed"
+reply_to 900.000001 900.000009 3
+out=$(poll contradiction)
+assert_eq "$(closed_count "$out")" 1 "DOD-08 (b) a reply after removing the reaction answers"
+assert_eq "$(answer_line conflict-call)" "abort" "DOD-08 (b) reply after removal recorded"
+assert_eq "$(resolution_count conflict-call)" 1 "DOD-08 (b) reply after removal recorded once"
+out=$(poll contradiction)
+assert_eq "$(closed_count "$out")" 0 "DOD-08 (b) reply after removal is not recorded again"
 new_home contradiction-typed
 bind
 out=$(poll contradiction-typed)
