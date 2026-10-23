@@ -1712,11 +1712,18 @@ spawn_remote_secondmate() {
   # An alive endpoint is deliberately reused. Its profile can differ from the
   # requested one, so record and report what actually runs, not the request.
   harness=$remote_harness
+  # Only a confirmed fresh spawn proves the requested profile was applied.
+  # Reuse has no incarnation proof for a cached profile, so absent fields are
+  # unknown rather than inherited from either the request or the old record.
   if grep -q '^model=' <<<"$out"; then
     model=$(printf '%s\n' "$out" | sed -n 's/^model=//p' | tail -1)
+  elif [ "$remote_outcome" != spawned ]; then
+    model=
   fi
   if grep -q '^effort=' <<<"$out"; then
     effort=$(printf '%s\n' "$out" | sed -n 's/^effort=//p' | tail -1)
+  elif [ "$remote_outcome" != spawned ]; then
+    effort=
   fi
   # Record what the remote endpoint ACTUALLY carries, read back from its own
   # launch, rather than what this side hoped to deliver. That keeps the #995

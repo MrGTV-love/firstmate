@@ -416,17 +416,39 @@ assert_grep 'harness=omp' "$PARENT/state/ios2.meta" "an unrecognized disposition
 assert_grep 'remote_target=fm-remote:w3:p2' "$PARENT/state/ios2.meta" "an unrecognized disposition must preserve the reported route"
 pass "unknown launch disposition: the confirmed route is kept and reported as unconfirmed"
 
-# A host older than the profile report sends no model or effort key. The parent
-# keeps the requested values rather than recording them blank.
-sed '/^model=/d; /^effort=/d' "$ROOT/tests/fixtures/gtt-cb-r2-route.reply" > "$TMP_ROOT/route-reply-no-profile.txt"
-NO_PROFILE_OUT=$(FM_TEST_ROUTE_REPLY="$TMP_ROOT/route-reply-no-profile.txt" \
-  remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness omp \
-  --model openai-codex/gpt-6.1-sol --effort medium 2>&1); NO_PROFILE_RC=$?
-expect_code 0 "$NO_PROFILE_RC" "a route without model or effort keys was rejected"$'\n'"$NO_PROFILE_OUT"
-assert_contains "$NO_PROFILE_OUT" 'running ios2 harness=omp' "a route without a launch disposition must be reported as running"
-assert_grep 'model=openai-codex/gpt-6.1-sol' "$PARENT/state/ios2.meta" "an unreported model must keep the requested value"
-assert_grep 'effort=medium' "$PARENT/state/ios2.meta" "an unreported effort must keep the requested value"
-pass "older host profile: an unreported model or effort keeps the requested value"
+# Missing profile fields on reused or unconfirmed endpoints are not evidence
+# that the requested profile is running, even when an earlier route had values.
+for disposition in '' already-running; do
+  sed '/^model=/d; /^effort=/d' "$(route_reply omp "$disposition")" > "$TMP_ROOT/route-reply-no-profile.txt"
+  NO_PROFILE_OUT=$(FM_TEST_ROUTE_REPLY="$TMP_ROOT/route-reply-no-profile.txt" \
+    remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex \
+    --model gpt-6.1-sol --effort medium 2>&1); NO_PROFILE_RC=$?
+  expect_code 0 "$NO_PROFILE_RC" "a reused route without profile keys was rejected"$'\n'"$NO_PROFILE_OUT"
+  assert_grep 'harness=omp' "$PARENT/state/ios2.meta" "reuse must still record the confirmed actual harness"
+  [ -z "$(sed -n 's/^model=//p' "$PARENT/state/ios2.meta")" ] || fail "cross-harness reuse fabricated an unreported model from the request"
+  [ -z "$(sed -n 's/^effort=//p' "$PARENT/state/ios2.meta")" ] || fail "cross-harness reuse fabricated an unreported effort from the request"
+done
+pass "older host reuse: cross-harness missing profile fields remain unknown"
+
+# Only a confirmed fresh launch of the requested harness justifies fallback.
+sed '/^model=/d; /^effort=/d' "$(route_reply codex spawned)" > "$TMP_ROOT/route-reply-no-profile.txt"
+FRESH_PROFILE_OUT=$(FM_TEST_ROUTE_REPLY="$TMP_ROOT/route-reply-no-profile.txt" \
+  remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex \
+  --model gpt-6.1-sol --effort medium 2>&1); FRESH_PROFILE_RC=$?
+expect_code 0 "$FRESH_PROFILE_RC" "a fresh route without profile keys was rejected"$'\n'"$FRESH_PROFILE_OUT"
+[ "$(sed -n 's/^model=//p' "$PARENT/state/ios2.meta")" = gpt-6.1-sol ] || fail "a confirmed fresh launch lost its requested model"
+[ "$(sed -n 's/^effort=//p' "$PARENT/state/ios2.meta")" = medium ] || fail "a confirmed fresh launch lost its requested effort"
+pass "older host fresh launch: absent profile fields retain the confirmed request"
+
+# An explicitly empty host field is authoritative, not an absent-field fallback.
+sed 's/^model=.*/model=/; s/^effort=.*/effort=/' "$(route_reply codex spawned)" > "$TMP_ROOT/route-reply-empty-profile.txt"
+EMPTY_PROFILE_OUT=$(FM_TEST_ROUTE_REPLY="$TMP_ROOT/route-reply-empty-profile.txt" \
+  remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex \
+  --model gpt-6.1-sol --effort medium 2>&1); EMPTY_PROFILE_RC=$?
+expect_code 0 "$EMPTY_PROFILE_RC" "a fresh route with empty profile fields was rejected"$'\n'"$EMPTY_PROFILE_OUT"
+[ -z "$(sed -n 's/^model=//p' "$PARENT/state/ios2.meta")" ] || fail "an explicit empty model was replaced by the request"
+[ -z "$(sed -n 's/^effort=//p' "$PARENT/state/ios2.meta")" ] || fail "an explicit empty effort was replaced by the request"
+pass "host profile: explicit empty fields remain empty"
 
 # The opt-in fleet ledger records a dispatch only for a new launch. A reused
 # agent is not one, so it must not reset that task's ledger history.
