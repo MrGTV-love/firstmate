@@ -621,6 +621,10 @@
       "audience": "maintainer-verification"
     },
     {
+      "path": "docs/verification/slack-watch.md",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": "docs/verification/stow-memory.md",
       "audience": "maintainer-verification"
     },

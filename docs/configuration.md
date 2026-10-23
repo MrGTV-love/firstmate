@@ -2923,6 +2923,85 @@ A fail-closed poll that already queued a wake, and a timeout, always print so th
 `FM_MAIL_CHECK_BUDGET` (default 15, valid 5..25) bounds one standing poll and is cut down to fit `FM_CHECK_TIMEOUT`.
 `bin/fm-mail-check.sh disarm` removes the standing check.
 
+## Slack decision plane (.env)
+
+The Slack plane mirrors this home's open captain-held tasks into one owner DM, one thread per hold occurrence, and returns answers through the existing keyed-answer intake.
+It does not create decisions, reconcile them, or change merge authority.
+The terminal, board, inbox, and existing decision records remain authoritative and unchanged.
+There is no inbound listener, Socket Mode connection, or separate schedule.
+This section owns its configuration schema; command mechanics are in `bin/fm-slack-check.sh --help` and the Slack script headers.
+
+Set these values in the home's gitignored `.env`; explicitly supplied environment values win, including an empty value that disables the plane.
+
+```sh
+SLACK_BOT_TOKEN=          # required for the plane; absent means off, never copied into state or diagnostics
+FM_SLACK_DM_USER=         # required; immutable owner member id, U... or W...
+FM_SLACK_ALLOWED_AUTHORS= # required and non-empty; comma/whitespace-separated immutable member ids
+FM_SLACK_POLL_MAX_ANSWERS=20 # optional whole number, 1..200; default 20
+```
+
+A missing token or an empty allowlist means the plane is off: a silent no-op, before network calls, state creation, task reads, or notifications.
+The one exception is an explicit `fm-slack-check.sh arm`: it writes `slack: refused: unconfigured` to stderr, prints nothing to stdout, exits non-zero, and registers nothing, so an arm that did nothing never looks like success.
+An unparseable allowlist, an invalid `FM_SLACK_DM_USER`, or an out-of-range `FM_SLACK_POLL_MAX_ANSWERS` refuses everything.
+Run by hand (`fm-slack-poll.sh`, `fm-slack-mirror.sh`, which print the reason to stdout) or through `fm-slack-check.sh arm` (which writes every refusal or failure to stderr each time it runs, even one already recorded in state, prints only `armed:` to stdout, and exits non-zero on failure), a refusal names its reason; the armed standing check stays silent on the same refusal, so a typo in `.env` never wakes firstmate every cycle.
+Every allowlist token must match `[UW][A-Z0-9]{8,}`; names, email addresses, partially valid lists, and handles are refused rather than interpreted as authority.
+Typed messages carrying a bot marker (`bot_id`, `app_id`, or `bot_profile`) are refused even when their user id is allowlisted; a Slack message subtype alone, such as `thread_broadcast` for a thread reply also sent to the main window, does not refuse an allowlisted owner's reply.
+Reaction authors also require a read-only user lookup proving they are not a bot or app user.
+`FM_SLACK_FAULT` is a test-only crash-injection value (`after-delivery` or `after-answer`) read from the process environment only, never from `.env`; unset means normal operation.
+
+Before activation, grant `chat:write`, `im:write` (opening the owner DM), and `im:history` (reading the DM and its threads).
+Reaction answering additionally requires `reactions:read` and `users:read`; `reactions:write` is optional and lets the mirror seed numbered reactions on the card.
+Without reaction/identity-read scopes the card explicitly offers numbered typed answers instead of advertising unavailable taps.
+Inspect granted scopes with read-only `auth.test` before deployment rather than assuming an installed token has them.
+
+To opt in, first run `bin/fm-captain-hold.sh bind slack-dm`, then `bin/fm-slack-check.sh arm` in the intended home.
+Arming refuses an unbound source, establishes the DM and proves it readable, then writes and registers `state/slack.check.sh` on the watcher's existing slow-check cadence.
+`bin/fm-slack-check.sh disarm` removes the check and its trust binding immediately, whatever the token or allowlist say, and exits non-zero when the removal is refused; `bin/fm-captain-hold.sh unbind slack-dm` stops the standing check and any manual poll from feeding answers.
+The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters.
+Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed`; remove `state/slack-watch/` to start a fresh DM.
+Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
+No Slack request runs when there are neither open calls nor tracked threads needing resolution.
+
+Each card includes only decision-card fields: the task id and title, the current board's about/question text or the hold reason, options, recommendation, and evidence pointer; arbitrary task-body prose is never posted.
+Every card tells the captain to reply inside the card's thread and says that a message typed in the main DM window is not read, because only a thread reply maps to one decision.
+A card that fits in 38,000 characters is posted whole; only an oversized card is budgeted, keeping short values whole and splitting the remaining space among the long ones, so every field heading, the option block, the affordance, and the tap-versus-type disagreement rule survive; the full decision remains in the local backlog.
+Any other post longer than 39,000 characters is cut to 38,000 characters and ends with `Full text remains in the local backlog.`, below Slack's 40,000-character message limit.
+Every value posted to Slack (card fields, option text, task ids, and conflict candidates) has `&`, `<`, and `>` escaped as `&amp;`, `&lt;`, and `&gt;`, so a placeholder such as `<source-id>` shows as written instead of being read as Slack markup; the card budget and the post cut count the escaped length and never split an escape, and the wake line keeps the plain text.
+The mirror reads explicit `Option N:`, `Recommendation:`, and `Evidence:` fields from the task body, but does not post other body lines or infer options from arbitrary prose.
+An option written without a `(value)` records its label, never its hint, as the keyed answer.
+A board card (options, recommendation, evidence, close mode) is used only when the board was regenerated after the hold's recorded set time.
+When a board card exists but that cannot be proven, the thread carries the question and reason as text only, with no numbered options and no seed reactions, and a reply is recorded verbatim.
+A typed reply and a reaction seen in the same poll are compared: agreement records one answer, disagreement surfaces to the captain once and records neither.
+Two contradictory typed replies, or two different reactions, likewise record nothing and surface once.
+A conflicted thread stays blocked until a fresh typed reply arrives or the reaction set changes; every typed reply in the conflict is consumed and is never recorded later.
+Conflict notices and notifications show bounded previews of the first two candidate labels, name any additional candidates by count, and retain the remedy instead of truncating it behind the conflicting text.
+When a reaction is part of the conflict, both surfaces tell the captain to remove it and reply again, or to type its option number, since a fresh reply alone cannot outvote a standing reaction and removing the reaction alone records nothing.
+Notices (conflicts and unmatched replies) surface in the order they arose, and a poll emits only as many of their lines as fit the wake line with room left for a queue marker; a notice is posted to its thread, reported, and marked seen only when its line is emitted, along with the replies that caused it.
+The notices that do not fit stay pending unchanged for the next poll, and the emitted line ends with `; +N queued` while N wait, so one long reply cannot push other pending conditions out of the wake line.
+A reply or reaction on a thread whose call has closed, or whose task was held again under a newer hold, is never applied; the old thread is retired and a typed reply there is surfaced as unmatched.
+A poll retires a closed or replaced thread only after it has read that thread's replies; a thread the poll did not reach because the per-poll answer cap ran out stays tracked, so its late reply is read and surfaced as unmatched by the next poll before the thread is retired.
+When the call's state cannot be read, the poll leaves the reply unread and tries again next time; a thread mirrored while the state was unreadable is treated as replaced as soon as the call reads as open under a verified hold, so it never answers one.
+Each tap is attributed to the member who made it, and a staged answer is dropped if that member has left the allowlist before delivery.
+Typing an option number, or tapping its reaction, records the option's value as the keyed answer and its label as the label, the same record the board leaves; all other typed words are passed through within the intake's existing field constraints, after Slack's own message escaping is undone (`&amp;`, `&lt;`, `&gt;` become `&`, `<`, `>`, and a link Slack wrapped as `<url>` or `<url|text>` becomes the url or the text), so the record holds what the owner typed.
+The reserved `reconcile` value never answers a call.
+A long or multiline reply is flattened to one line for the intake, which keeps its existing truncation; the full text stays in the Slack thread, and the only copy kept in this home is the journal row that stages it, which is removed when its publication completes.
+An authorized reply that the intake refuses is acknowledged in its thread and surfaced for firstmate rather than silently dropped; a reply the intake fails to process at all is neither acknowledged nor consumed, stays staged, and is retried on the next poll, with one wake line per failure episode that carries the intake's own error text.
+Anything the intake writes to its error stream, such as a parent-channel delivery problem after a successful close, is passed on in the wake line.
+A repeat sighting of an already-recorded reply produces no extra line: the intake's replay detection keeps one record, and the poll reports only what it did.
+A closed tracked call receives one resolution notice naming the task and pointing to its local resolution record, without copying the task body, and is retired; it is not re-posted unless that task starts a genuinely new hold occurrence.
+
+`state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, and the last reported failure class.
+It is transport state, not a second decision store; `fm-captain-hold.sh answers` still owns record creation and answer replay detection.
+Recovery repeats an unfinished intake row through that same intake before committing its cursor; the intake accepts an exact replay of a row it already applied, in both close modes, so the acknowledgement says the answer was recorded.
+The test-only `after-delivery` fault fires after the intake has applied the row and before that is journaled; `after-answer` fires after it is journaled and before the acknowledgement.
+A crash after notification publication may duplicate a notification but cannot discard the staged answer.
+Ordinary Slack outages, revoked tokens, and rate limits are reported once per failure episode; the other answer surfaces keep working.
+A missing reaction scope is reported once per change in the missing set, not on every poll.
+The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
+
+`tests/fm-slack-watch.test.sh` drives checked-in replay transcripts and the real keyed-answer intake without live Slack traffic; `tests/fm-slack-intake-unchanged.test.sh` pins the intake refusals Slack must never reach, and `tests/fm-slack-secret-scan.test.sh` runs the plane with a known token and scans for it.
+Re-notification, a periodic digest, quiet hours, and old-thread cleanup are intentionally not part of this first step.
+
 ## Relay (.env)
 
 Relay lets a firstmate instance answer public mentions and act on normal reversible mention requests through firstmate's normal lifecycle.
@@ -3912,6 +3991,10 @@ FM_IMAP_HOST=      # mail-plane IMAP server hostname
 FM_IMAP_PORT=993   # mail-plane IMAP server port
 FM_SMTP_HOST=      # mail-plane SMTP server hostname
 FM_SMTP_PORT=465   # mail-plane SMTP server port
+SLACK_BOT_TOKEN=   # Slack decision-plane bot token; absent means the plane is off (docs/configuration.md "Slack decision plane")
+FM_SLACK_DM_USER=  # required immutable owner member id for the Slack DM target
+FM_SLACK_ALLOWED_AUTHORS=   # required non-empty immutable member ids allowed to answer
+FM_SLACK_POLL_MAX_ANSWERS=20   # optional per-poll answer cap, 1..200; default 20
 FMX_PAIRING_TOKEN=      # Relay pairing token; .env opt-in authorizes replies and eligible lifecycle actions
 FMX_RELAY_URL=https://myfirstmate.io   # optional Relay endpoint override, mainly for local relay development
 FMX_ENV_FILE=           # optional alternate .env file for direct Relay client invocations; bootstrap still checks $FM_HOME/.env
