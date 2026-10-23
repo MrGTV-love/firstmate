@@ -327,8 +327,8 @@ SH
 # `git -C`, so fixture setup would commit, move refs, and register worktrees in
 # the caller's repository; GIT_INDEX_FILE and GIT_COMMON_DIR redirect the index
 # and refs the same way, and GIT_WORK_TREE breaks the setup outright. Each entry
-# point runs fm-teardown.test.sh's Git setup with each variable aimed in turn at
-# a disposable ambient clone, which must come through unchanged.
+# point runs the teardown suites' make_case Git setup with each variable aimed in
+# turn at a disposable ambient clone, which must come through unchanged.
 test_inherited_git_location_isolation() (
   local dir="$TMP_ROOT/git-location" before after var value helper rc
   mkdir -p "$dir/runner/bin" "$dir/runner/tests"

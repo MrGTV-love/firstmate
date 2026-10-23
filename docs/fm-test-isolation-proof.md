@@ -159,6 +159,7 @@ That is close to the family's ceiling rather than a scheduling loss: its longest
 The family's clock is two long scripts that do not contend: `fm-pr-check-security` (198.5s) and `fm-teardown` (194.1s) each own a worker for nearly the whole run, and `fm-pr-merge` (118.5s) plus `fm-x-mode` (79.4s) fill the other two.
 `bin/fm-test-isolation-proof.sh`'s own `--list-exclusions` keeps `fm-pr-check-security` and `fm-teardown` out of the mixed PORTABLE pool, where they would share a machine with unrelated lock and forge stress.
 Admitting them inside their own family is a different question and this proof answers it: the six members present on that date are safe with each other at four workers.
+The teardown file named above has since split into `fm-teardown`, `fm-teardown-pool`, and `fm-teardown-cleanup` ([portable shards](fm-test-portable-shards.md#teardown-groups)); this proof measured the combined script, and the 2026-10-22 proof below covers the three group files running concurrently with the family.
 
 `tests/fm-pr-state.test.sh` and `tests/fm-pr-reviewers.test.sh` joined this family after the date above, so that result does not cover them.
 `script_allows_concurrency` in `bin/fm-test-run.sh` grants concurrency by family membership alone, so the family was re-proved at its then-current eight-member membership.
@@ -178,6 +179,15 @@ That its duration landed within 3% of the two clean runs is evidence the elevate
 
 These durations are not comparable with the six-member run above: that measurement was taken on a different machine state, and the gap is far larger than two short scripts can account for, so it is not evidence about the two new members.
 For the same reason the 1.72x four-worker figure recorded above is left as a statement about that measurement rather than restated as current.
+
+The teardown split added `fm-teardown-pool` and `fm-teardown-cleanup` to the family beside `fm-teardown`, so the family was re-proved at its then-current membership.
+
+- Date: 2026-10-22
+- Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4`, in an Ubuntu 26.04 container
+- Result: one run, 13 candidates, 0 failures, summary `duration_ms=499534`, artifact `fm_test_run_jobs_enabled=true`.
+
+The three teardown groups ran in that proof at 426064 ms for `fm-teardown-cleanup`, 229022 ms for `fm-teardown-pool`, and 150181 ms for `fm-teardown`.
+Each worker got a private mode-0700 temporary root with ambient `FM_HOME` and `FM_*_OVERRIDE` cleared.
 
 ### secondmate: admitted
 

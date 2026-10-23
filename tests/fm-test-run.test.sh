@@ -474,6 +474,91 @@ test_captain_hold_groups_share_helper_changed_selection() {
   pass "every captain-hold group is independently selectable and the shared helper selects all of them"
 }
 
+# The three teardown groups partition one former suite. This is the checked
+# inventory the split is judged against: the union of the group lists must be the
+# same 333 cases, each registered by the one file that defines it, with no case
+# twice. A dropped or duplicated case is exactly what a partition loses while
+# every remaining assertion still passes.
+test_teardown_groups_register_each_case_once() {
+  local group file registered defined union total dup diff
+  local -a groups=(fm-teardown fm-teardown-pool fm-teardown-cleanup)
+  union=''
+  for group in "${groups[@]}"; do
+    file="$ROOT/tests/$group.test.sh"
+    [ -f "$file" ] || fail "missing teardown group file: tests/$group.test.sh"
+    registered=$(sed -n '/^teardown_test_cases=(/,/^)/p' "$file" | grep '^test_' | LC_ALL=C sort)
+    [ -n "$registered" ] || fail "tests/$group.test.sh registers no cases"
+    defined=$(grep -oE '^test_[A-Za-z0-9_]+\(\)' "$file" | sed 's/()$//' | LC_ALL=C sort)
+    diff=$(comm -3 <(printf '%s\n' "$registered") <(printf '%s\n' "$defined") | tr -d '\t' | tr '\n' ' ')
+    [ -z "$diff" ] \
+      || fail "tests/$group.test.sh must register exactly the cases it defines; mismatch: $diff"
+    union=$(printf '%s\n%s\n' "$union" "$registered")
+  done
+  union=$(printf '%s\n' "$union" | grep '^test_' | LC_ALL=C sort)
+  dup=$(printf '%s\n' "$union" | uniq -d)
+  [ -z "$dup" ] || fail "a teardown case is registered in more than one group: $dup"
+  total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
+  [ "$total" = 333 ] \
+    || fail "the teardown groups register $total cases, not the 333-case inventory they partition"
+  pass "the teardown groups are a duplicate-free 333-case cover, each case registered by the file that defines it"
+}
+
+# Each group must stay independently runnable and keep its lane coverage: the
+# shared helper change selects all three, and the pr-forge family still owns the
+# landing and cleanup paths the former single file carried.
+test_teardown_groups_share_helper_and_stay_selectable() {
+  local tmp repo listed listed_alone family script group helper lock_helper
+  local -a groups=(fm-teardown fm-teardown-pool fm-teardown-cleanup)
+  helper=fm-teardown-helpers
+  helper=$helper.sh
+  lock_helper=git-lock-helpers
+  lock_helper=$lock_helper.sh
+  family=$("$RUNNER" --list --family pr-forge)
+  for group in "${groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$family" "tests/$script" "the pr-forge family must keep $script"
+    listed_alone=$("$RUNNER" --list "tests/$script")
+    [ "$listed_alone" = "tests/$script" ] || fail "$script must be independently selectable: $listed_alone"
+  done
+  tmp=$(fm_test_tmproot fm-test-run-teardown-selection)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for group in "${groups[@]}"; do
+    printf '#!/usr/bin/env bash\n# %s\n' "$helper" >"$repo/tests/$group.test.sh"
+    chmod +x "$repo/tests/$group.test.sh"
+  done
+  printf '# helpers\n# %s\n' "$lock_helper" >"$repo/tests/$helper"
+  printf '# lock helpers\n' >"$repo/tests/$lock_helper"
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm teardown-selection-fixture
+  printf '\n' >>"$repo/tests/$helper"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "the teardown helper change failed selection"
+  for group in "${groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$listed" "tests/$script" "the shared teardown helper change must select $script"
+  done
+  # The reference scan selects the consumer's whole family, and every teardown
+  # group is in pr-forge. So the helper change must land exactly on that family
+  # in this fixture - nothing outside it, nothing missing from it.
+  expected=$(cd "$repo" && bin/fm-test-run.sh --list --family pr-forge | LC_ALL=C sort)
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "the teardown helper change must select exactly the pr-forge family; got: $(printf '%s\n' "$listed" | tr '\n' ' ')"
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm teardown-helper-change
+  printf '\n' >>"$repo/tests/$lock_helper"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "the git lock helper change failed selection"
+  for group in "${groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$listed" "tests/$script" "the git lock helper change must select $script through the teardown helper"
+  done
+  [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
+    || fail "the git lock helper change must select exactly the pr-forge family; got: $(printf '%s\n' "$listed" | tr '\n' ' ')"
+  rm -rf "$tmp"
+  pass "every teardown group stays independently selectable, the shared and git lock helpers select its pr-forge family, and pr-forge keeps them"
+}
+
 test_changed_task_copy_lib_selects_retained_and_secondmate() {
   local tmp repo listed path family expected
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-allocation.XXXXXX")
@@ -3070,6 +3155,8 @@ test_changed_dependency_selection_and_unmapped_failure
 test_changed_wake_classifier_selects_both_consumers
 test_supervision_groups_share_coverage_and_changed_selection
 test_captain_hold_groups_share_helper_changed_selection
+test_teardown_groups_register_each_case_once
+test_teardown_groups_share_helper_and_stay_selectable
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
 test_changed_spawn_selects_picker_without_broadening_siblings

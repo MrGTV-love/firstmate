@@ -167,7 +167,7 @@ A complete line that fails the schema is diagnosed the same way, as invalid hist
 Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
 An omitted event remains missing evidence, not a guarded-operation failure.
 The optional friction writer is separate from Jev's existing mandatory audit: that audit's `AuditUnavailableError` behavior is unchanged.
-[`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
+[`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references
 

@@ -67,8 +67,8 @@
 # A failed container, network, or volume listing names itself and prints Docker's
 # own error.
 # A final container listing also rejects arrivals during network or volume cleanup.
-# Portable regression coverage: tests/fm-teardown.test.sh; real Docker CLI guard:
-# tests/fm-task-docker-live-e2e.test.sh.
+# Portable regression coverage: tests/fm-teardown-cleanup.test.sh;
+# real Docker CLI guard: tests/fm-task-docker-live-e2e.test.sh.
 #
 # A Docker call is bounded by FM_TASK_DOCKER_TIMEOUT_SECS (default 120) through
 # bin/fm-timeout-lib.sh. A missing docker binary is silent.

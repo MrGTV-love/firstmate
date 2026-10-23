@@ -205,4 +205,4 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 [`fm-teardown.sh`'s header](../bin/fm-teardown.sh) owns cleanup ordering, forced-descendant cleanup, reassigned-slot handling, prerequisites, failure/retry behavior, and the live-producer residual.
 The worker Docker instructions rendered by [`fm-brief.sh`](../bin/fm-brief.sh) own how ship and scout workers mark resources and isolate Supabase configuration.
 
-[`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon and declares its prerequisites through [`fm_live_gate`](../tests/lib.sh).
+[`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon and declares its prerequisites through [`fm_live_gate`](../tests/lib.sh).

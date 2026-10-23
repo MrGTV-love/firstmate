@@ -142,6 +142,37 @@ Five cases run their independent matrix cells at once through `run_cells_in_para
 Each cell builds its own homes under unique names, and a failing cell fails the case with the tail of its log.
 No case body, assertion, or `ok -` line was shortened or removed.
 
+## Teardown groups
+
+The former combined `tests/fm-teardown.test.sh` was an indivisible member: serial shard 2 of [run 39838628417](https://github.com/MrGTV-love/firstmate/actions/runs/39838628417) held it alone, its script time was 1587660 ms, and that job finished 26 minutes 49 seconds after the workflow started against the 1200000 ms packing target.
+Its 333 cases now run exactly once across three independently runnable files:
+
+| File | Area |
+|---|---|
+| `tests/fm-teardown.test.sh` | the landed-work proof and refusal matrix: fork and local-only landing, squash-merge and PR-head proofs, content fallback, task archives, pipeline-input ties, PR-check head records, dirty-worktree diagnostics, legacy records, and index-lock recovery |
+| `tests/fm-teardown-pool.test.sh` | pool slots, leases, custody, and returns: reservation before cleanup, proved landing after a wait, return-pending records across a refusal, reassigned and enclosing slots, reassociated and prior copies, nested slots, and subordinate cleanup custody |
+| `tests/fm-teardown-cleanup.test.sh` | post-close cleanup: the bounded process reap, foreign and held copies with the closeout driver, private no-mistakes launch agents, Docker stacks with their retained records, Herdr projection journals, and secondmate delivery and retirement |
+
+All three source `tests/fm-teardown-helpers.sh`, which owns every fixture and assertion helper plus the working tree's temporary root, the birth-identity fixture registry, and the EXIT cleanup.
+Each invocation owns its temporary root, its registered cleanup, and its own process inspection, so the final `ok -` line appears once per file.
+Every case still builds and tears down its own sandbox through `make_case`, and selecting one case by name still works in the file that owns it.
+The three files stay serial in the CI lanes: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, which keeps them out of the mixed PORTABLE pool.
+A local `--family pr-forge` run at an admitted job count runs them concurrently with the family, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md#pr-forge-admitted) records the 2026-10-22 proof of that membership.
+`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 333-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
+
+On the pre-rebase 332-case inventory, the intact suite and the three groups reported the same 335 `ok -` lines and no failures in a local Ubuntu 26.04 container, which is the behavior-parity evidence for the split.
+The rebase then added upstream's `test_closeout_refusal_reports_tail_and_preserves_complete_output`, taken verbatim into `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 333; the 2026-10-22 pr-forge isolation proof ran all three group files to exit 0 on that 333-case head.
+
+The group hints are the groups' own measured times in the `fm-test-timing-portable-serial-*` artifacts of [run 39881107550](https://github.com/MrGTV-love/firstmate/actions/runs/39881107550): `fm-teardown` 307312 ms, `fm-teardown-pool` 333924 ms, and `fm-teardown-cleanup` 917727 ms, summing to 1558963 ms against the former combined 1587660 ms.
+That run replaced the first apportioned estimates (272355, 439235, and 876070 ms), which had divided the combined CI measurement by local container times.
+`tests/fm-teardown-*` packed into three shards instead of one indivisible member: shard 17 summed 1181211 ms, shard 4 1199945 ms, and shard 15 860782 ms, and every packed shard stayed inside the 1200000 ms target at the unchanged twenty shards.
+The worst pool then moved to `fm-watch-triage-waits`, which holds serial shard 1 alone at a 1433371 ms hint and measured 1410975 ms of script time; that job finished in 23 minutes 55 seconds, against the 26 minutes 49 seconds the old teardown shard took in run 39838628417.
+The workflow finished in 31 minutes 39 seconds, down from that earlier run's 35 minutes 40 seconds; serial shards 1, 2, and 4 started seven to eight minutes late in the queued run, so the pool bound is the waits job and the workflow's extra minutes are runner queueing rather than work.
+
+The hint table also carries the run 39838628417 measurements that grew by more than 30 seconds - `fm-pr-check-security` (342666 to 420272 ms), `fm-control-relaunch` (1318470 to 1358153 ms), and `fm-spawn-compact-adviser-disable-remote` (294998 to 352918 ms) - plus four measured but previously unhinted serial members: `fm-api-key-guard-lib` (3850), `fm-copy-sweep` (207702), `fm-friction-ledger` (2020), and `fm-jev-guard-audit` (1281 ms).
+Both sets are successful per-script `duration_ms` records from that run's `fm-test-timing-portable-serial-*` artifacts.
+The serial lane still passes `--check-coverage` at the unchanged twenty shards, and the largest remaining single script is `fm-watch-triage-waits` at 1433371 ms, so splitting that suite is the way to a packed shard below it.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
@@ -246,6 +277,7 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 `bin/fm-lint.sh` owns three canonical CI partitions, each attempting full source-aware ShellCheck analysis and running workflow validation and backend-purity checks.
 Its `fm_lint_partition_weight_hints` table contains the slowest successful per-root duration from the two partitions' `partition-N.roots.tsv` sidecars in the same three main runs used by the latest serial refresh.
 The seven captain-hold roots have no lint measurement of their own yet: their rows divide the former combined file's 12745 ms in proportion to each file's bytes, so refresh them from the next three main runs' sidecars.
+The four teardown rows (`tests/fm-teardown-cleanup.test.sh` 4219, `tests/fm-teardown-helpers.sh` 2194, `tests/fm-teardown-pool.test.sh` 2043, and `tests/fm-teardown.test.sh` 1830) divide the former combined file's measured 10286 ms by each file's line share; they are not measurements, so replace them from the lint sidecars of the next three Ubuntu main runs.
 The telemetry records ShellCheck 0.11.0 on Linux x86_64, Ubuntu 24, image `20261004.327.1`.
 Longest-processing-time packing uses those durations, not direct file bytes: equal byte totals previously carried 1240 and 1781 seconds of measured lint work in run 38312847224.
 The script header owns missing-root fallback and partition syntax; local worker balancing and its telemetry weight fields still use direct bytes.

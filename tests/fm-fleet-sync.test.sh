@@ -169,7 +169,7 @@ build_packed_prunable() {
 
 plant_packed_refs_lock() { : > "$1/.git/packed-refs.lock"; }
 
-# lsof shims mirror tests/fm-teardown.test.sh: no-holder (provably free), a live
+# lsof shims mirror tests/fm-teardown-helpers.sh: no-holder (provably free), a live
 # holder, and an lsof error. Written into a per-home fakebin/ prepended to PATH.
 lsof_no_holder() {
   cat > "$1/lsof" <<'SH'
