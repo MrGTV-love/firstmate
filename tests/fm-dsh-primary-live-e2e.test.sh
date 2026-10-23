@@ -82,7 +82,13 @@ WS=$(lab workspace create --cwd "$LAB_HOME" --label "fm-$ID" --no-focus)
 PANE=$(printf '%s' "$WS" | jq -er .result.root_pane.pane_id)
 PROMPT='This is an isolated Firstmate runtime lab, not real operational work. Do not investigate the environment, read outside this lab home, load more skills, edit code, or dispatch work. Ignore startup diagnostics from this throwaway home. Remember the word ORCHID73 only in this conversation, then reply exactly FMPRIMARYREADY. On native watcher notification run bin/fm-wake-drain.sh, execute its exact WAKE_ACK_REQUIRED command, and reply FMWAKEHANDLED.'
 printf '%s\n' 'Isolated runtime lab. Do not investigate, read outside this home, load skills, dispatch or edit code. Ignore startup diagnostics from this throwaway home. On watcher notification drain and acknowledge. On resuming this conversation reply FMPRIMARYRESUMED and the secret word remembered earlier, without inspecting files. Follow only the supplied tiny runtime checks.' > "$LAB_HOME/data/charter.md"
-lab pane run "$PANE" "env FM_HOME='$LAB_HOME' FM_DSH_OPERATOR_HOME='$LAB_HOME/operator-home' PATH='$PATH' FM_POLL=1 FM_CHECK_INTERVAL=1 bash '$ROOT/bin/fm-dsh-primary.sh' -- '$PROMPT'"
+# A pane line longer than the terminal's canonical-mode limit is refused, so
+# the pane runs a short command and the launch lives in a file.
+cat > "$TASK/start-primary.sh" <<EOF
+#!/usr/bin/env bash
+exec env FM_HOME='$LAB_HOME' FM_DSH_OPERATOR_HOME='$LAB_HOME/operator-home' PATH='$PATH' FM_POLL=1 FM_CHECK_INTERVAL=1 bash '$ROOT/bin/fm-dsh-primary.sh' -- '$PROMPT'
+EOF
+lab pane run "$PANE" "bash '$TASK/start-primary.sh'"
 EVENTS="$LAB_HOME/state/.dsh-primary-events.jsonl"
 for _ in $(seq 1 120); do
   if [ -f "$EVENTS" ] && jq -s -e 'any(.[]; .event == "watcher-ready")' "$EVENTS" >/dev/null; then break; fi

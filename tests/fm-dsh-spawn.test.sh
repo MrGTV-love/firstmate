@@ -290,7 +290,11 @@ PY
 # A native secondmate plugin standing in for the TUI: it records startup for
 # the launch id the pane command carries, as its own live process, then holds
 # the first turn back past the spawn's read budget as a slow digest would.
-# "stale" records startup for another launch and never starts a turn.
+# "slow" first leaves an older error row under its own pid, as a reused pid
+# would. "error" records a startup error and the follow-up carrying the brief;
+# "error-only" records the error with no follow-up and never starts a turn.
+# "broken" writes a log that fails the sequence check. "stale" records startup
+# for another launch and never starts a turn.
 cat > "$TMP_ROOT/dsh-native-writer.py" <<'PY'
 import json
 import os
@@ -311,17 +315,25 @@ else:
     sys.exit(1)
 launch_id = re.search(r"FM_DSH_LAUNCH_ID='?([^' ]+)", Path(launch).read_text()).group(1)
 events = Path(home) / "state" / ".dsh-primary-events.jsonl"
-row = {"event": "startup", "pid": os.getpid(), "launch": "stale-launch" if mode == "stale" else launch_id}
-with events.open("a") as stream:
-    stream.write(json.dumps(row) + "\n")
-if mode == "stale":
+def append(**row):
+    with events.open("a") as stream:
+        stream.write(json.dumps({"pid": os.getpid(), **row}) + "\n")
+if mode == "slow":
+    append(event="error", detail="an earlier process with this pid")
+append(event="startup", launch="stale-launch" if mode == "stale" else launch_id)
+if mode in ("error", "error-only"):
+    append(event="error", detail="fixture startup fault")
+if mode == "error":
+    append(event="followup", kind="guard")
+if mode in ("stale", "error-only"):
     time.sleep(120)
-time.sleep(3)
+time.sleep(0 if mode == "broken" else 3)
 bound = json.loads(binding.read_text())
 store = Path(bound["root"]) / "dsh" / "sessions" / "workspace" / "session"
 store.mkdir(parents=True, exist_ok=True)
 header = {"type": "session", "version": 4, "id": str(uuid.uuid4()), "cwd": bound["cwd"], "delegationDepth": 0}
-(store / "session.v4.jsonl").write_text(json.dumps(header) + "\n" + json.dumps({"type": "turn/start", "seq": 1}) + "\n")
+turns = [{"type": "turn/start", "seq": 2}, {"type": "turn/end", "seq": 1}] if mode == "broken" else [{"type": "turn/start", "seq": 1}]
+(store / "session.v4.jsonl").write_text("".join(json.dumps(event) + "\n" for event in [header, *turns]))
 time.sleep(120)
 PY
 
@@ -527,7 +539,7 @@ test_secondmate_start_waits_on_its_native_digest() {
   out=$(secondmate_spawn "$id" slow 2>&1)
   status=$?
   expect_code 0 "$status" "a dsh secondmate whose digest outlasts the read budget must still spawn: $out"
-  assert_contains "$out" "is preparing its session-start digest" "the spawn must report the digest wait"
+  assert_contains "$out" "is live; waiting for its first turn" "the spawn must report the digest wait"
   assert_grep "harness=dsh" "$HOME_DIR/state/$id.meta" "the secondmate must launch on dsh"
   assert_equals "$CASE_DIR/spawner-operator/.config" "$(readlink "$HOME_DIR/state/$id.dsh/"*/home/.config)" \
     "the secondmate's private HOME must link the spawner's operator home"
@@ -536,11 +548,22 @@ test_secondmate_start_waits_on_its_native_digest() {
   assert_equals "$CASE_DIR/spawner-operator" "$(sed -n 's/^FM_DSH_OPERATOR_HOME=//p' "$log")" \
     "nested spawns inside the secondmate must link the same operator home"
   assert_equals 2 "$(wc -l < "$log.args" | tr -d ' ')" "the brief must reach the native plugin, not dsh-tui's opening prompt"
+  out=$(secondmate_spawn "$id-error" error 2>&1)
+  status=$?
+  expect_code 0 "$status" "a startup error whose follow-up carried the brief must not kill the spawn: $out"
+  out=$(secondmate_spawn "$id-error-only" error-only 2>&1)
+  status=$?
+  expect_code 1 "$status" "a startup error with no follow-up must fail the spawn: $out"
+  assert_contains "$out" "fixture startup fault" "the refusal must name the recorded error"
+  out=$(secondmate_spawn "$id-broken" broken 2>&1)
+  status=$?
+  expect_code 1 "$status" "a log failing a behavior check must not count as native progress: $out"
+  assert_contains "$out" "non-monotonic sequence" "the refusal must name the failed log check"
   out=$(secondmate_spawn "$id-stale" stale 2>&1)
   status=$?
   expect_code 1 "$status" "another launch's startup row must not hold a spawn open: $out"
   assert_contains "$out" "no native DSH startup event for launch" "the refusal must name the missing startup event"
-  pass "fm-spawn: a dsh secondmate waits past the read budget on its own live native startup, and a stale launch's row is not proof"
+  pass "fm-spawn: a dsh secondmate waits past the read budget on its own live native startup, tolerates a startup error whose follow-up carried the brief, and fails on an unbriefed error, a broken log or another launch's row"
 }
 
 test_launch_policy_admits_dsh() {

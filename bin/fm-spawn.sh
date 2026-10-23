@@ -5644,10 +5644,12 @@ agy_spawn_fail() {  # <detail>
 # require the live composer shape the steering parser understands: a successful
 # version command is not proof that a changed frontend remains compatible.
 # A secondmate's first turn waits on its native session-start digest. Once its
-# plugin records startup for this launch id, the read budget stops counting:
-# only that native process exiting, or recording an error, ends the wait.
+# plugin records startup for this launch id, a log that simply has no turn yet
+# stops counting against the read budget: only that native process exiting, or
+# an error before any follow-up carried the brief, ends the wait. A log that
+# fails a behavior check still uses the budget and is reported.
 dsh_wait_for_start() {
-  local state pane parse_error i=0 waited=0 rc max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  local state pane parse_error i=0 waited=0 pending=0 rc max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
   local events="$WT/state/.dsh-primary-events.jsonl"
   # shellcheck source=bin/fm-composer-lib.sh
   . "$SCRIPT_DIR/fm-composer-lib.sh"
@@ -5655,6 +5657,7 @@ dsh_wait_for_start() {
   DSH_NATIVE_PID=
   while [ "$i" -lt "$max" ]; do
     state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
+    pending=0
     case "$state" in
       busy | idle)
         if fm_backend_visible_capture_supported "$BACKEND"; then
@@ -5669,44 +5672,53 @@ dsh_wait_for_start() {
         ;;
       *)
         case "$state" in unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;; esac
-        if [ "$KIND" = secondmate ]; then
-          dsh_native_progress "$events" && rc=0 || rc=$?
-          case "$rc" in
-            0)
-              if [ $((waited % max)) -eq 0 ]; then
-                echo "dsh secondmate $ID: native startup pid $DSH_NATIVE_PID is preparing its session-start digest; waiting for its first turn" >&2
-              fi
-              waited=$((waited + 1))
-              sleep "$interval"
-              continue
-              ;;
-            2) return 1 ;;
-          esac
-        fi
+        case "$KIND:$state" in
+          'secondmate:unknown: no depth-zero dsh session log yet' | 'secondmate:unknown: dsh session log has no turn/start or turn/end yet' | 'secondmate:unknown: no turn started beyond the launch position')
+            pending=1
+            dsh_native_progress "$events" && rc=0 || rc=$?
+            case "$rc" in
+              0)
+                if [ $((waited % max)) -eq 0 ]; then
+                  echo "dsh secondmate $ID: native startup pid $DSH_NATIVE_PID is live; waiting for its first turn" >&2
+                fi
+                waited=$((waited + 1))
+                sleep "$interval"
+                continue
+                ;;
+              2) return 1 ;;
+            esac
+            ;;
+        esac
         ;;
     esac
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
   done
-  if [ "$KIND" = secondmate ] && [ -z "$DSH_NATIVE_PID" ]; then
+  if [ "$pending" = 1 ]; then
     DSH_START_ERROR="no native DSH startup event for launch $SPAWN_GEN in $events${DSH_START_ERROR:+ ($DSH_START_ERROR)}"
   fi
   return 1
 }
 
-# 0: this launch's native plugin recorded startup and its process is alive with
-# no recorded error. 1: no startup event for this launch yet. 2: positive
-# failure evidence, described in DSH_START_ERROR.
+# Reads only the rows after this launch's own startup row. 0: its native
+# process is alive and has no error, or a follow-up already carried the brief.
+# 1: no startup event for this launch yet. 2: positive failure evidence,
+# described in DSH_START_ERROR.
 dsh_native_progress() {  # <events>
-  local found detail
-  if [ -z "$DSH_NATIVE_PID" ]; then
-    found=$(jq -nRr --arg launch "$SPAWN_GEN" '[inputs | fromjson? | select(.event == "startup" and .launch == $launch) | .pid] | last // empty' "$1" 2>/dev/null) || found=
-    case "$found" in '' | *[!0-9]*) return 1 ;; esac
-    DSH_NATIVE_PID=$found
-  fi
-  detail=$(jq -nRr --argjson pid "$DSH_NATIVE_PID" '[inputs | fromjson? | select(.event == "error" and .pid == $pid) | .detail] | last // empty' "$1" 2>/dev/null) || detail=
-  if [ -n "$detail" ]; then
-    DSH_START_ERROR="native DSH startup pid $DSH_NATIVE_PID recorded an error before its first turn: $detail"
+  local found pid followup detail
+  found=$(jq -nRr --arg launch "$SPAWN_GEN" '
+    [inputs | fromjson? | objects] as $rows
+    | ($rows | map(.event == "startup" and .launch == $launch) | rindex(true)) as $at
+    | if $at == null then empty else
+        $rows[$at].pid as $pid
+        | [$rows[($at + 1):][] | select(.pid == $pid)] as $own
+        | [$pid, ($own | any(.event == "followup")), ([$own[] | select(.event == "error") | .detail] | last // "")] | @tsv
+      end' "$1" 2>/dev/null) || found=
+  IFS=$'\t' read -r pid followup detail <<<"$found"
+  case "$pid" in '' | *[!0-9]*) return 1 ;; esac
+  DSH_NATIVE_PID=$pid
+  if [ -n "$detail" ] && [ "$followup" != true ]; then
+    DSH_START_ERROR="native DSH startup pid $DSH_NATIVE_PID recorded an error before any follow-up carried the brief: $detail"
     return 2
   fi
   kill -0 "$DSH_NATIVE_PID" 2>/dev/null || {
