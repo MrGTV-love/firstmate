@@ -747,6 +747,8 @@ The finished-session check is asked again once that lock is held, right before t
 A worker that was steered or became busy since the first answer backs off, and nothing is stopped, signalled, or destroyed.
 The proof that is repeated while that lock and the task control lock are held makes no fetch and reuses the remote refs fetched before them, so a hung remote never holds either lock.
 The slot's owner claim is read again right before the signal: a slot that another task has claimed, whose claim cannot be read, or whose claim for this task id names another home or no home, stays untouched.
+Then each nested copy that the project's `.gitignore` does not cover, already proved on its own, is removed: `treehouse destroy` counts its untracked directory as dirt and refuses the slot, and the pane's `treehouse get` would stop at its "uncommitted changes" prompt when its idle shell ends.
+An independent clone goes with its directory and a linked worktree with `git worktree remove --force`, the way teardown removes its own proved nested copies; a locked one, or one that does not go, keeps the copy.
 When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
 That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` is present, and its last status event is `done`.
 The ordinary finished-session sweep keeps its classification unchanged.

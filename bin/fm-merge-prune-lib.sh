@@ -23,7 +23,8 @@
 #   - git reports no changed or untracked file (every untracked file and every
 #     changed submodule counts, whatever status.showUntrackedFiles or
 #     diff.ignoreSubmodules says; the one exception is the untracked directory
-#     of a nested copy, which is proved on its own) and the copy holds no stash
+#     of a nested copy, which is proved on its own and removed before the
+#     destroy, fm_mp_remove_unignored_nested) and the copy holds no stash
 #     entry of its own work: for a linked worktree of the project, a stash made
 #     on another branch of the project is another task's (a linked worktree
 #     shares the project's stash list), while a stash made on the copy's branch,
@@ -239,6 +240,37 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
     return 1
   fi
   [ -z "$prn" ] || fm_mp_prove_landed "$copy" "$prsha" || return 1
+  return 0
+}
+
+# A nested copy that the project's .gitignore does not cover shows in the status
+# of the copy that holds it as one untracked directory, "?? <path>/".
+# fm_mp_prove_git does not count that line, because the nested copy is proved on
+# its own, but `treehouse destroy` counts it as dirt and refuses the slot, and a
+# pane's `treehouse get` stops at its "uncommitted changes" prompt when its idle
+# shell ends. So each such nested copy of <real-copy> (FM_MP_NESTED, already
+# proved) is removed first: an independent clone with its directory, a linked
+# worktree with `git worktree remove --force` (proved clean, the way teardown
+# removes its own proved nested copies; a locked one is still refused). A clone
+# inside it goes with it. One that cannot be removed keeps the copy.
+fm_mp_remove_unignored_nested() {  # <real-copy>
+  local copy=$1 n status common
+  if ! status=$(git -C "$copy" status --porcelain --untracked-files=all 2>/dev/null); then
+    fm_mp_verdict keep "git status failed in $copy"
+    return 1
+  fi
+  for n in ${FM_MP_NESTED[@]+"${FM_MP_NESTED[@]}"}; do
+    printf '%s\n' "$status" | grep -Fxq -- "?? ${n#"$copy"/}/" || continue
+    if [ -d "$n/.git" ]; then
+      rm -rf -- "$n" 2>/dev/null
+    elif common=$(git -C "$n" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+      git --git-dir="$common" worktree remove --force "$n" >/dev/null 2>&1
+    fi
+    if [ -e "$n" ]; then
+      fm_mp_verdict keep "could not remove the nested copy $n, which the status of $copy shows as an untracked directory"
+      return 1
+    fi
+  done
   return 0
 }
 

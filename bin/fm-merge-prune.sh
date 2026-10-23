@@ -92,7 +92,9 @@
 # listing, the stash listing, the search for nested copies, an error from the
 # process check) never counts as finding nothing. The slot-owner claim is read again right before the signal,
 # and a slot claimed by another task, or for this task id by another home, is
-# left alone. The preserve-list
+# left alone. Then each nested copy whose untracked directory shows in the
+# copy's status (the project's .gitignore does not cover it) is removed, because
+# treehouse counts that directory as dirt (fm_mp_remove_unignored_nested). The preserve-list
 # files are copied to data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
 # `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
 # call the reaper makes; --include-unlanded, --include-in-use and --force are
@@ -471,6 +473,13 @@ fallback_remove() {  # <real-copy> <pr-number>
       return 1
       ;;
   esac
+  # Before the pane's idle shell ends: its `treehouse get` would stop at a prompt
+  # on the untracked directory of a nested copy, and `treehouse destroy` refuses it.
+  if ! fm_mp_remove_unignored_nested "$real"; then
+    fm_lock_release "$LOCK_CONTROL" || true
+    record_verdict "$real"
+    return 1
+  fi
   if [ -n "$FM_MP_PANE_SHELL" ]; then
     reason=
     if [ "$WORKER_STOPPED" != 1 ]; then
