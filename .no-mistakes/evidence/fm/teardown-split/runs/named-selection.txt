@@ -1,0 +1,32 @@
+$ bash tests/fm-teardown.test.sh test_local_only_fork_remote_allows
+ok - local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed
+[exit 0]
+
+$ bash tests/fm-teardown-pool.test.sh test_non_pool_returns_recheck_registered_copies
+ok - every forced return checks registered copies without pool inventory, and recovery names the owning home
+[exit 0]
+
+$ bash tests/fm-teardown-cleanup.test.sh test_closeout_refusal_reports_tail_and_preserves_complete_output
+ok - own and foreign closeout refusals show the tail and save byte-identical full output; short output stays complete and successful output stays silent without a durable log
+[exit 0]
+
+$ bash tests/fm-teardown.test.sh test_closeout_refusal_reports_tail_and_preserves_complete_output
+Unknown test case: test_closeout_refusal_reports_tail_and_preserves_complete_output
+Usage: bash tests/fm-teardown.test.sh [test_function_name ...]
+[exit 2]
+
+$ bash tests/fm-teardown-cleanup.test.sh test_local_only_fork_remote_allows
+Unknown test case: test_local_only_fork_remote_allows
+Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]
+[exit 2]
+
+$ bash tests/fm-teardown-pool.test.sh test_local_only_fork_remote_allows test_no_such_case
+Unknown test case: test_local_only_fork_remote_allows
+Usage: bash tests/fm-teardown-pool.test.sh [test_function_name ...]
+[exit 2]
+
+$ bash tests/fm-teardown-cleanup.test.sh test_closeout_refusal_reports_tail_and_preserves_complete_output test_local_only_fork_remote_allows
+Unknown test case: test_local_only_fork_remote_allows
+Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]
+[exit 2]
+

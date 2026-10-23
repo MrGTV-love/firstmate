@@ -1,0 +1,5 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/5da8156c4e9b/01M5JXSYXX6G53G15TVH2PWZKJ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-22T23:58:54Z tests/fm-teardown-cleanup.test.sh family=pr-forge expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T23:58:54Z tests/fm-teardown-pool.test.sh family=pr-forge expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T23:58:54Z tests/fm-teardown.test.sh family=pr-forge expected_gate_skip=none
+Terminated: 15

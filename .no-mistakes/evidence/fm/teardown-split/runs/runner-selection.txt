@@ -1,0 +1,36 @@
+$ env FM_TEST_ONLY=test_teardown_groups_register_each_case_once bash tests/fm-test-run.test.sh
+ok - the teardown groups are a duplicate-free 333-case cover, each case registered by the file that defines it
+[exit 0]
+
+$ env FM_TEST_ONLY=test_teardown_groups_share_helper_and_stay_selectable bash tests/fm-test-run.test.sh
+ok - every teardown group stays independently selectable, the shared and git lock helpers select its pr-forge family, and pr-forge keeps them
+[exit 0]
+
+$ env FM_TEST_ONLY=test_portable_serial_shards_partition_the_serial_lane bash tests/fm-test-run.test.sh
+ok - portable serial shards are a deterministic disjoint cover of the serial lane
+[exit 0]
+
+$ env FM_TEST_ONLY=test_portable_serial_packing_budget_boundary bash tests/fm-test-run.test.sh
+ok - serial packing accepts a lone script above the target, accepts a packed shard at it, and refuses one a millisecond above
+[exit 0]
+
+$ env FM_TEST_ONLY=test_portable_shard_union_and_coverage_guard bash tests/fm-test-run.test.sh
+ok - portable shard union, disjointness, and coverage guard hold
+[exit 0]
+
+$ bin/fm-test-run.sh --list tests/fm-teardown.test.sh tests/fm-teardown-pool.test.sh tests/fm-teardown-cleanup.test.sh
+tests/fm-teardown.test.sh
+tests/fm-teardown-pool.test.sh
+tests/fm-teardown-cleanup.test.sh
+[exit 0]
+
+$ bash -c bin/fm-test-run.sh --list --family pr-forge | grep teardown
+tests/fm-teardown-cleanup.test.sh
+tests/fm-teardown-pool.test.sh
+tests/fm-teardown.test.sh
+[exit 0]
+
+$ bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=334 parallel=29 parallel_max_ms=1857531 parallel_imbalance_ms=28538 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=2 parallel_makespan_ms=983606 parallel_budget_ms=1200000 serial=287 serial_shards=20 serial_unhinted=1 serial_max_ms=1433371 serial_budget_ms=1200000 serial_indivisible_ms=1433371 herdr=18
+[exit 0]
+

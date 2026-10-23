@@ -1,0 +1,80 @@
+base file: /Users/charlesabrooker/.no-mistakes/evidence/01M5JXSYXX6G53G15TVH2PWZKJ/base/fm-teardown.test.sh
+base registered cases: 333 (unique 333)
+tests/fm-teardown.test.sh: registered cases 92, top-level functions 92
+tests/fm-teardown-pool.test.sh: registered cases 53, top-level functions 53
+tests/fm-teardown-cleanup.test.sh: registered cases 188, top-level functions 188
+tests/fm-teardown-helpers.sh: registered cases 0, top-level functions 133
+union registered: 333; duplicates 0; drops 0; additions 0
+base top-level function names: 466 (multi-defined: [])
+functions byte-identical after move: 466; changed: 0; missing: 0; new: 0
+residual non-function lines only in base: 10; only in split files: 102
+  -base x1: # --- Fix 1: conclude/abort the task's own parked no-mistakes run before the
+  -base x1: # worker is removed, and Fix 2: reap leaked descendant processes rooted under
+  -base x1: # the task's own worktree/tasktmp - both exercised through the real teardown
+  -base x1: # path (bin/fm-teardown.sh), never by matching its source text. ------------
+  -base x1: # No-mistakes auto-installs a KeepAlive launchd agent for a daemon whose home is
+  -base x1: # private to one task. These cases drive teardown against a fake launchctl and a
+  -base x1: # fixture LaunchAgents directory (FM_LAUNCH_AGENTS_DIR), never the real ones.
+  -base x1: # run_foreign_teardown <rc-var> [VAR=value...]: runs the case's teardown with
+  -base x1: # the stub interpreter and the given environment, which may replace it; stdout
+  -base x1: # and stderr land in the case. FOREIGN_TEARDOWN_ARGS holds any teardown flags.
+  +split x3: #!/usr/bin/env bash
+  +split x2: #
+  +split x3: set -u
+  +split x3: # shellcheck source=tests/fm-teardown-helpers.sh
+  +split x3: . "$(dirname "${BASH_SOURCE[0]}")/fm-teardown-helpers.sh"
+  +split x2: teardown_test_cases=(
+  +split x2: )
+  +split x2: # Validate the complete selection before running any behavioral case.
+  +split x2: for requested_case in "$@"; do
+  +split x2:   registered_case=false
+  +split x2:   for test_case in "${teardown_test_cases[@]}"; do
+  +split x4:     if [ "$requested_case" = "$test_case" ]; then
+  +split x2:       registered_case=true
+  +split x4:       break
+  +split x4:     fi
+  +split x4:   done
+  +split x2:   if [ "$registered_case" = false ]; then
+  +split x2:     printf 'Unknown test case: %s\n' "$requested_case" >&2
+  +split x2:     exit 2
+  +split x4:   fi
+  +split x4: done
+  +split x2: for test_case in "${teardown_test_cases[@]}"; do
+  +split x2:   if [ "$#" -eq 0 ]; then
+  +split x2:     "$test_case"
+  +split x2:     continue
+  +split x2:   for requested_case in "$@"; do
+  +split x2:       "$test_case"
+  +split x1: # Pool slots, leases, custody, and returns for bin/fm-teardown.sh's destructive
+  +split x1: # Treehouse return: reservation before cleanup, proved landing after a wait,
+  +split x1: # return-pending records across a refusal, reassigned and enclosing slots,
+  +split x1: # reassociated and prior copies, nested slots, and subordinate cleanup custody.
+  +split x1: # The landed-work proof matrix and refusal diagnostics live in
+  +split x1: # tests/fm-teardown.test.sh; post-close cleanup lives in
+  +split x1: # tests/fm-teardown-cleanup.test.sh. Shared fixtures: tests/fm-teardown-helpers.sh.
+  +split x1: # Usage: bash tests/fm-teardown-pool.test.sh [test_function_name ...]
+  +split x1:     printf 'Usage: bash tests/fm-teardown-pool.test.sh [test_function_name ...]\n' >&2
+  +split x1: # Post-close cleanup for bin/fm-teardown.sh: leaked processes and the bounded
+  +split x1: # reap, foreign and held copies with their closeout driver, private no-mistakes
+  +split x1: # launch agents, Docker stacks and their retained records, Herdr projection
+  +split x1: # journals, and secondmate delivery and retirement.
+  +split x1: # The landed-work proof matrix lives in tests/fm-teardown.test.sh; pool slots
+  +split x1: # and returns live in tests/fm-teardown-pool.test.sh. Shared fixtures:
+  +split x1: # tests/fm-teardown-helpers.sh.
+  +split x1: # Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]
+  +split x1:     printf 'Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]\n' >&2
+  +split x1: # Shared definitions and fixture setup for the independently runnable
+  +split x1: # fm-teardown suites: tests/fm-teardown.test.sh (the landed-work proof and
+  +split x1: # refusal matrix), tests/fm-teardown-pool.test.sh (pool slots, leases, custody,
+  +split x1: # and returns), and tests/fm-teardown-cleanup.test.sh (post-close cleanup of
+  +split x1: # processes, foreign copies, launch agents, and Docker stacks).
+  +split x1: # Source this from a group file and register that group's cases there.
+  +split x1: # Each sourcing process owns one temporary root, one tracked-fixture process
+  +split x1: # registry, and one EXIT cleanup, exactly as the single combined suite did, so a
+  +split x1: # group file stays independently runnable beside its siblings.
+  +split x1: # Every case builds its own sandbox through make_case and never reuses another
+  +split x1: # case's directory: sharing one would carry state into later cases and change
+  +split x1: # behavior rather than test the product. Fixture processes are tracked by birth
+  +split x1: # identity as well as pid, so a recycled pid is never signalled, and
+  +split x1: # teardown_fixture_cleanup stops everything this process registered.
+RESULT: PASS
