@@ -303,7 +303,7 @@ test_noop_attempts_alarm_on_original_schedule() {
   rm -f "$home/config/watchdog-resume"
   run_check "$home" FM_WATCHDOG_NOW=1000
   expect_code 1 "$CODE" "no-op attempt retains unhealthy exit"
-  assert_contains "$OUT" "no-op (attempt 1)" "nothing ran, so this is not a failed recovery"
+  assert_contains "$OUT" "no-op (attempt 1) - no live watcher to stop and no config/watchdog-resume" "nothing ran, so this is not a failed recovery"
   assert_grep "attempt 1 was a no-op" "$home/state/.watchdog.log" "log classifies the no-op"
   assert_not_contains "$OUT" "recovery failed" "no-op output must not claim a failed recovery"
   assert_not_contains "$(cat "$home/state/.watchdog.log")" "recovery attempt 1 failed" "no-op log must not claim a failed recovery"
@@ -314,9 +314,8 @@ test_noop_attempts_alarm_on_original_schedule() {
   assert_contains "$OUT" "waiting out the retry interval" "no-ops retain retry timing"
   run_check "$home" FM_WATCHDOG_NOW=1300
   expect_code 1 "$CODE" "second no-op exit"
-  assert_contains "$(cat "$dir/alarm.calls")" "failed recoveries: 0; no-op attempts: 2" "no-ops are counted separately"
-  assert_contains "$(cat "$dir/alarm.calls")" "no recovery is possible from this watchdog: no live watcher to stop and no config/watchdog-resume" "alarm names the missing recovery route"
-  assert_contains "$(cat "$dir/alarm.calls")" "firstmate supervision is down (session-missing)" "watchdog alarm title names the actual condition"
+  assert_contains "$(cat "$dir/alarm.calls")" "firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and no config/watchdog-resume - see $home/state/.watchdog.log" "alarm counts checks and names the missing recovery route"
+  assert_not_contains "$(cat "$dir/alarm.calls")" "recoveries failed" "no-op alarm must not claim failed recoveries"
   assert_equals 'attempts=2 last_attempt=1300 last_alarm=1300' "$(cat "$home/state/.watchdog-episode")" "episode format and alarm threshold are unchanged"
   run_check "$home" FM_WATCHDOG_NOW=1600
   assert_equals 1 "$(wc -l < "$dir/alarm.calls" | tr -d ' ')" "no-op alarms retain rate limiting"
@@ -326,12 +325,11 @@ test_noop_attempts_alarm_on_original_schedule() {
   write_stubs "$home" 'true'
   run_check "$home" FM_WATCHDOG_NOW=9000
   assert_contains "$OUT" "recovery failed (attempt 5)" "a command that ran but did not heal is a failed recovery"
-  assert_contains "$(cat "$dir/alarm.calls")" "failed recoveries: 1; no-op attempts: 4" "mixed outcomes survive separate scheduled checks"
-  assert_grep "failed recoveries: 1; no-op attempts: 4" "$home/state/.watchdog.log" "log records both totals"
+  assert_contains "$(cat "$dir/alarm.calls")" "5 recovery checks did not restore supervision; latest attempt: recovery failed - see" "the alarm classifies only the latest attempt"
   write_stubs "$home" "$(healing_resume "$home" "$(start_session)")"
   run_check "$home" FM_WATCHDOG_NOW=9300
   expect_code 0 "$CODE" "mixed episode recovers"
-  assert_absent "$home/state/.watchdog-outcomes" "recovery clears classification counts"
+  assert_absent "$home/state/.watchdog-episode" "recovery clears the episode"
   pass "no-op and real failed recoveries are distinct without changing alarm timing"
 }
 
@@ -347,28 +345,25 @@ test_stop_only_attempt_is_a_failed_recovery() {
   run_check "$home" FM_WATCHDOG_NOW=1000 FM_WATCHDOG_ALARM_AFTER=1
   expect_code 1 "$CODE" "stop-only unhealthy exit"
   assert_equals --stop "$(cat "$dir/arm.calls")" "stop-only attempt ran a real action"
-  assert_contains "$(cat "$dir/alarm.calls")" 'failed recoveries: 1; no-op attempts: 0' "watcher-stop action counts even without resume"
-  assert_contains "$(cat "$dir/alarm.calls")" 'the session cannot be resumed from here' "missing resume route is explicit"
+  assert_contains "$(cat "$dir/alarm.calls")" '1 recovery check did not restore supervision; latest attempt: recovery failed - no config/watchdog-resume; the session cannot be resumed from here' "watcher-stop action counts even without resume"
   pass "a watcher stop that does not restore health is a real failed recovery"
 }
 
-test_legacy_episode_does_not_invent_failures() {
+test_empty_resume_command_is_a_noop() {
   local home dir
-  home=$(make_home legacy dead)
+  home=$(make_home emptyresume dead)
   dir=$(dirname "$home")
   write_stubs "$home" '# no usable resume command'
   printf 'attempts=1 last_attempt=1000 last_alarm=0\n' > "$home/state/.watchdog-episode"
   run_check "$home" FM_WATCHDOG_NOW=1300
-  expect_code 1 "$CODE" "legacy episode remains unhealthy"
-  assert_contains "$(cat "$dir/alarm.calls")" 'failed recoveries: 0; no-op attempts: 1; earlier unclassified attempts: 1' "old attempts cannot be assumed to have run actions"
-  assert_contains "$(cat "$dir/alarm.calls")" 'config/watchdog-resume holds no command' "empty resume file is not a recovery action"
-  assert_equals 'attempts=2 last_attempt=1300 last_alarm=1300' "$(cat "$home/state/.watchdog-episode")" "legacy attempt still contributes to original alarm threshold"
+  expect_code 1 "$CODE" "empty resume command remains unhealthy"
+  assert_contains "$(cat "$dir/alarm.calls")" '2 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and config/watchdog-resume holds no command' "empty resume file is not a recovery action"
+  assert_equals 'attempts=2 last_attempt=1300 last_alarm=1300' "$(cat "$home/state/.watchdog-episode")" "an earlier attempt still contributes to the original alarm threshold"
   rm -f "$home/state/task.meta"
   run_check "$home" FM_WATCHDOG_NOW=1400
-  expect_code 0 "$CODE" "idle clears legacy episode"
-  assert_absent "$home/state/.watchdog-episode" "idle clears timing record"
-  assert_absent "$home/state/.watchdog-outcomes" "idle clears classification record"
-  pass "legacy attempts retain alarm timing without inventing failed recoveries"
+  expect_code 0 "$CODE" "idle clears the episode"
+  assert_absent "$home/state/.watchdog-episode" "idle clears the timing record"
+  pass "an empty resume command is a no-op that keeps the alarm schedule"
 }
 
 test_watchdog_and_away_alarm_titles() {
@@ -383,7 +378,8 @@ printf '%s\\n' "\$3" > "$dir/title"
 STUB
   run_check "$home" FM_WATCHDOG_NOW=1000 FM_WATCHDOG_ALARM_AFTER=1 FM_WEDGE_ALARM_CHANNEL=osascript
   assert_equals 'firstmate supervision is down (session-missing)' "$(cat "$dir/title")" "watchdog title through the notifier seam"
-  assert_contains "$(cat "$dir/summary")" 'failed recoveries: 1; no-op attempts: 0' "real unsuccessful resume is counted as failed"
+  assert_contains "$(cat "$dir/summary")" 'latest attempt: recovery failed - see' "real unsuccessful resume is counted as failed"
+  # shellcheck disable=SC2016 # The child shell expands its own positional arguments.
   env FM_HOME="$home" FM_WEDGE_ALARM_EXEC="$dir/alarm.sh" FM_WEDGE_ALARM_CHANNEL=osascript FM_SUPERVISOR_BACKEND=orca \
     bash -c '. "$1"; inject_wedge_alarm "$2" 600' _ "$ROOT/bin/fm-supervise-daemon.sh" "$home/state"
   assert_equals 'firstmate: away-mode escalations WEDGED' "$(cat "$dir/title")" "away-mode title is unchanged"
@@ -643,7 +639,7 @@ test_failed_recovery_alarms_after_threshold
 test_missing_resume_command_fails_and_logs
 test_noop_attempts_alarm_on_original_schedule
 test_stop_only_attempt_is_a_failed_recovery
-test_legacy_episode_does_not_invent_failures
+test_empty_resume_command_is_a_noop
 test_watchdog_and_away_alarm_titles
 test_recovery_after_failures_clears_episode
 test_reused_watchdog_pid_is_reclaimed

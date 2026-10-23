@@ -44,20 +44,20 @@
 #      command gets FM_HOME, FM_ROOT, and FM_WATCHDOG_REASON (the verdict).
 #      An absent file makes this step a recorded no-op.
 #   3. Re-read the verdict for up to FM_WATCHDOG_VERIFY_SECS (default 90).
-# An action that ran without restoring healthy or idle is a failed recovery;
-# no watcher to stop and no usable resume command is a no-op, not a failure.
-# At most one attempt runs per FM_WATCHDOG_RETRY_SECS (default 240). After
-# FM_WATCHDOG_ALARM_AFTER (default 2) consecutive unsuccessful attempts (either
-# kind), the check raises the existing wedge alarm channels (docs/wedge-alarm.md)
-# with a supervision-down title naming the verdict and separate failure/no-op
-# totals, at most once per FM_WATCHDOG_ALARM_INTERVAL_SECS (default 3600).
-# A healthy or idle verdict clears the episode and classification counts.
+# An attempt that ran an action without restoring healthy or idle is a failed
+# recovery; one with no watcher to stop and no usable resume command is a
+# no-op. Only the current attempt is classified. At most one attempt runs per
+# FM_WATCHDOG_RETRY_SECS (default 240). After FM_WATCHDOG_ALARM_AFTER (default
+# 2) consecutive attempts of either kind, the check raises the existing wedge
+# alarm channels (docs/wedge-alarm.md) titled with the verdict, counting the
+# recovery checks and naming the latest attempt's kind, at most once per
+# FM_WATCHDOG_ALARM_INTERVAL_SECS (default 3600). A healthy or idle verdict
+# clears the episode.
 #
 # Exit 0: healthy, idle, recovered, or waiting out the retry interval.
 # Exit 1: still unhealthy after an attempt, including a no-op. Exit 2: usage.
-# State: state/.watchdog-episode (unchanged attempt count and times),
-# state/.watchdog-outcomes (classified counts), state/.watchdog.log (bounded),
-# state/.watchdog.lock. Nothing outside this home is touched.
+# State: state/.watchdog-episode (attempt count and times), state/.watchdog.log
+# (bounded), state/.watchdog.lock. Nothing outside this home is touched.
 #
 # Test seams, honored only when FM_TEST_SEAM=1: FM_WATCHDOG_ARM replaces
 # bin/fm-watch-arm.sh and FM_WATCHDOG_NOW replaces the clock.
@@ -206,34 +206,6 @@ episode_write() {
   return 0
 }
 
-# Classification is separate so the existing episode record and its timing
-# consumers stay unchanged. One line: <attempts> <last_attempt> <failed> <noops>.
-# Counts apply only to the matching episode snapshot. Older or interrupted
-# snapshots remain unclassified rather than being guessed to be failures.
-OUTCOMES="$STATE/.watchdog-outcomes"
-EP_FAILED=0
-EP_NOOPS=0
-outcomes_read() {
-  local attempts last failed noops value
-  EP_FAILED=0
-  EP_NOOPS=0
-  [ -f "$OUTCOMES" ] || return 0
-  read -r attempts last failed noops < "$OUTCOMES" || return 0
-  for value in "$attempts" "$last" "$failed" "$noops"; do
-    case "$value" in ''|*[!0-9]*|0[0-9]*) return 0 ;; esac
-  done
-  [ "$attempts" = "$EP_ATTEMPTS" ] && [ "$last" = "$EP_LAST_ATTEMPT" ] || return 0
-  [ $((failed + noops)) -le "$EP_ATTEMPTS" ] || return 0
-  EP_FAILED=$failed
-  EP_NOOPS=$noops
-}
-outcomes_write() {
-  printf '%s %s %s %s\n' "$EP_ATTEMPTS" "$EP_LAST_ATTEMPT" "$EP_FAILED" "$EP_NOOPS" \
-    > "$OUTCOMES.tmp.$$" 2>/dev/null && mv -f "$OUTCOMES.tmp.$$" "$OUTCOMES" 2>/dev/null
-  rm -f "$OUTCOMES.tmp.$$" 2>/dev/null
-  return 0
-}
-
 # Raise the wedge-alarm channels (docs/wedge-alarm.md). The daemon owns the
 # channel dispatch; sourcing it is its supported library mode, which defaults
 # the notifier seam to "discard" so tests cannot post. Production must fire the
@@ -297,20 +269,19 @@ wait_healthy() {
 }
 
 watchdog_main() {
-  local first now_epoch totals unavailable='' result unclassified
+  local first now_epoch detail='' latest checks=checks
   watchdog_verdict
   first=$WATCHDOG_VERDICT
   case "$first" in
     healthy|idle)
-      if [ -e "$EPISODE" ] || [ -e "$OUTCOMES" ]; then
+      if [ -e "$EPISODE" ]; then
         log "verdict $first; episode cleared"
-        rm -f "$EPISODE" "$OUTCOMES" 2>/dev/null
+        rm -f "$EPISODE" 2>/dev/null
       fi
       echo "watchdog: $first"
       return 0 ;;
   esac
   episode_read
-  outcomes_read
   now_epoch=$(now)
   if [ "$EP_LAST_ATTEMPT" -gt 0 ] && [ $((now_epoch - EP_LAST_ATTEMPT)) -lt "$RETRY_SECS" ]; then
     echo "watchdog: $first - waiting out the retry interval"
@@ -320,41 +291,33 @@ watchdog_main() {
   stop_stale_watcher
   run_resume "$first"
   if [ "$RECOVERY_ACTION_RAN" -eq 0 ]; then
-    unavailable="; no recovery is possible from this watchdog: no live watcher to stop and $RESUME_UNAVAILABLE"
+    detail=" - no live watcher to stop and $RESUME_UNAVAILABLE"
   elif [ -n "$RESUME_UNAVAILABLE" ]; then
-    unavailable="; $RESUME_UNAVAILABLE; the session cannot be resumed from here"
+    detail=" - $RESUME_UNAVAILABLE; the session cannot be resumed from here"
   fi
   EP_LAST_ATTEMPT=$now_epoch
   if wait_healthy; then
     log "recovered from $first"
-    rm -f "$EPISODE" "$OUTCOMES" 2>/dev/null
+    rm -f "$EPISODE" 2>/dev/null
     echo "watchdog: recovered from $first"
     return 0
   fi
   EP_ATTEMPTS=$((EP_ATTEMPTS + 1))
   if [ "$RECOVERY_ACTION_RAN" -eq 1 ]; then
-    EP_FAILED=$((EP_FAILED + 1))
-    result="recovery failed (attempt $EP_ATTEMPTS)"
+    latest="recovery failed"
     log "recovery attempt $EP_ATTEMPTS failed; verdict now $WATCHDOG_VERDICT"
   else
-    EP_NOOPS=$((EP_NOOPS + 1))
-    result="no-op (attempt $EP_ATTEMPTS)"
+    latest="no-op"
     log "attempt $EP_ATTEMPTS was a no-op; verdict now $WATCHDOG_VERDICT"
   fi
-  totals="failed recoveries: $EP_FAILED; no-op attempts: $EP_NOOPS"
-  unclassified=$((EP_ATTEMPTS - EP_FAILED - EP_NOOPS))
-  if [ "$unclassified" -gt 0 ]; then
-    totals="$totals; earlier unclassified attempts: $unclassified"
-  fi
-  log "$totals$unavailable"
+  [ "$EP_ATTEMPTS" -eq 1 ] && checks=check
   if [ "$EP_ATTEMPTS" -ge "$ALARM_AFTER" ] \
     && { [ "$EP_LAST_ALARM" -eq 0 ] || [ $((now_epoch - EP_LAST_ALARM)) -ge "$ALARM_INTERVAL" ]; }; then
     EP_LAST_ALARM=$now_epoch
-    raise_alarm "firstmate supervision is down ($first): $totals$unavailable - see $LOG" "$first"
+    raise_alarm "firstmate supervision is down ($first): $EP_ATTEMPTS recovery $checks did not restore supervision; latest attempt: $latest$detail - see $LOG" "$first"
   fi
-  outcomes_write
   episode_write
-  echo "watchdog: $first - $result$unavailable"
+  echo "watchdog: $first - $latest (attempt $EP_ATTEMPTS)$detail"
   return 1
 }
 

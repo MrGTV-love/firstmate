@@ -7,11 +7,10 @@ The active alert is pane-independent because a tmux status-line flash has no cro
 The durable marker and tmux flash remain as additional signals.
 
 The [out-of-session watchdog](watchdog.md) uses the same channels with the title `firstmate supervision is down (<verdict>)`.
-Its summary and log count failed recoveries separately from no-op attempts: stopping a live watcher or running a configured resume command is a recovery action, while having neither action available is a no-op.
-When there is no live watcher and no `config/watchdog-resume`, the alarm says that no recovery is possible from this watchdog and names the missing command.
-An empty resume configuration likewise names the absence of a usable command.
-No-ops still contribute to the existing alarm threshold; wording and classification do not delay the alarm.
-Older attempts without classification evidence are reported as unclassified, not assumed to be failures.
+Its summary counts the recovery checks that did not restore supervision and classifies only the latest attempt.
+Stopping a live watcher or running a configured resume command is a recovery action, so an attempt that ran one is a failed recovery.
+An attempt with neither action available is a no-op, and the summary names the missing route, such as no live watcher to stop and no `config/watchdog-resume`.
+No-ops still contribute to the existing alarm threshold; the wording does not delay the alarm.
 The watchdog script's header owns the attempt sequence and state records.
 
 ## Channels
@@ -45,5 +44,5 @@ When the daemon is sourced as a library, that seam defaults to `discard`, so a t
 Production leaves the seam unset and uses the configured real channels.
 
 `tests/fm-daemon.test.sh` covers directive parsing, rate limiting, timeout and process-group cleanup, argv-safe dispatch, channel fallback, and safe `command:` summary delivery.
-`tests/fm-watchdog-check.test.sh` captures watchdog and away-mode titles through the notifier seam and verifies recovery/no-op counts without changing watchdog alarm timing.
+`tests/fm-watchdog-check.test.sh` captures watchdog and away-mode titles through the notifier seam and verifies the failed-recovery and no-op wording without changing watchdog alarm timing.
 [`verification/supervision.md`](verification/supervision.md#wedge-alarm-channels) records the bounded manual macOS and Herdr channel proof.

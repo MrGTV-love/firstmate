@@ -987,14 +987,14 @@ wedge_alarm_stop_active_notifier() {
 
 # The single execution seam for every configured notifier channel.
 # FM_WEDGE_ALARM_EXEC, when set, REPLACES the real notifier: the resolved channel
-# name and summary are handed to that command instead of ever invoking osascript
+# name, summary, and title are handed to that command instead of ever invoking osascript
 # or herdr or a captain-supplied command. This is the one injection point the test harness forces to a recorder
 # so no test can post a real desktop notification - the library-mode guard at the
 # foot of this file defaults it to "discard" whenever the daemon is SOURCED
 # rather than executed, which is the only way a test reaches these functions. The
 # special value "discard" fires nothing; unset means production (the executed
 # daemon), so the real channels fire.
-wedge_alarm_os_notifier_override() {  # <channel> <summary>
+wedge_alarm_os_notifier_override() {  # <channel> <summary>; title: WEDGE_ALARM_TITLE
   local channel=$1 summary=$2 rc exec_override=${FM_WEDGE_ALARM_EXEC:-}
   case "$exec_override" in
     '') return 2 ;;
@@ -1065,7 +1065,7 @@ wedge_alarm_via_command() {  # <cmd> <summary>
   return 1
 }
 
-wedge_alarm_emit() {  # <channel> <summary>
+wedge_alarm_emit() {  # <channel> <summary>; title: WEDGE_ALARM_TITLE
   local channel=$1 summary=$2 cmd=${3:-} rc exec_override=${FM_WEDGE_ALARM_EXEC:-} WEDGE_ALARM_EMIT_ACTIVE=1
   case "$exec_override" in
     '') ;;
