@@ -186,14 +186,6 @@ const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(exte
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
 const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
-// 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
-// bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
-// SIGTERMed mid-confirmation. Conditioned on win32 so other platforms keep 12s.
-const armReadyTimeoutMs = positiveInteger(
-  "FM_OMP_ARM_READY_TIMEOUT_MS",
-  process.platform === "win32" ? 35000 : 12000,
-);
-const hostReadyTimeoutMs = Math.max(armReadyTimeoutMs, 30000);
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const successorGraceMs = positiveInteger("FM_OMP_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
@@ -240,7 +232,6 @@ const armClose = new WeakMap<ChildProcess, Promise<void>>();
 const armRetired = new WeakSet<ChildProcess>();
 const armRecovery = new WeakMap<ChildProcess, { generation: string; watcherPid: string }>();
 const armPendingActionable = new WeakMap<ChildProcess, PendingActionableClose>();
-const armHostMode = new WeakMap<ChildProcess, boolean>();
 
 function positiveInteger(name: string, fallback: number): number {
   const value = Number(process.env[name]);
@@ -1515,23 +1506,9 @@ export default function (pi: ExtensionAPI) {
   function waitForReadiness(armChild: ChildProcess): Promise<boolean> {
     const readiness = armReadiness.get(armChild);
     if (!readiness) return Promise.resolve(false);
-    const timeout = armHostMode.get(armChild) ? hostReadyTimeoutMs : armReadyTimeoutMs;
-    return new Promise((resolveReady) => {
-      const timer = setLifecycleDeadline(() => {
-        lifecycle("bound-expired", {
-          waiter: "omp-watch-extension",
-          "waited-on": armHostMode.get(armChild) ? "supervision-host-readiness" : "arm-readiness",
-          bound: `${timeout}ms`,
-          actual: `${timer.elapsedMs()}ms`,
-        });
-        resolveReady(false);
-      }, timeout);
-      timer.unref();
-      void readiness.then((ready) => {
-        timer.cancel();
-        resolveReady(ready);
-      });
-    });
+    // The arm owns startup progress/death detection. A second wall-clock
+    // deadline here would retire a productive child before it can report.
+    return readiness;
   }
 
   async function retireArm(armChild: ChildProcess | null): Promise<boolean> {
@@ -1653,7 +1630,6 @@ export default function (pi: ExtensionAPI) {
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });
-    armHostMode.set(armChild, hostMode);
     owner.child = armChild;
     let stdout = "";
     let stderr = "";

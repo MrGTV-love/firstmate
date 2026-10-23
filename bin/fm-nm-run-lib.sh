@@ -18,7 +18,9 @@
 #
 # Bounded call to an arbitrary command in dir $1, timeout $2 seconds, and its
 # `no-mistakes "$@"` specialization. The bounded
-# form preserves stdout, stderr, and exit status; the checked form discards
+# form preserves stdout, stderr, and exit status. FM_NM_READ_PROGRESS=1 selects
+# fm_run_progress for read-only crew-state consumers; mutation/abort callers keep
+# their explicit hard-bound contract. The checked form discards
 # command stderr, while fm_nm_run keeps the fail-open query contract for read-only callers.
 # Successful explicit --run queries import completed step durations through
 # fm-duration.py, whose header owns idempotence and historical-load handling;
@@ -32,6 +34,10 @@ fi
 fm_nm_bounded() {  # <dir> <timeout_secs> <command> <args...>
   local dir=$1 timeout_secs=$2 have_timeout=none
   shift 2
+  if [ "${FM_NM_READ_PROGRESS:-0}" = 1 ]; then
+    ( cd "$dir" && fm_run_progress "$timeout_secs" "$@" )
+    return $?
+  fi
   if command -v timeout >/dev/null 2>&1; then have_timeout=timeout
   elif command -v gtimeout >/dev/null 2>&1; then have_timeout=gtimeout
   elif command -v perl >/dev/null 2>&1; then have_timeout=perl

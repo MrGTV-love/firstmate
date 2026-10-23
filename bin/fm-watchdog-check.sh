@@ -34,9 +34,11 @@
 # rewake during a legitimate handling turn.
 #
 # Recovery, only for a verdict other than healthy or idle, under this home's watchdog lock:
-#   1. When the watcher lock names a live pid, stop that watcher with
-#      `bin/fm-watch-arm.sh --stop`, the home-scoped stop that publishes
-#      downtime exactly as any watcher close does. Never pkill.
+#   1. Stop a live watcher only after identity-bound repeated observations
+#      prove no process-tree CPU or beacon progress for STALE_SECS. First or
+#      uncertain samples and advancing work are preserved regardless of beacon
+#      age. `bin/fm-watch-arm.sh --stop` rechecks that exact identity and progress
+#      proof before signalling; never pkill. The reason is logged.
 #   2. Run config/watchdog-resume, the one command that resumes the main
 #      session (relaunch it when gone, wake it when idle). The repository has
 #      no supported relaunch route for a main session, so the captain's own
@@ -57,7 +59,8 @@
 # Exit 0: healthy, idle, recovered, or waiting out the retry interval.
 # Exit 1: still unhealthy after an attempt, including a no-op. Exit 2: usage.
 # State: state/.watchdog-episode (attempt count and times), state/.watchdog.log
-# (bounded), state/.watchdog.lock. Nothing outside this home is touched.
+# (bounded), state/.watchdog.lock, and state/.watchdog-progress (identity-bound
+# CPU/beacon samples). Nothing outside this home is touched.
 #
 # Test seams, honored only when FM_TEST_SEAM=1: FM_WATCHDOG_ARM replaces
 # bin/fm-watch-arm.sh and FM_WATCHDOG_NOW replaces the clock.
@@ -148,9 +151,13 @@ if [ -z "${FM_SUPERVISION_MODEL:-}" ]; then
 fi
 
 WATCHDOG_VERDICT=
+WATCHDOG_STUCK_PID=
+WATCHDOG_STUCK_IDENTITY=
 watchdog_verdict() {
-  local lock_pid age
+  local lock_pid age watcher_pid progress_rc=0
   WATCHDOG_VERDICT=healthy
+  WATCHDOG_STUCK_PID=
+  WATCHDOG_STUCK_IDENTITY=
   fm_supervision_status "$STATE" "$STALE_SECS"
   if [ "$FM_SUP_NEEDED" != true ]; then
     WATCHDOG_VERDICT=idle
@@ -160,6 +167,20 @@ watchdog_verdict() {
   if [ -z "$lock_pid" ] || ! fm_harness_pid_alive "$lock_pid"; then
     WATCHDOG_VERDICT="session-missing"
     return 0
+  fi
+  watcher_pid=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
+  if fm_pid_alive "$watcher_pid" \
+    && fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$watcher_pid" "$FM_HOME"; then
+    # An old beacon is not proof of a hang. Consecutive identity-bound samples
+    # must show neither tree CPU nor beacon progress for the inactivity bound.
+    # A first, failed or uncertain sample preserves the running watcher.
+    python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$STATE/.watchdog-progress" \
+      "$watcher_pid" "$STALE_SECS" "$STATE/.last-watcher-beat" >> "$LOG" 2>&1 || progress_rc=$?
+    if [ "$progress_rc" -ne 124 ]; then
+      return 0
+    fi
+    WATCHDOG_STUCK_PID=$watcher_pid
+    WATCHDOG_STUCK_IDENTITY=$FM_WATCHER_MATCHED_IDENTITY
   fi
   fm_watcher_supervision_verdict "$STATE" "$WATCH" "$STALE_SECS" "$FM_HOME" "$FM_ROOT"
   if [ "$FM_WATCHER_VERDICT_OK" = true ]; then
@@ -233,9 +254,17 @@ stop_stale_watcher() {
   local pid
   pid=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
   fm_pid_alive "$pid" || return 0
-  log "stopping the stale watcher pid=$pid through $(basename "$ARM") --stop"
+  if [ "$pid" != "$WATCHDOG_STUCK_PID" ] \
+    || ! fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$pid" "$FM_HOME" \
+    || [ "$FM_WATCHER_MATCHED_IDENTITY" != "$WATCHDOG_STUCK_IDENTITY" ]; then
+    log "preserving watcher pid=$pid: no identity-matched no-progress proof"
+    return 0
+  fi
+  log "stopping watcher pid=$pid: no CPU or beacon progress for ${STALE_SECS}s, identity reverified; through $(basename "$ARM") --stop"
   RECOVERY_ACTION_RAN=1
-  fm_run_timed "$STEP_BOUND" "$ARM" --stop >> "$LOG" 2>&1 \
+  fm_run_timed "$STEP_BOUND" env FM_WATCH_STOP_PID="$pid" \
+    FM_WATCH_STOP_IDENTITY="$WATCHDOG_STUCK_IDENTITY" FM_WATCH_STOP_IDLE_SECS="$STALE_SECS" \
+    "$ARM" --stop >> "$LOG" 2>&1 \
     || log "watcher stop reported a failure"
 }
 

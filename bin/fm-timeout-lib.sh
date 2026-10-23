@@ -85,6 +85,155 @@
 # (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
+# fm_run_progress <no-progress-seconds> <command...>: keep slow work running
+# while stdout, stderr or cumulative process-tree CPU advances. Unlike the hard
+# bounds below it has no wall-clock cutoff. fm-duration.py owns the Python
+# runner; the Perl-core fallback preserves Python-optional shell readers with
+# the same CPU/output rule. Both forward signals, clean up the owned command
+# group and write no duration records.
+fm_run_progress() {
+  local seconds=$1 helper
+  shift
+  # An outer collector already observes this whole tree. Counting an inner
+  # sampler's CPU as work would hide a hung source forever.
+  if [ "${FM_PROGRESS_MANAGED:-0}" = 1 ]; then
+    "$@"
+    return $?
+  fi
+  helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 "$helper" keep-going "$seconds" -- "$@"
+  elif command -v perl >/dev/null 2>&1; then
+    fm_run_perl_progress "$seconds" "$@"
+  else
+    printf 'fm_run_progress: Python 3 or Perl is required to observe command progress\n' >&2
+    return 127
+  fi
+}
+
+# Preserve the existing Python-optional shell readers. Perl core modules relay
+# both streams and sample the same identity-bound ps CPU facts as fm-duration.py.
+# The bound is inactivity only, including TERM cleanup; an unavailable sample
+# never proves a stall. Parent death and signals clean up the owned command group.
+fm_run_perl_progress() {
+  local owner=${BASHPID:-$$}
+  # shellcheck disable=SC2016 # Perl, not the sourcing shell, expands this program.
+  perl -MPOSIX=WNOHANG -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -MIO::Select -MIO::Handle -e '
+    my ($owner, $idle) = (shift, shift);
+    die "inactivity must be positive\n" unless $idle =~ /^\d+(?:[.]\d+)?$/ && $idle > 0;
+    my $parent = getppid();
+    my ($pending, $stopping, $exit_code) = (0, 0, 0);
+    $SIG{TERM} = sub { $pending ||= 143 };
+    $SIG{INT} = sub { $pending ||= 130 };
+    $SIG{HUP} = sub { $pending ||= 129 };
+    $SIG{PIPE} = sub { $pending ||= 143 };
+    setpgrp(0, 0) or die "setpgrp: $!";
+    pipe(my $out_r, my $out_w) or die "pipe: $!";
+    pipe(my $err_r, my $err_w) or die "pipe: $!";
+    my $pid = fork;
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+      $SIG{$_} = "DEFAULT" for qw(TERM INT HUP);
+      setpgrp(0, 0);
+      close $out_r; close $err_r;
+      open STDOUT, ">&", $out_w or die "stdout: $!";
+      open STDERR, ">&", $err_w or die "stderr: $!";
+      close $out_w; close $err_w;
+      $ENV{FM_PROGRESS_MANAGED} = 1;
+      exec @ARGV;
+      exit 127;
+    }
+    setpgrp($pid, $pid);
+    close $out_w; close $err_w;
+    STDOUT->autoflush(1); STDERR->autoflush(1);
+    my $streams = IO::Select->new($out_r, $err_r);
+    my %sink = (fileno($out_r) => \*STDOUT, fileno($err_r) => \*STDERR);
+    my (%observed, $last_cpu);
+    my $last_progress = clock_gettime(CLOCK_MONOTONIC);
+    my $next_sample = 0;
+    my $cadence = $idle / 4 < 1 ? $idle / 4 : 1;
+    my $cpu = sub {
+      local $ENV{LC_ALL} = "C";
+      open my $ps, "-|", "ps", "-axo", "pid=,ppid=,time=,lstart=" or return;
+      my (%children, %times);
+      while (my $line = <$ps>) {
+        my ($child, $parent, $clock, $identity) = split " ", $line, 4;
+        next unless defined $identity && $child =~ /^\d+$/ && $parent =~ /^\d+$/;
+        chomp $identity;
+        my $seconds = 0;
+        $seconds = $1 * 86400 if $clock =~ s/^(\d+)-//;
+        my $part = 0;
+        $part = $part * 60 + $_ for split /:/, $clock;
+        push @{$children{$parent}}, $child;
+        $times{$child} = [$seconds + $part, $identity];
+      }
+      close $ps or return;
+      return unless exists $times{$pid};
+      my @todo = ($pid);
+      while (@todo) {
+        my $child = pop @todo;
+        if (exists $times{$child}) {
+          my ($seconds, $identity) = @{$times{$child}};
+          my $key = "$child:$identity";
+          $observed{$key} = $seconds if !exists $observed{$key} || $seconds > $observed{$key};
+        }
+        push @todo, @{$children{$child} || []};
+      }
+      my $total = 0;
+      $total += $_ for values %observed;
+      return $total;
+    };
+    my $relay = sub {
+      my $stream = shift;
+      my $count = sysread($stream, my $buffer, 65536);
+      if (defined $count && $count > 0) {
+        print {$sink{fileno($stream)}} $buffer;
+        $last_progress = clock_gettime(CLOCK_MONOTONIC);
+      } elsif (defined $count) {
+        $streams->remove($stream); close $stream;
+      } elsif (!$!{EINTR}) {
+        $pending ||= 1;
+      }
+    };
+    while (1) {
+      my $done = waitpid $pid, WNOHANG;
+      my $status = $?;
+      if ($done == $pid) {
+        kill "KILL", -$pid if $stopping;
+        while (my @ready = $streams->can_read(0)) { $relay->($_) for @ready; }
+        exit($stopping ? $exit_code : (($status & 127) ? 128 + ($status & 127) : $status >> 8));
+      }
+      exit 127 if $done == -1;
+      $pending ||= 143 if getppid() != $parent || !kill(0, $owner);
+      if ($pending) {
+        if ($stopping) { kill "KILL", -$pid; }
+        else {
+          $stopping = 1; $exit_code = $pending;
+          $last_progress = clock_gettime(CLOCK_MONOTONIC);
+          kill "TERM", -$pid;
+        }
+        $pending = 0;
+      }
+      if ($streams->count) { $relay->($_) for $streams->can_read($cadence); }
+      else { select undef, undef, undef, $cadence; }
+      my $now = clock_gettime(CLOCK_MONOTONIC);
+      if ($now >= $next_sample) {
+        my $sample = $cpu->();
+        $last_progress = $now if !defined $sample || !defined $last_cpu || $sample > $last_cpu;
+        $last_cpu = $sample if defined $sample;
+        $next_sample = $now + $cadence;
+      }
+      if ($now - $last_progress >= $idle) {
+        if ($stopping) { kill "KILL", -$pid; }
+        else {
+          print STDERR "no_progress: command made no output or CPU progress\n";
+          $pending = 124;
+        }
+      }
+    }
+  ' "$owner" "$@"
+}
+
 fm_timeout_mechanism() {
   if [ "${FM_TIMEOUT_MECHANISM_OVERRIDE:-}" = bash ]; then
     printf 'bash\n'

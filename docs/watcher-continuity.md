@@ -89,7 +89,8 @@ These logs are evidence, not proof of a healthy arm or permission to use a retir
 
 `tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, repeated binding predecessor release, and owner-marker publication failures.
 `tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, and wake delivery after recovery.
-Both suites use `tests/watch-lifecycle-expiry.mjs` for shutdown child-close, successor readiness (including omp host mode), and unready-arm retirement expiry evidence, plus deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
+Both suites use `tests/watch-lifecycle-expiry.mjs` for explicit shutdown child-close expiry evidence and deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
+Pi also exercises its remaining successor-readiness and unready-arm retirement expiries; `tests/fm-work-progress.test.sh` instead proves that a slow omp successor remains alive until readiness.
 
 ### omp stale wake gating
 
@@ -240,9 +241,9 @@ A failed confirmation is never swallowed.
 
 ### Readiness timeout and retry
 
-The adapter waits at most one readiness timeout per attempt.
-omp uses FM_OMP_ARM_READY_TIMEOUT_MS for arm readiness, defaulting to 12000ms on non-Windows platforms and 35000ms on Windows; host readiness uses the greater of that arm timeout and 30000ms. Its separate idle queue-read deadline remains fixed at 10000ms.
-If the successor is not ready in that time, the adapter sends TERM and waits a bounded retirement confirmation before the next lock-verified exponential retry.
+omp waits for the successor's readiness or actual failure, with startup no-progress detection owned by `bin/fm-watch-arm.sh`; it has no separate arm or host readiness clock that can terminate productive work.
+Its separate idle queue-read deadline remains fixed at 10000ms.
+Pi and OpenCode retain their adapter-owned readiness timeout per attempt, followed by TERM and a bounded retirement confirmation before the next lock-verified exponential retry.
 
 If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds watcher work until idle and reads current main-owned queued rows before delivery.
 When that retained arm later closes, its actual close is classified as a new supervised event without replaying the earlier fallback.
@@ -272,7 +273,8 @@ So that successor is the one deliberate detached launch in the continuity path:
 This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
 The next Stop's foreground arm attaches to that live cycle.
-A successor that confirms no live watcher adds one line to the rewake banner and never withholds the wake.
+The hook does not impose a second readiness deadline: a slow productive successor is awaited, while the arm owns startup no-progress detection.
+A successor that fails or dies before confirming a live watcher adds one line to the rewake banner and never withholds the wake.
 The next Stop then re-arms as before.
 
 ### Durable queue and turn-end backstop

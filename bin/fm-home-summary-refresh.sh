@@ -15,13 +15,15 @@
 # successful publication into that directory. After a failed, interrupted, or
 # killed refresh, an existing ledger remains complete, never torn output.
 # A home-local refresh lock serializes concurrent triggers so an older in-flight
-# summary cannot overwrite one computed after a later status change. The deadline
+# summary cannot overwrite one computed after a later status change. The parent
 # owner retains the lock through publication and streak reset or failure accounting.
 # The existing lock's steal mutex fences handoff, pending-marker consumption,
 # publication, streak changes, wake appends, and release against stale-owner recovery;
 # each critical section checks parent liveness and ownership while holding it.
-# The shared timeout owner bounds state initialization, lock acquisition, validation,
-# and publication with FM_HOME_SUMMARY_TIMEOUT (default 60 seconds).
+# The shared progress owner covers state initialization, lock acquisition,
+# validation and publication. FM_HOME_SUMMARY_TIMEOUT selects its no-output/no-CPU
+# interval (default 900 seconds), never a wall-clock deadline; productive work
+# keeps running. bin/fm-duration.py owns progress detection and signal cleanup.
 # Failure logging, streak accounting, and owner-checked release have independent
 # deadlines of 4, 10, and 4 seconds, so logging failure cannot skip the latter two.
 # No reader can observe temporary output through the ledger path.
@@ -67,7 +69,8 @@ REFRESH_LOCK="$STATE/.home-summary-refresh.lock"
 PENDING_MARK="$STATE/.home-summary-refresh.pending"
 STREAK_FILE="$STATE/.home-summary-refresh.streak"
 ERROR_LOG_MAX_BYTES=${FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES:-65536}
-HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-60}
+# Match fm-duration.py's 15-minute no-progress policy, not a wall deadline.
+HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-$((15 * 60))}
 HOME_SUMMARY_IF_IDLE=${FM_HOME_SUMMARY_IF_IDLE:-0}
 BEST_EFFORT=0
 DETACH=0
@@ -106,7 +109,7 @@ case "$ERROR_LOG_MAX_BYTES" in
   ''|*[!0-9]*|0) ERROR_LOG_MAX_BYTES=65536 ;;
 esac
 case "$HOME_SUMMARY_TIMEOUT" in
-  ''|*[!0-9]*|0) HOME_SUMMARY_TIMEOUT=60 ;;
+  ''|*[!0-9]*|0) HOME_SUMMARY_TIMEOUT=$((15 * 60)) ;;
 esac
 case "$HOME_SUMMARY_IF_IDLE" in
   0|1) ;;
@@ -157,7 +160,7 @@ home_summary_refresh_once() {
   fm_current_pid worker_pid || return 1
   home_summary_fence "$worker_pid" || return 1
   if ! printf '%s\n' "$FM_HOME_SUMMARY_PARENT_PID" > "$REFRESH_LOCK/pid" 2>/dev/null; then
-    home_summary_fail "could not hand the refresh lock to its timeout owner"
+    home_summary_fail "could not hand the refresh lock to its parent owner"
     return 1
   fi
   HOME_SUMMARY_LOCK_HELD=0
@@ -369,7 +372,7 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   while :; do
     attempt_stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || attempt_stamp=
     attempt_start=$SECONDS
-    if worker_error=$(fm_run_timed "$HOME_SUMMARY_TIMEOUT" env \
+    if worker_error=$(fm_run_progress "$HOME_SUMMARY_TIMEOUT" env \
       FM_HOME_SUMMARY_PARENT_PID="$$" \
       FM_HOME_SUMMARY_WORKER_BEST_EFFORT="$BEST_EFFORT" \
       FM_HOME_SUMMARY_IF_IDLE="$HOME_SUMMARY_IF_IDLE" \
@@ -390,7 +393,7 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   done
   if [ "$BEST_EFFORT" -eq 1 ]; then
     if [ "$refresh_rc" -eq 124 ]; then
-      parent_error="refresh exceeded its ${HOME_SUMMARY_TIMEOUT}-second deadline"
+      parent_error="refresh made no output or CPU progress for ${HOME_SUMMARY_TIMEOUT} seconds"
     elif [ -n "$worker_error" ]; then
       parent_error=$worker_error
     else
@@ -412,7 +415,7 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
   fi
   home_summary_release_parent_lock || true
   if [ "$refresh_rc" -eq 124 ]; then
-    printf 'fm-home-summary-refresh: refresh exceeded its %s-second deadline\n' \
+    printf 'fm-home-summary-refresh: refresh made no output or CPU progress for %s seconds\n' \
       "$HOME_SUMMARY_TIMEOUT" >&2
   fi
   exit "$refresh_rc"

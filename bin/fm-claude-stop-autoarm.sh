@@ -355,13 +355,12 @@ run_arm() {  # <output file, or empty for none>
 # successor receives the closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID; it
 # must outlive this hook's exit, so it is detached three ways: nohup, stdio
 # away from the hook's pipes, and its own process group. Its one status line
-# is awaited within the arm's own confirmation budget plus slack. Sets
+# is awaited until readiness, a reported startup failure or proven death. The
+# arm owns startup no-progress detection; no second clock can cut it short. Sets
 # SUCCESSOR_FAILURE to the banner line for an unconfirmed successor.
 SUCCESSOR_FAILURE=
 start_handling_successor() {  # <closed-arm-pid>
-  local out pid deadline budget line monitor_was_on=0
-  budget=${FM_ARM_CONFIRM_TIMEOUT:-30}
-  case "$budget" in ''|*[!0-9]*) budget=30 ;; esac
+  local out pid line monitor_was_on=0
   if ! out=$(mktemp "$STATE/.claude-autoarm-successor.XXXXXX"); then
     SUCCESSOR_FAILURE='The handling successor did not confirm a live watcher (its output file could not be created); this handling turn runs uncovered until the next turn end re-arms.'
     return 1
@@ -372,14 +371,13 @@ start_handling_successor() {  # <closed-arm-pid>
     nohup "$SCRIPT_DIR/fm-watch-arm.sh" >"$out" 2>&1 </dev/null &
   pid=$!
   [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
-  deadline=$(( $(date +%s) + budget + 2 ))
   while :; do
     if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
       rm -f "$out" 2>/dev/null || true
       return 0
     fi
     grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
-    [ "$(date +%s)" -ge "$deadline" ] && break
+    fm_pid_alive "$pid" || break
     sleep 0.2
   done
   line=$(grep '^watcher: FAILED' "$out" 2>/dev/null | head -n 1 || true)

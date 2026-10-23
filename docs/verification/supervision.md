@@ -225,9 +225,30 @@ These guarantees are process semantics, not vendor-emitted signals, so no live-h
 [`bin/fm-timeout-lib.sh`](../../bin/fm-timeout-lib.sh)'s header owns the shared Perl bound's process-group, signal, and owner-death contract.
 [`tests/fm-timeout-lib.test.sh`](../../tests/fm-timeout-lib.test.sh) exercises delayed child process-group creation through both `fm_run_timed` and `fm_nm_bounded`, TERM forwarding, and an outer deadline expiring before an inner bound with a TERM-resistant child and delayed inner cleanup.
 The nested-bound case checks that captured stdout closes promptly and the child is no longer running.
-[`tests/fm-crew-state.test.sh`](../../tests/fm-crew-state.test.sh)'s no-timeout case checks that the fake no-mistakes call actually ran and did not survive its bound before asserting the pane-state fallback.
+[`tests/fm-work-progress.test.sh`](../../tests/fm-work-progress.test.sh) exercises slow productive no-mistakes reads through the current crew-state consumer; the shared hard-bound mechanisms remain covered by `tests/fm-timeout-lib.test.sh` for their unchanged callers.
 
 [`tests/lib.sh`](../../tests/lib.sh) owns registered fixture identity checks, stopped-watcher resumption, cleanup ordering, and the default blocking-stub ceiling.
+
+### Productive-work limits
+
+Verified 2026-10-23 on macOS arm64 with Bash 3.2.57, Python 3.13.6, Perl 5.34.1 and Node 26.4.0:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-work-progress.test.sh
+bash tests/fm-backlog-read-bound.test.sh
+bash bin/fm-test-run.sh tests/fm-crew-state.test.sh
+bash bin/fm-test-run.sh tests/fm-duration.test.sh
+```
+
+These commands ran beneath the process-budget and duration owners.
+The progress suite reported `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0` with all eleven cases passing.
+It exercises slow arm/omp/Claude readiness, a productive watcher with an old beacon followed by a real inactive-holder stop, atomic summary publication, authoritative crew and fleet reads, and collection beyond the retired overall alarm.
+It also removes Python from the child's PATH and proves both CPU-only descendant work and output-only work survive, while a genuinely inactive source is stopped without leaving a live descendant.
+The backlog suite finished with `# fm-backlog-read-bound.test.sh: all assertions passed`, covering slow row/inventory/held-call reads without poisoning the sweep, plus real no-progress recovery and refusal to spend an unreadable row as absence or inventory attestation.
+The complete crew-state suite also passed its unchanged Python-free and unavailable-SQLite diagnostics, and the duration-owner suite retained real statistics-import and ownership behavior.
+Progress-only execution therefore does not acquire a SQLite dependency just to observe a command.
+These are project-owned process and API-boundary guarantees, not refreshed vendor-rendering or backend-availability claims.
+The [progress owner](../../bin/fm-duration.py), [shell execution owner](../../bin/fm-timeout-lib.sh), and [backlog owner](../../bin/fm-backlog-transition-lib.sh) define the current mechanics; incident chronology and before-change counterfactuals remain in private task evidence.
 
 ## Semantic busy state
 

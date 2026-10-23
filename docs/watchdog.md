@@ -26,7 +26,10 @@ A launchd job runs outside every harness, so the check derives the supervision m
 Pi and omp homes use the extension model and are not covered by the derivation.
 
 The ordinary stale threshold defaults to 900 seconds (`FM_WATCHDOG_STALE_SECS`).
-A live session with a rewake ledger bound to its session lock and current recovery generation has a separate fixed limit of 3600 seconds for a legitimate handling turn.
+For a live identity-matched watcher, this is a no-progress interval, not permission to stop it merely because its beacon is old.
+The check preserves a first or uncertain observation and any watcher whose process-tree CPU or beacon advances; automatic stopping requires repeated valid observations with neither form of progress, with the evidence and identity recorded in the log.
+The arm rechecks the same identity and progress evidence before signalling so a replacement or resumed watcher is retained.
+When no verified live watcher exists, a live session with a rewake ledger bound to its session lock and current recovery generation has a separate fixed limit of 3600 seconds for a legitimate handling turn.
 The bound ledger must be at least as new as the beacon and have no exhausted-failure marker.
 At or beyond that limit, the watchdog reports `stale-watcher` even when `FM_WATCHDOG_STALE_SECS` is larger or the pull guard's separate mid-turn policy still considers the session healthy.
 
@@ -69,4 +72,5 @@ The installer bakes the `PATH` of the shell that runs it into the agent, because
 - It does not cover Pi or omp extension supervision, secondmate homes' own supervision, or the away-mode daemon's injection path.
 - The root cause of any particular death is out of scope here.
 
-`tests/fm-watchdog-check.test.sh` covers the fresh, idle, stale-watcher, dead-arm-owner, and missing-session verdicts, the home-scoped stop, the retry interval, the failed-recovery and no-op attempt wording, the alarm threshold, title, and rate limit, and the installer, all against a temporary home.
+`tests/fm-watchdog-check.test.sh` covers the fresh, idle, stale-watcher, dead-arm-owner, and missing-session verdicts, the home-scoped stop, the retry interval, the failed-recovery and no-op attempt wording, the alarm threshold, title, and rate limit, and the installer, all against temporary homes.
+`tests/fm-work-progress.test.sh` proves that an old beacon cannot stop a productive watcher, while a genuinely inactive holder is stopped with its evidence logged and a superseded stop proof cannot signal a replacement.

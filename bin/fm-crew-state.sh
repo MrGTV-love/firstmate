@@ -42,9 +42,10 @@
 #       stale model the spawn gate let through (docs/configuration.md#model-freshness).
 # Absence of either component is not evidence of health: a session that has not
 # published a record (not omp, not yet started, or remote) adds nothing.
-# A run-attribution lookup cut by its own FM_CREW_STATE_NM_TIMEOUT (every lookup
-# has the full allowance) is never retried and ends the line with `run-store:
-# skipped (read budget exceeded)`. A cut first status read leaves the pane and
+# Each run-attribution lookup uses FM_CREW_STATE_NM_TIMEOUT as a no-output/no-CPU
+# interval (default 900 seconds), not a wall-clock deadline. Slow productive reads
+# finish and are used. A proven stalled lookup is never retried and ends the line
+# with `run-store: skipped (no output or CPU progress)`. A cut first status read leaves the pane and
 # status-log fallback below to answer. A cut overview, inventory, id-addressed
 # status or identity runs-list read reports an unknown run-step verdict. A cut
 # runs-list read after a bound run is skipped and the bare status answer stands;
@@ -236,8 +237,12 @@ ID=${1:-}
 # state read resolves the same task generation selected by that snapshot.
 META=${FM_CREW_STATE_META_OVERRIDE:-"$STATE/$ID.meta"}
 LOG=${FM_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
-NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-10}
-case "$NM_TIMEOUT" in ''|*[!0-9]*) NM_TIMEOUT=10 ;; esac
+# The daemon may be working outside this process tree. Allow its quiet reads
+# the same 15-minute inactivity policy as fm-duration.py, never a 10s wall kill.
+NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-$((15 * 60))}
+case "$NM_TIMEOUT" in ''|*[!0-9]*|0) NM_TIMEOUT=$((15 * 60)) ;; esac
+# Shell-local: only this read-only consumer opts into the shared runner mode.
+FM_NM_READ_PROGRESS=1
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (fm_nm_runs_status_for_worktree in bin/fm-nm-run-lib.sh) scans for the legacy
 # fallback or an unfetched-head continuation (docs/configuration.md owns the
@@ -256,7 +261,7 @@ LIVE_NOTE=''
 nm_note_cut() {  # <exit-status>
   [ "$1" = 124 ] || return 0
   case "$LIVE_NOTE" in *"${SEP}run-store: skipped"*) return 0 ;; esac
-  LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (read budget exceeded)"
+  LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (no output or CPU progress)"
 }
 
 # Emit the one canonical line and exit 0. Detail is optional.
@@ -963,10 +968,8 @@ nm_daemon_probe_down() {
 # record it would drop a working crew back to a possibly-stale status log every
 # time the probe merely ran slow - the crew would flap between working and
 # failed on probe latency alone. 124 is the bounded call's own did-not-answer
-# code (both the timeout and perl arms of fm_nm_run_bounded use it), and proves
-# nothing about the daemon. The no-timeout-tool return of 1 cannot reach here:
-# without a timeout tool the `axi status` read above is empty too, so this whole
-# block is skipped.
+# code for a proven no-progress read, and proves nothing about daemon death.
+# A slow productive probe finishes before this classification is made.
 nm_daemon_answered_down() {
   nm_daemon_probe
   [ "$NM_DAEMON_ANSWER" = down ]

@@ -84,7 +84,10 @@
 # bin/fm-supervision-host.sh). The stopped watcher publishes downtime exactly
 # as any watcher close does; prints "watcher: stopped pid=<N>" or
 # "watcher: none running" and exits 0, or exits 1 when the watcher outlived
-# the stop.
+# the stop. The watchdog supplies FM_WATCH_STOP_PID, FM_WATCH_STOP_IDENTITY and
+# FM_WATCH_STOP_IDLE_SECS to restrict an automatic --stop to its observed holder;
+# this script rechecks state/.watchdog-progress before signalling. A superseded
+# identity or resumed progress reports retained instead of stopping a successor.
 #
 # A copy of this script living under a disposable no-mistakes validation
 # checkout (a path containing /.no-mistakes/worktrees/) refuses every mode
@@ -127,14 +130,17 @@ WATCH_LOCK="$STATE/.watch.lock"
 BEAT="$STATE/.last-watcher-beat"
 # "Fresh" reuses the guard's threshold so there is one definition of liveness.
 GRACE=${FM_GUARD_GRACE:-300}
-# How long to wait for a freshly forked watcher to acquire the lock and beat.
-# Git Bash/MSYS pays a much higher fork cost while the watcher completes its
-# required pre-lock migration, so its bounded default covers that cold start.
+# How long to observe the absence of a healthy successor after a cycle has
+# actually ended. This never terminates a running startup. Git Bash/MSYS needs
+# additional publication slack for its higher fork cost.
 case "${OSTYPE:-}" in
   msys*|mingw*|cygwin*) ARM_CONFIRM_DEFAULT=30 ;;
   *) ARM_CONFIRM_DEFAULT=10 ;;
 esac
 CONFIRM_TIMEOUT=${FM_ARM_CONFIRM_TIMEOUT:-$ARM_CONFIRM_DEFAULT}
+# Startup has no wall-clock cutoff. The 15-minute inactivity policy matches
+# fm-duration.py; the old override now shortens only this no-progress bound.
+START_NO_PROGRESS=${FM_ARM_CONFIRM_TIMEOUT:-$((15 * 60))}
 # Poll interval while attached to an existing healthy watcher.
 ATTACH_POLL=${FM_ARM_ATTACH_POLL:-0.5}
 # The beacon age at which the watcher's own re-arm evicts a live holder; an
@@ -513,11 +519,27 @@ fi
 # reclaims a now-dead-pid stale lock instead of seeing the dying one as a live
 # holder and no-opping. Sets STOPPED_PID to the pid it stopped.
 STOPPED_PID=
+STOP_SUPERSEDED=0
 stop_home_watcher() {
-  local lock_pid i
+  local lock_pid i progress_rc=0
   lock_pid=$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)
   fm_pid_alive "$lock_pid" || return 0
   if fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$lock_pid" "$FM_HOME"; then
+    # A watchdog request cannot stop a successor that acquired the lock after
+    # its sample, nor a holder that resumed progress while the arm was starting.
+    if [ -n "${FM_WATCH_STOP_PID:-}" ]; then
+      if [ "$lock_pid" != "$FM_WATCH_STOP_PID" ] \
+        || [ "$FM_WATCHER_MATCHED_IDENTITY" != "${FM_WATCH_STOP_IDENTITY:-}" ]; then
+        STOP_SUPERSEDED=1
+        return 0
+      fi
+      python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$STATE/.watchdog-progress" \
+        "$lock_pid" "${FM_WATCH_STOP_IDLE_SECS:-0}" "$BEAT" || progress_rc=$?
+      if [ "$progress_rc" -ne 124 ]; then
+        STOP_SUPERSEDED=1
+        return 0
+      fi
+    fi
     kill -TERM "$lock_pid" 2>/dev/null || true
     i=0
     while [ "$i" -lt 50 ] && fm_pid_alive "$lock_pid"; do
@@ -542,6 +564,8 @@ if [ "$mode" = stop ]; then
     exit 1
   elif [ -n "$STOPPED_PID" ]; then
     echo "watcher: stopped pid=$STOPPED_PID"
+  elif [ "$STOP_SUPERSEDED" -eq 1 ]; then
+    echo "watcher: retained - automatic stop proof superseded"
   else
     echo "watcher: none running"
   fi
@@ -632,7 +656,7 @@ cleanup_child() {
     kill -TERM "$child" 2>/dev/null || true
   fi
   if [ -n "$child_out" ]; then
-    rm -f "$child_out" 2>/dev/null || true
+    rm -f "$child_out" "$child_out.progress" 2>/dev/null || true
   fi
 }
 
@@ -679,10 +703,13 @@ else
 fi
 child=$!
 cycle_begin "$child" started "$(fm_pid_identity "$child" 2>/dev/null || true)"
+python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$child_out.progress" "$child" "$START_NO_PROGRESS" \
+  "$child_out" "$BEAT" || true
 child_done=0
 
 owned_child_finished() {
   local rc=$1 signal reason_type status
+  rm -f "$child_out.progress" 2>/dev/null || true
   signal=$(cycle_signal_name "$rc")
   if [ "$rc" -eq 0 ] && watch_output_has_wake "$child_out"; then
     reason_type=$(watch_output_reason_type "$child_out")
@@ -781,7 +808,13 @@ while :; do
     owned_child_finished "$rc"
     exit $?
   fi
-  [ "$(date +%s)" -ge "$deadline" ] && break
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    progress_rc=0
+    python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$child_out.progress" "$child" "$START_NO_PROGRESS" \
+      "$child_out" "$BEAT" || progress_rc=$?
+    [ "$progress_rc" -ne 124 ] || break
+    deadline=$(( $(date +%s) + 1 ))
+  fi
   sleep 0.2
 done
 
@@ -790,6 +823,6 @@ print_watch_output "$child_out"
 cleanup_child
 wait "$child" 2>/dev/null
 rc=$?
-cycle_log_append "$rc" "$(cycle_signal_name "$rc")" confirmation-timeout none
+cycle_log_append "$rc" "$(cycle_signal_name "$rc")" confirmation-no-progress none
 echo "watcher: FAILED - no live watcher with a fresh beacon"
 exit 1

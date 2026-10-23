@@ -485,7 +485,7 @@ require_tasks_axi() {
 }
 
 # Read one row into TASK_SHOW_OUTPUT; a non-zero return means the row is
-# absent. A read that could not finish inside its bound is NOT absence, and
+# absent. A read stopped for proven no progress is NOT absence, and
 # every caller below would otherwise spend it as one - minting a duplicate task,
 # skipping a keyed answer, or reporting a task that exists as missing. So the
 # bound's own status stops the command instead, loudly and by name, and it
@@ -500,7 +500,7 @@ task_show() {  # <id>; sets TASK_SHOW_OUTPUT
   if [ "$status" -eq 124 ]; then
     reason=${TASK_SHOW_OUTPUT%%$'\n'*}
     printf 'fm-captain-hold: %s\n' \
-      "${reason:-tasks-axi show $1 exceeded its backlog read bound}" >&2
+      "${reason:-tasks-axi show $1 made no output or CPU progress within its backlog read inactivity bound}" >&2
     exit 124
   fi
   return "$status"
@@ -512,7 +512,7 @@ task_show() {  # <id>; sets TASK_SHOW_OUTPUT
 # it carries the row in TASK_SHOW_OUTPUT, which a subshell cannot hand back.
 task_show_or_fail() {  # <id> <absence-message>; sets show
   task_show "$1" || {
-    [ "$?" -ne 124 ] || fail "the backlog backend exceeded its read bound reading $1"
+    [ "$?" -ne 124 ] || fail "the backlog backend made no output or CPU progress reading $1"
     fail "$2"
   }
   show=$TASK_SHOW_OUTPUT

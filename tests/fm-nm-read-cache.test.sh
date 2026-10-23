@@ -440,55 +440,6 @@ case_answers_are_classified_by_what_they_say() {
   pass 'answers are classified by what they say, and only a settled finished run is kept'
 }
 
-# The snapshot bound protects against a hang, not against a loaded read. One
-# snapshot at its default holds a lane whose responsive store lookups together
-# outlast the old 10-second bound, a quick lane, and a lane whose git read never
-# returns: the slow and quick lanes answer, the hung lane is cut at the default
-# 40 seconds, and the whole snapshot returns inside the callers' 60-second
-# default deadlines (bin/fm_open_loops.py, bin/fm-home-summary-refresh.sh).
-case_snapshot_default_cuts_only_the_hung_lane() {
-  local d lane real_git out start elapsed state
-  d=$(new_case hung-lane)
-  serve_run "$d" 01RUN completed passed
-  mkdir -p "$d/data" "$d/config" "$d/projects"
-  printf '## In flight\n' > "$d/data/backlog.md"
-  for lane in quick hung; do
-    git clone -q -b "$BRANCH" "$d/wt" "$d/wt-$lane" || fail "could not clone the $lane lane"
-    fm_write_meta "$d/state/$lane.meta" "window=fm:fm-$lane" "worktree=$d/wt-$lane" "kind=ship"
-  done
-  mv "$d/fakebin/no-mistakes" "$d/fakebin/nm-response"
-  cat > "$d/fakebin/no-mistakes" <<'SH'
-#!/usr/bin/env bash
-case "$PWD" in */wt) sleep 4 ;; esac
-exec "${0%/*}/nm-response" "$@"
-SH
-  real_git=$(command -v git)
-  cat > "$d/fakebin/git" <<SH
-#!/usr/bin/env bash
-case " \$* " in
-  *'/wt-hung symbolic-ref '*) exec sleep 600 ;;
-esac
-exec "$real_git" "\$@"
-SH
-  chmod +x "$d/fakebin/no-mistakes" "$d/fakebin/git"
-  start=$SECONDS
-  out=$(snapshot_json "$d") || fail "the hung lane lost the snapshot: $(cat "$d/snapshot.err")"
-  elapsed=$((SECONDS - start))
-  assert_equals 3 "$(printf '%s\n' "$out" | jq '.tasks | length')" 'every lane is in the snapshot'
-  for lane in cached quick; do
-    state=$(printf '%s\n' "$out" | jq -c --arg id "$lane" '.tasks[] | select(.id == $id) | .current_state')
-    assert_equals 'done' "$(printf '%s\n' "$state" | jq -r '.state')" "the $lane lane still reports its finished run"
-    assert_equals run-step "$(printf '%s\n' "$state" | jq -r '.source')" "the $lane lane keeps its authoritative source"
-  done
-  state=$(printf '%s\n' "$out" | jq -c '.tasks[] | select(.id == "hung") | .current_state')
-  assert_equals unknown "$(printf '%s\n' "$state" | jq -r '.state')" 'the hung lane is unknown'
-  assert_contains "$state" 'current-state command failed (exit 124)' 'the hung lane is cut by the whole-read bound'
-  [ "$elapsed" -ge 39 ] || fail "the hung lane was cut after ${elapsed}s, before the 40-second default"
-  [ "$elapsed" -lt 60 ] || fail "the snapshot took ${elapsed}s, past the callers' 60-second deadlines"
-  pass "the default whole-read bound cuts only the hung lane, after ${elapsed}s"
-}
-
-
 # --- (d) mutation checks ----------------------------------------------------------------
 
 # A copy of bin/ whose cache library ends with <override>: a later definition
@@ -520,7 +471,6 @@ expect_mutant_caught() {  # <label> <case-function> <override>
 
 main() {
   local fn
-  case_snapshot_default_cuts_only_the_hung_lane
   for fn in \
     case_finished_run_is_kept_until_the_id_changes \
     case_finished_run_needs_the_database \

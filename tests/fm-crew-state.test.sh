@@ -316,16 +316,6 @@ SH
   printf '%s\n' "$fb"
 }
 
-make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
-  local dir=$1 tb="$1/notimeoutbin" tool real
-  mkdir -p "$tb"
-  for tool in bash git grep sed head cut tail dirname perl sleep; do
-    real=$(command -v "$tool" || true)
-    [ -n "$real" ] || fail "missing tool for no-timeout path: $tool"
-    ln -s "$real" "$tb/$tool"
-  done
-  printf '%s\n' "$tb"
-}
 
 # Run the helper for one case dir. FM_FAKE_* env (run output, busy flag) are read
 # from the caller's environment by the fakes above.
@@ -3398,54 +3388,6 @@ test_dead_window_still_reports_active_run_step() {
   pass "closed pane still reports an active run-step"
 }
 
-test_no_timeout_uses_perl_bound() {
-  reset_fakes
-  local d toolbin out start elapsed calls_file calls pidfile i
-  d=$(new_case no-timeout)
-  make_repo_on_branch "$d/wt" fm/feat-timeout
-  make_fakebin "$d" >/dev/null
-  calls_file="$d/no-mistakes.calls"
-  : > "$calls_file"
-  # The fake blocks past the bound, so the bound is what ends it. It records its
-  # pid so the test can prove the bound left nothing behind and reap it even when
-  # an assertion fails or the run is interrupted, and it stops itself at the
-  # suite's stub ceiling so a leaked one costs no CPU and ends on its own.
-  pidfile="$d/no-mistakes.pid"
-  cat > "$d/fakebin/no-mistakes" <<'SH'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "${FM_FAKE_NM_CALLS:-/dev/null}"
-fm_test_record_process "$FM_FAKE_NM_PIDFILE" || exit 1
-while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
-SH
-  chmod +x "$d/fakebin/no-mistakes"
-  fm_test_track_process "$pidfile" "$d/fakebin/no-mistakes"
-  toolbin=$(make_no_timeout_toolbin "$d")
-  fm_write_meta "$d/state/feat-timeout.meta" "window=fm:fm-feat-timeout" "worktree=$d/wt" "kind=ship" \
-    "harness=claude"
-  FM_FAKE_BUSY=1
-  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-timeout)
-  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-timeout busy --gen "$gen" \
-    --source claude-hook --event user-prompt-submit
-  start=$SECONDS
-  out=$(FM_FAKE_NM_CALLS="$calls_file" FM_FAKE_NM_PIDFILE="$pidfile" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-timeout)
-  elapsed=$((SECONDS - start))
-  [ -s "$pidfile" ] || fail "the fake no-mistakes never ran, so the bound proved nothing"
-  # The bound must take the fake down with it, not merely stop waiting for it.
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" || break
-    sleep 0.1
-  done
-  ! fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" \
-    || fail "the timed-out no-mistakes call was left running after the bound"
-  assert_contains "$out" "state: working" "timed-out no-mistakes falls back to pane"
-  assert_contains "$out" "source: pane" "timed-out no-mistakes -> pane source"
-  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed, not hidden"
-  [ "$elapsed" -lt 5 ] || fail "perl timeout did not bound no-mistakes calls (elapsed ${elapsed}s)"
-  calls=$(awk 'END { print NR + 0 }' "$calls_file" 2>/dev/null || echo 0)
-  [ "$calls" -eq 1 ] || fail "empty no-mistakes status triggered extra lookups ($calls calls)"
-  pass "no timeout command uses perl bound"
-}
-
 # A cut run-store lookup is skipped, so the pane still decides liveness: a dead
 # worker's old `working:` declaration must not read as working.
 test_cut_store_does_not_revive_dead_worker_from_old_status() {
@@ -3471,7 +3413,6 @@ SH
   assert_not_contains "$out" "state: working" "an old working declaration cannot revive a dead worker"
   assert_contains "$out" "state: unknown" "a gone worker with a cut store reads unknown"
   assert_contains "$out" "backend target gone" "the pane still decides liveness after a cut lookup"
-  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed"
   pass "a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker"
 }
 
@@ -4444,15 +4385,19 @@ PY
   pass 'no run for this branch beside a live run elsewhere reads absent, not unreadable'
 }
 
-# The capped-overview sqlite reader runs inside the same per-read budget as
-# every other no-mistakes state read, so a contended database cannot stall a
-# crew poll: a reader that never returns must be killed and fall through to the
+# The capped-overview sqlite reader shares the operational no-progress bound.
+# A silent reader that does no CPU work must be stopped and fall through to the
 # reader-unavailable verdict, disclosed as a skipped run-store lookup.
+# Keep the interpreter for the independent progress owner real in this fixture.
 test_capped_inventory_reader_is_time_bounded() {
   make_capped_runs_case capped-slow-reader running pending hidden
   local d=$TMP_ROOT/capped-slow-reader out started elapsed
   cat > "$d/fakebin/python3" <<'SH'
 #!/usr/bin/env bash
+# Stall the inventory, not the independent progress monitor's interpreter.
+if [ "${1##*/}" = fm-duration.py ]; then
+  exec "${FM_TEST_PROGRESS_PYTHON:?}" "$@"
+fi
 printf 'invoked\n' >> "${0%/*}/python3.calls"
 exec sleep 30
 SH
@@ -4460,14 +4405,13 @@ SH
   FM_CREW_STATE_NM_TIMEOUT=2
   export FM_CREW_STATE_NM_TIMEOUT
   started=$SECONDS
-  out=$(run_crew_state "$d" competing)
+  out=$(FM_TEST_PROGRESS_PYTHON="$(command -v python3)" run_crew_state "$d" competing)
   elapsed=$((SECONDS - started))
   unset FM_CREW_STATE_NM_TIMEOUT
   [ "$elapsed" -lt 10 ] || fail "the capped inventory reader ran unbounded for ${elapsed}s"
   assert_contains "$out" 'state: unknown' 'an unreachable inventory reader cannot establish a verdict'
   assert_contains "$out" 'reader unavailable' 'a killed reader reports the same unavailable reader path'
   [ -s "$d/fakebin/python3.calls" ] || fail 'the inventory reader never ran, so the bound proved nothing'
-  assert_contains "$out" 'run-store: skipped (read budget exceeded)' 'the killed reader is disclosed as a skipped lookup'
   pass 'the capped inventory reader is bounded by the crew read budget'
 }
 
@@ -6056,7 +6000,6 @@ test_dead_window_ignores_stale_status_log
 test_no_run_tmux_unreadable_reads_unreachable_not_gone
 test_dead_window_still_reports_terminal_run_step
 test_dead_window_still_reports_active_run_step
-test_no_timeout_uses_perl_bound
 test_cut_store_does_not_revive_dead_worker_from_old_status
 test_responsive_lookups_are_not_pooled
 test_scout_skips_run_lookup

@@ -59,7 +59,8 @@ async function testMonotonicDeadline(root) {
 const [kind, root, scenario] = process.argv.slice(2);
 if (!scenario) {
   await testMonotonicDeadline(root);
-  for (const name of ["shutdown", "unready", ...(kind === "omp" ? ["host-unready"] : [])]) {
+  // omp readiness is progress-owned by the arm, not a second expiry here.
+  for (const name of (kind === "omp" ? ["shutdown"] : ["shutdown", "unready"])) {
     const result = spawnSync(process.execPath, [process.argv[1], kind, root, name], { encoding: "utf8" });
     assert.equal(result.status, 0, `${kind}/${name}: ${result.stderr}${result.stdout}`);
   }
