@@ -472,9 +472,12 @@ run_with_clients() {  # <dir> <path> <body>
     bash -c ". \"\$0/bin/backends/herdr.sh\"; $body" "$ROOT"
 }
 
-# A stopped server can retain a saved pane. Neither a stopped nor an
-# unreadable server proves endpoint absence; an answering running server does.
-test_passive_read_requires_a_running_server_before_claiming_absence() {
+# A stopped server can retain a saved pane. A stopped status whose absence
+# proof cannot be read, or an unreadable status, does not prove endpoint
+# absence; an answering running server does. The proven-absent stopped case is
+# covered by tests/herdr-server-start-fixture.py with real process and socket
+# state.
+test_passive_read_requires_a_running_server_or_proven_stop_before_claiming_absence() {
   local dir log resp fb state expected out
   for state in false true null; do
     dir="$TMP_ROOT/passive-server-$state"; mkdir -p "$dir/responses"
@@ -490,7 +493,7 @@ test_passive_read_requires_a_running_server_before_claiming_absence() {
     [ "$out" = "$expected" ] || fail "server running=$state must classify as $expected, got '$out'"
     assert_not_contains "$(cat "$log")" $'\x1fserver\x1f' "a passive classifier must not start a server"
   done
-  pass "herdr passive classifier requires a running server before claiming pane absence"
+  pass "herdr passive classifier requires a running server or proven stop before claiming pane absence"
 }
 
 # --- stale agent registration over a shell-only pane (issue #4115) -----------
@@ -6315,7 +6318,7 @@ test_workspace_label_empty_marker_falls_back_to_primary
 test_workspace_label_different_secondmates_get_different_labels
 test_cli_helper_sets_env_and_appends_trailing_session_flag
 test_agent_state_bypasses_a_stale_client_shadowing_a_compatible_one
-test_passive_read_requires_a_running_server_before_claiming_absence
+test_passive_read_requires_a_running_server_or_proven_stop_before_claiming_absence
 test_stale_registration_over_a_shell_only_pane_is_agent_free
 test_missing_registration_requires_process_evidence
 test_stale_registration_ignores_status_and_reads_the_process

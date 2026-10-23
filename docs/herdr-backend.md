@@ -589,7 +589,10 @@ An environment variable alone is not reliable when another Herdr server is runni
 
 A failed, empty, or malformed status is unknown and refuses startup.
 A successful stopped status is necessary but not sufficient: [`herdr-server-start.py`](../bin/backends/herdr-server-start.py) owns serialized startup after proving both process absence for the session and a non-accepting session socket.
-A live process, accepting socket, unreadable proof, or competing starter refuses rather than replacing a server.
+A `herdr server` process without `--session` serves the session named by its inherited `HERDR_SESSION`, or `default` when that variable is absent; the helper reads that environment with `ps -E` on macOS or `/proc/<pid>/environ` on Linux.
+When that environment cannot be read, the process's session is unknown and it blocks startup.
+A live process, accepting socket, or unreadable proof refuses rather than replacing a server.
+A competing starter waits for the start lock, then re-reads status and reuses the server the first starter brought up, so only one launch happens.
 The detached launch closes inherited file descriptors so neither a background starter shell nor a caller's capture pipe survives for the server's lifetime.
 
 When absence is proven, the adapter launches the server without these inherited values:
@@ -808,15 +811,16 @@ An unreadable or unparseable process view reads `unknown`, which refuses lifecyc
 
 ### Agent-liveness probe
 
-The generic Herdr agent-liveness probe requires a positively running server before reusing the pane classifier.
-A stopped server may retain the saved endpoint, so passive inspection cannot classify its pane as missing.
+The generic Herdr agent-liveness probe reuses the pane classifier on a positively running server.
+A stopped status counts as session absence only when the same read-only proof that guards startup also finds no server process and no accepting socket; the probe never starts a server.
+Absence of the server is not proof that its saved endpoint was destroyed, so recovery that would re-create an endpoint first restores the server and rechecks the pane ([Agent control](agent-control.md#reclaiming-a-task-whose-endpoint-is-gone)).
 
 | Pane read | Probe verdict |
 | --- | --- |
-| A running server confirms the recorded pane is structurally gone | `missing` |
+| A running server confirms the recorded pane is structurally gone, or a stopped session's server absence is proven | `missing` |
 | A restored agent-less shell, or a stale registration over a shell-only pane | `dead` |
 | A verified live harness, registered or not, or a registered agent backed by a non-shell process | `alive` |
-| A stopped or unreachable server, or any other unexpected read | `unreadable` |
+| A failed or timed-out status probe, a stopped status whose absence is unproven, or any other unexpected read | `unreadable` |
 
 The stale-registration verdict does not widen husk detection or any close authority.
 Those paths still refuse an unreadable pane.

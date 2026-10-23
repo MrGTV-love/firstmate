@@ -169,15 +169,15 @@ STATE=$(fm_backend_agent_state herdr "$SESSION:$PANE_ID")
 [ "$(fm_backend_herdr_server_running_state "fm-lab-never-started-$$")" = stopped ] \
   || version_fail "a session with no server does not report .server.running=false, so authoritative absence can no longer be told from an unreadable read"
 
-# A stopped session may retain the pane in its saved layout. Passive reads
-# must not start it or claim that the endpoint was destroyed.
-[ "$(fm_backend_agent_state herdr "fm-lab-never-started-$$:w1:p2")" = unreadable ] \
-  || version_fail "an endpoint behind a stopped server must remain unreadable until explicit recovery"
+# Issue #4091's exact stranding shape: an endpoint recorded in a session with
+# no server process and no socket reads `missing` without starting a server.
+[ "$(fm_backend_agent_state herdr "fm-lab-never-started-$$:w1:p2")" = missing ] \
+  || version_fail "an endpoint in a session with proven server absence is not classified as recoverable"
 
 # And the safety direction: an uninterpretable read must never license recovery.
 [ "$(fm_backend_agent_state herdr "no-separator-here")" = unreadable ] \
   || version_fail "a malformed endpoint target does not stay unreadable"
-pass "real herdr $HERDR_VERSION: a live agent-free pane reads dead; a stopped session and malformed target stay unreadable"
+pass "real herdr $HERDR_VERSION: a live agent-free pane reads dead, a proven-absent session reads missing, and a malformed target stays unreadable"
 
 FAKEBIN="$SCRATCH/fakebin"
 mkdir -p "$FAKEBIN"

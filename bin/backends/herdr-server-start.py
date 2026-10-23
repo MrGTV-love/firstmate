@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Cold-start a Herdr session only after proving process and socket absence.
+"""Prove Herdr session process and socket absence, and cold-start only after it.
 
-Usage: herdr-server-start.py <session> <client-binary>
-Read the successful stopped status JSON on stdin. Serialize Firstmate starters
-beside that status's canonical socket, then re-read status under the lock.
+Usage: herdr-server-start.py [--prove-absent] <session> <client-binary>
+Read the successful stopped status JSON on stdin. --prove-absent only proves
+absence and starts nothing. Otherwise wait for the start lock beside that
+status's canonical socket, then re-read status under the lock; a server that a
+competing starter brought up is reused, never launched twice.
 Unknown status, process inventory, socket identity, or socket errors refuse.
 The lock file stays in place so competing starters cannot lock different inodes.
 The detached server inherits neither this lock nor any caller pipe descriptor.
@@ -62,6 +64,28 @@ def process_table(column):
     return rows
 
 
+def environment_session(pid, command):
+    """Session an unscoped server inherited, or None when it cannot be read."""
+    if sys.platform.startswith("linux"):
+        try:
+            entries = Path(f"/proc/{pid}/environ").read_bytes().decode(errors="replace").split("\0")
+        except OSError:
+            return None
+    else:
+        shown = subprocess.run(["ps", "-E", "-ww", "-p", pid, "-o", "command="],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               text=True, timeout=STARTUP_SECONDS).stdout.strip()
+        # ps appends the environment to the unquoted argv; macOS shows nothing
+        # after argv for a process whose environment it withholds.
+        if not shown.startswith(command) or not shown[len(command):].strip():
+            return None
+        entries = shown[len(command):].split()
+    values = {entry.split("=", 1)[1] for entry in entries if entry.startswith("HERDR_SESSION=")}
+    if len(values) > 1:
+        return None
+    return (values.pop() if values else "") or "default"
+
+
 def prove_process_absence(session, client):
     if any(char.isspace() for char in session):
         raise ValueError("cannot prove process absence for a whitespace-containing session")
@@ -109,8 +133,8 @@ def prove_process_absence(session, client):
             if subcommand < len(options) and options[subcommand].startswith("-") and "server" in options:
                 raise ValueError(f"Herdr process {pid} has unrecognized server options")
             continue
-        # An unscoped server could depend on inherited session selection;
-        # without its environment it cannot prove absence for any session.
+        # An unscoped server serves its inherited HERDR_SESSION, else default;
+        # an unreadable environment leaves its owner unknown.
         selected = None
         for index, arg in enumerate(options):
             if arg in ("--session", "-s"):
@@ -119,7 +143,11 @@ def prove_process_absence(session, client):
                 selected = options[index + 1]
             elif arg.startswith("--session="):
                 selected = arg.split("=", 1)[1]
-        if selected is None or selected == session:
+        if selected is None:
+            selected = environment_session(pid, command)
+            if selected is None:
+                raise ValueError(f"Herdr server process {pid} has an unreadable session environment")
+        if selected == session:
             raise ValueError(f"Herdr server process {pid} is still alive")
 
 
@@ -135,15 +163,18 @@ def prove_socket_absence(path):
     raise ValueError("the session socket still accepts connections")
 
 
-def main():
-    session, client = sys.argv[1:]
+def main(prove_only, session, client):
     initial = json.load(sys.stdin)
     if initial["server"].get("running") is not False:
-        raise ValueError("startup requires a successful stopped status")
+        raise ValueError("absence requires a successful stopped status")
     path = socket_path(initial, session)
+    if prove_only:
+        prove_process_absence(session, client)
+        prove_socket_absence(path)
+        return
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path + ".firstmate-start.lock", "a", encoding="utf-8") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_EX)
         current = status(client, session)
         if socket_path(current, session) != path:
             raise ValueError("the session socket changed during startup")
@@ -167,8 +198,10 @@ def main():
 
 
 if __name__ == "__main__":
+    prove_only = sys.argv[1:2] == ["--prove-absent"]
     try:
-        main()
+        main(prove_only, *sys.argv[1 + prove_only:])
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
-        print(f"error: refusing Herdr server startup: {error}", file=sys.stderr)
+        action = "Herdr session absence is unproven" if prove_only else "refusing Herdr server startup"
+        print(f"error: {action}: {error}", file=sys.stderr)
         sys.exit(1)

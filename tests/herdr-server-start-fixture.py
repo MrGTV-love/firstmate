@@ -14,7 +14,6 @@ import time
 import unittest
 
 ROOT = Path(sys.argv.pop(1)).resolve()
-EVIDENCE = os.environ.get("FM_HERDR_START_EVIDENCE")
 
 STUB = r'''
 import json, os, pathlib, sys, time
@@ -69,7 +68,6 @@ class StartupSafety(unittest.TestCase):
         self.env.pop("FM_CREW_STATE_STATUS_OVERRIDE", None)
         self.listener = None
         self.children = []
-        self.transcript = []
 
     def tearDown(self):
         servers = self.dir / "servers"
@@ -89,13 +87,6 @@ class StartupSafety(unittest.TestCase):
                 child.communicate()
         if self.listener:
             self.listener.close()
-        if EVIDENCE:
-            dest = Path(EVIDENCE) / self._testMethodName
-            dest.mkdir(parents=True, exist_ok=True)
-            for filename in ("argv.jsonl", "pid"):
-                if (self.dir / filename).exists():
-                    shutil.copyfile(self.dir / filename, dest / filename)
-            (dest / "observations.txt").write_text("\n".join(self.transcript) + "\n")
         self.tmp.cleanup()
 
     def listen(self):
@@ -114,9 +105,7 @@ class StartupSafety(unittest.TestCase):
         try:
             out, err = child.communicate(timeout=4)
         except subprocess.TimeoutExpired:
-            self.transcript.append("starter did not release its output pipe while the server was alive")
             self.fail("server retained a starter descriptor or the call did not return")
-        self.transcript.append(f"rc={child.returncode} stdout={out!r} stderr={err!r}")
         return child.returncode, out
 
     def starts(self):
@@ -154,6 +143,28 @@ class StartupSafety(unittest.TestCase):
         rc, _ = self.ensure()
         self.assertNotEqual(rc, 0)
         self.assertEqual(len(self.starts()), 1, "an unreachable live process must prevent a second start")
+
+    def unscoped_server(self, session=None):
+        binary = self.dir / "unscoped" / "herdr"
+        binary.parent.mkdir()
+        binary.write_text(f"#!{sys.executable}\nimport time; time.sleep(60)\n")
+        binary.chmod(0o755)
+        env = dict(self.env)
+        env.pop("HERDR_SESSION", None)
+        if session is not None:
+            env["HERDR_SESSION"] = session
+        self.children.append(subprocess.Popen([str(binary), "server"], env=env,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+
+    def test_unscoped_default_server_does_not_block_other_session_start(self):
+        self.unscoped_server()
+        self.assertEqual(self.ensure()[0], 0)
+        self.assertEqual(len(self.starts()), 1)
+
+    def test_unscoped_server_inheriting_the_session_blocks_its_start(self):
+        self.unscoped_server(self.dir.name)
+        self.assertNotEqual(self.ensure()[0], 0)
+        self.assertEqual(self.starts(), [])
 
     def test_proven_absence_starts_once_and_reuses_server(self):
         rc, _ = self.ensure()
@@ -200,9 +211,8 @@ class StartupSafety(unittest.TestCase):
             self.children.append(subprocess.Popen(
                 ["bash", "-c", script, "fixture", str(ROOT), self.dir.name], env=self.env,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True))
-        results = [child.communicate(timeout=4) for child in self.children]
-        self.transcript.extend(repr(result) for result in results)
-        self.assertIn(0, [child.returncode for child in self.children])
+        results = [child.communicate(timeout=8) for child in self.children]
+        self.assertEqual([child.returncode for child in self.children], [0, 0], results)
         self.assertEqual(len(self.starts()), 1)
 
     def test_starter_exits_and_closes_inherited_descriptors(self):
@@ -214,21 +224,31 @@ class StartupSafety(unittest.TestCase):
         parent = subprocess.check_output(["ps", "-p", str(pid), "-o", "ppid="], text=True).strip()
         command = subprocess.run(["ps", "-p", parent, "-o", "command="],
                                  capture_output=True, text=True).stdout
-        self.transcript.append(f"server={pid} parent={parent} parent_command={command.strip()}")
         self.assertNotIn("fm_backend_herdr_server_ensure", command,
                          "a background Bash copy of the starter must not survive as the server's parent")
+
+    def state(self, fn, status):
+        return self.invoke(f'. "$1/bin/fm-backend.sh"; fm_backend_source herdr; {fn} "$2:w1:p2"',
+                           status=status)
 
     def test_read_only_state_never_starts_unreachable_server(self):
         for mode in ("error", "timeout", "empty", "false"):
             for fn in ("fm_backend_agent_state herdr", "fm_backend_herdr_endpoint_absence_recheck"):
                 with self.subTest(status=mode, entry=fn):
-                    rc, out = self.invoke(f'. "$1/bin/fm-backend.sh"; fm_backend_source herdr; '
-                                          f'{fn} "$2:w1:p2"', status=mode)
+                    rc, out = self.state(fn, mode)
                     self.assertEqual(rc, 0)
-                    self.assertEqual(out, "unreadable")
+                    expected = "missing" if (mode, fn) == ("false", "fm_backend_agent_state herdr") else "unreadable"
+                    self.assertEqual(out, expected)
                     self.assertEqual(self.starts(), [])
 
-    def test_crew_state_reports_unreadable_without_starting(self):
+    def test_stopped_server_reads_missing_only_with_proven_absence(self):
+        self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "missing"))
+        self.listen()
+        self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "unreadable"),
+                         "an accepting socket behind a stopped status is not proven absence")
+        self.assertEqual(self.starts(), [])
+
+    def test_crew_state_reads_without_starting(self):
         (self.dir / "state").mkdir()
         (self.dir / "state" / "fixture.meta").write_text(
             f"backend=herdr\nwindow={self.dir.name}:w1:p2\nkind=scout\nharness=claude\nworktree={ROOT}\n")
@@ -236,7 +256,10 @@ class StartupSafety(unittest.TestCase):
             with self.subTest(status=mode):
                 rc, out = self.invoke('bash "$1/bin/fm-crew-state.sh" fixture', status=mode)
                 self.assertEqual(rc, 0)
-                self.assertIn("backend unreachable (herdr endpoint state: unreadable)", out)
+                if mode == "false":
+                    self.assertIn(f"backend target gone: {self.dir.name}:w1:p2", out)
+                else:
+                    self.assertIn("backend unreachable (herdr endpoint state: unreadable)", out)
                 self.assertEqual(self.starts(), [], "a crew-state read must never launch a server")
 
 

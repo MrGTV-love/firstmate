@@ -178,7 +178,7 @@ test_herdr_agent_state_preserves_husk_classifier() {
   out=$(bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state "no-colon-target"' "$ROOT")
   [ "$out" = unreadable ] || fail "an unparseable Herdr target should classify as unreadable, got '$out'"
 
-  out=$(bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_agent_state() { printf "no-agent"; }; fm_backend_herdr_agent_alive "sess:p1"' "$ROOT")
+  out=$(bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_agent_state() { printf "no-agent"; }; fm_backend_herdr_server_running_state() { printf running; }; fm_backend_herdr_agent_alive "sess:p1"' "$ROOT")
   [ "$out" = dead ] || fail "the Herdr compatibility view should keep a no-agent husk dead, got '$out'"
 
   pass "fm_backend_herdr_agent_state: preserves missing/no-agent/live/unknown husk behavior"
@@ -193,7 +193,7 @@ test_agent_state_dispatcher_and_compatibility() {
   out=$(PATH="$fb:$BASE_PATH" bash -c '. "$0/bin/fm-backend.sh"; fm_backend_agent_state tmux sess:win' "$ROOT")
   [ "$out" = alive ] || fail "detailed dispatcher should route tmux, got '$out'"
 
-  out=$(bash -c '. "$0/bin/fm-backend.sh"; fm_backend_source herdr; fm_backend_herdr_pane_agent_state() { printf "live"; }; fm_backend_agent_state herdr sess:p1' "$ROOT")
+  out=$(bash -c '. "$0/bin/fm-backend.sh"; fm_backend_source herdr; fm_backend_herdr_pane_agent_state() { printf "live"; }; fm_backend_herdr_server_running_state() { printf running; }; fm_backend_agent_state herdr sess:p1' "$ROOT")
   [ "$out" = alive ] || fail "detailed dispatcher should route Herdr, got '$out'"
 
   out=$(bash -c '. "$0/bin/fm-backend.sh"; fm_backend_agent_state zellij sess:7' "$ROOT")
