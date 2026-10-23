@@ -1,0 +1,7 @@
+flag=off id=t-off-1 exit=0 fm-spawn returned in 5.9 s; row for t-off-1 right after return: 
+flag=1 id=t-on-1 exit=0 fm-spawn returned in 5.6 s; row for t-on-1 right after return: 
+flag=off id=t-off-2 exit=0 fm-spawn returned in 5.66 s; row for t-off-2 right after return: 0
+flag=1 id=t-on-2 exit=0 fm-spawn returned in 5.58 s; row for t-on-2 right after return: 0
+both flag-on rows landed later (detached)
+t-on-1|claude:opus|high|accepted
+t-on-2|claude:opus|high|accepted

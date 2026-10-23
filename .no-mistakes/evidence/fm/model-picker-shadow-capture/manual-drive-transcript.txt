@@ -1,0 +1,103 @@
+== Step 0: Phase-1 store (pre-picker columns) with one old row; --report must migrate it
+columns before: 22
+0 shadow dispatches logged
+report exit=0
+columns after:  33
+
+== Step 1: flag OFF real fm-spawn launch
+exit=0 out: warning: task off-1: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/off-1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/off-1/launch-brief.md records no ship branch; defaulting to legacy branch fm/off-1
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/off-1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for off-1: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned off-1 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-off-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/wt
+rows=0 jev_calls=0
+
+== Step 2: flag ON real fm-spawn launch (timed return)
+exit=0 out: warning: task on-1: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/on-1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/on-1/launch-brief.md records no ship branch; defaulting to legacy branch fm/on-1
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/on-1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for on-1: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned on-1 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-on-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/wt
+fm-spawn returned in 5.65 s; rows right after return: 1
+row landed (detached capture)
+rows=1
+1|on-1|claude:opus|high|accepted|claude:opus|omp:openai-codex/gpt-6.1-sol|high
+
+== Step 3: five parallel real fm-spawn launches
+par-3 exit=0
+par-4 exit=0
+par-2 exit=0
+par-1 exit=0
+par-5 exit=0
+spawned par-1
+spawned par-2
+spawned par-3
+spawned par-4
+spawned par-5
+five rows landed
+par-1|1|claude:opus|high|accepted
+par-2|1|claude:opus|high|accepted
+par-3|1|claude:opus|high|accepted
+par-4|1|claude:opus|high|accepted
+par-5|1|claude:opus|high|accepted
+
+== Step 4: scout launch
+exit=0 out: warning: task scout-1: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/scout-1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for scout-1: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned scout-1 harness=claude kind=scout window=firstmate:fm-scout-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/wt
+scout row landed
+scout-1|claude:opus|high|accepted
+
+== Step 5 (adversarial): Jev endpoint DOWN; compare launch with flag on vs off
+flag on : exit=0 out: warning: task down-on: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/down-on/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/down-on/launch-brief.md records no ship branch; defaulting to legacy branch fm/down-on
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/down-on/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for down-on: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned down-on harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-down-on worktree=/Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/wt
+flag off: exit=0 out: warning: task down-off: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/down-off/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/down-off/launch-brief.md records no ship branch; defaulting to legacy branch fm/down-off
+warning: /Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/home/data/down-off/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for down-off: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned down-off harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-down-off worktree=/Users/charlesabrooker/tmp/fm-shadow-manual-drive.Z9s92d/case/wt
+launch commands identical (modulo task id)
+spawn stdout identical (modulo task id)
+endpoint-down launch still recorded
+down-on|claude:opus|high|picker-error
+
+== Step 6: final store and --report
+down-on|1
+on-1|1
+par-1|1
+par-2|1
+par-3|1
+par-4|1
+par-5|1
+scout-1|1
+Shadow disagreement report - routing evidence, not outcome labels.
+These rows show what the picker would have chosen; they cannot show how an unrun pick would have performed.
+work_type                           runs  rule noRte noPick  wDen wDiff  vDen vDiff  eDen eDiff dispatch   ask escal stale
+Feature / capability                   7     7     0      0     7     0     0     0     7     0        7     0     0     0
+unclassified                           1     1     0      1     0     0     0     0     0     0        0     0     0     0
+Denominators: worker disagreement over 7 rows where both the rule and the picker named a worker; validator disagreement over 0 rows where both named a validator; effort disagreement over 7 rows where both named an effort. 1 rows have no picker pick; 0 rows have no rule route.
+Bands: dispatch=7 ask=0 escalate=0 unknown=1; stale snapshots=0; none-fit=0; rejected picks=0.
+report exit=0

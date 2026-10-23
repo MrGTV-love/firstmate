@@ -54,4 +54,4 @@ ok - equivalent options pool behind the pick, and each resolve appends one priva
 ok - a pooled group with more probability than the answer choice is the pick when it clears its floor and the choice does not
 ok - shadow mode: off is identical and inert; on logs both picks without changing the dispatch, even when Jev fails or the snapshot is untrusted
 # all fm-dispatch-resolve tests passed
-bash tests/fm-dispatch-resolve.test.sh  39.86s user 52.50s system 77% cpu 1:58.48 total
+bash tests/fm-dispatch-resolve.test.sh  44.93s user 65.73s system 82% cpu 2:14.89 total
