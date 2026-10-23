@@ -38,6 +38,8 @@
 #   model-stale: <model> on <harness> is older than <newer> in the <harness> catalog
 #       any harness: the launch was told, at spawn, that a newer model of the
 #       same family was in its catalog (bin/fm-model-freshness.sh owns the rule).
+#       A trailing "(admitted by captain pin)" or "(admitted at launch)" marks a
+#       stale model the spawn gate let through (docs/configuration.md#model-freshness).
 # Absence of either component is not evidence of health: a session that has not
 # published a record (not omp, not yet started, or remote) adds nothing.
 # A run-attribution lookup cut by its own FM_CREW_STATE_NM_TIMEOUT (every lookup

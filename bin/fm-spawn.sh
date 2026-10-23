@@ -1614,6 +1614,7 @@ spawn_remote_secondmate() {
   fi
   launch_args=("$id" "$harness" "$model" "$effort" "$backend")
   [ -z "$remote_traceparent" ] || launch_args+=("$remote_traceparent")
+  [ "$CAPTAIN_MODEL_PIN_SET" -eq 0 ] || launch_args+=("--captain-model-pin=$CAPTAIN_MODEL_PIN")
   # The transport clears ambient variables. Carry only the normalized emergency
   # override, never the invoking environment or any TypeSafe credential.
   [ "$COMPACT_ADVISER_FORCE_OFF" = 0 ] || launch_args+=(--compact-adviser-disable)
@@ -2089,6 +2090,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$MODE_SET" -eq 0 ] || shared_args+=(--mode "$MODE")
   [ "$YOLO_SET" -eq 0 ] || shared_args+=(--yolo "$YOLO")
   [ "$BRANCH_PREFIX_SET" -eq 0 ] || shared_args+=(--branch-prefix "$BRANCH_PREFIX")
+  [ "$CAPTAIN_MODEL_PIN_SET" -eq 0 ] || shared_args+=(--captain-model-pin "$CAPTAIN_MODEL_PIN")
   [ "$ALLOW_API_KEY" -eq 0 ] || shared_args+=(--allow-api-key)
   [ "$OMP_NO_HELPERS" -eq 0 ] || shared_args+=(--omp-no-helpers)
   [ "$FIXED_FAMILY" -eq 0 ] || shared_args+=(--fixed-family)
@@ -3453,18 +3455,28 @@ if [ "$MODEL_INDEXED" = 1 ]; then
   MODEL_CATALOG_READ=$(FM_MODEL_CATALOG_EMIT=1 FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT") || exit 1
 fi
 
-# Model freshness (blocking): a model that a newer model of its own family has
-# passed in the harness's catalog refuses the spawn. Only the captain may run a
-# superseded model, and only for the task where the captain named that exact
-# model: the caller passes --captain-model-pin <that id>, which must equal the
-# requested model, so a pin can never launder a different (or newer) pick. The
-# finding is recorded as model_stale= in the task record so fm-crew-state.sh
+# Model freshness (blocking): a model that a newer model of its own family and
+# tier has passed in the harness's catalog refuses the spawn. A finding marked
+# "(other tier: ...)" names only a newer model of another tier, so it warns and
+# never refuses. Only the captain may run a superseded model, and only for the
+# task where the captain named that exact model: the caller passes
+# --captain-model-pin <that id>, which must equal the requested model, so a pin
+# can never launder a different (or newer) pick. A batch forwards the one pin to
+# every pair, and a remote secondmate launch forwards it to the host-local spawn,
+# where the same check runs. A --relaunch, or a secondmate respawn, of the model
+# the task's existing record names is not gated again: that model was admitted
+# at launch.
+# The finding is recorded as model_stale= in the task record so fm-crew-state.sh
 # keeps showing it after this terminal output is gone. Run under the worker
 # account pin so a pinned account answers from its own catalog; skipped for a raw
 # launch and a Claude custom launcher, whose catalog this environment does not
 # hold. A catalog this spawn already read (MODEL_CATALOG_READ) is handed over
 # rather than read a second time.
 MODEL_STALE=
+MODEL_PRIOR_META=
+if [ "$RELAUNCH" -eq 1 ] || [ "$KIND" = secondmate ]; then
+  MODEL_PRIOR_META="$STATE/$ID.meta"
+fi
 if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
   # A check that produced no verdict must never read as a clean one. stderr is
   # captured rather than discarded so an unreadable catalog (a missing tool, an
@@ -3481,12 +3493,23 @@ if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != d
     echo "warning: model freshness unverified - $MODEL_FRESHNESS_NOTICE" >&2
   fi
   if [ -n "$MODEL_STALE" ]; then
-    if [ "$CAPTAIN_MODEL_PIN" = "$MODEL" ]; then
-      echo "warning: model is stale - $MODEL_STALE (admitted by captain pin)" >&2
+    if [[ "$MODEL_STALE" == *' (other tier: '*')' ]]; then
+      echo "warning: a newer model exists in another tier - $MODEL_STALE" >&2
+    elif [ "$CAPTAIN_MODEL_PIN" = "$MODEL" ]; then
+      echo "warning: stale model admitted by captain pin - $MODEL_STALE" >&2
       # The marker rides in the recorded value, so the task record and the
       # crew-state line say the exception was authorized rather than merely
       # noticed. No new record field: the value is free text by construction.
       MODEL_STALE="$MODEL_STALE (admitted by captain pin)"
+    elif [ -n "$MODEL_PRIOR_META" ] && [ "$(fm_meta_get "$MODEL_PRIOR_META" model)" = "$MODEL" ]; then
+      # A relaunch or secondmate respawn of the model the task already runs was
+      # admitted at launch. Any other model still gates. The record keeps the
+      # launch's own marker, so a captain-pinned task stays marked as pinned.
+      echo "warning: stale model kept by relaunch, admitted at launch - $MODEL_STALE" >&2
+      case "$(fm_meta_get "$MODEL_PRIOR_META" model_stale)" in
+      *' (admitted by captain pin)') MODEL_STALE="$MODEL_STALE (admitted by captain pin)" ;;
+      *) MODEL_STALE="$MODEL_STALE (admitted at launch)" ;;
+      esac
     else
       echo "error: refusing to launch a stale model - $MODEL_STALE" >&2
       if [ -n "$CAPTAIN_MODEL_PIN" ]; then

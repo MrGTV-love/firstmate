@@ -177,7 +177,8 @@
 # times. Missing parallel hints are reported without failing this guard.
 # It also reports parallel_jobs (PORTABLE_PARALLEL_JOBS, the concurrency the
 # model assumes and CI passes as --jobs), parallel_makespan_ms (the larger lane's
-# longest-first makespan over the parallel hints at that count) and
+# longest-first makespan over the parallel hints at that count, stretched by
+# PORTABLE_PARALLEL_JOBS over PORTABLE_PARALLEL_EFFECTIVE_JOBS) and
 # parallel_budget_ms (PORTABLE_PARALLEL_MAX_MSPAN_MS), refusing a lane whose
 # modeled makespan is above that budget. These are modeled, not observed.
 #
@@ -273,23 +274,27 @@ PORTABLE_SERIAL_SHARDS=20
 # to this value, and the coverage guard models the makespan at it.
 PORTABLE_PARALLEL_JOBS=3
 
-# How many of the scripts above the runner actually runs at full speed. Three
-# are in flight, but a four-vCPU runner saturates before that: the lane that
-# summed 33.5 minutes serially took 20 minutes three abreast, an effective
-# factor near two rather than three, and its per-script wall times rose to a
-# 57.9 minute sum. The makespan model divides by this rather than by the raw job
-# count, because a model that assumed perfect scaling would pass while the real
-# lane ran 40 percent over its own budget.
-# measured: value=2 date=2026-10-22 host=github-ubuntu-26.04 margin=1.0 (lane 1: 33.5 min serial, 57.9 min summed at three abreast, 20 min wall; run 39757092565)
-PORTABLE_PARALLEL_EFFECTIVE_JOBS=2
+# How many scripts' worth of throughput one portable-parallel job delivers while
+# PORTABLE_PARALLEL_JOBS scripts run at once. Three are in flight, but a
+# four-vCPU runner saturates before that, so the makespan model packs a lane over
+# the raw job count and then stretches the result by jobs over this value. It is
+# calibrated on lane 1 of run 39757092565: that lane packs to 705697 ms over
+# three bins at the hinted, uncontended costs and ran 20 minutes (1200000 ms), so
+# 3 * 705697 / 1200000 = 1.764. The lane summed 33.5 minutes serially and 57.9
+# minutes of per-script wall time three abreast, a 1.73 times inflation that this
+# factor (3 / 1.764 = 1.70 times) reproduces. One factor fits the lanes only
+# roughly: lane 2 inflated 1.19 times (28.0 to 33.4 minutes) and ran 13 minutes
+# against the 21.5 minutes it models, because its one long script gates it. The
+# model errs on the safe side there.
+# measured: value=1.764 date=2026-10-22 host=github-ubuntu-26.04 margin=1.0 (lane 1 packs to 705697 ms over three bins and ran 1200000 ms; run 39757092565)
+PORTABLE_PARALLEL_EFFECTIVE_JOBS=1.764
 
-# Modeled makespan budget for one portable-parallel job. Set from the measured
-# run rather than the optimistic model: the slower lane finished in 20 minutes
-# on the 26.04 image, and the budget leaves a quarter again on top so a new
-# member or a slow path fails the coverage guard instead of quietly stretching
-# the workflow. Like the serial target this is packing arithmetic, not an
-# execution timeout.
-# measured: value=1500000 date=2026-10-22 host=github-ubuntu-26.04 margin=1.25 (slowest parallel lane measured 20 minutes in run 39757092565)
+# Modeled makespan budget for one portable-parallel job: a quarter again on top
+# of the 20 minutes (1200000 ms) lane 1 measured on the 26.04 image, which the
+# calibrated model reproduces for that lane. A new member or a slow path fails the
+# coverage guard instead of quietly stretching the workflow. Like the serial
+# target this is packing arithmetic, not an execution timeout.
+# measured: value=1500000 date=2026-10-22 host=github-ubuntu-26.04 margin=1.25 (lane 1 measured 20 minutes in run 39757092565 and the calibrated model reproduces it)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1500000
 
 # Conservative balance hint for a portable-serial script with no measurement.
@@ -1129,7 +1134,8 @@ portable_serial_lane_weight() {
 # on stdin and the hints come from portable_parallel_weight_hints, so the model
 # moves with the same weights the lanes are composed from. A lane runs its
 # scripts independently, but they share the runner's CPU, which is why the model
-# packs the hinted work over <jobs> bins rather than adding it up.
+# packs the hinted work over <jobs> bins rather than adding it up, and why it then
+# stretches that packing by <jobs> over PORTABLE_PARALLEL_EFFECTIVE_JOBS.
 portable_parallel_lane_makespan() {  # <jobs>
   local jobs=$1
   awk -v jobs="$jobs" -v eff="$PORTABLE_PARALLEL_EFFECTIVE_JOBS" -v def="$PORTABLE_SERIAL_DEFAULT_WEIGHT_MS" '
@@ -1138,7 +1144,7 @@ portable_parallel_lane_makespan() {  # <jobs>
     END {
       if (jobs < 1) jobs = 1
       if (eff < 1) eff = 1
-      if (jobs > eff) jobs = eff
+      if (eff > jobs) eff = jobs
       for (i = 2; i <= n; i++) {
         key = v[i]; j = i - 1
         while (j > 0 && v[j] < key) { v[j + 1] = v[j]; j-- }
@@ -1151,7 +1157,7 @@ portable_parallel_lane_makespan() {  # <jobs>
       }
       makespan = 0
       for (b = 1; b <= jobs; b++) if (bin[b] > makespan) makespan = bin[b]
-      printf "%d %d\n", makespan, n
+      printf "%d %d\n", makespan * jobs / eff, n
     }
   ' <(portable_parallel_weight_hints) -
 }

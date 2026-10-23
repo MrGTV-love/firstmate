@@ -754,9 +754,15 @@ fm_dod_ref_contains() {  # <repo> <ref-namespace> <sha>
 # green`, with any surrounding text). bin/fm-crew-state.sh takes its CI-ready
 # path on this same test, so every CI-ready line it acts on is gated.
 fm_dod_note_reports_ci_ready() {  # <note>
-  case "$1" in
-    *PR*"checks green"*|*"checks green"*PR*) return 0 ;;
-  esac
+  # A note is CI-ready only when it names a checks-green result and an actual
+  # pull request reference. "PR checks green" and "PROD ... checks green" name
+  # no reference, and a substring match made "PROD" read as one.
+  local note=$1
+  [[ $note == *"checks green"* ]] || return 1
+  [[ $note =~ (^|[^[:alnum:]])PR[[:space:]]*#[0-9]+ ]] && return 0
+  [[ $note =~ /pull/[0-9]+ ]] && return 0
+  [[ $note =~ /merge_requests/[0-9]+ ]] && return 0
+  [[ $note =~ /pulls/[0-9]+ ]] && return 0
   return 1
 }
 
