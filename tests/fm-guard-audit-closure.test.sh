@@ -114,9 +114,17 @@ grep -qs 'bin/fm-claude-stop-autoarm.sh' "$ROOT/bin/fm-supervision-instructions.
 pass "G-01 one liveness owner, and the Claude repair line is a command"
 
 # --- G-04/G-05/G-06: Firstmate cuts are real -----------------------------
-grep -rqs 'jev-posttool-advisory' "$ROOT/bin" \
-  && fail "the retired post-tool advisory id still appears in bin/"
-pass "G-04 the post-tool advisory is cut and recorded"
+# Read the retired ids from the changelog rather than naming one here: the
+# reference check forbids a retired id in tracked code, and this proof file is
+# tracked code, so the assertion has to be data-driven.
+retired_live=''
+for retired_id in $(jq -r '.[].id' "$ROOT/docs/guards/retired.json"); do
+  if grep -rqsF -- "$retired_id" "$ROOT/bin"; then
+    retired_live="$retired_live $retired_id"
+  fi
+done
+[ -z "$retired_live" ] || fail "retired guard ids still appear in bin/:$retired_live"
+pass "G-04 every retired guard is absent from bin/ and the advisory cut is recorded"
 
 # --- Vernant, when the checkout is available ------------------------------
 # The cross-repo half runs only where the operator points at the Vernant clone,
