@@ -10,9 +10,8 @@
 # through fm_brief_file_problem before capturing their text in shell variables.
 
 fm_brief_file_problem() {  # <file>
-  local prefix
   [ -f "$1" ] && [ -r "$1" ] || return 1
-  if IFS= read -r -d '' prefix < "$1"; then
+  if IFS= read -r -d '' _ < "$1"; then
     printf 'malformed input %s: NUL bytes are not supported; replace them with text or line endings\n' "$1"
     return 0
   fi
