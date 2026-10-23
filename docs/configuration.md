@@ -3977,13 +3977,13 @@ FM_INJECT_SKIP=heartbeat           # |-prefixes force-self-handled bypassing cla
 FM_ESCALATE_BATCH_SECS=90          # buffer window for batched escalation digests; 0 = flush immediately
 FM_MAX_DEFER_SECS=300              # max buffered escalation age before retry plus wedge alarm; 0 disables
 FM_WEDGE_ALARM_CHANNEL=            # override config/wedge-alarm with one active-alert directive for the wedge alarm; off|auto|osascript|herdr|command:<cmd>; absent = auto (macOS -> an OS notification)
-FM_WEDGE_ALARM_EXEC=              # notifier seam: route every channel (osascript, herdr, command:) through this command as `<cmd> <channel> <summary>`; "discard" fires nothing; unset in production; the daemon defaults it to "discard" when sourced so no test posts a real notification (docs/wedge-alarm.md)
+FM_WEDGE_ALARM_EXEC=              # notifier seam: route every channel (osascript, herdr, command:) through this command as `<cmd> <channel> <summary> <title>`; "discard" fires nothing; unset in production; the daemon defaults it to "discard" when sourced so no test posts a real notification (docs/wedge-alarm.md)
 FM_WEDGE_ALARM_TIMEOUT_SECS=10    # maximum seconds for each osascript, herdr, override, or command: notifier before its watchdog terminates it and continues to the next channel; invalid or zero values use 10
 # out-of-session watchdog (bin/fm-watchdog-check.sh); docs/watchdog.md owns the contract
 FM_WATCHDOG_STALE_SECS=900         # ordinary beacon-age threshold; bound-rewake cap: docs/watchdog.md
 FM_WATCHDOG_VERIFY_SECS=90         # seconds the watchdog re-reads the verdict after a recovery
 FM_WATCHDOG_RETRY_SECS=240         # minimum seconds between recovery attempts
-FM_WATCHDOG_ALARM_AFTER=2          # consecutive failed recoveries before the wedge alarm fires
+FM_WATCHDOG_ALARM_AFTER=2          # unsuccessful attempts (failed recoveries or no-ops) before the alarm fires
 FM_WATCHDOG_ALARM_INTERVAL_SECS=3600   # minimum seconds between repeated alarms
 FM_WATCHDOG_STEP_SECS=60           # bound for each recovery step
 FM_WATCHDOG_INTERVAL_SECS=120      # agent run interval chosen at install time (bin/fm-watchdog-install.sh)
