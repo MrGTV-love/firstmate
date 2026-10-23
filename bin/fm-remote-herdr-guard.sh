@@ -22,11 +22,16 @@
 #   the launch agent PATH)             -> exit 1 before server start or takeover
 #   no server owns the session socket  -> exec `herdr server --session <s>`
 #                                          (foreground, launchd-supervised)
+#   a failed or unparseable status, or a stopped status whose server process
+#   and socket absence bin/backends/herdr-server-start.py --prove-absent
+#   cannot prove                       -> log why, wait, and re-check; never
+#                                          start a second server beside one
+#                                          that may still be alive
 #   the owner was born in the Aqua session (launchd or the Aqua remote-job
 #   worker)                            -> exit 0, leave it alone
 #   the owner was born anywhere else (an SSH remote attach, a shell over
-#   ssh/mosh, or a birth it cannot prove) -> `herdr server stop`, wait until the
-#                                          socket is released, then exec
+#   ssh/mosh, or a birth it cannot prove) -> `herdr server stop`, wait until
+#                                          absence is proven the same way, then exec
 #                                          `herdr server --session <s>` at once
 #                                          so the socket is rebound before a
 #                                          reconnecting SSH attach can start
@@ -60,12 +65,36 @@ STOP_WAIT_TENTHS=${FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS:-50}
 
 log() { printf 'fm-remote-herdr-guard: %s\n' "$*"; }
 
-herdr_status() { # prints the session's status JSON, empty when herdr fails
-  HERDR_SESSION="$SESSION" "$HERDR_BIN" status --json --session "$SESSION" 2>/dev/null || true
+herdr_status() { # prints the session's status JSON; fails when herdr fails
+  HERDR_SESSION="$SESSION" "$HERDR_BIN" status --json --session "$SESSION" 2>/dev/null
 }
 
-status_running() { # <status-json>
-  [ "$(printf '%s' "$1" | jq -r '.server.running // false' 2>/dev/null)" = true ]
+# read_state: sets STATUS and STATE to running, absent (a successful stopped
+# status plus proven server process and socket absence), or the reason neither
+# is proven.
+read_state() {
+  if ! STATUS=$(herdr_status); then
+    STATE='herdr status failed'
+    return 0
+  fi
+  case "$(printf '%s' "$STATUS" | jq -r '.server.running | if type == "boolean" then tostring else "unknown" end' 2>/dev/null)" in
+    true) STATE=running ;;
+    false)
+      if printf '%s' "$STATUS" | python3 "$SCRIPT_DIR/backends/herdr-server-start.py" \
+        --prove-absent "$SESSION" "$HERDR_BIN" >/dev/null 2>&1; then
+        STATE=absent
+      else
+        STATE='status says stopped but server process and socket absence is unproven'
+      fi
+      ;;
+    *) STATE='herdr status is unreadable' ;;
+  esac
+}
+
+WAIT_REASON=
+wait_note() { # <reason>
+  [ "$1" = "$WAIT_REASON" ] || log "session $SESSION: $1; waiting and re-checking rather than starting a second server"
+  WAIT_REASON=$1
 }
 
 start_server() {
@@ -73,11 +102,18 @@ start_server() {
   exec "$HERDR_BIN" server --session "$SESSION"
 }
 
-STATUS=$(herdr_status)
-if ! status_running "$STATUS"; then
-  log "no server owns session $SESSION"
-  start_server
-fi
+while :; do
+  read_state
+  case "$STATE" in
+    running) break ;;
+    absent)
+      log "no server owns session $SESSION"
+      start_server
+      ;;
+  esac
+  wait_note "$STATE"
+  sleep 1
+done
 
 SOCKET=$(printf '%s' "$STATUS" | jq -r '.server.socket // empty' 2>/dev/null)
 OWNER=$(fm_remote_herdr_socket_owner "$SOCKET"); OWNER_RC=$?
@@ -101,10 +137,15 @@ HERDR_SESSION="$SESSION" "$HERDR_BIN" server stop --session "$SESSION" >/dev/nul
   || log "herdr server stop for session $SESSION did not succeed; waiting for the socket anyway"
 i=0
 while [ "$i" -lt "$STOP_WAIT_TENTHS" ]; do
-  if ! status_running "$(herdr_status)"; then
-    log "session $SESSION released its socket after $i tenths of a second"
-    start_server
-  fi
+  read_state
+  case "$STATE" in
+    absent)
+      log "session $SESSION released its socket after $i tenths of a second"
+      start_server
+      ;;
+    running) ;;
+    *) wait_note "$STATE" ;;
+  esac
   sleep 0.1
   i=$((i + 1))
 done
