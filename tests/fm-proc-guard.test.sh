@@ -100,6 +100,7 @@ warning_count=$("$GUARD" check --json | python3 -I -c 'import json, sys; print(j
 warning_limit=$(python3 -I -c 'import sys; print(max(3, int(int(sys.argv[1]) / 0.75)))' "$warning_count")
 warning_json=$("$GUARD" check --json --limit "$warning_limit")
 for warning_pid in $warning_pids; do kill "$warning_pid" 2>/dev/null || true; done
+# shellcheck disable=SC2086 # jobs -p yields separate PIDs; wait must receive each one.
 wait $warning_pids 2>/dev/null || true
 printf '%s\n' "$warning_json" | python3 -I -c '
 import json, sys

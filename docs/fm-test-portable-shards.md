@@ -145,7 +145,7 @@ No case body, assertion, or `ok -` line was shortened or removed.
 ## Teardown groups
 
 The former combined `tests/fm-teardown.test.sh` was an indivisible member: serial shard 2 of [run 39838628417](https://github.com/MrGTV-love/firstmate/actions/runs/39838628417) held it alone, its script time was 1587660 ms, and that job finished 26 minutes 49 seconds after the workflow started against the 1200000 ms packing target.
-Its 333 cases now run exactly once across three independently runnable files:
+Its 334 cases now run exactly once across three independently runnable files:
 
 | File | Area |
 |---|---|
@@ -158,10 +158,11 @@ Each invocation owns its temporary root, its registered cleanup, and its own pro
 Every case still builds and tears down its own sandbox through `make_case`, and selecting one case by name still works in the file that owns it.
 The three files stay serial in the CI lanes: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, which keeps them out of the mixed PORTABLE pool.
 A local `--family pr-forge` run at an admitted job count runs them concurrently with the family, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md#pr-forge-admitted) records the 2026-10-22 proof of that membership.
-`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 333-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
+`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 334-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
 
 On the pre-rebase 332-case inventory, the intact suite and the three groups reported the same 335 `ok -` lines and no failures in a local Ubuntu 26.04 container, which is the behavior-parity evidence for the split.
 The rebase then added upstream's `test_closeout_refusal_reports_tail_and_preserves_complete_output`, taken verbatim into `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 333; the 2026-10-22 pr-forge isolation proof ran all three group files to exit 0 on that 333-case head.
+PR #210 then added `test_squash_pushed_missing_subject_match_ignores_hash_boundary` to `tests/fm-teardown.test.sh`, which makes the inventory 334.
 
 The group hints are the groups' own measured times in the `fm-test-timing-portable-serial-*` artifacts of [run 39881107550](https://github.com/MrGTV-love/firstmate/actions/runs/39881107550): `fm-teardown` 307312 ms, `fm-teardown-pool` 333924 ms, and `fm-teardown-cleanup` 917727 ms, summing to 1558963 ms against the former combined 1587660 ms.
 That run replaced the first apportioned estimates (272355, 439235, and 876070 ms), which had divided the combined CI measurement by local container times.

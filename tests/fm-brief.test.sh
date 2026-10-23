@@ -1885,7 +1885,7 @@ test_worktree_isolation_refusal_carries_the_repair() {
   [ -n "$source" ] || fail "could not read validate_spawn_worktree from bin/fm-spawn.sh"
   out=$(
     exec 2>&1
-    # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.
+    # shellcheck disable=SC2030,SC2034 # The eval'd guard needs this subshell-local script root.
     SCRIPT_DIR="$ROOT/bin"
     # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.
     WT="$TMP_ROOT/primary-checkout"
@@ -1893,6 +1893,7 @@ test_worktree_isolation_refusal_carries_the_repair() {
     PROJ_ABS="$TMP_ROOT/project-clone"
     # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.
     FM_TASK_COPY_TOP="$TMP_ROOT/project-clone"
+    # shellcheck disable=SC2329 # The eval'd validate_spawn_worktree calls this fixture predicate.
     fm_task_copy_isolated() { return 1; }
     eval "$source"
     validate_spawn_worktree "treehouse get" "tmux pane"

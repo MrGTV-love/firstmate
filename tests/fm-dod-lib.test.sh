@@ -306,7 +306,9 @@ test_ci_ready_requires_pr_reference() {
     'paused: PROD deploy watch, checks green on TEST' \
     'paused: checks green on TEST, PROPERTIES watch' \
     'PR checks green' \
-    'PR #12 checks pending'; do
+    'PR #12 checks pending' \
+    'PR https://review.example.org/c/team/project/+/123 checks pending' \
+    'https://review.example.org/c/team/project/+/not-a-number checks green'; do
     if fm_dod_note_reports_ci_ready "$note"; then
       fail "non-CI-ready note accepted: $note"
     fi
@@ -317,7 +319,9 @@ test_ci_ready_requires_pr_reference() {
     'PR #12 checks green' \
     'checks green: PR#12' \
     'https://gitlab.com/o/r/-/merge_requests/5 checks green' \
-    'https://git.example.org/team/repo/pulls/12 checks green'; do
+    'https://git.example.org/team/repo/pulls/12 checks green' \
+    'PR https://review.example.org/c/project/+/123 checks green' \
+    'checks green: https://review.example.org/c/team/project/+/456'; do
     fm_dod_note_reports_ci_ready "$note" \
       || fail "CI-ready PR reference rejected: $note"
   done
@@ -813,115 +817,37 @@ test_worker_role_names_skill_and_fallback_file() {
   pass "worker role names the skill and its fallback skill file"
 }
 
-# forge=external: a review tool uploads its own snapshot, so nothing is pushed.
-# The fixtures name an invented tool and an RFC 6761 reserved host only.
-EXT_CFG="$TMP_ROOT/external-config"
-mkdir -p "$EXT_CFG"
-# shellcheck disable=SC2016 # Backticks are literal adapter text.
-printf '%s\n' 'Run `review-tool upload --draft` and stop at a draft with checks green.' > "$EXT_CFG/external-review.md"
-
-test_external_forge_is_direct_pr_only() {
-  local out
-  fm_forge_valid_for_mode external direct-PR test 2>/dev/null || fail "forge=external direct-PR was refused"
-  out=$(fm_forge_valid_for_mode external no-mistakes test 2>&1) && fail "forge=external no-mistakes was accepted"
-  assert_contains "$out" "ships direct-PR only for now" "the no-mistakes refusal did not say why"
-  out=$(fm_forge_valid_for_mode external local-only test 2>&1) && fail "forge=external local-only was accepted"
-  assert_contains "$out" "cannot ship mode=local-only" "the local-only refusal did not say why"
-  out=$(fm_base_branch_valid release direct-PR external test 2>&1) && fail "a base branch was accepted on forge=external"
-  pass "forge=external composes with direct-PR only and refuses a base branch"
+# This fork never had a forge=external implementation in bin/fm-dod-lib.sh.
+# Merges a5f1fa1ef and 9f16517ff imported upstream's external-forge tests
+# without their implementation, and revert 992ed7d6d removed only
+# docs/external-review-forge.md, so an external forge is refused before
+# rendering or publishing instructions.
+test_external_forge_direct_pr_is_refused() {
+  local rc=0 out="$TMP_ROOT/external-forge.out" err="$TMP_ROOT/external-forge.err"
+  fm_forge_valid_for_mode external direct-PR test >"$out" 2>"$err" || rc=$?
+  [ "$rc" -eq 1 ] || fail "unsupported external forge returned $rc instead of refusal"
+  [ ! -s "$out" ] || fail "unsupported external forge emitted a delivery contract"
+  [ "$(cat "$err")" = "error: test: unknown forge 'external' (expected none, gerrit, or forgejo)" ] \
+    || fail "unsupported external forge did not explain its supported alternatives: $(cat "$err")"
+  pass "external-forge direct-PR is refused with the exact supported-forge diagnostic"
 }
 
-test_external_rule_one_forbids_every_task_push() {
-  local rule
-  rule=$(CONFIG=$EXT_CFG fm_ship_rule_one direct-PR t1 fm/t1 external) || fail "external rule one did not render"
-  assert_contains "$rule" "Never push to \`origin\`" "external rule one does not forbid the origin push"
-  assert_contains "$rule" "never push your \`fm/t1\` branch or any \`fm/\`-prefixed branch to any remote" \
-    "external rule one does not forbid the task-prefixed push"
-  assert_not_contains "$rule" "push only your" "external rule one still invites a branch push"
-  assert_not_contains "$rule" "personal backup remote" "external rule one offers a backup nobody configured"
-  printf 'backup\n' > "$EXT_CFG/external-review-backup"
-  rule=$(CONFIG=$EXT_CFG fm_ship_rule_one direct-PR t1 fm/t1 external) || fail "external rule one with a backup did not render"
-  rm -f "$EXT_CFG/external-review-backup"
-  assert_contains "$rule" "\`git push backup HEAD:refs/heads/backup/t1\`" "external rule one does not name the backup copy"
-  pass "external rule one forbids origin and task-prefixed pushes and names only the backup copy"
+test_external_forge_brief_is_not_published() {
+  local home="$TMP_ROOT/external-brief-home" rc=0
+  local out="$TMP_ROOT/external-brief.out" err="$TMP_ROOT/external-brief.err"
+  mkdir -p "$home"
+  FM_HOME="$home" bash "$ROOT/bin/fm-brief.sh" external-pr fixture --mode direct-PR --forge external \
+    >"$out" 2>"$err" || rc=$?
+  [ "$rc" -eq 1 ] || fail "external-forge brief returned $rc instead of refusal"
+  [ ! -s "$out" ] || fail "refused external-forge brief announced success"
+  [ "$(cat "$err")" = "error: fm-brief.sh --forge: unknown forge 'external' (expected none, gerrit, or forgejo)" ] \
+    || fail "external-forge brief did not report its exact refusal: $(cat "$err")"
+  [ ! -e "$home/data/external-pr/brief.md" ] || fail "refused external forge published worker instructions"
+  pass "external-forge direct-PR instructions are refused without publishing a brief"
 }
 
-test_external_dod_renders_the_adapter() {
-  local dod out
-  dod=$(CONFIG=$EXT_CFG fm_dod_block direct-PR t1 fm/t1 external) || fail "external DoD did not render"
-  assert_contains "$dod" "Delivery contract: mode=direct-PR forge=external" "external DoD lacks its contract line"
-  assert_contains "$dod" "done [at=<epoch>]: review {url} uploaded for review" "external DoD lacks the ready grammar"
-  assert_contains "$dod" "## Review tool instructions (home configuration)" "external DoD lacks the adapter section"
-  assert_contains "$dod" "review-tool upload --draft" "external DoD lacks the adapter body"
-  assert_not_contains "$dod" "push your branch and open a PR" "external DoD still asks for a pushed PR"
-  out=$(CONFIG="$TMP_ROOT/no-such-config" fm_dod_block direct-PR t1 fm/t1 external 2>&1) \
-    && fail "external DoD rendered with no adapter"
-  assert_contains "$out" "external-review.md" "the missing-adapter refusal did not name the file"
-  pass "external DoD renders the contract, the review grammar, and the adapter, and refuses without one"
-}
-
-# A review-tool fixture: a worker copy, its meta recording forge=external, and
-# optionally a backup remote. Sets EXT_WT, EXT_REPO, EXT_META.
-external_fixture() {  # <name> [backup]
-  local name=$1 backup=${2:-}
-  EXT_REPO="$TMP_ROOT/$name-repo"
-  EXT_WT="$TMP_ROOT/$name-wt"
-  fm_git_worktree "$EXT_REPO" "$EXT_WT" "fm/$name"
-  git -C "$EXT_WT" commit -q --allow-empty -m 'change only in the copy'
-  EXT_META="$TMP_ROOT/$name.meta"
-  if [ -n "$backup" ]; then
-    fm_write_meta "$EXT_META" kind=ship mode=direct-PR forge=external backup_remote=backup backup_prefix=backup/
-  else
-    fm_write_meta "$EXT_META" kind=ship mode=direct-PR forge=external
-  fi
-}
-
-ext_accept() {  # <line>
-  CONFIG=$EXT_CFG fm_dod_accept_ship_done ship direct-PR "$EXT_WT" "$EXT_REPO" "$1" "$TMP_ROOT" ext "$EXT_META"
-}
-
-test_external_review_done_without_backup_is_accepted_on_the_url() {
-  local reason
-  external_fixture ext-nobackup
-  ext_accept 'done [at=1]: review https://review.example.test/r/123 uploaded for review' \
-    || fail "an external review done with HEAD only in the copy was refused with no backup recorded"
-  reason=$(ext_accept 'done [at=1]: PR https://github.com/o/r/pull/1') && fail "a PR done on an external project was accepted"
-  assert_contains "$reason" "never a PR" "the PR refusal did not point at the review grammar"
-  for bad in 'http://review.example.test/r/1' 'https://review.example.test/r/1?x=1' \
-    'https://review.example.test/r/1#c' 'https://github.com/o/r/pull/1'; do
-    reason=$(ext_accept "done [at=1]: review $bad uploaded for review") && fail "review URL $bad was accepted"
-  done
-  printf '%s\n' '^https://review\.example\.test/r/[1-9][0-9]*$' > "$EXT_CFG/external-review-url"
-  reason=$(ext_accept 'done [at=1]: review https://other.example.test/r/1 uploaded for review') \
-    && fail "a review URL outside config/external-review-url was accepted"
-  ext_accept 'done [at=1]: review https://review.example.test/r/7 uploaded for review' \
-    || fail "a review URL matching config/external-review-url was refused"
-  rm -f "$EXT_CFG/external-review-url"
-  pass "external review done: accepted on a canonical URL alone without a backup; PR, non-https, query, fragment, forge, and pattern mismatches refused"
-}
-
-test_external_review_done_with_backup_needs_the_copy() {
-  local reason sha
-  external_fixture ext-backup backup
-  sha=$(git -C "$EXT_WT" rev-parse HEAD)
-  reason=$(ext_accept 'done [at=1]: review https://review.example.test/r/9 uploaded for review') \
-    && fail "a backed-up external done was accepted before the copy existed"
-  assert_contains "$reason" "not on the backup remote backup" "the backup refusal did not name the remote"
-  git -C "$EXT_WT" update-ref refs/remotes/backup/fm/ext-backup "$sha"
-  reason=$(ext_accept 'done [at=1]: review https://review.example.test/r/9 uploaded for review') \
-    && fail "a copy outside the backup prefix satisfied the backup gate"
-  git -C "$EXT_WT" update-ref refs/remotes/backup/backup/ext-backup "$sha"
-  ext_accept 'done [at=1]: review https://review.example.test/r/9 uploaded for review' \
-    || fail "a backed-up external done was refused once HEAD was on the backup namespace"
-  pass "external review done with a backup: refused until HEAD is under refs/remotes/backup/backup/, then accepted"
-}
-
-test_external_forge_is_direct_pr_only
-test_external_rule_one_forbids_every_task_push
-test_external_dod_renders_the_adapter
-test_external_review_done_without_backup_is_accepted_on_the_url
-test_external_review_done_with_backup_needs_the_copy
-
+test_external_forge_direct_pr_is_refused
+test_external_forge_brief_is_not_published
 test_worker_role_names_skill_and_fallback_file
 
 echo "all fm-dod-lib tests passed"

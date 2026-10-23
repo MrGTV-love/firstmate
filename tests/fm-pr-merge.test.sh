@@ -774,6 +774,7 @@ hold_fixture_task() {
 # assert one event per decision without depending on line order.
 count_guard_events() {  # <log> <guard> <decision>
   local log=$1 guard=$2 decision=$3
+  # shellcheck disable=SC2016 # jq expands the variables supplied by --arg.
   "$JQ_BIN" -s --arg guard "$guard" --arg decision "$decision" \
     '[.[] | select(.guard == $guard and .decision == $decision)] | length' "$log"
 }

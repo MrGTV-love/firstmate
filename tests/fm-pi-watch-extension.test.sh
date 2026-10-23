@@ -5519,6 +5519,8 @@ printf 'watcher: healthy pid=1 (beacon 0s)\n'
 SH
   cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
 #!/usr/bin/env bash
+# Match production's complete stdin read before deciding whether to refuse.
+cat >/dev/null
 printf 'guard\n' >> "${FM_GUARD_LOG:?}"
 printf 'guard ran after external healthy watcher\n' >&2
 exit 2

@@ -763,6 +763,7 @@ fm_dod_note_reports_ci_ready() {  # <note>
   [[ $note =~ /pull/[0-9]+ ]] && return 0
   [[ $note =~ /merge_requests/[0-9]+ ]] && return 0
   [[ $note =~ /pulls/[0-9]+ ]] && return 0
+  [[ $note =~ /c/[^[:space:]]+/\+/[0-9]+ ]] && return 0
   return 1
 }
 
