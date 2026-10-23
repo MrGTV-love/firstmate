@@ -1,0 +1,4 @@
+## target stub (drains stdin like bin/fm-turnend-guard.sh), 200 iterations
+STRESS pass=200 fail=0
+## base stub (exits without reading stdin), 200 iterations
+STRESS pass=200 fail=0

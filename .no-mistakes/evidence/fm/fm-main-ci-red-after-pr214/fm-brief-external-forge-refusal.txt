@@ -1,0 +1,9 @@
+$ FM_HOME=$LAB bin/fm-brief.sh external-pr fixture --mode direct-PR --forge external
+error: fm-brief.sh --forge: unknown forge 'external' (expected none, gerrit, or forgejo)
+rc=1
+brief published? no
+
+$ FM_HOME=$LAB bin/fm-brief.sh gerrit-pr fixture --mode direct-PR --forge gerrit   (control: a supported forge)
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.ajIG3C/data/gerrit-pr/brief.md (ship, mode=direct-PR forge=gerrit shape=squash; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE} before spawn)
+rc=
+brief published? yes

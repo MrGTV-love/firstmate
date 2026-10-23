@@ -1,0 +1,1115 @@
+Behavior portable parallel 1	UNKNOWN STEP	﻿2026-10-23T12:19:48.2294230Z Current runner version: '2.338.0'
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2331113Z ##[group]Runner Image Provisioner
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2332624Z Hosted Compute Agent
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2333750Z Version: 20261012.601
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2335284Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2336589Z Build Date: 2026-10-12T17:48:21Z
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2337920Z Worker ID: {1fbbba13-c601-4361-b14e-5e9bc2efecb3}
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2339261Z Region: eastus
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2340287Z Cloud: Azure
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2341368Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2344424Z ##[group]Operating System
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2345584Z Ubuntu
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2346688Z 26.04.1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2347699Z LTS
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2348633Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2349795Z ##[group]Runner Image
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2350866Z Image: ubuntu-26.04
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2352148Z Version: 20261012.163.1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2354818Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261012.163/images/ubuntu/Ubuntu2604-Readme.md
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2357667Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261012.163
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2360596Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2362841Z ##[group]GITHUB_TOKEN Permissions
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2366003Z Contents: read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2367183Z Metadata: read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2368229Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2371973Z Secret source: Actions
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2373720Z Cache mode: write
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2375916Z Prepare workflow directory
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2869290Z Prepare all required actions
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.2919958Z Getting action download info
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.4598038Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.6090371Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.7924348Z Complete job name: Behavior portable parallel 1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8693729Z ##[group]Run actions/checkout@v6
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8694939Z with:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8695382Z   fetch-depth: 0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8695848Z   repository: MrGTV-love/firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8699941Z   token: ***
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8700581Z   ssh-strict: true
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8701032Z   ssh-user: git
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8701486Z   persist-credentials: true
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8701976Z   clean: true
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8702418Z   sparse-checkout-cone-mode: true
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8702938Z   fetch-tags: false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8703378Z   show-progress: true
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8703999Z   lfs: false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8704428Z   submodules: false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8704878Z   set-safe-directory: true
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8705394Z   allow-unsafe-pr-checkout: false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.8706203Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9692393Z Syncing repository: MrGTV-love/firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9695248Z ##[group]Getting Git version info
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9696157Z Working directory is '/home/runner/work/firstmate/firstmate'
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9697219Z [command]/usr/bin/git version
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9702439Z git version 2.55.0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9726681Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9742836Z Temporarily overriding HOME='/home/runner/work/_temp/c2b482b0-74e5-47ae-8f74-9d24acac1243' before making global git config changes
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9745581Z Adding repository directory to the temporary git global config as a safe directory
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9748964Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9807569Z Deleting the contents of '/home/runner/work/firstmate/firstmate'
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9818741Z ##[group]Determining repository object format
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9819727Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9820457Z ##[group]Initializing the repository
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9821167Z [command]/usr/bin/git init /home/runner/work/firstmate/firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9941885Z hint: Using 'master' as the name for the initial branch. This default branch name
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9943510Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9945192Z hint: to use in all of your new repositories, which will suppress this warning,
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9946761Z hint: call:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9947490Z hint:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9948730Z hint: 	git config --global init.defaultBranch <name>
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9950319Z hint:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9951771Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9954515Z hint: 'development'. The just-created branch can be renamed via this command:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9956642Z hint:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9957688Z hint: 	git branch -m <name>
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9958634Z hint:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9959911Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9961859Z Initialized empty Git repository in /home/runner/work/firstmate/firstmate/.git/
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:48.9964997Z [command]/usr/bin/git remote add origin https://github.com/MrGTV-love/firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0037217Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0038562Z ##[group]Disabling automatic garbage collection
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0041605Z [command]/usr/bin/git config --local gc.auto 0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0074221Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0075783Z ##[group]Setting up auth
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0076544Z Removing SSH command configuration
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0081186Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0112634Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0515869Z Removing HTTP extra header
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0521562Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0555737Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0819631Z Removing includeIf entries pointing to credentials config files
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0825850Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.0861843Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1137756Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1176371Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1209064Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1245048Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1275151Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1303367Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1304420Z ##[group]Fetching the repository
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:49.1312358Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6011978Z From https://github.com/MrGTV-love/firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6015501Z  * [new branch]        archive/fm-lifecycle-phase3-golden-fold -> origin/archive/fm-lifecycle-phase3-golden-fold
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6019973Z  * [new branch]        archive/fm-lifecycle-phase3-restart-r6 -> origin/archive/fm-lifecycle-phase3-restart-r6
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6023084Z  * [new branch]        cursor/ci-fm-ci-churn-macos-herdr-dry-e1d1 -> origin/cursor/ci-fm-ci-churn-macos-herdr-dry-e1d1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6026615Z  * [new branch]        devin/1790040975-secondmate-fm-root-pin -> origin/devin/1790040975-secondmate-fm-root-pin
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6030194Z  * [new branch]        fm/afk-pi-wake-bypass-r1 -> origin/fm/afk-pi-wake-bypass-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6033540Z  * [new branch]        fm/afk-return-stale-record-gate-r1 -> origin/fm/afk-return-stale-record-gate-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6037122Z  * [new branch]        fm/agents-md-merge-rule -> origin/fm/agents-md-merge-rule
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6039595Z  * [new branch]        fm/ci-2604-cite         -> origin/fm/ci-2604-cite
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6042122Z  * [new branch]        fm/ci-2604-proof        -> origin/fm/ci-2604-proof
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6045107Z  * [new branch]        fm/diagnostic-remote-seed -> origin/fm/diagnostic-remote-seed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6047186Z  * [new branch]        fm/direct-edit-class    -> origin/fm/direct-edit-class
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6050418Z  * [new branch]        fm/fm-actionable-update-escalation-misclassification-r1 -> origin/fm/fm-actionable-update-escalation-misclassification-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6055953Z  * [new branch]        fm/fm-actionable-update-escalation-misclassification-r3 -> origin/fm/fm-actionable-update-escalation-misclassification-r3
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6060178Z  * [new branch]        fm/fm-afk-pi-branch-both-postures-r1 -> origin/fm/fm-afk-pi-branch-both-postures-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6063265Z  * [new branch]        fm/fm-api-key-guard-fork-pr6 -> origin/fm/fm-api-key-guard-fork-pr6
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6066452Z  * [new branch]        fm/fm-board-answer-closes-live-work -> origin/fm/fm-board-answer-closes-live-work
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6069404Z  * [new branch]        fm/fm-board-answer-latency -> origin/fm/fm-board-answer-latency
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6071923Z  * [new branch]        fm/fm-board-answer-latency-r4 -> origin/fm/fm-board-answer-latency-r4
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6074945Z  * [new branch]        fm/fm-board-answer-unrouted-ledger -> origin/fm/fm-board-answer-unrouted-ledger
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6077949Z  * [new branch]        fm/fm-board-decision-card-substance -> origin/fm/fm-board-decision-card-substance
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6080670Z  * [new branch]        fm/fm-board-listener-retire -> origin/fm/fm-board-listener-retire
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6083298Z  * [new branch]        fm/fm-branch-note-sailboat-r2 -> origin/fm/fm-branch-note-sailboat-r2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6086083Z  * [new branch]        fm/fm-brief-task-dod-sections -> origin/fm/fm-brief-task-dod-sections
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6088920Z  * [new branch]        fm/fm-capacity-counts-running-only -> origin/fm/fm-capacity-counts-running-only
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6092259Z  * [new branch]        fm/fm-captain-hold-gate-reads-done-archive -> origin/fm/fm-captain-hold-gate-reads-done-archive
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6096551Z  * [new branch]        fm/fm-captain-hold-operational-keys -> origin/fm/fm-captain-hold-operational-keys
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6099791Z  * [new branch]        fm/fm-cd-guard-warn-not-block -> origin/fm/fm-cd-guard-warn-not-block
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6102350Z  * [new branch]        fm/fm-ci-2604-r4-m2-followup -> origin/fm/fm-ci-2604-r4-m2-followup
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6106257Z  * [new branch]        fm/fm-ci-lint-partition-near-time-limit -> origin/fm/fm-ci-lint-partition-near-time-limit
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6109806Z  * [new branch]        fm/fm-ci-shard2-captain-hold-test-too-long -> origin/fm/fm-ci-shard2-captain-hold-test-too-long
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6113263Z  * [new branch]        fm/fm-ci-ubuntu-2604-runner-image -> origin/fm/fm-ci-ubuntu-2604-runner-image
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6116723Z  * [new branch]        fm/fm-claude-titled-composer-unknown -> origin/fm/fm-claude-titled-composer-unknown
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6119829Z  * [new branch]        fm/fm-claude-trust-sibling-clones -> origin/fm/fm-claude-trust-sibling-clones
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6124414Z  * [new branch]        fm/fm-claude-worker-api-key-guard -> origin/fm/fm-claude-worker-api-key-guard
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6127212Z  * [new branch]        fm/fm-compact-adviser-fleet -> origin/fm/fm-compact-adviser-fleet
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6130362Z  * [new branch]        fm/fm-compact-jev-omp-pipeline -> origin/fm/fm-compact-jev-omp-pipeline
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6134289Z  * [new branch]        fm/fm-composer-thin-adapter-refactor-r1 -> origin/fm/fm-composer-thin-adapter-refactor-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6137942Z  * [new branch]        fm/fm-control-agy-relaunch-composer -> origin/fm/fm-control-agy-relaunch-composer
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6141709Z  * [new branch]        fm/fm-control-exit-claude-background-prompt -> origin/fm/fm-control-exit-claude-background-prompt
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6145987Z  * [new branch]        fm/fm-control-reattribute-endpoints-after-reboot -> origin/fm/fm-control-reattribute-endpoints-after-reboot
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6150084Z  * [new branch]        fm/fm-control-reclaim-missing-endpoint-s2 -> origin/fm/fm-control-reclaim-missing-endpoint-s2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6154184Z  * [new branch]        fm/fm-control-relaunch-relocate-missing-worktree -> origin/fm/fm-control-relaunch-relocate-missing-worktree
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6158469Z  * [new branch]        fm/fm-copy-sweep-and-budget -> origin/fm/fm-copy-sweep-and-budget
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6161352Z  * [new branch]        fm/fm-copy-sweep-release-dead-locks -> origin/fm/fm-copy-sweep-release-dead-locks
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6164438Z  * [new branch]        fm/fm-cpu-pool-gate-overlay -> origin/fm/fm-cpu-pool-gate-overlay
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6167385Z  * [new branch]        fm/fm-crew-state-cache-no-mistakes-reads -> origin/fm/fm-crew-state-cache-no-mistakes-reads
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6170810Z  * [new branch]        fm/fm-crew-state-ci-monitor-terminal -> origin/fm/fm-crew-state-ci-monitor-terminal
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6174692Z  * [new branch]        fm/fm-crew-state-test-spin-leak-s2 -> origin/fm/fm-crew-state-test-spin-leak-s2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6177895Z  * [new branch]        fm/fm-dispatch-diagnostic-count-main -> origin/fm/fm-dispatch-diagnostic-count-main
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6181320Z  * [new branch]        fm/fm-documentation-audience-cleanup-r1 -> origin/fm/fm-documentation-audience-cleanup-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6184532Z  * [new branch]        fm/fm-dod-reaches-reviewer -> origin/fm/fm-dod-reaches-reviewer
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6186789Z  * [new branch]        fm/fm-dsh-tui-adoption  -> origin/fm/fm-dsh-tui-adoption
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6189630Z  * [new branch]        fm/fm-duration-writes-into-project-root -> origin/fm/fm-duration-writes-into-project-root
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6193267Z  * [new branch]        fm/fm-flaky-claude-contexts-stdin-file -> origin/fm/fm-flaky-claude-contexts-stdin-file
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6197395Z  * [new branch]        fm/fm-flaky-opencode-guard-stub-drain -> origin/fm/fm-flaky-opencode-guard-stub-drain
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6200497Z  * [new branch]        fm/fm-flaky-tmux-smoke-readiness -> origin/fm/fm-flaky-tmux-smoke-readiness
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6203361Z  * [new branch]        fm/fm-fleet-process-launch-churn -> origin/fm/fm-fleet-process-launch-churn
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6206729Z  * [new branch]        fm/fm-fleet-snapshot-latest-pull-url -> origin/fm/fm-fleet-snapshot-latest-pull-url
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6209615Z  * [new branch]        fm/fm-github-conditional-reads -> origin/fm/fm-github-conditional-reads
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6212389Z  * [new branch]        fm/fm-github-conditional-reads-r3 -> origin/fm/fm-github-conditional-reads-r3
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6215726Z  * [new branch]        fm/fm-guard-gate-1-envelope-ledger -> origin/fm/fm-guard-gate-1-envelope-ledger
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6218667Z  * [new branch]        fm/fm-herdr-agents-pane-visibility -> origin/fm/fm-herdr-agents-pane-visibility
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6221351Z  * [new branch]        fm/fm-herdr-claude-exit -> origin/fm/fm-herdr-claude-exit
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6224562Z  * [new branch]        fm/fm-herdr-concurrent-recovery-lock -> origin/fm/fm-herdr-concurrent-recovery-lock
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6227835Z  * [new branch]        fm/fm-herdr-contiguity-resume -> origin/fm/fm-herdr-contiguity-resume
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6231378Z  * [new branch]        fm/fm-herdr-reboot-resumed-agents-uncontrolled -> origin/fm/fm-herdr-reboot-resumed-agents-uncontrolled
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6235595Z  * [new branch]        fm/fm-herdr-recovery-classifier-stale-agent-r1 -> origin/fm/fm-herdr-recovery-classifier-stale-agent-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6239201Z  * [new branch]        fm/fm-home-summary-refresh-deadline -> origin/fm/fm-home-summary-refresh-deadline
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6241850Z  * [new branch]        fm/fm-host-load-reduction -> origin/fm/fm-host-load-reduction
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6244272Z  * [new branch]        fm/fm-hyper-jev-skill   -> origin/fm/fm-hyper-jev-skill
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6246597Z  * [new branch]        fm/fm-idle-exit-relaunch-ship -> origin/fm/fm-idle-exit-relaunch-ship
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6249385Z  * [new branch]        fm/fm-idle-reap-test-reread-race -> origin/fm/fm-idle-reap-test-reread-race
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6251825Z  * [new branch]        fm/fm-idle-session-reap -> origin/fm/fm-idle-session-reap
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6254457Z  * [new branch]        fm/fm-jev-credit-failure-alert -> origin/fm/fm-jev-credit-failure-alert
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6257133Z  * [new branch]        fm/fm-jev-dispatch-floor-and-log -> origin/fm/fm-jev-dispatch-floor-and-log
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6260414Z  * [new branch]        fm/fm-jev-guard-bounded-retry-and-outage-text -> origin/fm/fm-jev-guard-bounded-retry-and-outage-text
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6263656Z  * [new branch]        fm/fm-jev-guard-omp-device-paths -> origin/fm/fm-jev-guard-omp-device-paths
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6266564Z  * [new branch]        fm/fm-jev-guard-rebuild-scout -> origin/fm/fm-jev-guard-rebuild-scout
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6269494Z  * [new branch]        fm/fm-jev-guard-request-size-ceiling -> origin/fm/fm-jev-guard-request-size-ceiling
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6272641Z  * [new branch]        fm/fm-jev-guard-unicode-space-file-scope -> origin/fm/fm-jev-guard-unicode-space-file-scope
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6275748Z  * [new branch]        fm/fm-jev-guardrail-hook -> origin/fm/fm-jev-guardrail-hook
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6278135Z  * [new branch]        fm/fm-jev-level5-routers-as-is -> origin/fm/fm-jev-level5-routers-as-is
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6280497Z  * [new branch]        fm/fm-jev-mem-guard-macos -> origin/fm/fm-jev-mem-guard-macos
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6282835Z  * [new branch]        fm/fm-jev-never-send-sections -> origin/fm/fm-jev-never-send-sections
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6285891Z  * [new branch]        fm/fm-jev-pipeline-coverage-clipping -> origin/fm/fm-jev-pipeline-coverage-clipping
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6288739Z  * [new branch]        fm/fm-jev-resolver-observability -> origin/fm/fm-jev-resolver-observability
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6291383Z  * [new branch]        fm/fm-jev-resolver-runway-guard -> origin/fm/fm-jev-resolver-runway-guard
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6294150Z  * [new branch]        fm/fm-jev-retire-invented-v2 -> origin/fm/fm-jev-retire-invented-v2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6296532Z  * [new branch]        fm/fm-jev-single-key-source -> origin/fm/fm-jev-single-key-source
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6299190Z  * [new branch]        fm/fm-jev-size-guard-never-blocks-work -> origin/fm/fm-jev-size-guard-never-blocks-work
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6301733Z  * [new branch]        fm/fm-jev-skill-picker  -> origin/fm/fm-jev-skill-picker
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6304405Z  * [new branch]        fm/fm-keep-ai-trailers-per-home-s2 -> origin/fm/fm-keep-ai-trailers-per-home-s2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6307175Z  * [new branch]        fm/fm-lab-home-refuse-in-worktree -> origin/fm/fm-lab-home-refuse-in-worktree
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6309513Z  * [new branch]        fm/fm-lab-orphan-reaper -> origin/fm/fm-lab-orphan-reaper
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6311519Z  * [new branch]        fm/fm-lane-wake-replay  -> origin/fm/fm-lane-wake-replay
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6313612Z  * [new branch]        fm/fm-lane-wake-replay-r21 -> origin/fm/fm-lane-wake-replay-r21
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6316376Z  * [new branch]        fm/fm-lane-wake-replay-r22 -> origin/fm/fm-lane-wake-replay-r22
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6318764Z  * [new branch]        fm/fm-lavish-board-answers-lost -> origin/fm/fm-lavish-board-answers-lost
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6321373Z  * [new branch]        fm/fm-lavish-legacy-answer-schema -> origin/fm/fm-lavish-legacy-answer-schema
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6324315Z  * [new branch]        fm/fm-lavish-listener-slow-server -> origin/fm/fm-lavish-listener-slow-server
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6326879Z  * [new branch]        fm/fm-ledger-dated-fold-cost -> origin/fm/fm-ledger-dated-fold-cost
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6329266Z  * [new branch]        fm/fm-ledger-lifecycle-events -> origin/fm/fm-ledger-lifecycle-events
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6331847Z  * [new branch]        fm/fm-ledger-local-origin-degrades -> origin/fm/fm-ledger-local-origin-degrades
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6334658Z  * [new branch]        fm/fm-ledger-pr-row-actions -> origin/fm/fm-ledger-pr-row-actions
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6336801Z  * [new branch]        fm/fm-lifecycle-phase3  -> origin/fm/fm-lifecycle-phase3
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6339526Z  * [new branch]        fm/fm-limits-extremes-only-guard-and-spawn -> origin/fm/fm-limits-extremes-only-guard-and-spawn
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6342926Z  * [new branch]        fm/fm-limits-extremes-only-teardown-and-tests -> origin/fm/fm-limits-extremes-only-teardown-and-tests
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6346119Z  * [new branch]        fm/fm-lint-concurrency-bound -> origin/fm/fm-lint-concurrency-bound
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6348635Z  * [new branch]        fm/fm-lint-gate-starves-under-load -> origin/fm/fm-lint-gate-starves-under-load
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6350939Z  * [new branch]        fm/fm-lint-memory-fix   -> origin/fm/fm-lint-memory-fix
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6352970Z  * [new branch]        fm/fm-lint-once-and-scoped -> origin/fm/fm-lint-once-and-scoped
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6355588Z  * [new branch]        fm/fm-main-ci-red-20261010 -> origin/fm/fm-main-ci-red-20261010
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6357778Z  * [new branch]        fm/fm-main-ci-watch-arm-red -> origin/fm/fm-main-ci-watch-arm-red
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6360535Z  * [new branch]        fm/fm-main-findings-a-control-guards-parser -> origin/fm/fm-main-findings-a-control-guards-parser
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6364351Z  * [new branch]        fm/fm-main-findings-b1-spend-audit-cache-test-docs -> origin/fm/fm-main-findings-b1-spend-audit-cache-test-docs
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6367555Z  * [new branch]        fm/fm-main-ledger-owner-diagnosis -> origin/fm/fm-main-ledger-owner-diagnosis
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6370046Z  * [new branch]        fm/fm-main-watcher-death-0117 -> origin/fm/fm-main-watcher-death-0117
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6372636Z  * [new branch]        fm/fm-merge-guard-multi-pr-task-head -> origin/fm/fm-merge-guard-multi-pr-task-head
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6375535Z  * [new branch]        fm/fm-model-freshness-check -> origin/fm/fm-model-freshness-check
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6377566Z  * [new branch]        fm/fm-model-index       -> origin/fm/fm-model-index
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6379753Z  * [new branch]        fm/fm-needs-decision-main-only-r1 -> origin/fm/fm-needs-decision-main-only-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6382411Z  * [new branch]        fm/fm-needs-decision-whole-batch-r1 -> origin/fm/fm-needs-decision-whole-batch-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6385453Z  * [new branch]        fm/fm-nested-copy-no-second-layer -> origin/fm/fm-nested-copy-no-second-layer
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6388204Z  * [new branch]        fm/fm-nested-worker-supervisor-import -> origin/fm/fm-nested-worker-supervisor-import
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6391066Z  * [new branch]        fm/fm-nm-evidence-store-firstmate-r1 -> origin/fm/fm-nm-evidence-store-firstmate-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6394244Z  * [new branch]        fm/fm-omp-approved-fallback-chain-exception -> origin/fm/fm-omp-approved-fallback-chain-exception
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6397146Z  * [new branch]        fm/fm-omp-codex-account-failover -> origin/fm/fm-omp-codex-account-failover
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6399861Z  * [new branch]        fm/fm-omp-codex-account-failover-v2-r3 -> origin/fm/fm-omp-codex-account-failover-v2-r3
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6403136Z  * [new branch]        fm/fm-omp-composer-unknown-blocks-control -> origin/fm/fm-omp-composer-unknown-blocks-control
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6406114Z  * [new branch]        fm/fm-omp-global-roles-overwrite -> origin/fm/fm-omp-global-roles-overwrite
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6408390Z  * [new branch]        fm/fm-omp-idle-wake-stall -> origin/fm/fm-omp-idle-wake-stall
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6410531Z  * [new branch]        fm/fm-omp-jev-thinking-route -> origin/fm/fm-omp-jev-thinking-route
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6412869Z  * [new branch]        fm/fm-omp-lane-wake-unsubmitted -> origin/fm/fm-omp-lane-wake-unsubmitted
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6415811Z  * [new branch]        fm/fm-omp-lane-wake-unsubmitted-r2 -> origin/fm/fm-omp-lane-wake-unsubmitted-r2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6418378Z  * [new branch]        fm/fm-omp-refuse-api-billed-gpt -> origin/fm/fm-omp-refuse-api-billed-gpt
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6420759Z  * [new branch]        fm/fm-omp-remote-trace-tests -> origin/fm/fm-omp-remote-trace-tests
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6423346Z  * [new branch]        fm/fm-omp-sol-chain-deepseek-stand-in -> origin/fm/fm-omp-sol-chain-deepseek-stand-in
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6426423Z  * [new branch]        fm/fm-omp-sol-fallback-downgrade-r2 -> origin/fm/fm-omp-sol-fallback-downgrade-r2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6428914Z  * [new branch]        fm/fm-omp-wake-delivery-gaps -> origin/fm/fm-omp-wake-delivery-gaps
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6431104Z  * [new branch]        fm/fm-omp-worker-memory-off -> origin/fm/fm-omp-worker-memory-off
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6433703Z  * [new branch]        fm/fm-open-loops-action-per-row-snapshot -> origin/fm/fm-open-loops-action-per-row-snapshot
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6436986Z  * [new branch]        fm/fm-open-loops-captain-wait-standing -> origin/fm/fm-open-loops-captain-wait-standing
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6440078Z  * [new branch]        fm/fm-open-loops-checkin-live-evidence -> origin/fm/fm-open-loops-checkin-live-evidence
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6442557Z  * [new branch]        fm/fm-open-loops-core   -> origin/fm/fm-open-loops-core
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6444837Z  * [new branch]        fm/fm-open-loops-lane-scope -> origin/fm/fm-open-loops-lane-scope
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6447053Z  * [new branch]        fm/fm-overdue-rows-block-ack -> origin/fm/fm-overdue-rows-block-ack
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6449421Z  * [new branch]        fm/fm-pause-declared-stale-alarm -> origin/fm/fm-pause-declared-stale-alarm
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6451993Z  * [new branch]        fm/fm-per-task-delivery-override-r1 -> origin/fm/fm-per-task-delivery-override-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6454969Z  * [new branch]        fm/fm-pi-120-before-agent-start-union -> origin/fm/fm-pi-120-before-agent-start-union
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6457289Z  * [new branch]        fm/fm-pi-render-drift   -> origin/fm/fm-pi-render-drift
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6459724Z  * [new branch]        fm/fm-pool-slot-prefilter-skips-unleased -> origin/fm/fm-pool-slot-prefilter-skips-unleased
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6462835Z  * [new branch]        fm/fm-pr-merge-false-missing-required-checks -> origin/fm/fm-pr-merge-false-missing-required-checks
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6466121Z  * [new branch]        fm/fm-pr-merge-requires-recorded-pass -> origin/fm/fm-pr-merge-requires-recorded-pass
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6468549Z  * [new branch]        fm/fm-proc-budget-wrapper -> origin/fm/fm-proc-budget-wrapper
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6470567Z  * [new branch]        fm/fm-proc-count-detector -> origin/fm/fm-proc-count-detector
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6472925Z  * [new branch]        fm/fm-procevent-bound-reader-orphans -> origin/fm/fm-procevent-bound-reader-orphans
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6476052Z  * [new branch]        fm/fm-procevent-lavish-list-form-parse -> origin/fm/fm-procevent-lavish-list-form-parse
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6479002Z  * [new branch]        fm/fm-procevent-lease-debounce-test-flaky -> origin/fm/fm-procevent-lease-debounce-test-flaky
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6481614Z  * [new branch]        fm/fm-project-lock-fair-wait -> origin/fm/fm-project-lock-fair-wait
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6484417Z  * [new branch]        fm/fm-project-lock-fair-wait-v2 -> origin/fm/fm-project-lock-fair-wait-v2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6486642Z  * [new branch]        fm/fm-prune-copy-on-merge -> origin/fm/fm-prune-copy-on-merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6489189Z  * [new branch]        fm/fm-public-stow-readbeforewrite-port-r1 -> origin/fm/fm-public-stow-readbeforewrite-port-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6492102Z  * [new branch]        fm/fm-reassociate-shared-root-overlap -> origin/fm/fm-reassociate-shared-root-overlap
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6495452Z  * [new branch]        fm/fm-reboot-recover-transient-child-false-alarm -> origin/fm/fm-reboot-recover-transient-child-false-alarm
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6498532Z  * [new branch]        fm/fm-relaunch-held-task-stops-first -> origin/fm/fm-relaunch-held-task-stops-first
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6501114Z  * [new branch]        fm/fm-relaunch-stale-git-hook-env -> origin/fm/fm-relaunch-stale-git-hook-env
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6504144Z  * [new branch]        fm/fm-relaunch-tx-breaks-pr-metadata-parse -> origin/fm/fm-relaunch-tx-breaks-pr-metadata-parse
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6507517Z  * [new branch]        fm/fm-remote-reply-malformed-update-and-launch -> origin/fm/fm-remote-reply-malformed-update-and-launch
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6510311Z  * [new branch]        fm/fm-remote-spawn-allow-omp -> origin/fm/fm-remote-spawn-allow-omp
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6512764Z  * [new branch]        fm/fm-remove-tracked-lavish-scratch -> origin/fm/fm-remove-tracked-lavish-scratch
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6515312Z  * [new branch]        fm/fm-repeat-mistake-sweep -> origin/fm/fm-repeat-mistake-sweep
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6517468Z  * [new branch]        fm/fm-report-silence-checkin -> origin/fm/fm-report-silence-checkin
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6519896Z  * [new branch]        fm/fm-review-agent-dynamic-selector -> origin/fm/fm-review-agent-dynamic-selector
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6522449Z  * [new branch]        fm/fm-safe-auto-reboot-simple-r1 -> origin/fm/fm-safe-auto-reboot-simple-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6525691Z  * [new branch]        fm/fm-secondmate-creation-record-intake-r1 -> origin/fm/fm-secondmate-creation-record-intake-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6528945Z  * [new branch]        fm/fm-secondmate-parent-channel-structural-r1 -> origin/fm/fm-secondmate-parent-channel-structural-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6532220Z  * [new branch]        fm/fm-secondmate-record-atomic-transitions-r1 -> origin/fm/fm-secondmate-record-atomic-transitions-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6610751Z  * [new branch]        fm/fm-session-launch-runtime-restriction -> origin/fm/fm-session-launch-runtime-restriction
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6615966Z  * [new branch]        fm/fm-session-start-false-liveness -> origin/fm/fm-session-start-false-liveness
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6619882Z  * [new branch]        fm/fm-session-start-fast -> origin/fm/fm-session-start-fast
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6624228Z  * [new branch]        fm/fm-sessionstart-network-free-r1 -> origin/fm/fm-sessionstart-network-free-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6628615Z  * [new branch]        fm/fm-shared-slot-custody-gaps -> origin/fm/fm-shared-slot-custody-gaps
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6631279Z  * [new branch]        fm/fm-shared-slot-review-followups -> origin/fm/fm-shared-slot-review-followups
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6633767Z  * [new branch]        fm/fm-shared-test-fixtures-r1 -> origin/fm/fm-shared-test-fixtures-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6636518Z  * [new branch]        fm/fm-size-refusal-names-budget -> origin/fm/fm-size-refusal-names-budget
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6638982Z  * [new branch]        fm/fm-skill-frontmatter-desc-r1 -> origin/fm/fm-skill-frontmatter-desc-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6641072Z  * [new branch]        fm/fm-slack-watch       -> origin/fm/fm-slack-watch
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6643428Z  * [new branch]        fm/fm-snapshot-crew-state-bounded-read -> origin/fm/fm-snapshot-crew-state-bounded-read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6646674Z  * [new branch]        fm/fm-spawn-acquisition-limit-root-cause -> origin/fm/fm-spawn-acquisition-limit-root-cause
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6649484Z  * [new branch]        fm/fm-spawn-allocation-guard-exact -> origin/fm/fm-spawn-allocation-guard-exact
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6652316Z  * [new branch]        fm/fm-spawn-fixed-family-readers -> origin/fm/fm-spawn-fixed-family-readers
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6655423Z  * [new branch]        fm/fm-spawn-isolation-timeout-leaks-pool-slot -> origin/fm/fm-spawn-isolation-timeout-leaks-pool-slot
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6658447Z  * [new branch]        fm/fm-spawn-provision-existing-slot -> origin/fm/fm-spawn-provision-existing-slot
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6661341Z  * [new branch]        fm/fm-stale-lock-proof-ignores-idle-shells -> origin/fm/fm-stale-lock-proof-ignores-idle-shells
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6664248Z  * [new branch]        fm/fm-status-runaway-guard -> origin/fm/fm-status-runaway-guard
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6666328Z  * [new branch]        fm/fm-subagent-guard-fix -> origin/fm/fm-subagent-guard-fix
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6668435Z  * [new branch]        fm/fm-supervision-fork-budget -> origin/fm/fm-supervision-fork-budget
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6671194Z  * [new branch]        fm/fm-supervision-pr-url-hallucination-r1 -> origin/fm/fm-supervision-pr-url-hallucination-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6674356Z  * [new branch]        fm/fm-supervision-rearm-resurface-r1 -> origin/fm/fm-supervision-rearm-resurface-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6677151Z  * [new branch]        fm/fm-supervision-refused-ack-loop-r1 -> origin/fm/fm-supervision-refused-ack-loop-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6680074Z  * [new branch]        fm/fm-supervision-watchdog-outside-session -> origin/fm/fm-supervision-watchdog-outside-session
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6682874Z  * [new branch]        fm/fm-task-copy-reassociate-v2-r2 -> origin/fm/fm-task-copy-reassociate-v2-r2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6685503Z  * [new branch]        fm/fm-teamclaude-launcher-land -> origin/fm/fm-teamclaude-launcher-land
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6687800Z  * [new branch]        fm/fm-teardown-after-ci-rebase -> origin/fm/fm-teardown-after-ci-rebase
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6690620Z  * [new branch]        fm/fm-teardown-close-without-slot-return -> origin/fm/fm-teardown-close-without-slot-return
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6693446Z  * [new branch]        fm/fm-teardown-closeout-full-refusal -> origin/fm/fm-teardown-closeout-full-refusal
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6696504Z  * [new branch]        fm/fm-teardown-closes-captain-held-scout-r1 -> origin/fm/fm-teardown-closes-captain-held-scout-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6699158Z  * [new branch]        fm/fm-teardown-docker-stacks -> origin/fm/fm-teardown-docker-stacks
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6701434Z  * [new branch]        fm/fm-teardown-docker-stacks-r2 -> origin/fm/fm-teardown-docker-stacks-r2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6704432Z  * [new branch]        fm/fm-teardown-holds-project-lock-too-long -> origin/fm/fm-teardown-holds-project-lock-too-long
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6707214Z  * [new branch]        fm/fm-teardown-leak-kill-identity -> origin/fm/fm-teardown-leak-kill-identity
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6709975Z  * [new branch]        fm/fm-teardown-locked-nested-copy-release -> origin/fm/fm-teardown-locked-nested-copy-release
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6712782Z  * [new branch]        fm/fm-teardown-orphan-reap-confine -> origin/fm/fm-teardown-orphan-reap-confine
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6715613Z  * [new branch]        fm/fm-teardown-owns-nested-copies -> origin/fm/fm-teardown-owns-nested-copies
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6718159Z  * [new branch]        fm/fm-teardown-pipeline-input-copy -> origin/fm/fm-teardown-pipeline-input-copy
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6721279Z  * [new branch]        fm/fm-teardown-prior-custody-root-after-reassociate -> origin/fm/fm-teardown-prior-custody-root-after-reassociate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6725111Z  * [new branch]        fm/fm-teardown-prior-custody-root-after-reassociate-2 -> origin/fm/fm-teardown-prior-custody-root-after-reassociate-2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6728358Z  * [new branch]        fm/fm-teardown-private-nm-daemon-leak -> origin/fm/fm-teardown-private-nm-daemon-leak
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6731234Z  * [new branch]        fm/fm-teardown-reaps-task-archive-branches -> origin/fm/fm-teardown-reaps-task-archive-branches
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6734165Z  * [new branch]        fm/fm-teardown-shared-copy-refusal -> origin/fm/fm-teardown-shared-copy-refusal
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6737026Z  * [new branch]        fm/fm-teardown-slot-collision-fix-r1 -> origin/fm/fm-teardown-slot-collision-fix-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6739786Z  * [new branch]        fm/fm-teardown-slot-custody-review-nits -> origin/fm/fm-teardown-slot-custody-review-nits
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6742586Z  * [new branch]        fm/fm-teardown-slow-holds-lease-lock -> origin/fm/fm-teardown-slow-holds-lease-lock
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6745571Z  * [new branch]        fm/fm-teardown-squash-oracle-anchor -> origin/fm/fm-teardown-squash-oracle-anchor
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6748467Z  * [new branch]        fm/fm-teardown-verified-bundle-preservation -> origin/fm/fm-teardown-verified-bundle-preservation
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6751349Z  * [new branch]        fm/fm-test-endpoint-safety-tmux-leak -> origin/fm/fm-test-endpoint-safety-tmux-leak
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6754108Z  * [new branch]        fm/fm-test-run-shard-guard-dup -> origin/fm/fm-test-run-shard-guard-dup
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6756798Z  * [new branch]        fm/fm-timeout-limits-measured-not-guessed -> origin/fm/fm-timeout-limits-measured-not-guessed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6759163Z  * [new branch]        fm/fm-tmpdir-leaks      -> origin/fm/fm-tmpdir-leaks
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6761290Z  * [new branch]        fm/fm-tmux-no-server-absence-proof -> origin/fm/fm-tmux-no-server-absence-proof
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6764022Z  * [new branch]        fm/fm-turnend-autoarm-wait-empirical -> origin/fm/fm-turnend-autoarm-wait-empirical
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6766745Z  * [new branch]        fm/fm-turnend-foreign-owner-arm-fix-r1 -> origin/fm/fm-turnend-foreign-owner-arm-fix-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6769015Z  * [new branch]        fm/fm-upstream-sync     -> origin/fm/fm-upstream-sync
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6770969Z  * [new branch]        fm/fm-upstream-sync-20261013 -> origin/fm/fm-upstream-sync-20261013
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6772965Z  * [new branch]        fm/fm-upstream-sync-a2  -> origin/fm/fm-upstream-sync-a2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6775462Z  * [new branch]        fm/fm-validation-bind-archive-route -> origin/fm/fm-validation-bind-archive-route
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6777696Z  * [new branch]        fm/fm-wake-drain-fast   -> origin/fm/fm-wake-drain-fast
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6779624Z  * [new branch]        fm/fm-watch-beat-under-load -> origin/fm/fm-watch-beat-under-load
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6781921Z  * [new branch]        fm/fm-watch-device-id-signal-storm -> origin/fm/fm-watch-device-id-signal-storm
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6784603Z  * [new branch]        fm/fm-watch-missed-done-signal -> origin/fm/fm-watch-missed-done-signal
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6786963Z  * [new branch]        fm/fm-watch-prelude-beacon-stall -> origin/fm/fm-watch-prelude-beacon-stall
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6789131Z  * [new branch]        fm/fm-watch-triage-split -> origin/fm/fm-watch-triage-split
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6791153Z  * [new branch]        fm/fm-watchdog-alarm-wording -> origin/fm/fm-watchdog-alarm-wording
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6793469Z  * [new branch]        fm/fm-watcher-flap-autoarm-fix-r2 -> origin/fm/fm-watcher-flap-autoarm-fix-r2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6796008Z  * [new branch]        fm/fm-watcher-hardening-r1 -> origin/fm/fm-watcher-hardening-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6798052Z  * [new branch]        fm/fm-watcher-hardening-r2 -> origin/fm/fm-watcher-hardening-r2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6800075Z  * [new branch]        fm/fm-watcher-hardening-r3 -> origin/fm/fm-watcher-hardening-r3
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6802170Z  * [new branch]        fm/fm-watcher-lock-test-race -> origin/fm/fm-watcher-lock-test-race
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6804620Z  * [new branch]        fm/fm-worker-project-skill-picker -> origin/fm/fm-worker-project-skill-picker
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6806805Z  * [new branch]        fm/guard-audit-closure  -> origin/fm/guard-audit-closure
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6809218Z  * [new branch]        fm/herdr-workspace-contiguity-maintenance -> origin/fm/herdr-workspace-contiguity-maintenance
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6811629Z  * [new branch]        fm/jev-outage-degrade   -> origin/fm/jev-outage-degrade
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6813470Z  * [new branch]        fm/model-freshness-gate -> origin/fm/model-freshness-gate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6815764Z  * [new branch]        fm/model-picker-collector -> origin/fm/model-picker-collector
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6817696Z  * [new branch]        fm/model-picker-shadow  -> origin/fm/model-picker-shadow
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6820030Z  * [new branch]        fm/nm-required-exempt-release-please-r1 -> origin/fm/nm-required-exempt-release-please-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6822910Z  * [new branch]        fm/reconcile-inactive-crew-investigate-s1 -> origin/fm/reconcile-inactive-crew-investigate-s1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6826043Z  * [new branch]        fm/remote-send-confirm-readback-fix-r1 -> origin/fm/remote-send-confirm-readback-fix-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6828634Z  * [new branch]        fm/remote-send-delivery-delta-r1 -> origin/fm/remote-send-delivery-delta-r1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6831251Z  * [new branch]        fm/secondmate-autonomous-supervision-s7 -> origin/fm/secondmate-autonomous-supervision-s7
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6833548Z  * [new branch]        fm/teardown-split       -> origin/fm/teardown-split
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6835588Z  * [new branch]        fm/untrack-graft-cache  -> origin/fm/untrack-graft-cache
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6837227Z  * [new branch]        main                    -> origin/main
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6838871Z  * [new branch]        no-mistakes/evidence    -> origin/no-mistakes/evidence
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6840826Z  * [new branch]        proto/herdr-child-workspaces -> origin/proto/herdr-child-workspaces
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6844444Z [command]/usr/bin/git branch --list --remote origin/main
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6845696Z   origin/main
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6847768Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6849077Z b3fa25f9869349667b64f6c3b4f2e0f307d3e2b5
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6851738Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6853115Z ##[group]Determining the checkout info
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6855487Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6856813Z [command]/usr/bin/git sparse-checkout disable
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6859577Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6862661Z ##[group]Checking out the ref
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.6864594Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.7955101Z Switched to a new branch 'main'
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.7957574Z branch 'main' set up to track 'origin/main'.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.7983724Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8034657Z [command]/usr/bin/git log -1 --format=%H
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8060998Z b3fa25f9869349667b64f6c3b4f2e0f307d3e2b5
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8310940Z ##[group]Run set -eu
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8311866Z ^[[36;1mset -eu^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8312850Z ^[[36;1mbin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8314316Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8486903Z shell: /usr/bin/bash -e {0}
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:55.8488017Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1178965Z ShellCheck - shell script analysis tool
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1181128Z version: 0.11.0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1183069Z license: GNU General Public License, version 3
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1185485Z website: https://www.shellcheck.net
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1300360Z ##[group]Run set -eu
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1301123Z ^[[36;1mset -eu^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1301890Z ^[[36;1mbin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1302780Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1367794Z shell: /usr/bin/bash -e {0}
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.1368547Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2606981Z 1.7.12
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2608541Z installed by downloading from release page
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2609855Z built with go1.26.1 compiler for linux/amd64
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2697522Z ##[group]Run set -eu
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2698280Z ^[[36;1mset -eu^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2698977Z ^[[36;1mnpm install -g tasks-axi^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2699730Z ^[[36;1mtasks-axi --version^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2764396Z shell: /usr/bin/bash -e {0}
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:56.2765343Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.3445948Z 
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.3446569Z added 3 packages in 781ms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.3962112Z 0.2.6
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.4064654Z ##[group]Run set -eu
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.4065202Z ^[[36;1mset -eu^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.4065844Z ^[[36;1mnpm install -g @earendil-works/pi-coding-agent typescript^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.4066677Z ^[[36;1mnpm ls -g --depth 0 @earendil-works/pi-coding-agent typescript^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.4067118Z ^[[36;1mtsc --version^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.4148342Z shell: /usr/bin/bash -e {0}
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:19:57.4148667Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:02.3739020Z npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8365461Z 
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8366113Z added 121 packages in 8s
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8366503Z 
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8366932Z 9 packages are looking for funding
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8367599Z   run `npm fund` for details
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8389305Z npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8390719Z npm warn install-scripts   @google/genai@2.21.0 (preinstall: echo 'preinstall: no-op')
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8392143Z npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8393165Z npm warn install-scripts
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:05.8395261Z npm warn install-scripts Run `npm install -g --allow-scripts=@google/genai,protobufjs` to allow these scripts once, or `npm config set allow-scripts=@google/genai,protobufjs --location=user` to allow them for all global installs.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.2620728Z /usr/local/lib
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.2621737Z ├── @earendil-works/pi-coding-agent@1.4.0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.2622505Z └── typescript@7.0.2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.2622816Z 
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3126481Z Version 7.0.2
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3206641Z ##[group]Run set -eu
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3207087Z ^[[36;1mset -eu^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3207469Z ^[[36;1mmkdir -p "$RUNNER_TEMP/fm-test"^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3208211Z ^[[36;1m# Three scripts at a time: the lane is exactly the proven-isolated^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3209066Z ^[[36;1m# set, whose recorded four-way proof ran on macOS with two members^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3209922Z ^[[36;1m# not passing (docs/fm-test-isolation-proof.md). The first three-wide^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3210749Z ^[[36;1m# run on the 26.04 image passed; docs/fm-test-portable-shards.md^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3211527Z ^[[36;1m# cites it. --jobs must match PORTABLE_PARALLEL_JOBS, which the^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3212399Z ^[[36;1m# coverage guard packs into min(jobs, PORTABLE_PARALLEL_EFFECTIVE_JOBS)^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3213183Z ^[[36;1m# bins and tests/fm-ci-workflow.test.sh enforces.^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3214351Z ^[[36;1mbin/fm-test-run.sh --lane portable-parallel-1 --jobs 3 \^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3215098Z ^[[36;1m  --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3215695Z ^[[36;1m  --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-parallel-1.json"^[[0m
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3275791Z shell: /usr/bin/bash -e {0}
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.3276085Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.7161737Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.7382538Z FM_TEST_BEGIN 2026-10-23T12:20:06Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.7526128Z FM_TEST_BEGIN 2026-10-23T12:20:06Z tests/fm-test-run.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:20:06.7731021Z FM_TEST_BEGIN 2026-10-23T12:20:06Z tests/fm-captain-hold-lifecycle.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.1835374Z ok - exact suite coverage: --all lists every tests/*.test.sh once
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.1880844Z ok - family selection returns a proper subset of the suite
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.1930227Z ok - single-script selection lists exactly that path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.1975297Z ok - changed-file selection stays conservative (never silent full suite)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2005384Z ok - a task marker refuses execution in the primary checkout and leaves worktrees and inspection alone
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2010053Z ok - runner and its documentation surfaces select their curated family, not just their contract owners
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2011416Z ok - shell line-ending policy selects runner coverage
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2012676Z ok - a task-copy change selects retained-spawn and secondmate safety; spawn and wake changes keep their own families
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2014609Z fm-test-run: no tests selected for changes vs HEAD (map is conservative; use --all for the complete suite)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2016131Z fm-test-run: no tests selected for changes vs HEAD (map is conservative; use --all for the complete suite)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2039891Z ok - changed selection covers dependents, fails closed for live unmapped source, and accepts retired unconsumed source
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2044221Z ok - wake classifier changes select both consuming suites without broadening coverage
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2045631Z ok - both supervision groups retain family coverage and direct/transitive changed selection
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2046920Z ok - both triage groups retain watcher coverage and direct/transitive changed selection
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2048266Z ok - every captain-hold group is independently selectable and the shared helper selects all of them
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2049577Z not ok - the teardown groups register 334 cases, not the 333-case inventory they partition
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.2314856Z FM_TEST_END 2026-10-23T12:21:02Z tests/fm-test-run.test.sh exit=1 duration_ms=55365 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:21:02.4967996Z FM_TEST_BEGIN 2026-10-23T12:21:02Z tests/fm-captain-hold-reconcile.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1803170Z ok - legacy reconcile replaces earlier choices before either intake is selected
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1807135Z ok - only a bound captured source creates reconcile requests
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1808080Z ok - normal answers and their replays retire reconcile requests
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1810994Z ok - reconcile closes a moot call with evidence and keeps an active one open with a note
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1812579Z ok - reconcile outcomes apply durable mutations once across partial failures
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1825461Z ok - verified recorded-answer and moot closes work without board requests and replay parent publication
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1845204Z ok - standalone close retries preserve hold age and cannot replay across hold lifecycles
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1875084Z ok - an interrupted close retries only as an exact replay and resolves the hold's original parent key
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1905233Z ok - the close retry matrix accepts only exact replays and the first close of a new opening, and never closes a newer or unidentifiable one
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1934992Z ok - verified closes refuse active calls, missing or reserved evidence, and unfinished work
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1964973Z ok - skipped on markdown-only tasks-axi: close-key against a beads-migrated hold
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1966567Z ok - status-only operational closes preserve evidence, unrelated calls, and reopened-key replay safety
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.1985482Z ok - operational closes enforce ownership and attestation, recover after an interrupted append, and refuse staged evidence once the call reopened
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2015211Z ok - standalone evidence closes refuse the attended branch, relocate under the away record, and leave main and the board path unchanged
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2024634Z ok - a channel source with no decision binding closes nothing
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2034351Z ok - legacy identities, metadata, bindings, and the shim keep working
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2064720Z ok - a board answer reaches the keyed-answer intake and wakes firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2080775Z ok - the chat channel feeds the same keyed-answer intake a captured review does
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2104720Z ok - completion and verification validate origins before constructing paths
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2127704Z ok - a status resolution over a still-open captain-held task is signalled, not closed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2153606Z ok - a captain call with no routed work, a verified transfer, an open decision, and an answered call all stay silent
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2155288Z ok - captain-hold lifecycle leaves no runner or watchdog processes
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.2156857Z FM_TEST_END 2026-10-23T12:27:51Z tests/fm-captain-hold-reconcile.test.sh exit=0 duration_ms=408626 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:27:51.3399191Z FM_TEST_BEGIN 2026-10-23T12:27:51Z tests/fm-captain-hold-sweep.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7526358Z ok - marked hold reasons round-trip through public reads, fleet, startup, and return without changing other fields
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7556929Z ok - new, active, and released holds require the origin first with and without deferral
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7579467Z ok - historical self-inventories name a workable repair that preserves sibling entries
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7587180Z ok - completion and verification compare backend identities for entries and current or stored origins
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7588466Z ok - complete refuses the origin as its own captain-call inventory
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7589528Z ok - complete refuses an entry held for another origin and flags one with none recorded
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7590876Z ok - report-only unresolved captain call is reproduced and completion refuses before loss
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7594074Z ok - internal retention and read-only admission preserve active captain drop classification
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7597380Z ok - both body-decoding paths work without the allow_nonref default
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7598511Z ok - cleanup preserves every byte of a retained body's non-ASCII characters
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7600123Z ok - the completion gate attests captain-held inventory and transfers open status decisions
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7601384Z ok - answer records the captain's words, closes idempotently, and releases routed work
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7602547Z ok - release frees held work with the captain's words recorded and the body preserved
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7603666Z ok - captain holds become visible only after their hold-set timestamp is durable
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7605003Z ok - an interrupted answer preserves its hold age until close retry
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7606122Z ok - a deferred captain call leaves the live Captain's Call until its date and stays answerable
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7607314Z ok - an out-of-band close is recordable with the captain's word and nothing else
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7608342Z ok - ended visual review follows the same captain-hold completion owner
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7609359Z ok - resolved findings and decision-like prose do not create captain-held tasks
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7610426Z ok - terminal single-owner stale status decisions do not block empty inventory
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7611445Z ok - main-home and secondmate-home captain calls remain correctly routed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7612509Z ok - a secondmate home publishes each hold occurrence and its answer on the parent channel
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7613634Z ok - secondmate resolutions publish before retiring durable retry triggers
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7615121Z ok - a captain-hold resolution records its UTC time and the answering home's role, and a replay changes neither
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7616472Z ok - answered_by comes from two exact source prefixes or this home's role, and is unknown otherwise
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7617946Z ok - ledger on: a recorded answer appends one task.answered, a replay none, and an unwritable ledger costs one stderr line
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7619536Z ok - ledger on: a created call, a direct answer, and a reconciliation each write one record; an existing item or a replay writes none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7631986Z ok - captain-hold lifecycle leaves no runner or watchdog processes
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.7751018Z FM_TEST_END 2026-10-23T12:28:25Z tests/fm-captain-hold-lifecycle.test.sh exit=0 duration_ms=498921 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:28:25.8947624Z FM_TEST_BEGIN 2026-10-23T12:28:25Z tests/fm-arm-pretool-check.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3458967Z ok - matrix A01: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3460198Z ok - matrix A02: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3461067Z ok - matrix A03: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3461813Z ok - matrix A04: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3462593Z ok - matrix A05: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3463595Z ok - matrix A06: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3464583Z ok - matrix A07: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3465319Z ok - matrix A08: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3466059Z ok - matrix A09: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3466845Z ok - matrix A10: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3467631Z ok - matrix A11: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3468376Z ok - matrix A12: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3469276Z ok - matrix A13: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3470248Z ok - matrix A14: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3470994Z ok - matrix A15: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3471728Z ok - matrix A16: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3472495Z ok - matrix A17: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3473254Z ok - matrix R01: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3474255Z ok - matrix R02: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3475115Z ok - matrix R03: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3475845Z ok - matrix R04: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3477043Z ok - matrix R05: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3477821Z ok - matrix R06: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3478595Z ok - matrix R07: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3479333Z ok - matrix R08: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3480074Z ok - matrix R09: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3480794Z ok - matrix R10: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3481516Z ok - matrix R11: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3482280Z ok - matrix R12: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3483011Z ok - matrix R13: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3483772Z ok - matrix R14: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3484947Z ok - matrix R15: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3485636Z ok - matrix R16: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3486389Z ok - matrix R17: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3487103Z ok - matrix R18: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3487820Z ok - matrix R19: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3488613Z ok - matrix R20: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3489408Z ok - matrix R21: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3490261Z ok - matrix D01: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3491037Z ok - matrix D02: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3491811Z ok - matrix D03: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3492589Z ok - matrix D04: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3493370Z ok - matrix D05: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3494377Z ok - matrix D06: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3495125Z ok - matrix D07: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3495880Z ok - matrix D08: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3496641Z ok - matrix D09: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3497380Z ok - matrix D10: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3498121Z ok - matrix D11: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3499159Z ok - matrix D12: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3499904Z ok - matrix D13: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3500647Z ok - matrix D14: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3501378Z ok - matrix D15: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3502105Z ok - matrix D16: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3502831Z ok - matrix D17: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3503644Z ok - matrix D18: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3504877Z ok - matrix D19: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3505662Z ok - matrix D20: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3506426Z ok - matrix D21: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3507183Z ok - matrix D22: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3507913Z ok - matrix D23: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3508625Z ok - matrix D24: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3509381Z ok - matrix D25: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3510165Z ok - matrix D26: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3510912Z ok - matrix D27: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3511655Z ok - matrix D28: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3512385Z ok - matrix D29: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3513149Z ok - matrix D30: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3514466Z ok - matrix D31: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3515224Z ok - matrix D32: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3515934Z ok - matrix D33: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3516650Z ok - matrix D34: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3517597Z ok - matrix D35: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3518376Z ok - matrix D36: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3519121Z ok - matrix D37: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3519844Z ok - matrix D38: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3520539Z ok - matrix D39: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3521246Z ok - matrix D40: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3521980Z ok - matrix D41: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3522825Z ok - matrix D42: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3523637Z ok - matrix D43: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3524616Z ok - matrix D44: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3525345Z ok - matrix D45: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3526072Z ok - matrix D46: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3526825Z ok - matrix D47: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3527576Z ok - matrix D48: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3528333Z ok - matrix D49: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3529094Z ok - matrix D50: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3529804Z ok - matrix D51: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3530887Z ok - matrix D52: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3531702Z ok - matrix D53: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3532421Z ok - matrix D54: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3533152Z ok - matrix D55: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3534168Z ok - matrix D56: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3535022Z ok - matrix D57: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3535763Z ok - matrix D58: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3536489Z ok - matrix D59: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3537260Z ok - matrix D60: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3537997Z ok - matrix D61: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3538726Z ok - matrix D62: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3539775Z ok - matrix D63: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3540458Z ok - matrix D64: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3541181Z ok - matrix D65: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3541904Z ok - matrix E01: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3542654Z ok - matrix E02: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3543434Z ok - matrix E03: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3544510Z ok - matrix E04: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3545346Z ok - matrix E05: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3546307Z ok - matrix E06: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3546938Z ok - matrix E07: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3547530Z ok - matrix E08: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3548116Z ok - matrix E09: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3548657Z ok - matrix E10: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3549212Z ok - matrix E11: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3549755Z ok - matrix E12: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3550305Z ok - matrix E13: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3550864Z ok - matrix E14: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3551435Z ok - matrix E15: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3552009Z ok - matrix E16: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3552618Z ok - matrix E17: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3553197Z ok - matrix K01: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3554458Z ok - matrix K02: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3555135Z ok - matrix K03: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3555969Z ok - matrix K04: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3556575Z ok - matrix K05: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3557145Z ok - matrix K06: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3557723Z ok - matrix K07: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3558289Z ok - matrix K08: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3558856Z ok - matrix K09: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3559434Z ok - matrix K10: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3560009Z ok - matrix K11: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3560571Z ok - matrix K12: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3561137Z ok - matrix K13: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3561687Z ok - matrix K14: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3562390Z ok - matrix K15: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3562967Z ok - matrix K16: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3563527Z ok - matrix K17: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3564509Z ok - matrix K18: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3565108Z ok - matrix K19: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3565797Z ok - matrix K20: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3566383Z ok - matrix K21: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3566968Z ok - matrix K22: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3567583Z ok - matrix K23: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3568159Z ok - matrix K24: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3568735Z ok - matrix K25: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3569316Z ok - matrix K26: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3569890Z ok - matrix K27: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3570460Z ok - matrix K28: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3571035Z ok - matrix K29: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3571594Z ok - matrix K30: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3572165Z ok - matrix K31: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3573014Z ok - matrix K32: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3573584Z ok - matrix K33: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3574501Z ok - matrix K34: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3575080Z ok - matrix K35: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3575642Z ok - matrix K36: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3576202Z ok - matrix K37: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3576766Z ok - matrix K38: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3577330Z ok - matrix K39: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3577915Z ok - matrix K40: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3578492Z ok - matrix K41: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3579060Z ok - matrix K42: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3579626Z ok - matrix K43: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3580179Z ok - matrix K44: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3580751Z ok - matrix K45: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3581345Z ok - matrix K46: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3581915Z ok - matrix K47: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3582552Z ok - matrix K48: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3583299Z ok - matrix K49: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3589481Z ok - matrix K50: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3590346Z ok - matrix K51: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3590904Z ok - matrix K52: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3591483Z ok - matrix K53: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3592096Z ok - matrix K54: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3592928Z ok - matrix K55: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3593525Z ok - matrix K56: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3594423Z ok - matrix K57: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3595048Z ok - matrix K58: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3595741Z ok - matrix K59: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3596369Z ok - matrix K60: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3596956Z ok - matrix K61: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3597575Z ok - matrix K62: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3598164Z ok - matrix K63: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3598766Z ok - matrix K64: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3599335Z ok - matrix K65: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3599897Z ok - matrix K66: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3600466Z ok - matrix K67: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3601266Z ok - matrix K68: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3601921Z ok - matrix K69: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3602539Z ok - matrix K70: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3603128Z ok - matrix K71: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3603706Z ok - matrix K72: allow through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3604638Z ok - matrix K73: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3605487Z ok - matrix K74: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3606054Z ok - matrix K75: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3606891Z ok - matrix K76: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3607465Z ok - matrix K77: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3608294Z ok - matrix K78: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3609091Z ok - matrix K79: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3609680Z ok - matrix K80: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3610480Z ok - matrix K81: deny through all five entry forms
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3611326Z ok - direct policy direct-data-pkill: allow
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3612595Z ok - direct policy direct-broad-pkill: deny	broad-watcher-kill
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3613409Z ok - direct policy direct-loop-broad-pkill: deny	broad-watcher-kill
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3614476Z ok - direct policy direct-loop-broad-kill-pgrep: deny	broad-watcher-kill
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3615567Z ok - direct policy direct-loop-no-kill-allowed: allow
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3616559Z ok - direct policy direct-pipeline: deny	watcher-pipeline
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3617597Z ok - direct policy direct-leading-redirection: deny	watcher-redirection
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3618851Z ok - direct policy direct-unclassifiable: deny	unclassifiable-protected-command
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3620135Z ok - direct policy direct-unsupported: deny	unclassifiable-protected-command
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3621250Z ok - direct policy direct-constructed-payload: deny	watcher-nested
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3622173Z ok - direct policy direct-parameter-export: allow
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3622810Z ok - direct policy direct-expanded-arm-blessed: allow
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3623855Z ok - direct policy direct-expanded-arm-background: deny	watcher-background
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3625211Z ok - direct policy direct-expanded-arm-pipeline: deny	watcher-pipeline
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3626241Z ok - direct policy direct-watch-not-blessed: deny	watcher-direct
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3626979Z ok - direct policy direct-watch-expanded: deny	watcher-direct
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3627761Z ok - direct policy direct-watch-safe-shape: deny	watcher-direct
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3628446Z ok - direct policy direct-heredoc-data: allow
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3629103Z ok - direct policy direct-heredoc-watcher: deny	watcher-redirection
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3629801Z ok - --command=<val> equals-form parses correctly
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3630826Z ok - --background is accepted for interface parity and is never itself a deny signal
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3631683Z ok - unknown CLI flag is rejected
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3632728Z ok - stdin grok schema (toolInput.command): denied with Grok-shaped stdout JSON
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3634109Z ok - stdin claude/codex schema (tool_input.command): blessed shape allowed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3634991Z ok - stdin claude/codex schema (tool_input.command): backgrounded shape denied
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3635732Z ok - stdin: unrelated command is a fast allow
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3636817Z ok - transport prefilter is a strict superset: non-fm-watch fast-allows, every fm-watch and quoting-decoder-marker command reaches the classifier
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3637966Z ok - fail-open: empty stdin
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3638419Z ok - fail-open: unparseable JSON on stdin
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3638936Z ok - fail-open: missing jq on stdin path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3639521Z ok - fail-open: missing classifier runtime
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3640406Z ok - --claude: stdout empty, stderr carries hookSpecificOutput deny JSON
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3641350Z ok - default mode: stdout carries Grok-shaped decision JSON on deny
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3642475Z ok - a backgrounded arm names the foreground checkpoint and the harness-native repair line in Grok and Cursor renderings
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3643644Z ok - allow is silent on both stdout and stderr in default and --claude mode
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3644740Z ok - bin/fm-arm-pretool-check.sh is clean under bin/fm-lint.sh
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.3719008Z FM_TEST_END 2026-10-23T12:29:58Z tests/fm-arm-pretool-check.test.sh exit=0 duration_ms=92410 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:29:58.5017293Z FM_TEST_BEGIN 2026-10-23T12:29:58Z tests/fm-cd-pretool-check.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.2996138Z ok - cd-guard acceptance matrix: 63 cases x 5 harness entry forms, block/allow all correct
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3014950Z ok - cd-guard: fires in a secondmate home (its own primary session is a primary)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3036699Z ok - cd-guard: inert in a crewmate/scout task worktree (linked git worktree)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3037550Z ok - cd-guard: inert in a non-firstmate repo (no AGENTS.md)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3038181Z ok - cd-guard: inert when not inside a git repo
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3039381Z ok - cd-guard: reproduces the cwd leak and denies the exact command that causes it
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3040112Z ok - cd-guard: fails open on empty stdin
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3040646Z ok - cd-guard: fails open on unparseable stdin JSON
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3041267Z ok - cd-guard: fails open (never blocks) when node is missing
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3041936Z ok - cd-guard: fails open on the stdin path when jq is missing
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3042784Z ok - cd-guard: prefilter fast-allows (skips node) when no cd/pushd/popd substring is present
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3049497Z ok - cd-guard: fm-cd-command-policy.mjs CLI honors the deny/allow output contract
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3050405Z ok - bin/fm-cd-pretool-check.sh is clean under bin/fm-lint.sh
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.3232652Z FM_TEST_END 2026-10-23T12:30:29Z tests/fm-cd-pretool-check.test.sh exit=0 duration_ms=30753 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:29.4418076Z FM_TEST_BEGIN 2026-10-23T12:30:29Z tests/fm-tmux-submit-busy.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6063624Z ok - tmux busy omp held payload stays pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6067256Z ok - tmux omp unknown remains pending despite explicit idle baseline and canonical busy footer
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6077918Z ok - tmux omp initial, refreshed, and postretry redraws retain independent-watcher payloads
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6079900Z ok - fm_tmux_submit_enter_core: busy pane + pending composer returns empty (message queued)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6081346Z ok - fm_tmux_submit_enter_core: idle pane + pending composer stays pending (genuine swallow preserved)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6082677Z ok - fm_tmux_submit_enter_core: the Claude background-task exit picker gets no confirming Enter
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6084927Z ok - fm_backend_send_text_submit: a typed message to the exit picker types nothing and sends no Enter
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6088089Z ok - fm_tmux_submit_enter_core: wrapped input retains swallowed-Enter retries
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6089562Z ok - fm_tmux_submit_enter_core: placeholder-like bare input retains swallowed-Enter retries
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6090824Z ok - fm_tmux_submit_enter_core: busy pane clears composer on first Enter - returns empty
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6092043Z ok - fm_tmux_submit_enter_core: idle pane clears composer on first Enter - returns empty as before
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6093235Z ok - fm_tmux_submit_enter_core: busy conversion is limited to proven pending input
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6094760Z ok - fm_tmux_submit_core: failed baseline capture disables busy unknown conversion
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6095777Z ok - fm_tmux_submit_enter_core: pending-unproven retries without busy conversion
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6096948Z ok - fm_tmux_submit_enter_core: unconfirmed draft risk retains its token and stops Enter retries, even when already busy
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6098302Z ok - fm_tmux_submit_core: idle-to-busy proof still confirms a conservative unknown-draft after one Enter
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6099325Z ok - fm_tmux_submit_enter_core: unrecognized states skip busy conversion
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6100231Z ok - fm_pane_is_busy: Claude spinner is scoped, multi-frame, and backward-compatible
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6101172Z ok - tmux omp refreshes pending frames and requires empty proof before confirming
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6102084Z ok - tmux omp retries dropped first Enter and confirms a cleared composer
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6103116Z ok - tmux pi-launcher and kimi retain main unknown confirmation, repeated Enter, and busy queue handling
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6104445Z ok - tmux proven omp identity survives a missing subsequent pane identity
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6105639Z ok - tmux foreground omp proof survives title loss while background omp cannot change legacy submit scope
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6106708Z ok - tmux unavailable initial identity fails closed on initial, postretry, and exhausted pending paths
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6107362Z ok - tmux non-omp confirmation preserves main's predicate and Pi launcher eligibility
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.6300876Z FM_TEST_END 2026-10-23T12:30:44Z tests/fm-tmux-submit-busy.test.sh exit=0 duration_ms=15115 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:44.7621884Z FM_TEST_BEGIN 2026-10-23T12:30:44Z tests/fm-review-diff.test.sh family=pr-forge expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8169990Z ok - fm-review-diff falls back to recorded pr_head when pull head cannot be fetched
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8171497Z ok - fm-review-diff fetches refs/pull/<n>/head when pr_head= is absent
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8173069Z ok - fm-review-diff prefers freshly fetched PR head over a stale recorded pr_head=
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8177846Z ok - fm-review-diff without pr= keeps the worktree-branch diff
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8178956Z ok - fm-review-diff falls back to local branch with a warning when PR head is unreachable
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8180302Z ok - fm-review-diff reviews the meta-recorded ship branch even when the worktree HEAD moved off it
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8181641Z ok - fm-review-diff refuses a corrupt recorded ship branch instead of reviewing the wrong content
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8184790Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8186145Z ●  WATCHER DOWN - SUPERVISION IS OFF
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8198390Z ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8199913Z ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8201271Z ●  This is a supervision warning only; the guarded operation WILL still run.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8202751Z ●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8204443Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8205848Z ok - fm-review-diff compares a task against its recorded base branch
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8206928Z ok - fm-review-diff fetches refs/pull/<n>/head for a Forgejo /pulls/<n> pr= URL
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8208196Z ok - fm-review-diff resolves a Forgejo repo literally named pulls by the last /pulls/ segment
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8209569Z ok - fm-review-diff falls back to a recorded Forgejo pr_head when the pull ref cannot be fetched
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.8394485Z FM_TEST_END 2026-10-23T12:30:57Z tests/fm-review-diff.test.sh exit=0 duration_ms=13011 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:30:57.9589633Z FM_TEST_BEGIN 2026-10-23T12:30:57Z tests/fm-send-strict.test.sh family=backend-dispatch expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0372708Z ok - fm-send strict: exact task/lane ids resolve through home metadata
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0373745Z ok - fm-send --key: exit status follows delivery, and an undelivered key never reports success
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0374911Z ok - fm-send strict: unset FM_HOME fails before target resolution
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0375719Z ok - fm-send strict: unresolvable selectors do not fall back to tmux
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0376647Z ok - fm-send strict: prefixless herdr pane ids are rejected before tmux fallback
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0377898Z ok - fm-send strict: unmatched single-colon explicit targets must verify live before sending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0378979Z ok - fm-send strict: fm-prefixed Herdr sessions remain explicit backend targets
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0379910Z ok - fm-send strict: healthy fm-<id> sends record the steer and ring once
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.0561256Z FM_TEST_END 2026-10-23T12:31:08Z tests/fm-send-strict.test.sh exit=0 duration_ms=10039 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:08.1732005Z FM_TEST_BEGIN 2026-10-23T12:31:08Z tests/fm-composer-ghost.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4904780Z ok - fm_tmux_strip_ghost drops dim/faint runs, keeps normal and bold text
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4905893Z ok - fm_tmux_strip_ghost handles combined SGR, ESC[22m, and reset-then-dim
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4907071Z ok - fm_tmux_strip_ghost keeps bright colored text with 2 payloads
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4908231Z ok - fm_tmux_strip_ghost drops a dark/muted truecolor foreground (grok placeholder)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4909406Z ok - fm_tmux_strip_ghost keeps muse's near-threshold glyph and its typed text
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4911318Z ok - fm_pane_input_pending: a dim ghost-only composer is NOT pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4912426Z ok - fm_pane_input_pending: dim ghost inside a bordered composer is NOT pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4913526Z ok - fm_pane_input_pending: normal-intensity typed text is still pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4914913Z ok - fm_pane_input_pending: bright colored text with 2 payloads is still pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4916168Z ok - fm_pane_input_pending: a dark truecolor ghost-only composer (grok placeholder) is NOT pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4917427Z ok - fm_tmux_composer_state: dark truecolor shell prompts read unknown
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4918562Z ok - fm_pane_input_pending: real text plus a trailing ghost run is still pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4919691Z ok - fm_tmux_composer_state: text above an empty cursor row is pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4920713Z ok - fm_tmux_composer_state: a message wrapped across three rows is pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4921847Z ok - fm_tmux_composer_state: a proven titled box tolerates a bottom-border cursor
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4923013Z ok - fm_tmux_composer_identity: unknown busy state cannot become idle identity
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4924692Z ok - fm_tmux_composer_state: typed Pi and Grok busy signatures inside a box are pending
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4926045Z ok - fm_tmux_composer_state: a bare busy-footer row reads unknown (strict container-proof rule)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4927298Z ok - fm_tmux_composer_state: an unbounded bordered box fails closed as unknown
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4928484Z ok - fm_tmux_composer_state: clipped and asymmetric composer edges fail closed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4929480Z ok - fm_tmux_composer_state: inconsistent box geometry fails closed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4930757Z ok - fm_tmux_composer_state: misaligned box bounds fail closed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4932300Z ok - fm_tmux_composer_state: unproved ghost and malformed geometry stay unknown while styled placeholder-like text stays pending-unproven
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4934272Z ok - fm_tmux_composer_state: differing widths prefer pending or unknown, never empty
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4935661Z ok - fm_tmux_composer_state: emoji and CJK text remain pending under the C locale
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4936883Z ok - fm_tmux_composer_state: all tmux harnesses share empty and pending classification
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4938028Z ok - fm_pane_input_pending: unrecognized states defer by default
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4939094Z ok - fm_tmux_composer_state: one capture feeds the classifier; no band-capture race remains
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4940321Z ok - fm_tmux_composer_state: absent Pi identity preserves Claude's enclosed bare verdict
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4941528Z ok - fm_tmux_composer_state: only proven structural and non-bordered empty routes stay empty
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4943130Z ok - fm_tmux_composer_state: panes without bordered structure retain compatibility fallback
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4944700Z ok - fm_tmux_composer_state: interior edge glyphs retain non-bordered fallback
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.4945789Z ok - fm-peek output is escape-free (no raw -e bytes reach firstmate context)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.5175488Z FM_TEST_END 2026-10-23T12:31:13Z tests/fm-composer-ghost.test.sh exit=0 duration_ms=5270 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:13.6406189Z FM_TEST_BEGIN 2026-10-23T12:31:13Z tests/fm-pi-primary-types.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:17.9043181Z ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.4.0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:17.9266885Z FM_TEST_END 2026-10-23T12:31:17Z tests/fm-pi-primary-types.test.sh exit=0 duration_ms=4221 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:18.0547642Z FM_TEST_BEGIN 2026-10-23T12:31:18Z tests/fm-supervision-instructions.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0843310Z ok - renderer adds the supervision-host protocol on a claude home unless config/supervision-host-off opts it out, leaving the claude block intact
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0865209Z ok - renderer gives each non-Pi arm owner the host protocol in its own terms, and grok arms the host
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0866835Z ok - renderer prints exactly the selected harness block
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0867539Z ok - renderer falls back to unknown.md for unverified harness names
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0868395Z ok - renderer includes read-only, afk, and effective x-mode current-state stanzas
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0869145Z ok - renderer's away/quiet stanzas are mode-aware, default to away, and fall back safely on garbage input
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0869757Z ok - renderer repair-line mode is harness-aware and honors conditional state
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0870392Z ok - renderer preserves every harness ordinary-continuation and missing-cycle repair path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0871358Z ok - pi-signed keeps its identity while sharing Pi's supervision protocol
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0872339Z ok - grok supervision is Claude-shaped background notify with passive Stop-hook backstop
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0873204Z ok - grok rendered command sources the effective x-mode config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0885720Z ok - pi supervision snippet renders the effective extension path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.0886937Z ok - supervision instructions: every harness names the task grading sections, the DoD file escape, and the missing-section rule
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:31:21.1072008Z FM_TEST_END 2026-10-23T12:31:21Z tests/fm-supervision-instructions.test.sh exit=0 duration_ms=2980 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1205975Z ok - the sweep retires finished boards and keeps every board that could still carry an answer
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1207371Z ok - the automatic sweep retires finished boards, never a live or unanswered one whose listener cannot start, and records why
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1208724Z ok - the automatic sweep keeps a live board whose file is gone and retires it once the session has ended
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1210280Z ok - the sweep stops the resident poll of a finished board's live listener
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1211587Z ok - deleted boards retain standing, feedback, ownership and captured-result protections
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1212651Z ok - filesystem permission errors keep ended, sessionless and idle board listeners
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1213658Z ok - stale sweeps preserve replacement generations and newly captured rounds
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1214842Z ok - recent acknowledgements keep only their own listeners in literal home paths
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1215848Z ok - unknown inbox evidence keeps listeners at sweep and locked retirement boundaries
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1216846Z ok - unknown and dynamic card discovery keeps ended, sessionless and idle listeners
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1217912Z ok - bound sweep keys share exact and legacy answer precedence without cross-source cache leakage
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1218760Z ok - sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1219446Z ok - captain-hold lifecycle leaves no runner or watchdog processes
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:33:49.1409556Z FM_TEST_END 2026-10-23T12:33:49Z tests/fm-captain-hold-sweep.test.sh exit=0 duration_ms=357736 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3540087Z ok - fm-pr-merge reports exact queue retry flags after a zero-exit false success
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3540773Z ok - fm-pr-merge omits merge-queue retry guidance for a closed GitHub PR
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3541310Z ok - fm-pr-merge aggregates agreeing merge-queue rules
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3541802Z ok - fm-pr-merge reports ambiguity for conflicting merge-queue rules
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3542343Z ok - fm-pr-merge records pr= and pr_head= for a verified GitHub merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3543013Z ok - fm-pr-merge records pr= before the forge call can land the merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3544256Z ok - fm-pr-merge propagates a real merge failure without silently succeeding
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3545515Z ok - fm-pr-merge refuses a GitHub merge call that leaves the PR open and unqueued
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3546852Z ok - fm-pr-merge retries a bounded number of times when mergeable is UNKNOWN and merges once it resolves
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3547722Z ok - fm-pr-merge reports mergeability still pending after its bounded UNKNOWN retry is spent
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3548843Z ok - fm-pr-merge refuses on the UNKNOWN re-check when a check turned red between reads
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3549563Z ok - fm-pr-merge refuses a genuine mergeable conflict immediately, without retrying
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3550312Z ok - fm-pr-merge keeps PR bookkeeping when it cannot read a successful merge call's outcome
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3551052Z ok - fm-pr-merge refuses with the forge's own output quoted apart from its verdict
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3551736Z ok - fm-pr-merge quotes the forge output when it cannot read the outcome either
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3552628Z ok - fm-pr-merge does not echo back queue flags the caller already used
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3553273Z ok - fm-pr-merge still names retry flags when the caller used a different method
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3554198Z ok - fm-pr-merge names the queue requirement even when its method is unrecognised
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3554933Z ok - fm-pr-merge distinguishes unreadable branch rules from a base with no merge queue
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3555691Z ok - fm-pr-merge reads a plan-gated 403 on branch rules as no merge queue, not unreadable
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3556288Z ok - fm-pr-merge says nothing about a merge queue when the base branch has no queue rule
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3556824Z ok - fm-pr-merge accepts only a proved merge from the gh-axi fallback
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3557803Z ok - fm-pr-merge explains an armed auto-merge that landed nothing on a queue-less base
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3558643Z ok - fm-pr-merge never reports auto-merge as armed when the merge command failed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3559475Z ok - fm-pr-merge claims no acceptance for a failed merge command carrying queue flags
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3560461Z ok - fm-pr-merge falls back to the gh-axi view when gh's read fails
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3561269Z ok - fm-pr-merge names a landed state hiding behind a failed GitHub merge command
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3562078Z ok - fm-pr-merge refuses a GitHub merge when gh is missing, before recording
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3562880Z ok - fm-pr-merge refuses a GitHub merge when gh is missing rather than merging blind
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3563598Z ok - fm-pr-merge verifies a genuinely merged GitHub pull request
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3572663Z ok - fm-pr-merge refuses to claim a merge when poll recording fails
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3573533Z ok - fm-pr-merge accepts and accurately reports a GitHub merge-queue entry
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3574695Z ok - fm-pr-merge explains how to retry with the required GitHub merge queue method
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3575670Z ok - fm-pr-merge refuses branch deletion unless --attended-override is passed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3576512Z ok - fm-pr-merge refuses before merging when task meta is missing
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3577258Z ok - fm-pr-merge refuses malformed PR URLs before calling gh-axi
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3578017Z ok - fm-pr-merge refuses unsafe PR URL segments before recording state
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3578780Z ok - fm-pr-merge refuses repo override args before recording state
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3579681Z ok - fm-pr-merge refuses a bundled short-option repo override and refuses -d unless attended
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3580942Z ok - fm-pr-merge does not add default --squash when the caller passes an explicit merge method
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3581865Z ok - fm-pr-merge respects --method=<value> as an explicit merge method
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3582382Z ok - fm-pr-merge parses a GitHub PR URL into gh-axi number and --repo arguments
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3582956Z ok - fm-pr-merge refuses a caller --sha on GitHub because the head comes from the live read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3583542Z ok - fm-pr-merge merges a GitLab merge request through glab instead of refusing it
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3584547Z ok - fm-pr-merge takes the GitLab instance from the URL rather than assuming one
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3585420Z ok - fm-pr-merge imposes no merge method on GitLab, leaving the project's own one
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3586409Z ok - fm-pr-merge refuses GitLab source-branch deletion unless --attended-override is passed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3587682Z ok - fm-pr-merge propagates a real glab merge failure without silently succeeding
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3588562Z ok - fm-pr-merge refuses on each GitLab pre-merge condition independently
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3589302Z ok - fm-pr-merge reports every failing GitLab condition, not only the first
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3589797Z ok - fm-pr-merge reports a stale recorded head and verifies the live one
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3590330Z ok - fm-pr-merge refuses an unreadable GitLab merge request state rather than merging blind
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3590839Z ok - fm-pr-merge refuses a GitLab head commit it cannot validate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3591292Z ok - fm-pr-merge refuses before recording anything when glab or jq is absent
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3591826Z ok - fm-pr-merge merges a Forgejo pull request through tea api instead of refusing it
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3592414Z ok - fm-pr-merge resolves the tea login by matching the PR's host against every registered login
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3593028Z ok - fm-pr-merge refuses when zero or more than one tea login matches the pull request's host
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3593576Z ok - fm-pr-merge refuses on each Forgejo pre-merge condition independently
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3594548Z ok - fm-pr-merge treats an unconfigured Forgejo combined status as none, refusing rather than skipping the check
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3595187Z ok - fm-pr-merge reads every Forgejo combined-status page before merging
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3595722Z ok - fm-pr-merge reports a stale recorded head and binds the merge to the live one instead
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3596227Z ok - fm-pr-merge refuses a Forgejo head commit it cannot validate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3596684Z ok - fm-pr-merge refuses before recording anything when tea or jq is absent
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3597417Z ok - fm-pr-merge never trusts tea api's exit status alone; a rejected merge is caught by the confirm read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3598083Z ok - fm-pr-merge retries a failed Forgejo confirmation read and persists the merge authority
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3598900Z ok - fm-pr-merge maps --squash/--rebase to Forgejo's Do field, defaults to the repository's default merge style, and refuses any other extra argument
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3599645Z ok - fm-pr-merge refuses a GitLab head override before recording state
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3600128Z ok - a merge a secondmate home performs itself is reported upward exactly once
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3600690Z ok - a locally routed secondmate home reports the landed PR into its parent's own channel
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3601223Z ok - a landed GitLab merge request is reported upward on the same channel
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3601718Z ok - a queued GitLab merge stays silent and leaves confirmation to the armed poll
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3602162Z ok - a refused or failed merge reports no outcome
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3602554Z ok - a GitLab merge refused before the forge call reports no outcome
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3603021Z ok - a merge a main home performs itself leaves one durable wake naming the PR
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3603531Z ok - a queued GitHub merge stays silent and leaves confirmation to the armed poll
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3604300Z ok - distinct merged PRs for one task retain distinct captain-facing wakes
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3604787Z ok - an uncommitted marker retry preserves at least one durable outcome
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3605295Z ok - a secondmate home that cannot report upward says so instead of merging in silence
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3605789Z ok - fm-pr-merge proceeds when the home carries no backlog at all
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3606222Z ok - fm-pr-merge refuses when the backlog exists but cannot be read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3606648Z ok - fm-pr-merge refuses when its configured backend cannot be read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3607106Z ok - fm-pr-merge refuses when its user backend configuration cannot be read
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3607640Z ok - fm-pr-merge refuses when its user backend configuration directory cannot be traversed
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3608262Z ok - fm-pr-merge proceeds once when its user configuration directory and backlog are genuinely absent
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3609004Z ok - fm-pr-merge honors a backend override over an unreadable user configuration
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3609530Z ok - fm-pr-merge refuses red GitHub checks and waives only a named --allow-red check
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3610099Z ok - a multi-PR task merges the named green PR although the copy's HEAD is a local-only tip
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3610675Z ok - a multi-PR task merges the named green PR after a sibling merged and lost its branch
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3611211Z ok - a single-PR task whose copy HEAD exists only locally is still refused at merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3611737Z ok - a multi-PR task whose named PR reports no forge head is still refused at merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3612205Z ok - a multi-PR task's red PR head is still refused at merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3612662Z ok - fm-pr-merge refuses a draft pull request and one with no boolean draft state
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3613182Z ok - fm-pr-merge merges when a failed check run was replaced by a passing re-run
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3613679Z ok - fm-pr-merge never lets a check run supersede a legacy status context
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3614561Z ok - fm-pr-merge still refuses when a check's current run failed after an earlier pass
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3615070Z ok - fm-pr-merge uses start order when the old success finishes last
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3615506Z ok - fm-pr-merge supersedes an old cancellation that finishes last
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3615946Z ok - fm-pr-merge keeps a check red while its re-run is still in flight
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3616403Z ok - fm-pr-merge never lets one check's pass clear another check's failure
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3616889Z ok - fm-pr-merge clears a failure only on a proven later pass of the same check
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3617574Z ok - fm-pr-merge keeps --allow-red scoped to its named check beside a superseded failure
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3618114Z ok - fm-pr-merge rechecks away presence before an attended red merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3618639Z ok - fm-pr-merge keeps a quiet-mode home's merges attended, the named red-check waiver included
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3619188Z ok - fm-pr-merge accepts exactly one separately named red-check waiver
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3619846Z ok - while the away-posture record exists any green merge lands under away authority, yolo or not, and attended merges stay untagged
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3620820Z ok - under the away-posture record the branch merges a green task, is refused on a red check with or without --allow-red, and is refused at the partition while attended
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3621649Z ok - a branch merge refuses under the lock when the away record is archived during preflight
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3622203Z ok - away posture permits immediate merges but refuses every asynchronous path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3622760Z ok - away merge proceeds on a plan-gated 403 because that repository cannot have a merge queue
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3623323Z ok - the away record does not bypass red checks, and a recorded pr= must match the URL
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3624175Z ok - an unreadable away-posture record refuses the merge instead of skipping the record
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3624792Z ok - no away-record archive or replacement lands between the authority read and the merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3625353Z ok - a record made unreadable before the merge's own authority read refuses the merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3625877Z ok - a merge that cannot lock the away record refuses instead of merging unlocked
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3626393Z ok - fm-pr-merge refuses --allow-red on GitLab
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3627007Z ok - fm-pr-merge refuses when a required check from branch protection or a ruleset never reported
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3627564Z ok - fm-pr-merge merges when every required check reported and is green
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3628126Z ok - fm-pr-merge reports a red check and an unreported required check together with every other failure
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3628798Z ok - fm-pr-merge refuses when the required checks cannot be read, and tells a plan without rules apart
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3629506Z ok - fm-pr-merge --allow-missing waives only its named unreported check
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3630043Z ok - fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only like --allow-red
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3630637Z ok - fm-pr-merge retries incomplete and transient rollups, then judges every check anew
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3631237Z ok - fm-pr-merge refuses incomplete rollups as unreadable sources even with a missing-check waiver
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3631783Z ok - fm-pr-merge judges required and red checks on later rollup pages
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3632278Z ok - fm-pr-merge retries an incomplete producer list before merging the verified head
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3632819Z ok - fm-pr-merge retries transient classic and ruleset required-source failures
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3633273Z ok - fm-pr-merge never waives incomplete producer evidence
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3633688Z ok - fm-pr-merge enforces required producer identity and named waivers
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3634388Z ok - fm-pr-merge matches an app-bound required commit status by name
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3634865Z ok - fm-pr-merge reports known missing checks and all independent read errors
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3635282Z ok - fm-pr-merge refuses --allow-red on Forgejo
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3635610Z ok - fm-pr-merge refuses --allow-missing on Forgejo
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3636167Z ok - fm-pr-merge prints one green-head refusal naming each check, its requirement, its next action, and the exact repair
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3636905Z ok - fm-pr-merge names the away posture and the attended waiver command when it refuses a waiver while away
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3637516Z ok - fm-pr-merge prints the exact captain-hold release command with the real task id
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3638131Z ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.3744530Z FM_TEST_END 2026-10-23T12:34:18Z tests/fm-pr-merge.test.sh exit=0 duration_ms=851579 gate_skip=false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4681124Z FM_TEST_SUMMARY total=13 failed=1 skipped_gate=0 duration_ms=852110
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4716708Z FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=10039 failed=0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4717664Z FM_TEST_SUMMARY_FAMILY family=pr-forge count=2 duration_ms=864590 failed=0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4718549Z FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=10 duration_ms=1471397 failed=1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4763571Z FM_TEST_SLOWEST rank=1 script=tests/fm-pr-merge.test.sh duration_ms=851579
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4764840Z FM_TEST_SLOWEST rank=2 script=tests/fm-captain-hold-lifecycle.test.sh duration_ms=498921
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4766011Z FM_TEST_SLOWEST rank=3 script=tests/fm-captain-hold-reconcile.test.sh duration_ms=408626
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4766832Z FM_TEST_SLOWEST rank=4 script=tests/fm-captain-hold-sweep.test.sh duration_ms=357736
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4767781Z FM_TEST_SLOWEST rank=5 script=tests/fm-arm-pretool-check.test.sh duration_ms=92410
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4768736Z FM_TEST_SLOWEST rank=6 script=tests/fm-test-run.test.sh duration_ms=55365
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4769648Z FM_TEST_SLOWEST rank=7 script=tests/fm-cd-pretool-check.test.sh duration_ms=30753
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4770595Z FM_TEST_SLOWEST rank=8 script=tests/fm-tmux-submit-busy.test.sh duration_ms=15115
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4771505Z FM_TEST_SLOWEST rank=9 script=tests/fm-review-diff.test.sh duration_ms=13011
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4772388Z FM_TEST_SLOWEST rank=10 script=tests/fm-send-strict.test.sh duration_ms=10039
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4772991Z FM_TEST_SLOWEST rank=11 script=tests/fm-composer-ghost.test.sh duration_ms=5270
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4773592Z FM_TEST_SLOWEST rank=12 script=tests/fm-pi-primary-types.test.sh duration_ms=4221
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.4774849Z FM_TEST_SLOWEST rank=13 script=tests/fm-supervision-instructions.test.sh duration_ms=2980
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5084502Z fm-test-run: wrote timing artifact: /home/runner/work/_temp/fm-test/fm-test-timing-portable-parallel-1.json
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5863513Z ##[error]Process completed with exit code 1.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5969592Z ##[group]Run actions/upload-artifact@v4
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5969918Z with:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5970160Z   name: fm-test-timing-portable-parallel-1
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5970618Z   path: /home/runner/work/_temp/fm-test/fm-test-timing-portable-parallel-1.json
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5971048Z   if-no-files-found: warn
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5971283Z   compression-level: 6
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5971506Z   overwrite: false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5971726Z   include-hidden-files: false
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.5971974Z ##[endgroup]
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.7683092Z (node:726527) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.7684440Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.7728803Z With the provided path, there will be 1 file uploaded
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.7734323Z Artifact name is valid!
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.7735889Z Root directory input is valid!
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.9640899Z Beginning upload of artifact content to blob storage
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:18.9832452Z (node:726527) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.0324585Z Uploaded bytes 838
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.0502076Z Finished uploading artifact content to blob storage!
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.0503398Z SHA256 digest of uploaded artifact zip is d24d8ffe86c317685a02b17ccd4d01c4d2f83ced82ee0e68a5495defa9ff8762
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.0505203Z Finalizing artifact upload
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.4621877Z Artifact fm-test-timing-portable-parallel-1.zip successfully finalized. Artifact ID 12501911379
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.4623970Z Artifact fm-test-timing-portable-parallel-1 has been successfully uploaded! Final size is 838 bytes. Artifact ID is 12501911379
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.4630388Z Artifact download URL: https://github.com/MrGTV-love/firstmate/actions/runs/39952484274/artifacts/12501911379
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.4867513Z Post job cleanup.
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5776131Z [command]/usr/bin/git version
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5818569Z git version 2.55.0
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5861714Z Temporarily overriding HOME='/home/runner/work/_temp/57b02c36-c3ce-4569-8bbd-d78ad3183938' before making global git config changes
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5863124Z Adding repository directory to the temporary git global config as a safe directory
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5868872Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5902905Z Removing SSH command configuration
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5909474Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.5946397Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6228937Z Removing HTTP extra header
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6236639Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6275692Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6552269Z Removing includeIf entries pointing to credentials config files
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6559427Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6588249Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6589259Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6590592Z includeif.gitdir:/github/workspace/.git.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6591662Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6600099Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6625853Z /home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6638726Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6679228Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6705953Z /home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6722692Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6750503Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6774747Z /github/runner_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6785023Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6821541Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6848664Z /github/runner_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6856779Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.6899853Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.7216372Z Removing credentials config '/home/runner/work/_temp/git-credentials-b3055959-ed82-4b11-969f-dbaada8da804.config'
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.7405149Z Cleaning up orphan processes
+Behavior portable parallel 1	UNKNOWN STEP	2026-10-23T12:34:19.7865843Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

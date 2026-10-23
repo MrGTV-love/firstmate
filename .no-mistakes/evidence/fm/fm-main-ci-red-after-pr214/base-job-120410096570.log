@@ -1,0 +1,1024 @@
+Behavior portable serial 9	UNKNOWN STEP	﻿2026-10-23T12:24:06.1680036Z Current runner version: '2.338.0'
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1716259Z ##[group]Runner Image Provisioner
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1717664Z Hosted Compute Agent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1718806Z Version: 20261012.601
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1720011Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1721436Z Build Date: 2026-10-12T17:48:21Z
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1722723Z Worker ID: {d7be441a-62c6-40da-ac31-52b3d13409c4}
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1724388Z Region: eastus
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1725374Z Cloud: Azure
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1726498Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1729082Z ##[group]Operating System
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1730344Z Ubuntu
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1731253Z 26.04.1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1732316Z LTS
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1733284Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1734520Z ##[group]Runner Image
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1735665Z Image: ubuntu-26.04
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1736640Z Version: 20261012.163.1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1739069Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261012.163/images/ubuntu/Ubuntu2604-Readme.md
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1742151Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261012.163
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1744196Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1746248Z ##[group]GITHUB_TOKEN Permissions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1749138Z Contents: read
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1750255Z Metadata: read
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1751351Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1755146Z Secret source: Actions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1756859Z Cache mode: write
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.1758447Z Prepare workflow directory
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.2227107Z Prepare all required actions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.2285392Z Getting action download info
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.3865989Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.5089921Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.7525520Z Complete job name: Behavior portable serial 9
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8252658Z ##[group]Run actions/checkout@v6
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8253791Z with:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8254241Z   fetch-depth: 0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8254711Z   repository: MrGTV-love/firstmate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8258366Z   token: ***
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8258805Z   ssh-strict: true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8259248Z   ssh-user: git
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8259688Z   persist-credentials: true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8260185Z   clean: true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8260626Z   sparse-checkout-cone-mode: true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8261146Z   fetch-tags: false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8261597Z   show-progress: true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8262043Z   lfs: false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8262455Z   submodules: false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8262900Z   set-safe-directory: true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8263408Z   allow-unsafe-pr-checkout: false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.8264345Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9301713Z Syncing repository: MrGTV-love/firstmate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9304544Z ##[group]Getting Git version info
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9305692Z Working directory is '/home/runner/work/firstmate/firstmate'
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9306776Z [command]/usr/bin/git version
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9307330Z git version 2.55.0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9326865Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9343825Z Temporarily overriding HOME='/home/runner/work/_temp/d3bffed6-bfb1-4d60-97d9-12f438970a32' before making global git config changes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9346285Z Adding repository directory to the temporary git global config as a safe directory
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9350055Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9419799Z Deleting the contents of '/home/runner/work/firstmate/firstmate'
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9423269Z ##[group]Determining repository object format
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9426346Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9427459Z ##[group]Initializing the repository
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9431514Z [command]/usr/bin/git init /home/runner/work/firstmate/firstmate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9609153Z hint: Using 'master' as the name for the initial branch. This default branch name
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9611372Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9612961Z hint: to use in all of your new repositories, which will suppress this warning,
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9614454Z hint: call:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9615108Z hint:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9615674Z hint: 	git config --global init.defaultBranch <name>
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9616304Z hint:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9616897Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9617836Z hint: 'development'. The just-created branch can be renamed via this command:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9618579Z hint:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9619004Z hint: 	git branch -m <name>
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9619476Z hint:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9620108Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9621150Z Initialized empty Git repository in /home/runner/work/firstmate/firstmate/.git/
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9626871Z [command]/usr/bin/git remote add origin https://github.com/MrGTV-love/firstmate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9679837Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9680640Z ##[group]Disabling automatic garbage collection
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9683394Z [command]/usr/bin/git config --local gc.auto 0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9716614Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9718062Z ##[group]Setting up auth
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9718776Z Removing SSH command configuration
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9723753Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:06.9756153Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0190627Z Removing HTTP extra header
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0196658Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0231191Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0490378Z Removing includeIf entries pointing to credentials config files
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0496554Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0529875Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0798142Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0835219Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0866756Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0901643Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0932470Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0962335Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0963794Z ##[group]Fetching the repository
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:07.0970463Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5189375Z From https://github.com/MrGTV-love/firstmate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5191840Z  * [new branch]        archive/fm-lifecycle-phase3-golden-fold -> origin/archive/fm-lifecycle-phase3-golden-fold
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5195240Z  * [new branch]        archive/fm-lifecycle-phase3-restart-r6 -> origin/archive/fm-lifecycle-phase3-restart-r6
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5197622Z  * [new branch]        cursor/ci-fm-ci-churn-macos-herdr-dry-e1d1 -> origin/cursor/ci-fm-ci-churn-macos-herdr-dry-e1d1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5199763Z  * [new branch]        devin/1790040975-secondmate-fm-root-pin -> origin/devin/1790040975-secondmate-fm-root-pin
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5201081Z  * [new branch]        fm/afk-pi-wake-bypass-r1 -> origin/fm/afk-pi-wake-bypass-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5202336Z  * [new branch]        fm/afk-return-stale-record-gate-r1 -> origin/fm/afk-return-stale-record-gate-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5203788Z  * [new branch]        fm/agents-md-merge-rule -> origin/fm/agents-md-merge-rule
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5205618Z  * [new branch]        fm/ci-2604-cite         -> origin/fm/ci-2604-cite
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5206910Z  * [new branch]        fm/ci-2604-proof        -> origin/fm/ci-2604-proof
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5208154Z  * [new branch]        fm/diagnostic-remote-seed -> origin/fm/diagnostic-remote-seed
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5209550Z  * [new branch]        fm/direct-edit-class    -> origin/fm/direct-edit-class
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5211164Z  * [new branch]        fm/fm-actionable-update-escalation-misclassification-r1 -> origin/fm/fm-actionable-update-escalation-misclassification-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5213078Z  * [new branch]        fm/fm-actionable-update-escalation-misclassification-r3 -> origin/fm/fm-actionable-update-escalation-misclassification-r3
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5215095Z  * [new branch]        fm/fm-afk-pi-branch-both-postures-r1 -> origin/fm/fm-afk-pi-branch-both-postures-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5216577Z  * [new branch]        fm/fm-api-key-guard-fork-pr6 -> origin/fm/fm-api-key-guard-fork-pr6
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5217876Z  * [new branch]        fm/fm-board-answer-closes-live-work -> origin/fm/fm-board-answer-closes-live-work
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5219379Z  * [new branch]        fm/fm-board-answer-latency -> origin/fm/fm-board-answer-latency
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5220531Z  * [new branch]        fm/fm-board-answer-latency-r4 -> origin/fm/fm-board-answer-latency-r4
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5221759Z  * [new branch]        fm/fm-board-answer-unrouted-ledger -> origin/fm/fm-board-answer-unrouted-ledger
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5223074Z  * [new branch]        fm/fm-board-decision-card-substance -> origin/fm/fm-board-decision-card-substance
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5224784Z  * [new branch]        fm/fm-board-listener-retire -> origin/fm/fm-board-listener-retire
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5225909Z  * [new branch]        fm/fm-branch-note-sailboat-r2 -> origin/fm/fm-branch-note-sailboat-r2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5227041Z  * [new branch]        fm/fm-brief-task-dod-sections -> origin/fm/fm-brief-task-dod-sections
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5228274Z  * [new branch]        fm/fm-capacity-counts-running-only -> origin/fm/fm-capacity-counts-running-only
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5229684Z  * [new branch]        fm/fm-captain-hold-gate-reads-done-archive -> origin/fm/fm-captain-hold-gate-reads-done-archive
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5231115Z  * [new branch]        fm/fm-captain-hold-operational-keys -> origin/fm/fm-captain-hold-operational-keys
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5232338Z  * [new branch]        fm/fm-cd-guard-warn-not-block -> origin/fm/fm-cd-guard-warn-not-block
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5233432Z  * [new branch]        fm/fm-ci-2604-r4-m2-followup -> origin/fm/fm-ci-2604-r4-m2-followup
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5235067Z  * [new branch]        fm/fm-ci-lint-partition-near-time-limit -> origin/fm/fm-ci-lint-partition-near-time-limit
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5236643Z  * [new branch]        fm/fm-ci-shard2-captain-hold-test-too-long -> origin/fm/fm-ci-shard2-captain-hold-test-too-long
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5238011Z  * [new branch]        fm/fm-ci-ubuntu-2604-runner-image -> origin/fm/fm-ci-ubuntu-2604-runner-image
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5239311Z  * [new branch]        fm/fm-claude-titled-composer-unknown -> origin/fm/fm-claude-titled-composer-unknown
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5240619Z  * [new branch]        fm/fm-claude-trust-sibling-clones -> origin/fm/fm-claude-trust-sibling-clones
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5242074Z  * [new branch]        fm/fm-claude-worker-api-key-guard -> origin/fm/fm-claude-worker-api-key-guard
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5243242Z  * [new branch]        fm/fm-compact-adviser-fleet -> origin/fm/fm-compact-adviser-fleet
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5244715Z  * [new branch]        fm/fm-compact-jev-omp-pipeline -> origin/fm/fm-compact-jev-omp-pipeline
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5246037Z  * [new branch]        fm/fm-composer-thin-adapter-refactor-r1 -> origin/fm/fm-composer-thin-adapter-refactor-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5247407Z  * [new branch]        fm/fm-control-agy-relaunch-composer -> origin/fm/fm-control-agy-relaunch-composer
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5248833Z  * [new branch]        fm/fm-control-exit-claude-background-prompt -> origin/fm/fm-control-exit-claude-background-prompt
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5250462Z  * [new branch]        fm/fm-control-reattribute-endpoints-after-reboot -> origin/fm/fm-control-reattribute-endpoints-after-reboot
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5252077Z  * [new branch]        fm/fm-control-reclaim-missing-endpoint-s2 -> origin/fm/fm-control-reclaim-missing-endpoint-s2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5253963Z  * [new branch]        fm/fm-control-relaunch-relocate-missing-worktree -> origin/fm/fm-control-relaunch-relocate-missing-worktree
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5255384Z  * [new branch]        fm/fm-copy-sweep-and-budget -> origin/fm/fm-copy-sweep-and-budget
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5256572Z  * [new branch]        fm/fm-copy-sweep-release-dead-locks -> origin/fm/fm-copy-sweep-release-dead-locks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5257760Z  * [new branch]        fm/fm-cpu-pool-gate-overlay -> origin/fm/fm-cpu-pool-gate-overlay
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5259262Z  * [new branch]        fm/fm-crew-state-cache-no-mistakes-reads -> origin/fm/fm-crew-state-cache-no-mistakes-reads
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5261200Z  * [new branch]        fm/fm-crew-state-ci-monitor-terminal -> origin/fm/fm-crew-state-ci-monitor-terminal
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5263094Z  * [new branch]        fm/fm-crew-state-test-spin-leak-s2 -> origin/fm/fm-crew-state-test-spin-leak-s2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5264859Z  * [new branch]        fm/fm-dispatch-diagnostic-count-main -> origin/fm/fm-dispatch-diagnostic-count-main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5266293Z  * [new branch]        fm/fm-documentation-audience-cleanup-r1 -> origin/fm/fm-documentation-audience-cleanup-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5268065Z  * [new branch]        fm/fm-dod-reaches-reviewer -> origin/fm/fm-dod-reaches-reviewer
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5269096Z  * [new branch]        fm/fm-dsh-tui-adoption  -> origin/fm/fm-dsh-tui-adoption
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5270289Z  * [new branch]        fm/fm-duration-writes-into-project-root -> origin/fm/fm-duration-writes-into-project-root
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5271697Z  * [new branch]        fm/fm-flaky-claude-contexts-stdin-file -> origin/fm/fm-flaky-claude-contexts-stdin-file
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5273145Z  * [new branch]        fm/fm-flaky-opencode-guard-stub-drain -> origin/fm/fm-flaky-opencode-guard-stub-drain
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5275876Z  * [new branch]        fm/fm-flaky-tmux-smoke-readiness -> origin/fm/fm-flaky-tmux-smoke-readiness
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5277624Z  * [new branch]        fm/fm-fleet-process-launch-churn -> origin/fm/fm-fleet-process-launch-churn
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5278930Z  * [new branch]        fm/fm-fleet-snapshot-latest-pull-url -> origin/fm/fm-fleet-snapshot-latest-pull-url
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5280201Z  * [new branch]        fm/fm-github-conditional-reads -> origin/fm/fm-github-conditional-reads
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5281416Z  * [new branch]        fm/fm-github-conditional-reads-r3 -> origin/fm/fm-github-conditional-reads-r3
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5282678Z  * [new branch]        fm/fm-guard-gate-1-envelope-ledger -> origin/fm/fm-guard-gate-1-envelope-ledger
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5285008Z  * [new branch]        fm/fm-herdr-agents-pane-visibility -> origin/fm/fm-herdr-agents-pane-visibility
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5286440Z  * [new branch]        fm/fm-herdr-claude-exit -> origin/fm/fm-herdr-claude-exit
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5287851Z  * [new branch]        fm/fm-herdr-concurrent-recovery-lock -> origin/fm/fm-herdr-concurrent-recovery-lock
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5289107Z  * [new branch]        fm/fm-herdr-contiguity-resume -> origin/fm/fm-herdr-contiguity-resume
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5290495Z  * [new branch]        fm/fm-herdr-reboot-resumed-agents-uncontrolled -> origin/fm/fm-herdr-reboot-resumed-agents-uncontrolled
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5293035Z  * [new branch]        fm/fm-herdr-recovery-classifier-stale-agent-r1 -> origin/fm/fm-herdr-recovery-classifier-stale-agent-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5294923Z  * [new branch]        fm/fm-home-summary-refresh-deadline -> origin/fm/fm-home-summary-refresh-deadline
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5296493Z  * [new branch]        fm/fm-host-load-reduction -> origin/fm/fm-host-load-reduction
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5297714Z  * [new branch]        fm/fm-hyper-jev-skill   -> origin/fm/fm-hyper-jev-skill
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5298806Z  * [new branch]        fm/fm-idle-exit-relaunch-ship -> origin/fm/fm-idle-exit-relaunch-ship
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5300002Z  * [new branch]        fm/fm-idle-reap-test-reread-race -> origin/fm/fm-idle-reap-test-reread-race
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5301366Z  * [new branch]        fm/fm-idle-session-reap -> origin/fm/fm-idle-session-reap
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5302660Z  * [new branch]        fm/fm-jev-credit-failure-alert -> origin/fm/fm-jev-credit-failure-alert
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5304263Z  * [new branch]        fm/fm-jev-dispatch-floor-and-log -> origin/fm/fm-jev-dispatch-floor-and-log
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5305722Z  * [new branch]        fm/fm-jev-guard-bounded-retry-and-outage-text -> origin/fm/fm-jev-guard-bounded-retry-and-outage-text
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5307132Z  * [new branch]        fm/fm-jev-guard-omp-device-paths -> origin/fm/fm-jev-guard-omp-device-paths
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5308545Z  * [new branch]        fm/fm-jev-guard-rebuild-scout -> origin/fm/fm-jev-guard-rebuild-scout
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5309969Z  * [new branch]        fm/fm-jev-guard-request-size-ceiling -> origin/fm/fm-jev-guard-request-size-ceiling
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5311399Z  * [new branch]        fm/fm-jev-guard-unicode-space-file-scope -> origin/fm/fm-jev-guard-unicode-space-file-scope
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5312630Z  * [new branch]        fm/fm-jev-guardrail-hook -> origin/fm/fm-jev-guardrail-hook
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5313874Z  * [new branch]        fm/fm-jev-level5-routers-as-is -> origin/fm/fm-jev-level5-routers-as-is
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5314987Z  * [new branch]        fm/fm-jev-mem-guard-macos -> origin/fm/fm-jev-mem-guard-macos
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5316062Z  * [new branch]        fm/fm-jev-never-send-sections -> origin/fm/fm-jev-never-send-sections
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5318445Z  * [new branch]        fm/fm-jev-pipeline-coverage-clipping -> origin/fm/fm-jev-pipeline-coverage-clipping
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5320003Z  * [new branch]        fm/fm-jev-resolver-observability -> origin/fm/fm-jev-resolver-observability
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5321269Z  * [new branch]        fm/fm-jev-resolver-runway-guard -> origin/fm/fm-jev-resolver-runway-guard
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5322443Z  * [new branch]        fm/fm-jev-retire-invented-v2 -> origin/fm/fm-jev-retire-invented-v2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5323854Z  * [new branch]        fm/fm-jev-single-key-source -> origin/fm/fm-jev-single-key-source
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5325151Z  * [new branch]        fm/fm-jev-size-guard-never-blocks-work -> origin/fm/fm-jev-size-guard-never-blocks-work
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5326338Z  * [new branch]        fm/fm-jev-skill-picker  -> origin/fm/fm-jev-skill-picker
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5327462Z  * [new branch]        fm/fm-keep-ai-trailers-per-home-s2 -> origin/fm/fm-keep-ai-trailers-per-home-s2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5328739Z  * [new branch]        fm/fm-lab-home-refuse-in-worktree -> origin/fm/fm-lab-home-refuse-in-worktree
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5329854Z  * [new branch]        fm/fm-lab-orphan-reaper -> origin/fm/fm-lab-orphan-reaper
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5330834Z  * [new branch]        fm/fm-lane-wake-replay  -> origin/fm/fm-lane-wake-replay
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5331850Z  * [new branch]        fm/fm-lane-wake-replay-r21 -> origin/fm/fm-lane-wake-replay-r21
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5333115Z  * [new branch]        fm/fm-lane-wake-replay-r22 -> origin/fm/fm-lane-wake-replay-r22
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5334416Z  * [new branch]        fm/fm-lavish-board-answers-lost -> origin/fm/fm-lavish-board-answers-lost
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5335643Z  * [new branch]        fm/fm-lavish-legacy-answer-schema -> origin/fm/fm-lavish-legacy-answer-schema
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5336894Z  * [new branch]        fm/fm-lavish-listener-slow-server -> origin/fm/fm-lavish-listener-slow-server
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5338067Z  * [new branch]        fm/fm-ledger-dated-fold-cost -> origin/fm/fm-ledger-dated-fold-cost
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5339186Z  * [new branch]        fm/fm-ledger-lifecycle-events -> origin/fm/fm-ledger-lifecycle-events
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5340694Z  * [new branch]        fm/fm-ledger-local-origin-degrades -> origin/fm/fm-ledger-local-origin-degrades
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5341884Z  * [new branch]        fm/fm-ledger-pr-row-actions -> origin/fm/fm-ledger-pr-row-actions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5342920Z  * [new branch]        fm/fm-lifecycle-phase3  -> origin/fm/fm-lifecycle-phase3
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5344547Z  * [new branch]        fm/fm-limits-extremes-only-guard-and-spawn -> origin/fm/fm-limits-extremes-only-guard-and-spawn
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5346309Z  * [new branch]        fm/fm-limits-extremes-only-teardown-and-tests -> origin/fm/fm-limits-extremes-only-teardown-and-tests
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5347678Z  * [new branch]        fm/fm-lint-concurrency-bound -> origin/fm/fm-lint-concurrency-bound
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5348872Z  * [new branch]        fm/fm-lint-gate-starves-under-load -> origin/fm/fm-lint-gate-starves-under-load
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5350258Z  * [new branch]        fm/fm-lint-memory-fix   -> origin/fm/fm-lint-memory-fix
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5351276Z  * [new branch]        fm/fm-lint-once-and-scoped -> origin/fm/fm-lint-once-and-scoped
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5352474Z  * [new branch]        fm/fm-main-ci-red-20261010 -> origin/fm/fm-main-ci-red-20261010
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5354351Z  * [new branch]        fm/fm-main-ci-watch-arm-red -> origin/fm/fm-main-ci-watch-arm-red
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5356850Z  * [new branch]        fm/fm-main-findings-a-control-guards-parser -> origin/fm/fm-main-findings-a-control-guards-parser
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5359971Z  * [new branch]        fm/fm-main-findings-b1-spend-audit-cache-test-docs -> origin/fm/fm-main-findings-b1-spend-audit-cache-test-docs
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5363106Z  * [new branch]        fm/fm-main-ledger-owner-diagnosis -> origin/fm/fm-main-ledger-owner-diagnosis
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5364978Z  * [new branch]        fm/fm-main-watcher-death-0117 -> origin/fm/fm-main-watcher-death-0117
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5366236Z  * [new branch]        fm/fm-merge-guard-multi-pr-task-head -> origin/fm/fm-merge-guard-multi-pr-task-head
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5367441Z  * [new branch]        fm/fm-model-freshness-check -> origin/fm/fm-model-freshness-check
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5368451Z  * [new branch]        fm/fm-model-index       -> origin/fm/fm-model-index
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5370343Z  * [new branch]        fm/fm-needs-decision-main-only-r1 -> origin/fm/fm-needs-decision-main-only-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5372084Z  * [new branch]        fm/fm-needs-decision-whole-batch-r1 -> origin/fm/fm-needs-decision-whole-batch-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5373401Z  * [new branch]        fm/fm-nested-copy-no-second-layer -> origin/fm/fm-nested-copy-no-second-layer
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5375089Z  * [new branch]        fm/fm-nested-worker-supervisor-import -> origin/fm/fm-nested-worker-supervisor-import
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5376473Z  * [new branch]        fm/fm-nm-evidence-store-firstmate-r1 -> origin/fm/fm-nm-evidence-store-firstmate-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5377904Z  * [new branch]        fm/fm-omp-approved-fallback-chain-exception -> origin/fm/fm-omp-approved-fallback-chain-exception
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5379272Z  * [new branch]        fm/fm-omp-codex-account-failover -> origin/fm/fm-omp-codex-account-failover
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5380802Z  * [new branch]        fm/fm-omp-codex-account-failover-v2-r3 -> origin/fm/fm-omp-codex-account-failover-v2-r3
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5384193Z  * [new branch]        fm/fm-omp-composer-unknown-blocks-control -> origin/fm/fm-omp-composer-unknown-blocks-control
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5386994Z  * [new branch]        fm/fm-omp-global-roles-overwrite -> origin/fm/fm-omp-global-roles-overwrite
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5389250Z  * [new branch]        fm/fm-omp-idle-wake-stall -> origin/fm/fm-omp-idle-wake-stall
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5391481Z  * [new branch]        fm/fm-omp-jev-thinking-route -> origin/fm/fm-omp-jev-thinking-route
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5393913Z  * [new branch]        fm/fm-omp-lane-wake-unsubmitted -> origin/fm/fm-omp-lane-wake-unsubmitted
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5396191Z  * [new branch]        fm/fm-omp-lane-wake-unsubmitted-r2 -> origin/fm/fm-omp-lane-wake-unsubmitted-r2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5398626Z  * [new branch]        fm/fm-omp-refuse-api-billed-gpt -> origin/fm/fm-omp-refuse-api-billed-gpt
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5399861Z  * [new branch]        fm/fm-omp-remote-trace-tests -> origin/fm/fm-omp-remote-trace-tests
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5401109Z  * [new branch]        fm/fm-omp-sol-chain-deepseek-stand-in -> origin/fm/fm-omp-sol-chain-deepseek-stand-in
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5402509Z  * [new branch]        fm/fm-omp-sol-fallback-downgrade-r2 -> origin/fm/fm-omp-sol-fallback-downgrade-r2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5404327Z  * [new branch]        fm/fm-omp-wake-delivery-gaps -> origin/fm/fm-omp-wake-delivery-gaps
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5406197Z  * [new branch]        fm/fm-omp-worker-memory-off -> origin/fm/fm-omp-worker-memory-off
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5407538Z  * [new branch]        fm/fm-open-loops-action-per-row-snapshot -> origin/fm/fm-open-loops-action-per-row-snapshot
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5408985Z  * [new branch]        fm/fm-open-loops-captain-wait-standing -> origin/fm/fm-open-loops-captain-wait-standing
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5410615Z  * [new branch]        fm/fm-open-loops-checkin-live-evidence -> origin/fm/fm-open-loops-checkin-live-evidence
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5411851Z  * [new branch]        fm/fm-open-loops-core   -> origin/fm/fm-open-loops-core
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5412883Z  * [new branch]        fm/fm-open-loops-lane-scope -> origin/fm/fm-open-loops-lane-scope
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5414347Z  * [new branch]        fm/fm-overdue-rows-block-ack -> origin/fm/fm-overdue-rows-block-ack
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5415550Z  * [new branch]        fm/fm-pause-declared-stale-alarm -> origin/fm/fm-pause-declared-stale-alarm
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5416821Z  * [new branch]        fm/fm-per-task-delivery-override-r1 -> origin/fm/fm-per-task-delivery-override-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5418132Z  * [new branch]        fm/fm-pi-120-before-agent-start-union -> origin/fm/fm-pi-120-before-agent-start-union
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5419268Z  * [new branch]        fm/fm-pi-render-drift   -> origin/fm/fm-pi-render-drift
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5420484Z  * [new branch]        fm/fm-pool-slot-prefilter-skips-unleased -> origin/fm/fm-pool-slot-prefilter-skips-unleased
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5422002Z  * [new branch]        fm/fm-pr-merge-false-missing-required-checks -> origin/fm/fm-pr-merge-false-missing-required-checks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5423720Z  * [new branch]        fm/fm-pr-merge-requires-recorded-pass -> origin/fm/fm-pr-merge-requires-recorded-pass
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5424966Z  * [new branch]        fm/fm-proc-budget-wrapper -> origin/fm/fm-proc-budget-wrapper
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5425990Z  * [new branch]        fm/fm-proc-count-detector -> origin/fm/fm-proc-count-detector
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5427191Z  * [new branch]        fm/fm-procevent-bound-reader-orphans -> origin/fm/fm-procevent-bound-reader-orphans
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5428891Z  * [new branch]        fm/fm-procevent-lavish-list-form-parse -> origin/fm/fm-procevent-lavish-list-form-parse
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5430408Z  * [new branch]        fm/fm-procevent-lease-debounce-test-flaky -> origin/fm/fm-procevent-lease-debounce-test-flaky
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5431716Z  * [new branch]        fm/fm-project-lock-fair-wait -> origin/fm/fm-project-lock-fair-wait
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5433043Z  * [new branch]        fm/fm-project-lock-fair-wait-v2 -> origin/fm/fm-project-lock-fair-wait-v2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5506683Z  * [new branch]        fm/fm-prune-copy-on-merge -> origin/fm/fm-prune-copy-on-merge
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5508296Z  * [new branch]        fm/fm-public-stow-readbeforewrite-port-r1 -> origin/fm/fm-public-stow-readbeforewrite-port-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5509908Z  * [new branch]        fm/fm-reassociate-shared-root-overlap -> origin/fm/fm-reassociate-shared-root-overlap
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5511455Z  * [new branch]        fm/fm-reboot-recover-transient-child-false-alarm -> origin/fm/fm-reboot-recover-transient-child-false-alarm
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5512985Z  * [new branch]        fm/fm-relaunch-held-task-stops-first -> origin/fm/fm-relaunch-held-task-stops-first
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5514608Z  * [new branch]        fm/fm-relaunch-stale-git-hook-env -> origin/fm/fm-relaunch-stale-git-hook-env
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5516027Z  * [new branch]        fm/fm-relaunch-tx-breaks-pr-metadata-parse -> origin/fm/fm-relaunch-tx-breaks-pr-metadata-parse
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5517636Z  * [new branch]        fm/fm-remote-reply-malformed-update-and-launch -> origin/fm/fm-remote-reply-malformed-update-and-launch
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5519052Z  * [new branch]        fm/fm-remote-spawn-allow-omp -> origin/fm/fm-remote-spawn-allow-omp
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5520275Z  * [new branch]        fm/fm-remove-tracked-lavish-scratch -> origin/fm/fm-remove-tracked-lavish-scratch
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5521480Z  * [new branch]        fm/fm-repeat-mistake-sweep -> origin/fm/fm-repeat-mistake-sweep
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5522586Z  * [new branch]        fm/fm-report-silence-checkin -> origin/fm/fm-report-silence-checkin
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5523960Z  * [new branch]        fm/fm-review-agent-dynamic-selector -> origin/fm/fm-review-agent-dynamic-selector
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5525291Z  * [new branch]        fm/fm-safe-auto-reboot-simple-r1 -> origin/fm/fm-safe-auto-reboot-simple-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5526909Z  * [new branch]        fm/fm-secondmate-creation-record-intake-r1 -> origin/fm/fm-secondmate-creation-record-intake-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5528492Z  * [new branch]        fm/fm-secondmate-parent-channel-structural-r1 -> origin/fm/fm-secondmate-parent-channel-structural-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5530120Z  * [new branch]        fm/fm-secondmate-record-atomic-transitions-r1 -> origin/fm/fm-secondmate-record-atomic-transitions-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5531660Z  * [new branch]        fm/fm-session-launch-runtime-restriction -> origin/fm/fm-session-launch-runtime-restriction
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5533048Z  * [new branch]        fm/fm-session-start-false-liveness -> origin/fm/fm-session-start-false-liveness
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5534478Z  * [new branch]        fm/fm-session-start-fast -> origin/fm/fm-session-start-fast
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5535636Z  * [new branch]        fm/fm-sessionstart-network-free-r1 -> origin/fm/fm-sessionstart-network-free-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5536873Z  * [new branch]        fm/fm-shared-slot-custody-gaps -> origin/fm/fm-shared-slot-custody-gaps
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5538104Z  * [new branch]        fm/fm-shared-slot-review-followups -> origin/fm/fm-shared-slot-review-followups
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5539308Z  * [new branch]        fm/fm-shared-test-fixtures-r1 -> origin/fm/fm-shared-test-fixtures-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5540466Z  * [new branch]        fm/fm-size-refusal-names-budget -> origin/fm/fm-size-refusal-names-budget
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5541689Z  * [new branch]        fm/fm-skill-frontmatter-desc-r1 -> origin/fm/fm-skill-frontmatter-desc-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5542730Z  * [new branch]        fm/fm-slack-watch       -> origin/fm/fm-slack-watch
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5544066Z  * [new branch]        fm/fm-snapshot-crew-state-bounded-read -> origin/fm/fm-snapshot-crew-state-bounded-read
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5545513Z  * [new branch]        fm/fm-spawn-acquisition-limit-root-cause -> origin/fm/fm-spawn-acquisition-limit-root-cause
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5546931Z  * [new branch]        fm/fm-spawn-allocation-guard-exact -> origin/fm/fm-spawn-allocation-guard-exact
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5548399Z  * [new branch]        fm/fm-spawn-fixed-family-readers -> origin/fm/fm-spawn-fixed-family-readers
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5549843Z  * [new branch]        fm/fm-spawn-isolation-timeout-leaks-pool-slot -> origin/fm/fm-spawn-isolation-timeout-leaks-pool-slot
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5551343Z  * [new branch]        fm/fm-spawn-provision-existing-slot -> origin/fm/fm-spawn-provision-existing-slot
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5552779Z  * [new branch]        fm/fm-stale-lock-proof-ignores-idle-shells -> origin/fm/fm-stale-lock-proof-ignores-idle-shells
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5554255Z  * [new branch]        fm/fm-status-runaway-guard -> origin/fm/fm-status-runaway-guard
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5555303Z  * [new branch]        fm/fm-subagent-guard-fix -> origin/fm/fm-subagent-guard-fix
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5556383Z  * [new branch]        fm/fm-supervision-fork-budget -> origin/fm/fm-supervision-fork-budget
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5557726Z  * [new branch]        fm/fm-supervision-pr-url-hallucination-r1 -> origin/fm/fm-supervision-pr-url-hallucination-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5559174Z  * [new branch]        fm/fm-supervision-rearm-resurface-r1 -> origin/fm/fm-supervision-rearm-resurface-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5560571Z  * [new branch]        fm/fm-supervision-refused-ack-loop-r1 -> origin/fm/fm-supervision-refused-ack-loop-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5562052Z  * [new branch]        fm/fm-supervision-watchdog-outside-session -> origin/fm/fm-supervision-watchdog-outside-session
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5563606Z  * [new branch]        fm/fm-task-copy-reassociate-v2-r2 -> origin/fm/fm-task-copy-reassociate-v2-r2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5564855Z  * [new branch]        fm/fm-teamclaude-launcher-land -> origin/fm/fm-teamclaude-launcher-land
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5566037Z  * [new branch]        fm/fm-teardown-after-ci-rebase -> origin/fm/fm-teardown-after-ci-rebase
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5567506Z  * [new branch]        fm/fm-teardown-close-without-slot-return -> origin/fm/fm-teardown-close-without-slot-return
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5568957Z  * [new branch]        fm/fm-teardown-closeout-full-refusal -> origin/fm/fm-teardown-closeout-full-refusal
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5570422Z  * [new branch]        fm/fm-teardown-closes-captain-held-scout-r1 -> origin/fm/fm-teardown-closes-captain-held-scout-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5571754Z  * [new branch]        fm/fm-teardown-docker-stacks -> origin/fm/fm-teardown-docker-stacks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5572922Z  * [new branch]        fm/fm-teardown-docker-stacks-r2 -> origin/fm/fm-teardown-docker-stacks-r2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5574571Z  * [new branch]        fm/fm-teardown-holds-project-lock-too-long -> origin/fm/fm-teardown-holds-project-lock-too-long
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5576011Z  * [new branch]        fm/fm-teardown-leak-kill-identity -> origin/fm/fm-teardown-leak-kill-identity
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5577413Z  * [new branch]        fm/fm-teardown-locked-nested-copy-release -> origin/fm/fm-teardown-locked-nested-copy-release
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5578825Z  * [new branch]        fm/fm-teardown-orphan-reap-confine -> origin/fm/fm-teardown-orphan-reap-confine
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5580138Z  * [new branch]        fm/fm-teardown-owns-nested-copies -> origin/fm/fm-teardown-owns-nested-copies
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5581435Z  * [new branch]        fm/fm-teardown-pipeline-input-copy -> origin/fm/fm-teardown-pipeline-input-copy
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5583013Z  * [new branch]        fm/fm-teardown-prior-custody-root-after-reassociate -> origin/fm/fm-teardown-prior-custody-root-after-reassociate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5584991Z  * [new branch]        fm/fm-teardown-prior-custody-root-after-reassociate-2 -> origin/fm/fm-teardown-prior-custody-root-after-reassociate-2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5586613Z  * [new branch]        fm/fm-teardown-private-nm-daemon-leak -> origin/fm/fm-teardown-private-nm-daemon-leak
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5588082Z  * [new branch]        fm/fm-teardown-reaps-task-archive-branches -> origin/fm/fm-teardown-reaps-task-archive-branches
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5589508Z  * [new branch]        fm/fm-teardown-shared-copy-refusal -> origin/fm/fm-teardown-shared-copy-refusal
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5591045Z  * [new branch]        fm/fm-teardown-slot-collision-fix-r1 -> origin/fm/fm-teardown-slot-collision-fix-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5592449Z  * [new branch]        fm/fm-teardown-slot-custody-review-nits -> origin/fm/fm-teardown-slot-custody-review-nits
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5594029Z  * [new branch]        fm/fm-teardown-slow-holds-lease-lock -> origin/fm/fm-teardown-slow-holds-lease-lock
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5595636Z  * [new branch]        fm/fm-teardown-squash-oracle-anchor -> origin/fm/fm-teardown-squash-oracle-anchor
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5597126Z  * [new branch]        fm/fm-teardown-verified-bundle-preservation -> origin/fm/fm-teardown-verified-bundle-preservation
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5598628Z  * [new branch]        fm/fm-test-endpoint-safety-tmux-leak -> origin/fm/fm-test-endpoint-safety-tmux-leak
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5599899Z  * [new branch]        fm/fm-test-run-shard-guard-dup -> origin/fm/fm-test-run-shard-guard-dup
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5601253Z  * [new branch]        fm/fm-timeout-limits-measured-not-guessed -> origin/fm/fm-timeout-limits-measured-not-guessed
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5602511Z  * [new branch]        fm/fm-tmpdir-leaks      -> origin/fm/fm-tmpdir-leaks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5603861Z  * [new branch]        fm/fm-tmux-no-server-absence-proof -> origin/fm/fm-tmux-no-server-absence-proof
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5605260Z  * [new branch]        fm/fm-turnend-autoarm-wait-empirical -> origin/fm/fm-turnend-autoarm-wait-empirical
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5606652Z  * [new branch]        fm/fm-turnend-foreign-owner-arm-fix-r1 -> origin/fm/fm-turnend-foreign-owner-arm-fix-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5607837Z  * [new branch]        fm/fm-upstream-sync     -> origin/fm/fm-upstream-sync
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5608860Z  * [new branch]        fm/fm-upstream-sync-20261013 -> origin/fm/fm-upstream-sync-20261013
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5609903Z  * [new branch]        fm/fm-upstream-sync-a2  -> origin/fm/fm-upstream-sync-a2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5611219Z  * [new branch]        fm/fm-validation-bind-archive-route -> origin/fm/fm-validation-bind-archive-route
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5612393Z  * [new branch]        fm/fm-wake-drain-fast   -> origin/fm/fm-wake-drain-fast
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5613415Z  * [new branch]        fm/fm-watch-beat-under-load -> origin/fm/fm-watch-beat-under-load
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5614829Z  * [new branch]        fm/fm-watch-device-id-signal-storm -> origin/fm/fm-watch-device-id-signal-storm
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5616103Z  * [new branch]        fm/fm-watch-missed-done-signal -> origin/fm/fm-watch-missed-done-signal
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5617324Z  * [new branch]        fm/fm-watch-prelude-beacon-stall -> origin/fm/fm-watch-prelude-beacon-stall
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5618449Z  * [new branch]        fm/fm-watch-triage-split -> origin/fm/fm-watch-triage-split
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5619508Z  * [new branch]        fm/fm-watchdog-alarm-wording -> origin/fm/fm-watchdog-alarm-wording
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5620714Z  * [new branch]        fm/fm-watcher-flap-autoarm-fix-r2 -> origin/fm/fm-watcher-flap-autoarm-fix-r2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5621886Z  * [new branch]        fm/fm-watcher-hardening-r1 -> origin/fm/fm-watcher-hardening-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5622955Z  * [new branch]        fm/fm-watcher-hardening-r2 -> origin/fm/fm-watcher-hardening-r2
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5624172Z  * [new branch]        fm/fm-watcher-hardening-r3 -> origin/fm/fm-watcher-hardening-r3
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5625280Z  * [new branch]        fm/fm-watcher-lock-test-race -> origin/fm/fm-watcher-lock-test-race
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5626485Z  * [new branch]        fm/fm-worker-project-skill-picker -> origin/fm/fm-worker-project-skill-picker
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5627616Z  * [new branch]        fm/guard-audit-closure  -> origin/fm/guard-audit-closure
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5628878Z  * [new branch]        fm/herdr-workspace-contiguity-maintenance -> origin/fm/herdr-workspace-contiguity-maintenance
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5630138Z  * [new branch]        fm/jev-outage-degrade   -> origin/fm/jev-outage-degrade
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5631107Z  * [new branch]        fm/model-freshness-gate -> origin/fm/model-freshness-gate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5632285Z  * [new branch]        fm/model-picker-collector -> origin/fm/model-picker-collector
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5633304Z  * [new branch]        fm/model-picker-shadow  -> origin/fm/model-picker-shadow
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5634669Z  * [new branch]        fm/nm-required-exempt-release-please-r1 -> origin/fm/nm-required-exempt-release-please-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5636159Z  * [new branch]        fm/reconcile-inactive-crew-investigate-s1 -> origin/fm/reconcile-inactive-crew-investigate-s1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5637617Z  * [new branch]        fm/remote-send-confirm-readback-fix-r1 -> origin/fm/remote-send-confirm-readback-fix-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5638953Z  * [new branch]        fm/remote-send-delivery-delta-r1 -> origin/fm/remote-send-delivery-delta-r1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5640324Z  * [new branch]        fm/secondmate-autonomous-supervision-s7 -> origin/fm/secondmate-autonomous-supervision-s7
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5641525Z  * [new branch]        fm/teardown-split       -> origin/fm/teardown-split
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5642478Z  * [new branch]        fm/untrack-graft-cache  -> origin/fm/untrack-graft-cache
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5643357Z  * [new branch]        main                    -> origin/main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5644340Z  * [new branch]        no-mistakes/evidence    -> origin/no-mistakes/evidence
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5645384Z  * [new branch]        proto/herdr-child-workspaces -> origin/proto/herdr-child-workspaces
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5647234Z [command]/usr/bin/git branch --list --remote origin/main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5648020Z   origin/main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5649201Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5649941Z b3fa25f9869349667b64f6c3b4f2e0f307d3e2b5
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5651409Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5652171Z ##[group]Determining the checkout info
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5653036Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5653949Z [command]/usr/bin/git sparse-checkout disable
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5655698Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5657403Z ##[group]Checking out the ref
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.5658233Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7105662Z Switched to a new branch 'main'
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7107235Z branch 'main' set up to track 'origin/main'.
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7134169Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7318920Z [command]/usr/bin/git log -1 --format=%H
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7347424Z b3fa25f9869349667b64f6c3b4f2e0f307d3e2b5
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7586770Z ##[group]Run set -eu
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7587459Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7588246Z ^[[36;1mbin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7589429Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7781550Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:13.7782315Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0381430Z ShellCheck - shell script analysis tool
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0382916Z version: 0.11.0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0383897Z license: GNU General Public License, version 3
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0384922Z website: https://www.shellcheck.net
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0518251Z ##[group]Run set -eu
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0519356Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0520591Z ^[[36;1mbin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0522200Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0585348Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.0586522Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.1974529Z 1.7.12
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.1976204Z installed by downloading from release page
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.1978178Z built with go1.26.1 compiler for linux/amd64
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2083926Z ##[group]Run set -eu
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2085047Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2086050Z ^[[36;1mcommand -v tmux >/dev/null || {^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2087578Z ^[[36;1m  echo "::error::tmux is required for real afk injection e2e coverage"^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2089302Z ^[[36;1m  exit 1^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2090124Z ^[[36;1m}^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2090898Z ^[[36;1mtmux -V^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2151164Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.2152156Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.3335498Z tmux 3.6
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.3416521Z ##[group]Run set -eu
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.3417429Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.3418281Z ^[[36;1mnpm install -g tasks-axi^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.3419325Z ^[[36;1mtasks-axi --version^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.3478651Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:14.3479638Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1211886Z 
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1808450Z added 3 packages in 2s
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1809050Z 0.2.6
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1907062Z ##[group]Run set -eu
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1907366Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1907659Z ^[[36;1mnpm install -g @earendil-works/pi-coding-agent^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1908088Z ^[[36;1mnpm ls -g --depth 0 @earendil-works/pi-coding-agent^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1970016Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:19.1970305Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:23.0564937Z npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3467114Z 
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3467753Z added 119 packages in 7s
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3468235Z 
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3474854Z 9 packages are looking for funding
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3475532Z   run `npm fund` for details
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3486560Z npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3488063Z npm warn install-scripts   @google/genai@2.21.0 (preinstall: echo 'preinstall: no-op')
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3489488Z npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3490540Z npm warn install-scripts
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.3492526Z npm warn install-scripts Run `npm install -g --allow-scripts=@google/genai,protobufjs` to allow these scripts once, or `npm config set allow-scripts=@google/genai,protobufjs --location=user` to allow them for all global installs.
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7578793Z /usr/local/lib
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7579643Z └── @earendil-works/pi-coding-agent@1.4.0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7579899Z 
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7729867Z ##[group]Run set -eu
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7730149Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7730372Z ^[[36;1mmkdir -p "$RUNNER_TEMP/fm-test"^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7730800Z ^[[36;1m# Only Pi is installed above; the TypeScript compiler is installed on^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7731319Z ^[[36;1m# parallel 1, which runs the typecheck suite. The gate-skip flag guards^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7731855Z ^[[36;1m# against a typecheck member moving into this lane, where its missing^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7732353Z ^[[36;1m# prerequisite would otherwise skip and pass silently.^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7732753Z ^[[36;1mbin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7733204Z ^[[36;1m  --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7734075Z ^[[36;1m  --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-serial-${FM_SERIAL_SHARD}.json"^[[0m
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7793951Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7794250Z env:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7794501Z   FM_SERIAL_LANE: portable-serial-9of20
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7794794Z   FM_SERIAL_SHARD: 9
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:26.7795007Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:27.1836897Z FM_TEST_BEGIN 2026-10-23T12:24:27Z tests/fm-open-loops.test.sh family=pr-forge expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:31.7604525Z PASS: ordinary categories, PR proof, ages and configuration
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:52.6368286Z PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:24:59.4712484Z PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:10.3131910Z PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:17.9059974Z PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:21.5599358Z PASS: interrupted teardown records bound to the current task record
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:29.3519645Z PASS: correction coverage and landed/drop exclusions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:33.5479326Z PASS: recorded task-only PR classification, fork landing, and correction coverage
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:33.9487479Z PASS: patch-equivalent delivery
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:37.0758671Z PASS: approved local landing and qualified defaults
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:40.2414894Z PASS: independent failed delivery and worker liveness axes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:41.6547781Z PASS: unknown current state degrades independently of live verdict
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:42.5042571Z PASS: future pipeline stamps do not mask older valid progress
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:42.5043719Z PASS: future status commit and reflog cannot hide unknown-age stalls
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:46.0342145Z PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:46.4929206Z PASS: collection leaves Git index and object inventory unchanged
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:25:53.4570558Z PASS: last-error JSON and human representations
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:26:26.6028711Z PASS: local-path origins are disclosed without degrading the ledger
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:26:30.6863601Z PASS: exact GitHub host admission and PR projection
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:26:42.8314628Z PASS: unreadable shared state inventory cannot publish complete empty coverage
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:12.3794961Z PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:14.2552091Z PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:16.6752341Z PASS: generation-invalidated snapshots retain coverage failures despite live stop events
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:17.1199132Z PASS: only dispatched ready work is overdue
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:17.4549082Z PASS: ordinary recovery adapters and source degradation
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:27.7508660Z PASS: publication suppression reset success/failure/skip
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:28.2160703Z PASS: held-gate singleflight and child cleanup
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:27:35.6329297Z PASS: unset and empty address overrides share shell defaults before collection
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:06.8353790Z PASS: command deadline owns resistant descendant cleanup
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:08.0748622Z PASS: collection deadline owns resistant descendant cleanup
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:09.0286052Z PASS: deadline escapes origins source recovery
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:10.2950538Z PASS: deadline escapes pr-checks source recovery
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:11.4934890Z PASS: deadline escapes pr-state source recovery
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:12.4004468Z PASS: deadline escapes questions source recovery
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:22.4100468Z PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:22.4101583Z PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:42.6864219Z PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:48.2981736Z PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:28:54.4017668Z PASS: live and aged captain holds share unresolved-question coverage with status decisions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:29:05.8366430Z PASS: unreadable tmux degrades coverage without fabricating missing worker
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:29:12.3466840Z PASS: current-state timeout retains independent observation failure
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:29:12.5978944Z PASS: real snapshot unreadable metadata/status inventory stays degraded
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:29:42.7602925Z PASS: real snapshot cancellation reaps nested groups and removes temporary inventory
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:30:02.3737807Z PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:30:08.0067760Z PASS: a steer on a row with a non-object source falls back to its owner inbox
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:30:30.5336823Z PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:02.2743951Z Traceback (most recent call last):
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:02.2744477Z   File "<stdin>", line 292, in <module>
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:02.2745590Z AssertionError: ('full-run', 'state: working · source: run-step · validating (running)\n')
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:02.6116160Z FM_TEST_END 2026-10-23T12:31:02Z tests/fm-open-loops.test.sh exit=1 duration_ms=395418 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:02.6769232Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:02.7109848Z FM_TEST_BEGIN 2026-10-23T12:31:02Z tests/fm-dispatch-resolve.test.sh family=standalone expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:04.8821866Z ok - pool bias is removed by normalized nonadditive evidence, with explicit ties
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:06.3178326Z ok - common headroom and economic urgency are normalized before weighting
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:07.0353100Z ok - quota veto preserves required reasoning class
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:08.5034415Z ok - an unmeasured usable pool remains disclosed uncertainty without blocking ranking
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:09.2361538Z ok - the resolver runs its adapter with node when bun is absent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:09.4189382Z ok - vendored upstream Level 5 tests pass unchanged
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:11.9214543Z ok - the rule Choice decides project-scoped and Claude-only rules without local text pre-checks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:14.1263847Z ok - session launch policy filters the selected rule after judgment and names an emptied rule
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:18.4282446Z ok - Level 5 tier and effort map to the approved model matrix
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:24.1144690Z ok - ambiguity and unsupported handler/capability decisions escalate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:27.5985112Z ok - privacy boundaries and provider errors preserve safe fallback
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:29.0419823Z ok - captain approval and declared floors veto before weighted selection
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:30.1482720Z ok - fixed questions, task extraction, and protected regions retain their privacy boundary
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:30.8584383Z ok - rule floor: a known shortfall falls through to default
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:33.0008469Z ok - per-rule confidence floors fall to the most probable runner-up that clears its own floor
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:34.9464811Z ok - proven exhaustion activates only the declared model-matrix stand-in
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:36.8886237Z ok - a powerful verdict filters declared stand-ins and every stand-in takes the route effort
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:37.5930492Z ok - task-horizon feasibility still vetoes the quota winner
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:37.7462793Z ok - absent key is off: one stderr line, exit 0, no network call or quota read
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:37.9268027Z ok - help and bare-filename startup isolate environment credentials
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:40.1416759Z ok - TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:40.1446208Z skip: bun is not installed; node alone covers key handling
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:41.0450660Z ok - key handling: bearer header only, never argv or child environments; the request carries task, project, and criteria only
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:46.1911404Z ok - never-send list withholds the request on a match or a bad list, and never prints the value
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:51.7168426Z ok - opt-in marked sections protect outgoing bodies and markers never send without the exact opt-in
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:52.3519089Z ok - error diagnostics omit sensitive API bodies without blocking intake
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:53.6231315Z ok - stock Bash resolver separates API, quota, local and total timing at millisecond precision, with input-only Jev cost
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:54.3466916Z ok - EPOCHREALTIME timing stays on the builtin fast path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:55.6215568Z ok - unavailable usage is unknown and a failed quota snapshot retains API cost
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:56.2928880Z ok - quota-error model evidence accepts only safe Jev version ids
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:57.0666803Z ok - successful resolution model evidence accepts only safe Jev version ids
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:31:58.6325960Z ok - rules snapshots and shell quoting preserve the profile protocol
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:01.2824198Z ok - no-rule fallback, Agy, Gemini, and documented configurations resolve
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:02.8455411Z ok - ambiguous: confidence below the fixed floor hands the decision back
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:07.5942961Z ok - per-rule confidence floor boundaries check each runner-up on its own probability; no declared floors keeps the global floor
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:13.2882530Z ok - only the brief's task sections and scout tag reach the model, with a whole-brief fallback
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:15.6356505Z ok - rule floor: unavailable evidence, including the OMP pool, escalates rather than falling through
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:18.7539128Z ok - declared provider and profile floor evidence are applied in code
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:19.5317107Z ok - nonnumeric spendPriority evidence is never ranked
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:23.4909198Z ok - partial and missing quota evidence remain eligible but unranked
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:25.1327965Z ok - provider-wide and exact quota rows combine into one limiting candidate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:25.9711667Z ok - default: no rule matched resolves among the default profiles
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:27.5405082Z ok - tie: equal quota evidence never breaks by array order
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:28.3207293Z ok - no rankable candidate: the tool escalates instead of guessing
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:38.6393117Z ok - schema 6: native Codex and Pi lanes bind to their own account rows; schema 5 is unchanged
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:57.4278504Z ok - task-horizon runway, OpenRouter coverage, and minimum-version guards
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:32:58.8869568Z ok - quota evidence comes from one quota-axi --json read, and its failure is an error outcome
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:21.9829596Z ok - API, transport, and response failures are error outcomes with exit 0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:27.1544388Z ok - typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:29.7310649Z ok - configuration errors exit 2 before any network call
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:32.8488327Z ok - typed intake resolves roles before quota ranking and detects concrete duplicates
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:33.6980734Z ok - typed intake checks the chosen id against the pinned worker account's catalog
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:37.5253789Z ok - chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:46.7819243Z ok - equivalent options pool behind the pick, and each resolve appends one private result record
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:52.9266237Z ok - a pooled group with more probability than the answer choice is the pick when it clears its floor and the choice does not
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:57.4268990Z ok - shadow mode: off is identical and inert; on logs both picks without changing the dispatch, even when Jev fails or the snapshot is untrusted
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:57.4270250Z # all fm-dispatch-resolve tests passed
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:57.7089293Z FM_TEST_END 2026-10-23T12:33:57Z tests/fm-dispatch-resolve.test.sh exit=0 duration_ms=174986 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:57.7731727Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:57.8066721Z FM_TEST_BEGIN 2026-10-23T12:33:57Z tests/fm-secondmate-safety.test.sh family=secondmate expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:59.8648040Z ok - FM_HOME parameterizes data and state paths
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:33:59.9040023Z ok - fm-lock status is scoped per home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:01.4636956Z ok - seed allows overlapping project clone lists and drops the owns/owner routing
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:01.5057274Z ok - home-seed validation rejects registry records no operational parser can consume
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:01.6121789Z ok - home seeding refuses broken registry symlinks before provisioning
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:01.7425378Z ok - home seeding refuses unreadable registries before provisioning
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:01.7939570Z ok - home seed validation rejects duplicate home routes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:01.8483200Z ok - home seed validation rejects duplicate id routes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:01.9070305Z ok - home seed validation rejects nested home routes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:02.2947713Z leased worktree for dash
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:02.6265284Z ok - home seeding durably leases treehouse-acquired dash homes under the secondmate id
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:03.0600540Z ok - home seed refuses a slot holding a live record's nested copy before lease acquisition
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:03.7228872Z ok - a slot a reassociated task left permits ordinary lease acquisition and a failed get remains a failure
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:04.2439249Z ok - home seeding returns rejected acquired homes through treehouse
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:04.7368580Z ok - home seed rollback warns when treehouse-acquired return fails
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:05.1041430Z ok - home seeding leaves unsafe acquired active homes untouched
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:05.8172264Z ok - home seeding rolls back failed clone attempts without residue
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:06.3342451Z ok - home seeding refuses direct seed without filled charter text
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:06.9239384Z ok - home seeding refuses unfilled placeholder charters
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:08.1000675Z ok - home seeding refuses empty normalized charter fields
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:10.6765468Z ok - home seeding scaffolds, registers, and spawns a project-less home end to end
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:12.5796299Z ok - secondmate spawn resolves home validation and projects from punctuated registry fields
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:15.8996766Z ok - secondmate spawn refuses ambiguous, supplied-home, and metadata-home registry bindings
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:16.4695984Z ok - home seeding validates reused project-less charters before mutation
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:16.6615634Z ok - home seeding refuses project-less conversion of a populated home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:18.2117679Z ok - home seeding handles spaced project names in project-less refusal and registry queries
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:18.3830132Z ok - home seeding refuses project-less homes whose projects directory cannot be inspected
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:18.5587073Z ok - home seeding refuses project-less homes with symlinked projects directories
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:18.7311978Z ok - home seeding refuses project-less homes with non-directory projects paths
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:18.9124502Z ok - home seeding refuses project-less homes whose project registry cannot be inspected
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:18.9804878Z ok - home seeding fails loudly on accidental project omission and rejects mixed --no-projects
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:19.0849363Z ok - home seeding refuses local-only projects
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:19.1966138Z ok - home seeding refuses a registry entry whose posture does not resolve
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:19.6704708Z ok - home seeding refuses registry delimiter home paths
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:21.3427574Z ok - home seeding refuses active home and repo root
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:21.7808806Z ok - home seeding refuses homes marked for another id
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:22.2381386Z ok - home seeding refuses homes registered to another id
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:23.0651503Z ok - home seeding refuses same-id reassignment to a different home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:23.8491627Z ok - home seeding refuses registered home overlaps
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:24.0227767Z ok - remote-backed subhome seeding requires a source origin
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:24.5870202Z ok - remote-backed subhome seeding validates existing destination origins
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:25.6371811Z ok - home seeding resolves relative source origins against the source project
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:26.3984302Z ok - home seeding skips initialized existing no-mistakes clones
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:27.0167735Z ok - home seeding refuses uninitialized existing no-mistakes clones
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:27.4983339Z ok - home seeding refuses project destinations outside the subhome
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:28.6984163Z ok - home seeding refuses operational directories outside the subhome
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:32.2326380Z ok - home seeding refuses symlinked and non-regular leaf files
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:33.2544222Z ok - home reseeding preserves and enforces the durable parent binding
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:38.3918887Z ok - secondmate spawn validates homes before launch
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:40.5175134Z ok - secondmate spawn refuses operational directories outside the subhome
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:40.6808874Z ok - fm-send refuses a bare firstmate window with no metadata in this home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:41.7389249Z ok - secondmate teardown retires empty homes and releases routing
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:42.0776399Z ok - the supervision branch cannot retire a secondmate and leaves it fully intact
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:46.0967395Z ok - secondmate teardown refuses ambiguous and identity-mismatched registry bindings
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:47.6742981Z ok - normal secondmate teardown sweeps process events before removal
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:49.2075101Z ok - secondmate teardown preserves state when process-event sweeping is unavailable
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:50.7198694Z ok - later teardown refusals preserve active process-event sources
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:53.4232422Z ok - force teardown sweeps nested secondmate homes before deletion
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:56.4132770Z ok - force teardown preserves nested process-event restoration status and recovery state
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:34:58.4669073Z ok - secondmate teardown refuses to hide failed leased-home return
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:00.1987795Z ok - secondmate teardown raw-removes plain-clone homes, including a leaked read-only strip dir
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:03.7106999Z ok - secondmate force teardown discards child work
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:05.5693387Z ok - forced secondmate teardown refuses duplicated descendant pool slots
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:08.5082676Z ok - secondmate force teardown preserves child worktree after unproven lock refusal
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:12.9447935Z ok - forced secondmate teardown keeps a child slot holding an unproven registered copy, with or without Treehouse
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:16.4104584Z ok - secondmate teardown keeps a pool home holding an unproven registered copy before touching any endpoint, child or record
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:21.4069803Z ok - force teardown allows non-state operational directory symlinks inside the subhome
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:22.8435869Z ok - force teardown refuses operational directory symlinks outside the subhome
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:24.2081330Z ok - secondmate teardown refuses homes containing registered nested homes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:25.6091664Z ok - secondmate teardown refuses nested homes from the child registry
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:26.9593947Z ok - force teardown validates subhome before child cleanup
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:28.3052266Z ok - forced teardown refuses a non-directory descendant state path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:29.7034342Z ok - forced teardown refuses a symlinked descendant state path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:31.2891674Z ok - forced teardown locks a descendant whose state directory was absent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:32.8065528Z ok - forced teardown refuses while a fresh task is being published in the home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:33.5874642Z ok - a fresh spawn refuses to publish while a forced teardown owns the task set
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:34.3665915Z ok - a fresh spawn refusal identifies another spawn as the task-set holder
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:34.7224149Z ok - a fresh remote secondmate spawn refuses while the task set is owned
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:36.4045525Z ok - force teardown refuses child worktrees inside the active home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:37.6741135Z ok - force teardown refuses child worktrees inside the firstmate repo
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:39.4012176Z ok - force teardown refuses unregistered child worktree paths
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:44.1280280Z ok - secondmate teardown path-boundary matrix refuses unmarked/ancestor/active-descendant/repo-descendant homes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:46.8171605Z ok - idle kind=secondmate pane is healthy and not stale
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:46.8996406Z ok - secondmate charter brief is idle by default and does not self-initiate work
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:47.4353664Z ok - fm-backlog-handoff aborts atomically on unmatched, in-flight, and unregistered targets
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:48.1697705Z ok - fm-backlog-handoff refuses Done items under whitespace section headings and unsafe homes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:49.6270565Z FM_TEST_END 2026-10-23T12:35:49Z tests/fm-secondmate-safety.test.sh exit=0 duration_ms=111809 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:49.6925044Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:49.7286619Z FM_TEST_BEGIN 2026-10-23T12:35:49Z tests/fm-tasks-axi.test.sh family=unclassified expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:50.4630035Z ok - bootstrap reports a regular code-root backlog and stays silent for a link into the home or no copy
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:50.6061093Z ok - bootstrap reports a code-root backlog linked elsewhere and a forked archive
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:50.8634081Z ok - bootstrap stays silent when the code root is the home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:51.0820400Z ok - bare tasks-axi replaced the code-root link and bootstrap reported the fork
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:53.3997783Z ok - fm-tasks-axi.sh writes, holds, archives, and reads relative body files through to the home from the code root
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:53.6347822Z ok - fm-tasks-axi.sh pins the home's backlog over an ambient TASKS_AXI_FILE and serves the dashboard
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:53.7737956Z ok - fm-tasks-axi.sh refuses caller --file, a symlinked home backlog, and an unresolvable home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:54.2767805Z ok - fm-tasks-axi.sh refuses add --start while plain add and start <id> pass through
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:54.3951022Z ok - fm-tasks-axi.sh keeps the single-home layout addressing its own code-root backlog
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:35:58.9638385Z ok - fm-tasks-axi.sh closes a ship or scout only with its proved deliverable
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:00.5741986Z ok - fm-tasks-axi.sh records a captain's drop with the exact words and refuses a live task
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:07.7355934Z ok - all completion spellings preserve retained captain calls before accepting drop, report, or merged PR evidence
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:17.3055038Z ok - public reopen and start with either noun retire drop provenance in home and caller-relative data, preserving body and words
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:20.5859803Z ok - real snapshot and landed projection distinguish resumed deliveries from untouched captain drops
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:22.0464650Z ok - restart handles sole dropped bodies and refuses failed retirement updates without changing the row
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:23.5025509Z ok - unsupported leading global forms are refused by the wrapper without changing the task
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:33.5679740Z ok - bounded completion and restart grammar refuses before SDK calls, drop retention, retirement, or archiving
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:36.0596275Z ok - bounded backend refusals preserve rows and retained captain words under default, environment beads, and home beads configuration
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:38.0888599Z ok - only exact unconsumed help tokens reach production help without completion or restart side effects
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:39.4176139Z ok - documented numeric keep forms, no-prune, note, json, and optional noun preserve ordinary completion
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:44.2318689Z ok - completion and restart spellings wait for control then metadata custody before authoritative reads
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:45.9475908Z ok - a concurrent hold serializes before admission or after proved completion, never inside its evidence-to-mutation window
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:36:49.6240496Z ok - start and reopen keep body updates outside retirement, failed-command readback, and rollback custody
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:16.0539512Z ok - failed start and reopen with either noun read back home and caller-relative data before restoring only proved unchanged drops
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:16.9374331Z ok - ledger on: add records one task.filed with the stored fields, a repeat add records none, and output and status are unchanged
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:17.3796405Z ok - ledger off writes nothing, and an unwritable ledger costs one stderr line without changing the add
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:21.7152603Z ok - ledger on: a proven done records one task.closed, a refusal or a Done row records none, and a failing ledger leaves the close alone
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:21.9486262Z FM_TEST_END 2026-10-23T12:37:21Z tests/fm-tasks-axi.test.sh exit=0 duration_ms=92208 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:22.0129873Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:22.0471003Z FM_TEST_BEGIN 2026-10-23T12:37:22Z tests/fm-afk-return.test.sh family=afk expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:25.5920954Z ok - return catch-up owns live blocker remediation, reports itself to Bearings as content, preserves evidence once, and clears idempotently
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:28.4121079Z ok - tmux and Herdr blockers require the same explicit durable reclassification before ordinary work
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:28.9562962Z ok - needs-decision remains reportable without masquerading as a firstmate-actionable blocker
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:30.0723750Z ok - AFK return re-drains published wakes until handling acknowledges
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:30.1368654Z ok - away-mode re-entry fails closed while the prior return catch-up is pending
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:30.6791155Z ok - /quiet off's return path behaves identically for a quiet-content flag as for a legacy away-content one
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:31.5559577Z ok - check retries recorded terminal teardown and keeps catch-up gated until success
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:33.9226357Z ok - an unreadable superseded mandate stays required until its record validates
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:35.8451546Z ok - the retained contract epoch requires its final archive on every check
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:38.5399181Z ok - the return brief renders health, the words with the session account, waiting, could-not-fix, handled, and cost from durable records, and the gate shrinks to what the away session could not fix
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:39.6170078Z ok - the return brief lists landed work whose worker is still up, from the durable merge marker only, without gating on it and never offering a secondmate for teardown
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:43.3885051Z ok - the return brief points at the drain for branch outcomes on a host home and leaves the read cursor to it, and a Pi home's brief is unchanged
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:44.6999891Z ok - the all-silent return keeps the outcome stored without promising a drain presentation
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:48.2370710Z ok - a drain that cannot record its branch-outcome presentation keeps the return's catch-up gated until a check records it
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:49.6380006Z ok - a refreshed posture keeps its original window, superseded mandate, and earlier outcomes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:50.2196652Z ok - a malformed posture record stays live and gates return catch-up
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:52.1024997Z ok - an epochless malformed record remains required until restored valid
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:52.8922901Z ok - an unreadable outcome store gates catch-up until a successful reread
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:53.8585601Z ok - an unavailable held listing gates catch-up until a successful reread
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:54.6258657Z ok - an unreadable status stays private and gates until a successful reread
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:55.3950359Z ok - a status-file-less leftover record gates return; a readable status on that same record is the proven path that passes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:55.8051981Z ok - a leftover record with a readable status file lets return catch-up clear
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:56.0475223Z ok - the read-only guard treats the away-posture record as active away mode without the legacy flag
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:56.9727950Z ok - the return brief leads with supervisor health and names every detected gap
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:37:57.9007607Z ok - the return brief does not report an already-acked watcher-down marker as an open gap
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:01.5441928Z ok - the return brief reports a wake mid-handling at return as information, and only an open downtime episode as a gap
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:15.1447672Z ok - the return brief's failures section names an engine latch inside the away window with its time, error count, and cooldown state
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:16.2940003Z ok - a lost second trip append does not attach the current pause to a recovered episode
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:17.4244616Z ok - a recovered row preceding the stale retry time does not invent a second trip
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:18.9683360Z ok - a later failed probe does not change the trip-row error count
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:20.4749702Z ok - the return brief excludes prior-session latch rows
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:23.8917229Z ok - the return brief retains in-window trips and failed turns across a main restart
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:24.3718522Z ok - a return with only the legacy away flag still renders the brief and measures the window from the flag
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:24.6256084Z FM_TEST_END 2026-10-23T12:38:24Z tests/fm-afk-return.test.sh exit=0 duration_ms=62566 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:24.6907114Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:24.7264792Z FM_TEST_BEGIN 2026-10-23T12:38:24Z tests/fm-turnend-guard.test.sh family=watcher-wake-lock expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.0914002Z ok - fm_supervision_unhealthy: false with no state/*.meta at all
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.0942682Z ok - fm_supervision_unhealthy: true with in-flight task and no beacon ever
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.1102450Z ok - fm_supervision_unhealthy: true with in-flight task and a beacon far outside the grace window
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.1251004Z ok - fm_supervision_unhealthy: false with in-flight task and a fresh beacon
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.1333929Z ok - fm_supervision_needed: a final unread wake survives source retirement and releases need after acknowledgement
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.1364395Z ok - fm_supervision_needed: X-mode relay poll needs supervision
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.1392636Z ok - fm_supervision_unhealthy: source-only home needs supervision
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.7595717Z ok - fm_supervision_needed: only the built-in standing process pile-up detector needs no supervision
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.8671541Z ok - fm_supervision_needed: a registered custom check needs supervision with no task in flight
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.9752131Z ok - fm_supervision_needed: a registered check whose bytes drifted still needs supervision
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.9814246Z ok - fm_supervision_needed: false for a check.sh with no registration binding
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.9872302Z ok - fm_supervision_needed: a task PR poll without a trust binding is not a registered custom check
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:25.9905789Z ok - fm_supervision_status: the relay shim is not counted as a registered custom check
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:26.0785116Z ok - fm-supervision-liveness-lib: off for a stale beacon with no lock owner
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:26.2290899Z ok - fm-supervision-liveness-lib: live for a fresh beacon with a live lock owner
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:26.3187011Z ok - fm-supervision-liveness-lib: off for a fresh beacon with no live lock owner
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:26.3824408Z ok - fm-supervision-liveness-lib: unknown for an unreadable state directory
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:26.5122569Z ok - fm-supervision-liveness-lib: the away/quiet-daemon ownership proof lives in the shared predicate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:27.2339694Z ok - fm-turnend-guard: exactly one deny event per blocked stop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:28.0798663Z ok - fm-turnend-guard: a recovery allow carries cleared-by continue and a healthy start emits nothing
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:28.1071267Z ok - fm-supervision-instructions: Claude and Cursor repair lines carry the exact arm commands
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:28.1902884Z ok - fm-turnend-guard: silent no-op with nothing in flight
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:28.3814902Z ok - fm-turnend-guard: blocks when a fresh beacon has no live watcher lock
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:28.5537020Z ok - fm-turnend-guard: non-Claude path blocks a source-only home
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:28.7502594Z ok - fm-turnend-guard: blocks on a dead watcher lock even when the beacon is fresh
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:28.9093907Z ok - fm-turnend-guard: silent no-op with a live watcher lock and fresh beacon
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:29.7420169Z ok - fm-turnend-guard: healthy non-Claude harness paths ignore Claude episode contention
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:29.9852732Z ok - fm-turnend-guard: blocks on a live watcher lock with an ancient beacon
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:30.1584753Z ok - fm-turnend-guard: blocks with the exact required reason in the primary when unhealthy
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:30.3348434Z ok - fm-turnend-guard: blocks from active FM_HOME state, not only repo-root state
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:30.5115623Z ok - fm-turnend-guard: X-mode repair reason sources the cadence config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:30.6860808Z ok - fm-turnend-guard: X-mode-only supervision remains guarded in default mode
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:30.9609029Z ok - fm-turnend-guard: registered-check-only supervision is named in the block banner
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:31.1382074Z ok - fm-turnend-guard: an unread-wake-only supervision need is named in the block banner
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:31.2252205Z ok - fm-turnend-guard: ignores stale repo-root state when FM_HOME is set
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:31.4020664Z ok - fm-turnend-guard: uses FM_STATE_OVERRIDE ahead of FM_HOME/state
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:31.4624687Z ok - fm-turnend-guard: stop_hook_active=true always allows the stop (never blocks twice in one turn)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:31.6368435Z ok - fm-turnend-guard: blocks a blind turn end in a secondmate's own home (.fm-secondmate-home no longer excludes it)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:31.7164346Z ok - fm-turnend-guard: idle-by-default - silent in a secondmate home with nothing in flight
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:31.7766287Z ok - fm-turnend-guard: stop_hook_active=true allows the stop in a secondmate home (never blocks twice in one turn)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.0796578Z ok - fm-turnend-guard: secondmate deferred-death recovery - silent while watched, forces re-arm once the watcher exits
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.1871479Z ok - fm-turnend-guard: inert in a secondmate's own child worktree (linked git worktree) even when unhealthy
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.3830079Z ok - fm-turnend-guard: blocks a blind turn end in a treehouse-leased LINKED secondmate home (marker force-include)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.4690555Z ok - fm-turnend-guard: an invalid (empty) marker cannot spoof inclusion; linked worktree stays exempt
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.5568565Z ok - fm-turnend-guard: a non-ASCII marker cannot spoof inclusion; linked worktree stays exempt
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.6438074Z ok - fm-turnend-guard: inert in a crewmate/scout task worktree (linked git worktree) even when unhealthy
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.7313063Z ok - fm-turnend-guard: fails open (never blocks) when jq is missing
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.7836469Z ok - fm-turnend-guard: silent no-op on empty stdin
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:32.9550048Z ok - fm-turnend-guard: runs well under the generous timing margin (0s)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:33.3394891Z ok - fm-turnend-guard-grok: forces one explicitly marked same-session resume when the shared predicate blocks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:33.4027366Z ok - fm-turnend-guard-grok: legacy environment loop guard prevents a nested resume loop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:33.7589684Z ok - fm-turnend-guard-grok: native false delegates blocking feedback with zero resume processes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:33.8368325Z ok - fm-turnend-guard-grok: native true remains bounded and starts no resume process
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:34.5093789Z ok - fm-turnend-guard-grok: both spellings are typed and camelCase has deterministic precedence
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:34.6581433Z ok - fm-turnend-guard-grok: malformed, invalidly typed, and missing-prerequisite payloads start neither path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:34.8241771Z ok - fm-turnend-guard-grok: missing jq and no-supervision-needed stops stay silent and bounded
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:34.8723067Z warning: re-init: ignored --initial-branch=main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:41.2409242Z ok - tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:41.2902520Z warning: re-init: ignored --initial-branch=main
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:41.6485107Z ok - Claude tools: helpers excluded, exact Bash/Read surface, both real Bash authorizations retained
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:41.8873082Z ok - .codex/hooks.json: Stop hook uses hook process root when payload cwd is outside
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:42.0928198Z ok - .codex/hooks.json: Stop hook ignores nested git root guard scripts
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:42.1560603Z ok - .opencode primary plugin: guard path is anchored to worktree, not directory
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:42.3098213Z ok - .pi primary extension: no-tool and multi-tool runs each inject exactly one guard follow-up
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:42.4609551Z ok - .pi primary extension: delivery failure resets the logical-run latch
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:43.0470167Z ok - .pi primary extension: a nested load keeps the live session's turn-end marker
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:43.6868535Z ok - fm-turnend-guard --claude: re-blocks a loop-guarded stop while unhealthy and unclaimed (incident regression)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:44.3300606Z ok - fm-turnend-guard --claude: X-mode-only homes re-block when auto-arm recovery is absent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:44.7099573Z ok - fm-turnend-guard --claude: a live arming epoch advances once and repeated observation is idempotent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:46.1740437Z ok - fm-turnend-guard --claude: repeated failed-to-arming races make bounded monotonic progress
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:47.0982440Z ok - fm-turnend-guard --claude: terminal owner boundary excludes a concurrent start without deadlock
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:47.2681844Z ok - fm-turnend-guard --claude: fresh rewake epoch prevents a duplicate continuation for the same event
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:48.0179669Z ok - fm-turnend-guard --claude: an abandoned auto-arm claim no longer allows a blind stop (incident regression)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:48.7683674Z ok - fm-turnend-guard --claude: a claim whose pid was reused stops counting as recovery even while its entry reads arming
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:49.5532999Z ok - fm-turnend-guard --claude: a hung owner frozen at arming with no watcher beat no longer allows a blind stop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:49.7888042Z ok - fm-turnend-guard --claude: a live open generation claim owns recovery with no lock held
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:50.5431897Z ok - fm-turnend-guard --claude: a stuck generation claim no longer allows a blind stop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:51.2482067Z ok - fm-turnend-guard --claude: the terminal path clears an abandoned claim instead of stepping aside silently
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:51.9574281Z ok - fm-turnend-guard --claude: the terminal fail-open names an unread-wake-only need
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:52.7586918Z ok - fm-turnend-guard --claude: fresh failed epochs preserve and advance monotonic fail-open progression
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:38:59.1161973Z ok - fm-turnend-guard --claude: integrated fresh failures reach one bounded fail-open, stop continuation, and reset on recovery
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:03.5909683Z ok - fm-turnend-guard --claude: an inert auto-arm's frozen epoch reaches one bounded fail-open and resets on recovery
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:06.1876407Z ok - fm-turnend-guard --claude: a frozen unverified epoch spends the budget yet still blocks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:06.6177495Z ok - fm-turnend-guard --claude: reset contention preserves all episode state until retry
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:07.1697676Z ok - fm-turnend-guard --claude: concurrent auto-arm and guard resets are idempotent and deadlock-free
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:07.8700050Z ok - fm-turnend-guard --claude: stale rewake epoch does not allow a blind stop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:09.8364959Z ok - fm-turnend-guard --claude: budget exhaustion alone cannot permit a blind stop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:10.7838915Z ok - fm-turnend-guard --claude: verified fail-open is loud, bounded, attended, and non-repeating
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:11.9041135Z ok - fm-turnend-guard --claude: fail-open requires both exhausted retries and consumed notice
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:12.4639888Z ok - fm-turnend-guard --claude: away ownership excludes the Stop-autoarm fail-open
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:13.6495453Z ok - fm-turnend-guard --claude: positive watcher recovery resets failure episode state
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:14.1637546Z ok - fm-turnend-guard --claude: bounded claim wait avoids a token-consuming forced continuation
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:16.8633400Z ok - fm-turnend-guard --claude: default wait covers a claim 2.5s after the wait starts
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:17.6095570Z ok - fm-turnend-guard --claude: secondmate home re-blocks unclaimed and allows auto-arm-claimed stops
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:17.8869618Z ok - fm-turnend-guard: a live away-mode daemon satisfies supervision with no watcher holding the lock
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:18.0463433Z ok - fm-turnend-guard: away-mode daemon ownership survives a leftover dead watcher lock
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:18.2465589Z ok - fm-turnend-guard: away mode with no daemon and no watcher still blocks
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:18.4527498Z ok - fm-turnend-guard: away mode blocks on a dead away-mode daemon
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:18.6691956Z ok - fm-turnend-guard: away mode blocks on a pid-reused away-mode daemon lock
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:18.8964244Z ok - fm-turnend-guard: away-mode daemon ownership never substitutes for a fresh beacon
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:19.1212982Z ok - fm-turnend-guard: a daemon lock proves nothing while away mode is off
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:19.2866759Z ok - fm-turnend-guard: away-mode beacon freshness uses the poll-derived grace, not the flat default
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:19.4921871Z ok - fm-turnend-guard: a dead away-mode daemon still blocks under the poll-derived grace
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:19.7257461Z ok - fm-turnend-guard: the poll-derived grace is bounded, not unlimited
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:19.9644481Z ok - fm-turnend-guard: with away mode off, the poll-derived grace never applies
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:20.3091297Z FM_TEST_END 2026-10-23T12:39:20Z tests/fm-turnend-guard.test.sh exit=0 duration_ms=55571 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:20.3743954Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:20.4094046Z FM_TEST_BEGIN 2026-10-23T12:39:20Z tests/fm-model-freshness.test.sh family=unclassified expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:20.9464288Z ok - a fixture catalog listing gemini-3.8-flash-high flags a requested gemini-3.1-pro-high and spares current models
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:21.2965517Z ok - aliases and context suffixes count as current; versions compare as numbers across spellings
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:21.4049433Z ok - a newer model under a different provider prefix is not a replacement
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:21.4802245Z ok - a dated snapshot suffix is never read as a version
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:21.5529195Z ok - a newer model with no tier word is marked as another tier
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:21.5833098Z ok - a harness without a readable catalog is a notice, not a verdict
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:21.6957661Z ok - scan names every stale configured model once, resolves roles, edits no config, and exits 0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:21.9920580Z ok - scan is silent and exits 0 without a usable dispatch file
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:22.1714554Z ok - a home with a custom Claude launcher gets no claude verdict, at scan and at check
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:22.2036705Z ok - only a malformed call exits non-zero; FM_MODEL_FRESHNESS=0 turns the check off
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:22.3444560Z ok - live discovery reads the harness catalog and a failing command is a notice, not a verdict
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:22.4075102Z ok - a catalog on stdin is compared without discovery, and an empty one is a notice
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:29.0916561Z ok - a model with a newer model only in another tier launches with a warning, is recorded on the task and surfaced in the crew state; a current model draws none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:41.4795843Z ok - a spawn reads the harness catalog once, for an indexed model, a literal model, and an unreadable catalog
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:45.5576253Z ok - a model whose only newer model is of another tier launches unpinned with a recorded warning
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:39:56.1996600Z ok - a spawn of a model outside the index reuses the agy or omp listing it already read
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:00.3329373Z ok - a spawn through a custom Claude launcher reads no catalog and records no stale model
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:00.3330250Z # all fm-model-freshness tests passed
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:00.5861604Z FM_TEST_END 2026-10-23T12:40:00Z tests/fm-model-freshness.test.sh exit=0 duration_ms=40165 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:00.6520683Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:00.6886377Z FM_TEST_BEGIN 2026-10-23T12:40:00Z tests/fm-fleet-snapshot-view.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:01.3740031Z ok - empty fleet snapshot and view use explicit absence markers
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:05.8875670Z ok - fixture snapshot covers task rows, backlog rows, pointers, stable ordering, and emission-time event age
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:07.3059611Z ok - home-summary excludes kind=secondmate from unowned_current and terminal_in_flight
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:07.9508117Z ok - undated captain holds age after a configurable threshold, decided only from structured fields
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:08.1688555Z ok - captain-hold buckets are total, mutually exclusive, and never decided by prose
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:08.8715894Z ok - main_inventory discloses orphan/unstructured and clears when inventory is consistent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:09.7805240Z ok - backlog normalization preserves strict roles and resolves every blocker compatibly
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:10.5056091Z ok - snapshot event hints follow reconciled current state
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:11.0157223Z ok - durable fold keeps an open decision past a later unrelated event
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:11.5215894Z ok - a live secondmate endpoint preserves unrelated open decisions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:12.0410076Z ok - durable captain-held transfer closes the duplicate live status decision
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:12.5762658Z ok - durable fold clears a decision only on a keyed resolution
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:18.5802689Z ok - a completed scout's stale decision surfaces as a report pointer, not pending
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:18.9494107Z ok - a scout still parked at a decision stays pending (terminal clear does not over-fire)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:19.1543167Z ok - snapshot includes durable scout reports after teardown
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:19.9615732Z ok - snapshot parses tasks-axi rows and respects operational overrides
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:20.7784359Z ok - fleet view renders the snapshot without secondmate peek guidance
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:21.2603180Z ok - fleet view renders secondmate agent liveness
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:21.5092415Z FM_TEST_END 2026-10-23T12:40:21Z tests/fm-fleet-snapshot-view.test.sh exit=0 duration_ms=20809 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:21.5732740Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:21.6081708Z FM_TEST_BEGIN 2026-10-23T12:40:21Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:26.1784501Z ok - a single transient stale pane_current_path read is not accepted as the worktree
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:29.4409533Z ok - an already-settled pane confirms on the next read, not a whole extra cycle
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:31.1989354Z ok - a transient primary-checkout pane read is not accepted as the worktree
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:32.7601621Z ok - a pane stuck on the primary checkout fails loudly at the deadline
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:34.8914086Z ok - a get with changing output keeps waiting beyond ten minutes of scaled total time
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:37.2832756Z ok - output activity cannot keep an acquisition alive beyond the absolute extreme
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:37.2833895Z # all fm-spawn-worktree-settle tests passed
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:37.5407756Z FM_TEST_END 2026-10-23T12:40:37Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=15921 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:37.6061291Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:37.6421370Z FM_TEST_BEGIN 2026-10-23T12:40:37Z tests/fm-ci-workflow.test.sh family=unclassified expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:44.9816734Z ok - CI matrices cover every executable serial lane and canonical lint root exactly once
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:45.1489553Z ok - a newer push to one PR supersedes that PR's in-flight CI
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:45.3125094Z ok - distinct PRs get distinct concurrency groups
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:45.4803179Z ok - every main push keeps its own group and is never cancelled
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:45.5581087Z ok - every ci.yml job carries a finite timeout
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:46.3462664Z ok - every ci.yml job belongs to one of the three timeout tiers
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:46.5769564Z ok - fast tier jobs share one 5 minute tripwire
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:47.1976990Z ok - normal tier jobs share one 60 minute budget
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:47.7455236Z ok - Herdr keeps a 60 minute step tripwire under a 120 minute job backstop
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:57.3272131Z ok - both portable parallel jobs pass the concurrency the model starts from
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:57.5364517Z FM_TEST_END 2026-10-23T12:40:57Z tests/fm-ci-workflow.test.sh exit=0 duration_ms=19882 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:57.6154371Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:57.6524210Z FM_TEST_BEGIN 2026-10-23T12:40:57Z tests/fm-send-agy-confirm.test.sh family=unclassified expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:59.0836927Z ok - agy typed send: no not-submitted refusal on confirmed idle-to-busy
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:40:59.0905091Z ok - agy typed send: sleep log shows the confirm poll running to the late busy render
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:00.1300845Z ok - agy typed send: explicit FM_SEND_RETRIES=3 keeps the exit-1 verdict=unknown refusal
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:01.5174640Z ok - agy typed send: never-rendering busy footer still refuses with verdict=unknown
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:02.8146531Z ok - agy typed send: long-brief render (15th poll) still confirms idle-to-busy
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:03.8537582Z ok - claude typed send: late busy footer still refuses (agy budget is agy-scoped)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.0793332Z FM_TEST_END 2026-10-23T12:41:04Z tests/fm-send-agy-confirm.test.sh exit=0 duration_ms=6415 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.1431706Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.1771618Z FM_TEST_BEGIN 2026-10-23T12:41:04Z tests/fm-api-key-guard-lib.test.sh family=unclassified expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.5372157Z ok - padded API selectors are refused while subscription selectors remain admitted
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.6301078Z ok - padded role and fallback selectors are diagnosed without writes or secret output
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.7171018Z approval absent:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.7171853Z retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.7173022Z retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.7174113Z retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:04.8035942Z approval present: no billing findings
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:06.0684268Z ok - recorded fallback entries are exact and entry-scoped; other entries, roles, GPT and openai stay flagged
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:06.5504568Z ok - a first-time seed reads the code root record only when the home has none, and honors only the recorded entries
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:07.2619971Z ok - malformed and unreadable approval records diagnose configuration problems without granting exceptions
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:07.2685991Z ok - an approval record alone never produces a diagnostic when no omp config exists
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:07.4350528Z ok - all ordered role patterns are inspected and subscription-only lists stay unflagged
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:07.4351177Z all fm-api-key-guard-lib tests passed
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:07.6704335Z FM_TEST_END 2026-10-23T12:41:07Z tests/fm-api-key-guard-lib.test.sh exit=0 duration_ms=3481 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:07.7357083Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:07.7709837Z FM_TEST_BEGIN 2026-10-23T12:41:07Z tests/fm-check-unregister.test.sh family=pr-forge expected_gate_skip=none
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:08.3492138Z ok - empty id or missing state dir refuses loudly and never rms a stray path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:08.4936811Z ok - happy path removes only the named check.sh and check-trust
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:08.6562997Z ok - hard-linked or symlinked artifacts are refused and left in place
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:08.8827949Z FM_TEST_END 2026-10-23T12:41:08Z tests/fm-check-unregister.test.sh exit=0 duration_ms=1099 gate_skip=false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:08.9474045Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:08.9829137Z FM_TEST_BEGIN 2026-10-23T12:41:08Z tests/fm-composer-codex-idle-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:09.3250568Z skip: live: codex absent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:09.5389547Z fm-test-run: gate skip: tests/fm-composer-codex-idle-live-e2e.test.sh: live: codex absent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:09.5390358Z FM_TEST_END 2026-10-23T12:41:09Z tests/fm-composer-codex-idle-live-e2e.test.sh exit=0 duration_ms=537 gate_skip=true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:09.5642588Z FM_TEST_BEGIN 2026-10-23T12:41:09Z tests/fm-cursor-primary-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:09.9117909Z skip: live: opt-in; set FM_CURSOR_PRIMARY_LIVE_E2E=1 to run
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.1269160Z fm-test-run: gate skip: tests/fm-cursor-primary-live-e2e.test.sh: live: opt-in; set FM_CURSOR_PRIMARY_LIVE_E2E=1 to run
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.1270769Z FM_TEST_END 2026-10-23T12:41:10Z tests/fm-cursor-primary-live-e2e.test.sh exit=0 duration_ms=543 gate_skip=true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.1541184Z FM_TEST_BEGIN 2026-10-23T12:41:10Z tests/fm-jev-guard-omp-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.5057185Z skip: live: omp absent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7211313Z fm-test-run: gate skip: tests/fm-jev-guard-omp-live-e2e.test.sh: live: omp absent
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7212206Z FM_TEST_END 2026-10-23T12:41:10Z tests/fm-jev-guard-omp-live-e2e.test.sh exit=0 duration_ms=546 gate_skip=true
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7451145Z FM_TEST_SUMMARY total=16 failed=1 skipped_gate=3 duration_ms=1003935
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7490701Z FM_TEST_SUMMARY_FAMILY family=afk count=1 duration_ms=62566 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7491381Z FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=15921 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7492341Z FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=3 duration_ms=1626 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7493304Z FM_TEST_SUMMARY_FAMILY family=pr-forge count=2 duration_ms=396517 failed=1
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7495013Z FM_TEST_SUMMARY_FAMILY family=secondmate count=1 duration_ms=111809 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7496369Z FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=1 duration_ms=20809 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7497621Z FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=174986 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7498620Z FM_TEST_SUMMARY_FAMILY family=unclassified count=5 duration_ms=162151 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7499665Z FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=55571 failed=0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7538385Z FM_TEST_SLOWEST rank=1 script=tests/fm-open-loops.test.sh duration_ms=395418
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7539409Z FM_TEST_SLOWEST rank=2 script=tests/fm-dispatch-resolve.test.sh duration_ms=174986
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7540408Z FM_TEST_SLOWEST rank=3 script=tests/fm-secondmate-safety.test.sh duration_ms=111809
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7541376Z FM_TEST_SLOWEST rank=4 script=tests/fm-tasks-axi.test.sh duration_ms=92208
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7542246Z FM_TEST_SLOWEST rank=5 script=tests/fm-afk-return.test.sh duration_ms=62566
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7543169Z FM_TEST_SLOWEST rank=6 script=tests/fm-turnend-guard.test.sh duration_ms=55571
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7544710Z FM_TEST_SLOWEST rank=7 script=tests/fm-model-freshness.test.sh duration_ms=40165
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7545697Z FM_TEST_SLOWEST rank=8 script=tests/fm-fleet-snapshot-view.test.sh duration_ms=20809
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7546637Z FM_TEST_SLOWEST rank=9 script=tests/fm-ci-workflow.test.sh duration_ms=19882
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7547599Z FM_TEST_SLOWEST rank=10 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=15921
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7548584Z FM_TEST_SLOWEST rank=11 script=tests/fm-send-agy-confirm.test.sh duration_ms=6415
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7549521Z FM_TEST_SLOWEST rank=12 script=tests/fm-api-key-guard-lib.test.sh duration_ms=3481
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7550880Z FM_TEST_SLOWEST rank=13 script=tests/fm-check-unregister.test.sh duration_ms=1099
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7551856Z FM_TEST_SLOWEST rank=14 script=tests/fm-jev-guard-omp-live-e2e.test.sh duration_ms=546
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7552870Z FM_TEST_SLOWEST rank=15 script=tests/fm-cursor-primary-live-e2e.test.sh duration_ms=543
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.7865288Z fm-test-run: wrote timing artifact: /home/runner/work/_temp/fm-test/fm-test-timing-portable-serial-9.json
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8508151Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8628333Z ##[error]Process completed with exit code 1.
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8714730Z ##[group]Run actions/upload-artifact@v4
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8715060Z with:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8715297Z   name: fm-test-timing-portable-serial-9
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8715738Z   path: /home/runner/work/_temp/fm-test/fm-test-timing-portable-serial-9.json
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8716167Z   if-no-files-found: warn
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8716418Z   compression-level: 6
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8716630Z   overwrite: false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8716839Z   include-hidden-files: false
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:10.8717072Z ##[endgroup]
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.0465571Z (node:406662) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.0466449Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.0511686Z With the provided path, there will be 1 file uploaded
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.0517390Z Artifact name is valid!
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.0518254Z Root directory input is valid!
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.2569980Z Beginning upload of artifact content to blob storage
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.2766858Z (node:406662) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.3452427Z Uploaded bytes 1116
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.3662160Z Finished uploading artifact content to blob storage!
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.3663179Z SHA256 digest of uploaded artifact zip is 29d3c05e37a963a8cbf941d2b5348d77fb8f49904c65b09e9debf757610851f4
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.3666097Z Finalizing artifact upload
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.7640833Z Artifact fm-test-timing-portable-serial-9.zip successfully finalized. Artifact ID 12502081697
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.7642581Z Artifact fm-test-timing-portable-serial-9 has been successfully uploaded! Final size is 1116 bytes. Artifact ID is 12502081697
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.7649224Z Artifact download URL: https://github.com/MrGTV-love/firstmate/actions/runs/39952484274/artifacts/12502081697
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.7919204Z Post job cleanup.
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8797536Z [command]/usr/bin/git version
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8837082Z git version 2.55.0
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8877552Z Temporarily overriding HOME='/home/runner/work/_temp/e3b2e207-1157-4707-9338-46e1cfa90c00' before making global git config changes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8879025Z Adding repository directory to the temporary git global config as a safe directory
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8883393Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8917549Z Removing SSH command configuration
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8924055Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.8958603Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9232583Z Removing HTTP extra header
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9237945Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9274588Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9540642Z Removing includeIf entries pointing to credentials config files
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9548129Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9575273Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9576394Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9577030Z includeif.gitdir:/github/workspace/.git.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9577461Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9585107Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9607632Z /home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9617882Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9653284Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9675648Z /home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9685152Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9718853Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9740615Z /github/runner_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9749632Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9782765Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9806857Z /github/runner_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9814886Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:11.9849386Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:12.0137118Z Removing credentials config '/home/runner/work/_temp/git-credentials-d321adb0-5c96-481d-90a8-e7e31a3a2532.config'
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:12.0308391Z Cleaning up orphan processes
+Behavior portable serial 9	UNKNOWN STEP	2026-10-23T12:41:12.0674600Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

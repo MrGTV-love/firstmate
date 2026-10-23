@@ -1,0 +1,4 @@
+## nodrain stub, 12 parallel workers x 40 iterations
+TOTAL pass=480 fail=0
+## target stub, 12 parallel workers x 40 iterations
+TOTAL pass=480 fail=0

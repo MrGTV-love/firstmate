@@ -1,0 +1,18 @@
+## base b3fa25f98 bin/fm-dod-lib.sh
+  not-ready  PR https://gerrit.example/c/test/project/+/140 published for review; checks green
+  not-ready  checks green: https://review.example.org/c/team/project/+/456
+  not-ready  PR https://review.example.org/c/team/project/+/123 checks pending
+  not-ready  https://review.example.org/c/team/project/+/not-a-number checks green
+  not-ready  PR checks green
+  not-ready  paused: PROD deploy watch, checks green on TEST
+  CI-READY   PR #12 checks green
+  CI-READY   https://github.com/o/r/pull/7 checks green
+## target b0cc3a708 bin/fm-dod-lib.sh
+  CI-READY   PR https://gerrit.example/c/test/project/+/140 published for review; checks green
+  CI-READY   checks green: https://review.example.org/c/team/project/+/456
+  not-ready  PR https://review.example.org/c/team/project/+/123 checks pending
+  not-ready  https://review.example.org/c/team/project/+/not-a-number checks green
+  not-ready  PR checks green
+  not-ready  paused: PROD deploy watch, checks green on TEST
+  CI-READY   PR #12 checks green
+  CI-READY   https://github.com/o/r/pull/7 checks green

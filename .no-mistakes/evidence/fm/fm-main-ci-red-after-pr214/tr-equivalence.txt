@@ -1,0 +1,27 @@
+input: Run `bin/fm-x.sh --y` (see docs/a.md, tests/b.test.sh;"state/c") ok
+--- /usr/bin/tr old:
+0000000    R   u   n  \n  \n   b   i   n   /   f   m   -   x   .   s   h
+0000020   \n   -   -   y  \n  \n  \n   s   e   e  \n   d   o   c   s   /
+0000040    a   .   m   d  \n  \n   t   e   s   t   s   /   b   .   t   e
+0000060    s   t   .   s   h  \n  \n   s   t   a   t   e   /   c  \n  \n
+0000100   \n   o   k                                                    
+--- /usr/bin/tr new:
+0000000    R   u   n  \n  \n   b   i   n   /   f   m   -   x   .   s   h
+0000020   \n   -   -   y  \n  \n  \n   s   e   e  \n   d   o   c   s   /
+0000040    a   .   m   d  \n  \n   t   e   s   t   s   /   b   .   t   e
+0000060    s   t   .   s   h  \n  \n   s   t   a   t   e   /   c  \n  \n
+0000100   \n   o   k                                                    
+--- gtr old:
+0000000    R   u   n  \n  \n   b   i   n   /   f   m   -   x   .   s   h
+0000020   \n   -   -   y  \n  \n  \n   s   e   e  \n   d   o   c   s   /
+0000040    a   .   m   d  \n  \n   t   e   s   t   s   /   b   .   t   e
+0000060    s   t   .   s   h  \n  \n   s   t   a   t   e   /   c  \n  \n
+0000100   \n   o   k                                                    
+--- gtr new:
+0000000    R   u   n  \n  \n   b   i   n   /   f   m   -   x   .   s   h
+0000020   \n   -   -   y  \n  \n  \n   s   e   e  \n   d   o   c   s   /
+0000040    a   .   m   d  \n  \n   t   e   s   t   s   /   b   .   t   e
+0000060    s   t   .   s   h  \n  \n   s   t   a   t   e   /   c  \n  \n
+0000100   \n   o   k                                                    
+/usr/bin/tr: identical
+gtr: identical

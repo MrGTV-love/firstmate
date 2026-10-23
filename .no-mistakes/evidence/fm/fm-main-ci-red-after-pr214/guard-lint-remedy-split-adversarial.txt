@@ -1,0 +1,14 @@
+# guards[0].remedy rewritten to: run `bin/fm-no-such-a.sh` (see docs/no-such-b.md, "tests/no-such-c.test.sh";bin/fm-supervision-instructions.sh)
+# 3 missing paths split by backtick, paren, comma, quote, semicolon; 1 real path
+## target (macOS /usr/bin/tr)
+rc=1
+VIOLATION R2 turnend-supervision-block: remedy names 'bin/fm-no-such-a.sh', which does not exist
+VIOLATION R2 turnend-supervision-block: remedy names 'docs/no-such-b.md', which does not exist
+VIOLATION R2 turnend-supervision-block: remedy names 'tests/no-such-c.test.sh', which does not exist
+LINT_SUMMARY mode=enforce guards=28 violations=3 allowlisted=0 stale=0 shown=3
+## base
+rc=1
+VIOLATION R2 turnend-supervision-block: remedy names 'bin/fm-no-such-a.sh', which does not exist
+VIOLATION R2 turnend-supervision-block: remedy names 'docs/no-such-b.md', which does not exist
+VIOLATION R2 turnend-supervision-block: remedy names 'tests/no-such-c.test.sh', which does not exist
+LINT_SUMMARY mode=enforce guards=28 violations=3 allowlisted=0 stale=0 shown=3

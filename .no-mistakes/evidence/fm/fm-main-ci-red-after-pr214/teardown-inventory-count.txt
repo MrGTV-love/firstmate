@@ -1,0 +1,6 @@
+registered teardown cases at b3fa25f98^ (before #210): 333
+registered teardown cases at b3fa25f98 (#210 merged):  334
+registered teardown cases at HEAD:                    334
+case added by #210 (git diff b3fa25f98^ b3fa25f98 -- tests/fm-teardown.test.sh):
++test_squash_pushed_missing_subject_match_ignores_hash_boundary() {
++test_squash_pushed_missing_subject_match_ignores_hash_boundary

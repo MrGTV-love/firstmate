@@ -1,0 +1,10 @@
+$ bin/fm-doc-audience-check.sh --inventory <base b3fa25f98 docs/documentation-audiences.json>
+fm-doc-audience-check: unclassified: docs/guard-spec.md
+rc=1
+
+$ bin/fm-doc-audience-check.sh   (target inventory)
+fm-doc-audience-check: ok surfaces=145 local_links=1558
+rc=0
+
+$ git log --diff-filter=A --format='%h %s' -- docs/guard-spec.md
+b9897b8f7 feat(guards): own the guard spec, registry, lint, and reference check

@@ -1,0 +1,58 @@
+FM_TEST_BEGIN 2026-10-23T17:24:08Z tests/fm-open-loops.test.sh family=pr-forge expected_gate_skip=none
+PASS: ordinary categories, PR proof, ages and configuration
+PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion
+PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
+PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
+PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
+PASS: interrupted teardown records bound to the current task record
+PASS: correction coverage and landed/drop exclusions
+PASS: recorded task-only PR classification, fork landing, and correction coverage
+PASS: patch-equivalent delivery
+PASS: approved local landing and qualified defaults
+PASS: independent failed delivery and worker liveness axes
+PASS: unknown current state degrades independently of live verdict
+PASS: future pipeline stamps do not mask older valid progress
+PASS: future status commit and reflog cannot hide unknown-age stalls
+PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
+PASS: collection leaves Git index and object inventory unchanged
+PASS: last-error JSON and human representations
+PASS: local-path origins are disclosed without degrading the ledger
+PASS: exact GitHub host admission and PR projection
+PASS: unreadable shared state inventory cannot publish complete empty coverage
+PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
+PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
+PASS: generation-invalidated snapshots retain coverage failures despite live stop events
+PASS: only dispatched ready work is overdue
+PASS: ordinary recovery adapters and source degradation
+PASS: publication suppression reset success/failure/skip
+PASS: held-gate singleflight and child cleanup
+PASS: unset and empty address overrides share shell defaults before collection
+PASS: command deadline owns resistant descendant cleanup
+PASS: collection deadline owns resistant descendant cleanup
+PASS: deadline escapes origins source recovery
+PASS: deadline escapes pr-checks source recovery
+PASS: deadline escapes pr-state source recovery
+PASS: deadline escapes questions source recovery
+PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
+PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
+PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
+PASS: live and aged captain holds share unresolved-question coverage with status decisions
+PASS: unreadable tmux degrades coverage without fabricating missing worker
+PASS: current-state timeout retains independent observation failure
+PASS: real snapshot unreadable metadata/status inventory stays degraded
+PASS: real snapshot cancellation reaps nested groups and removes temporary inventory
+PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
+PASS: a steer on a row with a non-object source falls back to its owner inbox
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers
+PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup
+PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger; a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not
+ok - open-work reconciliation reports owned obligations from live records
+FM_TEST_END 2026-10-23T17:33:37Z tests/fm-open-loops.test.sh exit=0 duration_ms=568846 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5MVA7V9FDTEFM7DA9T1Q4PA/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=569228
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=568846 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-open-loops.test.sh duration_ms=568846
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5MVA7V9FDTEFM7DA9T1Q4PA/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0

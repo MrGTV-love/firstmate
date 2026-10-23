@@ -1,0 +1,1315 @@
+Lint 3	UNKNOWN STEP	﻿2026-10-23T12:26:34.9954255Z Current runner version: '2.338.0'
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9990294Z ##[group]Runner Image Provisioner
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9991754Z Hosted Compute Agent
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9992811Z Version: 20261012.601
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9993904Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9995345Z Build Date: 2026-10-12T17:48:21Z
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9996536Z Worker ID: {75b7eeec-7b12-4d3d-a077-c5ad5501d8bf}
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9997705Z Region: eastus2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:34.9999124Z Cloud: Azure
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0000050Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0002482Z ##[group]Operating System
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0003545Z Ubuntu
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0004404Z 26.04.1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0005318Z LTS
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0006262Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0007503Z ##[group]Runner Image
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0009011Z Image: ubuntu-26.04
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0010061Z Version: 20261012.163.1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0012863Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261012.163/images/ubuntu/Ubuntu2604-Readme.md
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0015962Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261012.163
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0017848Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0020317Z ##[group]GITHUB_TOKEN Permissions
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0023274Z Contents: read
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0024273Z Metadata: read
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0025466Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0028826Z Secret source: Actions
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0030729Z Cache mode: write
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0032268Z Prepare workflow directory
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0530256Z Prepare all required actions
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.0601795Z Getting action download info
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.2556289Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.3596759Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.5452179Z Complete job name: Lint 3
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6238810Z ##[group]Run actions/checkout@v6
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6239780Z with:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6240222Z   fetch-depth: 0
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6240699Z   repository: MrGTV-love/firstmate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6244712Z   token: ***
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6245150Z   ssh-strict: true
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6245598Z   ssh-user: git
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6246047Z   persist-credentials: true
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6246535Z   clean: true
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6246998Z   sparse-checkout-cone-mode: true
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6247516Z   fetch-tags: false
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6247951Z   show-progress: true
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6248589Z   lfs: false
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6249009Z   submodules: false
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6249458Z   set-safe-directory: true
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6249957Z   allow-unsafe-pr-checkout: false
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.6250882Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7282999Z Syncing repository: MrGTV-love/firstmate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7286362Z ##[group]Getting Git version info
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7287763Z Working directory is '/home/runner/work/firstmate/firstmate'
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7289954Z [command]/usr/bin/git version
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7290938Z git version 2.55.0
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7309581Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7325450Z Temporarily overriding HOME='/home/runner/work/_temp/d8a15e4b-9bee-40f8-8b93-32ad4e827e48' before making global git config changes
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7327901Z Adding repository directory to the temporary git global config as a safe directory
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7331440Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7387147Z Deleting the contents of '/home/runner/work/firstmate/firstmate'
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7391053Z ##[group]Determining repository object format
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7393576Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7394748Z ##[group]Initializing the repository
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7398484Z [command]/usr/bin/git init /home/runner/work/firstmate/firstmate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7491580Z hint: Using 'master' as the name for the initial branch. This default branch name
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7493608Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7495025Z hint: to use in all of your new repositories, which will suppress this warning,
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7496481Z hint: call:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7497264Z hint:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7498491Z hint: 	git config --global init.defaultBranch <name>
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7499642Z hint:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7500720Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7502354Z hint: 'development'. The just-created branch can be renamed via this command:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7503610Z hint:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7504355Z hint: 	git branch -m <name>
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7505251Z hint:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7506498Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7508659Z Initialized empty Git repository in /home/runner/work/firstmate/firstmate/.git/
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7511525Z [command]/usr/bin/git remote add origin https://github.com/MrGTV-love/firstmate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7554503Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7556212Z ##[group]Disabling automatic garbage collection
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7558529Z [command]/usr/bin/git config --local gc.auto 0
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7591954Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7593740Z ##[group]Setting up auth
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7594741Z Removing SSH command configuration
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7600822Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.7633660Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8015545Z Removing HTTP extra header
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8021417Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8056987Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8321531Z Removing includeIf entries pointing to credentials config files
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8328840Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8363706Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8636532Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8675295Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8707921Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8743225Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8774793Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8802694Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8803450Z ##[group]Fetching the repository
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:35.8812143Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3818889Z From https://github.com/MrGTV-love/firstmate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3822076Z  * [new branch]        archive/fm-lifecycle-phase3-golden-fold -> origin/archive/fm-lifecycle-phase3-golden-fold
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3830357Z  * [new branch]        archive/fm-lifecycle-phase3-restart-r6 -> origin/archive/fm-lifecycle-phase3-restart-r6
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3833087Z  * [new branch]        cursor/ci-fm-ci-churn-macos-herdr-dry-e1d1 -> origin/cursor/ci-fm-ci-churn-macos-herdr-dry-e1d1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3835769Z  * [new branch]        devin/1790040975-secondmate-fm-root-pin -> origin/devin/1790040975-secondmate-fm-root-pin
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3837779Z  * [new branch]        fm/afk-pi-wake-bypass-r1 -> origin/fm/afk-pi-wake-bypass-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3840248Z  * [new branch]        fm/afk-return-stale-record-gate-r1 -> origin/fm/afk-return-stale-record-gate-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3842240Z  * [new branch]        fm/agents-md-merge-rule -> origin/fm/agents-md-merge-rule
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3843699Z  * [new branch]        fm/ci-2604-cite         -> origin/fm/ci-2604-cite
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3845099Z  * [new branch]        fm/ci-2604-proof        -> origin/fm/ci-2604-proof
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3846622Z  * [new branch]        fm/diagnostic-remote-seed -> origin/fm/diagnostic-remote-seed
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3848499Z  * [new branch]        fm/direct-edit-class    -> origin/fm/direct-edit-class
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3850528Z  * [new branch]        fm/fm-actionable-update-escalation-misclassification-r1 -> origin/fm/fm-actionable-update-escalation-misclassification-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3852313Z  * [new branch]        fm/fm-actionable-update-escalation-misclassification-r3 -> origin/fm/fm-actionable-update-escalation-misclassification-r3
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3853884Z  * [new branch]        fm/fm-afk-pi-branch-both-postures-r1 -> origin/fm/fm-afk-pi-branch-both-postures-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3855111Z  * [new branch]        fm/fm-api-key-guard-fork-pr6 -> origin/fm/fm-api-key-guard-fork-pr6
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3856223Z  * [new branch]        fm/fm-board-answer-closes-live-work -> origin/fm/fm-board-answer-closes-live-work
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3857550Z  * [new branch]        fm/fm-board-answer-latency -> origin/fm/fm-board-answer-latency
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3861559Z  * [new branch]        fm/fm-board-answer-latency-r4 -> origin/fm/fm-board-answer-latency-r4
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3862745Z  * [new branch]        fm/fm-board-answer-unrouted-ledger -> origin/fm/fm-board-answer-unrouted-ledger
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3864001Z  * [new branch]        fm/fm-board-decision-card-substance -> origin/fm/fm-board-decision-card-substance
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3865103Z  * [new branch]        fm/fm-board-listener-retire -> origin/fm/fm-board-listener-retire
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3866147Z  * [new branch]        fm/fm-branch-note-sailboat-r2 -> origin/fm/fm-branch-note-sailboat-r2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3867181Z  * [new branch]        fm/fm-brief-task-dod-sections -> origin/fm/fm-brief-task-dod-sections
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3868802Z  * [new branch]        fm/fm-capacity-counts-running-only -> origin/fm/fm-capacity-counts-running-only
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3870453Z  * [new branch]        fm/fm-captain-hold-gate-reads-done-archive -> origin/fm/fm-captain-hold-gate-reads-done-archive
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3871750Z  * [new branch]        fm/fm-captain-hold-operational-keys -> origin/fm/fm-captain-hold-operational-keys
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3872879Z  * [new branch]        fm/fm-cd-guard-warn-not-block -> origin/fm/fm-cd-guard-warn-not-block
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3873910Z  * [new branch]        fm/fm-ci-2604-r4-m2-followup -> origin/fm/fm-ci-2604-r4-m2-followup
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3875171Z  * [new branch]        fm/fm-ci-lint-partition-near-time-limit -> origin/fm/fm-ci-lint-partition-near-time-limit
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3876631Z  * [new branch]        fm/fm-ci-shard2-captain-hold-test-too-long -> origin/fm/fm-ci-shard2-captain-hold-test-too-long
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3877913Z  * [new branch]        fm/fm-ci-ubuntu-2604-runner-image -> origin/fm/fm-ci-ubuntu-2604-runner-image
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3879701Z  * [new branch]        fm/fm-claude-titled-composer-unknown -> origin/fm/fm-claude-titled-composer-unknown
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3880921Z  * [new branch]        fm/fm-claude-trust-sibling-clones -> origin/fm/fm-claude-trust-sibling-clones
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3882299Z  * [new branch]        fm/fm-claude-worker-api-key-guard -> origin/fm/fm-claude-worker-api-key-guard
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3883467Z  * [new branch]        fm/fm-compact-adviser-fleet -> origin/fm/fm-compact-adviser-fleet
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3884661Z  * [new branch]        fm/fm-compact-jev-omp-pipeline -> origin/fm/fm-compact-jev-omp-pipeline
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3888182Z  * [new branch]        fm/fm-composer-thin-adapter-refactor-r1 -> origin/fm/fm-composer-thin-adapter-refactor-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3889584Z  * [new branch]        fm/fm-control-agy-relaunch-composer -> origin/fm/fm-control-agy-relaunch-composer
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3890920Z  * [new branch]        fm/fm-control-exit-claude-background-prompt -> origin/fm/fm-control-exit-claude-background-prompt
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3892443Z  * [new branch]        fm/fm-control-reattribute-endpoints-after-reboot -> origin/fm/fm-control-reattribute-endpoints-after-reboot
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3893910Z  * [new branch]        fm/fm-control-reclaim-missing-endpoint-s2 -> origin/fm/fm-control-reclaim-missing-endpoint-s2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3895358Z  * [new branch]        fm/fm-control-relaunch-relocate-missing-worktree -> origin/fm/fm-control-relaunch-relocate-missing-worktree
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3896624Z  * [new branch]        fm/fm-copy-sweep-and-budget -> origin/fm/fm-copy-sweep-and-budget
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3897714Z  * [new branch]        fm/fm-copy-sweep-release-dead-locks -> origin/fm/fm-copy-sweep-release-dead-locks
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3899076Z  * [new branch]        fm/fm-cpu-pool-gate-overlay -> origin/fm/fm-cpu-pool-gate-overlay
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3900251Z  * [new branch]        fm/fm-crew-state-cache-no-mistakes-reads -> origin/fm/fm-crew-state-cache-no-mistakes-reads
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3901526Z  * [new branch]        fm/fm-crew-state-ci-monitor-terminal -> origin/fm/fm-crew-state-ci-monitor-terminal
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3902898Z  * [new branch]        fm/fm-crew-state-test-spin-leak-s2 -> origin/fm/fm-crew-state-test-spin-leak-s2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3904126Z  * [new branch]        fm/fm-dispatch-diagnostic-count-main -> origin/fm/fm-dispatch-diagnostic-count-main
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3905399Z  * [new branch]        fm/fm-documentation-audience-cleanup-r1 -> origin/fm/fm-documentation-audience-cleanup-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3906540Z  * [new branch]        fm/fm-dod-reaches-reviewer -> origin/fm/fm-dod-reaches-reviewer
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3907470Z  * [new branch]        fm/fm-dsh-tui-adoption  -> origin/fm/fm-dsh-tui-adoption
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3908945Z  * [new branch]        fm/fm-duration-writes-into-project-root -> origin/fm/fm-duration-writes-into-project-root
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3911209Z  * [new branch]        fm/fm-flaky-claude-contexts-stdin-file -> origin/fm/fm-flaky-claude-contexts-stdin-file
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3913565Z  * [new branch]        fm/fm-flaky-opencode-guard-stub-drain -> origin/fm/fm-flaky-opencode-guard-stub-drain
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3915953Z  * [new branch]        fm/fm-flaky-tmux-smoke-readiness -> origin/fm/fm-flaky-tmux-smoke-readiness
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3918884Z  * [new branch]        fm/fm-fleet-process-launch-churn -> origin/fm/fm-fleet-process-launch-churn
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3921231Z  * [new branch]        fm/fm-fleet-snapshot-latest-pull-url -> origin/fm/fm-fleet-snapshot-latest-pull-url
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3923716Z  * [new branch]        fm/fm-github-conditional-reads -> origin/fm/fm-github-conditional-reads
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3925770Z  * [new branch]        fm/fm-github-conditional-reads-r3 -> origin/fm/fm-github-conditional-reads-r3
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3927815Z  * [new branch]        fm/fm-guard-gate-1-envelope-ledger -> origin/fm/fm-guard-gate-1-envelope-ledger
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3930425Z  * [new branch]        fm/fm-herdr-agents-pane-visibility -> origin/fm/fm-herdr-agents-pane-visibility
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3931544Z  * [new branch]        fm/fm-herdr-claude-exit -> origin/fm/fm-herdr-claude-exit
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3932800Z  * [new branch]        fm/fm-herdr-concurrent-recovery-lock -> origin/fm/fm-herdr-concurrent-recovery-lock
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3934191Z  * [new branch]        fm/fm-herdr-contiguity-resume -> origin/fm/fm-herdr-contiguity-resume
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3935585Z  * [new branch]        fm/fm-herdr-reboot-resumed-agents-uncontrolled -> origin/fm/fm-herdr-reboot-resumed-agents-uncontrolled
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3937083Z  * [new branch]        fm/fm-herdr-recovery-classifier-stale-agent-r1 -> origin/fm/fm-herdr-recovery-classifier-stale-agent-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3939133Z  * [new branch]        fm/fm-home-summary-refresh-deadline -> origin/fm/fm-home-summary-refresh-deadline
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3941371Z  * [new branch]        fm/fm-host-load-reduction -> origin/fm/fm-host-load-reduction
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3943093Z  * [new branch]        fm/fm-hyper-jev-skill   -> origin/fm/fm-hyper-jev-skill
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3944520Z  * [new branch]        fm/fm-idle-exit-relaunch-ship -> origin/fm/fm-idle-exit-relaunch-ship
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3945721Z  * [new branch]        fm/fm-idle-reap-test-reread-race -> origin/fm/fm-idle-reap-test-reread-race
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3946808Z  * [new branch]        fm/fm-idle-session-reap -> origin/fm/fm-idle-session-reap
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3947870Z  * [new branch]        fm/fm-jev-credit-failure-alert -> origin/fm/fm-jev-credit-failure-alert
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3949795Z  * [new branch]        fm/fm-jev-dispatch-floor-and-log -> origin/fm/fm-jev-dispatch-floor-and-log
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3951637Z  * [new branch]        fm/fm-jev-guard-bounded-retry-and-outage-text -> origin/fm/fm-jev-guard-bounded-retry-and-outage-text
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3954268Z  * [new branch]        fm/fm-jev-guard-omp-device-paths -> origin/fm/fm-jev-guard-omp-device-paths
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3956815Z  * [new branch]        fm/fm-jev-guard-rebuild-scout -> origin/fm/fm-jev-guard-rebuild-scout
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3960116Z  * [new branch]        fm/fm-jev-guard-request-size-ceiling -> origin/fm/fm-jev-guard-request-size-ceiling
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3963213Z  * [new branch]        fm/fm-jev-guard-unicode-space-file-scope -> origin/fm/fm-jev-guard-unicode-space-file-scope
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3965877Z  * [new branch]        fm/fm-jev-guardrail-hook -> origin/fm/fm-jev-guardrail-hook
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3968416Z  * [new branch]        fm/fm-jev-level5-routers-as-is -> origin/fm/fm-jev-level5-routers-as-is
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3970599Z  * [new branch]        fm/fm-jev-mem-guard-macos -> origin/fm/fm-jev-mem-guard-macos
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3972700Z  * [new branch]        fm/fm-jev-never-send-sections -> origin/fm/fm-jev-never-send-sections
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3975560Z  * [new branch]        fm/fm-jev-pipeline-coverage-clipping -> origin/fm/fm-jev-pipeline-coverage-clipping
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3977209Z  * [new branch]        fm/fm-jev-resolver-observability -> origin/fm/fm-jev-resolver-observability
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3979095Z  * [new branch]        fm/fm-jev-resolver-runway-guard -> origin/fm/fm-jev-resolver-runway-guard
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3980509Z  * [new branch]        fm/fm-jev-retire-invented-v2 -> origin/fm/fm-jev-retire-invented-v2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3981750Z  * [new branch]        fm/fm-jev-single-key-source -> origin/fm/fm-jev-single-key-source
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3983429Z  * [new branch]        fm/fm-jev-size-guard-never-blocks-work -> origin/fm/fm-jev-size-guard-never-blocks-work
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3985821Z  * [new branch]        fm/fm-jev-skill-picker  -> origin/fm/fm-jev-skill-picker
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3988243Z  * [new branch]        fm/fm-keep-ai-trailers-per-home-s2 -> origin/fm/fm-keep-ai-trailers-per-home-s2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3989807Z  * [new branch]        fm/fm-lab-home-refuse-in-worktree -> origin/fm/fm-lab-home-refuse-in-worktree
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3991061Z  * [new branch]        fm/fm-lab-orphan-reaper -> origin/fm/fm-lab-orphan-reaper
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3992170Z  * [new branch]        fm/fm-lane-wake-replay  -> origin/fm/fm-lane-wake-replay
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3993306Z  * [new branch]        fm/fm-lane-wake-replay-r21 -> origin/fm/fm-lane-wake-replay-r21
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3994684Z  * [new branch]        fm/fm-lane-wake-replay-r22 -> origin/fm/fm-lane-wake-replay-r22
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3995951Z  * [new branch]        fm/fm-lavish-board-answers-lost -> origin/fm/fm-lavish-board-answers-lost
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3997375Z  * [new branch]        fm/fm-lavish-legacy-answer-schema -> origin/fm/fm-lavish-legacy-answer-schema
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.3999078Z  * [new branch]        fm/fm-lavish-listener-slow-server -> origin/fm/fm-lavish-listener-slow-server
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4000413Z  * [new branch]        fm/fm-ledger-dated-fold-cost -> origin/fm/fm-ledger-dated-fold-cost
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4001683Z  * [new branch]        fm/fm-ledger-lifecycle-events -> origin/fm/fm-ledger-lifecycle-events
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4003047Z  * [new branch]        fm/fm-ledger-local-origin-degrades -> origin/fm/fm-ledger-local-origin-degrades
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4004377Z  * [new branch]        fm/fm-ledger-pr-row-actions -> origin/fm/fm-ledger-pr-row-actions
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4005536Z  * [new branch]        fm/fm-lifecycle-phase3  -> origin/fm/fm-lifecycle-phase3
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4006945Z  * [new branch]        fm/fm-limits-extremes-only-guard-and-spawn -> origin/fm/fm-limits-extremes-only-guard-and-spawn
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4009051Z  * [new branch]        fm/fm-limits-extremes-only-teardown-and-tests -> origin/fm/fm-limits-extremes-only-teardown-and-tests
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4010621Z  * [new branch]        fm/fm-lint-concurrency-bound -> origin/fm/fm-lint-concurrency-bound
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4012118Z  * [new branch]        fm/fm-lint-gate-starves-under-load -> origin/fm/fm-lint-gate-starves-under-load
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4013327Z  * [new branch]        fm/fm-lint-memory-fix   -> origin/fm/fm-lint-memory-fix
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4014398Z  * [new branch]        fm/fm-lint-once-and-scoped -> origin/fm/fm-lint-once-and-scoped
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4015691Z  * [new branch]        fm/fm-main-ci-red-20261010 -> origin/fm/fm-main-ci-red-20261010
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4016920Z  * [new branch]        fm/fm-main-ci-watch-arm-red -> origin/fm/fm-main-ci-watch-arm-red
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4018741Z  * [new branch]        fm/fm-main-findings-a-control-guards-parser -> origin/fm/fm-main-findings-a-control-guards-parser
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4020727Z  * [new branch]        fm/fm-main-findings-b1-spend-audit-cache-test-docs -> origin/fm/fm-main-findings-b1-spend-audit-cache-test-docs
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4022964Z  * [new branch]        fm/fm-main-ledger-owner-diagnosis -> origin/fm/fm-main-ledger-owner-diagnosis
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4025442Z  * [new branch]        fm/fm-main-watcher-death-0117 -> origin/fm/fm-main-watcher-death-0117
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4028232Z  * [new branch]        fm/fm-merge-guard-multi-pr-task-head -> origin/fm/fm-merge-guard-multi-pr-task-head
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4030716Z  * [new branch]        fm/fm-model-freshness-check -> origin/fm/fm-model-freshness-check
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4032691Z  * [new branch]        fm/fm-model-index       -> origin/fm/fm-model-index
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4034662Z  * [new branch]        fm/fm-needs-decision-main-only-r1 -> origin/fm/fm-needs-decision-main-only-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4036254Z  * [new branch]        fm/fm-needs-decision-whole-batch-r1 -> origin/fm/fm-needs-decision-whole-batch-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4037690Z  * [new branch]        fm/fm-nested-copy-no-second-layer -> origin/fm/fm-nested-copy-no-second-layer
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4040077Z  * [new branch]        fm/fm-nested-worker-supervisor-import -> origin/fm/fm-nested-worker-supervisor-import
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4042562Z  * [new branch]        fm/fm-nm-evidence-store-firstmate-r1 -> origin/fm/fm-nm-evidence-store-firstmate-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4045265Z  * [new branch]        fm/fm-omp-approved-fallback-chain-exception -> origin/fm/fm-omp-approved-fallback-chain-exception
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4048331Z  * [new branch]        fm/fm-omp-codex-account-failover -> origin/fm/fm-omp-codex-account-failover
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4051405Z  * [new branch]        fm/fm-omp-codex-account-failover-v2-r3 -> origin/fm/fm-omp-codex-account-failover-v2-r3
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4054668Z  * [new branch]        fm/fm-omp-composer-unknown-blocks-control -> origin/fm/fm-omp-composer-unknown-blocks-control
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4057494Z  * [new branch]        fm/fm-omp-global-roles-overwrite -> origin/fm/fm-omp-global-roles-overwrite
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4060058Z  * [new branch]        fm/fm-omp-idle-wake-stall -> origin/fm/fm-omp-idle-wake-stall
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4062184Z  * [new branch]        fm/fm-omp-jev-thinking-route -> origin/fm/fm-omp-jev-thinking-route
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4064435Z  * [new branch]        fm/fm-omp-lane-wake-unsubmitted -> origin/fm/fm-omp-lane-wake-unsubmitted
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4066415Z  * [new branch]        fm/fm-omp-lane-wake-unsubmitted-r2 -> origin/fm/fm-omp-lane-wake-unsubmitted-r2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4067883Z  * [new branch]        fm/fm-omp-refuse-api-billed-gpt -> origin/fm/fm-omp-refuse-api-billed-gpt
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4070332Z  * [new branch]        fm/fm-omp-remote-trace-tests -> origin/fm/fm-omp-remote-trace-tests
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4072884Z  * [new branch]        fm/fm-omp-sol-chain-deepseek-stand-in -> origin/fm/fm-omp-sol-chain-deepseek-stand-in
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4075764Z  * [new branch]        fm/fm-omp-sol-fallback-downgrade-r2 -> origin/fm/fm-omp-sol-fallback-downgrade-r2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4078557Z  * [new branch]        fm/fm-omp-wake-delivery-gaps -> origin/fm/fm-omp-wake-delivery-gaps
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4080154Z  * [new branch]        fm/fm-omp-worker-memory-off -> origin/fm/fm-omp-worker-memory-off
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4081816Z  * [new branch]        fm/fm-open-loops-action-per-row-snapshot -> origin/fm/fm-open-loops-action-per-row-snapshot
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4084815Z  * [new branch]        fm/fm-open-loops-captain-wait-standing -> origin/fm/fm-open-loops-captain-wait-standing
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4088307Z  * [new branch]        fm/fm-open-loops-checkin-live-evidence -> origin/fm/fm-open-loops-checkin-live-evidence
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4090941Z  * [new branch]        fm/fm-open-loops-core   -> origin/fm/fm-open-loops-core
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4093259Z  * [new branch]        fm/fm-open-loops-lane-scope -> origin/fm/fm-open-loops-lane-scope
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4095627Z  * [new branch]        fm/fm-overdue-rows-block-ack -> origin/fm/fm-overdue-rows-block-ack
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4098423Z  * [new branch]        fm/fm-pause-declared-stale-alarm -> origin/fm/fm-pause-declared-stale-alarm
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4101301Z  * [new branch]        fm/fm-per-task-delivery-override-r1 -> origin/fm/fm-per-task-delivery-override-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4104201Z  * [new branch]        fm/fm-pi-120-before-agent-start-union -> origin/fm/fm-pi-120-before-agent-start-union
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4106643Z  * [new branch]        fm/fm-pi-render-drift   -> origin/fm/fm-pi-render-drift
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4108927Z  * [new branch]        fm/fm-pool-slot-prefilter-skips-unleased -> origin/fm/fm-pool-slot-prefilter-skips-unleased
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4111837Z  * [new branch]        fm/fm-pr-merge-false-missing-required-checks -> origin/fm/fm-pr-merge-false-missing-required-checks
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4115069Z  * [new branch]        fm/fm-pr-merge-requires-recorded-pass -> origin/fm/fm-pr-merge-requires-recorded-pass
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4117684Z  * [new branch]        fm/fm-proc-budget-wrapper -> origin/fm/fm-proc-budget-wrapper
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4120086Z  * [new branch]        fm/fm-proc-count-detector -> origin/fm/fm-proc-count-detector
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4122673Z  * [new branch]        fm/fm-procevent-bound-reader-orphans -> origin/fm/fm-procevent-bound-reader-orphans
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4125553Z  * [new branch]        fm/fm-procevent-lavish-list-form-parse -> origin/fm/fm-procevent-lavish-list-form-parse
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4128857Z  * [new branch]        fm/fm-procevent-lease-debounce-test-flaky -> origin/fm/fm-procevent-lease-debounce-test-flaky
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4131865Z  * [new branch]        fm/fm-project-lock-fair-wait -> origin/fm/fm-project-lock-fair-wait
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4134690Z  * [new branch]        fm/fm-project-lock-fair-wait-v2 -> origin/fm/fm-project-lock-fair-wait-v2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4137201Z  * [new branch]        fm/fm-prune-copy-on-merge -> origin/fm/fm-prune-copy-on-merge
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4140668Z  * [new branch]        fm/fm-public-stow-readbeforewrite-port-r1 -> origin/fm/fm-public-stow-readbeforewrite-port-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4144107Z  * [new branch]        fm/fm-reassociate-shared-root-overlap -> origin/fm/fm-reassociate-shared-root-overlap
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4147890Z  * [new branch]        fm/fm-reboot-recover-transient-child-false-alarm -> origin/fm/fm-reboot-recover-transient-child-false-alarm
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4152523Z  * [new branch]        fm/fm-relaunch-held-task-stops-first -> origin/fm/fm-relaunch-held-task-stops-first
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4156352Z  * [new branch]        fm/fm-relaunch-stale-git-hook-env -> origin/fm/fm-relaunch-stale-git-hook-env
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4160787Z  * [new branch]        fm/fm-relaunch-tx-breaks-pr-metadata-parse -> origin/fm/fm-relaunch-tx-breaks-pr-metadata-parse
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4165815Z  * [new branch]        fm/fm-remote-reply-malformed-update-and-launch -> origin/fm/fm-remote-reply-malformed-update-and-launch
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4170495Z  * [new branch]        fm/fm-remote-spawn-allow-omp -> origin/fm/fm-remote-spawn-allow-omp
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4174224Z  * [new branch]        fm/fm-remove-tracked-lavish-scratch -> origin/fm/fm-remove-tracked-lavish-scratch
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4177789Z  * [new branch]        fm/fm-repeat-mistake-sweep -> origin/fm/fm-repeat-mistake-sweep
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4181392Z  * [new branch]        fm/fm-report-silence-checkin -> origin/fm/fm-report-silence-checkin
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4185311Z  * [new branch]        fm/fm-review-agent-dynamic-selector -> origin/fm/fm-review-agent-dynamic-selector
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4189671Z  * [new branch]        fm/fm-safe-auto-reboot-simple-r1 -> origin/fm/fm-safe-auto-reboot-simple-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4194355Z  * [new branch]        fm/fm-secondmate-creation-record-intake-r1 -> origin/fm/fm-secondmate-creation-record-intake-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4199949Z  * [new branch]        fm/fm-secondmate-parent-channel-structural-r1 -> origin/fm/fm-secondmate-parent-channel-structural-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4205358Z  * [new branch]        fm/fm-secondmate-record-atomic-transitions-r1 -> origin/fm/fm-secondmate-record-atomic-transitions-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4210597Z  * [new branch]        fm/fm-session-launch-runtime-restriction -> origin/fm/fm-session-launch-runtime-restriction
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4214915Z  * [new branch]        fm/fm-session-start-false-liveness -> origin/fm/fm-session-start-false-liveness
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4218579Z  * [new branch]        fm/fm-session-start-fast -> origin/fm/fm-session-start-fast
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4222022Z  * [new branch]        fm/fm-sessionstart-network-free-r1 -> origin/fm/fm-sessionstart-network-free-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4225764Z  * [new branch]        fm/fm-shared-slot-custody-gaps -> origin/fm/fm-shared-slot-custody-gaps
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4229742Z  * [new branch]        fm/fm-shared-slot-review-followups -> origin/fm/fm-shared-slot-review-followups
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4233416Z  * [new branch]        fm/fm-shared-test-fixtures-r1 -> origin/fm/fm-shared-test-fixtures-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4236892Z  * [new branch]        fm/fm-size-refusal-names-budget -> origin/fm/fm-size-refusal-names-budget
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4240779Z  * [new branch]        fm/fm-skill-frontmatter-desc-r1 -> origin/fm/fm-skill-frontmatter-desc-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4243793Z  * [new branch]        fm/fm-slack-watch       -> origin/fm/fm-slack-watch
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4247149Z  * [new branch]        fm/fm-snapshot-crew-state-bounded-read -> origin/fm/fm-snapshot-crew-state-bounded-read
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4251881Z  * [new branch]        fm/fm-spawn-acquisition-limit-root-cause -> origin/fm/fm-spawn-acquisition-limit-root-cause
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4341280Z  * [new branch]        fm/fm-spawn-allocation-guard-exact -> origin/fm/fm-spawn-allocation-guard-exact
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4344249Z  * [new branch]        fm/fm-spawn-fixed-family-readers -> origin/fm/fm-spawn-fixed-family-readers
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4347026Z  * [new branch]        fm/fm-spawn-isolation-timeout-leaks-pool-slot -> origin/fm/fm-spawn-isolation-timeout-leaks-pool-slot
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4350281Z  * [new branch]        fm/fm-spawn-provision-existing-slot -> origin/fm/fm-spawn-provision-existing-slot
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4352939Z  * [new branch]        fm/fm-stale-lock-proof-ignores-idle-shells -> origin/fm/fm-stale-lock-proof-ignores-idle-shells
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4355262Z  * [new branch]        fm/fm-status-runaway-guard -> origin/fm/fm-status-runaway-guard
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4357036Z  * [new branch]        fm/fm-subagent-guard-fix -> origin/fm/fm-subagent-guard-fix
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4359183Z  * [new branch]        fm/fm-supervision-fork-budget -> origin/fm/fm-supervision-fork-budget
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4361666Z  * [new branch]        fm/fm-supervision-pr-url-hallucination-r1 -> origin/fm/fm-supervision-pr-url-hallucination-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4364347Z  * [new branch]        fm/fm-supervision-rearm-resurface-r1 -> origin/fm/fm-supervision-rearm-resurface-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4366924Z  * [new branch]        fm/fm-supervision-refused-ack-loop-r1 -> origin/fm/fm-supervision-refused-ack-loop-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4369830Z  * [new branch]        fm/fm-supervision-watchdog-outside-session -> origin/fm/fm-supervision-watchdog-outside-session
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4372418Z  * [new branch]        fm/fm-task-copy-reassociate-v2-r2 -> origin/fm/fm-task-copy-reassociate-v2-r2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4374599Z  * [new branch]        fm/fm-teamclaude-launcher-land -> origin/fm/fm-teamclaude-launcher-land
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4376672Z  * [new branch]        fm/fm-teardown-after-ci-rebase -> origin/fm/fm-teardown-after-ci-rebase
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4379511Z  * [new branch]        fm/fm-teardown-close-without-slot-return -> origin/fm/fm-teardown-close-without-slot-return
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4382084Z  * [new branch]        fm/fm-teardown-closeout-full-refusal -> origin/fm/fm-teardown-closeout-full-refusal
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4384705Z  * [new branch]        fm/fm-teardown-closes-captain-held-scout-r1 -> origin/fm/fm-teardown-closes-captain-held-scout-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4387054Z  * [new branch]        fm/fm-teardown-docker-stacks -> origin/fm/fm-teardown-docker-stacks
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4389363Z  * [new branch]        fm/fm-teardown-docker-stacks-r2 -> origin/fm/fm-teardown-docker-stacks-r2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4391819Z  * [new branch]        fm/fm-teardown-holds-project-lock-too-long -> origin/fm/fm-teardown-holds-project-lock-too-long
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4394313Z  * [new branch]        fm/fm-teardown-leak-kill-identity -> origin/fm/fm-teardown-leak-kill-identity
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4396794Z  * [new branch]        fm/fm-teardown-locked-nested-copy-release -> origin/fm/fm-teardown-locked-nested-copy-release
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4399434Z  * [new branch]        fm/fm-teardown-orphan-reap-confine -> origin/fm/fm-teardown-orphan-reap-confine
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4401692Z  * [new branch]        fm/fm-teardown-owns-nested-copies -> origin/fm/fm-teardown-owns-nested-copies
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4403976Z  * [new branch]        fm/fm-teardown-pipeline-input-copy -> origin/fm/fm-teardown-pipeline-input-copy
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4406863Z  * [new branch]        fm/fm-teardown-prior-custody-root-after-reassociate -> origin/fm/fm-teardown-prior-custody-root-after-reassociate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4410563Z  * [new branch]        fm/fm-teardown-prior-custody-root-after-reassociate-2 -> origin/fm/fm-teardown-prior-custody-root-after-reassociate-2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4414021Z  * [new branch]        fm/fm-teardown-private-nm-daemon-leak -> origin/fm/fm-teardown-private-nm-daemon-leak
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4416729Z  * [new branch]        fm/fm-teardown-reaps-task-archive-branches -> origin/fm/fm-teardown-reaps-task-archive-branches
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4419599Z  * [new branch]        fm/fm-teardown-shared-copy-refusal -> origin/fm/fm-teardown-shared-copy-refusal
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4422209Z  * [new branch]        fm/fm-teardown-slot-collision-fix-r1 -> origin/fm/fm-teardown-slot-collision-fix-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4424768Z  * [new branch]        fm/fm-teardown-slot-custody-review-nits -> origin/fm/fm-teardown-slot-custody-review-nits
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4427304Z  * [new branch]        fm/fm-teardown-slow-holds-lease-lock -> origin/fm/fm-teardown-slow-holds-lease-lock
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4429956Z  * [new branch]        fm/fm-teardown-squash-oracle-anchor -> origin/fm/fm-teardown-squash-oracle-anchor
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4432722Z  * [new branch]        fm/fm-teardown-verified-bundle-preservation -> origin/fm/fm-teardown-verified-bundle-preservation
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4435455Z  * [new branch]        fm/fm-test-endpoint-safety-tmux-leak -> origin/fm/fm-test-endpoint-safety-tmux-leak
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4437714Z  * [new branch]        fm/fm-test-run-shard-guard-dup -> origin/fm/fm-test-run-shard-guard-dup
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4440461Z  * [new branch]        fm/fm-timeout-limits-measured-not-guessed -> origin/fm/fm-timeout-limits-measured-not-guessed
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4442616Z  * [new branch]        fm/fm-tmpdir-leaks      -> origin/fm/fm-tmpdir-leaks
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4444509Z  * [new branch]        fm/fm-tmux-no-server-absence-proof -> origin/fm/fm-tmux-no-server-absence-proof
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4446910Z  * [new branch]        fm/fm-turnend-autoarm-wait-empirical -> origin/fm/fm-turnend-autoarm-wait-empirical
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4449580Z  * [new branch]        fm/fm-turnend-foreign-owner-arm-fix-r1 -> origin/fm/fm-turnend-foreign-owner-arm-fix-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4451625Z  * [new branch]        fm/fm-upstream-sync     -> origin/fm/fm-upstream-sync
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4453304Z  * [new branch]        fm/fm-upstream-sync-20261013 -> origin/fm/fm-upstream-sync-20261013
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4455055Z  * [new branch]        fm/fm-upstream-sync-a2  -> origin/fm/fm-upstream-sync-a2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4457202Z  * [new branch]        fm/fm-validation-bind-archive-route -> origin/fm/fm-validation-bind-archive-route
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4459337Z  * [new branch]        fm/fm-wake-drain-fast   -> origin/fm/fm-wake-drain-fast
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4461013Z  * [new branch]        fm/fm-watch-beat-under-load -> origin/fm/fm-watch-beat-under-load
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4463070Z  * [new branch]        fm/fm-watch-device-id-signal-storm -> origin/fm/fm-watch-device-id-signal-storm
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4465221Z  * [new branch]        fm/fm-watch-missed-done-signal -> origin/fm/fm-watch-missed-done-signal
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4467332Z  * [new branch]        fm/fm-watch-prelude-beacon-stall -> origin/fm/fm-watch-prelude-beacon-stall
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4469534Z  * [new branch]        fm/fm-watch-triage-split -> origin/fm/fm-watch-triage-split
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4471332Z  * [new branch]        fm/fm-watchdog-alarm-wording -> origin/fm/fm-watchdog-alarm-wording
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4473395Z  * [new branch]        fm/fm-watcher-flap-autoarm-fix-r2 -> origin/fm/fm-watcher-flap-autoarm-fix-r2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4475381Z  * [new branch]        fm/fm-watcher-hardening-r1 -> origin/fm/fm-watcher-hardening-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4477149Z  * [new branch]        fm/fm-watcher-hardening-r2 -> origin/fm/fm-watcher-hardening-r2
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4479177Z  * [new branch]        fm/fm-watcher-hardening-r3 -> origin/fm/fm-watcher-hardening-r3
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4481010Z  * [new branch]        fm/fm-watcher-lock-test-race -> origin/fm/fm-watcher-lock-test-race
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4483060Z  * [new branch]        fm/fm-worker-project-skill-picker -> origin/fm/fm-worker-project-skill-picker
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4484973Z  * [new branch]        fm/guard-audit-closure  -> origin/fm/guard-audit-closure
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4487100Z  * [new branch]        fm/herdr-workspace-contiguity-maintenance -> origin/fm/herdr-workspace-contiguity-maintenance
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4489517Z  * [new branch]        fm/jev-outage-degrade   -> origin/fm/jev-outage-degrade
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4491084Z  * [new branch]        fm/model-freshness-gate -> origin/fm/model-freshness-gate
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4492913Z  * [new branch]        fm/model-picker-collector -> origin/fm/model-picker-collector
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4494550Z  * [new branch]        fm/model-picker-shadow  -> origin/fm/model-picker-shadow
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4496609Z  * [new branch]        fm/nm-required-exempt-release-please-r1 -> origin/fm/nm-required-exempt-release-please-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4499568Z  * [new branch]        fm/reconcile-inactive-crew-investigate-s1 -> origin/fm/reconcile-inactive-crew-investigate-s1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4502157Z  * [new branch]        fm/remote-send-confirm-readback-fix-r1 -> origin/fm/remote-send-confirm-readback-fix-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4504437Z  * [new branch]        fm/remote-send-delivery-delta-r1 -> origin/fm/remote-send-delivery-delta-r1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4506799Z  * [new branch]        fm/secondmate-autonomous-supervision-s7 -> origin/fm/secondmate-autonomous-supervision-s7
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4508904Z  * [new branch]        fm/teardown-split       -> origin/fm/teardown-split
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4510382Z  * [new branch]        fm/untrack-graft-cache  -> origin/fm/untrack-graft-cache
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4511715Z  * [new branch]        main                    -> origin/main
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4512963Z  * [new branch]        no-mistakes/evidence    -> origin/no-mistakes/evidence
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4514613Z  * [new branch]        proto/herdr-child-workspaces -> origin/proto/herdr-child-workspaces
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4517194Z [command]/usr/bin/git branch --list --remote origin/main
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4518402Z   origin/main
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4519859Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4520847Z b3fa25f9869349667b64f6c3b4f2e0f307d3e2b5
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4522723Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4523621Z ##[group]Determining the checkout info
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4524707Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4525461Z [command]/usr/bin/git sparse-checkout disable
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4527504Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4530203Z ##[group]Checking out the ref
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.4531380Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.5844816Z Switched to a new branch 'main'
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.5846600Z branch 'main' set up to track 'origin/main'.
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.5875319Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.5923887Z [command]/usr/bin/git log -1 --format=%H
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.5950207Z b3fa25f9869349667b64f6c3b4f2e0f307d3e2b5
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.6189084Z ##[group]Run set -eu
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.6189762Z ^[[36;1mset -eu^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.6190513Z ^[[36;1mbin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.6191579Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.6347480Z shell: /usr/bin/bash -e {0}
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.6348375Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9106255Z ShellCheck - shell script analysis tool
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9107509Z version: 0.11.0
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9108794Z license: GNU General Public License, version 3
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9110951Z website: https://www.shellcheck.net
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9221717Z ##[group]Run set -eu
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9222324Z ^[[36;1mset -eu^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9223028Z ^[[36;1mbin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9224064Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9286812Z shell: /usr/bin/bash -e {0}
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:42.9287446Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0806683Z 1.7.12
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0807749Z installed by downloading from release page
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0809127Z built with go1.26.1 compiler for linux/amd64
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0936556Z ##[group]Run set -eu
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0937179Z ^[[36;1mset -eu^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0937755Z ^[[36;1mmkdir -p "$RUNNER_TEMP/fm-lint"^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0938788Z ^[[36;1mbin/fm-lint.sh --partition "3of3" \^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.0939808Z ^[[36;1m  --telemetry "$RUNNER_TEMP/fm-lint/partition-3.tsv"^[[0m
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.1000861Z shell: /usr/bin/bash -e {0}
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.1001487Z env:
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.1001938Z   FM_LINT_REQUIRE_BOUNDS: 1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.1002542Z   FM_LINT_JOBS: 1
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:43.1003033Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:45.4059256Z fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:45.4060041Z fm-lint.sh: full ShellCheck extended analysis enabled
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:48.4938343Z calibration: "0 of 5 samples for lint-root.full.bin/fm-afk-launch.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:48.4939292Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:48.5119156Z fm-lint: begin bin/fm-afk-launch.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:59.1976406Z fm-lint: end bin/fm-afk-launch.sh reason=ok rc=0 duration_ms=10680 rss_kib=1176924
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:59.2625021Z calibration: "0 of 5 samples for lint-root.full.bin/fm-afk-start.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:59.2824235Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:26:59.2825020Z fm-lint: begin bin/fm-afk-start.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.2032677Z fm-lint: end bin/fm-afk-start.sh reason=ok rc=0 duration_ms=6916 rss_kib=717084
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.2649485Z calibration: "0 of 5 samples for lint-root.full.bin/fm-agy-trust.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.2650387Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.2832534Z fm-lint: begin bin/fm-agy-trust.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.5366455Z fm-lint: end bin/fm-agy-trust.sh reason=ok rc=0 duration_ms=248 rss_kib=32096
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.5974816Z calibration: "0 of 5 samples for lint-root.full.bin/fm-answered-by-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.5975761Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:06.6170175Z fm-lint: begin bin/fm-answered-by-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:07.7246824Z fm-lint: end bin/fm-answered-by-lib.sh reason=ok rc=0 duration_ms=1102 rss_kib=125232
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:07.7913938Z calibration: "0 of 5 samples for lint-root.full.bin/fm-api-key-guard-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:07.7915031Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:07.8106294Z fm-lint: begin bin/fm-api-key-guard-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.0874200Z fm-lint: end bin/fm-api-key-guard-lib.sh reason=ok rc=0 duration_ms=271 rss_kib=29216
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.1535203Z calibration: "0 of 5 samples for lint-root.full.bin/fm-bearings-snapshot.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.1536125Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.1719994Z fm-lint: begin bin/fm-bearings-snapshot.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.8288876Z fm-lint: end bin/fm-bearings-snapshot.sh reason=ok rc=0 duration_ms=651 rss_kib=107424
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.8900973Z calibration: "0 of 5 samples for lint-root.full.bin/fm-brief-heading-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.8901907Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:08.9077264Z fm-lint: begin bin/fm-brief-heading-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:09.0606242Z fm-lint: end bin/fm-brief-heading-lib.sh reason=ok rc=0 duration_ms=147 rss_kib=19040
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:09.1220956Z calibration: "0 of 5 samples for lint-root.full.bin/fm-brief.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:09.1221594Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:09.1394797Z fm-lint: begin bin/fm-brief.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.6266798Z fm-lint: end bin/fm-brief.sh reason=ok rc=0 duration_ms=16482 rss_kib=2022744
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.6879452Z calibration: "0 of 5 samples for lint-root.full.bin/fm-cd-pretool-check.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.6880564Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.7056416Z fm-lint: begin bin/fm-cd-pretool-check.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.9082471Z fm-lint: end bin/fm-cd-pretool-check.sh reason=ok rc=0 duration_ms=198 rss_kib=24800
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.9694014Z calibration: "0 of 5 samples for lint-root.full.bin/fm-control-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.9694801Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:25.9871872Z fm-lint: begin bin/fm-control-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:26.3920666Z fm-lint: end bin/fm-control-lib.sh reason=ok rc=0 duration_ms=399 rss_kib=49248
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:26.4529891Z calibration: "0 of 5 samples for lint-root.full.bin/fm-crew-state.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:26.4530904Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:26.4709240Z fm-lint: begin bin/fm-crew-state.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.1369403Z fm-lint: end bin/fm-crew-state.sh reason=ok rc=0 duration_ms=25660 rss_kib=2822392
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.1978447Z calibration: "0 of 5 samples for lint-root.full.bin/fm-decision-hold.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.1979319Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.2150585Z fm-lint: begin bin/fm-decision-hold.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.5683917Z fm-lint: end bin/fm-decision-hold.sh reason=ok rc=0 duration_ms=348 rss_kib=41184
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.6297957Z calibration: "0 of 5 samples for lint-root.full.bin/fm-env-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.6299207Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.6479163Z fm-lint: begin bin/fm-env-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.8026617Z fm-lint: end bin/fm-env-lib.sh reason=ok rc=0 duration_ms=149 rss_kib=18144
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.8637325Z calibration: "0 of 5 samples for lint-root.full.bin/fm-fleet-sync.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.8638627Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:52.8849442Z fm-lint: begin bin/fm-fleet-sync.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:53.5404167Z fm-lint: end bin/fm-fleet-sync.sh reason=ok rc=0 duration_ms=650 rss_kib=81120
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:53.6015832Z calibration: "0 of 5 samples for lint-root.full.bin/fm-gh-rest.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:53.6016809Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:27:53.6192469Z fm-lint: begin bin/fm-gh-rest.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:00.9906365Z fm-lint: end bin/fm-gh-rest.sh reason=ok rc=0 duration_ms=7366 rss_kib=780588
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:01.0525676Z calibration: "0 of 5 samples for lint-root.full.bin/fm-guard-event.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:01.0526527Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:01.0701106Z fm-lint: begin bin/fm-guard-event.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:01.2732554Z fm-lint: end bin/fm-guard-event.sh reason=ok rc=0 duration_ms=197 rss_kib=23264
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:01.3338391Z calibration: "0 of 5 samples for lint-root.full.bin/fm-idle-reap-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:01.3339453Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:01.3508168Z fm-lint: begin bin/fm-idle-reap-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.4900230Z fm-lint: end bin/fm-idle-reap-lib.sh reason=ok rc=0 duration_ms=16133 rss_kib=1712384
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.5513229Z calibration: "0 of 5 samples for lint-root.full.bin/fm-install-shellcheck.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.5514159Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.5689470Z fm-lint: begin bin/fm-install-shellcheck.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.7715311Z fm-lint: end bin/fm-install-shellcheck.sh reason=ok rc=0 duration_ms=197 rss_kib=18784
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.8323911Z calibration: "0 of 5 samples for lint-root.full.bin/fm-lint-workflows.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.8324830Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:17.8503581Z fm-lint: begin bin/fm-lint-workflows.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:18.0538611Z fm-lint: end bin/fm-lint-workflows.sh reason=ok rc=0 duration_ms=198 rss_kib=20448
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:18.1155267Z calibration: "0 of 5 samples for lint-root.full.bin/fm-lint.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:18.1156532Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:18.1331748Z fm-lint: begin bin/fm-lint.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.1412718Z fm-lint: end bin/fm-lint.sh reason=ok rc=0 duration_ms=2003 rss_kib=341240
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.2022669Z calibration: "0 of 5 samples for lint-root.full.bin/fm-load-report.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.2023890Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.2195822Z fm-lint: begin bin/fm-load-report.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.3727221Z fm-lint: end bin/fm-load-report.sh reason=ok rc=0 duration_ms=147 rss_kib=16064
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.4343057Z calibration: "0 of 5 samples for lint-root.full.bin/fm-mem-guard.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.4343860Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.4519839Z fm-lint: begin bin/fm-mem-guard.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.6050415Z fm-lint: end bin/fm-mem-guard.sh reason=ok rc=0 duration_ms=148 rss_kib=16064
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.6655507Z calibration: "0 of 5 samples for lint-root.full.bin/fm-project-mode.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.6656248Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.6827448Z fm-lint: begin bin/fm-project-mode.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.8855123Z fm-lint: end bin/fm-project-mode.sh reason=ok rc=0 duration_ms=197 rss_kib=23200
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.9465466Z calibration: "0 of 5 samples for lint-root.full.bin/fm-promote.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.9466210Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:28:20.9645193Z fm-lint: begin bin/fm-promote.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:03.6635372Z fm-lint: end bin/fm-promote.sh reason=ok rc=0 duration_ms=42694 rss_kib=4704596
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:03.7254580Z calibration: "0 of 5 samples for lint-root.full.bin/fm-public-followup.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:03.7255535Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:03.7436777Z fm-lint: begin bin/fm-public-followup.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:21.5419398Z fm-lint: end bin/fm-public-followup.sh reason=ok rc=0 duration_ms=17792 rss_kib=1871172
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:21.6041324Z calibration: "0 of 5 samples for lint-root.full.bin/fm-remote-herdr-guard.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:21.6042248Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:21.6220972Z fm-lint: begin bin/fm-remote-herdr-guard.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:21.9770082Z fm-lint: end bin/fm-remote-herdr-guard.sh reason=ok rc=0 duration_ms=349 rss_kib=39520
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:22.0390590Z calibration: "0 of 5 samples for lint-root.full.bin/fm-remote-herdr-owner-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:22.0391475Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:22.0583488Z fm-lint: begin bin/fm-remote-herdr-owner-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:22.3134343Z fm-lint: end bin/fm-remote-herdr-owner-lib.sh reason=ok rc=0 duration_ms=250 rss_kib=26848
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:22.3751401Z calibration: "0 of 5 samples for lint-root.full.bin/fm-remote-secondmate-relaunch.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:22.3752548Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:22.3936900Z fm-lint: begin bin/fm-remote-secondmate-relaunch.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:34.1239690Z fm-lint: end bin/fm-remote-secondmate-relaunch.sh reason=ok rc=0 duration_ms=11724 rss_kib=1239348
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:34.1854104Z calibration: "0 of 5 samples for lint-root.full.bin/fm-session-end-relaunch-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:34.1854925Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:34.2047004Z fm-lint: begin bin/fm-session-end-relaunch-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.6591389Z fm-lint: end bin/fm-session-end-relaunch-lib.sh reason=ok rc=0 duration_ms=19448 rss_kib=1981756
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.7202563Z calibration: "0 of 5 samples for lint-root.full.bin/fm-sessionstart-cursor.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.7203361Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.7381398Z fm-lint: begin bin/fm-sessionstart-cursor.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.8909520Z fm-lint: end bin/fm-sessionstart-cursor.sh reason=ok rc=0 duration_ms=148 rss_kib=16608
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.9521364Z calibration: "0 of 5 samples for lint-root.full.bin/fm-startup-growth-check.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.9522059Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:53.9701939Z fm-lint: begin bin/fm-startup-growth-check.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:56.6802208Z fm-lint: end bin/fm-startup-growth-check.sh reason=ok rc=0 duration_ms=2705 rss_kib=334048
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:56.7416080Z calibration: "0 of 5 samples for lint-root.full.bin/fm-startup-memory-budget.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:56.7417048Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:56.7594994Z fm-lint: begin bin/fm-startup-memory-budget.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:57.0629511Z fm-lint: end bin/fm-startup-memory-budget.sh reason=ok rc=0 duration_ms=298 rss_kib=35040
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:57.1247796Z calibration: "0 of 5 samples for lint-root.full.bin/fm-status-decision-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:57.1248887Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:57.1427446Z fm-lint: begin bin/fm-status-decision-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:58.2992531Z fm-lint: end bin/fm-status-decision-lib.sh reason=ok rc=0 duration_ms=1150 rss_kib=132320
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:58.3609500Z calibration: "0 of 5 samples for lint-root.full.bin/fm-status-io-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:58.3610371Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:58.3789152Z fm-lint: begin bin/fm-status-io-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:58.9841236Z fm-lint: end bin/fm-status-io-lib.sh reason=ok rc=0 duration_ms=599 rss_kib=73056
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:59.0464947Z calibration: "0 of 5 samples for lint-root.full.bin/fm-status-wake-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:59.0465799Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:29:59.0651627Z fm-lint: begin bin/fm-status-wake-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:01.6344016Z fm-lint: end bin/fm-status-wake-lib.sh reason=ok rc=0 duration_ms=2563 rss_kib=271584
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:01.6974320Z calibration: "0 of 5 samples for lint-root.full.bin/fm-supervision-engine-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:01.6975095Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:01.7162321Z fm-lint: begin bin/fm-supervision-engine-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:02.1235320Z fm-lint: end bin/fm-supervision-engine-lib.sh reason=ok rc=0 duration_ms=402 rss_kib=48352
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:02.1883335Z calibration: "0 of 5 samples for lint-root.full.bin/fm-supervision-host.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:02.1884217Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:02.2079469Z fm-lint: begin bin/fm-supervision-host.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.2886029Z fm-lint: end bin/fm-supervision-host.sh reason=ok rc=0 duration_ms=11075 rss_kib=1292536
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.3499224Z calibration: "0 of 5 samples for lint-root.full.bin/fm-tangle-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.3500055Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.3683826Z fm-lint: begin bin/fm-tangle-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.5221304Z fm-lint: end bin/fm-tangle-lib.sh reason=ok rc=0 duration_ms=148 rss_kib=17952
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.5834367Z calibration: "0 of 5 samples for lint-root.full.bin/fm-tasks-axi-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.5835222Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.6008499Z fm-lint: begin bin/fm-tasks-axi-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.8546334Z fm-lint: end bin/fm-tasks-axi-lib.sh reason=ok rc=0 duration_ms=248 rss_kib=28192
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.9160225Z calibration: "0 of 5 samples for lint-root.full.bin/fm-tasks-axi.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.9161067Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:13.9334738Z fm-lint: begin bin/fm-tasks-axi.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.3133275Z fm-lint: end bin/fm-tasks-axi.sh reason=ok rc=0 duration_ms=12375 rss_kib=1403044
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.3738570Z calibration: "0 of 5 samples for lint-root.full.bin/fm-teamclaude-launch.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.3739494Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.3911236Z fm-lint: begin bin/fm-teamclaude-launch.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.7442939Z fm-lint: end bin/fm-teamclaude-launch.sh reason=ok rc=0 duration_ms=348 rss_kib=41184
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.8056392Z calibration: "0 of 5 samples for lint-root.full.bin/fm-teardown-nested-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.8057159Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:26.8231316Z fm-lint: begin bin/fm-teardown-nested-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:27.8789313Z fm-lint: end bin/fm-teardown-nested-lib.sh reason=ok rc=0 duration_ms=1050 rss_kib=125816
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:27.9407450Z calibration: "0 of 5 samples for lint-root.full.bin/fm-test-isolation-proof.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:27.9408583Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:27.9585900Z fm-lint: begin bin/fm-test-isolation-proof.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:28.4147778Z fm-lint: end bin/fm-test-isolation-proof.sh reason=ok rc=0 duration_ms=450 rss_kib=67808
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:28.4773340Z calibration: "0 of 5 samples for lint-root.full.bin/fm-test-run.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:28.4774224Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:28.4948316Z fm-lint: begin bin/fm-test-run.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.2049952Z fm-lint: end bin/fm-test-run.sh reason=ok rc=0 duration_ms=2704 rss_kib=430344
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.2658859Z calibration: "0 of 5 samples for lint-root.full.bin/fm-trace-context-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.2659920Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.2838470Z fm-lint: begin bin/fm-trace-context-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.5377848Z fm-lint: end bin/fm-trace-context-lib.sh reason=ok rc=0 duration_ms=248 rss_kib=25888
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.5988872Z calibration: "0 of 5 samples for lint-root.full.bin/fm-wake-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.5989715Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:31.6166565Z fm-lint: begin bin/fm-wake-lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:38.0373372Z fm-lint: end bin/fm-wake-lib.sh reason=ok rc=0 duration_ms=6414 rss_kib=682120
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:38.1024982Z calibration: "0 of 5 samples for lint-root.full.tests/fixtures.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:38.1025809Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:38.1216340Z fm-lint: begin tests/fixtures.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:39.0279262Z fm-lint: end tests/fixtures.sh reason=ok rc=0 duration_ms=901 rss_kib=102112
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:39.0891304Z calibration: "0 of 5 samples for lint-root.full.tests/fm-backend-orca.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:39.0892226Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:39.1068948Z fm-lint: begin tests/fm-backend-orca.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:41.5170475Z fm-lint: end tests/fm-backend-orca.test.sh reason=ok rc=0 duration_ms=2404 rss_kib=276728
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:41.5785349Z calibration: "0 of 5 samples for lint-root.full.tests/fm-bearings-snapshot.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:41.5786231Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:41.5976822Z fm-lint: begin tests/fm-bearings-snapshot.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:45.6629060Z fm-lint: end tests/fm-bearings-snapshot.test.sh reason=ok rc=0 duration_ms=4059 rss_kib=437512
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:45.7241772Z calibration: "0 of 5 samples for lint-root.full.tests/fm-calm-pi-extension.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:45.7242601Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:45.7426770Z fm-lint: begin tests/fm-calm-pi-extension.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:48.8543654Z fm-lint: end tests/fm-calm-pi-extension.test.sh reason=ok rc=0 duration_ms=3105 rss_kib=396552
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:48.9152459Z calibration: "0 of 5 samples for lint-root.full.tests/fm-captain-hold-cleanup.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:48.9153231Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:48.9327971Z fm-lint: begin tests/fm-captain-hold-cleanup.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:52.5949045Z fm-lint: end tests/fm-captain-hold-cleanup.test.sh reason=ok rc=0 duration_ms=3656 rss_kib=389384
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:52.6560867Z calibration: "0 of 5 samples for lint-root.full.tests/fm-classify-corr-token.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:52.6561870Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:52.6736216Z fm-lint: begin tests/fm-classify-corr-token.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:59.6439449Z fm-lint: end tests/fm-classify-corr-token.test.sh reason=ok rc=0 duration_ms=6964 rss_kib=780600
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:59.7059717Z calibration: "0 of 5 samples for lint-root.full.tests/fm-claude-titled-composer-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:59.7060796Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:30:59.7240927Z fm-lint: begin tests/fm-claude-titled-composer-live-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:01.0318663Z fm-lint: end tests/fm-claude-titled-composer-live-e2e.test.sh reason=ok rc=0 duration_ms=1302 rss_kib=210400
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:01.0927341Z calibration: "0 of 5 samples for lint-root.full.tests/fm-composer-codex-idle-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:01.0928916Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:01.1102170Z fm-lint: begin tests/fm-composer-codex-idle-live-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:02.0186904Z fm-lint: end tests/fm-composer-codex-idle-live-e2e.test.sh reason=ok rc=0 duration_ms=902 rss_kib=113120
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:02.0803842Z calibration: "0 of 5 samples for lint-root.full.tests/fm-composer-lib.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:02.0804760Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:02.0986997Z fm-lint: begin tests/fm-composer-lib.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:05.8617825Z fm-lint: end tests/fm-composer-lib.test.sh reason=ok rc=0 duration_ms=3757 rss_kib=393480
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:05.9233568Z calibration: "0 of 5 samples for lint-root.full.tests/fm-control-herdr-smoke.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:05.9234458Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:05.9406896Z fm-lint: begin tests/fm-control-herdr-smoke.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:07.0965669Z fm-lint: end tests/fm-control-herdr-smoke.test.sh reason=ok rc=0 duration_ms=1150 rss_kib=156768
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:07.1587396Z calibration: "0 of 5 samples for lint-root.full.tests/fm-cursor-primary.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:07.1588734Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:07.1757591Z fm-lint: begin tests/fm-cursor-primary.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:08.8335659Z fm-lint: end tests/fm-cursor-primary.test.sh reason=ok rc=0 duration_ms=1652 rss_kib=169184
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:08.8958681Z calibration: "0 of 5 samples for lint-root.full.tests/fm-dispatch-capacity.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:08.8959836Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:08.9139875Z fm-lint: begin tests/fm-dispatch-capacity.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:14.5323433Z fm-lint: end tests/fm-dispatch-capacity.test.sh reason=ok rc=0 duration_ms=5612 rss_kib=640224
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:14.5935945Z calibration: "0 of 5 samples for lint-root.full.tests/fm-documentation-audiences.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:14.5936967Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:14.6118514Z fm-lint: begin tests/fm-documentation-audiences.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:15.4672534Z fm-lint: end tests/fm-documentation-audiences.test.sh reason=ok rc=0 duration_ms=850 rss_kib=94432
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:15.5283542Z calibration: "0 of 5 samples for lint-root.full.tests/fm-duration.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:15.5284409Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:15.5470245Z fm-lint: begin tests/fm-duration.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:16.3535433Z fm-lint: end tests/fm-duration.test.sh reason=ok rc=0 duration_ms=801 rss_kib=89336
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:16.4153967Z calibration: "0 of 5 samples for lint-root.full.tests/fm-extension-binding.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:16.4154713Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:16.4339584Z fm-lint: begin tests/fm-extension-binding.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:24.6583952Z fm-lint: end tests/fm-extension-binding.test.sh reason=ok rc=0 duration_ms=8219 rss_kib=1683720
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:24.7191682Z calibration: "0 of 5 samples for lint-root.full.tests/fm-fork-free-helpers.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:24.7192422Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:24.7370576Z fm-lint: begin tests/fm-fork-free-helpers.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:25.5929778Z fm-lint: end tests/fm-fork-free-helpers.test.sh reason=ok rc=0 duration_ms=850 rss_kib=90336
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:25.6553074Z calibration: "0 of 5 samples for lint-root.full.tests/fm-grok-continuity-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:25.6554252Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:25.6734324Z fm-lint: begin tests/fm-grok-continuity-live-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:26.5297894Z fm-lint: end tests/fm-grok-continuity-live-e2e.test.sh reason=ok rc=0 duration_ms=851 rss_kib=99552
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:26.5909433Z calibration: "0 of 5 samples for lint-root.full.tests/fm-guard-lint.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:26.5910287Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:26.6093503Z fm-lint: begin tests/fm-guard-lint.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:27.5160151Z fm-lint: end tests/fm-guard-lint.test.sh reason=ok rc=0 duration_ms=901 rss_kib=107744
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:27.5766118Z calibration: "0 of 5 samples for lint-root.full.tests/fm-herdr-pi-stale-registration-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:27.5767339Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:27.5947810Z fm-lint: begin tests/fm-herdr-pi-stale-registration-live-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:28.5510053Z fm-lint: end tests/fm-herdr-pi-stale-registration-live-e2e.test.sh reason=ok rc=0 duration_ms=950 rss_kib=120032
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:28.6121123Z calibration: "0 of 5 samples for lint-root.full.tests/fm-host-mirror-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:28.6122030Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:28.6301938Z fm-lint: begin tests/fm-host-mirror-live-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:35.3508802Z fm-lint: end tests/fm-host-mirror-live-e2e.test.sh reason=ok rc=0 duration_ms=6715 rss_kib=823592
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:35.4117130Z calibration: "0 of 5 samples for lint-root.full.tests/fm-jev-guard-audit.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:35.4117822Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:35.4290146Z fm-lint: begin tests/fm-jev-guard-audit.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:36.1839619Z fm-lint: end tests/fm-jev-guard-audit.test.sh reason=ok rc=0 duration_ms=749 rss_kib=89312
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:36.2453594Z calibration: "0 of 5 samples for lint-root.full.tests/fm-lint-workflows.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:36.2454717Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:36.2636502Z fm-lint: begin tests/fm-lint-workflows.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:37.4217599Z fm-lint: end tests/fm-lint-workflows.test.sh reason=ok rc=0 duration_ms=1153 rss_kib=132448
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:37.4838466Z calibration: "0 of 5 samples for lint-root.full.tests/fm-live-gate.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:37.4839316Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:37.5022934Z fm-lint: begin tests/fm-live-gate.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:38.7632916Z fm-lint: end tests/fm-live-gate.test.sh reason=ok rc=0 duration_ms=1254 rss_kib=142560
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:38.8290671Z calibration: "0 of 5 samples for lint-root.full.tests/fm-load-report.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:38.8291868Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:38.8498867Z fm-lint: begin tests/fm-load-report.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:39.8573883Z fm-lint: end tests/fm-load-report.test.sh reason=ok rc=0 duration_ms=1002 rss_kib=113888
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:39.9190890Z calibration: "0 of 5 samples for lint-root.full.tests/fm-muse-harness.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:39.9192556Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:39.9371787Z fm-lint: begin tests/fm-muse-harness.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.2019533Z fm-lint: end tests/fm-muse-harness.test.sh reason=ok rc=0 duration_ms=4259 rss_kib=394464
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.2635382Z calibration: "0 of 5 samples for lint-root.full.tests/fm-omp-wake-turns.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.2636269Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.2821327Z fm-lint: begin tests/fm-omp-wake-turns.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.4386510Z fm-lint: end tests/fm-omp-wake-turns.test.sh reason=ok rc=0 duration_ms=151 rss_kib=16096
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.5005386Z calibration: "0 of 5 samples for lint-root.full.tests/fm-orphan-safety.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.5006312Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:44.5200372Z fm-lint: begin tests/fm-orphan-safety.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.5284783Z fm-lint: end tests/fm-orphan-safety.test.sh reason=ok rc=0 duration_ms=1003 rss_kib=118112
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.5917608Z calibration: "0 of 5 samples for lint-root.full.tests/fm-pi-primary-types.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.5918610Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.6107636Z fm-lint: begin tests/fm-pi-primary-types.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.8176455Z fm-lint: end tests/fm-pi-primary-types.test.sh reason=ok rc=0 duration_ms=201 rss_kib=18272
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.8805777Z calibration: "0 of 5 samples for lint-root.full.tests/fm-pi-windows-shell-invocation.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.8806705Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:45.9003713Z fm-lint: begin tests/fm-pi-windows-shell-invocation.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:46.7079333Z fm-lint: end tests/fm-pi-windows-shell-invocation.test.sh reason=ok rc=0 duration_ms=802 rss_kib=90404
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:46.7698289Z calibration: "0 of 5 samples for lint-root.full.tests/fm-project-capacity.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:46.7699187Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:46.7886028Z fm-lint: begin tests/fm-project-capacity.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:49.9503928Z fm-lint: end tests/fm-project-capacity.test.sh reason=ok rc=0 duration_ms=3157 rss_kib=339208
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:50.0122273Z calibration: "0 of 5 samples for lint-root.full.tests/fm-project-mode.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:50.0123155Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:50.0310991Z fm-lint: begin tests/fm-project-mode.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:50.8882838Z fm-lint: end tests/fm-project-mode.test.sh reason=ok rc=0 duration_ms=851 rss_kib=101600
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:50.9501942Z calibration: "0 of 5 samples for lint-root.full.tests/fm-quota-array-dispatch-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:50.9502863Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:50.9689179Z fm-lint: begin tests/fm-quota-array-dispatch-live-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:51.7769310Z fm-lint: end tests/fm-quota-array-dispatch-live-e2e.test.sh reason=ok rc=0 duration_ms=802 rss_kib=96480
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:51.8388830Z calibration: "0 of 5 samples for lint-root.full.tests/fm-quota-choose.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:51.8389686Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:51.8572232Z fm-lint: begin tests/fm-quota-choose.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:52.4131152Z fm-lint: end tests/fm-quota-choose.test.sh reason=ok rc=0 duration_ms=550 rss_kib=67808
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:52.4746819Z calibration: "0 of 5 samples for lint-root.full.tests/fm-remote-entrypoint.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:52.4747620Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:52.4936751Z fm-lint: begin tests/fm-remote-entrypoint.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:53.3029864Z fm-lint: end tests/fm-remote-entrypoint.test.sh reason=ok rc=0 duration_ms=804 rss_kib=86312
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:53.3642930Z calibration: "0 of 5 samples for lint-root.full.tests/fm-remote-job-launchagent.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:53.3643786Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:53.3829358Z fm-lint: begin tests/fm-remote-job-launchagent.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:56.6958330Z fm-lint: end tests/fm-remote-job-launchagent.test.sh reason=ok rc=0 duration_ms=3307 rss_kib=402656
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:56.7573221Z calibration: "0 of 5 samples for lint-root.full.tests/fm-remote-secondmate-lifecycle-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:56.7574080Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:31:56.7753183Z fm-lint: begin tests/fm-remote-secondmate-lifecycle-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:02.4444260Z fm-lint: end tests/fm-remote-secondmate-lifecycle-e2e.test.sh reason=ok rc=0 duration_ms=5664 rss_kib=907984
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:02.5068621Z calibration: "0 of 5 samples for lint-root.full.tests/fm-secondmate-liveness.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:02.5069854Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:02.5254660Z fm-lint: begin tests/fm-secondmate-liveness.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:04.2857776Z fm-lint: end tests/fm-secondmate-liveness.test.sh reason=ok rc=0 duration_ms=1755 rss_kib=188664
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:04.3486676Z calibration: "0 of 5 samples for lint-root.full.tests/fm-send-inbox-doorbell-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:04.3487727Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:04.3675498Z fm-lint: begin tests/fm-send-inbox-doorbell-live-e2e.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:05.3244547Z fm-lint: end tests/fm-send-inbox-doorbell-live-e2e.test.sh reason=ok rc=0 duration_ms=952 rss_kib=102624
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:05.3866310Z calibration: "0 of 5 samples for lint-root.full.tests/fm-send-inbox.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:05.3866984Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:05.4049608Z fm-lint: begin tests/fm-send-inbox.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:06.7129367Z fm-lint: end tests/fm-send-inbox.test.sh reason=ok rc=0 duration_ms=1302 rss_kib=139488
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:06.7746376Z calibration: "0 of 5 samples for lint-root.full.tests/fm-send-remote-delivery.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:06.7747319Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:06.7939684Z fm-lint: begin tests/fm-send-remote-delivery.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:31.9079053Z fm-lint: end tests/fm-send-remote-delivery.test.sh reason=ok rc=0 duration_ms=25108 rss_kib=2708808
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:31.9688956Z calibration: "0 of 5 samples for lint-root.full.tests/fm-send-secondmate-marker.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:31.9689738Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:31.9863328Z fm-lint: begin tests/fm-send-secondmate-marker.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:32.9932978Z fm-lint: end tests/fm-send-secondmate-marker.test.sh reason=ok rc=0 duration_ms=1002 rss_kib=119392
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:33.0550512Z calibration: "0 of 5 samples for lint-root.full.tests/fm-sessionstart-nudge.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:33.0551447Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:33.0730156Z fm-lint: begin tests/fm-sessionstart-nudge.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:34.4313093Z fm-lint: end tests/fm-sessionstart-nudge.test.sh reason=ok rc=0 duration_ms=1352 rss_kib=160888
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:34.4928689Z calibration: "0 of 5 samples for lint-root.full.tests/fm-spawn-claude-start-confirm.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:34.4929919Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:34.5107750Z fm-lint: begin tests/fm-spawn-claude-start-confirm.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:35.6170716Z fm-lint: end tests/fm-spawn-claude-start-confirm.test.sh reason=ok rc=0 duration_ms=1101 rss_kib=134368
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:35.6784543Z calibration: "0 of 5 samples for lint-root.full.tests/fm-spawn-retained-copy.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:35.6786235Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:35.6969130Z fm-lint: begin tests/fm-spawn-retained-copy.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:53.2952454Z fm-lint: end tests/fm-spawn-retained-copy.test.sh reason=ok rc=0 duration_ms=17592 rss_kib=1612096
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:53.3579546Z calibration: "0 of 5 samples for lint-root.full.tests/fm-startup-growth-check.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:53.3580393Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:53.3773196Z fm-lint: begin tests/fm-startup-growth-check.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:56.8919443Z fm-lint: end tests/fm-startup-growth-check.test.sh reason=ok rc=0 duration_ms=3509 rss_kib=410848
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:56.9539557Z calibration: "0 of 5 samples for lint-root.full.tests/fm-stat-shadowing.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:56.9540370Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:32:56.9721867Z fm-lint: begin tests/fm-stat-shadowing.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:02.3186118Z fm-lint: end tests/fm-stat-shadowing.test.sh reason=memory-fallback rc=0 duration_ms=65341 rss_kib=8389988
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:02.3808361Z calibration: "0 of 5 samples for lint-root.full.tests/fm-supervision-host.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:02.3809251Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:02.3999295Z fm-lint: begin tests/fm-supervision-host.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:06.4151280Z fm-lint: end tests/fm-supervision-host.test.sh reason=ok rc=0 duration_ms=4009 rss_kib=369928
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:06.4773505Z calibration: "0 of 5 samples for lint-root.full.tests/fm-test-isolation-proof.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:06.4774449Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:06.4956050Z fm-lint: begin tests/fm-test-isolation-proof.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:07.4561077Z fm-lint: end tests/fm-test-isolation-proof.test.sh reason=ok rc=0 duration_ms=955 rss_kib=101600
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:07.5208275Z calibration: "0 of 5 samples for lint-root.full.tests/fm-typesafe-health.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:07.5209544Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:07.5401800Z fm-lint: begin tests/fm-typesafe-health.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:08.7024732Z fm-lint: end tests/fm-typesafe-health.test.sh reason=ok rc=0 duration_ms=1156 rss_kib=137440
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:08.7642190Z calibration: "0 of 5 samples for lint-root.full.tests/fm-typesafe-key-source.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:08.7643115Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:08.7828275Z fm-lint: begin tests/fm-typesafe-key-source.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:09.9404866Z fm-lint: end tests/fm-typesafe-key-source.test.sh reason=ok rc=0 duration_ms=1152 rss_kib=157920
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:10.0022911Z calibration: "0 of 5 samples for lint-root.full.tests/fm-update.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:10.0024044Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:10.0212457Z fm-lint: begin tests/fm-update.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:11.2288777Z fm-lint: end tests/fm-update.test.sh reason=ok rc=0 duration_ms=1202 rss_kib=130272
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:11.2920872Z calibration: "0 of 5 samples for lint-root.full.tests/fm-wake-drain-open-decisions-cursor.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:11.2922147Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:11.3106796Z fm-lint: begin tests/fm-wake-drain-open-decisions-cursor.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:13.0192926Z fm-lint: end tests/fm-wake-drain-open-decisions-cursor.test.sh reason=ok rc=0 duration_ms=1703 rss_kib=183544
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:13.0815941Z calibration: "0 of 5 samples for lint-root.full.tests/fm-watch-checkpoint.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:13.0816774Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:13.1003261Z fm-lint: begin tests/fm-watch-checkpoint.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:14.8091496Z fm-lint: end tests/fm-watch-checkpoint.test.sh reason=ok rc=0 duration_ms=1703 rss_kib=183520
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:14.8703799Z calibration: "0 of 5 samples for lint-root.full.tests/fm-watch-triage-helpers.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:14.8704633Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:14.8883634Z fm-lint: begin tests/fm-watch-triage-helpers.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:27.0205675Z fm-lint: end tests/fm-watch-triage-helpers.sh reason=ok rc=0 duration_ms=12127 rss_kib=1250568
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:27.0827029Z calibration: "0 of 5 samples for lint-root.full.tests/fm-watch-typesafe-health.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:27.0827969Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:27.1012879Z fm-lint: begin tests/fm-watch-typesafe-health.test.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:28.2086597Z fm-lint: end tests/fm-watch-typesafe-health.test.sh reason=ok rc=0 duration_ms=1102 rss_kib=121056
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:28.2705158Z calibration: "0 of 5 samples for lint-root.full.tests/lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:28.2706217Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:28.2891962Z fm-lint: begin tests/lib.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:28.9449560Z fm-lint: end tests/lib.sh reason=ok rc=0 duration_ms=650 rss_kib=70904
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:29.0071075Z calibration: "0 of 5 samples for lint-root.full.tests/secondmate-helpers.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:29.0071937Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:29.0264953Z fm-lint: begin tests/secondmate-helpers.sh (shard 0, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:29.8344740Z fm-lint: end tests/secondmate-helpers.sh reason=ok rc=0 duration_ms=803 rss_kib=85216
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:29.9149381Z calibration: "0 of 5 samples for lint-root.full.bin/fm-backlog-handoff.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:29.9150059Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:34:29.9328439Z fm-lint: begin bin/fm-backlog-handoff.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:22.7662582Z fm-lint: end bin/fm-backlog-handoff.sh reason=ok rc=0 duration_ms=52828 rss_kib=5280016
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:22.8270271Z calibration: "0 of 5 samples for lint-root.full.bin/fm-backlog-transition-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:22.8271049Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:22.8444463Z fm-lint: begin bin/fm-backlog-transition-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:26.5056254Z fm-lint: end bin/fm-backlog-transition-lib.sh reason=ok rc=0 duration_ms=3656 rss_kib=454904
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:26.5676725Z calibration: "0 of 5 samples for lint-root.full.bin/fm-branch-report.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:26.5677451Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:26.5854885Z fm-lint: begin bin/fm-branch-report.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:34.1072379Z fm-lint: end bin/fm-branch-report.sh reason=ok rc=0 duration_ms=7517 rss_kib=746800
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:34.1685894Z calibration: "0 of 5 samples for lint-root.full.bin/fm-config-push.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:34.1686792Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:34.1864697Z fm-lint: begin bin/fm-config-push.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:46.7215112Z fm-lint: end bin/fm-config-push.sh reason=ok rc=0 duration_ms=12529 rss_kib=1346784
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:46.7841166Z calibration: "0 of 5 samples for lint-root.full.bin/fm-control.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:46.7842153Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:35:46.8025509Z fm-lint: begin bin/fm-control.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.3735544Z fm-lint: end bin/fm-control.sh reason=ok rc=0 duration_ms=49566 rss_kib=6319504
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.4354088Z calibration: "0 of 5 samples for lint-root.full.bin/fm-cpu-pass.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.4355436Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.4535165Z fm-lint: begin bin/fm-cpu-pass.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.6573369Z fm-lint: end bin/fm-cpu-pass.sh reason=ok rc=0 duration_ms=199 rss_kib=19296
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.7184610Z calibration: "0 of 5 samples for lint-root.full.bin/fm-exclude-tools-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.7186407Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.7362777Z fm-lint: begin bin/fm-exclude-tools-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:36.9400896Z fm-lint: end bin/fm-exclude-tools-lib.sh reason=ok rc=0 duration_ms=199 rss_kib=20704
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:37.0009747Z calibration: "0 of 5 samples for lint-root.full.bin/fm-fleet-ledger.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:37.0010596Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:37.0188826Z fm-lint: begin bin/fm-fleet-ledger.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:50.9025483Z fm-lint: end bin/fm-fleet-ledger.sh reason=ok rc=0 duration_ms=13878 rss_kib=1290556
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:50.9632468Z calibration: "0 of 5 samples for lint-root.full.bin/fm-fleet-snapshot.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:50.9633357Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:36:50.9803796Z fm-lint: begin bin/fm-fleet-snapshot.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:03.6598368Z fm-lint: end bin/fm-fleet-snapshot.sh reason=ok rc=0 duration_ms=12674 rss_kib=1676636
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:03.7206791Z calibration: "0 of 5 samples for lint-root.full.bin/fm-guard-refcheck.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:03.7207759Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:03.7378374Z fm-lint: begin bin/fm-guard-refcheck.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:03.9909815Z fm-lint: end bin/fm-guard-refcheck.sh reason=ok rc=0 duration_ms=247 rss_kib=27872
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:04.0523277Z calibration: "0 of 5 samples for lint-root.full.bin/fm-harness.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:04.0524535Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:04.0702027Z fm-lint: begin bin/fm-harness.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:05.1264005Z fm-lint: end bin/fm-harness.sh reason=ok rc=0 duration_ms=1051 rss_kib=128160
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:05.1884586Z calibration: "0 of 5 samples for lint-root.full.bin/fm-home-summary-refresh.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:05.1885529Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:05.2059954Z fm-lint: begin bin/fm-home-summary-refresh.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.6253572Z fm-lint: end bin/fm-home-summary-refresh.sh reason=ok rc=0 duration_ms=7414 rss_kib=767272
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.6855740Z calibration: "0 of 5 samples for lint-root.full.bin/fm-hook-host-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.6856841Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.7026832Z fm-lint: begin bin/fm-hook-host-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.8553105Z fm-lint: end bin/fm-hook-host-lib.sh reason=ok rc=0 duration_ms=147 rss_kib=16224
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.9165163Z calibration: "0 of 5 samples for lint-root.full.bin/fm-lab-home.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.9166098Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:12.9336746Z fm-lint: begin bin/fm-lab-home.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.3038936Z fm-lint: end bin/fm-lab-home.sh reason=ok rc=0 duration_ms=7364 rss_kib=746804
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.3649413Z calibration: "0 of 5 samples for lint-root.full.bin/fm-line-cap-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.3650293Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.3826893Z fm-lint: begin bin/fm-line-cap-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.5351121Z fm-lint: end bin/fm-line-cap-lib.sh reason=ok rc=0 duration_ms=147 rss_kib=16800
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.5961561Z calibration: "0 of 5 samples for lint-root.full.bin/fm-lock.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.5962276Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:20.6139713Z fm-lint: begin bin/fm-lock.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:28.7365083Z fm-lint: end bin/fm-lock.sh reason=ok rc=0 duration_ms=8117 rss_kib=923956
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:28.7973817Z calibration: "0 of 5 samples for lint-root.full.bin/fm-marker-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:28.7974682Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:28.8147041Z fm-lint: begin bin/fm-marker-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:29.3179875Z fm-lint: end bin/fm-marker-lib.sh reason=ok rc=0 duration_ms=498 rss_kib=63772
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:29.3792610Z calibration: "0 of 5 samples for lint-root.full.bin/fm-model-picker-shadow.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:29.3793327Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:29.3965496Z fm-lint: begin bin/fm-model-picker-shadow.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:29.9526078Z fm-lint: end bin/fm-model-picker-shadow.sh reason=ok rc=0 duration_ms=549 rss_kib=69856
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:30.0139771Z calibration: "0 of 5 samples for lint-root.full.bin/fm-nm-run-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:30.0140626Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:30.0331271Z fm-lint: begin bin/fm-nm-run-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:30.6398677Z fm-lint: end bin/fm-nm-run-lib.sh reason=ok rc=0 duration_ms=601 rss_kib=74976
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:30.7005370Z calibration: "0 of 5 samples for lint-root.full.bin/fm-pr-check.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:30.7006172Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:30.7183324Z fm-lint: begin bin/fm-pr-check.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:49.7155004Z fm-lint: end bin/fm-pr-check.sh reason=ok rc=0 duration_ms=18992 rss_kib=2097376
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:49.7761195Z calibration: "0 of 5 samples for lint-root.full.bin/fm-proc-budget.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:49.7762102Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:49.7936619Z fm-lint: begin bin/fm-proc-budget.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:49.9978825Z fm-lint: end bin/fm-proc-budget.sh reason=ok rc=0 duration_ms=199 rss_kib=21728
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:50.0605171Z calibration: "0 of 5 samples for lint-root.full.bin/fm-procevent-remote-reply.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:50.0605951Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:37:50.0787430Z fm-lint: begin bin/fm-procevent-remote-reply.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.3055214Z fm-lint: end bin/fm-procevent-remote-reply.sh reason=ok rc=0 duration_ms=32221 rss_kib=3150092
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.3663513Z calibration: "0 of 5 samples for lint-root.full.bin/fm-project-capacity-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.3833759Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.3834420Z fm-lint: begin bin/fm-project-capacity-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.6356724Z fm-lint: end bin/fm-project-capacity-lib.sh reason=ok rc=0 duration_ms=247 rss_kib=32480
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.6963564Z calibration: "0 of 5 samples for lint-root.full.bin/fm-project-lock-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.6964481Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:22.7136636Z fm-lint: begin bin/fm-project-lock-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:23.0673492Z fm-lint: end bin/fm-project-lock-lib.sh reason=ok rc=0 duration_ms=348 rss_kib=47400
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:23.1285942Z calibration: "0 of 5 samples for lint-root.full.bin/fm-push-transition-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:23.1286733Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:23.1463804Z fm-lint: begin bin/fm-push-transition-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:36.4308392Z fm-lint: end bin/fm-push-transition-lib.sh reason=ok rc=0 duration_ms=13279 rss_kib=1422560
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:36.4922511Z calibration: "0 of 5 samples for lint-root.full.bin/fm-reboot-recover.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:36.4923393Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:36.5094672Z fm-lint: begin bin/fm-reboot-recover.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:39.1178881Z fm-lint: end bin/fm-reboot-recover.sh reason=ok rc=0 duration_ms=2603 rss_kib=296160
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:39.1794050Z calibration: "0 of 5 samples for lint-root.full.bin/fm-remote-job-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:39.1797079Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:39.1967297Z fm-lint: begin bin/fm-remote-job-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:40.9035568Z fm-lint: end bin/fm-remote-job-lib.sh reason=ok rc=0 duration_ms=1701 rss_kib=184568
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:40.9639139Z calibration: "0 of 5 samples for lint-root.full.bin/fm-role-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:40.9640620Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:40.9810406Z fm-lint: begin bin/fm-role-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.4346116Z fm-lint: end bin/fm-role-lib.sh reason=ok rc=0 duration_ms=448 rss_kib=50784
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.4956183Z calibration: "0 of 5 samples for lint-root.full.bin/fm-secondmate-parent-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.4957163Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.5130252Z fm-lint: begin bin/fm-secondmate-parent-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.7170016Z fm-lint: end bin/fm-secondmate-parent-lib.sh reason=ok rc=0 duration_ms=198 rss_kib=23648
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.7778212Z calibration: "0 of 5 samples for lint-root.full.bin/fm-session-launch-policy-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.7778995Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:41.7951213Z fm-lint: begin bin/fm-session-launch-policy-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:44.6557890Z fm-lint: end bin/fm-session-launch-policy-lib.sh reason=ok rc=0 duration_ms=2855 rss_kib=308520
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:44.7162451Z calibration: "0 of 5 samples for lint-root.full.bin/fm-spawn.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:44.7163300Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:38:44.7334012Z fm-lint: begin bin/fm-spawn.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:50.9779412Z fm-lint: end bin/fm-spawn.sh reason=memory-fallback rc=0 duration_ms=66239 rss_kib=8390040
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:51.0388427Z calibration: "0 of 5 samples for lint-root.full.bin/fm-supervisor-target-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:51.0389328Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:51.0564032Z fm-lint: begin bin/fm-supervisor-target-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:51.2093412Z fm-lint: end bin/fm-supervisor-target-lib.sh reason=ok rc=0 duration_ms=148 rss_kib=16736
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:51.2698803Z calibration: "0 of 5 samples for lint-root.full.bin/fm-task-copy-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:51.2699554Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:51.2872713Z fm-lint: begin bin/fm-task-copy-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:52.2921949Z fm-lint: end bin/fm-task-copy-lib.sh reason=ok rc=0 duration_ms=1000 rss_kib=127200
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:52.3535721Z calibration: "0 of 5 samples for lint-root.full.bin/fm-task-inbox-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:52.3536621Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:52.3706815Z fm-lint: begin bin/fm-task-inbox-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:52.9245858Z fm-lint: end bin/fm-task-inbox-lib.sh reason=ok rc=0 duration_ms=548 rss_kib=61728
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:52.9861969Z calibration: "0 of 5 samples for lint-root.full.bin/fm-timeout-lib.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:52.9862855Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:53.0034367Z fm-lint: begin bin/fm-timeout-lib.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:53.3069006Z fm-lint: end bin/fm-timeout-lib.sh reason=ok rc=0 duration_ms=298 rss_kib=33952
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:53.3683259Z calibration: "0 of 5 samples for lint-root.full.bin/fm-update.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:53.3684237Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:53.3857634Z fm-lint: begin bin/fm-update.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:55.9455440Z fm-lint: end bin/fm-update.sh reason=ok rc=0 duration_ms=2554 rss_kib=325856
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:56.0061902Z calibration: "0 of 5 samples for lint-root.full.bin/fm-wake-grant.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:56.0062576Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:39:56.0241724Z fm-lint: begin bin/fm-wake-grant.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.4925546Z fm-lint: end bin/fm-wake-grant.sh reason=ok rc=0 duration_ms=6463 rss_kib=605484
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.5541512Z calibration: "0 of 5 samples for lint-root.full.bin/fm-watchdog-install.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.5542385Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.5721654Z fm-lint: begin bin/fm-watchdog-install.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.8268221Z fm-lint: end bin/fm-watchdog-install.sh reason=ok rc=0 duration_ms=249 rss_kib=29152
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.8881791Z calibration: "0 of 5 samples for lint-root.full.bin/fm-x-poll.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.8882617Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:02.9066085Z fm-lint: begin bin/fm-x-poll.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:17.8964346Z fm-lint: end bin/fm-x-poll.sh reason=ok rc=0 duration_ms=14985 rss_kib=1521888
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:17.9581487Z calibration: "0 of 5 samples for lint-root.full.bin/fm-x-reply.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:17.9582475Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:17.9762955Z fm-lint: begin bin/fm-x-reply.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:24.4957124Z fm-lint: end bin/fm-x-reply.sh reason=ok rc=0 duration_ms=6514 rss_kib=894124
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:24.5576806Z calibration: "0 of 5 samples for lint-root.full.bin/backends/cmux.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:24.5577652Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:24.5755690Z fm-lint: begin bin/backends/cmux.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:28.1875961Z fm-lint: end bin/backends/cmux.sh reason=ok rc=0 duration_ms=3607 rss_kib=481640
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:28.2491035Z calibration: "0 of 5 samples for lint-root.full.tests/fm-afk-return.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:28.2491878Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:28.2667828Z fm-lint: begin tests/fm-afk-return.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:32.8814553Z fm-lint: end tests/fm-afk-return.test.sh reason=ok rc=0 duration_ms=4609 rss_kib=513344
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:32.9425122Z calibration: "0 of 5 samples for lint-root.full.tests/fm-agy-signals-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:32.9426285Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:32.9602448Z fm-lint: begin tests/fm-agy-signals-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:33.9164378Z fm-lint: end tests/fm-agy-signals-live-e2e.test.sh reason=ok rc=0 duration_ms=951 rss_kib=124896
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:33.9781844Z calibration: "0 of 5 samples for lint-root.full.tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:33.9783352Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:33.9968799Z fm-lint: begin tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:34.9525148Z fm-lint: end tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh reason=ok rc=0 duration_ms=950 rss_kib=124128
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:35.0132992Z calibration: "0 of 5 samples for lint-root.full.tests/fm-backend-herdr-focus-flash-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:35.0134672Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:35.0319900Z fm-lint: begin tests/fm-backend-herdr-focus-flash-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:35.4915028Z fm-lint: end tests/fm-backend-herdr-focus-flash-e2e.test.sh reason=ok rc=0 duration_ms=449 rss_kib=60640
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:35.5479769Z calibration: "0 of 5 samples for lint-root.full.tests/fm-backend-herdr-smoke.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:35.5481051Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:35.5655464Z fm-lint: begin tests/fm-backend-herdr-smoke.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:36.0696058Z fm-lint: end tests/fm-backend-herdr-smoke.test.sh reason=ok rc=0 duration_ms=499 rss_kib=86240
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:36.1308684Z calibration: "0 of 5 samples for lint-root.full.tests/fm-backend-zellij.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:36.1309617Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:36.1491014Z fm-lint: begin tests/fm-backend-zellij.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:46.5254987Z fm-lint: end tests/fm-backend-zellij.test.sh reason=ok rc=0 duration_ms=10371 rss_kib=912708
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:46.5861855Z calibration: "0 of 5 samples for lint-root.full.tests/fm-backend.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:46.5862771Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:46.6036368Z fm-lint: begin tests/fm-backend.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:48.4615482Z fm-lint: end tests/fm-backend.test.sh reason=ok rc=0 duration_ms=1852 rss_kib=216312
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:48.5224938Z calibration: "0 of 5 samples for lint-root.full.tests/fm-bearings-board-render.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:48.5406583Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:48.5407063Z fm-lint: begin tests/fm-bearings-board-render.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:49.5009333Z fm-lint: end tests/fm-bearings-board-render.test.sh reason=ok rc=0 duration_ms=954 rss_kib=108768
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:49.5630731Z calibration: "0 of 5 samples for lint-root.full.tests/fm-classify-decision-key.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:49.5631727Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:49.5809614Z fm-lint: begin tests/fm-classify-decision-key.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:56.0988374Z fm-lint: end tests/fm-classify-decision-key.test.sh reason=ok rc=0 duration_ms=6512 rss_kib=762420
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:56.1601229Z calibration: "0 of 5 samples for lint-root.full.tests/fm-claude-trust.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:56.1601964Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:56.1777027Z fm-lint: begin tests/fm-claude-trust.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:57.9347576Z fm-lint: end tests/fm-claude-trust.test.sh reason=ok rc=0 duration_ms=1751 rss_kib=197880
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:57.9954879Z calibration: "0 of 5 samples for lint-root.full.tests/fm-codex-continuity-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:57.9955794Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:58.0132808Z fm-lint: begin tests/fm-codex-continuity-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:58.7676093Z fm-lint: end tests/fm-codex-continuity-live-e2e.test.sh reason=ok rc=0 duration_ms=749 rss_kib=90364
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:58.8285826Z calibration: "0 of 5 samples for lint-root.full.tests/fm-codex-hook-layer-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:58.8287095Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:58.8469728Z fm-lint: begin tests/fm-codex-hook-layer-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:59.8520277Z fm-lint: end tests/fm-codex-hook-layer-live-e2e.test.sh reason=ok rc=0 duration_ms=999 rss_kib=127020
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:59.9134685Z calibration: "0 of 5 samples for lint-root.full.tests/fm-composer-native-band.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:59.9135882Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:40:59.9309245Z fm-lint: begin tests/fm-composer-native-band.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:01.3889717Z fm-lint: end tests/fm-composer-native-band.test.sh reason=ok rc=0 duration_ms=1452 rss_kib=194784
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:01.4505228Z calibration: "0 of 5 samples for lint-root.full.tests/fm-control-reassociate.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:01.4506477Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:01.4700972Z fm-lint: begin tests/fm-control-reassociate.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:05.9867498Z fm-lint: end tests/fm-control-reassociate.test.sh reason=ok rc=0 duration_ms=4511 rss_kib=467280
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:06.0492017Z calibration: "0 of 5 samples for lint-root.full.tests/fm-daemon.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:06.0493072Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:06.0674997Z fm-lint: begin tests/fm-daemon.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:42.2011398Z fm-lint: end tests/fm-daemon.test.sh reason=ok rc=0 duration_ms=36129 rss_kib=3804524
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:42.2623727Z calibration: "0 of 5 samples for lint-root.full.tests/fm-dispatch-resolve.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:42.2626718Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:42.2805754Z fm-lint: begin tests/fm-dispatch-resolve.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:46.4928608Z fm-lint: end tests/fm-dispatch-resolve.test.sh reason=ok rc=0 duration_ms=4207 rss_kib=956808
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:46.5550878Z calibration: "0 of 5 samples for lint-root.full.tests/fm-fleet-ledger.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:46.5552063Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:46.5731660Z fm-lint: begin tests/fm-fleet-ledger.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:59.6080852Z fm-lint: end tests/fm-fleet-ledger.test.sh reason=ok rc=0 duration_ms=13030 rss_kib=1196340
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:59.6696308Z calibration: "0 of 5 samples for lint-root.full.tests/fm-grok-stop-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:59.6697445Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:41:59.6871375Z fm-lint: begin tests/fm-grok-stop-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:00.6940452Z fm-lint: end tests/fm-grok-stop-live-e2e.test.sh reason=ok rc=0 duration_ms=1001 rss_kib=120032
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:00.7558585Z calibration: "0 of 5 samples for lint-root.full.tests/fm-home-summary-refresh-ownership.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:00.7559853Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:00.7738281Z fm-lint: begin tests/fm-home-summary-refresh-ownership.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:01.5290740Z fm-lint: end tests/fm-home-summary-refresh-ownership.test.sh reason=ok rc=0 duration_ms=749 rss_kib=80096
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:01.5901425Z calibration: "0 of 5 samples for lint-root.full.tests/fm-jev-guard-omp-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:01.5902252Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:01.6076889Z fm-lint: begin tests/fm-jev-guard-omp-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:03.3146080Z fm-lint: end tests/fm-jev-guard-omp-live-e2e.test.sh reason=ok rc=0 duration_ms=1701 rss_kib=198880
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:03.3771130Z calibration: "0 of 5 samples for lint-root.full.tests/fm-kimi-harness.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:03.3772048Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:03.3957174Z fm-lint: begin tests/fm-kimi-harness.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:05.2048761Z fm-lint: end tests/fm-kimi-harness.test.sh reason=ok rc=0 duration_ms=1803 rss_kib=191736
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:05.2652937Z calibration: "0 of 5 samples for lint-root.full.tests/fm-live-lab.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:05.2653788Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:05.2828660Z fm-lint: begin tests/fm-live-lab.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:07.4415380Z fm-lint: end tests/fm-live-lab.test.sh reason=ok rc=0 duration_ms=2153 rss_kib=365408
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:07.5030946Z calibration: "0 of 5 samples for lint-root.full.tests/fm-omp-composer-box-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:07.5031992Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:07.5218398Z fm-lint: begin tests/fm-omp-composer-box-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:10.2852392Z fm-lint: end tests/fm-omp-composer-box-live-e2e.test.sh reason=ok rc=0 duration_ms=2757 rss_kib=330848
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:10.3479699Z calibration: "0 of 5 samples for lint-root.full.tests/fm-omp-fallback-chain-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:10.3480720Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:10.3666845Z fm-lint: begin tests/fm-omp-fallback-chain-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:11.5250437Z fm-lint: end tests/fm-omp-fallback-chain-live-e2e.test.sh reason=ok rc=0 duration_ms=1152 rss_kib=131296
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:11.5869119Z calibration: "0 of 5 samples for lint-root.full.tests/fm-omp-stale-wake-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:11.5869899Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:11.6055635Z fm-lint: begin tests/fm-omp-stale-wake-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:12.4133090Z fm-lint: end tests/fm-omp-stale-wake-live-e2e.test.sh reason=ok rc=0 duration_ms=802 rss_kib=95456
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:12.4753557Z calibration: "0 of 5 samples for lint-root.full.tests/fm-omp-wake-restore-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:12.4754826Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:12.4948426Z fm-lint: begin tests/fm-omp-wake-restore-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:15.3573150Z fm-lint: end tests/fm-omp-wake-restore-live-e2e.test.sh reason=ok rc=0 duration_ms=2857 rss_kib=352480
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:15.4182409Z calibration: "0 of 5 samples for lint-root.full.tests/fm-opencode-primary-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:15.4183694Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:15.4361071Z fm-lint: begin tests/fm-opencode-primary-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:16.5426886Z fm-lint: end tests/fm-opencode-primary-live-e2e.test.sh reason=ok rc=0 duration_ms=1101 rss_kib=135392
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:16.6045565Z calibration: "0 of 5 samples for lint-root.full.tests/fm-peek-remote.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:16.6046540Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:16.6224964Z fm-lint: begin tests/fm-peek-remote.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:17.4289357Z fm-lint: end tests/fm-peek-remote.test.sh reason=ok rc=0 duration_ms=801 rss_kib=86240
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:17.4901292Z calibration: "0 of 5 samples for lint-root.full.tests/fm-pi-branch-extension.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:17.4902283Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:17.5074217Z fm-lint: begin tests/fm-pi-branch-extension.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:19.5159010Z fm-lint: end tests/fm-pi-branch-extension.test.sh reason=ok rc=0 duration_ms=2003 rss_kib=237832
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:19.5772713Z calibration: "0 of 5 samples for lint-root.full.tests/fm-pi-branch-responsiveness-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:19.5773808Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:19.5947673Z fm-lint: begin tests/fm-pi-branch-responsiveness-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:20.4494665Z fm-lint: end tests/fm-pi-branch-responsiveness-live-e2e.test.sh reason=ok rc=0 duration_ms=849 rss_kib=100576
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:20.5106131Z calibration: "0 of 5 samples for lint-root.full.tests/fm-pi-watch-loader-live.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:20.5107041Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:20.5288641Z fm-lint: begin tests/fm-pi-watch-loader-live.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:21.2844647Z fm-lint: end tests/fm-pi-watch-loader-live.test.sh reason=ok rc=0 duration_ms=750 rss_kib=82216
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:21.3455094Z calibration: "0 of 5 samples for lint-root.full.tests/fm-pr-check-security.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:21.3456055Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:21.3628931Z fm-lint: begin tests/fm-pr-check-security.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:34.8475687Z fm-lint: end tests/fm-pr-check-security.test.sh reason=ok rc=0 duration_ms=13479 rss_kib=1300828
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:34.9088774Z calibration: "0 of 5 samples for lint-root.full.tests/fm-proc-guard.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:34.9089643Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:34.9269593Z fm-lint: begin tests/fm-proc-guard.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:36.0340555Z fm-lint: end tests/fm-proc-guard.test.sh reason=findings rc=1 duration_ms=1101 rss_kib=154848
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:36.0959201Z calibration: "0 of 5 samples for lint-root.full.tests/fm-remote-delta-read.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:36.0960018Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:36.1136468Z fm-lint: begin tests/fm-remote-delta-read.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:37.1195962Z fm-lint: end tests/fm-remote-delta-read.test.sh reason=ok rc=0 duration_ms=1000 rss_kib=130272
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:37.1813501Z calibration: "0 of 5 samples for lint-root.full.tests/fm-remote-herdr-guard.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:37.1814947Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:37.2001771Z fm-lint: begin tests/fm-remote-herdr-guard.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:38.6594083Z fm-lint: end tests/fm-remote-herdr-guard.test.sh reason=ok rc=0 duration_ms=1454 rss_kib=206048
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:38.7203627Z calibration: "0 of 5 samples for lint-root.full.tests/fm-remote-job-claim-reap.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:38.7205353Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:38.7388541Z fm-lint: begin tests/fm-remote-job-claim-reap.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:43.7548849Z fm-lint: end tests/fm-remote-job-claim-reap.test.sh reason=ok rc=0 duration_ms=5010 rss_kib=494892
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:43.8164920Z calibration: "0 of 5 samples for lint-root.full.tests/fm-remote-secondmate-trace-context.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:43.8165998Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:43.8350060Z fm-lint: begin tests/fm-remote-secondmate-trace-context.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:44.9422736Z fm-lint: end tests/fm-remote-secondmate-trace-context.test.sh reason=ok rc=0 duration_ms=1102 rss_kib=146656
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:45.0033878Z calibration: "0 of 5 samples for lint-root.full.tests/fm-review-diff.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:45.0034766Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:45.0216448Z fm-lint: begin tests/fm-review-diff.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:45.9764228Z fm-lint: end tests/fm-review-diff.test.sh reason=ok rc=0 duration_ms=949 rss_kib=101472
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:46.0372249Z calibration: "0 of 5 samples for lint-root.full.tests/fm-rovo-harness.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:46.0372922Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:46.0546264Z fm-lint: begin tests/fm-rovo-harness.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:51.7712754Z fm-lint: end tests/fm-rovo-harness.test.sh reason=ok rc=0 duration_ms=5711 rss_kib=643380
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:51.8320465Z calibration: "0 of 5 samples for lint-root.full.tests/fm-secondmate-busy-contract-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:51.8321780Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:51.8503240Z fm-lint: begin tests/fm-secondmate-busy-contract-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:53.8089963Z fm-lint: end tests/fm-secondmate-busy-contract-live-e2e.test.sh reason=ok rc=0 duration_ms=1953 rss_kib=207072
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:53.8703830Z calibration: "0 of 5 samples for lint-root.full.tests/fm-secondmate-harness.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:53.8704852Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:53.8885775Z fm-lint: begin tests/fm-secondmate-harness.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:57.5008960Z fm-lint: end tests/fm-secondmate-harness.test.sh reason=ok rc=0 duration_ms=3607 rss_kib=387336
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:57.5615624Z calibration: "0 of 5 samples for lint-root.full.tests/fm-secondmate-lifecycle-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:57.5616665Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:57.5789263Z fm-lint: begin tests/fm-secondmate-lifecycle-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:58.7358540Z fm-lint: end tests/fm-secondmate-lifecycle-e2e.test.sh reason=ok rc=0 duration_ms=1151 rss_kib=141024
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:58.7971392Z calibration: "0 of 5 samples for lint-root.full.tests/fm-secondmate-reconcile.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:58.7972407Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:42:58.8155879Z fm-lint: begin tests/fm-secondmate-reconcile.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:00.7229021Z fm-lint: end tests/fm-secondmate-reconcile.test.sh reason=ok rc=0 duration_ms=1902 rss_kib=208120
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:00.7838963Z calibration: "0 of 5 samples for lint-root.full.tests/fm-send-secondmate-marker-herdr-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:00.7840320Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:00.8027197Z fm-lint: begin tests/fm-send-secondmate-marker-herdr-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:01.7094875Z fm-lint: end tests/fm-send-secondmate-marker-herdr-e2e.test.sh reason=ok rc=0 duration_ms=901 rss_kib=117088
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:01.7701045Z calibration: "0 of 5 samples for lint-root.full.tests/fm-session-end-relaunch.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:01.7701867Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:01.7880043Z fm-lint: begin tests/fm-session-end-relaunch.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:03.9969447Z fm-lint: end tests/fm-session-end-relaunch.test.sh reason=ok rc=0 duration_ms=2203 rss_kib=239840
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:04.0580887Z calibration: "0 of 5 samples for lint-root.full.tests/fm-session-launch-policy.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:04.0581980Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:04.0776195Z fm-lint: begin tests/fm-session-launch-policy.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:06.6386165Z fm-lint: end tests/fm-session-launch-policy.test.sh reason=ok rc=0 duration_ms=2556 rss_kib=351480
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:06.7000834Z calibration: "0 of 5 samples for lint-root.full.tests/fm-session-lock-ancestry.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:06.7001716Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:06.7183817Z fm-lint: begin tests/fm-session-lock-ancestry.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:08.3323534Z fm-lint: end tests/fm-session-lock-ancestry.test.sh reason=ok rc=0 duration_ms=1607 rss_kib=171128
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:08.3995223Z calibration: "0 of 5 samples for lint-root.full.tests/fm-spawn-orca-worktree.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:08.3996159Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:08.4198828Z fm-lint: begin tests/fm-spawn-orca-worktree.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:09.4797097Z fm-lint: end tests/fm-spawn-orca-worktree.test.sh reason=ok rc=0 duration_ms=1054 rss_kib=120032
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:09.5415482Z calibration: "0 of 5 samples for lint-root.full.tests/fm-startup-network.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:09.5416420Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:09.5595522Z fm-lint: begin tests/fm-startup-network.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:11.3673091Z fm-lint: end tests/fm-startup-network.test.sh reason=ok rc=0 duration_ms=1803 rss_kib=190688
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:11.4280891Z calibration: "0 of 5 samples for lint-root.full.tests/fm-task-delivery.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:11.4281673Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:11.4456310Z fm-lint: begin tests/fm-task-delivery.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:14.2565502Z fm-lint: end tests/fm-task-delivery.test.sh reason=ok rc=0 duration_ms=2805 rss_kib=305032
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:14.3172218Z calibration: "0 of 5 samples for lint-root.full.tests/fm-task-docker-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:14.3173203Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:14.3348980Z fm-lint: begin tests/fm-task-docker-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:15.9918772Z fm-lint: end tests/fm-task-docker-live-e2e.test.sh reason=ok rc=0 duration_ms=1651 rss_kib=190688
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:16.0525262Z calibration: "0 of 5 samples for lint-root.full.tests/fm-teardown-endpoint-safety.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:16.0526277Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:16.0702994Z fm-lint: begin tests/fm-teardown-endpoint-safety.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:18.6306056Z fm-lint: end tests/fm-teardown-endpoint-safety.test.sh reason=ok rc=0 duration_ms=2555 rss_kib=260344
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:18.6919732Z calibration: "0 of 5 samples for lint-root.full.tests/fm-tmux-submit-busy.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:18.6920668Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:18.7096899Z fm-lint: begin tests/fm-tmux-submit-busy.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:28.8877165Z fm-lint: end tests/fm-tmux-submit-busy.test.sh reason=ok rc=0 duration_ms=10172 rss_kib=924976
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:28.9486678Z calibration: "0 of 5 samples for lint-root.full.tests/fm-tool-update-check.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:28.9487822Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:28.9676591Z fm-lint: begin tests/fm-tool-update-check.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:30.7753822Z fm-lint: end tests/fm-tool-update-check.test.sh reason=ok rc=0 duration_ms=1803 rss_kib=195448
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:30.8368313Z calibration: "0 of 5 samples for lint-root.full.tests/fm-trace-context-spawn.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:30.8369770Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:30.8547304Z fm-lint: begin tests/fm-trace-context-spawn.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:32.2106835Z fm-lint: end tests/fm-trace-context-spawn.test.sh reason=ok rc=0 duration_ms=1350 rss_kib=165088
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:32.2721015Z calibration: "0 of 5 samples for lint-root.full.tests/fm-wake-daemon-lifecycle-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:32.2721894Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:32.2896101Z fm-lint: begin tests/fm-wake-daemon-lifecycle-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:33.3949439Z fm-lint: end tests/fm-wake-daemon-lifecycle-e2e.test.sh reason=ok rc=0 duration_ms=1100 rss_kib=115936
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:33.4557947Z calibration: "0 of 5 samples for lint-root.full.tests/fm-wake-drain-outcome-backstop.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:33.4559178Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:33.4738950Z fm-lint: begin tests/fm-wake-drain-outcome-backstop.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:34.9831949Z fm-lint: end tests/fm-wake-drain-outcome-backstop.test.sh reason=ok rc=0 duration_ms=1503 rss_kib=151848
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:35.0457287Z calibration: "0 of 5 samples for lint-root.full.tests/fm-watch-arm.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:35.0458446Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:35.0638736Z fm-lint: begin tests/fm-watch-arm.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:38.0234541Z fm-lint: end tests/fm-watch-arm.test.sh reason=ok rc=0 duration_ms=2953 rss_kib=333048
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:38.0874577Z calibration: "0 of 5 samples for lint-root.full.tests/fm-watch-triage.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:38.0875520Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:38.1067279Z fm-lint: begin tests/fm-watch-triage.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:51.3942756Z fm-lint: end tests/fm-watch-triage.test.sh reason=ok rc=0 duration_ms=13282 rss_kib=1309944
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:51.4549153Z calibration: "0 of 5 samples for lint-root.full.tests/fm-worker-account-live-e2e.test.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:51.4550015Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:51.4722608Z fm-lint: begin tests/fm-worker-account-live-e2e.test.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:52.7289531Z fm-lint: end tests/fm-worker-account-live-e2e.test.sh reason=ok rc=0 duration_ms=1251 rss_kib=137440
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:52.7900540Z calibration: "0 of 5 samples for lint-root.full.tests/herdr-test-safety.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:52.7901299Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:52.8076556Z fm-lint: begin tests/herdr-test-safety.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:52.9615731Z fm-lint: end tests/herdr-test-safety.sh reason=ok rc=0 duration_ms=148 rss_kib=16992
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.0235302Z calibration: "0 of 5 samples for lint-root.full.tests/remote-herdr-fixture.sh on runnervmdkmh8"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.0236250Z fallback: "1200s existing caller limit"
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.0417290Z fm-lint: begin tests/remote-herdr-fixture.sh (shard 1, full mode)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.1953330Z fm-lint: end tests/remote-herdr-fixture.sh reason=ok rc=0 duration_ms=148 rss_kib=16736
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.1985469Z fm-lint: tests/fm-stat-shadowing.test.sh hit the memory ceiling with --external-sources (reason=memory rc=251); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2044102Z fm-lint: bin/fm-spawn.sh hit the memory ceiling with --external-sources (reason=memory rc=251); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2044893Z 
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2045019Z In tests/fm-proc-guard.test.sh line 103:
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2045374Z wait $warning_pids 2>/dev/null || true
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2046076Z      ^-----------^ SC2086 (info): Double quote to prevent globbing and word splitting.
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2046889Z 
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2047022Z Did you mean:
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2047385Z wait "$warning_pids" 2>/dev/null || true
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2047813Z 
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2048227Z For more information:
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:53.2048986Z   https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:57.3743170Z fm-lint-workflows.sh: actionlint 1.7.12 (pinned 1.7.12)
+Lint 3	UNKNOWN STEP	2026-10-23T12:43:57.3795594Z fm-lint-workflows.sh: 3 workflow files valid
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5473463Z ledger: "/home/runner/work/firstmate/firstmate/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5679321Z ##[error]Process completed with exit code 1.
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5770422Z ##[group]Run actions/upload-artifact@v4
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5770750Z with:
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5770960Z   name: fm-lint-telemetry-3
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5771478Z   path: /home/runner/work/_temp/fm-lint/partition-3.tsv
+Lint 3	UNKNOWN STEP	/home/runner/work/_temp/fm-lint/partition-3.roots.tsv
+Lint 3	UNKNOWN STEP	
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5772030Z   if-no-files-found: warn
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5772273Z   compression-level: 6
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5772493Z   overwrite: false
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5772717Z   include-hidden-files: false
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.5772962Z ##[endgroup]
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.7454361Z (node:14699) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.7455700Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.7504328Z Multiple search paths detected. Calculating the least common ancestor of all paths
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.7508221Z The least common ancestor is /home/runner/work/_temp/fm-lint. This will be the root directory of the artifact
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.7509255Z With the provided path, there will be 2 files uploaded
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.7515501Z Artifact name is valid!
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.7516056Z Root directory input is valid!
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:00.9934310Z Beginning upload of artifact content to blob storage
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.0172520Z (node:14699) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.0387183Z Uploaded bytes 7966
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.0524725Z Finished uploading artifact content to blob storage!
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.0525835Z SHA256 digest of uploaded artifact zip is e1c57b78789132b8e9e10ba247f7b48d1026d0c40c6466a74a9d22d16e33fed5
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.0527396Z Finalizing artifact upload
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.4755013Z Artifact fm-lint-telemetry-3.zip successfully finalized. Artifact ID 12502850232
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.4756395Z Artifact fm-lint-telemetry-3 has been successfully uploaded! Final size is 7966 bytes. Artifact ID is 12502850232
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.4762591Z Artifact download URL: https://github.com/MrGTV-love/firstmate/actions/runs/39952484274/artifacts/12502850232
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5011643Z Post job cleanup.
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5824088Z [command]/usr/bin/git version
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5865159Z git version 2.55.0
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5903698Z Temporarily overriding HOME='/home/runner/work/_temp/178be873-4d11-4e73-8bc6-e78c39ded1f2' before making global git config changes
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5904678Z Adding repository directory to the temporary git global config as a safe directory
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5909469Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5940788Z Removing SSH command configuration
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5947273Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.5982942Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6253828Z Removing HTTP extra header
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6259149Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6293588Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6568308Z Removing includeIf entries pointing to credentials config files
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6575383Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6604658Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6605527Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6606025Z includeif.gitdir:/github/workspace/.git.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6606418Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6614183Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6639206Z /home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6650102Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6685952Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6709535Z /home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6721588Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6755489Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6778077Z /github/runner_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6787570Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6820412Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6842658Z /github/runner_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6850763Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.6907199Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.7182558Z Removing credentials config '/home/runner/work/_temp/git-credentials-dbc9ec7f-b547-44f9-82b5-7488b9ef103a.config'
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.7337823Z Cleaning up orphan processes
+Lint 3	UNKNOWN STEP	2026-10-23T12:44:01.7683961Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

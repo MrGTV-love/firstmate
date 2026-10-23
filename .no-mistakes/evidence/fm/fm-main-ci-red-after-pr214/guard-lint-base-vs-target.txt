@@ -1,0 +1,9 @@
+base report rc=0
+new report rc=0
+report output identical
+base enforce rc=0
+new enforce rc=0
+enforce output identical
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=28 retired=1 beyond_audit=0 excluded=1 unregistered=0 audited=30
+LINT_SUMMARY mode=enforce guards=28 violations=0 allowlisted=0 stale=0 shown=0
