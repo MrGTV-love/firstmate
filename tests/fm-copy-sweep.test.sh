@@ -942,7 +942,33 @@ SH
   assert_equals "v0"$'\n'"v4" "$(preserved_unique | while IFS= read -r kept; do cat "$kept"; done | sort)" \
     "the preserve of the old content or of the quiet content is missing"
   [ -z "$(ls -A "$HOMED/data/copy-sweep/waiting" 2>/dev/null)" ] || fail "the release left its waiting record"
-  pass "a copy whose preserved content changed during a temporary refusal reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost"
+  make_locked_copy_case waiting-revert dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'v0\n' > "$(copy_path locked)/unique.dat"
+  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
+  real_cp=$(command -v cp)
+  cat > "$FAKEBIN/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+printf 'v1\\n' > "$(copy_path locked)/unique.dat"
+SH
+  chmod +x "$FAKEBIN/cp"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "revert: a temporary refusal after a write should exit 1, got $RC: $OUT"
+  rm -f "$FAKEBIN/cp"
+  printf 'v0\n' > "$(copy_path locked)/unique.dat"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "revert: the run that saw the content change back failed ($RC): $OUT"
+  assert_class locked WAITING
+  rm -f "$W/execute-output"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "revert: the quiet run failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "revert: the quiet run did not release the copy"
+  assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "revert: the quiet run did not plan and execute exactly once"
+  assert_equals 1 "$(preserved_unique | grep -c .)" "revert: content that changed back to its preserved bytes was preserved again"
+  assert_equals 'v0' "$(cat "$(preserved_unique)")" "revert: the preserve of the original content changed"
+  pass "a copy whose preserved content changed during a temporary refusal reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve"
 }
 
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
@@ -1124,8 +1150,16 @@ SH
       *) assert_equals 'durable state' "$(cat "$(preserved_unique)")" "$shape: the preserve was discarded although the copy no longer holds the original" ;;
     esac
     [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "$shape: a copy that changed during preservation was logged as removed"
+    if [ "$shape" = lock ]; then
+      assert_contains "$line" "because the copy's identity or creation-lock bytes changed" "lock: the kept preserve did not name the changed lock as its cause"
+      FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+      [ "$RC" = 0 ] || fail "lock: the later quiet run failed ($RC): $OUT"
+      assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "lock: the later quiet run did not release the copy"
+      assert_equals 1 "$(preserved_unique | grep -c .)" "lock: the later quiet run preserved the bytes its latest preserve already holds"
+      assert_equals 1 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "lock: the later quiet run did not call the driver's release exactly once"
+    fi
   done
-  pass "a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock and every preserved original unchanged"
+  pass "a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock and every preserved original unchanged, and a later quiet run whose content equals that kept preserve releases the copy through the driver without preserving it again"
 }
 
 test_retained_ignored_payload_is_kept_once_without_growth() {
