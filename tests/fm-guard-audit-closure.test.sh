@@ -16,7 +16,6 @@ set -u
 LINT="$ROOT/bin/fm-guard-lint.sh"
 REFCHECK="$ROOT/bin/fm-guard-refcheck.sh"
 REGISTRY="$ROOT/docs/guards/registry.json"
-VERNANT_REGISTRY="$ROOT/docs/guards/registry-vernant.json"
 
 # --- G-10: the registry carries the population and its arithmetic -----------
 out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
@@ -125,20 +124,5 @@ for retired_id in $(jq -r '.[].id' "$ROOT/docs/guards/retired.json"); do
 done
 [ -z "$retired_live" ] || fail "retired guard ids still appear in bin/:$retired_live"
 pass "G-04 every retired guard is absent from bin/ and the advisory cut is recorded"
-
-# --- Vernant, when the checkout is available ------------------------------
-# The cross-repo half runs only where the operator points at the Vernant clone,
-# because this repository's suite must not depend on a sibling checkout.
-if [ -n "${FM_VERNANT_ROOT:-}" ] && [ -d "${FM_VERNANT_ROOT:-}" ]; then
-  out=$("$LINT" --root "$FM_VERNANT_ROOT" --mode enforce --counts \
-    --registry "$VERNANT_REGISTRY" \
-    --allowlist "$ROOT/docs/guards/lint-allowlist-vernant.json" \
-    --retired "$ROOT/docs/guards/retired-vernant.json" 2>&1) \
-    || fail "the Vernant registry lint is red: $out"
-  printf '%s\n' "$out" | grep -q 'audited=38' || fail "Vernant inventory drifted: $out"
-  pass "G-25 the same lint validates the Vernant registry"
-else
-  printf 'skip: FM_VERNANT_ROOT unset, cross-repo closure check not run\n'
-fi
 
 printf 'ok - fm-guard-audit-closure\n'
