@@ -142,8 +142,11 @@
 # refusal after the lock changed or went is a partial release and is retained like
 # any other failure, with its preserve. A proof that fails after preservation
 # discards this run's preserve the same way, and only while the same copy still
-# holds the plan's lock bytes. A preserve from an earlier run is never removed or
-# replaced.
+# holds the plan's lock bytes. Either way the preserve is discarded only while
+# every preserved file, symlink and directory is still in the copy with the same
+# bytes or target; when any original is missing, different or cannot be compared,
+# the preserve stays, and a temporary execute refusal is then retained like any
+# other failure. A preserve from an earlier run is never removed or replaced.
 # Other execution failures exit 1, record the driver's text, and retain the copy.
 # Never a force flag, hand unlock, lock-file write, recursive deletion of a copy,
 # or Treehouse call. Only the preservation library cleans its own staging data;
@@ -1198,14 +1201,44 @@ copy_still_holds() {  # <copy> <identity> <lock-sha256>
   [ "$actual" = "$3" ]
 }
 
+# True when every directory, file and symlink in preserve <dir> is still at the
+# same path in <copy>, with the same bytes or link target. An original that is
+# missing, different or cannot be compared returns 1.
+preserve_still_in_copy() {  # <dir> <copy>
+  local rel status='' want have
+  while IFS= read -r -d '' rel; do
+    case "$rel" in
+      ./*|.) ;;
+      *) status=$rel; continue ;;
+    esac
+    if [ -L "$1/$rel" ]; then
+      [ -L "$2/$rel" ] || return 1
+      want=$(readlink "$1/$rel") && have=$(readlink "$2/$rel") || return 1
+      [ "$want" = "$have" ] || return 1
+    elif [ -d "$1/$rel" ]; then
+      [ -d "$2/$rel" ] && [ ! -L "$2/$rel" ] || return 1
+    elif [ -f "$1/$rel" ]; then
+      [ -f "$2/$rel" ] && [ ! -L "$2/$rel" ] && cmp -s "$1/$rel" "$2/$rel" || return 1
+    else
+      return 1
+    fi
+  done < <(cd "$1" && find . ! -path ./copy-path ! -path ./SHA256SUMS -print0; printf '%s\0' "$?")
+  [ "$status" = 0 ]
+}
+
 # Removes the preserve directory this run built for <copy> under <release-id>,
-# and its parents once empty, only while copy_still_holds proves the originals
-# are still in the copy. A preserve from any other run is never touched.
+# and its parents once empty, only while copy_still_holds proves nothing was
+# released and preserve_still_in_copy proves every preserved original is still in
+# the copy unchanged. A preserve from any other run is never touched.
 discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
   local key dir
   copy_still_holds "$1" "$2" "$3" || return 1
   key=$(printf '%s' "$1" | teardown_ignored_sha256) || return 1
   dir="$DATA_DIR/$4/nested-copy-preserved"
+  if [ -e "$dir/$key" ] || [ -L "$dir/$key" ]; then
+    [ -d "$dir/$key" ] && [ ! -L "$dir/$key" ] || return 1
+    preserve_still_in_copy "$dir/$key" "$1" || return 1
+  fi
   rm -rf -- "${dir:?}/$key" || return 1
   rmdir "$dir" "$DATA_DIR/$4" 2>/dev/null || true
 }

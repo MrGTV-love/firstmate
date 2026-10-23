@@ -809,7 +809,7 @@ preserved_unique() {
 }
 
 test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run() {
-  local reason admin before line retained run kept
+  local reason admin before line retained run kept real_cp
   for reason in cleanup_lease_conflict cleanup_skipped_live_or_unknown; do
     make_locked_copy_case "temporary-$reason" dead
     install_driver "$SLOT" "$W"
@@ -864,7 +864,25 @@ test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run() {
   registered locked || fail "a partially released copy was removed on the next run"
   assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "a partial release was retried"
   assert_equals 1 "$(preserved_unique | grep -c .)" "a held partial release was preserved again"
-  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; the same refusal after an unlock stays held with its preserve"
+  make_locked_copy_case temporary-after-overwrite dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
+  real_cp=$(command -v cp)
+  cat > "$FAKEBIN/cp" <<SH
+#!/usr/bin/env bash
+"$real_cp" "\$@" || exit
+printf 'new owner state\\n' > "$(copy_path locked)/unique.dat"
+SH
+  chmod +x "$FAKEBIN/cp"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a temporary refusal after an overwrite should exit 1, got $RC: $OUT"
+  assert_not_contains "$OUT" "plans it again" "a copy whose original changed after preservation was reported retryable"
+  assert_equals 'new owner state' "$(cat "$(copy_path locked)/unique.dat")" "the copy's changed ignored file was touched"
+  assert_equals 'durable state' "$(cat "$(preserved_unique)")" "a temporary refusal discarded the only saved original"
+  registered locked || fail "a copy whose original changed after preservation was removed"
+  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; the same refusal after an unlock, or after a preserved original changed in the copy, stays held with its preserve"
 }
 
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
@@ -988,24 +1006,28 @@ test_a_lock_that_stops_being_vernants_after_the_plan_is_not_released() {
 test_ownership_or_lock_change_during_preservation_prevents_release() {
   local shape admin before real_cp line
   real_cp=$(command -v cp)
-  for shape in owner lock; do
+  for shape in owner owner-delete owner-overwrite lock; do
     make_locked_copy_case "preserve-change-$shape" dead
     install_driver "$SLOT" "$W"
     printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
     printf 'durable state\n' > "$(copy_path locked)/unique.dat"
     admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
-    if [ "$shape" = owner ]; then
-      printf 'printf "worktree=%%s\\nkind=ship\\n" %q > %q\n' "$(copy_path locked)" "$HOMED/state/late-owner.meta" > "$W/cp-hook"
-    else
+    if [ "$shape" = lock ]; then
       printf 'printf "vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=999999\\n" > %q\n' "$admin/locked" > "$W/cp-hook"
+    else
+      printf 'printf "worktree=%%s\\nkind=ship\\n" %q > %q\n' "$(copy_path locked)" "$HOMED/state/late-owner.meta" > "$W/cp-hook"
     fi
+    case "$shape" in
+      owner-delete) printf 'rm -f %q\n' "$(copy_path locked)/unique.dat" >> "$W/cp-hook" ;;
+      owner-overwrite) printf 'printf "new owner state\\n" > %q\n' "$(copy_path locked)/unique.dat" >> "$W/cp-hook" ;;
+    esac
     cat > "$FAKEBIN/cp" <<SH
 #!/usr/bin/env bash
+"$real_cp" "\$@" || exit
 if [ ! -e "$W/cp-hook-ran" ]; then
   : > "$W/cp-hook-ran"
   bash "$W/cp-hook"
 fi
-exec "$real_cp" "\$@"
 SH
     chmod +x "$FAKEBIN/cp"
     before=$(shasum -a 256 "$admin/locked")
@@ -1015,7 +1037,7 @@ SH
     line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
       || fail "$shape: the change during preservation was not reported as FAILED: $OUT"
     assert_contains "$line" "the copy was left" "$shape: the FAILED line did not say the copy was left"
-    if [ "$shape" = owner ]; then
+    if [ "$shape" != lock ]; then
       assert_contains "$line" "late-owner's active record" "the task record that appeared during preservation was not named"
       assert_contains "$line" "no longer proven" "the FAILED line did not say the copy is no longer proven"
       assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the sweep changed the lock of a copy a task claimed"
@@ -1027,19 +1049,23 @@ SH
     assert_not_contains "$OUT" "REMOVED" "$shape: a copy that changed during preservation was reported removed"
     registered locked || fail "$shape: a copy that changed during preservation is no longer registered"
     [ -f "$admin/locked" ] || fail "$shape: a copy that changed during preservation lost its lock"
-    assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "$shape: the ignored file changed"
+    case "$shape" in
+      owner-delete) [ ! -e "$(copy_path locked)/unique.dat" ] || fail "owner-delete: the owner's deletion was undone" ;;
+      owner-overwrite) assert_equals 'new owner state' "$(cat "$(copy_path locked)/unique.dat")" "owner-overwrite: the owner's write was undone" ;;
+      *) assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "$shape: the ignored file changed" ;;
+    esac
     assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(cat "$W/closeout.log")" \
       "$shape: the driver was asked for more than its plan"
     assert_equals 0 "$(find "$HOMED/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ')" \
       "$shape: a retention receipt was written for a release that never ran"
-    if [ "$shape" = owner ]; then
-      assert_equals '' "$(preserved_unique)" "owner: a proof that failed while the copy kept its lock left this run's preserve behind"
-    else
-      assert_equals 'durable state' "$(cat "$(preserved_unique)")" "lock: the preserve of a copy whose lock changed was discarded"
-    fi
+    case "$shape" in
+      owner) assert_equals '' "$(preserved_unique)" "owner: a proof that failed while the copy kept its lock and originals left this run's preserve behind" ;;
+      lock) assert_equals 'durable state' "$(cat "$(preserved_unique)")" "lock: the preserve of a copy whose lock changed was discarded" ;;
+      *) assert_equals 'durable state' "$(cat "$(preserved_unique)")" "$shape: the preserve was discarded although the copy no longer holds the original" ;;
+    esac
     [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "$shape: a copy that changed during preservation was logged as removed"
   done
-  pass "a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock"
+  pass "a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock and every preserved original unchanged"
 }
 
 test_retained_ignored_payload_is_kept_once_without_growth() {
