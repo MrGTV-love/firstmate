@@ -8,8 +8,9 @@
 # picker observes dispatches that never pass through the typed resolver. It builds the
 # launch observation (the sanitized launch-brief task text, the actual route, one
 # bounded quota snapshot) and hands it to bin/fm-model-picker-shadow.sh --observe
-# --hook spawn. When the resolver already wrote this task's row, that hook sets the
-# row's rule route to the launched route instead of writing a second row.
+# --hook spawn. When the resolver wrote this task's row from the same brief within the
+# last hour, that hook sets the row's rule route to the launched route instead of
+# writing a second row.
 #
 # Shadow only: it prints nothing, exits 0 on every failure, and no caller reads its
 # output. bin/fm-spawn.sh runs it detached under fm_run_timed; this tool also bounds

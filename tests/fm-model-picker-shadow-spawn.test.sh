@@ -4,7 +4,8 @@
 # tmux/treehouse/harness writes exactly one dispatch_log row carrying the route that
 # actually launched, and the flag-off launch writes none. The capture runs detached, so
 # every positive check polls the store with a deadline. A typed dispatch whose resolver
-# already logged its row, and a relaunch, add no second row. The TypeSafe key lives only
+# already logged its row, and a relaunch, add no second row; a re-resolve supersedes the
+# earlier resolver row, and a stale or edited-brief marker gets its own row. The TypeSafe key lives only
 # in the home's .env, and the scripted Jev endpoint refuses any other bearer, so an
 # accepted pick proves the hook resolved it. quota-axi is a fixture. This is the launch
 # path that bypasses the typed resolver, so it is the capture path this test exists to prove.
@@ -32,7 +33,7 @@ fm_test_spawn_home "$HOME_DIR" claude
 cp "$CASE/crew-dispatch.json" "$HOME_DIR/config/crew-dispatch.json"
 fm_git_worktree "$PROJ" "$WT" "wt-shadow-capture"
 for id in shadow-off shadow-capture shadow-typed shadow-override shadow-manual shadow-nomodel \
-          shadow-noeffort shadow-withheld; do
+          shadow-noeffort shadow-withheld shadow-rerun shadow-stale shadow-edited; do
   fm_test_spawn_brief "$HOME_DIR" "$id" "Prove the launch capture path."
 done
 printf 'TYPESAFE_API_KEY=synthetic-key\n' > "$HOME_DIR/.env"
@@ -239,4 +240,56 @@ spawn_hook shadow-withheld --model opus --effort high
 assert_equals 'withheld' "$(row_field picker_status shadow-withheld)" 'an unmarked-policy brief is withheld'
 assert_equals 'claude:opus' "$(row_field rule_worker shadow-withheld)" 'a withheld launch keeps its launched route'
 
-pass 'spawn capture: one row per launched dispatch carrying the launched route; a typed launch attaches to its resolver row; flag off and relaunch add none'
+gate_field() {  # <row-id> <key>
+  python3 -I -c 'import json,sqlite3,sys; r=sqlite3.connect(sys.argv[1]).execute("select gates from dispatch_log where id=?", (int(sys.argv[2]),)).fetchone(); v=json.loads(r[0] or "{}").get(sys.argv[3]) if r else None; print("missing" if v is None else v)' "$DATA/aa.sqlite" "$1" "$2"
+}
+live_count() {  # <task-key>: rows the report counts, i.e. not superseded
+  python3 -I -c 'import json,sqlite3,sys; print(sum("superseded_by" not in json.loads(g or "{}") for (g,) in sqlite3.connect(sys.argv[1]).execute("select gates from dispatch_log where task_key=?", (sys.argv[2],))))' "$DATA/aa.sqlite" "$1"
+}
+report_no_route() {
+  FM_MODEL_PICKER_DATA="$DATA" bash "$ROOT/bin/fm-model-picker-shadow.sh" --report 2>/dev/null \
+    | sed -n 's/.*; \([0-9][0-9]*\) rows have no rule route\..*/\1/p'
+}
+AMBIGUOUS='{"status":"ambiguous","candidates":[]}'
+
+# Two resolves for one task then one launch: the first row is superseded, the second
+# carries the launched route, and the report counts the dispatch once.
+no_route_before=$(report_no_route)
+[ -n "$no_route_before" ] || fail 'the report states its no-rule-route count'
+resolver_observe shadow-rerun ambiguous "$AMBIGUOUS"
+first=$(row_field id shadow-rerun)
+resolver_observe shadow-rerun ambiguous "$AMBIGUOUS"
+second=$(row_field id shadow-rerun)
+assert_equals "$second" "$(gate_field "$first" superseded_by)" 'a re-resolve supersedes the earlier resolver row'
+spawn_hook shadow-rerun --model opus --effort high
+assert_equals 2 "$(row_count shadow-rerun)" 'the launch after a re-resolve writes no third row'
+assert_equals 1 "$(live_count shadow-rerun)" 'exactly one non-superseded row for the re-resolved dispatch'
+assert_equals 'claude:opus' "$(row_field rule_worker shadow-rerun)" 'the newest resolver row carries the launched route'
+[ "$(gate_field "$second" launch_attached)" != missing ] || fail 'the launch attached to the newest resolver row'
+assert_equals missing "$(gate_field "$first" launch_attached)" 'the superseded row is not attached'
+[ ! -e "$DATA/resolver-rows/shadow-rerun" ] || fail 'the spawn hook consumed the re-resolve marker'
+assert_equals "$no_route_before" "$(report_no_route)" 'the report leaves the superseded row out'
+
+# A marker older than one hour is deleted and the launch writes its own row.
+resolver_observe shadow-stale ambiguous "$AMBIGUOUS"
+stale=$(row_field id shadow-stale)
+python3 -I -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["created_at"]-=7200; open(p,"w").write(json.dumps(d))' \
+  "$DATA/resolver-rows/shadow-stale"
+spawn_hook shadow-stale --model opus --effort high
+assert_equals 2 "$(row_count shadow-stale)" 'a stale marker leaves the launch its own row'
+[ ! -e "$DATA/resolver-rows/shadow-stale" ] || fail 'the spawn hook deleted the stale marker'
+[ "$(row_field id shadow-stale)" != "$stale" ] || fail 'the launch row is new'
+assert_equals 'claude:opus' "$(row_field rule_worker shadow-stale)" 'the launch row carries the launched route'
+assert_equals missing "$(gate_field "$stale" launch_attached)" 'the stale resolver row is not attached'
+assert_equals '' "$(python3 -I -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select rule_worker from dispatch_log where id=?", (int(sys.argv[2]),)).fetchone()[0] or "")' "$DATA/aa.sqlite" "$stale")" 'the stale resolver row keeps its own route'
+
+# A marker written for a brief that changed before the launch is not this dispatch's.
+resolver_observe shadow-edited ambiguous "$AMBIGUOUS"
+edited=$(row_field id shadow-edited)
+printf '%s\n' 'One more detail.' >> "$HOME_DIR/data/shadow-edited/brief.md"
+spawn_hook shadow-edited --model opus --effort high
+assert_equals 2 "$(row_count shadow-edited)" 'an edited-brief marker leaves the launch its own row'
+[ ! -e "$DATA/resolver-rows/shadow-edited" ] || fail 'the spawn hook deleted the edited-brief marker'
+assert_equals missing "$(gate_field "$edited" launch_attached)" 'the edited-brief resolver row is not attached'
+
+pass 'spawn capture: one row per launched dispatch carrying the launched route; a typed launch attaches to its fresh same-brief resolver row; a re-resolve supersedes; flag off and relaunch add none'

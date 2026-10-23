@@ -143,11 +143,9 @@ def _update(conn, dispatch_id, **cols):
     conn.commit()
 
 
-def record_launch(conn, dispatch_id, rule_worker, rule_effort, gates):
-    """The route that actually launched a logged dispatch, replacing its rule route;
-    gates is stored as sorted JSON."""
-    _update(conn, dispatch_id, rule_worker=rule_worker, rule_effort=rule_effort,
-            gates=json.dumps(gates, sort_keys=True))
+def amend_row(conn, dispatch_id, gates, **cols):
+    """Replace a logged dispatch's gates, stored as sorted JSON, and any other columns."""
+    _update(conn, dispatch_id, gates=json.dumps(gates, sort_keys=True), **cols)
 
 
 def record_validator(conn, dispatch_id, verdict, disagreement):

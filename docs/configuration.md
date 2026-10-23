@@ -984,8 +984,11 @@ It runs detached with every stream discarded, so the spawn command returns witho
 It resolves the TypeSafe key with the same `fm_typesafe_key` lookup the resolver uses (the environment, `<home>/.env`, then the primary home's `.env`); with no key it writes no row.
 A launch with no concrete `--model` (empty or `default`) records no rule route, and an empty or `default` effort records a NULL `rule_effort`.
 The spawn hook exists because real dispatches can bypass the typed resolver, and an unobserved dispatch cannot become calibration evidence.
-One dispatch gets one row: each resolver row leaves a one-shot marker `<data root>/resolver-rows/<task id>` holding that row's id.
-The spawn hook that finds the marker deletes it and writes no row of its own; it sets that resolver row's `rule_worker` and `rule_effort` to the route and effort that actually launched, and records the resolver's own route under `gates.launch_attached` (`resolver_worker`, `resolver_effort`).
+One dispatch gets one row: each resolver row leaves a one-shot marker `<data root>/resolver-rows/<task id>` holding that row's id, the brief's real path and SHA-256 content hash, and its creation time.
+A resolve that runs again for the same task (after an edit, an `ambiguous` or `escalate` result, or an error) first flags the row the old marker names with `gates.superseded_by` (the newer row's id), then replaces the marker; `--report` leaves superseded rows out.
+The spawn hook always deletes the marker it finds.
+It attaches only when the marker names the same launch brief (real path and content hash) and is at most one hour old; it then writes no row of its own, sets that resolver row's `rule_worker` and `rule_effort` to the route and effort that actually launched, and records the resolver's own route under `gates.launch_attached` (`resolver_worker`, `resolver_effort`).
+A stale marker (older than one hour, or written for a different or edited brief) is deleted and the launch writes its own row, so a task id reused after a dropped dispatch never inherits the old row.
 That holds for every resolver outcome, so an `ambiguous`, `escalate`, `error` or `withheld` resolve, and a `clear` result firstmate overrode, still end with the launched route on the row.
 A manual launch with no resolver row, or a marker whose row cannot be found, gets its own spawn-hook row, which always carries the launched route, even when the launch brief is withheld.
 A relaunch (`--relaunch`) is the same dispatch, so the spawn hook does not observe it again.
