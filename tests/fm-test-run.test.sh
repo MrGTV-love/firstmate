@@ -476,7 +476,7 @@ test_captain_hold_groups_share_helper_changed_selection() {
 
 # The three teardown groups partition one former suite. This is the checked
 # inventory the split is judged against: the union of the group lists must be the
-# same 333 cases, each registered by the one file that defines it, with no case
+# same 334 cases, each registered by the one file that defines it, with no case
 # twice. A dropped or duplicated case is exactly what a partition loses while
 # every remaining assertion still passes.
 test_teardown_groups_register_each_case_once() {
@@ -498,9 +498,9 @@ test_teardown_groups_register_each_case_once() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "a teardown case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 333 ] \
-    || fail "the teardown groups register $total cases, not the 333-case inventory they partition"
-  pass "the teardown groups are a duplicate-free 333-case cover, each case registered by the file that defines it"
+  [ "$total" = 334 ] \
+    || fail "the teardown groups register $total cases, not the 334-case inventory they partition"
+  pass "the teardown groups are a duplicate-free 334-case cover, each case registered by the file that defines it"
 }
 
 # Each group must stay independently runnable and keep its lane coverage: the
