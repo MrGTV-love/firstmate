@@ -802,49 +802,69 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_ref
   pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code"
 }
 
+# Prints every preserved copy of unique.dat under this world's sweep data, one
+# per line, so a test can count the preserves a run left.
+preserved_unique() {
+  find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -name unique.dat -type f 2>/dev/null
+}
+
 test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run() {
-  local reason admin before line retained
+  local reason admin before line retained run kept
   for reason in cleanup_lease_conflict cleanup_skipped_live_or_unknown; do
     make_locked_copy_case "temporary-$reason" dead
     install_driver "$SLOT" "$W"
+    printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+    printf 'durable state\n' > "$(copy_path locked)/unique.dat"
     admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
     before=$(shasum -a 256 "$admin/locked")
     retained="$HOMED/data/copy-sweep/retained"
     printf '{"allowed": false, "reason": "%s"}\n' "$reason" > "$W/execute-output"
-    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
-    [ "$RC" = 1 ] || fail "$reason: a refused execute should exit 1, got $RC: $OUT"
-    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
-      || fail "$reason: the refusal was not reported as FAILED: $OUT"
-    assert_contains "$line" "(exit 3): $reason: {\"allowed\": false" "$reason: the driver's reason was lost"
-    assert_contains "$line" "next sweep run plans it again" "$reason: the report did not say the copy is retried"
-    [ -e "$(copy_path locked)" ] || fail "$reason: a refused copy was removed"
-    registered locked || fail "$reason: a refused copy is no longer registered"
-    assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "$reason: the refused copy's lock changed"
-    [ -z "$(ls -A "$retained" 2>/dev/null)" ] || fail "$reason: a temporary refusal left a retention receipt"
+    for run in 1 2; do
+      FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+      [ "$RC" = 1 ] || fail "$reason run $run: a refused execute should exit 1, got $RC: $OUT"
+      line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
+        || fail "$reason run $run: the refusal was not reported as FAILED: $OUT"
+      assert_contains "$line" "(exit 3): $reason: {\"allowed\": false" "$reason run $run: the driver's reason was lost"
+      assert_contains "$line" "next sweep run plans it again" "$reason run $run: the report did not say the copy is retried"
+      [ -e "$(copy_path locked)" ] || fail "$reason run $run: a refused copy was removed"
+      registered locked || fail "$reason run $run: a refused copy is no longer registered"
+      assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "$reason run $run: the refused copy's lock changed"
+      assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "$reason run $run: the copy's original ignored file changed"
+      [ -z "$(ls -A "$retained" 2>/dev/null)" ] || fail "$reason run $run: a temporary refusal left a retention receipt"
+      assert_equals '' "$(preserved_unique)" "$reason run $run: a temporary refusal left this run's preserve behind"
+    done
+    assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "$reason: the second run did not plan and execute again"
     rm -f "$W/execute-output"
     FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
     [ "$RC" = 0 ] || fail "$reason: the retry failed ($RC): $OUT"
     assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "$reason: the next run did not release the copy"
     [ ! -e "$(copy_path locked)" ] || fail "$reason: the copy is still on disk after the retry"
     ! registered locked || fail "$reason: the copy is still registered after the retry"
-    assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "$reason: the next run did not plan and execute again"
-    assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(sed -n 3p "$W/closeout.log")" \
+    assert_equals 6 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "$reason: the next run did not plan and execute again"
+    assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(sed -n 5p "$W/closeout.log")" \
       "$reason: the retry did not ask the driver for a new plan first"
+    kept=$(preserved_unique)
+    assert_equals 1 "$(printf '%s\n' "$kept" | grep -c .)" "$reason: the release did not leave exactly one preserve"
+    assert_equals 'durable state' "$(cat "$kept")" "$reason: the released copy's preserved ignored file changed"
   done
   make_locked_copy_case temporary-after-unlock dead
   install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'durable state\n' > "$(copy_path locked)/unique.dat"
   printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
   : > "$W/execute-unlock-first"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 1 ] || fail "a temporary refusal after unlock should exit 1, got $RC: $OUT"
   assert_not_contains "$OUT" "plans it again" "a partial release was reported as retryable"
+  assert_equals 'durable state' "$(cat "$(preserved_unique)")" "a partial release lost its preserve"
   rm -f "$W/execute-output" "$W/execute-unlock-first"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "the held partial release failed on rerun ($RC): $OUT"
   assert_class locked HELD-LOCKED
   registered locked || fail "a partially released copy was removed on the next run"
   assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "a partial release was retried"
-  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt, and the next run plans and releases the copy; the same refusal after an unlock stays held"
+  assert_equals 1 "$(preserved_unique | grep -c .)" "a held partial release was preserved again"
+  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; the same refusal after an unlock stays held with its preserve"
 }
 
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
@@ -1012,9 +1032,14 @@ SH
       "$shape: the driver was asked for more than its plan"
     assert_equals 0 "$(find "$HOMED/data/copy-sweep/retained" -type f 2>/dev/null | wc -l | tr -d ' ')" \
       "$shape: a retention receipt was written for a release that never ran"
+    if [ "$shape" = owner ]; then
+      assert_equals '' "$(preserved_unique)" "owner: a proof that failed while the copy kept its lock left this run's preserve behind"
+    else
+      assert_equals 'durable state' "$(cat "$(preserved_unique)")" "lock: the preserve of a copy whose lock changed was discarded"
+    fi
     [ ! -e "$HOMED/data/copy-sweep.log" ] || fail "$shape: a copy that changed during preservation was logged as removed"
   done
-  pass "a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt"
+  pass "a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock"
 }
 
 test_retained_ignored_payload_is_kept_once_without_growth() {
