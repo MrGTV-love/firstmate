@@ -474,7 +474,9 @@ test_apply_removes_only_the_reapable_copy() {
 # records its own pid, and a hung plan's child, in <log-dir>/driver.pids. With it, it
 # unlocks and plainly removes the copy it is given, or prints two lines and
 # exits 3 while <log-dir>/refuse-execute exists. The interpreter runs it as a
-# shell script. Both log what they were asked to do.
+# shell script. With <log-dir>/execute-output it prints that file and exits with
+# <log-dir>/execute-exit (3 by default), first unlocking the copy while
+# <log-dir>/execute-unlock-first exists. Both log what they were asked to do.
 install_driver() {  # <slot> <log-dir>
   local slot=$1 log=$2 exclude
   exclude=$(git -C "$slot" rev-parse --path-format=absolute --git-path info/exclude)
@@ -535,6 +537,9 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   exit 0
 fi
 if [ -e "$log/execute-output" ]; then
+  if [ -e "$log/execute-unlock-first" ]; then
+    git worktree unlock "\$2" || exit 4
+  fi
   cat "$log/execute-output"
   exit "\$(cat "$log/execute-exit" 2>/dev/null || printf 3)"
 fi
@@ -795,6 +800,51 @@ test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_ref
   assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)"$'\n'"$SLOT|--cleanup-worktree $(copy_path locked) --execute-cleanup" \
     "$(cat "$W/closeout.log")" "the driver did not run once to plan and once to release"
   pass "a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code"
+}
+
+test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run() {
+  local reason admin before line retained
+  for reason in cleanup_lease_conflict cleanup_skipped_live_or_unknown; do
+    make_locked_copy_case "temporary-$reason" dead
+    install_driver "$SLOT" "$W"
+    admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+    before=$(shasum -a 256 "$admin/locked")
+    retained="$HOMED/data/copy-sweep/retained"
+    printf '{"allowed": false, "reason": "%s"}\n' "$reason" > "$W/execute-output"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 1 ] || fail "$reason: a refused execute should exit 1, got $RC: $OUT"
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
+      || fail "$reason: the refusal was not reported as FAILED: $OUT"
+    assert_contains "$line" "(exit 3): $reason: {\"allowed\": false" "$reason: the driver's reason was lost"
+    assert_contains "$line" "next sweep run plans it again" "$reason: the report did not say the copy is retried"
+    [ -e "$(copy_path locked)" ] || fail "$reason: a refused copy was removed"
+    registered locked || fail "$reason: a refused copy is no longer registered"
+    assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "$reason: the refused copy's lock changed"
+    [ -z "$(ls -A "$retained" 2>/dev/null)" ] || fail "$reason: a temporary refusal left a retention receipt"
+    rm -f "$W/execute-output"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$reason: the retry failed ($RC): $OUT"
+    assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "$reason: the next run did not release the copy"
+    [ ! -e "$(copy_path locked)" ] || fail "$reason: the copy is still on disk after the retry"
+    ! registered locked || fail "$reason: the copy is still registered after the retry"
+    assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "$reason: the next run did not plan and execute again"
+    assert_equals "$SLOT|--cleanup-worktree $(copy_path locked)" "$(sed -n 3p "$W/closeout.log")" \
+      "$reason: the retry did not ask the driver for a new plan first"
+  done
+  make_locked_copy_case temporary-after-unlock dead
+  install_driver "$SLOT" "$W"
+  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
+  : > "$W/execute-unlock-first"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a temporary refusal after unlock should exit 1, got $RC: $OUT"
+  assert_not_contains "$OUT" "plans it again" "a partial release was reported as retryable"
+  rm -f "$W/execute-output" "$W/execute-unlock-first"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the held partial release failed on rerun ($RC): $OUT"
+  assert_class locked HELD-LOCKED
+  registered locked || fail "a partially released copy was removed on the next run"
+  assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "a partial release was retried"
+  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt, and the next run plans and releases the copy; the same refusal after an unlock stays held"
 }
 
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
@@ -2218,6 +2268,7 @@ run_case test_driver_verdict_types_and_exit_status_are_not_permission
 run_case test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
 run_case test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_nothing
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal
+run_case test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
 run_case test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 run_case test_a_failed_preservation_leaves_no_staging_directory

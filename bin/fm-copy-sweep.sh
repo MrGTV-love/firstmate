@@ -127,12 +127,18 @@
 # SHA-256, the copy's path and the copy's identity (the inode and birth time of its
 # own .git file) and retains that same copy while its lock matches, or while it has
 # no lock (the driver may have released it); the sweep never clears one to retry a
-# copy. A receipt whose path is gone, whose path now holds a different copy, whose
+# copy, except as below for a refusal the driver names temporary. A receipt whose path is gone, whose path now holds a different copy, whose
 # copy now has a different lock, or that records no hash or identity is stale:
 # classification ignores it, report mode leaves it, and --apply removes it and
 # lists RECEIPT-CLEARED.
 # Exit 3 with cleanup_ignored_payload_archived_tree_retained is KEPT, not FAILED:
 # the run exits 0 and later runs neither preserve nor execute that copy again.
+# Exit 3 whose one JSON document refuses with cleanup_lease_conflict or
+# cleanup_skipped_live_or_unknown, which the driver names temporary, while the same
+# copy still holds exactly the lock bytes the plan saw, released nothing: the run
+# exits 1 with the driver's words and removes the receipt, so the next run plans,
+# preserves and executes that copy again. Such a refusal after the lock changed or
+# went is a partial release and is retained like any other failure.
 # Other execution failures exit 1, record the driver's text, and retain the copy.
 # Never a force flag, hand unlock, lock-file write, recursive deletion of a copy,
 # or Treehouse call. Only the preservation library cleans its own staging data.
@@ -1165,6 +1171,23 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
   fi
 }
 
+# True when the driver's execute refusal is one the driver itself names
+# temporary and nothing was released: exit 3, its whole answer is one JSON
+# document refusing with reason cleanup_lease_conflict or
+# cleanup_skipped_live_or_unknown, and the same copy still holds exactly the lock
+# bytes the plan saw. A changed or absent lock is a partial release and is held.
+execute_refusal_is_temporary() {  # <exit> <copy> <identity> <lock-sha256>
+  local actual rc=0
+  [ "$1" = 3 ] || return 1
+  printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1 || return 1
+  actual=$(copy_identity "$2") || return 1
+  [ "$actual" = "$3" ] || return 1
+  teardown_copy_lock_file "$2" || rc=$?
+  [ "$rc" = 0 ] || return 1
+  actual=$(teardown_ignored_sha256 "$TEARDOWN_FOREIGN_LOCK_FILE") || return 1
+  [ "$actual" = "$4" ]
+}
+
 # Preserves the ignored entries of a REAPABLE-DRIVER copy, then releases and
 # removes it through Vernant's own closeout driver, which is the only supported
 # release for its creation lock. The preservation lands under this sweep's data
@@ -1196,6 +1219,10 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
     words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
+    if execute_refusal_is_temporary "$rc" "$copy" "$identity" "$7" && rm -f -- "$(retained_receipt "$copy")"; then
+      echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so the next sweep run plans it again." >&2
+      return 1
+    fi
     record_driver_retention "$copy" "$7" "$identity" "exit $rc: $words" || true
     echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words" >&2
     if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_OUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
