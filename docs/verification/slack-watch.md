@@ -115,6 +115,7 @@ In a second home, removing the `:two:` reaction alone printed nothing, posted no
 The conflict notice in the thread named the remedy: `Remove the :two: reaction and reply again, or type 2.` for a reaction against a typed reply, `Please reply once.` for two typed replies, and `Remove all but one reaction.` for two reactions.
 Two conflicting typed replies of 45,000 characters each produced one readable outbound notice under 1,200 characters and one notification no longer than 480 characters, both naming previews of both candidates and retaining `Please reply once.`.
 The notice was measured from the outbound log, not from the incoming full-length replies sharing the thread.
+A `:three:` tap against eleven typed replies of 200 characters on a thread with a 17-character timestamp, with one more notice queued, produced a standing-check wake line no longer than 480 characters that named both candidate previews, `(+10 more)`, and the whole remedy `Remove the :three: reaction and reply again, or type 3.` before `; +1 queued`.
 No transport failure or answer was recorded.
 Result: pass.
 

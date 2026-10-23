@@ -272,6 +272,32 @@ assert_contains "$out" 'bbbbbbbb' "DOD-08 long conflict wake lost the second can
 assert_contains "$out" 'Please reply once.' "DOD-08 long conflict wake lost the remedy"
 [ "${#out}" -le 480 ] || fail "DOD-08 long conflict wake is unbounded"
 assert_open resolve-call 0 "DOD-08 long conflict records nothing"
+new_home contradiction
+bind
+python3 -I - "$FIX/contradiction/transcript.json" "$TMP/wide-conflict.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1]))
+card, other = '1792735945.123456', '1792735946.123456'
+data['messages'] = [{'ts': card, 'text': 'Seeded decision card', 'user': 'UBOT0123456', 'bot_id': 'BBOT0123456'},
+                    {'ts': other, 'text': 'Older decision card', 'user': 'UBOT0123456', 'bot_id': 'BBOT0123456'},
+                    {'ts': '1792735947.000001', 'thread_ts': other, 'user': 'U0TESTOWNER', 'text': 'late'}]
+data['messages'] += [{'ts': '1792735947.%06d' % (n + 2), 'thread_ts': card, 'user': 'U0TESTOWNER',
+                      'text': '0' + letter * 199} for n, letter in enumerate('abcdefghijk')]
+data['reactions'] = {card: [{'name': 'three', 'users': ['U0TESTOWNER']}]}
+row = data['seed_state']['threads']['conflict-call:2026-10-01T00:00:00Z#0']
+row['ts'] = card
+data['seed_state']['threads']['conflict-call:2026-09-01T00:00:00Z#0'] = dict(
+    row, identity='2026-09-01T00:00:00Z#0', ts=other)
+json.dump(data, open(sys.argv[2], 'w'))
+PY
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$TMP/wide-conflict.json" >/dev/null
+out=$("$ROOT/bin/fm-slack-check.sh" check --replay "$TMP/wide-conflict.json")
+[ "${#out}" -le 480 ] || fail "DOD-08 wide tap conflict wake is unbounded"
+assert_contains "$out" '0aaaaaaaa' "DOD-08 wide tap conflict wake lost the first candidate"
+assert_contains "$out" '0bbbbbbbb' "DOD-08 wide tap conflict wake lost the second candidate"
+assert_contains "$out" '(+10 more)' "DOD-08 wide tap conflict wake lost the candidate count"
+assert_contains "$out" 'Remove the :three: reaction and reply again, or type 3.; +1 queued$' "DOD-08 wide tap conflict wake lost the remedy"
+assert_open conflict-call 0 "DOD-08 wide tap conflict records nothing"
 new_home reaction-answer
 bind
 mirror reaction-answer >/dev/null
@@ -940,7 +966,7 @@ reply_to "$ts_a" 900.000102 "$(wide b)"
 reply_to "$ts_b" 900.000201 "$(wide c)"
 reply_to "$ts_b" 900.000202 "$(wide d)"
 close_terminal between
-reply_to "$ts_c" 900.000301 hello
+reply_to "$ts_c" 1792735947.000301 hello
 wake() { "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/mirror/transcript.json"; }
 out=$(wake)
 [ "${#out}" -le 480 ] || fail "X19 the wake line is unbounded"
@@ -965,7 +991,7 @@ assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_b")" 2 "X19 secon
 assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_c")" 0 "X19 the later reply was marked seen without its line"
 assert_contains "$(thread_texts "$ts_b")" 'Conflicting signals' "X19 second notice post"
 out=$(wake)
-assert_contains "$out" "unmatched reply 900.000301" "X19 the later reply's line was lost"
+assert_contains "$out" "unmatched reply 1792735947.000301" "X19 the later reply's line was lost"
 assert_not_contains "$out" 'queued' "X19 an empty queue left a marker"
 assert_eq "$(python3 "$HELPER" seen-count "$(state_file)" "$ts_c")" 1 "X19 the later reply marked seen"
 assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 0 "X19 rows left after every line surfaced"

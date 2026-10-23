@@ -34,7 +34,7 @@ USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
 QUEUE_RESERVE = 16
-LABEL_LIMIT = 172  # Leave room for two candidates, a remedy, and the queue marker.
+LABEL_LIMIT = 168  # Leave room for two candidates, a long thread ts, the longest remedy, and the queue marker.
 CARD_LIMIT = 38000
 SLACK_LINK = re.compile(r'<((?:https?://|mailto:)[^<>|\s]+)(?:\|([^<>]*))?>')
 
