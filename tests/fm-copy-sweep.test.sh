@@ -902,7 +902,7 @@ SH
 }
 
 test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases() {
-  local run real_cp kept
+  local run real_cp kept line
   make_locked_copy_case waiting-content dead
   install_driver "$SLOT" "$W"
   printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
@@ -965,6 +965,13 @@ SH
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "revert: the quiet run failed ($RC): $OUT"
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "revert: the quiet run did not release the copy"
+  line=$(printf '%s\n' "$OUT" | grep -F "REMOVED"$'\t'"$(copy_path locked)")
+  assert_contains "$line" "preserved - GiB (preserved in an earlier run), net freed - GiB, unmeasured" \
+    "revert: the release counted the bytes its earlier preserve still holds as freed"
+  assert_contains "$OUT" "sizes: 0 scanned copies unmeasured, 1 removed copies unmeasured" \
+    "revert: the release was not disclosed as unmeasured"
+  assert_contains "$(printf '%s\n' "$OUT" | tail -n 1)" "reaped=1 freed=0.00" "revert: the final total counted unmeasured bytes as freed"
+  assert_contains "$(tail -n 1 "$HOMED/data/copy-sweep.log")" $'\tpreserved_kib=-\t' "revert: the removal log claimed a measured preserve of the release"
   assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "revert: the quiet run did not plan and execute exactly once"
   assert_equals 1 "$(preserved_unique | grep -c .)" "revert: content that changed back to its preserved bytes was preserved again"
   assert_equals 'v0' "$(cat "$(preserved_unique)")" "revert: the preserve of the original content changed"

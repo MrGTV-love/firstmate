@@ -173,7 +173,10 @@
 # command, because the release id is no teardown task id and bin/fm-teardown.sh
 # would reject a command built from it. Each REMOVED line reports "copy X GiB,
 # preserved Y GiB, net freed Z GiB" (the copy's size less the bytes it preserved;
-# a size that was not measured shows "-" and "unmeasured"). One final accounting
+# a size that was not measured shows "-" and "unmeasured"). A copy released
+# without a new preserve, because its content equals its latest preserve, shows
+# "preserved - GiB (preserved in an earlier run)" and an unmeasured net freed, and
+# its log line records preserved_kib=-. One final accounting
 # line says "copies=<original total> GiB=<original measured total> reaped=<n>
 # freed=<measured net GiB>"; a separate sizes line discloses unmeasured copies,
 # so GiB/freed are lower bounds when sizing was skipped.
@@ -1514,7 +1517,7 @@ clear_stale_receipts() {
 # leaves the copy and is reported, never retried harder.
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
-  local release_id preserve_dir preserved net release_rc receipt lock_hash
+  local release_id preserve_dir preserved net release_rc receipt lock_hash earlier
   stamp=$(date -u +%Y%m%dT%H%M%SZ).$$
   read -r SCANNED_COUNT SCANNED_KIB SCANNED_UNMEASURED <<< "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++; if ($6 == "-") u++; else k += $6 } END { printf "%d %.0f %d\n", n, k, u }')"
   REMOVAL_REPORT=
@@ -1539,7 +1542,9 @@ apply_removals() {
     head=$(git -C "$copy" rev-parse HEAD 2>/dev/null) || head=unknown
     branch=$(git -C "$copy" symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=detached
     preserve_dir=
+    earlier=0
     if [ "$CLASS" = REAPABLE-DRIVER ]; then
+      earlier=$CONTENT_PRESERVED
       # The copy is Vernant-locked with a launcher pid that is not running. Its
       # driver is the only supported release: it unlocks and removes, after the
       # teardown library preserved every ignored entry it holds.
@@ -1591,7 +1596,9 @@ apply_removals() {
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
     gone="$gone$copy"$'\n'
     preserved=0
-    if [ -n "$preserve_dir" ]; then
+    if [ "$earlier" = 1 ]; then
+      preserved=-
+    elif [ -n "$preserve_dir" ]; then
       measure_dir "$preserve_dir"
       preserved=${SIZE_KIB:--}
     fi
@@ -1604,7 +1611,11 @@ apply_removals() {
       FREED_UNMEASURED=$((FREED_UNMEASURED + 1))
       freed="net freed - GiB, unmeasured"
     fi
-    freed="copy $(gib_or_dash "$kib") GiB, preserved $(gib_or_dash "$preserved") GiB, $freed"
+    if [ "$earlier" = 1 ]; then
+      freed="copy $(gib_or_dash "$kib") GiB, preserved - GiB (preserved in an earlier run), $freed"
+    else
+      freed="copy $(gib_or_dash "$kib") GiB, preserved $(gib_or_dash "$preserved") GiB, $freed"
+    fi
     REMOVAL_REPORT="${REMOVAL_REPORT}REMOVED"$'\t'"$copy"$'\t'"branch $branch at ${head:0:12}, $freed (${REASON})"$'\n'
     log_removal "$copy" "$clone" "$head" "$branch" "$kib" "$preserved" "$REASON" \
       || { FAILED_COUNT=$((FAILED_COUNT + 1)); REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it was removed but $REMOVAL_LOG could not be appended"$'\n'; }
