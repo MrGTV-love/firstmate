@@ -1291,7 +1291,6 @@ github_read_outcome_with_gh() {
     total=$((total + 1))
     case "$line" in
       state=*) state=${line#state=} ;;
-      review_decision=*) review_decision=${line#review_decision=} ;;
       merged=*) merged=${line#merged=} ;;
       queued=*) queued=${line#queued=} ;;
       base=*) base=${line#base=} ;;
