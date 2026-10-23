@@ -361,9 +361,10 @@ SH
 }
 
 # Twelve quiet status logs under <dir>/state, plus the helpers the marker
-# budgets share. marker-setup.sh pins a constant strong identity, so a result
-# does not depend on the host file system recording birth times, and offers
-# mark_all, grow_logs and quiet_scan.
+# budgets share. marker-setup.sh pins the constant identity held in
+# <dir>/identity (strong by default), so a result does not depend on the host
+# file system recording birth times, and offers mark_all, grow_logs and
+# quiet_scan.
 write_marker_fixture() {  # <dir>
   local dir=$1 i=0
   mkdir -p "$dir/state" "$dir/home"
@@ -371,9 +372,10 @@ write_marker_fixture() {  # <dir>
     i=$((i + 1))
     printf 'working [at=%s]: step\n' "$i" > "$dir/state/task-$i.status"
   done
-  cat > "$dir/identity-reader" <<'SH'
+  printf 'strong:16777232:123:2026-10-09 12:34:56' > "$dir/identity"
+  cat > "$dir/identity-reader" <<SH
 #!/bin/sh
-printf 'strong:16777232:123:2026-10-09 12:34:56'
+cat "$dir/identity"
 SH
   chmod +x "$dir/identity-reader"
   cat > "$TMP_ROOT/marker-setup.sh" <<'SH'
@@ -409,12 +411,17 @@ SH
 
 # The heartbeat marker lags its log between heartbeats (it is rewritten only
 # then), so a quiet scan meets a lagging marker on nearly every log. A lagging
-# marker on an unchanged device must cost a handful of commands, not the
-# per-byte signature decode.
-test_lagging_marker_scan_costs_no_signature_decode() {
-  local dir="$TMP_ROOT/lagging" script="$TMP_ROOT/lagging.sh" log="$TMP_ROOT/lagging.log" out quiet lagging count
+# marker that no device migration can apply to must cost a handful of commands,
+# not the per-byte signature decode: on an unchanged strong device, on a host
+# without birth times (a weak identity), and after a device shift has already
+# migrated the classified position of a marker whose reported size is stale.
+# Prints "<current-marker commands> <lagging-marker commands>" for one scan.
+lagging_scan_commands() {  # <dir> strong|weak|shifted
+  local dir=$1 mode=$2 script="$TMP_ROOT/lagging-$2.sh" log="$TMP_ROOT/lagging-$2.log" out
   write_marker_fixture "$dir"
+  [ "$mode" != weak ] || printf 'weak:16777232:123' > "$dir/identity"
   cat > "$script" <<'SH'
+mode=$3
 . "${0%/*}/marker-setup.sh"
 mark_all heartbeat
 quiet_scan
@@ -425,23 +432,41 @@ scan_signals > /dev/null
 trap - DEBUG
 quiet=$_FMB_COMMANDS
 grow_logs
+if [ "$mode" = shifted ]; then
+  printf 'strong:16777233:123:2026-10-09 12:34:56' > "$dir/identity"
+  quiet_scan
+  case "$(cat "$STATE/.hb-surfaced-task-1")" in
+    *@strong:16777233:*) ;;
+    *) echo "the scan did not migrate the classified heartbeat position to the new device" ;;
+  esac
+fi
 quiet_scan
 hb_before=$(cat "$STATE/.hb-surfaced-task-1")
 _FMB_COMMANDS=0
 trap '_FMB_COMMANDS=$((_FMB_COMMANDS + 1))' DEBUG
 scan_signals > /dev/null
 trap - DEBUG
-[ "$(cat "$STATE/.hb-surfaced-task-1")" = "$hb_before" ] || echo "the scan rewrote a lagging heartbeat marker on an unchanged device"
+[ "$(cat "$STATE/.hb-surfaced-task-1")" = "$hb_before" ] || echo "the scan rewrote a lagging $mode heartbeat marker it could not migrate"
 printf '%s %s' "$quiet" "$_FMB_COMMANDS" > "$FMB_LOG"
 SH
   : > "$log"
-  out=$(FMB_LOG="$log" "${BASH:-bash}" "$script" "$ROOT" "$dir" 2>&1) || fail "measured script failed: $out"
-  [ -z "$out" ] || fail "measured script printed: $out"
-  read -r quiet lagging < "$log"
+  out=$(FMB_LOG="$log" "${BASH:-bash}" "$script" "$ROOT" "$dir" "$mode" 2>&1) || fail "measured $mode script failed: $out"
+  [ -z "$out" ] || fail "measured $mode script printed: $out"
+  cat "$log"
+}
+
+test_lagging_marker_scan_costs_no_signature_decode() {
+  local dir="$TMP_ROOT/lagging" script="$TMP_ROOT/lagging.sh" mode measured quiet lagging count added=''
   # 12 logs: a bound of 150 commands per log over the current-marker scan. The
   # per-byte decode this guards against added about 1100 per log.
-  [ "$((lagging - quiet))" -le $((12 * 150)) ] \
-    || fail "lagging heartbeat markers added $((lagging - quiet)) commands to a quiet scan of 12 logs; the bound is $((12 * 150))"
+  for mode in strong weak shifted; do
+    measured=$(lagging_scan_commands "$dir-$mode" "$mode")
+    read -r quiet lagging <<< "$measured"
+    [ "$((lagging - quiet))" -le $((12 * 150)) ] \
+      || fail "lagging $mode heartbeat markers added $((lagging - quiet)) commands to a quiet scan of 12 logs; the bound is $((12 * 150))"
+    added="$added $mode=$((lagging - quiet))"
+  done
+  write_marker_fixture "$dir"
   cat > "$script" <<'SH'
 . "${0%/*}/marker-setup.sh"
 unset FM_STATUS_IDENTITY_READER
@@ -455,7 +480,7 @@ SH
   count=$(subshells_of "$script" "$dir")
   [ "$count" -le 40 ] \
     || fail "a quiet scan of 12 logs with lagging heartbeat markers entered $count subshells; the bound is 40"
-  pass "lagging heartbeat markers add $((lagging - quiet)) commands (bound $((12 * 150))) and keep the scan at $count subshells (bound 40)"
+  pass "lagging heartbeat markers add commands$added (bound $((12 * 150)) each) and keep the scan at $count subshells (bound 40)"
 }
 
 # The heartbeat backstop walks every status log, so a log with nothing past its
