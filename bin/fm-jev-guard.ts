@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { authorizedDeletion, recordDeletion } from "./fm-jev-deletions.ts";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
 import type { Questions, State } from "./ten-levels/src/core/types.ts";
 import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, SIZE_REFUSAL_NOTICE, SIZE_RESULT_NOTICE, withDecisionBudget,
@@ -412,6 +413,16 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       }
       if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
       if (typeof input.command !== "string") throw new GuardUnavailableError("InvalidToolInputError");
+      const deletion = authorizedDeletion(input.command, ctx.cwd, c);
+      if (deletion) {
+        try {
+          recordDeletion(c, deletion);
+        } catch {
+          return finishCall({ ...terminal, decision: "review", enforcement: "pretool_deny", branch: "outage",
+            error_type: "AuditUnavailableError" });
+        }
+        return finishCall({ ...terminal, branch: "deterministic" });
+      }
       const settled = settle(await screenParts(service.plan({ command: input.command, cwd: ctx.cwd }, "command", BASH_QUESTIONS), async (piece, judge) => {
         const { effect, destructive_intent } = (await judge({ command: piece, cwd: ctx.cwd }, BASH_QUESTIONS)).answers;
         if (effect?.type !== "choice" || destructive_intent?.type !== "noul") throw new ContractError("Invalid shell answers.");

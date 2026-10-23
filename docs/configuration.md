@@ -2468,6 +2468,41 @@ Questions and numeric policy are code-owned:
 - Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
   The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
 
+### Brief-named file deletion allowance
+
+On both omp and Claude, a single literal `rm` or `/bin/rm` can bypass model shell screening only when **every** operand resolves to an explicitly listed, existing regular file tracked in the task worktree's `HEAD`.
+The file's canonical path must equal its resolved path inside that worktree: symlinks, symlinked parents, parent traversal, directories, gitlinks and files tracked only in the index do not qualify.
+The working directory must be inside the task worktree.
+The bounded parser accepts space/tab-separated literal operands, single/double quotes, `--`, the short flags `f`, `r`, `v`, and their long forms `--force`, `--recursive`, `--verbose`.
+It does not interpret shell expansions, backslashes, globs, substitutions, pipelines, redirects, compound commands or other flags.
+Those forms, mixed listed/unlisted operands and every other deletion keep ordinary shell screening; this is not a general destructive-command exemption and does not change the Jev questions, thresholds, block notice or other guards.
+A listed file may have local modifications; `HEAD` tracking proves a committed version exists, not that uncommitted contents can be restored.
+
+Firstmate declares the complete replacement list in one exact `## Authorized deletions` section of the brief, containing only a fenced `json` array of literal worktree-relative paths, for example:
+
+````markdown
+## Authorized deletions
+
+```json
+["bin/obsolete.sh", "tests/obsolete.test.sh"]
+```
+````
+
+Fresh guarded launches snapshot that section before the worker starts; relaunches retain the existing snapshot rather than rereading a potentially worker-edited brief.
+For a task already running, Firstmate edits that section and runs [`bin/fm-jev-deletions.sh`](../bin/fm-jev-deletions.sh) from the supervising home; its `--help` owns the exact invocation and override paths.
+The command validates the files and replaces the entire list under the task metadata lock; publishing a brief without the section revokes all allowances.
+Both hosts reread the list and digest for each candidate deletion, so live additions and revocations require no worker restart once that host has loaded this implementation.
+An omp worker already using older guard code must load this implementation through an authorized relaunch before it can consume a new list; Claude's command hook loads the shared code each call.
+
+The publisher writes `state/<task>.authorized-deletions.json` and its SHA-256 as `jev_deletions_sha256` in `state/<task>.meta`, binding the snapshot to the task and canonical worktree.
+Missing, unreadable, malformed or mismatched records grant no allowance, including during the two-file publication window.
+The list and its digest are firstmate-written; a worker running as the same OS user could forge both, so this guards against mistakes, not deliberate forgery.
+It is not producer authentication, an OS permission boundary, or a filesystem/process sandbox.
+Path and `HEAD` checks happen immediately before admission, not atomically with shell execution; concurrent filesystem or Git changes can invalidate that observation.
+Every admitted candidate first appends a task-local line to `state/<task>.authorized-deletions.jsonl` with `task`, canonical worktree-relative `paths`, `list_sha256` and ISO-8601 `time`.
+That line records permission before execution, not proof the shell succeeded; either an allowance-audit failure or the ordinary guard-audit failure prevents admission.
+The behavioral regression in [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises both hosts, actual file removal, live publication/revocation, inconsistent lists, scope exclusions and the six obsolete cd-guard paths.
+
 `supervisorReadAdmission` is the single isolated Firstmate-channel consistency check.
 It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
 The existing [launch publisher](../bin/fm-operational-input.sh) owns the consistency-receipt format, reused by the [numeric inbox publisher](../bin/fm-task-inbox-lib.sh); neither the reader nor a tool-result authority claim creates a receipt.

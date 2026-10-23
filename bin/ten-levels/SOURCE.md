@@ -56,7 +56,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 ## Firstmate glue outside this directory
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
-  It judges every planned piece with the unchanged level 6 policies; calls pass only when every planned piece passes, while result handling applies the explicit advisory and trusted-read rules below.
+  Except for the deterministic brief-named deletion admission below, it judges every planned piece with the unchanged level 6 policies; calls pass only when every planned piece passes, while result handling applies the explicit advisory and trusted-read rules below.
   Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
   Its host response handling preserves answered middle-band results with an advisory and audit row.
   Native reads of task-owned data/state and tracked own-worktree files, including modified tracked files, pass immediately without a judge; cross-task roots are not trusted.
@@ -65,6 +65,9 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
+- `bin/fm-jev-deletions.ts` owns the deterministic brief-named deletion admission shared by omp and Claude, its mandatory task-local audit, and the firstmate-side publisher used by `bin/fm-jev-deletions.sh` and initial spawn.
+  The [operator contract](../../docs/configuration.md#brief-named-file-deletion-allowance) owns the literal-shell grammar, HEAD/file/path checks, live update/revocation route, digest format and same-user consistency-only limit; a worker can deliberately forge both list and digest.
+  The upstream shell questions, thresholds and `bash-gate.ts` remain unchanged.
 - `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
   Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.

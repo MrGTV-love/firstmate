@@ -465,6 +465,14 @@ test_worker_guard_project_scope() {
     id="omp-scope-$scope"
     rec=$(make_spawn_case "scope-$scope" omp "$id" "$project")
     read_case_record "$rec"
+    cat >> "$HOME_DIR/data/$id/brief.md" <<'BRIEF'
+
+## Authorized deletions
+
+```json
+["README.md"]
+```
+BRIEF
     out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${extra[@]+"${extra[@]}"})
     expect_code 0 $? "omp $scope spawn should succeed: $out"
     expected=off
@@ -510,6 +518,12 @@ try {
     assert.equal(result?.block, true);
     assert.deepEqual(requests.map(row => row.path), ["/direct"]);
     assert.ok(requests.every(row => row.state.command === "rm -rf customer-record"));
+    // The initial spawn snapshot, not a later worker edit of the brief, permits this file.
+    const admitted = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf README.md" } }, { cwd: process.env.WT });
+    assert.equal(admitted, undefined);
+    assert.equal(requests.length, 1, "a spawn-authorized deletion must not reach the provider");
+    execFileSync("rm", ["-f", `${process.env.WT}/README.md`]);
+    assert.throws(() => execFileSync("git", ["-C", process.env.WT, "diff", "--quiet"]), "the admitted deletion must actually change the task copy");
   } else {
     assert.throws(credential, "a non-firstmate worker must have no native judge credential");
     assert.equal(result, undefined);
