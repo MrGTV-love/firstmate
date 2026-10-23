@@ -8,8 +8,9 @@
 #   fm-model-picker-shadow.sh --check-routes [--rules PATH]
 #
 # --observe records what the picker WOULD have chosen beside the route the current dispatch
-#   rules chose. It never prints, returns or writes a dispatch route, and never changes what
-#   dispatches: every failure exits 0 with one stderr warning. It is off unless
+#   rules chose, or with --hook spawn the route that actually launched. It never prints,
+#   returns or writes a dispatch route, and never changes what dispatches: every failure
+#   exits 0 with one stderr warning. It is off unless
 #   FM_MODEL_PICKER_SHADOW is an on value; bin/fm-model-picker-shadow-lib.sh owns that
 #   allowlist for this tool and the resolver. The resolver calls it after its own result is produced,
 #   bounded by bin/fm-timeout-lib.sh; this tool never becomes a dispatch dependency. A resolver
@@ -26,7 +27,8 @@
 #
 # Data root: FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else
 #   <FM_HOME>/data/model-picker. The calibration store is <data root>/aa.sqlite; this tool
-#   only inserts dispatch_log rows and never touches the benchmark matrix or verdict.json.
+#   only inserts dispatch_log rows (and, with --hook spawn, sets a resolver row's rule route and
+#   gates) and never touches the benchmark matrix or verdict.json.
 #
 # Key handling: the TypeSafe key reaches bin/fm_model_picker/shadow.py on file descriptor 3,
 #   never on argv, never exported, never written. When no caller supplies fd 3, the shared

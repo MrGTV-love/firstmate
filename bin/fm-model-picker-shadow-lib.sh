@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # fm-model-picker-shadow-lib.sh - the one owner of the FM_MODEL_PICKER_SHADOW allowlist.
 #
-# Sourced, never executed, by bin/fm-dispatch-resolve.sh and bin/fm-model-picker-shadow.sh.
+# Sourced, never executed, by bin/fm-dispatch-resolve.sh, bin/fm-spawn.sh,
+# bin/fm-model-picker-shadow.sh and bin/fm-model-picker-shadow-spawn.sh.
 #
 #   fm_model_picker_shadow_enabled
 #       Returns 0 only when FM_MODEL_PICKER_SHADOW is 1/true/on/yes/shadow. Empty, 0,

@@ -965,13 +965,13 @@ Run `bin/fm-model-picker.sh --selftest` for the fixture suite; [`tests/fm-model-
 
 ## Shadow model picker (FM_MODEL_PICKER_SHADOW)
 
-`bin/fm-model-picker-shadow.sh` is Phase 2 of the model-picker chain: it observes a dispatch, decides what the picker WOULD have chosen from the trusted Artificial Analysis snapshot plus bounded Jev judgments, and records that beside the route `config/crew-dispatch.json` actually chose.
+`bin/fm-model-picker-shadow.sh` is Phase 2 of the model-picker chain: it observes a dispatch, decides what the picker WOULD have chosen from the trusted Artificial Analysis snapshot plus bounded Jev judgments, and records that beside the dispatch's route: the route that actually launched, or the route `config/crew-dispatch.json` chose when no launch was attached.
 It is SHADOW MODE ONLY: it never returns, prints or writes a dispatch route, and no dispatch or spawn path reads its output.
 Its header and `--help` own its flags, data-root resolution, output and exit codes; `bin/fm_model_picker/shadow.py` is the implementation and `bin/fm_model_picker/routes.json` is the route table.
 
 ### The flag
 
-`FM_MODEL_PICKER_SHADOW` is off by default and accepts only shadow-enabled values; `bin/fm-model-picker-shadow-lib.sh` is the one owner of the allowlist, shared by the resolver and the shadow tool.
+`FM_MODEL_PICKER_SHADOW` is off by default and accepts only shadow-enabled values; `bin/fm-model-picker-shadow-lib.sh` is the one owner of the allowlist, shared by the resolver, the spawn hook and the shadow tool.
 `1`, `true`, `on`, `yes` and `shadow` enable observation; empty, `0`, `false`, `off` and `no` leave every route untouched and read no model-picker data; any other non-empty value prints one warning and stays off.
 No value enables live behavior, and no code path writes a `mode 'live'` row.
 
@@ -990,7 +990,7 @@ That holds for every resolver outcome, so an `ambiguous`, `escalate`, `error` or
 A manual launch with no resolver row, or a marker whose row cannot be found, gets its own spawn-hook row, which always carries the launched route, even when the launch brief is withheld.
 A relaunch (`--relaunch`) is the same dispatch, so the spawn hook does not observe it again.
 Both hooks discard their output and swallow every failure, so the printed status, profile line, exit code and spawn result are never derived from the picker.
-A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.
+A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route until a spawn hook attaches the launch, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.
 A spawn that never launches (a refused or failed launch) writes no spawn-hook row.
 The report applies the same additive migration the write path uses, so it reads a Phase-1 store without error; concurrent first opens of a Phase-1 store each finish that migration, because a column another process added first is not an error.
 
