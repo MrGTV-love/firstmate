@@ -595,8 +595,11 @@ write_forgejo_status_json() {
   if [ "$total" = 0 ]; then
     printf '{"state":"","total_count":0,"statuses":[]}\n' > "$file"
   else
-    printf '{"state":"%s","total_count":%s,"statuses":[%s]}\n' "$state" "$total" \
-      "$(seq "$total" | sed "s/.*/{\"context\":\"ci-&\",\"status\":\"$state\"}/" | paste -sd, -)" \
+    # Build the payload with jq, not a printf plus an inline sed: the sed form
+    # lost its inner quoting under the runner and emitted invalid JSON, which
+    # the merge read as an unreadable combined status.
+    "$JQ_BIN" -n --arg state "$state" --argjson total "$total" \
+      '{state:$state,total_count:$total,statuses:[range($total) as $i | {context:("ci-" + (($i + 1) | tostring)), status:$state}]}' \
       > "$file"
   fi
 }
