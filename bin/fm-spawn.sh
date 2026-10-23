@@ -2965,18 +2965,12 @@ launch_template() {
   # real git identity file and no-mistakes home, resolved by the pane shell before
   # HOME changes, so a commit keeps its author and the worker still reaches the
   # shared daemon; every other HOME-relative tool state is absent on purpose.
-  # A secondmate's native plugin submits the brief after its session-start
-  # digest and records this launch's id; its own spawns stage from the
-  # operator's DSH install and link the operator's real home.
+  # A secondmate's own spawns stage from the operator's DSH install and link
+  # the operator's real home.
   dsh)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh '
-    [ "$kind" != secondmate ] || printf '%s' 'FM_DSH_SOURCE_HOME=__DSHSOURCE__ FM_DSH_OPERATOR_HOME=__DSHOPERATOR__ FM_DSH_LAUNCH_ID=__DSHLAUNCH__ '
-    printf '%s' 'GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ '
-    if [ "$kind" = secondmate ]; then
-      printf '%s' 'FM_DSH_OPENING_PROMPT="$( __OPINPUT__ encode launch-brief < __BRIEF__)" __DSHBIN__ --patch __DSHPATCH__'
-    else
-      printf '%s' '__DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
-    fi
+    [ "$kind" != secondmate ] || printf '%s' 'FM_DSH_SOURCE_HOME=__DSHSOURCE__ FM_DSH_OPERATOR_HOME=__DSHOPERATOR__ '
+    printf '%s' 'GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
     ;;
   # omp (Oh My Pi), a Pi fork. Same one-positional-brief, --model, --thinking,
   # and -e shape as Pi, verified on omp 18.1.11. The differences are all at
@@ -5634,8 +5628,7 @@ agy_spawn_fail() {  # <detail>
   rovo_endpoint_cleanup
 }
 
-# dsh-tui (or, for a secondmate, its native plugin after the session-start
-# digest) submits the brief as its opening prompt, so its own durable session
+# dsh-tui submits the brief as its opening prompt, so its own durable session
 # log is the start proof: a turn opening (busy) or already finishing (idle)
 # both mean the brief reached the agent. A resumed launch already holds the
 # earlier conversation, so only a turn that started beyond DSH_START_POSITION,
@@ -5643,21 +5636,13 @@ agy_spawn_fail() {  # <detail>
 # because the log is the same source the busy classifier trusts. Separately,
 # require the live composer shape the steering parser understands: a successful
 # version command is not proof that a changed frontend remains compatible.
-# A secondmate's first turn waits on its native session-start digest. Once its
-# plugin records startup for this launch id, a log that simply has no turn yet
-# stops counting against the read budget: only that native process exiting, or
-# an error before any follow-up carried the brief, ends the wait. A log that
-# fails a behavior check still uses the budget and is reported.
 dsh_wait_for_start() {
-  local state pane parse_error i=0 waited=0 pending=0 rc max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
-  local events="$WT/state/.dsh-primary-events.jsonl"
+  local state pane parse_error i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
   # shellcheck source=bin/fm-composer-lib.sh
   . "$SCRIPT_DIR/fm-composer-lib.sh"
   DSH_START_ERROR=
-  DSH_NATIVE_PID=
   while [ "$i" -lt "$max" ]; do
     state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
-    pending=0
     case "$state" in
       busy | idle)
         if fm_backend_visible_capture_supported "$BACKEND"; then
@@ -5670,61 +5655,12 @@ dsh_wait_for_start() {
         fi
         DSH_START_ERROR=${parse_error#error: }
         ;;
-      *)
-        case "$state" in unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;; esac
-        case "$KIND:$state" in
-          'secondmate:unknown: no depth-zero dsh session log yet' | 'secondmate:unknown: dsh session log has no turn/start or turn/end yet' | 'secondmate:unknown: no turn started beyond the launch position')
-            pending=1
-            dsh_native_progress "$events" && rc=0 || rc=$?
-            case "$rc" in
-              0)
-                if [ $((waited % max)) -eq 0 ]; then
-                  echo "dsh secondmate $ID: native startup pid $DSH_NATIVE_PID is live; waiting for its first turn" >&2
-                fi
-                waited=$((waited + 1))
-                sleep "$interval"
-                continue
-                ;;
-              2) return 1 ;;
-            esac
-            ;;
-        esac
-        ;;
+      unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;;
     esac
     i=$((i + 1))
     [ "$i" -ge "$max" ] || sleep "$interval"
   done
-  if [ "$pending" = 1 ]; then
-    DSH_START_ERROR="no native DSH startup event for launch $SPAWN_GEN in $events${DSH_START_ERROR:+ ($DSH_START_ERROR)}"
-  fi
   return 1
-}
-
-# Reads only the rows after this launch's own startup row. 0: its native
-# process is alive and has no error, or a follow-up already carried the brief.
-# 1: no startup event for this launch yet. 2: positive failure evidence,
-# described in DSH_START_ERROR.
-dsh_native_progress() {  # <events>
-  local found pid followup detail
-  found=$(jq -nRr --arg launch "$SPAWN_GEN" '
-    [inputs | fromjson? | objects] as $rows
-    | ($rows | map(.event == "startup" and .launch == $launch) | rindex(true)) as $at
-    | if $at == null then empty else
-        $rows[$at].pid as $pid
-        | [$rows[($at + 1):][] | select(.pid == $pid)] as $own
-        | [$pid, ($own | any(.event == "followup")), ([$own[] | select(.event == "error") | .detail] | last // "")] | @tsv
-      end' "$1" 2>/dev/null) || found=
-  IFS=$'\t' read -r pid followup detail <<<"$found"
-  case "$pid" in '' | *[!0-9]*) return 1 ;; esac
-  DSH_NATIVE_PID=$pid
-  if [ -n "$detail" ] && [ "$followup" != true ]; then
-    DSH_START_ERROR="native DSH startup pid $DSH_NATIVE_PID recorded an error before any follow-up carried the brief: $detail"
-    return 2
-  fi
-  kill -0 "$DSH_NATIVE_PID" 2>/dev/null || {
-    DSH_START_ERROR="native DSH startup pid $DSH_NATIVE_PID exited before its first turn"
-    return 2
-  }
 }
 
 dsh_spawn_fail() {  # <detail>
@@ -7097,7 +7033,6 @@ dsh)
   LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
   LAUNCH=${LAUNCH//__DSHSOURCE__/"$(shell_quote "$DSH_SOURCE_HOME")"}
   LAUNCH=${LAUNCH//__DSHOPERATOR__/"$(shell_quote "$DSH_OPERATOR_HOME")"}
-  LAUNCH=${LAUNCH//__DSHLAUNCH__/"$(shell_quote "$SPAWN_GEN")"}
   LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}
   LAUNCH=${LAUNCH//__DSHPATH__/"$(shell_quote "$PATH")"}
   LAUNCH=${LAUNCH//__DSHBIN__/"$(shell_quote "$DSH_BIN")"}

@@ -274,7 +274,6 @@ cat > "$P/fake/dsh-tui" <<'SH'
 #!/bin/sh
 [ "${1:-}" = version ] && exit 0
 printf '%s\n' "$@" > "$FM_FAKE_DSH_LOG"
-printf '%s\n' "$FM_DSH_OPENING_PROMPT" > "$FM_FAKE_DSH_LOG.prompt"
 SH
 printf '#!/bin/sh\nexit 0\n' > "$P/fake/dsh"
 chmod +x "$P/fake/dsh-tui" "$P/fake/dsh"
@@ -283,8 +282,8 @@ primary_launch() {
     FM_FAKE_DSH_LOG="$P/launch" PATH="$P/fake:$PATH" bash "$ROOT/bin/fm-dsh-primary.sh" "$@"
 }
 primary_launch --model deepseek/deepseek-v4-pro --effort max -- 'fixture opening'
-[ "$(cat "$P/launch.prompt")" = 'fixture opening' ] || { echo 'the opening prompt must reach the native plugin' >&2; exit 1; }
-[ "$(sed -n 1p "$P/launch")" = --patch ] && [ "$(wc -l < "$P/launch")" -eq 2 ] || { echo "dsh-tui must receive no positional opening prompt: $(cat "$P/launch")" >&2; exit 1; }
+[ "$(sed -n 1p "$P/launch")" = --patch ] && [ "$(sed -n 3,4p "$P/launch")" = "--
+fixture opening" ] || { echo "dsh-tui must receive the opening prompt positionally: $(cat "$P/launch")" >&2; exit 1; }
 GEN=$(dirname "$(sed -n 2p "$P/launch")")
 python3 - "$GEN" "$P/home" <<'PY2'
 import json, sys, uuid

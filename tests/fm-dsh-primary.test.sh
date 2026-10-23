@@ -49,62 +49,59 @@ function setup(name, {failArm = false, failStart = false} = {}) {
   const followups = [];
   const injected = [];
   const agent = {id: name, session: {header: {cwd: home}}, inject(value) {injected.push(value);}, followup(value) {followups.push(value);}};
-  process.env.FM_DSH_OPENING_PROMPT = `opening for ${name}`;
-  process.env.FM_DSH_LAUNCH_ID = `launch-${name}`;
   apply(ctx, {root: dir, home});
-  assert.equal(process.env.FM_DSH_OPENING_PROMPT, undefined, 'the opening prompt must not leak into native tool calls');
-  assert.equal(process.env.FM_DSH_LAUNCH_ID, undefined, 'the launch id must not leak into nested launches');
   const emit = (type, payload) => handlers.get(type)?.(payload);
+  const step = messages => handlers.get('agent/pre-step')({agent, messages, turn: 1, step: 1, signal: new AbortController().signal},
+    async () => ({kind: 'enter', messages}));
   const end = () => handlers.get('session/event')(agent.session, {type: 'turn/end', seq: 1});
   const consume = input => handlers.get('session/event')(agent.session, {type: 'user/message', data: input});
   const stop = () => {for (const fn of stops) fn();};
-  return {home, agent, followups, injected, emit, end, consume, stop};
+  return {home, agent, followups, injected, emit, step, end, consume, stop};
 }
-// DSH does not await agent/created, so no opening prompt may reach dsh-tui:
-// the only first-turn input is this follow-up, sent after the digest exists.
+// DSH submits the positional brief at once and does not await agent/created.
+// The awaited pre-step of the first step must enter the digest ahead of it.
+const brief = {id: 'brief', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'opening brief'}]};
 const opened = setup('startup-order');
-await opened.emit('agent/created', {agent: opened.agent});
-assert.equal(opened.followups.length, 1, 'startup must wake exactly one first turn');
-assert.equal(opened.followups[0].content[0].text, 'SESSION START - fixture\n\n\nopening for startup-order', 'the first turn must carry the digest before the opening prompt');
-assert.equal(opened.injected.length, 0, 'a fresh process must not park the digest behind an earlier turn');
-// The spawn start proof reads this row while the digest is still running.
-const rows = readFileSync(join(opened.home, 'state/.dsh-primary-events.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
-const startupRow = rows.findIndex(row => row.event === 'startup');
-assert(startupRow >= 0 && startupRow < rows.findIndex(row => row.event === 'followup'), 'startup must be recorded before the digest turn');
-assert.equal(rows[startupRow].launch, 'launch-startup-order', 'startup must name this launch');
-assert.equal(rows[startupRow].pid, process.pid, 'startup must name the native process');
+const openedStart = opened.emit('agent/created', {agent: opened.agent});
+const first = await opened.step([brief]);
+assert.equal(first.kind, 'enter');
+assert.deepEqual(first.messages.map(input => input.content[0].text), ['SESSION START - fixture\n', 'opening brief'], 'the first step must carry the digest ahead of the brief');
+assert.deepEqual((await opened.step([brief])).messages, [brief], 'later steps must pass through unchanged');
+await openedStart;
+assert.equal(opened.followups.length + opened.injected.length, 0, 'startup must not queue a second turn or park the digest');
 opened.stop();
 const broken = setup('startup-failure', {failStart: true});
-await broken.emit('agent/created', {agent: broken.agent});
-assert.equal(broken.followups.length, 1, 'a failed startup must still wake one first turn');
-assert.match(broken.followups[0].content[0].text, /session start failed: fixture startup fault[\s\S]*opening for startup-failure$/, 'a failed startup must report the fault and keep the opening prompt');
+const brokenStart = broken.emit('agent/created', {agent: broken.agent});
+const failedStep = await broken.step([brief]);
+assert.match(failedStep.messages[0].content[0].text, /session start failed: fixture startup fault/, 'a failed startup must report the fault in the first step');
+assert.equal(failedStep.messages[1], brief, 'a failed startup must keep the brief');
+await brokenStart;
+assert.equal(broken.followups.length, 0, 'a failed startup must not queue another turn');
 assert.match(readFileSync(join(broken.home, 'state/.dsh-primary-events.jsonl'), 'utf8'), /"event":"error"/, 'a failed startup must be recorded');
 broken.stop();
 const fail = setup('failed-arm', {failArm: true});
 await fail.emit('agent/created', {agent: fail.agent});
-await until(() => fail.followups.length === 2);
+await until(() => fail.followups.length === 1);
 // DSH commits UserMessage directly as event.data, including synthetic input.
 // Consuming the forced continuation must not classify it as a new human turn.
 fail.consume(fail.followups[0]);
-fail.consume(fail.followups[1]);
 fail.end();
 await delay(1000);
 fail.end();
 await delay(1000);
-assert.equal(fail.followups.length, 2, 'one failed episode must not force an endless series of model turns');
-assert.match(fail.followups[1].content[0].text, /no live supervisor/);
+assert.equal(fail.followups.length, 1, 'one failed episode must not force an endless series of model turns');
+assert.match(fail.followups[0].content[0].text, /no live supervisor/);
 fail.consume({id: 'external-user-turn', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'Try the recovery again.'}]});
 fail.end();
-await until(() => fail.followups.length === 3);
-fail.consume(fail.followups[2]);
+await until(() => fail.followups.length === 2);
+fail.consume(fail.followups[1]);
 fail.end();
 await delay(500);
-assert.equal(fail.followups.length, 3, 'a real new user turn grants one fresh continuation, not unlimited synthetic continuations');
+assert.equal(fail.followups.length, 2, 'a real new user turn grants one fresh continuation, not unlimited synthetic continuations');
 fail.stop();
 
 const wake = setup('wake');
 await wake.emit('agent/created', {agent: wake.agent});
-wake.consume(wake.followups[0]);
 await until(() => existsSync(join(wake.home, 'state/ready')));
 const firstPid = readFileSync(join(wake.home, 'state/arm-pid'), 'utf8');
 wake.end(); wake.end();
@@ -112,19 +109,19 @@ await delay(500);
 assert.equal(readFileSync(join(wake.home, 'state/arm-pid'), 'utf8'), firstPid, 'repeated turn ends must retain one arm');
 writeFileSync(join(wake.home, 'state/queue'), '100\t1\tcheck\tfixture\tnotice\n');
 writeFileSync(join(wake.home, 'state/close'), '');
-await until(() => wake.followups.length === 2);
+await until(() => wake.followups.length === 1);
 wake.end();
 await delay(500);
-assert.equal(wake.followups.length, 2, 'an accepted but unconsumed notification must not be delivered twice');
+assert.equal(wake.followups.length, 1, 'an accepted but unconsumed notification must not be delivered twice');
 assert.equal(existsSync(join(wake.home, 'state/ready')), false, 'unacknowledged rows must not spin new watcher cycles');
+wake.consume(wake.followups[0]);
+wake.end();
+await until(() => wake.followups.length === 2);
+assert.match(wake.followups[1].content[0].text, /generation-bound acknowledgement/, 'a consumed but unacknowledged wake requires the bounded guard continuation');
 wake.consume(wake.followups[1]);
 wake.end();
-await until(() => wake.followups.length === 3);
-assert.match(wake.followups[2].content[0].text, /generation-bound acknowledgement/, 'a consumed but unacknowledged wake requires the bounded guard continuation');
-wake.consume(wake.followups[2]);
-wake.end();
 await delay(500);
-assert.equal(wake.followups.length, 3, 'consuming the synthetic guard continuation must not reset its budget');
+assert.equal(wake.followups.length, 2, 'consuming the synthetic guard continuation must not reset its budget');
 writeFileSync(join(wake.home, 'state/queue'), '');
 wake.end();
 await until(() => existsSync(join(wake.home, 'state/ready')));
@@ -173,5 +170,5 @@ try {
   for (const pid of ownedPids) {try {process.kill(pid, 'SIGKILL');} catch {}}
   crash.stop();
 }
-console.log('ok - DSH primary sends its digest before the opening prompt as the first turn, reports startup failure, bounds guard follow-ups, preserves wake acknowledgement, excludes children, and retires watcher descendants on disposal and native SIGKILL');
+console.log('ok - DSH primary enters its digest ahead of the brief in the first step, reports startup failure there, bounds guard follow-ups, preserves wake acknowledgement, excludes children, and retires watcher descendants on disposal and native SIGKILL');
 JS

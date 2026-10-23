@@ -99,5 +99,5 @@ exec env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_O
   FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_HOME" \
   GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" \
   HOME="$RUNTIME/home" DSH_HOME="$RUNTIME/dsh" DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 \
-  DSH_PERMISSION_MODE=danger-full-access PATH="$PATH" FM_DSH_OPENING_PROMPT="$PROMPT" \
-  "$DSH_BIN" --patch "$RUNTIME/launch.yml"
+  DSH_PERMISSION_MODE=danger-full-access PATH="$PATH" "$DSH_BIN" --patch "$RUNTIME/launch.yml" -- \
+  "$PROMPT"

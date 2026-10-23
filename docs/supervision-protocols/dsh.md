@@ -4,7 +4,7 @@ For open-loop-ledger wakes and heartbeat row handling, follow [Event-driven supe
 
 Launch the primary with `bin/fm-dsh-primary.sh`; its task-local patch loads `.dsh/fm-primary.mjs` without editing the operator's DSH profile.
 A bare `dsh-tui` is detectable, but is not a supervised Firstmate primary unless that plugin is loaded.
-The native `agent/created` callback runs the shared session-start entry point, then submits its ordered digest with the opening prompt as the session's first turn; no positional prompt can start a turn before it.
+The native `agent/created` callback runs the shared session-start entry point, and the first step of a fresh process waits for it, so its ordered digest enters ahead of the opening prompt.
 The native `session/event` turn-end callback runs the shared turn-end guard and owns one tracked `bin/fm-watch-arm.sh` child, or the existing supervision host when this home enables it.
 Do not arm another watcher, run shell `&`, or substitute a foreground wait.
 

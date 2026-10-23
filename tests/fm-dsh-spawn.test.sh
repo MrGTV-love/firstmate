@@ -287,56 +287,6 @@ header = {"type": "session", "version": 4, "id": str(uuid.uuid4()), "cwd": bound
 (store / "session.v4.jsonl").write_text(json.dumps(header) + "\n" + json.dumps({"type": "turn/start", "seq": 1}) + "\n")
 PY
 
-# A native secondmate plugin standing in for the TUI: it records startup for
-# the launch id the pane command carries, as its own live process, then holds
-# the first turn back past the spawn's read budget as a slow digest would.
-# "slow" first leaves an older error row under its own pid, as a reused pid
-# would. "error" records a startup error and the follow-up carrying the brief;
-# "error-only" records the error with no follow-up and never starts a turn.
-# "broken" writes a log that fails the sequence check. "stale" records startup
-# for another launch and never starts a turn.
-cat > "$TMP_ROOT/dsh-native-writer.py" <<'PY'
-import json
-import os
-import re
-import sys
-import time
-import uuid
-from pathlib import Path
-
-state, task, launch, home, mode = sys.argv[1:]
-binding = Path(state) / f"{task}.dsh-session"
-deadline = time.time() + 120
-while time.time() < deadline:
-    if binding.exists() and os.path.exists(launch) and os.path.getsize(launch) > 0:
-        break
-    time.sleep(0.02)
-else:
-    sys.exit(1)
-launch_id = re.search(r"FM_DSH_LAUNCH_ID='?([^' ]+)", Path(launch).read_text()).group(1)
-events = Path(home) / "state" / ".dsh-primary-events.jsonl"
-def append(**row):
-    with events.open("a") as stream:
-        stream.write(json.dumps({"pid": os.getpid(), **row}) + "\n")
-if mode == "slow":
-    append(event="error", detail="an earlier process with this pid")
-append(event="startup", launch="stale-launch" if mode == "stale" else launch_id)
-if mode in ("error", "error-only"):
-    append(event="error", detail="fixture startup fault")
-if mode == "error":
-    append(event="followup", kind="guard")
-if mode in ("stale", "error-only"):
-    time.sleep(120)
-time.sleep(0 if mode == "broken" else 3)
-bound = json.loads(binding.read_text())
-store = Path(bound["root"]) / "dsh" / "sessions" / "workspace" / "session"
-store.mkdir(parents=True, exist_ok=True)
-header = {"type": "session", "version": 4, "id": str(uuid.uuid4()), "cwd": bound["cwd"], "delegationDepth": 0}
-turns = [{"type": "turn/start", "seq": 2}, {"type": "turn/end", "seq": 1}] if mode == "broken" else [{"type": "turn/start", "seq": 1}]
-(store / "session.v4.jsonl").write_text("".join(json.dumps(event) + "\n" for event in [header, *turns]))
-time.sleep(120)
-PY
-
 make_dsh_case() {  # <name> <id> [crew-harness]
   local name=$1 id=$2 crew=${3-omp}
   CASE_DIR="$TMP_ROOT/$name"
@@ -509,9 +459,8 @@ test_mirrored_dsh_primary_carries_its_bound_model() {
   pass "fm-spawn: a dsh crew harness mirrored from a DSH primary carries its bound model and the operator's install, and refuses without a live record"
 }
 
-# Spawn a dsh secondmate of the current case whose native plugin behaves as
-# <mode>; the read budget is a fraction of the stand-in digest's duration.
-secondmate_spawn() {  # <id> <mode> -> spawn output
+# Spawn a dsh secondmate of the current case into its own seeded home.
+secondmate_spawn() {  # <id> -> spawn output
   local sm="$CASE_DIR/sm-$1" writer status out
   mkdir -p "$sm/bin" "$sm/data" "$sm/state" "$sm/config" "$sm/projects"
   cp "$ROOT/bin/fm-turnend-guard.sh" "$sm/bin/fm-turnend-guard.sh"
@@ -520,9 +469,9 @@ secondmate_spawn() {  # <id> <mode> -> spawn output
   printf 'charter\n' > "$sm/data/charter.md"
   fm_git_init_commit "$sm"
   : > "$LAUNCH_LOG"
-  python3 "$TMP_ROOT/dsh-native-writer.py" "$HOME_DIR/state" "$1" "$LAUNCH_LOG" "$sm" "$2" &
+  python3 "$TMP_ROOT/dsh-session-writer.py" "$HOME_DIR/state" "$1" "$LAUNCH_LOG" &
   writer=$!
-  out=$(DSH_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux FM_DSH_START_POLLS=4 FM_DSH_START_POLL_INTERVAL=0.05 \
+  out=$(DSH_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 \
     FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
     fm_test_run_spawn "$HOME_DIR" "$sm" "$FAKEBIN_DIR" "$1" "$sm" dsh --secondmate --model "$DSH_MODEL")
   status=$?
@@ -532,14 +481,13 @@ secondmate_spawn() {  # <id> <mode> -> spawn output
   return "$status"
 }
 
-test_secondmate_start_waits_on_its_native_digest() {
-  local id=dsh-sm-slow out status log
+test_secondmate_launch_carries_brief_and_operator_home() {
+  local id=dsh-sm out status log
   make_dsh_case secondmate "$id" claude
   mkdir -p "$CASE_DIR/spawner-operator/.config"
-  out=$(secondmate_spawn "$id" slow 2>&1)
+  out=$(secondmate_spawn "$id" 2>&1)
   status=$?
-  expect_code 0 "$status" "a dsh secondmate whose digest outlasts the read budget must still spawn: $out"
-  assert_contains "$out" "is live; waiting for its first turn" "the spawn must report the digest wait"
+  expect_code 0 "$status" "a dsh secondmate must spawn: $out"
   assert_grep "harness=dsh" "$HOME_DIR/state/$id.meta" "the secondmate must launch on dsh"
   assert_equals "$CASE_DIR/spawner-operator/.config" "$(readlink "$HOME_DIR/state/$id.dsh/"*/home/.config)" \
     "the secondmate's private HOME must link the spawner's operator home"
@@ -547,23 +495,11 @@ test_secondmate_start_waits_on_its_native_digest() {
   run_recorded_launch "$log" || fail "the recorded dsh secondmate launch failed: $(cat "$LAUNCH_LOG")"
   assert_equals "$CASE_DIR/spawner-operator" "$(sed -n 's/^FM_DSH_OPERATOR_HOME=//p' "$log")" \
     "nested spawns inside the secondmate must link the same operator home"
-  assert_equals 2 "$(wc -l < "$log.args" | tr -d ' ')" "the brief must reach the native plugin, not dsh-tui's opening prompt"
-  out=$(secondmate_spawn "$id-error" error 2>&1)
-  status=$?
-  expect_code 0 "$status" "a startup error whose follow-up carried the brief must not kill the spawn: $out"
-  out=$(secondmate_spawn "$id-error-only" error-only 2>&1)
-  status=$?
-  expect_code 1 "$status" "a startup error with no follow-up must fail the spawn: $out"
-  assert_contains "$out" "fixture startup fault" "the refusal must name the recorded error"
-  out=$(secondmate_spawn "$id-broken" broken 2>&1)
-  status=$?
-  expect_code 1 "$status" "a log failing a behavior check must not count as native progress: $out"
-  assert_contains "$out" "non-monotonic sequence" "the refusal must name the failed log check"
-  out=$(secondmate_spawn "$id-stale" stale 2>&1)
-  status=$?
-  expect_code 1 "$status" "another launch's startup row must not hold a spawn open: $out"
-  assert_contains "$out" "no native DSH startup event for launch" "the refusal must name the missing startup event"
-  pass "fm-spawn: a dsh secondmate waits past the read budget on its own live native startup, tolerates a startup error whose follow-up carried the brief, and fails on an unbriefed error, a broken log or another launch's row"
+  assert_equals "$HOME_DIR/user-home/.dsh" "$(sed -n 's/^FM_DSH_SOURCE_HOME=//p' "$log")" \
+    "nested spawns inside the secondmate must stage from the operator's DSH install"
+  assert_equals -- "$(sed -n 3p "$log.args")" "the brief must reach dsh-tui as its positional opening prompt"
+  [ -n "$(sed -n 4p "$log.args")" ] || fail "the secondmate brief must not be empty: $(cat "$log.args")"
+  pass "fm-spawn: a dsh secondmate starts on its positional brief and carries the operator's DSH install and home to nested spawns"
 }
 
 test_launch_policy_admits_dsh() {
@@ -680,7 +616,7 @@ test_deepseek_model_without_a_harness_routes_to_dsh
 test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_mirrored_dsh_primary_carries_its_bound_model
-test_secondmate_start_waits_on_its_native_digest
+test_secondmate_launch_carries_brief_and_operator_home
 test_launch_policy_admits_dsh
 test_deepseek_cannot_launch_on_omp
 test_omp_default_cannot_hide_a_deepseek_route

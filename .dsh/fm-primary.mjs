@@ -20,12 +20,6 @@ export function apply(ctx, config) {
   Object.assign(process.env, {FM_HOME: home, FM_ROOT_OVERRIDE: home,
     FM_STATE_OVERRIDE: state, FM_CONFIG_OVERRIDE: join(home, 'config'),
     FM_DATA_OVERRIDE: join(home, 'data'), FM_PROJECTS_OVERRIDE: join(home, 'projects')});
-  // The launch hands its opening prompt here instead of to dsh-tui, which
-  // would submit it before this adapter's session-start digest exists.
-  const opening = process.env.FM_DSH_OPENING_PROMPT ?? '';
-  const launch = process.env.FM_DSH_LAUNCH_ID || undefined;
-  delete process.env.FM_DSH_OPENING_PROMPT;
-  delete process.env.FM_DSH_LAUNCH_ID;
   const env = {...process.env};
   let disposed = false;
   let agent;
@@ -35,6 +29,7 @@ export function apply(ctx, config) {
   let failedArm = false;
   let guardNudged = false;
   let started = false;
+  let leading;
   let generation = 0;
   const ownMessages = new Set();
   const wakeMessages = new Set();
@@ -81,11 +76,12 @@ export function apply(ctx, config) {
       throw error;
     }
   };
-  const failure = (error, after = '') => {
+  const failed = error => `Firstmate DSH primary supervision failed: ${String(error)}. Run bin/fm-wake-drain.sh first and follow the emitted recovery protocol.`;
+  const failure = error => {
     log('error', {detail: String(error)});
     if (!guardNudged) {
       guardNudged = true;
-      send(`Firstmate DSH primary supervision failed: ${String(error)}. Run bin/fm-wake-drain.sh first and follow the emitted recovery protocol.${after && `\n\n${after}`}`, 'guard');
+      send(failed(error), 'guard');
     }
   };
   const guard = async () => {
@@ -208,28 +204,46 @@ export function apply(ctx, config) {
     failedArm = false;
     wakeConsumed = pendingRows.size > 0;
     const source = started ? 'clear' : 'startup';
-    // A fresh process has no turn until this adapter wakes the driver, so the
-    // digest leads the first provider turn; a cleared session already runs.
-    let unsent = source === 'startup' ? opening : '';
+    // DSH does not await this callback and submits the positional opening
+    // prompt at once. The first pre-step of a fresh process holds until this
+    // resolves, so the digest enters that step ahead of the opening prompt.
+    let lead;
+    if (source === 'startup') leading = new Promise(accept => { lead = accept; });
+    const own = text => {
+      const input = message(text);
+      ownMessages.add(input.id);
+      return input;
+    };
     try {
-      log('startup', {session: created.id, launch});
+      log('startup', {session: created.id});
       const result = await command('fm-sessionstart-run.sh', ['--source', source]);
-      if (disposed || activation !== generation) return;
+      if (disposed || activation !== generation) return lead?.();
       started = true;
       if (result.code !== 0) throw new Error(`DSH primary session start failed: ${result.stderr || result.stdout}`);
       if (!result.stdout.trim()) throw new Error('DSH primary session start supplied no digest; primary scope or startup transport is missing');
-      if (source === 'startup') {
-        send(unsent ? `${result.stdout}\n\n${unsent}` : result.stdout, 'startup');
-        unsent = '';
+      if (lead) {
+        lead(own(result.stdout));
+        lead = undefined;
       } else {
-        const digest = message(result.stdout);
-        ownMessages.add(digest.id);
-        agent.inject(digest);
+        agent.inject(own(result.stdout));
       }
       await ensure();
     } catch (error) {
-      if (!disposed && activation === generation) failure(error, unsent);
+      if (disposed || activation !== generation) return lead?.();
+      if (!lead) return failure(error);
+      log('error', {detail: String(error)});
+      guardNudged = true;
+      lead(own(failed(error)));
     }
+  });
+  ctx.on('agent/pre-step', async (payload, next) => {
+    if (payload.agent !== agent || !leading) return next();
+    const pending = leading;
+    leading = undefined;
+    const first = await pending;
+    const decision = await next();
+    if (!first || decision.kind !== 'enter') return decision;
+    return {kind: 'enter', messages: [first, ...decision.messages]};
   });
   ctx.on('session/event', (session, event) => {
     if (session !== agent?.session) return;
