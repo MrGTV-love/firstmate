@@ -228,5 +228,9 @@
   ],
   "beyond_audit_retired": [
     "set-required"
-  ]
+  ],
+  "observed_at": "dfb7c11fd",
+  "upstream_at": "de1ef14c7",
+  "commits_behind_upstream": 4213,
+  "staleness_note": "This registry was measured on the local clone at dfb7c11fd, which is 4,213 commits behind origin/main (de1ef14c7). The mechanism is current; the entries are not. Re-verify every entry against origin/main before treating one as live: stop_orchestrator still blocks only on CRITICAL and HIGH upstream, the BOOTSTRAP_MODE trio is still registered, and the validator layer has been rewritten so the task-completion-gate, auto-approve-safe-commands, and env-file-guardian fixes must be re-derived."
 }
