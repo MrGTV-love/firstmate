@@ -108,6 +108,10 @@ esac
 [ -f "$SNIPPET" ] || SNIPPET="$DOC_DIR/unknown.md"
 HOST_SNIPPET=
 grok_arm='bin/fm-watch-arm.sh'
+# The exact command each hook-owned arm runs, expanded for this home so a block
+# message carries a runnable path instead of a pointer to "inspect the hook".
+claude_arm="$FM_ROOT/bin/fm-claude-stop-autoarm.sh"
+cursor_park="$FM_ROOT/bin/fm-watch-arm.sh"
 case "$HARNESS" in
   claude|cursor|opencode|omp|grok|codex)
     # shellcheck source=bin/fm-supervision-engine-lib.sh
@@ -115,6 +119,9 @@ case "$HARNESS" in
     if fm_supervision_host_enabled "$CONFIG" "$HARNESS"; then
       HOST_SNIPPET="$DOC_DIR/supervision-host.md"
       grok_arm='bin/fm-supervision-host.sh park'
+      # Cursor's park runs the host under its own primary binding
+      # (bin/fm-turnend-guard-cursor.sh), so name that exact invocation.
+      cursor_park="FM_SUPERVISION_HOST_PRIMARY=cursor $FM_ROOT/bin/fm-supervision-host.sh park"
     fi
     ;;
 esac
@@ -184,7 +191,7 @@ repair_line() {
 
   case "$HARNESS" in
     claude)
-      printf '%s%s\n' "$prefix" 'watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.'
+      printf '%s%s%s%s\n' "$prefix" 'watcher supervision needs Stop-owned automatic recovery: the Stop hook runs ' "$claude_arm" ', which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.'
       ;;
     codex)
       printf '%s%s%s%s\n' "$prefix" 'repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds ' "$checkpoint_seconds" '.'
@@ -202,7 +209,7 @@ repair_line() {
       printf '%s%s%s%s\n' "$prefix" 'repair missing watcher supervision with ' "$grok_arm" ' as its own Grok tracked background task, never shell &.'
       ;;
     cursor)
-      printf '%s%s\n' "$prefix" 'watcher supervision is owned by the stop-hook park; inspect the hook registration and watcher startup path before ending the turn.'
+      printf '%s%s%s%s\n' "$prefix" 'watcher supervision is owned by the stop-hook park: the park runs ' "$cursor_park" ' in the foreground and holds the turn open, so restore that same command for this home (restart cursor-agent if the stop hook is not loaded) instead of starting a background arm.'
       ;;
     *)
       printf '%s%s\n' "$prefix" 'repair missing watcher supervision according to the session-start block for this harness; do not use shell &.'
