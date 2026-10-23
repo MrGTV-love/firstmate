@@ -543,7 +543,7 @@ test_teardown_groups_share_helper_and_stay_selectable() {
   # in this fixture - nothing outside it, nothing missing from it.
   expected=$(cd "$repo" && bin/fm-test-run.sh --list --family pr-forge | LC_ALL=C sort)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
-    || fail "the teardown helper change must select exactly the pr-forge family; got: $(printf '%s ' $listed)"
+    || fail "the teardown helper change must select exactly the pr-forge family; got: $(printf '%s\n' "$listed" | tr '\n' ' ')"
   git -C "$repo" add tests
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm teardown-helper-change
   printf '\n' >>"$repo/tests/$lock_helper"
@@ -554,7 +554,7 @@ test_teardown_groups_share_helper_and_stay_selectable() {
     assert_contains "$listed" "tests/$script" "the git lock helper change must select $script through the teardown helper"
   done
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
-    || fail "the git lock helper change must select exactly the pr-forge family; got: $(printf '%s ' $listed)"
+    || fail "the git lock helper change must select exactly the pr-forge family; got: $(printf '%s\n' "$listed" | tr '\n' ' ')"
   rm -rf "$tmp"
   pass "every teardown group stays independently selectable, the shared and git lock helpers select its pr-forge family, and pr-forge keeps them"
 }

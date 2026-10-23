@@ -15,6 +15,9 @@
 # behavior rather than test the product. Fixture processes are tracked by birth
 # identity as well as pid, so a recycled pid is never signalled, and
 # teardown_fixture_cleanup stops everything this process registered.
+# Values assigned here are consumed by the group files that source this module,
+# so their use is not visible in this file.
+# shellcheck disable=SC2034
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
