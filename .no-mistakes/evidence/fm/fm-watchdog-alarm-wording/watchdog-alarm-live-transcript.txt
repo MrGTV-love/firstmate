@@ -1,0 +1,147 @@
+
+=================== S0 BEFORE (base 4d1dc7d5e): no watcher, no config/watchdog-resume, two checks ===================
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/before )
+watchdog: session-missing - recovery failed (attempt 1)
+exit=1
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/before )
+watchdog: session-missing - recovery failed (attempt 2)
+exit=1
+--- alarm.calls (base; base seam passes no title arg)
+channel=osascript
+summary=firstmate supervision is down (session-missing) and 2 automatic recoveries failed - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/before/state/.watchdog.log
+title=
+---
+
+=================== S1 AFTER: no-op attempts (no watcher, no config/watchdog-resume) ===================
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/noop )
+watchdog: session-missing - no-op (attempt 1) - no live watcher to stop and no config/watchdog-resume
+exit=1
+--- alarm.calls after check 1:
+(none - below threshold)
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/noop )
+watchdog: session-missing - waiting out the retry interval
+exit=0
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/noop )
+watchdog: session-missing - no-op (attempt 2) - no live watcher to stop and no config/watchdog-resume
+exit=1
+--- alarm.calls after check 2:
+channel=osascript
+summary=firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and no config/watchdog-resume - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/noop/state/.watchdog.log
+title=firstmate supervision is down (session-missing)
+---
+--- episode:
+attempts=2 last_attempt=1792733684 last_alarm=1792733684
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/noop )
+watchdog: session-missing - no-op (attempt 3) - no live watcher to stop and no config/watchdog-resume
+exit=1
+--- alarm count after check 3 (rate limit 3600s):
+1
+--- .watchdog.log:
+[2026-10-23T00:34:33-0500] verdict session-missing; recovery check attempt 1
+[2026-10-23T00:34:33-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-23T00:34:35-0500] attempt 1 was a no-op; verdict now session-missing
+[2026-10-23T00:34:44-0500] verdict session-missing; recovery check attempt 2
+[2026-10-23T00:34:44-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-23T00:34:46-0500] attempt 2 was a no-op; verdict now session-missing
+[2026-10-23T00:34:50-0500] verdict session-missing; recovery check attempt 3
+[2026-10-23T00:34:50-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-23T00:34:52-0500] attempt 3 was a no-op; verdict now session-missing
+
+=================== S2 AFTER: configured resume runs but does not heal -> recovery failed ===================
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/failed )
+watchdog: session-missing - recovery failed (attempt 1)
+exit=1
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/failed )
+watchdog: session-missing - recovery failed (attempt 2)
+exit=1
+--- resume.calls:
+resume ran reason=session-missing
+resume ran reason=session-missing
+--- alarm.calls:
+channel=osascript
+summary=firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: recovery failed - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/failed/state/.watchdog.log
+title=firstmate supervision is down (session-missing)
+---
+
+=================== S3 AFTER: live stale watcher stopped via real fm-watch-arm.sh --stop, no resume -> recovery failed, no extra detail ===================
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/stoponly FM_WATCHDOG_ALARM_AFTER=1)
+watchdog: session-missing - recovery failed (attempt 1)
+exit=1
+--- alarm.calls:
+channel=osascript
+summary=firstmate supervision is down (session-missing): 1 recovery check did not restore supervision; latest attempt: recovery failed - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/stoponly/state/.watchdog.log
+title=firstmate supervision is down (session-missing)
+---
+--- .watchdog.log:
+[2026-10-23T00:35:00-0500] verdict session-missing; recovery check attempt 1
+[2026-10-23T00:35:00-0500] stopping the stale watcher pid=86045 through fm-watch-arm.sh --stop
+watcher: FAILED - refusing to arm from a disposable validation checkout: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5KJCMWC77HCP3VSV6V5ZNC7/bin
+[2026-10-23T00:35:00-0500] watcher stop reported a failure
+[2026-10-23T00:35:00-0500] no config/watchdog-resume; the session cannot be resumed from here
+[2026-10-23T00:35:02-0500] recovery attempt 1 failed; verdict now session-missing
+
+=================== S4 AFTER: config/watchdog-resume holds only comments -> no-op naming the empty file ===================
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/emptyresume )
+watchdog: session-missing - no-op (attempt 1) - no live watcher to stop and config/watchdog-resume holds no command
+exit=1
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/emptyresume )
+watchdog: session-missing - no-op (attempt 2) - no live watcher to stop and config/watchdog-resume holds no command
+exit=1
+--- alarm.calls:
+channel=osascript
+summary=firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: no-op - no live watcher to stop and config/watchdog-resume holds no command - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/emptyresume/state/.watchdog.log
+title=firstmate supervision is down (session-missing)
+---
+
+=================== S5 AFTER: mixed episode no-op then real resume, then healing resume clears episode ===================
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/mixed )
+watchdog: session-missing - no-op (attempt 1) - no live watcher to stop and no config/watchdog-resume
+exit=1
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/mixed )
+watchdog: session-missing - recovery failed (attempt 2)
+exit=1
+--- alarm.calls:
+channel=osascript
+summary=firstmate supervision is down (session-missing): 2 recovery checks did not restore supervision; latest attempt: recovery failed - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/mixed/state/.watchdog.log
+title=firstmate supervision is down (session-missing)
+---
+$ fm-watchdog-check.sh  (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5tU3T5/mixed )
+watchdog: recovered from session-missing
+exit=0
+--- episode after heal:
+ls: /Users/charlesabrooker/tmp/fm-lab.5tU3T5/mixed/state/.watchdog-episode: No such file or directory
+
+=================== S6 AFTER: real osascript and herdr channel code with recorder binaries on PATH (seam unset, no real post) ===================
+$ fm-watchdog-check.sh with FM_WEDGE_ALARM_EXEC unset, FM_WEDGE_ALARM_CHANNEL unset, config/wedge-alarm = osascript + herdr
+watchdog: session-missing - no-op (attempt 1) - no live watcher to stop and no config/watchdog-resume
+exit=1
+--- recorded channel argv:
+argv of osascript:
+  [-e]
+  [on run argv]
+  [-e]
+  [display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"]
+  [-e]
+  [end run]
+  [firstmate supervision is down (session-missing): 1 recovery check did not restore supervision; latest attempt: no-op - no live watcher to stop and no config/watchdog-resume - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/channels/state/.watchdog.log]
+  [firstmate supervision is down (session-missing)]
+argv of herdr:
+  [notification]
+  [show]
+  [firstmate supervision is down (session-missing)]
+  [--body]
+  [firstmate supervision is down (session-missing): 1 recovery check did not restore supervision; latest attempt: no-op - no live watcher to stop and no config/watchdog-resume - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/channels/state/.watchdog.log]
+  [--sound]
+  [request]
+--- AppleScript from the osascript argv compiles (osacompile, nothing posted):
+osacompile OK
+
+=================== S7 AFTER: away-mode wedge alarm title unchanged (daemon inject_wedge_alarm through the recorder seam) ===================
+channel=osascript
+summary=away-mode escalations WEDGED 600s undelivered - see /Users/charlesabrooker/tmp/fm-lab.5tU3T5/away/state/.subsuper-inject-wedged
+title=firstmate: away-mode escalations WEDGED
+---
+
+lab root /Users/charlesabrooker/tmp/fm-lab.5tU3T5 removed on exit
+/Users/charlesabrooker/tmp/fm-drv.slh8k0/drive.sh: line 110: 86045 Terminated: 15          bash -c 'exec -a fm-watch-standin /bin/sleep 600'
+/Users/charlesabrooker/tmp/fm-drv.slh8k0/drive.sh: line 110: 14137 Terminated: 15          bash -c 'exec -a claude /bin/sleep 600' > /dev/null 2>&1
