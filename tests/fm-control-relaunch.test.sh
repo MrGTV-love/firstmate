@@ -422,6 +422,7 @@ run_spawn() {  # <case-dir> <args...>
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    HERDR_SESSION="${FM_FAKE_SESSION:-}" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
     FM_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
     "$SPAWN" "$@" 2>&1
@@ -3178,7 +3179,7 @@ test_tmux_worktree_local_recovery_with_real_lsof() {
           out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --reconcile-only --note "restore instruction owner"); rc=$?
           ;;
         direct)
-          out=$(cd "$wt" && HERDR_SESSION=fmlab run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
+          out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
           ;;
       esac
       expect_code 0 "$rc" "real lsof must permit $entry from the worktree $location"$'\n'"$out"
@@ -4107,15 +4108,16 @@ test_relocation_flag_is_scoped_to_relaunch() {
 #
 # Stopping and restarting a named Herdr server preserves workspace, tab, pane
 # and label ids; only the harness processes and their registrations die
-# (docs/herdr-backend.md "Restart and liveness behavior"). The recovery-grade
-# classifier still reads a stopped server as `missing`, so a reclaim that
-# believed that verdict would abandon a pane that was about to come back and
-# open a second tab beside it.
+# (docs/herdr-backend.md "Restart and liveness behavior"). Passive classification
+# reports unreadable until an explicit recovery safely restores the server;
+# recovery must then adopt the preserved pane rather than open a second tab.
 #
 # Canned/stateful fake only - never a real herdr session.
 make_herdr_stub() {  # <case-dir>
-  local fb="$1/fakebin"
+  local fb="$1/fakebin" socket_dir
   mkdir -p "$fb"
+  socket_dir=$(TMPDIR=/tmp fm_test_tmproot fm-lab-recovery) || return 1
+  printf '%s/herdr.sock\n' "$socket_dir" > "$1/fake/herdr-socket-path"
   # The herdr server-ensure poll must actually wait between reads, so this case
   # keeps the real sleep rather than the tmux cases' instant stub.
   rm -f "$fb/sleep"
@@ -4129,10 +4131,12 @@ fi
 printf '%s\n' "$*" >> "$D/herdr-log"
 if [ "${1:-}" = status ] && [ "${2:-}" = --json ]; then
   if [ -f "$D/herdr-stopped" ]; then
-    printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":false}}\n'
+    running=false
   else
-    printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":true}}\n'
+    running=true
   fi
+  printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":%s,"socket":"%s","session":"%s"}}\n' \
+    "$running" "$(cat "$D/herdr-socket-path")" "${HERDR_SESSION:-}"
   exit 0
 fi
 if [ "${1:-}" = server ]; then

@@ -501,9 +501,13 @@ fm_control_endpoint_absence_verdict() {  # <backend> <target> [worktree]
       printf 'gone\t'
       ;;
     herdr)
-      # Start the RECORDED session's server (only the server - nothing is
-      # created) and re-read the recorded pane. A pane that comes back with the
-      # server was never destroyed.
+      # Explicit recovery may restore the recorded session only after proven
+      # server absence. The endpoint recheck itself stays read-only.
+      if ! fm_backend_herdr_parse_target "$target" \
+        || ! fm_backend_herdr_server_ensure "$FM_BACKEND_HERDR_SESSION" >/dev/null 2>&1; then
+        printf 'unproven\tthe recorded herdr session server could not be safely ensured'
+        return 0
+      fi
       case "$(fm_backend_herdr_endpoint_absence_recheck "$target")" in
         dead) printf 'dead\t' ;;
         alive) printf 'alive\t' ;;

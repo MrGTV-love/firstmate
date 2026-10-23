@@ -1844,6 +1844,12 @@ retire_busy_incarnation() {
 do_exit() {
   local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed dialog pre_busy
   require_state_verified_backend exit
+  if [ "$BACKEND" = herdr ]; then
+    if ! fm_backend_herdr_parse_target "$T" \
+      || ! fm_backend_herdr_server_ensure "$FM_BACKEND_HERDR_SESSION"; then
+      die "the recorded Herdr server could not be safely ensured for exit"
+    fi
+  fi
   state=$(agent_state)
   case "$state" in
     dead)
@@ -2544,6 +2550,14 @@ do_relaunch() {
     || die "$FM_BACKLOG_TRANSITION_ERROR"
   [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
     || die "task $ID has a pending authoritative backlog close; finish or repair it before relaunch"
+  # Restoring a stopped server belongs to this admitted lifecycle operation,
+  # never to agent_state or the attribution inspection it feeds.
+  if [ "$BACKEND" = herdr ]; then
+    if ! fm_backend_herdr_parse_target "$T" \
+      || ! fm_backend_herdr_server_ensure "$FM_BACKEND_HERDR_SESSION"; then
+      die "the recorded Herdr server could not be safely ensured for relaunch"
+    fi
+  fi
   if [ "$RECONCILE_ONLY" = 1 ]; then
     state=$(agent_state)
     case "$state" in

@@ -583,11 +583,16 @@ Workspace and tab ids support verification and cleanup but are not inferred from
 
 ### Named server and session routing
 
-The adapter starts and polls a named server before workspace, tab, pane, or agent calls.
-Every Herdr invocation goes through `fm_backend_herdr_cli`, which sets the environment and passes an explicit trailing `--session <name>`.
+Mutating operations may ensure a named server before using it; passive state, capture, cwd, foreground-process, and busy probes never start one.
+Every Herdr invocation passes an explicit `--session <name>` alongside the environment variable, through `fm_backend_herdr_cli` or the dedicated startup helper.
 An environment variable alone is not reliable when another Herdr server is running.
 
-When the selected named server is not running, the adapter launches it without these inherited values:
+A failed, empty, or malformed status is unknown and refuses startup.
+A successful stopped status is necessary but not sufficient: [`herdr-server-start.py`](../bin/backends/herdr-server-start.py) owns serialized startup after proving both process absence for the session and a non-accepting session socket.
+A live process, accepting socket, unreadable proof, or competing starter refuses rather than replacing a server.
+The detached launch closes inherited file descriptors so neither a background starter shell nor a caller's capture pipe survives for the server's lifetime.
+
+When absence is proven, the adapter launches the server without these inherited values:
 
 - Firstmate home and directory overrides.
 - Harness identity markers.
@@ -803,16 +808,17 @@ An unreadable or unparseable process view reads `unknown`, which refuses lifecyc
 
 ### Agent-liveness probe
 
-The generic Herdr agent-liveness probe reuses that pane classifier, then applies one recovery-only exception.
+The generic Herdr agent-liveness probe requires a positively running server before reusing the pane classifier.
+A stopped server may retain the saved endpoint, so passive inspection cannot classify its pane as missing.
 
 | Pane read | Probe verdict |
 | --- | --- |
-| A structurally gone pane, or a pane read from a session positively reported as having no running server | `missing` |
+| A running server confirms the recorded pane is structurally gone | `missing` |
 | A restored agent-less shell, or a stale registration over a shell-only pane | `dead` |
 | A verified live harness, registered or not, or a registered agent backed by a non-shell process | `alive` |
-| Every other unexpected read | `unreadable` |
+| A stopped or unreachable server, or any other unexpected read | `unreadable` |
 
-Neither the stopped-server exception nor the stale-registration verdict widens husk detection or any close authority.
+The stale-registration verdict does not widen husk detection or any close authority.
 Those paths still refuse an unreadable pane.
 A `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell.
 

@@ -1024,8 +1024,9 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # reuses its strict husk classifier -
 # which consults `pane process-info` and the real process table even when
 # registration is absent, so a registration Herdr kept over a shell-only pane reads
-# `dead` here (issue #4115) - then maps a positively stopped session server to
-# `missing` only in this recovery-grade view. Zellij remains unverified because
+# `dead` here (issue #4115). A stopped or unreachable Herdr server is
+# `unreadable`, not proof that its saved endpoint is missing; this read never
+# starts a server. Zellij remains unverified because
 # its secondmate ghost-tab and agent-process recovery path has not been
 # empirically validated. Orca and cmux do not support secondmate spawns.
 fm_backend_agent_state() {  # <backend> <target>
