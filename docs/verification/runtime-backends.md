@@ -2942,7 +2942,7 @@ herdr status --json --session fm-lab-never-started | jq -c "{running: .server.ru
 {"running":false,"status":"not_running"}
 ```
 
-The current [passive liveness contract](../herdr-backend.md#agent-liveness-probe) reports a stopped session as `missing` only when the startup helper's read-only proof also finds no server process and no accepting socket; a failed probe or an unproven stop reads `unreadable`, and the endpoint recheck reads only from a running server because a saved pane may return after explicit recovery.
+The current [passive liveness contract](../herdr-backend.md#agent-liveness-probe) reads the pane first and consults status only when that pane read cannot be interpreted; it then reports a stopped session as `missing` only when the startup helper's read-only proof also finds no server process and no accepting socket; a failed probe or an unproven stop reads `unreadable`, and the endpoint recheck reads only from a running server because a saved pane may return after explicit recovery.
 The status field is present on 0.8.2 protocol 20 and 0.9.0 protocol 22 alike (measured in "Client selection" above); protocol-20 coverage remains structural rather than a current live result.
 
 Measured 2026-10-23 on macOS arm64 with Herdr 0.9.5 / protocol 22 in a fresh guarded lab, with adapter CLI calls routed through `fm-herdr-lab.sh run`:

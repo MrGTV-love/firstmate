@@ -2404,15 +2404,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: backend '$BACKEND' has no recovery-grade agent-state classifier, so a relaunch cannot prove the previous agent exited; refusing rather than risking two agents in one endpoint" >&2
     exit 1
   }
-  # Passive classification never restores a stopped server. This explicit
-  # relaunch owns startup, after the adapter's process/socket absence proof.
-  if [ "$BACKEND" = herdr ]; then
-    if ! fm_backend_herdr_parse_target "$RELAUNCH_TARGET" \
-      || ! fm_backend_herdr_server_ensure "$FM_BACKEND_HERDR_SESSION"; then
-      echo "error: the recorded Herdr server could not be safely ensured for relaunch" >&2
-      exit 1
-    fi
-  fi
   # A raw `missing` read does not establish an agent-free endpoint: the shared
   # absence proof must first rule out an unreachable live agent.
   # docs/agent-control.md "Reclaiming a task whose endpoint is gone" owns

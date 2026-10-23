@@ -455,7 +455,7 @@ Two endpoint verdicts can permit a relaunch, subject to the backend policy below
 That proof is its own step because an unreachable endpoint can still hold the live agent a rebind would duplicate.
 Absence is proven and never inferred from a failed read; whether it is provable at all is a property of the backend:
 
-- **Herdr can prove it.** The explicit recovery operation may ensure the recorded session through the [safe server-start boundary](herdr-backend.md#named-server-and-session-routing), then **re-reads the recorded pane**.
+- **Herdr can prove it.** The shared absence proof is the only recovery step that may ensure the recorded session, through the [safe server-start boundary](herdr-backend.md#named-server-and-session-routing); it then **re-reads the recorded pane**.
   Server startup is a mutation owned by recovery, not by the passive endpoint recheck or crew-state inspection.
   No workspace or tab is created by that server ensure.
   `dead` means the pane survived the restart and can be adopted; `alive` means an agent came back and refuses replacement; `missing` from an answering running server proves the pane itself did not survive.

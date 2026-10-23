@@ -811,7 +811,8 @@ An unreadable or unparseable process view reads `unknown`, which refuses lifecyc
 
 ### Agent-liveness probe
 
-The generic Herdr agent-liveness probe reuses the pane classifier on a positively running server.
+The generic Herdr agent-liveness probe reads the pane first through the pane classifier, so a failed or timed-out status read never hides an answering pane.
+Only a pane read that cannot be interpreted consults the server status.
 A stopped status counts as session absence only when the same read-only proof that guards startup also finds no server process and no accepting socket; the probe never starts a server.
 Absence of the server is not proof that its saved endpoint was destroyed, so recovery that would re-create an endpoint first restores the server and rechecks the pane ([Agent control](agent-control.md#reclaiming-a-task-whose-endpoint-is-gone)).
 

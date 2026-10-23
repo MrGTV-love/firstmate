@@ -2434,41 +2434,38 @@ fm_backend_herdr_server_running_state() {  # <session>
 # backed by a non-shell process is `alive`, and an ambiguous or failed
 # process/API read is `unreadable`.
 #
-# A session whose stopped status is backed by proven process and socket absence
-# reads `missing`, so its tasks are not stranded (issue #4091); a failed or
-# timed-out probe, or a stopped status with a live process or accepting socket,
-# reads `unreadable`. This read never starts a server, and `missing` from a
-# stopped server licenses no endpoint re-creation on its own: see
+# The pane is read first, so a failed or timed-out status read never hides an
+# answering pane. Only a pane read that cannot be interpreted consults the
+# server: a session whose stopped status is backed by proven process and socket
+# absence reads `missing`, so its tasks are not stranded (issue #4091); a failed
+# status, or a stopped status with a live process or accepting socket, reads
+# `unreadable`. This read never starts a server, and `missing` from a stopped
+# server licenses no endpoint re-creation on its own: see
 # fm_backend_herdr_endpoint_absence_recheck. The husk classifier stays strict.
 fm_backend_herdr_agent_state() {  # <target>
-  local target=$1
-  fm_backend_herdr_parse_target "$target" || { printf 'unreadable'; return 0; }
-  case "$(fm_backend_herdr_server_running_state "$FM_BACKEND_HERDR_SESSION")" in
-    running) ;;
-    stopped)
-      if fm_backend_herdr_server_absence_proven "$FM_BACKEND_HERDR_SESSION"; then
-        printf 'missing'
-      else
-        printf 'unreadable'
-      fi
-      return 0
-      ;;
-    *) printf 'unreadable'; return 0 ;;
-  esac
+  local state
+  state=$(fm_backend_herdr_endpoint_absence_recheck "$1")
+  if [ "$state" != unreadable ] || ! fm_backend_herdr_parse_target "$1" \
+    || [ "$(fm_backend_herdr_server_running_state "$FM_BACKEND_HERDR_SESSION")" != stopped ] \
+    || ! fm_backend_herdr_server_absence_proven "$FM_BACKEND_HERDR_SESSION"; then
+    printf '%s' "$state"
+    return 0
+  fi
+  printf 'missing'
+}
+
+# fm_backend_herdr_endpoint_absence_recheck: pure read of a recorded endpoint's
+# pane. Every verdict but `unreadable` needs an answer from a running server,
+# because a stopped server may still retain the saved pane. Explicit recovery
+# owns any preceding startup.
+fm_backend_herdr_endpoint_absence_recheck() {  # <target>
+  fm_backend_herdr_parse_target "$1" || { printf 'unreadable'; return 0; }
   case "$(fm_backend_herdr_pane_agent_state "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE")" in
     dead) printf 'missing' ;;
     no-agent|stale-agent) printf 'dead' ;;
     live) printf 'alive' ;;
     *) printf 'unreadable' ;;
   esac
-}
-
-# fm_backend_herdr_endpoint_absence_recheck: pure read of a recorded endpoint.
-# A stopped server may still retain the saved pane, so only inspect it with a
-# positively running server. Explicit recovery owns any preceding startup.
-fm_backend_herdr_endpoint_absence_recheck() {  # <target>
-  fm_backend_herdr_target_observable "$1" || { printf 'unreadable'; return 0; }
-  fm_backend_herdr_agent_state "$1"
 }
 
 # Backward-compatible three-state view for callers that only need a yes/no

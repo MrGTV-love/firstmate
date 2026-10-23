@@ -472,28 +472,53 @@ run_with_clients() {  # <dir> <path> <body>
     bash -c ". \"\$0/bin/backends/herdr.sh\"; $body" "$ROOT"
 }
 
-# A stopped server can retain a saved pane. A stopped status whose absence
-# proof cannot be read, or an unreadable status, does not prove endpoint
-# absence; an answering running server does. The proven-absent stopped case is
-# covered by tests/herdr-server-start-fixture.py with real process and socket
-# state.
-test_passive_read_requires_a_running_server_or_proven_stop_before_claiming_absence() {
-  local dir log resp fb state expected out
-  for state in false true null; do
-    dir="$TMP_ROOT/passive-server-$state"; mkdir -p "$dir/responses"
+# Passive classification reads the pane first. An answering pane is classified
+# without any status read, so a failed or timed-out status cannot hide it.
+# Only an uninterpretable pane read consults status, and there a running,
+# unknown, failed, or unprovable stopped server stays unreadable. The
+# proven-absent stopped case is covered by tests/herdr-server-start-fixture.py
+# with real process and socket state.
+test_passive_read_is_pane_first_and_consults_status_only_on_fallback() {
+  local dir log resp fb state out
+  dir="$TMP_ROOT/passive-live"; mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
+  printf '{"result":{"pane":{"pane_id":"w1:p2"}}}\n' > "$resp/1.out"
+  printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/2.out"
+  printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":4242,"foreground_process_group_id":4243,"foreground_processes":[{"pid":4243,"name":"node","argv0":"pi","argv":["pi"],"cmdline":"pi"}]}}}\n' > "$resp/3.out"
+  printf '124\n' > "$resp/4.exit"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state fmtest:w1:p2' "$ROOT")
+  [ "$out" = alive ] || fail "a live pane must read alive while status would time out, got '$out'"
+  assert_not_contains "$(cat "$log")" $'\x1fstatus\x1f' "a passive read of an answering pane must not call status"
+
+  dir="$TMP_ROOT/passive-gone"; mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
+  printf '{"error":{"code":"pane_not_found"}}\n' > "$resp/1.out"
+  printf '1\n' > "$resp/2.exit"
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state fmtest:w1:p2' "$ROOT")
+  [ "$out" = missing ] || fail "a running server's pane_not_found must read missing, got '$out'"
+  assert_not_contains "$(cat "$log")" $'\x1fstatus\x1f' "a structurally gone pane must not call status"
+
+  for state in true false null error; do
+    dir="$TMP_ROOT/passive-fallback-$state"; mkdir -p "$dir/responses"
     resp="$dir/responses"; log="$dir/log"; : > "$log"
-    printf '{"server":{"running":%s}}\n' "$state" > "$resp/1.out"
-    printf '{"error":{"code":"pane_not_found"}}\n' > "$resp/2.err"
-    printf '1\n' > "$resp/2.exit"
+    printf 'Error: socket unavailable\n' > "$resp/1.out"
+    printf '1\n' > "$resp/1.exit"
+    if [ "$state" = error ]; then
+      printf '1\n' > "$resp/2.exit"
+    else
+      printf '{"server":{"running":%s}}\n' "$state" > "$resp/2.out"
+      printf '{"server":{"running":%s}}\n' "$state" > "$resp/3.out"
+    fi
     fb=$(make_herdr_fakebin "$dir")
     out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
       bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state fmtest:w1:p2' "$ROOT")
-    expected=unreadable
-    [ "$state" != true ] || expected=missing
-    [ "$out" = "$expected" ] || fail "server running=$state must classify as $expected, got '$out'"
+    [ "$out" = unreadable ] || fail "an uninterpretable pane read with server status $state must stay unreadable, got '$out'"
+    assert_contains "$(cat "$log")" $'\x1fstatus\x1f' "an uninterpretable pane read must consult status"
     assert_not_contains "$(cat "$log")" $'\x1fserver\x1f' "a passive classifier must not start a server"
   done
-  pass "herdr passive classifier requires a running server or proven stop before claiming pane absence"
+  pass "herdr passive classifier reads the pane first and consults status only for an uninterpretable pane"
 }
 
 # --- stale agent registration over a shell-only pane (issue #4115) -----------
@@ -6318,7 +6343,7 @@ test_workspace_label_empty_marker_falls_back_to_primary
 test_workspace_label_different_secondmates_get_different_labels
 test_cli_helper_sets_env_and_appends_trailing_session_flag
 test_agent_state_bypasses_a_stale_client_shadowing_a_compatible_one
-test_passive_read_requires_a_running_server_or_proven_stop_before_claiming_absence
+test_passive_read_is_pane_first_and_consults_status_only_on_fallback
 test_stale_registration_over_a_shell_only_pane_is_agent_free
 test_missing_registration_requires_process_evidence
 test_stale_registration_ignores_status_and_reads_the_process
