@@ -6,6 +6,11 @@ shadow mode writes to them before any live pick. They carry the handoff columns 
 extra shadow columns (mode, rule_worker, rule_validator, rule_effort) so one row holds both
 the picker's pick and the current dispatch rule's choice.
 
+The shadow picker's own evidence columns (policy version, task join key, classification
+confidence, complexity components, confidence band, staleness and pick status) are added by
+an additive in-place migration: every shipped column keeps its name and every existing row
+survives. A drop or rename is never performed.
+
 The benchmark matrix (models, metrics, observations, reconcile_runs) is loaded
 by `migrate` from raw evidence only; every derived aggregate is recomputed, never imported.
 """
@@ -28,7 +33,11 @@ DDL_CALIBRATION = [
         jev_raw_payload BLOB, jev_candidate_version TEXT,
         gates TEXT, pareto_pruned TEXT, spend_priority TEXT,
         snapshot_age REAL, validator_verdict TEXT, validator_disagreement TEXT,
-        rework INTEGER, captain_acceptance TEXT)""",
+        rework INTEGER, captain_acceptance TEXT,
+        policy_version TEXT, task_key TEXT, work_type_confidence REAL,
+        complexity_components TEXT, complexity_confidence REAL, confidence_band TEXT,
+        snapshot_stale INTEGER, classification_uncertain INTEGER, picker_status TEXT,
+        reject_reason TEXT, jev_raw_support BLOB)""",
     """CREATE TABLE IF NOT EXISTS outcomes (
         dispatch_id INTEGER PRIMARY KEY REFERENCES dispatch_log(id),
         quality REAL, rework INTEGER, time_s REAL, accepted INTEGER, notes TEXT)""",
@@ -39,8 +48,19 @@ DISPATCH_FIELDS = (
     "chosen_validator", "effort", "rule_worker", "rule_validator", "rule_effort",
     "jev_raw_payload", "jev_candidate_version", "gates", "pareto_pruned", "spend_priority",
     "snapshot_age", "validator_verdict", "validator_disagreement", "rework",
-    "captain_acceptance")
-JSON_FIELDS = ("gates", "pareto_pruned", "spend_priority")
+    "captain_acceptance", "policy_version", "task_key", "work_type_confidence",
+    "complexity_components", "complexity_confidence", "confidence_band",
+    "snapshot_stale", "classification_uncertain", "picker_status", "reject_reason",
+    "jev_raw_support")
+JSON_FIELDS = ("gates", "pareto_pruned", "spend_priority", "complexity_components")
+# Added after the handoff columns shipped. The migration is additive only.
+SHADOW_COLUMNS = {
+    "policy_version": "TEXT", "task_key": "TEXT", "work_type_confidence": "REAL",
+    "complexity_components": "TEXT", "complexity_confidence": "REAL",
+    "confidence_band": "TEXT", "snapshot_stale": "INTEGER",
+    "classification_uncertain": "INTEGER", "picker_status": "TEXT", "reject_reason": "TEXT",
+    "jev_raw_support": "BLOB",
+}
 
 
 def utc_now():
@@ -58,10 +78,20 @@ def connect(path):
     return conn
 
 
+def _ensure_columns(conn, table, columns):
+    """Additive in-place migration: add only columns that are absent, never drop or rename."""
+    have = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    for name, decl in columns.items():
+        if name not in have:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
 def init_calibration(conn):
-    """Create the calibration tables only; the matrix tables come later."""
+    """Create the calibration tables only; the matrix tables come later.
+    Existing databases get the shadow evidence columns through an additive migration."""
     for stmt in DDL_CALIBRATION:
         conn.execute(stmt)
+    _ensure_columns(conn, "dispatch_log", SHADOW_COLUMNS)
     conn.commit()
 
 

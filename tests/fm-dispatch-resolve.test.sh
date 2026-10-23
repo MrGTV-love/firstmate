@@ -76,7 +76,7 @@ const server = http.createServer(async (req, res) => {
   if (settings.mutate) copyFileSync(settings.mutate[0], settings.mutate[1]);
   if (settings.delay) await new Promise(resolve => setTimeout(resolve, settings.delay));
   if (settings.drop) { req.socket.destroy(); return; }
-  if (settings.http) { res.writeHead(settings.http); res.end(settings.body ?? 'private-error-sentinel'); return; }
+  if (settings.http && (!settings.http_if || request.questions[settings.http_if])) { res.writeHead(settings.http); res.end(settings.body ?? 'private-error-sentinel'); return; }
   if (settings.raw !== undefined) { res.setHeader('content-type', 'application/json'); res.end(settings.raw); return; }
   const answers = {};
   for (const [id, q] of Object.entries(request.questions)) {
@@ -1922,5 +1922,83 @@ assert_equals 'clear rule_1 rule_2 rule_2' "$(jq -r '[.status, .choice, .rule, .
 printf '%s\n' '{}' > "$SETTINGS"
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 pass 'a pooled group with more probability than the answer choice is the pick when it clears its floor and the choice does not'
+
+
+# ---- shadow model picker: observe only -----------------------------------------
+# With the flag off the resolver is byte-identical and touches no picker data. With it on
+# the picker logs what it would have chosen and the resolver's status/profile/exit stay the
+# same, including when the picker's own Jev call fails.
+SHADOW_DATA="$TMP_ROOT/shadow-data"
+mkdir -p "$SHADOW_DATA/projection"
+for slug in claude-sonnet-5-5-high claude-opus-5-5-high claude-haiku-5-5 \
+            gpt-6-1-sol-high gpt-6-luna-low deepseek-v4-flash; do
+  cp "$ROOT/tests/fixtures/model-picker-shadow/projection/$slug.json" "$SHADOW_DATA/projection/"
+done
+printf '%s\n' '{"verdict":"TRUSTED"}' > "$SHADOW_DATA/verdict.json"
+printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_5"}' > "$SETTINGS"
+node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({reports:[{provider:"openai-codex",fetchedAt:Date.now(),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}},limits:[{scope:{tier:"chat"},amount:{remainingFraction:.9}}]}]}))' "$POOL"
+run_shadow() {  # <flag-value>
+  OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key \
+    FM_MODEL_PICKER_SHADOW="$1" FM_MODEL_PICKER_DATA="$SHADOW_DATA" \
+    bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" --project firstmate 2> "$TMP_ROOT/error") \
+    || fail "resolver failed with shadow flag '$1': $(cat "$TMP_ROOT/error")"
+}
+strip_diag() { printf '%s\n' "$1" | grep -v -e '^  timings:' -e '^  usage:' -e '^  model:'; }
+shadow_sql() { python3 -I -c 'import sqlite3,sys; print("\n".join("|".join(str(c) for c in r) for r in sqlite3.connect(sys.argv[1]).execute(sys.argv[2])))' "$SHADOW_DATA/aa.sqlite" "$1" 2>/dev/null || true; }
+
+before_calls=$(count)
+run_shadow ''
+OFF=$OUT
+[ ! -e "$SHADOW_DATA/aa.sqlite" ] || fail 'flag off created the picker store'
+strip_diag "$OFF" > "$TMP_ROOT/off1.txt"
+run_shadow ''
+strip_diag "$OUT" > "$TMP_ROOT/off2.txt"
+diff -u "$TMP_ROOT/off1.txt" "$TMP_ROOT/off2.txt" > "$TMP_ROOT/offdiff.txt" \
+  || fail "two flag-off resolves differ: $(cat "$TMP_ROOT/offdiff.txt")"
+assert_equals 2 "$(( $(count) - before_calls ))" 'two flag-off resolves make only their own rule calls'
+assert_equals 0 "$(grep -c '"work_type"' "$CALLS" || true)" 'flag off adds no picker request'
+off_calls=$(count)
+run_shadow 1
+ON=$OUT
+strip_diag "$OFF" > "$TMP_ROOT/off.txt"
+strip_diag "$ON" > "$TMP_ROOT/on.txt"
+diff -u "$TMP_ROOT/off.txt" "$TMP_ROOT/on.txt" > "$TMP_ROOT/diff.txt" \
+  || fail "flag-on stdout changed beyond timings: $(cat "$TMP_ROOT/diff.txt")"
+[ "$(count)" -gt "$off_calls" ] || fail 'flag on made no picker request'
+assert_equals 1 "$(shadow_sql "select count(*) from dispatch_log where mode='shadow'")" 'exactly one shadow row'
+[ "$(shadow_sql "select count(*) from outcomes")" = 0 ] || fail 'the shadow path wrote an outcome'
+assert_equals 'accepted' "$(shadow_sql "select picker_status from dispatch_log")" 'the picker accepted its pick'
+rule_worker=$(sed -n 's/^  profile:.*--harness \([^ ]*\) --model \([^ ]*\).*/\1:\2/p' <<<"$ON" | tr -d "'")
+assert_equals "$rule_worker" "$(shadow_sql "select rule_worker from dispatch_log")" 'the row records the route the resolver chose'
+[ -n "$(shadow_sql "select chosen_worker from dispatch_log")" ] || fail 'the row records the picker pick'
+assert_equals 'omp:openai-codex/gpt-6.1-sol' "$(shadow_sql "select chosen_validator from dispatch_log")" 'the row records the eligible cross-family validator'
+[ -n "$(shadow_sql "select jev_raw_payload from dispatch_log")" ] || fail 'the row retains the raw Jev result'
+
+# A picker-only Jev failure must not move the resolver result.
+python3 - "$SETTINGS" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+doc['http'] = 500
+doc['http_if'] = 'work_type'
+json.dump(doc, open(sys.argv[1], 'w'))
+PY
+run_shadow 1
+strip_diag "$OUT" > "$TMP_ROOT/on500.txt"
+diff -u "$TMP_ROOT/off.txt" "$TMP_ROOT/on500.txt" > "$TMP_ROOT/diff500.txt" \
+  || fail "a picker 500 changed the resolver result: $(cat "$TMP_ROOT/diff500.txt")"
+assert_equals 'picker-error' "$(shadow_sql "select picker_status from dispatch_log order by id desc limit 1")" 'the picker failure is recorded'
+printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_5"}' > "$SETTINGS"
+
+# An UNTRUSTED verdict stops the picker before any benchmark fact is read or sent.
+printf '%s\n' '{"verdict":"UNTRUSTED","reason":"matrix rebuilt without chart-diff"}' > "$SHADOW_DATA/verdict.json"
+picker_calls_before=$(grep -c '"work_type"' "$CALLS" || true)
+run_shadow 1
+strip_diag "$OUT" > "$TMP_ROOT/onunt.txt"
+diff -u "$TMP_ROOT/off.txt" "$TMP_ROOT/onunt.txt" > "$TMP_ROOT/diffunt.txt" \
+  || fail "an untrusted snapshot changed the resolver result: $(cat "$TMP_ROOT/diffunt.txt")"
+assert_equals "$picker_calls_before" "$(grep -c '"work_type"' "$CALLS" || true)" 'no picker request was sent for an untrusted snapshot'
+assert_equals 'no-trusted-snapshot' "$(shadow_sql "select picker_status from dispatch_log order by id desc limit 1")" 'the refusal is recorded'
+printf '%s\n' '{"verdict":"TRUSTED"}' > "$SHADOW_DATA/verdict.json"
+pass 'shadow mode: off is identical and inert; on logs both picks without changing the dispatch, even when Jev fails or the snapshot is untrusted'
 
 printf '# all fm-dispatch-resolve tests passed\n'

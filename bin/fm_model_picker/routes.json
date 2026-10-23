@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "table_version": "2026-10-19.1",
+  "comment": "Explicit route -> Artificial Analysis projection table for the shadow model picker. A route is a concrete harness:model from config/crew-dispatch.json. Every projection entry asserts the projection's own `name`; a mismatch refuses the entry and leaves the route a candidate with UNKNOWN facts. Effort keys select the measured variant closest to the route's configured effort; `default` is the fallback. Currency is the lane's real spend: subscription quota or API dollars.",
+  "families": {
+    "anthropic": {"creator": "Anthropic"},
+    "openai": {"creator": "OpenAI"},
+    "deepseek": {"creator": "DeepSeek"}
+  },
+  "routes": {
+    "claude:claude-sonnet-5-5[1m]": {
+      "family": "anthropic",
+      "currency": "subscription",
+      "provider": "claude",
+      "projections": {
+        "high": {"slug": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High, Default Fallback)"},
+        "max": {"slug": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5 (Max, Default Fallback)"},
+        "default": {"slug": "claude-sonnet-5-5-high", "name": "Claude Sonnet 5.5 (High, Default Fallback)"}
+      }
+    },
+    "claude:opus": {
+      "family": "anthropic",
+      "currency": "subscription",
+      "provider": "claude",
+      "projections": {
+        "high": {"slug": "claude-opus-5-5-high", "name": "Claude Opus 5.5 (High, Default Fallback)"},
+        "max": {"slug": "claude-opus-5-5", "name": "Claude Opus 5.5 (Max, Default Fallback)"},
+        "default": {"slug": "claude-opus-5-5-high", "name": "Claude Opus 5.5 (High, Default Fallback)"}
+      }
+    },
+    "claude:claude-haiku-5-5": {
+      "family": "anthropic",
+      "currency": "subscription",
+      "provider": "claude",
+      "projections": {
+        "max": {"slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5 (Max)"},
+        "default": {"slug": "claude-haiku-5-5", "name": "Claude Haiku 5.5 (Max)"}
+      }
+    },
+    "omp:openai-codex/gpt-6.1-sol": {
+      "family": "openai",
+      "currency": "subscription",
+      "provider": "codex",
+      "projections": {
+        "high": {"slug": "gpt-6-1-sol-high", "name": "GPT-6.1 Sol (High)"},
+        "max": {"slug": "gpt-6-1-sol", "name": "GPT-6.1 Sol (Max)"},
+        "default": {"slug": "gpt-6-1-sol-high", "name": "GPT-6.1 Sol (High)"}
+      }
+    },
+    "omp:openai-codex/gpt-6-luna": {
+      "family": "openai",
+      "currency": "subscription",
+      "provider": "codex",
+      "projections": {
+        "low": {"slug": "gpt-6-luna-low", "name": "GPT-6 Luna (Low)"},
+        "default": {"slug": "gpt-6-luna-low", "name": "GPT-6 Luna (Low)"}
+      }
+    },
+    "omp:deepseek/deepseek-v4-flash": {
+      "family": "deepseek",
+      "currency": "api",
+      "provider": null,
+      "projections": {
+        "high": {"slug": "deepseek-v4-flash", "name": "DeepSeek V4 Flash 0731 (Max)", "effort_note": "the route runs high; the only projection of the current DeepSeek V4 Flash build is its Max variant"},
+        "max": {"slug": "deepseek-v4-flash", "name": "DeepSeek V4 Flash 0731 (Max)"},
+        "default": {"slug": "deepseek-v4-flash", "name": "DeepSeek V4 Flash 0731 (Max)", "effort_note": "the route runs high; the only projection of the current DeepSeek V4 Flash build is its Max variant"}
+      }
+    }
+  }
+}
