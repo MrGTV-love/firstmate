@@ -2234,6 +2234,10 @@ resolve_relaunch_profile() {
     TARGET_MODEL=$NEW_MODEL
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_MODEL=${CONFIG_MODEL:-default}
+    if [ "$TARGET_HARNESS" = dsh ] && [ "$TARGET_MODEL" = default ]; then
+      TARGET_MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) \
+        || die "the dsh harness from config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness. The running agent was not stopped"
+    fi
   elif [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
     TARGET_MODEL=$PRIOR_MODEL
   else

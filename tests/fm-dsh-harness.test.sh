@@ -315,6 +315,34 @@ wait "$LIVE" 2>/dev/null || true
 case "$out" in *"live DSH session pid $LIVE"*) ;; *) echo "$out" >&2; exit 1 ;; esac
 [ -s "$GEN/dsh/sessions/workspace/s/session.v4.jsonl" ] || { echo 'refusals must keep the bound conversation' >&2; exit 1; }
 printf 'ok - the DSH primary resumes its bound model and effort and refuses to replace an unresumable or live conversation\n'
+# With no --model and no binding to resume, the launcher takes the operator's
+# dsh-tui /model choice at run time and refuses when it names no DeepSeek model.
+rm -f "$P/home/state/.lock"
+mkdir -p "$P/operator/.dsh-tui"
+for preference in absent '{"provider":"openrouter","model":"deepseek/deepseek-v4-pro"}' '{"provider":"deepseek-official","model":""}'; do
+  if [ "$preference" = absent ]; then
+    rm -f "$P/operator/.dsh-tui/model.json"
+  else
+    printf '%s\n' "$preference" > "$P/operator/.dsh-tui/model.json"
+  fi
+  : > "$P/launch"
+  if out=$(primary_launch 2>&1); then
+    echo "a primary with no --model and preference $preference must refuse" >&2; exit 1
+  fi
+  case "$out" in *'pass --model deepseek/<id>'*) ;; *) echo "$out" >&2; exit 1 ;; esac
+  [ ! -s "$P/launch" ] || { echo "a refused primary must not start dsh-tui: $(cat "$P/launch")" >&2; exit 1; }
+done
+printf '{"provider":"deepseek-official","model":"operator-choice"}\n' > "$P/operator/.dsh-tui/model.json"
+cp "$P/operator/.dsh-tui/model.json" "$TMP/operator-preference"
+primary_launch
+python3 - "$(sed -n 2p "$P/launch")" "$P/home/state/dsh-primary.dsh-session" <<'PY2'
+import json, sys
+row = json.load(open(sys.argv[1]))[0]['config']
+assert row['model'] == 'operator-choice' and row['effort'] == 'high', row
+assert json.load(open(sys.argv[2]))['model'] == 'operator-choice'
+PY2
+cmp -s "$TMP/operator-preference" "$P/operator/.dsh-tui/model.json" || { echo 'the launch must not change the operator preference' >&2; exit 1; }
+printf 'ok - a DSH primary with no --model reads the operator /model preference at launch and refuses when it names no DeepSeek model\n'
 for args in \
   'node /opt/homebrew/bin/dsh-tui --patch /state/t.dsh/g1/launch.yml -- brief' \
   'node /opt/homebrew/lib/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js --patch x' \

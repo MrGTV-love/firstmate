@@ -96,7 +96,7 @@ printf '%s\n' 'Isolated runtime lab. Do not investigate, read outside this home,
 # the pane runs a short command and the launch lives in a file.
 cat > "$TASK/start-primary.sh" <<EOF
 #!/usr/bin/env bash
-exec env FM_HOME='$LAB_HOME' FM_DSH_OPERATOR_HOME='$LAB_HOME/operator-home' PATH='$PATH' FM_POLL=1 FM_CHECK_INTERVAL=1 bash '$ROOT/bin/fm-dsh-primary.sh' -- '$PROMPT'
+exec env FM_HOME='$LAB_HOME' FM_DSH_OPERATOR_HOME='$LAB_HOME/operator-home' PATH='$PATH' FM_POLL=1 FM_CHECK_INTERVAL=1 bash '$ROOT/bin/fm-dsh-primary.sh' --model deepseek/deepseek-v4-flash --effort high -- '$PROMPT'
 EOF
 lab pane run "$PANE" "bash '$TASK/start-primary.sh'"
 EVENTS="$LAB_HOME/state/.dsh-primary-events.jsonl"

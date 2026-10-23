@@ -3,6 +3,8 @@
 # Usage: fm-dsh-primary.sh [--model deepseek/<id>] [--effort <level>] [--resume] [-- <opening-prompt>]
 #        fm-dsh-primary.sh inspect <home>   internal read-only ownership/need query
 # FM_HOME selects the operational home; no global DSH profile is modified.
+# A launch with no --model and no resumed binding reads the operator's dsh-tui
+# /model preference at run time, and refuses when it names no deepseek-official model.
 # --resume continues the bound primary conversation with its recorded model and
 # effort unless they are given; it starts fresh only when no binding exists and
 # refuses rather than replace a conversation it cannot resume. Neither form
@@ -51,6 +53,7 @@ while [ "$#" -gt 0 ]; do
     --help|-h)
       echo 'Usage: fm-dsh-primary.sh [--model deepseek/<id>] [--effort low|medium|high|xhigh|max] [--resume] [-- <opening-prompt>]'
       echo 'Launch from the Firstmate home. FM_HOME selects an alternate primary home.'
+      echo "Without --model, the operator's dsh-tui /model preference selects the model."
       exit 0 ;;
     *) echo "error: unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -80,7 +83,12 @@ if [ "$RESUME" = 1 ] && [ -e "$BINDING" ]; then
   [ -n "$MODEL" ] || MODEL=${BOUND%%$'\n'*}
   [ -n "$EFFORT" ] || EFFORT=${BOUND#*$'\n'}
 fi
-MODEL=${MODEL:-deepseek/deepseek-v4-flash}
+if [ -z "$MODEL" ]; then
+  MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" preferred-model "${FM_DSH_OPERATOR_HOME:-$HOME}") || {
+    echo "error: no --model was given and the operator's dsh-tui /model preference names no deepseek-official model; pass --model deepseek/<id>" >&2
+    exit 1
+  }
+fi
 EFFORT=${EFFORT:-high}
 python3 "$SCRIPT_DIR/fm-dsh.py" check dsh "$MODEL"
 SOURCE_HOME=${FM_DSH_SOURCE_HOME:-${DSH_HOME:-$HOME/.dsh}}

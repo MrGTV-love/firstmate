@@ -132,6 +132,67 @@ SH
   pass "fm-control relaunch: missing dsh models and DeepSeek-through-omp refuse before stopping"
 }
 
+# A plain relaunch of a secondmate whose configured harness is a bare dsh takes
+# the calling DSH session's bound model, as the spawn does, before the stop.
+test_secondmate_config_dsh_relaunch_carries_own_session_model() {
+  local dir home source primary out rc
+  dir=$(new_case smdsh smd)
+  home="$dir/home"
+  mkdir -p "$home/config" "$home/data/smd"
+  printf 'dsh\n' > "$home/config/secondmate-harness"
+  printf '# secondmate brief\n' > "$home/data/smd/brief.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+  mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
+  printf 'smd\n' > "$dir/smhome/.fm-secondmate-home"
+  printf '# agents\n' > "$dir/smhome/AGENTS.md"
+  {
+    echo "window=fmses:fm-smd"
+    echo "endpoint_task_id=smd"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "model=default"
+    echo "effort=default"
+    echo "home=$dir/smhome"
+  } > "$home/state/smd.meta"
+  printf '%s\n' "fm-smd" > "$dir/fake/windows"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  cat > "$dir/fakebin/dsh-tui" <<'SH'
+#!/bin/sh
+[ "${1:-}" = version ] && exit 0
+exit 1
+SH
+  printf '#!/bin/sh\nprintf "99.2.0\\n"\n' > "$dir/fakebin/dsh"
+  chmod +x "$dir/fakebin/dsh-tui" "$dir/fakebin/dsh"
+  cp "$home/state/smd.meta" "$dir/prior.meta"
+  out=$(DSH_HOME="$dir/unbound/dsh" run_control "$dir" smd relaunch); rc=$?
+  expect_code 1 "$rc" "a config dsh secondmate with no live session model must refuse: $out"
+  assert_contains "$out" "has no configured model" "the refusal must name the missing model configuration"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "the missing-model refusal stopped the running agent"
+  cmp -s "$dir/prior.meta" "$home/state/smd.meta" || fail "the missing-model refusal changed task metadata"
+  assert_absent "$home/state/smd.control-relaunch" "the missing-model refusal must precede the relaunch transaction"
+  source="$dir/operator-dsh"
+  mkdir -p "$source/profiles/dsh-tui/node_modules" "$dir/operator-home"
+  printf '{}\n' > "$source/profiles/dsh-tui/package.json"
+  primary=$(FM_DSH_OPERATOR_HOME="$dir/operator-home" python3 "$ROOT/bin/fm-dsh.py" prepare-primary \
+    "$dir/primary-state" dsh-primary g1 "$source" deepseek/deepseek-v4-pro high "$home" "$ROOT") \
+    || fail "the DSH primary runtime fixture could not be prepared"
+  # Pending composer text stops the transaction at the exit step, after the
+  # replacement profile is resolved and journaled but before the agent stops.
+  printf 'i' > "$dir/fake/composer"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_contains "$out" "composer visibly holds pending text" "the bound model must pass every pre-stop admission"
+  assert_equals dsh "$(journal_field "$dir" smd to_harness)" "the configured dsh harness must be the replacement"
+  assert_equals deepseek/deepseek-v4-pro "$(journal_field "$dir" smd to_model)" \
+    "the replacement must carry the calling DSH session's bound model"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "the pending-composer refusal stopped the running agent"
+  pass "fm-control relaunch: a config dsh secondmate with no model carries the DSH session's bound model and refuses without one before stopping"
+}
+
 test_relaunch_omp_billing_admission_preserves_running_agents() {
   local provider path dir id model meta out rc expected
   local -a args
@@ -2068,6 +2129,7 @@ control_relaunch_test_cases=(
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_unsupported_omp_before_stopping
 test_relaunch_refuses_contradictory_dsh_route_before_stopping
+test_secondmate_config_dsh_relaunch_carries_own_session_model
 test_relaunch_omp_billing_admission_preserves_running_agents
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

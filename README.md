@@ -121,7 +121,9 @@ Start `omp` with this checkout as its working directory: it auto-discovers the t
 **DeepSeek Harness**
 
 ```sh
-bin/fm-dsh-primary.sh --model deepseek/deepseek-v4-flash --effort high
+bin/fm-dsh-primary.sh --model deepseek/<id> --effort high
+# or use the model last chosen with /model in dsh-tui
+bin/fm-dsh-primary.sh
 # continue its recorded conversation after exiting or a crash
 bin/fm-dsh-primary.sh --resume
 ```

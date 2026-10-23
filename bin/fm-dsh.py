@@ -23,6 +23,9 @@ bound STATE ID prints the binding's model as deepseek/<id> and its effort
 (default when none) on two lines.
 own-model prints, as deepseek/<id>, the model bound to the Firstmate-prepared
 generation that DSH_HOME names, and fails unless that binding still names it.
+preferred-model OPERATOR_HOME prints, as deepseek/<id>, the operator's persisted
+dsh-tui /model choice in OPERATOR_HOME/.dsh-tui/model.json, and fails unless it
+is a concrete deepseek-official model.
 session-file STATE ID prints the live depth-zero session log.
 position STATE ID prints the live session log and its last durable seq as JSON,
 or nothing before the launch has a log.
@@ -363,6 +366,20 @@ def own_model():
     print("deepseek/" + binding["model"])
 
 
+def preferred_model(operator_home):
+    path = Path(operator_home) / ".dsh-tui" / "model.json"
+    try:
+        preference = json.loads(path.read_text())
+    except FileNotFoundError:
+        raise ValueError(f"no DSH model preference at {path}") from None
+    if not isinstance(preference, dict) or preference.get("provider") != "deepseek-official" \
+            or not isinstance(preference.get("model"), str) or not preference["model"]:
+        raise ValueError(f"{path} names no deepseek-official model")
+    model = "deepseek/" + preference["model"]
+    check("dsh", model)
+    print(model)
+
+
 def session_file(args):
     state, task = args
     path = live_log(state, task)
@@ -385,6 +402,8 @@ def main():
     p.add_argument("state")
     p.add_argument("task")
     sub.add_parser("own-model")
+    p = sub.add_parser("preferred-model")
+    p.add_argument("operator_home")
     p = sub.add_parser("session-file")
     p.add_argument("values", nargs=2)
     p = sub.add_parser("position")
@@ -416,6 +435,8 @@ def main():
             bound(args.state, args.task)
         elif args.command == "own-model":
             own_model()
+        elif args.command == "preferred-model":
+            preferred_model(args.operator_home)
         elif args.command == "session-file":
             session_file(args.values)
         elif args.command == "route":
