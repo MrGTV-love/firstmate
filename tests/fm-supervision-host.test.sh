@@ -760,12 +760,13 @@ SH
   printf '%s\n' "$bin/fm-supervision-host.sh"
 }
 
-# A successor that starts later than the removed 25-second readiness default
-# (its old knob still set to 1 second here) is awaited and left for main.
-test_slow_successor_is_awaited_not_retired() {
+# A successor that starts later than the readiness notice window (1 second here)
+# does not hold the close: it reaches main with a still-starting line, and the
+# successor is left running until it reports.
+test_slow_successor_does_not_hold_the_close() {
   local home host pid
   home=$(make_home slow-successor attended)
-  host=$(host_bin_with_successor "$home" 'sleep 3')
+  host=$(host_bin_with_successor "$home" 'sleep 5')
   FM_SUPERVISION_HOST_READY_TIMEOUT=1 HOST="$host" start_host "$home"
   wait_until 150 watcher_live "$home" || fail "slow successor: the host never started a watcher cycle"
   append_status "$home" 'which export format?' needs-decision
@@ -773,11 +774,12 @@ test_slow_successor_is_awaited_not_retired() {
   expect_code 0 "$(cat "$home/host.rc")" "a main-only close must exit 0"
   [ "$(cat "$home/arm-calls")" = 2 ] || fail "slow successor: the host did not start exactly one successor"
   assert_no_re 'successor-unverified' "$home/state/.supervision-host.log" "a slow successor must not be reported unverified"
-  watcher_live "$home" || fail "slow successor: the host retired the slow successor: $(cat "$home/state/.supervision-host.log")"
+  assert_re '^supervision-host: the successor watcher cycle is still starting' "$home/host.out" "the close must say the successor is still starting"
+  wait_until 150 watcher_live "$home" || fail "slow successor: the host retired the still-starting successor: $(cat "$home/state/.supervision-host.log")"
   pid=$(cat "$home/state/.watch.lock/pid")
   sleep 1
   kill -0 "$pid" 2>/dev/null || fail "slow successor: the successor watcher exited after the pass-through (pid $pid)"
-  pass "host: a successor slower than the removed readiness deadline is awaited and left running"
+  pass "host: a successor slower than the readiness notice window does not hold the close and is left running"
 }
 
 # A successor that reports its own startup failure ends the wait at once, even
@@ -2192,7 +2194,7 @@ run_host_case test_quiet_record_without_its_daemon_is_a_present_captain
 run_host_case test_attended_main_only_close_passes_straight_to_main
 run_host_case test_off_written_while_parked_passes_the_next_attended_close_to_main
 run_host_case test_main_only_pass_through_leaves_the_successor_watcher_running
-run_host_case test_slow_successor_is_awaited_not_retired
+run_host_case test_slow_successor_does_not_hold_the_close
 run_host_case test_failed_successor_fails_fast
 run_host_case test_attended_close_with_unidentified_main_session_passes_to_main
 run_host_case test_close_accepted_away_that_turns_attended_passes_to_main

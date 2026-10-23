@@ -12,11 +12,10 @@ EXT="$ROOT/.pi/extensions/fm-primary-pi-watch.ts"
 # unrelated to plugin output, which the assertions intentionally require empty.
 export NODE_NO_WARNINGS=1
 
-# The test value of the removed Pi/OpenCode readiness deadlines. The adapters no
-# longer read FM_PI_ARM_READY_TIMEOUT_MS or FM_OPENCODE_ARM_READY_TIMEOUT_MS: the
-# arm owns startup no-progress detection. Tests still pass this value so a
-# reintroduced deadline would retire the slow successor in the
-# *_slow_successor_is_not_retired tests, which start later than it.
+# The Pi/OpenCode readiness notice window for these tests: a wake waits this long
+# for its successor to report, then goes out with a still-starting line. The
+# successor is never stopped for it. The *_slow_successor_does_not_hold_the_wake
+# tests start their successor later than this window.
 ARM_READY_TIMEOUT_MS=2000
 
 install_pi_watch_extension_fixture() {
@@ -3042,13 +3041,15 @@ EOF
 }
 
 # The arm owns startup no-progress detection: a successor that starts later than
-# the removed readiness deadline is awaited, never retired.
-test_pi_slow_successor_is_not_retired() {
-  local repo home plugin log retired stop out status
+# the readiness notice window does not hold the wake, which goes out saying it is
+# still starting, and the successor is left running until it reports.
+test_pi_slow_successor_does_not_hold_the_wake() {
+  local repo home plugin log retired startedfile stop out status
   repo="$TMP_ROOT/pi-slow-successor-root"
   home="$TMP_ROOT/pi-slow-successor-home"
   log="$TMP_ROOT/pi-slow-successor.log"
   retired="$TMP_ROOT/pi-slow-successor.retired"
+  startedfile="$TMP_ROOT/pi-slow-successor.started"
   stop="$TMP_ROOT/pi-slow-successor.stop"
   mkdir -p "$repo/bin" "$home/state" "$home/config"
   install_pi_watch_extension_fixture "$repo"
@@ -3063,12 +3064,13 @@ if [ "$count" -eq 1 ]; then
   exit 0
 fi
 trap 'printf "retired\\n" > "${FM_SLOW_RETIRED_FILE:?}"; exit 0' TERM INT
-sleep 3
+sleep 5
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+: > "${FM_SLOW_STARTED_FILE:?}"
 while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_STOP_FILE="$stop" FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_SLOW_STARTED_FILE="$startedfile" FM_STOP_FILE="$stop" FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3087,37 +3089,41 @@ const pi = {
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
-const started = Date.now();
 await tool.execute("tool-call-slow-successor", {}, undefined, undefined, {});
 for (let i = 0; i < 1500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const elapsed = Date.now() - started;
+if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
+if (!prompt.includes("still starting")) throw new Error(`the wake did not say the successor is still starting: ${prompt}`);
+if (prompt.includes("FAILED")) throw new Error(`a slow successor was reported as failed: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the wake waited for the slow successor to report");
+for (let i = 0; i < 1500 && !existsSync(process.env.FM_SLOW_STARTED_FILE); i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
 const rows = existsSync(process.env.FM_ARM_LOG)
   ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
   : [];
-if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
-if (prompt.includes("FAILED")) throw new Error(`a slow successor was reported as failed: ${prompt}`);
-if (elapsed < 2000) throw new Error(`the successor was not slower than the removed deadline (${elapsed}ms)`);
+if (!existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the still-starting successor never reported started");
 if (rows.length !== 2) throw new Error(`a slow successor was replaced: ${rows.join(" | ")}`);
-if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("a slow successor was retired before it reported");
+if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("a slow successor was retired");
 writeFileSync(process.env.FM_STOP_FILE, "stop\n");
 await new Promise((resolve) => setTimeout(resolve, 80));
 EOF
 )
   status=$?
-  expect_code 0 "$status" "Pi must await a slow successor instead of retiring it"
+  expect_code 0 "$status" "Pi must deliver the wake without holding it for a slow successor, and keep that successor"
   [ -z "$out" ] || fail "Pi slow-successor test printed output: $out"
-  pass "Pi slow successor is awaited and never retired"
+  pass "Pi slow successor does not hold the wake and is never retired"
 }
 
-test_opencode_slow_successor_is_not_retired() {
-  local plugin repo home log retired stop out status
+test_opencode_slow_successor_does_not_hold_the_wake() {
+  local plugin repo home log retired startedfile stop out status
   plugin="$ROOT/.opencode/plugins/fm-primary-watch-arm.js"
   repo="$TMP_ROOT/opencode-slow-successor-root"
   home="$TMP_ROOT/opencode-slow-successor-home"
   log="$TMP_ROOT/opencode-slow-successor.log"
   retired="$TMP_ROOT/opencode-slow-successor.retired"
+  startedfile="$TMP_ROOT/opencode-slow-successor.started"
   stop="$TMP_ROOT/opencode-slow-successor.stop"
   mkdir -p "$repo/bin" "$home/state" "$home/config"
   git init -q "$repo"
@@ -3134,12 +3140,13 @@ if [ "$count" -eq 1 ]; then
   exit 0
 fi
 trap 'printf "retired\\n" > "${FM_SLOW_RETIRED_FILE:?}"; exit 0' TERM INT
-sleep 3
+sleep 5
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+: > "${FM_SLOW_STARTED_FILE:?}"
 while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
-  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_STOP_FILE="$stop" FM_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_SLOW_STARTED_FILE="$startedfile" FM_STOP_FILE="$stop" FM_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3158,28 +3165,31 @@ const hooks = await mod.FmPrimaryWatchArm({
   worktree: process.env.WORKTREE,
 });
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-const started = Date.now();
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
 for (let i = 0; i < 1500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
-const elapsed = Date.now() - started;
+if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
+if (!prompt.includes("still starting")) throw new Error(`the wake did not say the successor is still starting: ${prompt}`);
+if (prompt.includes("FAILED")) throw new Error(`a slow successor was reported as failed: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the wake waited for the slow successor to report");
+for (let i = 0; i < 1500 && !existsSync(process.env.FM_SLOW_STARTED_FILE); i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
 const rows = existsSync(process.env.FM_ARM_LOG)
   ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
   : [];
-if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
-if (prompt.includes("FAILED")) throw new Error(`a slow successor was reported as failed: ${prompt}`);
-if (elapsed < 2000) throw new Error(`the successor was not slower than the removed deadline (${elapsed}ms)`);
+if (!existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the still-starting successor never reported started");
 if (rows.length !== 2) throw new Error(`a slow successor was replaced: ${rows.join(" | ")}`);
-if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("a slow successor was retired before it reported");
+if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("a slow successor was retired");
 writeFileSync(process.env.FM_STOP_FILE, "stop\n");
 await new Promise((resolve) => setTimeout(resolve, 80));
 EOF
 )
   status=$?
-  expect_code 0 "$status" "OpenCode must await a slow successor instead of retiring it"
+  expect_code 0 "$status" "OpenCode must deliver the wake without holding it for a slow successor, and keep that successor"
   [ -z "$out" ] || fail "OpenCode slow-successor test printed output: $out"
-  pass "OpenCode slow successor is awaited and never retired"
+  pass "OpenCode slow successor does not hold the wake and is never retired"
 }
 
 test_pi_empty_close_retries_instead_of_disappearing() {
@@ -5800,7 +5810,7 @@ test_pi_deferred_close_starts_fresh_arm_over_dead_child
 test_pi_hung_successor_falls_back_to_typed_wake
 test_pi_unretired_successor_falls_back_without_retry
 test_pi_late_unretired_close_resumes_supervision
-test_pi_slow_successor_is_not_retired
+test_pi_slow_successor_does_not_hold_the_wake
 test_pi_empty_close_retries_instead_of_disappearing
 test_pi_established_empty_close_honors_retry_limit
 test_pi_actionable_close_rechecks_session_lock
@@ -5827,7 +5837,7 @@ test_opencode_pre_ready_actionable_close_preserves_its_successor
 test_opencode_hung_successor_falls_back_to_typed_wake
 test_opencode_unretired_successor_falls_back_without_retry
 test_opencode_late_unretired_close_resumes_supervision
-test_opencode_slow_successor_is_not_retired
+test_opencode_slow_successor_does_not_hold_the_wake
 test_opencode_empty_close_retries_instead_of_disappearing
 test_opencode_established_empty_close_honors_retry_limit
 test_opencode_actionable_close_rechecks_session_lock

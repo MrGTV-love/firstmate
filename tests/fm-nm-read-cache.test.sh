@@ -138,10 +138,9 @@ with sqlite3.connect(database) as db:
 PY
 }
 
-calls() {  # <case-dir> -> number of run-store calls so far
-  # The daemon probe opens every crew read and is never kept; its own case counts it.
+calls() {  # <case-dir> -> number of no-mistakes calls so far
   local n
-  n=$(grep -cv '^daemon status$' "$1/nmfake/calls.log")
+  n=$(wc -l < "$1/nmfake/calls.log")
   printf '%s\n' "${n//[[:space:]]/}"
 }
 

@@ -129,7 +129,7 @@ case "${1:-}" in
     # FM_FAKE_DAEMON_DOWN: the explicit down-probe fails, as the real
     # `no-mistakes daemon status` does when the daemon is not running.
     # FM_FAKE_DAEMON_TIMEOUT: the probe does not answer at all, which is what
-    # the progress runner reports as 124 for a daemon status with no progress.
+    # the bounded call reports as 124 when `timeout` kills a slow daemon status.
     [ -z "${FM_FAKE_DAEMON_PROBE_LOG:-}" ] || printf 'probe\n' >> "$FM_FAKE_DAEMON_PROBE_LOG"
     [ "${FM_FAKE_DAEMON_TIMEOUT:-0}" = 1 ] && exit 124
     [ "${FM_FAKE_DAEMON_DOWN:-0}" = 1 ] && exit 1
@@ -3388,11 +3388,87 @@ test_dead_window_still_reports_active_run_step() {
   pass "closed pane still reports an active run-step"
 }
 
-# A wedged daemon (no output, no CPU) costs one no-progress interval per crew
-# read: the daemon probe is the first read, its cut latches the crew read, and no
-# later run-store read is made. The verdict is unknown and names the daemon, so a
-# dead worker's old `working:` declaration cannot revive it either.
-test_wedged_daemon_latches_the_crew_read() {
+make_python_free_toolbin() {  # <dir> -> echoes toolbin path
+  local dir=$1 tb="$1/nopythonbin" tool real
+  mkdir -p "$tb"
+  for tool in bash git grep sed head cut tail dirname perl sleep ps; do
+    real=$(command -v "$tool" || true)
+    [ -n "$real" ] || fail "missing tool for the Python-free path: $tool"
+    ln -s "$real" "$tb/$tool"
+  done
+  printf '%s\n' "$tb"
+}
+
+# A wedged daemon (no output, no CPU) costs one no-progress interval: its first
+# read is cut, no later run-store read runs, and the pane and status-log
+# fallback still answer, with the cut disclosed. Python-free, so the Perl
+# progress runner owns the bound.
+test_wedged_daemon_falls_back_to_pane() {
+  reset_fakes
+  local d toolbin out start elapsed calls_file calls pidfile i
+  d=$(new_case wedged-daemon)
+  make_repo_on_branch "$d/wt" fm/feat-wedged
+  make_fakebin "$d" >/dev/null
+  calls_file="$d/no-mistakes.calls"
+  : > "$calls_file"
+  # The fake records its pid so the test can prove the bound left nothing
+  # behind, then blocks without output or CPU until the suite's stub ceiling.
+  pidfile="$d/no-mistakes.pid"
+  cat > "$d/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${FM_FAKE_NM_CALLS:-/dev/null}"
+fm_test_record_process "$FM_FAKE_NM_PIDFILE" || exit 1
+exec sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
+SH
+  chmod +x "$d/fakebin/no-mistakes"
+  fm_test_track_process "$pidfile" sleep
+  toolbin=$(make_python_free_toolbin "$d")
+  fm_write_meta "$d/state/feat-wedged.meta" "window=fm:fm-feat-wedged" "worktree=$d/wt" "kind=ship" \
+    "harness=claude"
+  FM_FAKE_BUSY=1
+  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-wedged)
+  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-wedged busy --gen "$gen" \
+    --source claude-hook --event user-prompt-submit
+  start=$SECONDS
+  out=$(FM_FAKE_NM_CALLS="$calls_file" FM_FAKE_NM_PIDFILE="$pidfile" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-wedged)
+  elapsed=$((SECONDS - start))
+  [ -s "$pidfile" ] || fail "the fake no-mistakes never ran, so the bound proved nothing"
+  # The bound must take the fake down with it, not merely stop waiting for it.
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    fm_test_process_alive "$pidfile" sleep || break
+    sleep 0.1
+  done
+  ! fm_test_process_alive "$pidfile" sleep \
+    || fail "the stalled no-mistakes call was left running after the bound"
+  assert_contains "$out" "state: working" "a wedged daemon falls back to the pane"
+  assert_contains "$out" "source: pane" "a wedged daemon leaves the pane as the source"
+  assert_contains "$out" "run-store: skipped (no output or CPU progress)" "the cut lookup is disclosed, not hidden"
+  [ "$elapsed" -lt 10 ] || fail "the no-progress bound did not cut the wedged read (elapsed ${elapsed}s)"
+  calls=$(awk 'END { print NR + 0 }' "$calls_file" 2>/dev/null || echo 0)
+  [ "$calls" -eq 1 ] || fail "a wedged daemon was read again after the cut ($calls calls)"
+  pass "a wedged daemon costs one read and leaves the pane to answer"
+}
+
+# A healthy daemon pays no extra probe: a bound live run makes no daemon status call.
+test_healthy_daemon_read_makes_no_probe() {
+  reset_fakes
+  local d out probes
+  d=$(new_case healthy-no-probe)
+  make_repo_on_branch "$d/wt" fm/feat-healthy
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-healthy.meta" "window=fm:fm-feat-healthy" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_running fm/feat-healthy)"
+  FM_FAKE_DAEMON_PROBE_LOG="$d/probes"
+  out=$(run_crew_state "$d" feat-healthy)
+  assert_contains "$out" "source: run-step" "a healthy daemon's run answers"
+  probes=$(awk 'END { print NR + 0 }' "$d/probes" 2>/dev/null || echo 0)
+  [ "$probes" -eq 0 ] || fail "a healthy read made $probes daemon status probe(s)"
+  pass "a healthy daemon read makes no daemon status probe"
+}
+
+# A cut run-store lookup is skipped, so the pane still decides liveness: a dead
+# worker's old `working:` declaration must not read as working.
+test_cut_store_does_not_revive_dead_worker_from_old_status() {
   reset_fakes
   local d out calls
   d=$(new_case cut-store-dead-worker)
@@ -3411,14 +3487,11 @@ SH
   out=$(FM_CREW_STATE_NM_TIMEOUT=2 run_crew_state "$d" feat-cut-dead)
   [ -s "$d/fakebin/no-mistakes.calls" ] || fail "the run-store lookup never ran, so the cut proved nothing"
   calls=$(awk 'END { print NR + 0 }' "$d/fakebin/no-mistakes.calls")
-  [ "$calls" -eq 1 ] || fail "the wedged daemon was read again after the latch ($calls calls)"
-  assert_equals 'daemon status' "$(cat "$d/fakebin/no-mistakes.calls")" 'the daemon probe is the first and only read'
+  [ "$calls" -eq 1 ] || fail "a cut lookup was retried ($calls calls)"
   assert_not_contains "$out" "state: working" "an old working declaration cannot revive a dead worker"
-  assert_contains "$out" "state: unknown" "a wedged daemon leaves the crew state unknown"
-  assert_contains "$out" "source: run-step" "the unknown verdict comes from the run store"
-  assert_contains "$out" "no-mistakes daemon unresponsive: no output or CPU progress for 2s" \
-    "the verdict names the unresponsive daemon and its interval"
-  pass "a wedged daemon costs one interval and skips every later run-store read"
+  assert_contains "$out" "state: unknown" "a gone worker with a cut store reads unknown"
+  assert_contains "$out" "backend target gone" "the pane still decides liveness after a cut lookup"
+  pass "a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker"
 }
 
 # A lookup that answers inside its own allowance is never marked skipped, even
@@ -3442,7 +3515,6 @@ SH
   assert_contains "$out" "state: done" "slow but responsive lookups keep the run-step answer"
   assert_contains "$out" "source: run-step" "the store evidence is used, not replaced by a fallback"
   assert_not_contains "$out" "run-store: skipped" "no lookup was cut, so nothing is marked skipped"
-  assert_not_contains "$out" "daemon unresponsive" "a slow daemon that answers is never latched"
   pass "responsive lookups each keep their own allowance"
 }
 
@@ -5346,10 +5418,10 @@ EOF
   pass "an open decision survives the dead-daemon verdict on the selected route"
 }
 
-# A probe proven to make no progress latches the crew read before any record is
-# read, so it must not hand the verdict to a stale open decision: a genuinely
-# failed run would be reported as awaiting a human. The verdict is unknown and
-# names the daemon, which is ambiguous but not falsely actionable.
+# A probe that did not ANSWER proves nothing, so it must not hand the verdict to
+# a stale open decision: a genuinely failed run would be reported as awaiting a
+# human on probe latency alone. The record still degrades to unknown, which is
+# ambiguous but not falsely actionable.
 test_unanswered_probe_does_not_turn_a_failed_coarse_record_into_a_gate() {
   reset_fakes
   local d local_short out; d=$(new_case coarse-failed-probe-timeout)
@@ -5369,7 +5441,6 @@ EOF
   arm_idle_record "$d/state" feat-cfpt
   out=$(run_crew_state "$d" feat-cfpt)
   assert_contains "$out" "state: unknown" "an unanswered probe still degrades the terminal record"
-  assert_contains "$out" "no-mistakes daemon unresponsive" "the unknown verdict names the unresponsive daemon"
   assert_not_contains "$out" "state: parked" "probe latency must not assert an open gate over a failed run"
   pass "an unanswered probe never turns a failed coarse record into a gate"
 }
@@ -5584,11 +5655,11 @@ EOF
   pass "a coarse failed record with a dead daemon reads unknown"
 }
 
-# A probe proven to make no progress does not prove the daemon dead, so it must
-# never drop a live rebased run back to a stale `failed:` log line. It latches
-# the crew read instead: unknown from run-step, naming the unresponsive daemon.
-# A slow `daemon status` that answers is never cut (test_responsive_lookups_are_not_pooled).
-test_unresponsive_daemon_probe_reads_unknown_not_stale_failed() {
+# A probe that does not ANSWER proves nothing about the daemon, so it must not
+# suppress a live rebased run: otherwise a slow `daemon status` on a busy fleet
+# drops the crew back to a stale `failed:` log line, and the crew flaps between
+# working and failed on probe latency alone.
+test_unanswered_daemon_probe_does_not_suppress_live_run() {
   reset_fakes
   local d rebased out; d=$(new_case probe-timeout)
   make_repo_on_branch "$d/wt" fm/feat-probeto
@@ -5605,11 +5676,10 @@ branch_sync:
   FM_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-probeto
   out=$(run_crew_state "$d" feat-probeto)
-  assert_contains "$out" "source: run-step" "an unresponsive probe keeps the run store as the source"
-  assert_contains "$out" "state: unknown" "an unresponsive daemon cannot confirm the live run"
-  assert_contains "$out" "no-mistakes daemon unresponsive" "the verdict names the unresponsive daemon"
-  assert_not_contains "$out" "state: failed" "the stale failed event must not answer for an unresponsive daemon"
-  pass "an unresponsive daemon probe reads unknown, never the stale failed log"
+  assert_contains "$out" "source: run-step" "an unanswered probe must not unbind the live run"
+  assert_contains "$out" "state: working" "the live rebased run still reads working"
+  assert_not_contains "$out" "state: failed" "the stale failed event must not answer on probe latency"
+  pass "an unanswered daemon probe leaves a live rebased run bound"
 }
 
 # The coarse ledger row sits at this worktree's own head, so the head rule has
@@ -6008,7 +6078,9 @@ test_dead_window_ignores_stale_status_log
 test_no_run_tmux_unreadable_reads_unreachable_not_gone
 test_dead_window_still_reports_terminal_run_step
 test_dead_window_still_reports_active_run_step
-test_wedged_daemon_latches_the_crew_read
+test_wedged_daemon_falls_back_to_pane
+test_healthy_daemon_read_makes_no_probe
+test_cut_store_does_not_revive_dead_worker_from_old_status
 test_responsive_lookups_are_not_pooled
 test_scout_skips_run_lookup
 test_torn_down_worktree
@@ -6089,7 +6161,7 @@ test_selected_route_dead_daemon_names_the_run_once
 test_head_tied_row_reads_the_same_whichever_run_axi_names
 test_coarse_head_tied_row_is_exempt_even_when_the_record_head_diverged
 test_unrecognised_ledger_word_keeps_the_ordinary_supersede_note
-test_unresponsive_daemon_probe_reads_unknown_not_stale_failed
+test_unanswered_daemon_probe_does_not_suppress_live_run
 test_coarse_live_row_is_exempt_from_the_dead_daemon_verdict
 test_coarse_live_row_keeps_the_original_supersede_note
 test_coarse_live_rebased_row_is_not_attributed

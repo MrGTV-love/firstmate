@@ -162,9 +162,10 @@
 # registration lets turns run past the boundary up to it, any other value is
 # the boundary), FM_SUPERVISION_HOST_TURN_TIMEOUT (1200), FM_SUPERVISION_HOST_ROTATE_TURNS (20:
 # a new engine conversation after this many turns; every main session start
-# also opens a new one), FM_SUPERVISION_HOST_POLL (1). A successor cycle has
-# no readiness deadline: the arm owns startup no-progress detection and reports
-# started, attached or FAILED itself.
+# also opens a new one), FM_SUPERVISION_HOST_READY_TIMEOUT (25: how long a close
+# waits for its successor cycle to verify before it goes on with a still-starting
+# line; a notice window only, the successor is never stopped for it, since the
+# arm owns startup no-progress detection), FM_SUPERVISION_HOST_POLL (1).
 # Park duration uses Bash's process-relative SECONDS counter (including Bash
 # 3.2), while durable timestamps still use epoch time. This is not a portable
 # monotonic-clock guarantee. Arm exit probes use ordinary 0.5-second child
@@ -218,6 +219,7 @@ PARK_LIMIT=$(numeric_or "${FM_SUPERVISION_HOST_PARK_LIMIT:-}" "$PARK_SECONDS")
 { [ "$PARK_LIMIT" -lt 28800 ] && [ "$PARK_LIMIT" -ge "$PARK_SECONDS" ]; } 2>/dev/null || PARK_LIMIT=$PARK_SECONDS
 TURN_TIMEOUT=$(numeric_or "${FM_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200)
 ROTATE_TURNS=$(numeric_or "${FM_SUPERVISION_HOST_ROTATE_TURNS:-}" 20)
+READY_TIMEOUT=$(numeric_or "${FM_SUPERVISION_HOST_READY_TIMEOUT:-}" 25)
 POLL=$(numeric_or "${FM_SUPERVISION_HOST_POLL:-}" 1)
 COOLDOWN=$FM_SUPERVISION_HOST_COOLDOWN
 COOLDOWN_MAX=3600
@@ -651,15 +653,18 @@ stand_down() {  # <why>
 }
 
 # Start the successor cycle and wait until it proves a live watcher or reports
-# its own failure. Sets SUCCESSOR_WATCHER and SUCCESSOR_GENERATION (empty when
-# the arm attached).
+# its own failure, for at most READY_TIMEOUT. Returns 0 when verified, 1 when it
+# failed, and 2 when it is still starting; that successor is left running. Sets
+# SUCCESSOR_WATCHER and SUCCESSOR_GENERATION (empty when the arm attached).
+SUCCESSOR_STARTING_LINE="supervision-host: the successor watcher cycle is still starting; it keeps running and reports its own result"
 start_successor() {  # <predecessor-arm-pid>
-  local line
+  local deadline line
   SUCCESSOR_WATCHER=
   SUCCESSOR_GENERATION=
   start_arm "$1" || return 1
   SUCCESSOR_PID=$STARTED_ARM_PID
   SUCCESSOR_OUT=$STARTED_ARM_OUT
+  deadline=$(( $(date +%s) + READY_TIMEOUT ))
   while :; do
     line=$(grep -E '^watcher: (started|attached) pid=[0-9]+' "$SUCCESSOR_OUT" 2>/dev/null | head -n 1)
     if [ -n "$line" ]; then
@@ -672,6 +677,7 @@ start_successor() {  # <predecessor-arm-pid>
     fi
     fm_pid_alive "$SUCCESSOR_PID" || return 1
     ! grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null || return 1
+    [ "$(date +%s)" -lt "$deadline" ] || return 2
     sleep 0.2
   done
 }
@@ -706,12 +712,17 @@ detach_successor() {
 # confirms no handling handoff: main, not the engine, handles this close, and
 # the re-arm owner delivers it only while the recovery marker still reads
 # downtime (autoarm_commit in bin/fm-claude-stop-autoarm.sh). A failed start
-# returns 1; the caller still prints the close unchanged.
+# returns 1; the caller still prints the close unchanged. A successor still
+# starting is left running too, and SUCCESSOR_NOTE carries the line saying so.
+SUCCESSOR_NOTE=
 leave_successor_for_main() {
-  if ! ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID"; then
+  local rc=0
+  ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || rc=$?
+  if [ "$rc" -eq 1 ]; then
     log_line "pass-through	successor-unverified	$(printf '%s\n' "$REASON" | head -n 1)"
     return 1
   fi
+  [ "$rc" -eq 0 ] || SUCCESSOR_NOTE=$SUCCESSOR_STARTING_LINE
   detach_successor
 }
 
@@ -1097,7 +1108,7 @@ while :; do
       if [ "$ATTENDED_WHY" = main-only ]; then
         leave_successor_for_main || true
       fi
-      emit
+      emit "$SUCCESSOR_NOTE"
       exit 0
     fi
     host_still_owner || stand_down "this session no longer owns supervision"
@@ -1121,7 +1132,13 @@ while :; do
 
   # A turn that could outlive the boundary would outlive the hook registration.
   turn_crosses_boundary && boundary_exit
-  if ! ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID"; then
+  SUCCESSOR_RC=0
+  ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || SUCCESSOR_RC=$?
+  if [ "$SUCCESSOR_RC" -eq 2 ]; then
+    detach_successor || true
+    exit_to_main "the successor watcher cycle is still starting; it keeps running and reports its own result, and this wake is yours"
+  fi
+  if [ "$SUCCESSOR_RC" -ne 0 ]; then
     exit_to_main "the successor watcher cycle could not be verified before handling; this wake is yours"
   fi
   if [ -n "$SUCCESSOR_GENERATION" ]; then

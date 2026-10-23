@@ -44,14 +44,15 @@
 # published a record (not omp, not yet started, or remote) adds nothing.
 # Each run-attribution lookup uses FM_CREW_STATE_NM_TIMEOUT as a no-output/no-CPU
 # interval (default 900 seconds), not a wall-clock deadline. Slow productive reads
-# finish and are used. The daemon probe is the first no-mistakes read. The first
-# no-mistakes read (daemon probe, status, overview, id-addressed status, runs list
-# or CI log) proven to make no progress latches the whole crew read: no later
-# no-mistakes read is made and the line reads state unknown from run-step, naming
-# the no-mistakes daemon unresponsive. A wedged daemon so costs one interval per
-# crew read. A cut capped-inventory reader (the local state database, not the
-# daemon) reports the reader-unavailable verdict and ends the line with
-# `run-store: skipped (no output or CPU progress)`.
+# finish and are used. A proven stalled lookup is never retried and ends the line
+# with `run-store: skipped (no output or CPU progress)`. A cut first status read leaves the pane and
+# status-log fallback below to answer. A cut overview, inventory, id-addressed
+# status or identity runs-list read reports an unknown run-step verdict. A cut
+# runs-list read after a bound run is skipped and the bare status answer stands;
+# a cut fallback runs-list leaves the pane and status-log fallback to answer.
+# After the first cut, no later no-mistakes read runs in that crew read: each
+# counts as cut without running (FM_NM_READ_STALLED in bin/fm-nm-run-lib.sh), so
+# a wedged daemon costs one interval and the fallbacks above still answer.
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
@@ -166,7 +167,7 @@
 #      coarse runs-ledger fallback (no steps table, no ci log), a terminal
 #      FAILED record whose daemon an explicit probe proves down reads unknown,
 #      never failed: an instrument failure must not read as work failure
-#      (nm_daemon_answered_down).
+#      (nm_daemon_probe_down).
 #   3. Reconcile the status log through fm-classify-lib.sh's status_current_line:
 #      open decisions survive unrelated events and continuation prose cannot
 #      hide a declaration. Ship/scout terminal declarations supersede stale log
@@ -245,6 +246,7 @@ NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-$((15 * 60))}
 case "$NM_TIMEOUT" in ''|*[!0-9]*|0) NM_TIMEOUT=$((15 * 60)) ;; esac
 # Shell-local: only this read-only consumer opts into the shared runner mode.
 FM_NM_READ_PROGRESS=1
+FM_NM_READ_STALLED=0
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (fm_nm_runs_status_for_worktree in bin/fm-nm-run-lib.sh) scans for the legacy
 # fallback or an unfetched-head continuation (docs/configuration.md owns the
@@ -262,16 +264,9 @@ LIVE_NOTE=''
 # Disclose a lookup the bounded runner cut (exit 124), once per read.
 nm_note_cut() {  # <exit-status>
   [ "$1" = 124 ] || return 0
+  FM_NM_READ_STALLED=1
   case "$LIVE_NOTE" in *"${SEP}run-store: skipped"*) return 0 ;; esac
   LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (no output or CPU progress)"
-}
-
-# Latch the first no-mistakes read cut for no progress (exit 124): every later
-# read would wait out the same interval on the same wedged daemon, so the crew
-# read ends here, before any of them is made.
-nm_daemon_unresponsive() {  # <exit-status>
-  [ "$1" = 124 ] || return 0
-  emit unknown run-step "no-mistakes daemon unresponsive: no output or CPU progress for ${NM_TIMEOUT}s; later run-store reads skipped"
 }
 
 # Emit the one canonical line and exit 0. Detail is optional.
@@ -891,7 +886,7 @@ nm_failed_run_is_green_held_ci() {
 $rows
 EOF
   [ "$saw_ci_failed" = 1 ] || return 1
-  ci_state=$(nm_ci_checks_state) || nm_daemon_unresponsive $?
+  ci_state=$(nm_ci_checks_state) || nm_note_cut $?
   [ "$ci_state" = green ]
 }
 
@@ -962,27 +957,46 @@ nm_reclassify_interrupted_run_as_finished() {
   return 0
 }
 
-# 0 when an explicit probe ANSWERED that the shared daemon is down: `no-mistakes
-# daemon status` is the canonical down-probe (the same one fm-brief.sh hands
-# crews before a blocked append) and exits non-zero when the daemon is not
-# running. A slow productive probe finishes before this classification is made,
-# and a probe proven to make no progress has already ended the crew read
-# (nm_daemon_unresponsive), so it never reads as a down daemon.
+# 0 when an explicit probe proves the shared daemon down: `no-mistakes daemon
+# status` is the canonical down-probe (the same one fm-brief.sh hands crews
+# before a blocked append) and exits non-zero when the daemon is not running.
+# Bounded like every other CLI call; a probe that fails for any reason -
+# refused socket, timeout, non-zero answer - means the daemon is not provably
+# up, which is the only fact the coarse fallback needs.
+nm_daemon_probe_down() {
+  nm_daemon_probe
+  [ "$NM_DAEMON_ANSWER" != up ]
+}
+
+# 0 only when the probe ANSWERED and that answer was "down". Suppressing a LIVE
+# record needs this stricter question: `not provably up` above is fail-closed,
+# which is safe when it degrades a terminal record to unknown, but on a live
+# record it would drop a working crew back to a possibly-stale status log every
+# time the probe merely ran slow - the crew would flap between working and
+# failed on probe latency alone. 124 is the bounded call's own did-not-answer
+# code for a proven no-progress read, and proves nothing about daemon death.
+# A slow productive probe finishes before this classification is made.
 nm_daemon_answered_down() {
   nm_daemon_probe
   [ "$NM_DAEMON_ANSWER" = down ]
 }
 
-# ONE `daemon status` call per crew read, made before any other no-mistakes
-# read and cached as `up` or `down`. A probe with no output or CPU progress for
-# NM_TIMEOUT latches the crew read, so a wedged daemon costs that one interval
-# instead of one interval per later read in the supervisor's per-crew loop.
+# ONE bounded `daemon status` call per crew read, cached with the three answers
+# its two readers need to stay distinguishable: `up`, `unanswered` (the bounded
+# call's own 124), and `down`. Collapsing `up` and `unanswered` into a single
+# not-down bucket is what would force a second subprocess, and on a wedged
+# daemon each probe burns the full timeout inside the supervisor's per-crew
+# polling loop.
 nm_daemon_probe() {
   local rc=0
   [ -n "$NM_DAEMON_ANSWER" ] && return 0
   fm_nm_run_checked "$WT" "$NM_TIMEOUT" daemon status >/dev/null || rc=$?
-  nm_daemon_unresponsive "$rc"
-  if [ "$rc" = 0 ]; then NM_DAEMON_ANSWER=up; else NM_DAEMON_ANSWER=down; fi
+  nm_note_cut "$rc"
+  case "$rc" in
+    0)   NM_DAEMON_ANSWER=up ;;
+    124) NM_DAEMON_ANSWER=unanswered ;;
+    *)   NM_DAEMON_ANSWER=down ;;
+  esac
 }
 
 nm_ci_step_status() {
@@ -1038,8 +1052,8 @@ nm_ci_checks_state() {
   # A finished run's ci log cannot change, so only that read is kept for good.
   fm_nm_run_is_active "$RUN_OUT" && finished_run='' || finished_run=$run_id
   ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" --full) || rc=$?
-  # This runs in its caller's command substitution, so the caller latches.
-  [ "$rc" != 124 ] || return 124
+  # This runs in its caller's command substitution, so the caller notes the cut.
+  [ "$rc" != 124 ] || { printf 'unknown'; return 124; }
   [ -n "$ci_log" ] || { printf 'unknown'; return; }
   marker=$(printf '%s\n' "$ci_log" \
     | grep -E 'CI checks passed|no CI checks reported - still monitoring|no CI checks reported yet|checks failed|issues detected|CI checks running' \
@@ -1073,8 +1087,8 @@ nm_ci_checks_state() {
 nm_runs_list_to() {  # <out-var>
   local _nm_out _nm_rc=0
   _nm_out=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" runs --limit "$FM_CREW_STATE_RUNS_LIMIT") || _nm_rc=$?
-  nm_daemon_unresponsive "$_nm_rc"
   printf -v "$1" '%s' "$_nm_out"
+  nm_note_cut "$_nm_rc"
 }
 
 # The overview and the verdict fm_nm_select_run draws from it, read together so
@@ -1090,7 +1104,7 @@ nm_read_choice() {
     return 0
   fi
   overview_ok=1
-  run_overview=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi) || { nm_daemon_unresponsive $?; overview_ok=0; }
+  run_overview=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi) || { nm_note_cut $?; overview_ok=0; }
   run_overview_present=1
   run_choice=''
   if [ -n "$run_overview" ]; then
@@ -1132,8 +1146,7 @@ SELECTED_RUN_ID=""
 # worktree, so skip the lookup for them and read state from pane/log directly.
 if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/null 2>&1; then
   fm_nmc_init "$STATE" "$ID" "$WT" "$CREW_BRANCH" "$NM_TIMEOUT"
-  nm_daemon_probe
-  fm_nmc_read_to RUN_OUT status status '' axi status || nm_daemon_unresponsive $?
+  fm_nmc_read_to RUN_OUT status status '' axi status || nm_note_cut $?
   if [ "$(strip_quotes "$(printf '%s\n' "$RUN_OUT" | sed -n 's/^error: //p')")" = "repo not initialized (run 'no-mistakes init' first)" ]; then
     RUN_OUT=""
   fi
@@ -1157,7 +1170,7 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
       selected\|*)
         IFS='|' read -r _ selected_id selected_status candidate_ids <<< "$run_choice"
         fm_nmc_read_to RUN_OUT "run-$selected_id" status-run "$selected_id" axi status --run "$selected_id" \
-          || { nm_daemon_unresponsive $?; emit unknown run-step "selected run unreadable; run ids: $candidate_ids"; }
+          || { nm_note_cut $?; emit unknown run-step "selected run unreadable; run ids: $candidate_ids"; }
         if [ "$(strip_quotes "$(nm_field id)")" != "$selected_id" ] \
           || [ "$(strip_quotes "$(nm_field branch)")" != "$CREW_BRANCH" ]; then
           emit unknown run-step "selected run unavailable or mismatched; run ids: $candidate_ids"
@@ -1279,7 +1292,7 @@ if [ "$HAVE_RUN" = 1 ]; then
         # and no ci log, so the orphaned-monitor shape cannot be recognized
         # here. With the daemon provably down, the row is unverified evidence
         # from a dead instrument and must not read as work failure.
-        if nm_daemon_answered_down; then
+        if nm_daemon_probe_down; then
           RUN_STATE=unknown
           RUN_DETAIL="no-mistakes daemon unreachable; last ledger record failed - unverified"
         else
@@ -1358,7 +1371,7 @@ if [ "$HAVE_RUN" = 1 ]; then
         CI_STEP_STATUS=$(nm_effective_ci_step_status)
         case "$CI_STEP_STATUS" in
           running)
-            CI_LOG_STATE=$(nm_ci_checks_state) || nm_daemon_unresponsive $?
+            CI_LOG_STATE=$(nm_ci_checks_state) || nm_note_cut $?
             if [ "$CI_LOG_STATE" = green ]; then
               RUN_STATE="done"
               RUN_DETAIL="checks green: PR ready for review (still monitoring for merge/close)"
@@ -1384,7 +1397,7 @@ if [ "$HAVE_RUN" = 1 ]; then
     if [ "$RUN_STATUS" = fixing ]; then
       CI_LOG_STATE=not-ready
     elif [ "$CI_STEP_STATUS" = running ] && [ -z "$CI_LOG_STATE" ]; then
-      CI_LOG_STATE=$(nm_ci_checks_state) || nm_daemon_unresponsive $?
+      CI_LOG_STATE=$(nm_ci_checks_state) || nm_note_cut $?
     elif [ "$CI_STEP_STATUS" = fixing ]; then
       CI_LOG_STATE=not-ready
     fi

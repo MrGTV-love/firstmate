@@ -90,7 +90,7 @@ These logs are evidence, not proof of a healthy arm or permission to use a retir
 `tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, repeated binding predecessor release, and owner-marker publication failures.
 `tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, and wake delivery after recovery.
 Both suites use `tests/watch-lifecycle-expiry.mjs` for explicit shutdown child-close expiry evidence and deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
-Pi also exercises its unready-arm retirement expiry for a successor that reported failure but does not exit; `tests/fm-work-progress.test.sh` proves that a slow omp successor remains alive until readiness, and `tests/fm-pi-watch-extension.test.sh` and `tests/fm-supervision-host.test.sh` prove the same for Pi, OpenCode and the supervision host.
+Pi also exercises its unready-arm retirement expiry for a successor that reported failure but does not exit; `tests/fm-work-progress.test.sh` proves that a slow omp or Claude successor does not hold the wake and stays alive until readiness, and `tests/fm-pi-watch-extension.test.sh` and `tests/fm-supervision-host.test.sh` prove the same for Pi, OpenCode and the supervision host.
 
 ### omp stale wake gating
 
@@ -242,7 +242,9 @@ A failed confirmation is never swallowed.
 ### Readiness and retry
 
 Pi, omp, OpenCode and the supervision host wait for the successor's own result (started or attached; OpenCode also healthy or a wake) or its actual failure: a `watcher: FAILED` line or the arm's exit.
-Startup no-progress detection is owned by `bin/fm-watch-arm.sh`, so no adapter or host has a readiness clock that can terminate productive work.
+That wait never holds the wake past each site's short readiness notice window (FM_PI_ARM_READY_TIMEOUT_MS, FM_OMP_ARM_READY_TIMEOUT_MS, FM_OPENCODE_ARM_READY_TIMEOUT_MS, FM_SUPERVISION_HOST_READY_TIMEOUT).
+Past it, the wake goes out with one line saying the successor is still starting, and the successor keeps running untouched; a later failure reaches firstmate through that successor's own failure path.
+Startup no-progress detection is owned by `bin/fm-watch-arm.sh`, so no adapter or host stops productive startup work.
 omp's separate idle queue-read deadline remains fixed at 10000ms.
 A successor that reported failure gets TERM and a bounded retirement confirmation before the next lock-verified exponential retry.
 
@@ -261,8 +263,8 @@ Claude's Stop hook also starts one handling successor before notification.
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
 1. Launches `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
-2. Waits for that arm's one status line.
-3. Only then exits 2 with the wake.
+2. Waits for that arm's one status line, for at most the arm's confirmation window plus slack.
+3. Then exits 2 with the wake.
 
 A child of the hook cannot outlive its exit-2 rewake.
 So that successor is the one deliberate detached launch in the continuity path:
@@ -274,7 +276,7 @@ So that successor is the one deliberate detached launch in the continuity path:
 This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
 The next Stop's foreground arm attaches to that live cycle.
-The hook does not impose a second readiness deadline: a slow productive successor is awaited, while the arm owns startup no-progress detection.
+That window is a notice window only: a successor still starting when it passes keeps running untouched, and the rewake banner gets one line saying it is still starting, while the arm owns startup no-progress detection.
 A successor that fails or dies before confirming a live watcher adds one line to the rewake banner and never withholds the wake.
 The next Stop then re-arms as before.
 

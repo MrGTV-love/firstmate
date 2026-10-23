@@ -355,14 +355,18 @@ run_arm() {  # <output file, or empty for none>
 # successor receives the closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID; it
 # must outlive this hook's exit, so it is detached three ways: nohup, stdio
 # away from the hook's pipes, and its own process group. Its one status line
-# is awaited until readiness, a reported startup failure or proven death. The
-# arm owns startup no-progress detection; no second clock can cut it short. Sets
-# SUCCESSOR_FAILURE to the banner line for an unconfirmed successor.
-SUCCESSOR_FAILURE=
+# is awaited within the arm's own confirmation window plus slack, a notice
+# window only: past it the wake is not held, the banner says the successor is
+# still starting, and the successor keeps running untouched to report its own
+# result (the arm owns startup no-progress detection). Sets SUCCESSOR_NOTE to
+# the banner line for a successor that failed or is still starting.
+SUCCESSOR_NOTE=
 start_handling_successor() {  # <closed-arm-pid>
-  local out pid line monitor_was_on=0
+  local out pid deadline budget line monitor_was_on=0
+  budget=${FM_ARM_CONFIRM_TIMEOUT:-30}
+  case "$budget" in ''|*[!0-9]*) budget=30 ;; esac
   if ! out=$(mktemp "$STATE/.claude-autoarm-successor.XXXXXX"); then
-    SUCCESSOR_FAILURE='The handling successor did not confirm a live watcher (its output file could not be created); this handling turn runs uncovered until the next turn end re-arms.'
+    SUCCESSOR_NOTE='The handling successor did not confirm a live watcher (its output file could not be created); this handling turn runs uncovered until the next turn end re-arms.'
     return 1
   fi
   case $- in *m*) monitor_was_on=1 ;; esac
@@ -371,6 +375,7 @@ start_handling_successor() {  # <closed-arm-pid>
     nohup "$SCRIPT_DIR/fm-watch-arm.sh" >"$out" 2>&1 </dev/null &
   pid=$!
   [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
+  deadline=$(( $(date +%s) + budget + 2 ))
   while :; do
     if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
       rm -f "$out" 2>/dev/null || true
@@ -378,12 +383,17 @@ start_handling_successor() {  # <closed-arm-pid>
     fi
     grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
     fm_pid_alive "$pid" || break
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      rm -f "$out" 2>/dev/null || true
+      SUCCESSOR_NOTE="The handling successor pid=$pid is still starting; this wake is not held for it, and it keeps running to report its own result."
+      return 0
+    fi
     sleep 0.2
   done
   line=$(grep '^watcher: FAILED' "$out" 2>/dev/null | head -n 1 || true)
   rm -f "$out" 2>/dev/null || true
   [ -z "$line" ] || line=" ($line)"
-  SUCCESSOR_FAILURE="The handling successor pid=$pid did not confirm a live watcher$line; this handling turn runs uncovered until the next turn end re-arms."
+  SUCCESSOR_NOTE="The handling successor pid=$pid did not confirm a live watcher$line; this handling turn runs uncovered until the next turn end re-arms."
   return 1
 }
 
@@ -523,7 +533,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
       && [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-contract.sh" mode 2>/dev/null)" != quiet ]; then
       printf 'This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.\n'
     fi
-    [ -z "$SUCCESSOR_FAILURE" ] || printf '%s\n' "$SUCCESSOR_FAILURE"
+    [ -z "$SUCCESSOR_NOTE" ] || printf '%s\n' "$SUCCESSOR_NOTE"
     printf 'Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.\n'
   } >&2
   if autoarm_commit rewake; then

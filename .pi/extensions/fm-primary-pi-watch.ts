@@ -169,6 +169,13 @@ const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(exte
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
 const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
+// How long a wake waits for its successor to report before it goes out with a
+// still-starting line. A notice window only: the successor is never stopped for
+// it, since the arm owns startup no-progress detection.
+const armReadyNoticeMs = positiveInteger(
+  "FM_PI_ARM_READY_TIMEOUT_MS",
+  process.platform === "win32" ? 35000 : 12000,
+);
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const successorGraceMs = positiveInteger("FM_PI_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy";
@@ -214,6 +221,7 @@ const retiringGenerations = new Set<SessionGeneration>();
 // Children the extension itself asked to exit; their close is not a failure
 // of the successor and never earns a deferred retry.
 const armRetired = new WeakSet<ChildProcess>();
+const armLeftStarting = new WeakSet<ChildProcess>();
 const armRecovery = new WeakMap<ChildProcess, { generation: string; watcherPid: string }>();
 const armPendingActionable = new WeakMap<ChildProcess, PendingActionableClose>();
 
@@ -997,7 +1005,8 @@ export default function (pi: ExtensionAPI) {
             releaseClaim();
             return;
           }
-          const message = restoration.failure ? `${pending.message}\n\n${restoration.failure}` : pending.message;
+          const note = restoration.failure || restoration.notice;
+          const message = note ? `${pending.message}\n\n${note}` : pending.message;
           const delivered = await deliverActionableWake(owner, message, Boolean(restoration.failure), pending, restoration.recovery);
           if (!delivered) {
             settleClaim("failed");
@@ -1071,12 +1080,17 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  function waitForReadiness(armChild: ChildProcess): Promise<boolean> {
+  function waitForReadiness(armChild: ChildProcess): Promise<"ready" | "failed" | "starting"> {
     const readiness = armReadiness.get(armChild);
-    if (!readiness) return Promise.resolve(false);
-    // The arm owns startup progress/death detection and reports its own
-    // result, so no wall-clock deadline here retires a productive child.
-    return readiness;
+    if (!readiness) return Promise.resolve("failed");
+    return new Promise((resolveReady) => {
+      const timer = setLifecycleDeadline(() => resolveReady("starting"), armReadyNoticeMs);
+      timer.unref();
+      void readiness.then((ready) => {
+        timer.cancel();
+        resolveReady(ready ? "ready" : "failed");
+      });
+    });
   }
 
   async function retireArm(armChild: ChildProcess | null): Promise<boolean> {
@@ -1105,6 +1119,7 @@ export default function (pi: ExtensionAPI) {
 
   async function restoreAfterActionableClose(owner: SessionGeneration, predecessorArmPid: string): Promise<{
     failure: string;
+    notice?: string;
     recovery?: { generation: string; watcherPid: string };
   }> {
     let failure = "";
@@ -1115,8 +1130,14 @@ export default function (pi: ExtensionAPI) {
       appendExtensionLog(
         `restore attempt=${attempt} predecessor=${predecessorArmPid || "none"} start=${replacement.ok ? `ok pid=${successorChild?.pid ?? "none"}` : "failed"}`,
       );
-      if (replacement.ok && successorChild && await waitForReadiness(successorChild)) {
+      const readiness = replacement.ok && successorChild ? await waitForReadiness(successorChild) : "failed";
+      if (successorChild && readiness === "ready") {
         return { failure: "", recovery: armRecovery.get(successorChild) };
+      }
+      if (successorChild && readiness === "starting") {
+        armLeftStarting.add(successorChild);
+        appendExtensionLog(`restore attempt=${attempt} readiness=starting pid=${successorChild.pid ?? "none"}`);
+        return { failure: "", notice: `watcher: successor pid=${successorChild.pid ?? "unknown"} still starting; it keeps running and reports its own result` };
       }
       if (replacement.ok) {
         appendExtensionLog(`restore attempt=${attempt} readiness=failed pid=${successorChild?.pid ?? "none"}`);
@@ -1268,10 +1289,10 @@ export default function (pi: ExtensionAPI) {
       if (!generationIsLive(owner)) return;
       if (owner.restoring) {
         // The pipeline is still delivering the wake this successor was
-        // started for. A verified successor that failed on its own keeps its
-        // bounded retry for the end of that delivery; an unready child closing
-        // here was retired by the restoration itself.
-        if (verified && !armRetired.has(armChild)) {
+        // started for. A verified or still-starting successor that failed on
+        // its own keeps its bounded retry for the end of that delivery; an
+        // unready child closing here was retired by the restoration itself.
+        if ((verified || armLeftStarting.has(armChild)) && !armRetired.has(armChild)) {
           owner.deferredClose = { message: classification.message, predecessorArmPid: predecessor };
         }
         return;

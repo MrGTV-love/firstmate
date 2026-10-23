@@ -33,9 +33,9 @@
 //     the close is injected. Every other host close is a queue-read mark under
 //     docs/watcher-continuity.md#omp-stale-wake-gating. The host
 //     prints the first cycle's status line as soon as it is verified, so
-//     readiness and the handling handoff work as they do for the arm, with no
-//     readiness deadline for either. On a home that does not run the host
-//     nothing below changes.
+//     readiness and the handling handoff work as they do for the arm, with a
+//     longer readiness notice window for the host's own startup. On a home
+//     that does not run the host nothing below changes.
 //
 // Session-generation ownership (stated once here):
 // Current task-session proof handles switch events separately in
@@ -186,6 +186,14 @@ const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(exte
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
 const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
+// How long a wake waits for its successor to report before it goes out with a
+// still-starting line. A notice window only: the successor is never stopped for
+// it, since the arm owns startup no-progress detection.
+const armReadyNoticeMs = positiveInteger(
+  "FM_OMP_ARM_READY_TIMEOUT_MS",
+  process.platform === "win32" ? 35000 : 12000,
+);
+const hostReadyNoticeMs = Math.max(armReadyNoticeMs, 30000);
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const successorGraceMs = positiveInteger("FM_OMP_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
@@ -230,6 +238,8 @@ const armClose = new WeakMap<ChildProcess, Promise<void>>();
 // Children the extension itself asked to exit; their close is not a failure
 // of the successor and never earns a deferred retry.
 const armRetired = new WeakSet<ChildProcess>();
+const armLeftStarting = new WeakSet<ChildProcess>();
+const armHostMode = new WeakMap<ChildProcess, boolean>();
 const armRecovery = new WeakMap<ChildProcess, { generation: string; watcherPid: string }>();
 const armPendingActionable = new WeakMap<ChildProcess, PendingActionableClose>();
 
@@ -1416,7 +1426,8 @@ export default function (pi: ExtensionAPI) {
             return;
           }
           if (restoration.failure && !operationalHandback(pending.message)) surfaceFailure(owner, restoration.failure);
-          const message = restoration.failure ? `${pending.message}\n\n${restoration.failure}` : pending.message;
+          const note = restoration.failure || restoration.notice;
+          const message = note ? `${pending.message}\n\n${note}` : pending.message;
           const delivered = await deliverActionableWake(owner, message, pending, restoration.recovery);
           if (!delivered) {
             settleClaim("failed");
@@ -1503,12 +1514,18 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  function waitForReadiness(armChild: ChildProcess): Promise<boolean> {
+  function waitForReadiness(armChild: ChildProcess): Promise<"ready" | "failed" | "starting"> {
     const readiness = armReadiness.get(armChild);
-    if (!readiness) return Promise.resolve(false);
-    // The arm owns startup progress/death detection. A second wall-clock
-    // deadline here would retire a productive child before it can report.
-    return readiness;
+    if (!readiness) return Promise.resolve("failed");
+    const notice = armHostMode.get(armChild) ? hostReadyNoticeMs : armReadyNoticeMs;
+    return new Promise((resolveReady) => {
+      const timer = setLifecycleDeadline(() => resolveReady("starting"), notice);
+      timer.unref();
+      void readiness.then((ready) => {
+        timer.cancel();
+        resolveReady(ready ? "ready" : "failed");
+      });
+    });
   }
 
   async function retireArm(armChild: ChildProcess | null): Promise<boolean> {
@@ -1537,6 +1554,7 @@ export default function (pi: ExtensionAPI) {
 
   async function restoreAfterActionableClose(owner: SessionGeneration, predecessorArmPid: string): Promise<{
     failure: string;
+    notice?: string;
     recovery?: { generation: string; watcherPid: string };
   }> {
     let failure = "";
@@ -1544,8 +1562,13 @@ export default function (pi: ExtensionAPI) {
       if (!generationIsLive(owner)) return { failure: "" };
       const replacement = startArm(owner, predecessorArmPid);
       const successorChild = owner.child;
-      if (replacement.ok && successorChild && await waitForReadiness(successorChild)) {
+      const readiness = replacement.ok && successorChild ? await waitForReadiness(successorChild) : "failed";
+      if (successorChild && readiness === "ready") {
         return { failure: "", recovery: armRecovery.get(successorChild) };
+      }
+      if (successorChild && readiness === "starting") {
+        armLeftStarting.add(successorChild);
+        return { failure: "", notice: `watcher: successor pid=${successorChild.pid ?? "unknown"} still starting; it keeps running and reports its own result` };
       }
       if (replacement.ok) {
         failure = "watcher: FAILED - omp extension could not verify a ready successor watcher";
@@ -1630,6 +1653,7 @@ export default function (pi: ExtensionAPI) {
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    armHostMode.set(armChild, hostMode);
     owner.child = armChild;
     let stdout = "";
     let stderr = "";
@@ -1658,6 +1682,8 @@ export default function (pi: ExtensionAPI) {
       if (recovery) armRecovery.set(armChild, { watcherPid: recovery[1], generation: recovery[2] });
       if (/^watcher: (?:started|attached)\b/m.test(combined)) {
         settleReadiness(true);
+      } else if (/^watcher: FAILED\b/m.test(combined)) {
+        settleReadiness(false);
       }
       if (hostMode) return;
       const reason = completedActionableLine(stdout) || completedActionableLine(stderr);
@@ -1700,10 +1726,10 @@ export default function (pi: ExtensionAPI) {
       if (!generationIsLive(owner)) return;
       if (owner.restoring) {
         // The pipeline is still delivering the wake this successor was
-        // started for. A verified successor that failed on its own keeps its
-        // bounded retry for the end of that delivery; an unready child closing
+        // started for. A verified or still-starting successor that failed on
+        // its own keeps its bounded retry for the end of that delivery; an unready child closing
         // here was retired by the restoration itself.
-        if (verified && !armRetired.has(armChild)) {
+        if ((verified || armLeftStarting.has(armChild)) && !armRetired.has(armChild)) {
           owner.deferredClose = { message: classification.message, predecessorArmPid: predecessor };
         }
         return;

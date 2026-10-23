@@ -104,19 +104,23 @@ try {
   await handlers.get('before_agent_start')({}, {isIdle:()=>true});
   const result = await tool.execute();
   for (let i = 0; i < 500 && sent.length === 0; i++) await new Promise(r=>setTimeout(r,100));
-  if (!result.details.ok || !existsSync(`${process.env.FM_HOME}/ready-completed`)
-      || sent.length !== 1 || !sent[0].includes('signal: slow readiness wake')
-      || sent[0].includes('did not confirm'))
-    throw new Error('productive readiness was retired: '+JSON.stringify({result,sent}));
+  if (!result.details.ok || sent.length !== 1 || !sent[0].includes('signal: slow readiness wake')
+      || !sent[0].includes('still starting') || sent[0].includes('FAILED'))
+    throw new Error('slow readiness held or failed the wake: '+JSON.stringify({result,sent}));
+  if (existsSync(`${process.env.FM_HOME}/ready-completed`))
+    throw new Error('the wake waited for the successor to become ready');
+  for (let i = 0; i < 300 && !existsSync(`${process.env.FM_HOME}/ready-completed`); i++) await new Promise(r=>setTimeout(r,100));
+  if (!existsSync(`${process.env.FM_HOME}/ready-completed`))
+    throw new Error('the still-starting successor was not left to become ready');
 } finally {await handlers.get('session_shutdown')({}, {});}
 process.exit(0);
 '''
     result = run(['node', '--input-type=module', '-e', js], env)
     require(result.returncode == 0, result.stdout + result.stderr)
-case('omp_slow_readiness_is_not_retired', omp_readiness)
+case('omp_slow_readiness_does_not_hold_the_wake', omp_readiness)
 
-def claude_readiness():
-    home, env = fixture('claude-readiness')
+def claude_readiness(mode):
+    home, env = fixture('claude-readiness-' + mode)
     subprocess.run(['git', 'init', '-q', str(home)], check=True)
     (home / 'AGENTS.md').write_text('')
     (home / 'config/supervision-host-off').touch()
@@ -128,6 +132,9 @@ from pathlib import Path
 home = Path(os.environ['FM_HOME'])
 if os.environ.get('FM_WATCH_PREDECESSOR_ARM_PID'):
     (home / 'successor-pid').write_text(str(os.getpid()))
+    if os.environ['FM_TEST_SUCCESSOR_MODE'] == 'failed':
+        print('watcher: FAILED - fixture startup failure', flush=True)
+        raise SystemExit(1)
     until = time.monotonic() + 5
     while time.monotonic() < until: sum(i*i for i in range(1000))
     print(f'watcher: started pid={os.getpid()} (beacon fresh)', flush=True)
@@ -138,22 +145,32 @@ else:
     print('signal: task.status done: fixture peer cycle ended', flush=True)
 '''
     script(home / 'bin/fm-watch-arm.sh', 'exec python3 -c ' + __import__('shlex').quote(source) + '\n')
-    env['FM_ARM_CONFIRM_TIMEOUT'] = '1'
+    env.update(FM_ARM_CONFIRM_TIMEOUT='1', FM_TEST_SUCCESSOR_MODE=mode)
     try:
         result = subprocess.run([str(fakeclaude), '-c',
             'printf "%s\\n" "$$" > "$FM_HOME/state/.lock"; "$FM_HOME/bin/fm-claude-stop-autoarm.sh"'],
             env=env, input='{"session_id":"slow-successor","stop_hook_active":false}\n',
             capture_output=True, text=True)
-        require(result.returncode == 2 and (home / 'successor-completed').exists()
-                and 'did not confirm' not in result.stderr,
-                f'rc={result.returncode} completed={(home / "successor-completed").exists()} ' + result.stdout + result.stderr)
+        detail = f'rc={result.returncode} completed={(home / "successor-completed").exists()} ' + result.stdout + result.stderr
+        require(result.returncode == 2, 'the wake was not delivered: ' + detail)
+        if mode == 'failed':
+            require('did not confirm' in result.stderr and 'fixture startup failure' in result.stderr,
+                    'the successor failure was not reported: ' + detail)
+            return
+        require('still starting' in result.stderr and 'did not confirm' not in result.stderr
+                and not (home / 'successor-completed').exists(), 'the wake waited on the slow successor: ' + detail)
+        for _ in range(200):
+            if (home / 'successor-completed').exists(): break
+            time.sleep(0.1)
+        require((home / 'successor-completed').exists(), 'the still-starting successor was not left to finish: ' + detail)
     finally:
         pidfile = home / 'successor-pid'
         if pidfile.exists():
             import signal
             try: os.kill(int(pidfile.read_text()), signal.SIGKILL)
             except ProcessLookupError: pass
-case('claude_slow_successor_confirms_before_rewake', claude_readiness)
+case('claude_slow_successor_does_not_hold_the_rewake', lambda: claude_readiness('slow'))
+case('claude_failed_successor_is_reported_in_the_rewake', lambda: claude_readiness('failed'))
 
 def watchdog():
     home, env = fixture('watchdog')
