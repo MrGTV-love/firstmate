@@ -1,0 +1,4 @@
+running test_github_review_required_refuses against /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+ok - fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED
+running test_github_review_required_refuses against /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh
+not ok - github-review-required: a PR awaiting review must refuse: expected exit 1, got 0

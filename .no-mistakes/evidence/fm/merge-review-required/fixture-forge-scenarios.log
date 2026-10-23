@@ -1,0 +1,260 @@
+==================================================================
+SCENARIO: new-review-required
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":"REVIEW_REQUIRED"}
+extra args: (none)
+exit code: 1
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refusing to merge https://github.com/example/repo/pull/86
+  - reviewDecision is REVIEW_REQUIRED (a review is required at this head)
+--- forge calls that merge (gh.log lines with 'pr merge'):
+(none: gh pr merge never ran)
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: base-review-required
+script:   /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":"REVIEW_REQUIRED"}
+extra args: (none)
+exit code: 0
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/86 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+verified: https://github.com/example/repo/pull/86 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 5555555555555555555555555555555555555555
+--- forge calls that merge (gh.log lines with 'pr merge'):
+pr merge 86 --repo example/repo --match-head-commit 5555555555555555555555555555555555555555 --squash
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/base-review-required/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/base-review-required/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: new-approved
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":"APPROVED"}
+extra args: (none)
+exit code: 0
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/86 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+verified: https://github.com/example/repo/pull/86 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 5555555555555555555555555555555555555555
+--- forge calls that merge (gh.log lines with 'pr merge'):
+pr merge 86 --repo example/repo --match-head-commit 5555555555555555555555555555555555555555 --squash
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-approved/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-approved/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: new-no-review-policy-empty
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":""}
+extra args: (none)
+exit code: 0
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/86 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+verified: https://github.com/example/repo/pull/86 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 5555555555555555555555555555555555555555
+--- forge calls that merge (gh.log lines with 'pr merge'):
+pr merge 86 --repo example/repo --match-head-commit 5555555555555555555555555555555555555555 --squash
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-no-review-policy-empty/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-no-review-policy-empty/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: new-review-key-absent
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main"}
+extra args: (none)
+exit code: 0
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/86 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+verified: https://github.com/example/repo/pull/86 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 5555555555555555555555555555555555555555
+--- forge calls that merge (gh.log lines with 'pr merge'):
+pr merge 86 --repo example/repo --match-head-commit 5555555555555555555555555555555555555555 --squash
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-key-absent/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-key-absent/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: new-review-null
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":null}
+extra args: (none)
+exit code: 0
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/86 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+verified: https://github.com/example/repo/pull/86 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 5555555555555555555555555555555555555555
+--- forge calls that merge (gh.log lines with 'pr merge'):
+pr merge 86 --repo example/repo --match-head-commit 5555555555555555555555555555555555555555 --squash
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-null/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-null/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: new-review-required-plus-draft-dirty-red
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":true,"mergeable":"CONFLICTING","mergeStateStatus":"DIRTY","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":"REVIEW_REQUIRED"}
+extra args: (none)
+exit code: 1
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refusing to merge https://github.com/example/repo/pull/86
+  - the pull request is a draft
+  - reviewDecision is REVIEW_REQUIRED (a review is required at this head)
+  - mergeStateStatus is DIRTY (conflicts)
+  - check 'ci' is not green: it failed, and it is not required by base branch main
+  - mergeable is "CONFLICTING", not MERGEABLE
+error: these checks are not green: ci
+A failed check clears only when the same check passes on a later run, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/86
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/86 --allow-red ci
+--- forge calls that merge (gh.log lines with 'pr merge'):
+(none: gh pr merge never ran)
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required-plus-draft-dirty-red/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required-plus-draft-dirty-red/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: new-review-required-mergeable-unknown
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"UNKNOWN","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":"REVIEW_REQUIRED"}
+extra args: (none)
+exit code: 1
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refusing to merge https://github.com/example/repo/pull/86
+  - reviewDecision is REVIEW_REQUIRED (a review is required at this head)
+  - mergeable is "UNKNOWN", not MERGEABLE
+--- forge calls that merge (gh.log lines with 'pr merge'):
+(none: gh pr merge never ran)
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required-mergeable-unknown/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required-mergeable-unknown/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555
+==================================================================
+SCENARIO: new-review-required-attended-override
+script:   /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+live view (gh pr view --json ...): {"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"5555555555555555555555555555555555555555","baseRefName":"main","reviewDecision":"REVIEW_REQUIRED"}
+extra args: --attended-override
+exit code: 1
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refusing to merge https://github.com/example/repo/pull/86
+  - reviewDecision is REVIEW_REQUIRED (a review is required at this head)
+--- forge calls that merge (gh.log lines with 'pr merge'):
+(none: gh pr merge never ran)
+--- task meta after run:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required-attended-override/wt
+project=/Users/charlesabrooker/tmp/fm-pr-merge-tests.1pYjGO/new-review-required-attended-override/project
+kind=ship
+mode=no-mistakes
+pr=https://github.com/example/repo/pull/86
+pr_head=5555555555555555555555555555555555555555

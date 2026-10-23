@@ -1,0 +1,241 @@
+==================================================================
+LIVE GITHUB SCENARIO: new script, real reviewDecision
+script: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+pr: https://github.com/MrGTV-love/firstmate/pull/226   injected reviewDecision: (none, real value)
+exit code: 1
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr (supervision banner removed)
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/226
+  - check 'Behavior portable parallel 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable parallel 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 10' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 11' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 12' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 13' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 14' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 15' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 16' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 17' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 18' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 19' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 20' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 3' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 4' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 5' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 6' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 7' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 8' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 9' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior tests (Herdr)' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 3' is not green: it is still running, and it is not required by base branch main
+  - check 'PR must be raised via no-mistakes' is not green: it failed, and it is not required by base branch main
+error: these checks are not green: Behavior portable parallel 1, Behavior portable parallel 2, Behavior portable serial 1, Behavior portable serial 10, Behavior portable serial 11, Behavior portable serial 12, Behavior portable serial 13, Behavior portable serial 14, Behavior portable serial 15, Behavior portable serial 16, Behavior portable serial 17, Behavior portable serial 18, Behavior portable serial 19, Behavior portable serial 2, Behavior portable serial 20, Behavior portable serial 3, Behavior portable serial 4, Behavior portable serial 5, Behavior portable serial 6, Behavior portable serial 7, Behavior portable serial 8, Behavior portable serial 9, Behavior tests (Herdr), Lint 1, Lint 2, Lint 3, PR must be raised via no-mistakes
+Wait for the pending or unreported check to report, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226
+A failed check clears only when the same check passes on a later run, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable parallel 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable parallel 2
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 10
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 11
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 12
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 13
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 14
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 15
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 16
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 17
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 18
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 19
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 2
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 20
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 3
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 4
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 5
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 6
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 7
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 8
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 9
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior tests (Herdr)
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 2
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 3
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red PR must be raised via no-mistakes
+--- real gh live view(s) seen by the script:
+REAL VIEW: f56c58204e5eada8ea8bd0e2baeee19ff45c77ee
+REAL VIEW: {"baseRefName":"main","headRefOid":"f56c58204e5eada8ea8bd0e2baeee19ff45c77ee","isDraft":false,"mergeStateStatus":"UNSTABLE","mergeable":"MERGEABLE","reviewDecision":"","state":"OPEN"}
+--- merge attempts:
+(none: no merge was attempted)
+--- lab task meta:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-lab.BzEC5k/wt
+project=/Users/charlesabrooker/tmp/fm-lab.BzEC5k/projects/none
+kind=ship
+mode=no-mistakes
+pr=https://github.com/MrGTV-love/firstmate/pull/226
+pr_head=f56c58204e5eada8ea8bd0e2baeee19ff45c77ee
+lab removed: yes
+==================================================================
+LIVE GITHUB SCENARIO: new script, reviewDecision=REVIEW_REQUIRED
+script: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh
+pr: https://github.com/MrGTV-love/firstmate/pull/226   injected reviewDecision: REVIEW_REQUIRED
+exit code: 1
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr (supervision banner removed)
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/226
+  - reviewDecision is REVIEW_REQUIRED (a review is required at this head)
+  - check 'Behavior portable parallel 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable parallel 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 10' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 11' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 12' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 13' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 14' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 15' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 16' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 17' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 18' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 19' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 20' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 3' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 4' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 5' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 6' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 7' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 8' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 9' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior tests (Herdr)' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 3' is not green: it is still running, and it is not required by base branch main
+  - check 'PR must be raised via no-mistakes' is not green: it failed, and it is not required by base branch main
+error: these checks are not green: Behavior portable parallel 1, Behavior portable parallel 2, Behavior portable serial 1, Behavior portable serial 10, Behavior portable serial 11, Behavior portable serial 12, Behavior portable serial 13, Behavior portable serial 14, Behavior portable serial 15, Behavior portable serial 16, Behavior portable serial 17, Behavior portable serial 18, Behavior portable serial 19, Behavior portable serial 2, Behavior portable serial 20, Behavior portable serial 3, Behavior portable serial 4, Behavior portable serial 5, Behavior portable serial 6, Behavior portable serial 7, Behavior portable serial 8, Behavior portable serial 9, Behavior tests (Herdr), Lint 1, Lint 2, Lint 3, PR must be raised via no-mistakes
+Wait for the pending or unreported check to report, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226
+A failed check clears only when the same check passes on a later run, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable parallel 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable parallel 2
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 10
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 11
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 12
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 13
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 14
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 15
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 16
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 17
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 18
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 19
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 2
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 20
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 3
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 4
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 5
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 6
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 7
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 8
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 9
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior tests (Herdr)
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 2
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 3
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5N9VADY0SSAVFNEHX6A7CNE/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red PR must be raised via no-mistakes
+--- real gh live view(s) seen by the script:
+REAL VIEW: f56c58204e5eada8ea8bd0e2baeee19ff45c77ee
+REAL VIEW: {"baseRefName":"main","headRefOid":"f56c58204e5eada8ea8bd0e2baeee19ff45c77ee","isDraft":false,"mergeStateStatus":"UNSTABLE","mergeable":"MERGEABLE","reviewDecision":"","state":"OPEN"}
+--- merge attempts:
+(none: no merge was attempted)
+--- lab task meta:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-lab.Tu5TIT/wt
+project=/Users/charlesabrooker/tmp/fm-lab.Tu5TIT/projects/none
+kind=ship
+mode=no-mistakes
+pr=https://github.com/MrGTV-love/firstmate/pull/226
+pr_head=f56c58204e5eada8ea8bd0e2baeee19ff45c77ee
+lab removed: yes
+==================================================================
+LIVE GITHUB SCENARIO: base script, reviewDecision=REVIEW_REQUIRED
+script: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh
+pr: https://github.com/MrGTV-love/firstmate/pull/226   injected reviewDecision: REVIEW_REQUIRED
+exit code: 1
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr (supervision banner removed)
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/226
+  - check 'Behavior portable parallel 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable parallel 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 10' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 11' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 12' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 13' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 14' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 15' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 16' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 17' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 18' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 19' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 20' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 3' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 4' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 5' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 6' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 7' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 8' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior portable serial 9' is not green: it is still running, and it is not required by base branch main
+  - check 'Behavior tests (Herdr)' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 1' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 2' is not green: it is still running, and it is not required by base branch main
+  - check 'Lint 3' is not green: it is still running, and it is not required by base branch main
+  - check 'PR must be raised via no-mistakes' is not green: it failed, and it is not required by base branch main
+error: these checks are not green: Behavior portable parallel 1, Behavior portable parallel 2, Behavior portable serial 1, Behavior portable serial 10, Behavior portable serial 11, Behavior portable serial 12, Behavior portable serial 13, Behavior portable serial 14, Behavior portable serial 15, Behavior portable serial 16, Behavior portable serial 17, Behavior portable serial 18, Behavior portable serial 19, Behavior portable serial 2, Behavior portable serial 20, Behavior portable serial 3, Behavior portable serial 4, Behavior portable serial 5, Behavior portable serial 6, Behavior portable serial 7, Behavior portable serial 8, Behavior portable serial 9, Behavior tests (Herdr), Lint 1, Lint 2, Lint 3, PR must be raised via no-mistakes
+Wait for the pending or unreported check to report, then re-run this merge: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226
+A failed check clears only when the same check passes on a later run, then re-run this merge: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable parallel 1
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable parallel 2
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 1
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 10
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 11
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 12
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 13
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 14
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 15
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 16
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 17
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 18
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 19
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 2
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 20
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 3
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 4
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 5
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 6
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 7
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 8
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior portable serial 9
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Behavior tests (Herdr)
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 1
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 2
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red Lint 3
+Attended only, waive one named check with: /Users/charlesabrooker/tmp/fm-base-bin.ppdari/bin/fm-pr-merge.sh task-x1 https://github.com/MrGTV-love/firstmate/pull/226 --allow-red PR must be raised via no-mistakes
+--- real gh live view(s) seen by the script:
+REAL VIEW: f56c58204e5eada8ea8bd0e2baeee19ff45c77ee
+REAL VIEW: {"baseRefName":"main","headRefOid":"f56c58204e5eada8ea8bd0e2baeee19ff45c77ee","isDraft":false,"mergeStateStatus":"UNSTABLE","mergeable":"MERGEABLE","state":"OPEN"}
+--- merge attempts:
+(none: no merge was attempted)
+--- lab task meta:
+window=fm-task-x1
+worktree=/Users/charlesabrooker/tmp/fm-lab.9Q3377/wt
+project=/Users/charlesabrooker/tmp/fm-lab.9Q3377/projects/none
+kind=ship
+mode=no-mistakes
+pr=https://github.com/MrGTV-love/firstmate/pull/226
+pr_head=f56c58204e5eada8ea8bd0e2baeee19ff45c77ee
+lab removed: yes
