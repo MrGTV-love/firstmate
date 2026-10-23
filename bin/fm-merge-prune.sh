@@ -90,12 +90,14 @@
 # steered or became busy since the first answer backs off, and nothing is
 # stopped, signalled or destroyed. A proof read that fails (the ignored-file
 # listing, the stash listing, the search for nested copies, an error from the
-# process check) never counts as finding nothing. The slot-owner claim is read again right before the signal,
-# and a slot claimed by another task, or for this task id by another home, is
-# left alone. Then each nested copy whose untracked directory shows in the
-# copy's status (the project's .gitignore does not cover it) is removed, because
-# treehouse counts that directory as dirt (fm_mp_remove_unignored_nested). The preserve-list
-# files are copied to data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
+# process check) never counts as finding nothing. The preserve-list files of the
+# copy and of each nested copy are copied to data/<id>/merge-prune-preserved/
+# with SHA-256 checksums before anything is removed. The slot-owner claim is
+# read again right before the signal, and a slot claimed by another task, or for
+# this task id by another home, is left alone. Then each nested copy whose
+# untracked directory shows in the copy's status (the project's .gitignore does
+# not cover it) is removed, because treehouse counts that directory as dirt
+# (fm_mp_remove_unignored_nested). Then
 # `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
 # call the reaper makes; --include-unlanded, --include-in-use and --force are
 # never used), and teardown runs again to finish the task's records. In this
