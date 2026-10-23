@@ -109,7 +109,8 @@ EOF
   printf '# Task\nLegacy task.\n' > "$brief"
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy plan crashed'
   assert_contains "$plan" 'Task Definition Of Done: absent' 'legacy plan concealed absent criteria'
-  assert_contains "$plan" 'Out-of-scope list: absent' 'legacy plan concealed absent exclusions'
+  assert_contains "$plan" 'Out-of-scope list: no recognized' 'legacy plan concealed unrecognized exclusions'
+  assert_contains "$plan" 'check the Firstmate spec for inline exclusions' 'legacy plan did not send the reviewer to the spec'
 
   cat > "$brief" <<'EOF'
 # Task
@@ -134,6 +135,19 @@ EOF
 # Task
 ## Captain's intent
 Fix the badge refresh.
+## Firstmate spec
+Keep the existing renderer.
+- Out of scope: Jev skill picking (separate task), any other Jev call site.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'inline exclusion list item failed'
+  assert_not_contains "$plan" 'Out-of-scope list: absent' 'an inline exclusion list item was reported absent'
+  assert_contains "$plan" 'Out-of-scope list: no recognized' 'an unrecognized inline exclusion was not flagged'
+  assert_contains "$plan" 'check the Firstmate spec for inline exclusions' 'an unrecognized inline exclusion did not send the reviewer to the spec'
+
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
 Out of scope: Do not touch the billing page.
 ## Firstmate spec
 Keep the existing renderer.
@@ -146,7 +160,7 @@ EOF
   assert_contains "$plan" 'Do not touch the billing page.' "exclusions under Captain's intent were reported absent"
   assert_contains "$plan" 'Do not rename the badge.' 'a legacy spec paragraph was dropped beside the subsection'
   assert_contains "$plan" 'Do not redesign the dashboard.' 'the Out of scope subsection was dropped'
-  assert_not_contains "$plan" 'Out-of-scope list: absent' 'present exclusions were reported absent'
+  assert_not_contains "$plan" 'Out-of-scope list: no recognized' 'present exclusions were reported unrecognized'
   [ "$(printf '%s\n' "$plan" | grep -c 'Do not change the dashboard layout.')" -eq 1 ] \
     || fail 'a marker line inside the subsection was printed twice'
 
@@ -214,7 +228,7 @@ EOF
   plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'external criteria plan failed'
   assert_contains "$plan" "A failed refresh retains the last known value." 'plan passed only a DoD-file pointer'
   assert_not_contains "$plan" '{DOD_MANDATORY_ITEMS}' 'external criteria did not replace scaffold placeholders'
-  assert_contains "$plan" 'Out-of-scope list: absent' 'a brief with DoD but no exclusions concealed the omission'
+  assert_contains "$plan" 'Out-of-scope list: no recognized' 'a brief with DoD but no exclusions concealed the omission'
   rm "$criteria"
   if plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
     fail 'missing external criteria silently emitted a plan'

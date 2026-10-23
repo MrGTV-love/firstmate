@@ -117,8 +117,10 @@
 # A promoted brief, marked by its # Current ship Firstmate spec heading, labels
 # that DoD and those exclusions as scout-time context; the promoted ship intent
 # governs where they conflict.
-# Absent criteria/exclusions are explicit; unreadable briefs, criteria files or
-# the shared rubric refuse construction rather than silently dropping evidence.
+# Absent criteria are explicit; an unrecognized exclusion list never claims none
+# exist and sends the reviewer to the Firstmate spec. Unreadable briefs, criteria
+# files or the shared rubric refuse construction rather than silently dropping
+# evidence.
 # CRLF briefs and criteria are accepted; NUL-bearing input is refused by path.
 # Every heredoc here stays outside a command substitution: `VAR=$(cat <<EOF ...)`
 # breaks parsing of the whole file on Bash 3.2 (tests/fm-brief.test.sh).
@@ -536,7 +538,7 @@ fm_brief_verification_plan() {  # <brief>
   if [ -n "$(printf '%s' "$scope" | tr -d '[:space:]')" ]; then
     printf '%s\n' "$scope"
   else
-    printf 'Out-of-scope list: absent from this brief.\n'
+    printf "Out-of-scope list: no recognized \`### Out of scope\` subsection or column-0 \`Out of scope:\` paragraph was found in this brief; check the Firstmate spec for inline exclusions.\n"
   fi
   printf '\n'
   cat "$rubric"
@@ -1207,7 +1209,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     -h|--help)
       printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
         'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
-        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; legacy briefs state absent sections.'
+        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; legacy briefs state absent criteria and unrecognized exclusions.'
       ;;
     *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief> (or --help)' >&2; exit 2 ;;
   esac
