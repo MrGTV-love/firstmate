@@ -7,8 +7,12 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=tests/lib.sh
 . "$ROOT/tests/lib.sh"
 fm_live_gate opt-in FM_DSH_LIVE herdr jq dsh-tui
-: "${FM_DSH_LAB_PROJECT:?supply a disposable preallocated project}"
-: "${FM_DSH_LAB_COPY:?supply its separate preallocated linked copy}"
+# Explicit checks, not ${VAR:?}: under bash 3.2 that expansion failure ends with
+# the tests/lib.sh EXIT trap's status 0, which reads as a pass.
+missing_input=0
+[ -n "${FM_DSH_LAB_PROJECT:-}" ] || { echo 'not ok - FM_DSH_LAB_PROJECT is missing: supply a disposable preallocated project' >&2; missing_input=1; }
+[ -n "${FM_DSH_LAB_COPY:-}" ] || { echo 'not ok - FM_DSH_LAB_COPY is missing: supply its separate preallocated linked copy' >&2; missing_input=1; }
+[ "$missing_input" -eq 0 ] || exit 1
 TASK=${FM_DSH_EVIDENCE_DIR:-$(mktemp -d)}
 HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 ORIGINAL_PATH=$PATH

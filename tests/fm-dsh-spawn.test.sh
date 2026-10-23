@@ -608,6 +608,54 @@ SH
   pass "fm-spawn: exhausted omp replaces its declared DeepSeek stand-in with dsh-tui under the session policy"
 }
 
+# The opted-in live guard must fail, not pass, when a required lab input is
+# missing. Stubbed tools record any call, so the refusal is proven to come
+# before any herdr or dsh-tui action.
+test_live_guard_refuses_missing_lab_inputs() {
+  local dir="$TMP_ROOT/live-inputs" guard="$ROOT/tests/fm-dsh-live-e2e.test.sh" tool label out status
+  local -a supplied
+  mkdir -p "$dir/bin"
+  for tool in herdr dsh-tui jq; do
+    cat > "$dir/bin/$tool" <<SH
+#!/bin/sh
+printf '%s\\n' "$tool \$*" >> "$dir/calls"
+exit 97
+SH
+    chmod +x "$dir/bin/$tool"
+  done
+  for label in both project copy; do
+    case "$label" in
+      both) supplied=() ;;
+      project) supplied=(FM_DSH_LAB_COPY="$dir/copy") ;;
+      copy) supplied=(FM_DSH_LAB_PROJECT="$dir/project") ;;
+    esac
+    out=$(env -u FM_LIVE -u FM_DSH_LAB_PROJECT -u FM_DSH_LAB_COPY PATH="$dir/bin:$PATH" \
+      FM_DSH_LIVE=1 "${supplied[@]+"${supplied[@]}"}" bash "$guard" 2>&1)
+    status=$?
+    expect_code 1 "$status" "the live guard must fail when $label input is missing: $out"
+    case "$label" in
+      both|project) assert_contains "$out" 'FM_DSH_LAB_PROJECT is missing' "the refusal must name the missing project ($label)" ;;
+      *) assert_not_contains "$out" 'FM_DSH_LAB_PROJECT is missing' "a supplied project must not be reported missing" ;;
+    esac
+    case "$label" in
+      both|copy) assert_contains "$out" 'FM_DSH_LAB_COPY is missing' "the refusal must name the missing copy ($label)" ;;
+      *) assert_not_contains "$out" 'FM_DSH_LAB_COPY is missing' "a supplied copy must not be reported missing" ;;
+    esac
+  done
+  out=$(env -u FM_LIVE -u FM_DSH_LAB_PROJECT -u FM_DSH_LAB_COPY PATH="$dir/bin:$PATH" \
+    FM_DSH_LIVE=1 FM_DURATION_FILE="$dir/durations.jsonl" "$ROOT/bin/fm-test-run.sh" "$guard" 2>&1)
+  status=$?
+  expect_code 1 "$status" "fm-test-run must fail an opted-in guard with no lab inputs: $out"
+  assert_contains "$out" 'exit=1 ' "fm-test-run must record the guard's nonzero exit"
+  assert_contains "$out" 'FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0' "fm-test-run must count the guard as failed, not passed or skipped"
+  out=$(env -u FM_LIVE -u FM_DSH_LIVE -u FM_DSH_LAB_PROJECT -u FM_DSH_LAB_COPY PATH="$dir/bin:$PATH" bash "$guard" 2>&1)
+  status=$?
+  expect_code 0 "$status" "the guard without its opt-in must stay an ordinary skip: $out"
+  assert_contains "$out" 'skip: live: opt-in; set FM_DSH_LIVE=1 to run' "the opt-out skip must be unchanged"
+  assert_absent "$dir/calls" "a missing-input refusal must not reach herdr, dsh-tui or jq: $(cat "$dir/calls" 2>/dev/null)"
+  pass "live guard: an opted-in run with a missing lab input fails before any lab action; the opt-out still skips"
+}
+
 test_detection_anchored_names_argv_and_marker_precedence
 test_lock_identity_and_tmux_liveness_name_dsh
 test_tmux_agent_state_names_dsh
@@ -622,3 +670,4 @@ test_deepseek_cannot_launch_on_omp
 test_omp_default_cannot_hide_a_deepseek_route
 test_unrecognized_dsh_screen_refuses_launch
 test_exhausted_omp_replaces_deepseek_harness
+test_live_guard_refuses_missing_lab_inputs
