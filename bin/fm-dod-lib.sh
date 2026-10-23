@@ -6,7 +6,7 @@
 # receives. Both paths must hand the worker the same contract: a promoted
 # no-mistakes worker that never received the ask-user escalation rule or the
 # `--yes` ban is the exact delivery hole this single owner exists to close.
-# fm_dod_block <no-mistakes|direct-PR|local-only> <task-id> [branch] [<forge>] [<base>]
+# fm_dod_block <no-mistakes|direct-PR|local-only> <task-id> [branch] [<forge>] [<base>] [<consent>] [<brief>]
 # prints the block on stdout with no trailing blank line. The caller validates the
 # mode; an unknown mode is refused rather than silently rendered as the pipeline
 # contract.
@@ -22,6 +22,9 @@
 # captain-approved <host>/<owner>/<repo> publication scope for this one task,
 # rendered as an `upstream-consent=<scope>` suffix token on the Delivery
 # contract line so brief, spawn record, and worker instructions agree.
+# The seventh argument is the durable task brief used to build the separate
+# verification plan; it is required for mode=no-mistakes, which refuses to
+# render without it, and unused by the other modes.
 # Callers of the gate are bin/fm-crew-state.sh (current-state done),
 # bin/fm-pr-check.sh (PR registration), and bin/fm-inactive-reconcile.sh
 # (secondmate ledger-first publish of a child done). A ship `done:` is not
@@ -101,6 +104,25 @@
 # and a `## Captain's intent` line opening with a Captain label or address
 # through the helpers below. Other mentions of `--intent` point here rather than
 # restating the rule.
+# Executable interface: bash bin/fm-dod-lib.sh --verification-plan <brief>
+# prints a verification plan for no-mistakes' --verification-plan FILE input.
+# It keeps task criteria and scope evidence separate from --intent and renders
+# docs/review-rubric.md, the one rubric owner also used by independent readers.
+# Task DoD content includes nested headings up to ## How You're Graded; an
+# unfenced DoD file directive selects that file's contents instead of the inline
+# scaffold, matching the criteria check, and never passes only its path.
+# Exclusions are gathered from the unfenced lines of every ### Out of scope
+# subsection and every legacy column-0 Out of scope: paragraph in # Task
+# (including its following list until a blank line), each printed once in order.
+# Other spellings, such as a `- Out of scope:` list item, are not extracted.
+# A promoted brief, marked by its # Current ship Firstmate spec heading, labels
+# that DoD and those exclusions as scout-time context; the promoted ship intent
+# governs where they conflict.
+# Absent criteria are explicit; an unrecognized exclusion list never claims none
+# exist and sends the reviewer to the Firstmate spec. Unreadable briefs, criteria
+# files or the shared rubric refuse construction rather than silently dropping
+# evidence.
+# CRLF briefs and criteria are accepted; NUL-bearing input is refused by path.
 # Every heredoc here stays outside a command substitution: `VAR=$(cat <<EOF ...)`
 # breaks parsing of the whole file on Bash 3.2 (tests/fm-brief.test.sh).
 # fm_brief_worker_role owns the ship/scout role scope. bin/fm-spawn.sh is its one
@@ -116,6 +138,9 @@
 # session does not register the skill, such as one in another project's
 # worktree, cannot, so the role also names the file as the fallback to read;
 # the Claude launch grants the skills directory that holds it.
+# It renders docs/review-rubric.md for independent review readers rather than
+# pointing at it, because that file is outside the Claude and Rovo read grants;
+# a missing rubric fails the role render instead of dropping the criteria.
 # The task-specific Definition of Done is the second half of a ship or scout
 # brief's completion contract: fm_task_dod_block prints the two sections
 # bin/fm-brief.sh scaffolds after the delivery contract above ("## Definition Of
@@ -171,6 +196,8 @@ When this task works on Firstmate itself, the repository root `AGENTS.md` (also 
 Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
 EOF
   printf "If the \`firstmate-coding-guidelines\` skill name does not resolve in this session, read \`%s/.agents/skills/firstmate-coding-guidelines/SKILL.md\` instead.\n" "$root"
+  printf '%s\n\n' "When assigned an independent review, apply the shared review rubric below, rendered from \`$root/docs/review-rubric.md\`, against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied."
+  cat "$root/docs/review-rubric.md"
 }
 
 # Launch-only scope override; the original instructions remain recovery context
@@ -242,6 +269,7 @@ fm_base_branch_valid() {  # <base> <mode> <forge> <caller>
 # none. Any other "Base branch:" line is prose and ignored.
 fm_brief_base_branches() {  # <brief>
   awk '
+    { sub(/\r$/, "") }
     setup && sub(/^Base branch: /, "") { print; n++ }
     { setup = /^You are in a disposable git worktree of .*, at a detached HEAD on a clean copy of its base branch\.$/ }
     END { exit !n }
@@ -273,18 +301,6 @@ fm_ship_rule_one() {  # <no-mistakes|direct-PR|local-only> <task-id> [branch] [<
       return 1
       ;;
   esac
-}
-
-# Return 0 when a Task subsection still consists only of its scaffold
-# placeholder. A missing file and legacy briefs carry no such placeholders.
-fm_brief_task_placeholders_present() {  # <file>
-  local file=$1 intent spec
-  [ -f "$file" ] || return 1
-  intent=$(fm_brief_task_heading_body "$file" "## Captain's intent")
-  spec=$(fm_brief_task_heading_body "$file" "## Firstmate spec")
-  [ "$(printf '%s' "$intent" | tr -d '[:space:]')" = '{TASK}' ] && return 0
-  [ "$(printf '%s' "$spec" | tr -d '[:space:]')" = '{FIRSTMATE_SPEC}' ] && return 0
-  return 1
 }
 
 # The task Definition of Done placeholders, in scaffold order, as
@@ -382,8 +398,8 @@ fm_dod_text_problem_list() {  # <text>
 
 # Print every reason a ship or scout brief cannot be dispatched, one line per
 # problem, and return 0 when at least one exists; return 1 when none does.
-# Covers, in the order an operator fills them, a `## Captain's intent` body that
-# is exactly {TASK}, a `## Firstmate spec` body that is exactly {FIRSTMATE_SPEC},
+# Covers, in the order an operator fills them, unfenced standalone {TASK} and
+# {FIRSTMATE_SPEC} lines in their respective Task subsections,
 # every DoD token from FM_TASK_DOD_PLACEHOLDERS still standing in its section,
 # and an unfenced `DoD file:` line naming a missing, unreadable, or empty file,
 # or one that still holds a token. Each file problem names the path to edit.
@@ -397,13 +413,19 @@ fm_dod_text_problem_list() {  # <text>
 fm_brief_dispatch_problems() {  # <brief> [task-only]
   local brief=$1 scope=${2:-all} intent spec span dod_file more line problems=1
   [ -f "$brief" ] || return 1
-  intent=$(fm_brief_task_heading_body "$brief" "## Captain's intent")
-  spec=$(fm_brief_task_heading_body "$brief" "## Firstmate spec")
-  if [ "$(printf '%s' "$intent" | tr -d '[:space:]')" = '{TASK}' ]; then
+  if more=$(fm_brief_file_problem "$brief"); then
+    printf '%s\n' "$more"
+    return 0
+  fi
+  intent=$(fm_brief_heading_parse - "## Captain's intent" unfenced-body <<<"## Captain's intent
+$(fm_brief_task_heading_body "$brief" "## Captain's intent")")
+  spec=$(fm_brief_heading_parse - "## Firstmate spec" unfenced-body <<<"## Firstmate spec
+$(fm_brief_task_heading_body "$brief" "## Firstmate spec")")
+  if printf '%s\n' "$intent" | grep -Eq '^[[:space:]]*\{TASK\}[[:space:]]*$'; then
     printf '%s\n' "## Captain's intent still holds {TASK}"
     problems=0
   fi
-  if [ "$(printf '%s' "$spec" | tr -d '[:space:]')" = '{FIRSTMATE_SPEC}' ]; then
+  if printf '%s\n' "$spec" | grep -Eq '^[[:space:]]*\{FIRSTMATE_SPEC\}[[:space:]]*$'; then
     printf '%s\n' "## Firstmate spec still holds {FIRSTMATE_SPEC}"
     problems=0
   fi
@@ -412,11 +434,14 @@ fm_brief_dispatch_problems() {  # <brief> [task-only]
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
   # DoD-file directive. The heading reader owns the fence boundaries.
-  dod_file=$(fm_brief_heading_parse "$brief" "$FM_TASK_DOD_SECTION_TITLE" unfenced-body "$FM_TASK_DOD_GRADED_TITLE" \
-    | sed -n 's/^DoD file: \(\/.*\)$/\1/p' | head -n 1)
+  dod_file=$(fm_brief_task_dod_file "$brief")
   if [ -n "$dod_file" ]; then
     if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
       printf 'DoD file %s is not a readable file\n' "$dod_file"
+      return 0
+    fi
+    if more=$(fm_brief_file_problem "$dod_file"); then
+      printf '%s\n' "$more"
       return 0
     fi
     if [ -z "$(tr -d '[:space:]' < "$dod_file")" ]; then
@@ -440,20 +465,107 @@ EOF
   return "$problems"
 }
 
+# The directive selector is shared by launch validation and plan construction.
+fm_brief_task_dod_file() {  # <brief>
+  fm_brief_heading_parse "$1" "$FM_TASK_DOD_SECTION_TITLE" unfenced-body "$FM_TASK_DOD_GRADED_TITLE" \
+    | awk '/^DoD file: \// { sub(/^DoD file: /, ""); print; exit }'
+}
+
+fm_brief_out_of_scope() {  # <brief>
+  local task
+  task=$(fm_brief_heading_body "$1" "# Task")
+  # Unfenced mode ignores quoted examples of either exclusion marker.
+  fm_brief_heading_parse - "# Task" unfenced-body <<<"# Task
+$task" | awk '
+      /^(   |  | )?#+([[:space:]]|$)/ {
+        scan = $0
+        sub(/^ +/, "", scan)
+        level = match(scan, /[^#]/) - 1
+        if (level < 0) level = length(scan)
+        emit = 0
+        if ($0 == "### Out of scope") { in_scope = 1; next }
+        if (level <= 3) in_scope = 0
+        if (!in_scope) next
+      }
+      in_scope { print; next }
+      /^Out of scope:/ { emit = 1 }
+      /^[[:space:]]*$/ { emit = 0 }
+      emit { print }
+    '
+}
+
+fm_brief_verification_plan() {  # <brief>
+  local brief=$1 rubric dod scope dod_file problem context=''
+  rubric="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)/docs/review-rubric.md"
+  [ -f "$brief" ] && [ -r "$brief" ] || {
+    printf 'error: verification-plan brief is not a readable file: %s\n' "$brief" >&2
+    return 1
+  }
+  [ -f "$rubric" ] && [ -r "$rubric" ] || {
+    printf 'error: shared review rubric is not a readable file: %s; restore it before building the verification plan\n' "$rubric" >&2
+    return 1
+  }
+  if problem=$(fm_brief_file_problem "$brief"); then
+    printf 'error: %s\n' "$problem" >&2
+    return 1
+  fi
+  dod=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
+  dod_file=$(fm_brief_task_dod_file "$brief")
+  if [ -n "$dod_file" ]; then
+    [ -f "$dod_file" ] && [ -r "$dod_file" ] || {
+      printf 'error: verification-plan DoD file is not a readable file: %s\n' "$dod_file" >&2
+      return 1
+    }
+    if problem=$(fm_brief_file_problem "$dod_file"); then
+      printf 'error: %s\n' "$problem" >&2
+      return 1
+    fi
+    dod=$(awk '{ sub(/\r$/, ""); print }' "$dod_file")
+  fi
+  scope=$(fm_brief_out_of_scope "$brief")
+  printf '# Verification plan\nAuthor-supplied verification evidence, not captain intent or authorization to broaden scope.\n\n'
+  if fm_brief_heading_present "$brief" "# Current ship Firstmate spec"; then
+    context=' (scout-time context)'
+    printf 'This task was promoted from a scout: the Task Definition Of Done and Out-of-scope list below are scout-time context from the original scout brief, not ship criteria.\n'
+    printf 'Where they conflict with the promoted ship intent, the promoted ship intent governs.\n\n'
+  fi
+  printf '## Task Definition Of Done%s\n' "$context"
+  if [ -n "$(printf '%s' "$dod" | tr -d '[:space:]')" ]; then
+    printf '%s\n' "$dod"
+  else
+    printf 'Task Definition Of Done: absent from this brief.\n'
+  fi
+  printf '\n## Out-of-scope list%s\n' "$context"
+  if [ -n "$(printf '%s' "$scope" | tr -d '[:space:]')" ]; then
+    printf '%s\n' "$scope"
+  else
+    printf "Out-of-scope list: no recognized \`### Out of scope\` subsection or column-0 \`Out of scope:\` paragraph was found in this brief; check the Firstmate spec for inline exclusions.\n"
+  fi
+  printf '\n'
+  cat "$rubric"
+}
+
 # Print what keeps a ship or scout brief's task Definition of Done from being
 # usable and return 0; return 1 and print nothing when it is usable or absent.
 fm_brief_task_dod_problem() {  # <brief>
   local brief=$1 span dod_file found
   [ -f "$brief" ] || return 1
+  if found=$(fm_brief_file_problem "$brief"); then
+    printf '%s\n' "$found"
+    return 0
+  fi
   fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return 1
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
   # DoD-file directive. The heading reader owns the fence boundaries.
-  dod_file=$(fm_brief_heading_parse "$brief" "$FM_TASK_DOD_SECTION_TITLE" unfenced-body "$FM_TASK_DOD_GRADED_TITLE" \
-    | sed -n 's/^DoD file: \(\/.*\)$/\1/p' | head -n 1)
+  dod_file=$(fm_brief_task_dod_file "$brief")
   if [ -n "$dod_file" ]; then
     if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
       printf 'DoD file %s is not a readable file\n' "$dod_file"
+      return 0
+    fi
+    if found=$(fm_brief_file_problem "$dod_file"); then
+      printf '%s\n' "$found"
       return 0
     fi
     if [ -z "$(tr -d '[:space:]' < "$dod_file")" ]; then
@@ -469,7 +581,7 @@ fm_brief_task_dod_problem() {  # <brief>
   fm_dod_text_placeholder "$span"
 }
 
-fm_brief_intent_overlay() {  # <captain-intent>
+fm_brief_intent_overlay() {  # <captain-intent> <brief>
   cat <<'EOF'
 
 # Current no-mistakes intent contract
@@ -479,9 +591,16 @@ Preserve those words without adding speaker labels or direct address.
 Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are specification, not captain intent.
 The Definition of done's rule that `--intent` must be self-sufficient still governs the string you pass: resolve any report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
 
-## Captain intent authorized for --intent
 EOF
+  fm_verification_plan_block "$2"
+  printf '## Captain intent authorized for --intent\n'
   printf '%s\n' "$1"
+}
+
+# Succeed when text has a line other than blank lines and ATX headings, so a
+# scaffolded subheading alone never counts as content.
+fm_brief_text_has_content() {  # <text>
+  printf '%s\n' "$1" | grep -Evq '^ {0,3}#{1,6}([[:space:]]|$)|^[[:space:]]*$'
 }
 
 # Accept the current two-subsection contract only when both bodies have content;
@@ -495,12 +614,12 @@ fm_brief_task_content_valid() {  # <file>
     [ "$has_intent" -eq 1 ] && [ "$has_spec" -eq 1 ] || return 1
     intent=$(fm_brief_task_heading_body "$file" "## Captain's intent")
     spec=$(fm_brief_task_heading_body "$file" "## Firstmate spec")
-    [ -n "$(printf '%s' "$intent" | tr -d '[:space:]')" ] || return 1
-    [ -n "$(printf '%s' "$spec" | tr -d '[:space:]')" ] || return 1
+    fm_brief_text_has_content "$intent" || return 1
+    fm_brief_text_has_content "$spec" || return 1
     return 0
   fi
   task=$(fm_brief_heading_body "$file" "# Task")
-  [ -n "$(printf '%s' "$task" | tr -d '[:space:]')" ]
+  fm_brief_text_has_content "$task"
 }
 
 # Print the first `## Captain's intent` body line that opens with an operator
@@ -509,6 +628,56 @@ fm_brief_intent_address_line() {  # <file>
   fm_brief_task_heading_body "$1" "## Captain's intent" | awk '
     /^[[:space:]]*(Captain('\''s (words|ask|intent))?:|Captain,)/ { print; found = 1; exit }
     END { exit !found }
+  '
+}
+
+# This is a mechanical minimum, not a natural-language judgment of the ask:
+# refuse no substantive lines, or only standalone path/URL/Markdown-link lines
+# (optionally introduced by See, Read, or Refer to). Path-shaped tokens contain
+# a slash or a filename extension. Ignore blank lines, ATX headings, fence
+# delimiters and standalone HTML comments. Other prose remains the author's ask.
+fm_brief_intent_ask_problem() {  # <brief>
+  local intent
+  if fm_brief_task_heading_present "$1" "## Captain's intent"; then
+    intent=$(fm_brief_task_heading_body "$1" "## Captain's intent")
+  else
+    intent=$(fm_brief_marked_captain_words "$(fm_brief_heading_body "$1" '# Task')")
+    # Legacy direct-PR/scout briefs may predate provenance markers.
+    [ -n "$intent" ] || intent=$(fm_brief_heading_body "$1" '# Task')
+  fi
+  printf '%s\n' "$intent" | awk '
+    {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      if (comment) {
+        if (!match(line, /-->/)) next
+        line = substr(line, RSTART + RLENGTH)
+        comment = 0
+      }
+      while (match(line, /<!--/)) {
+        before = substr(line, 1, RSTART - 1)
+        rest = substr(line, RSTART + RLENGTH)
+        if (match(rest, /-->/)) line = before substr(rest, RSTART + RLENGTH)
+        else { line = before; comment = 1; break }
+      }
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if (line == "" || line ~ /^#+([[:space:]]|$)/) next
+      if (line ~ /^(```+|~~~+)/) next
+      lines++
+      sub(/^[-*+] +/, "", line)
+      sub(/[.!]$/, "", line)
+      sub(/^([Ss]ee|[Rr]ead|[Rr]efer to)[[:space:]]+/, "", line)
+      if (line ~ /^\[[^]]+\]\([^[:space:]]+\)$/) next
+      gsub(/`/, "", line)
+      if (line ~ /^[^[:space:]]*\/[^[:space:]]*$/ || line ~ /^[^[:space:]]+\.[[:alnum:]_-]+$/) next
+      substantive = 1
+    }
+    END {
+      if (substantive) exit 1
+      if (!lines) print "no substantive ask after blank lines, headings, fence delimiters and standalone comments"
+      else print "only file or report pointers, with no ask written in"
+    }
   '
 }
 
@@ -526,6 +695,22 @@ fm_ask_user_escalation_block() {  # <data-dir> <task-id>
    For a no-mistakes ask-user gate specifically, escalate all ask-user findings as one event plus one snapshot file, using that same shape even when the gate holds only a single ask-user finding: write only the ask-user findings, verbatim and unparaphrased (id, severity, file, line, description, authority), to \`$data/$id/nm-<run>-findings.txt\`, then report the gate with
    \`needs-decision [at=<epoch>] [key=nm-<run>-<step>]: ask-user findings=<id1>,<id2>,... file=$data/$id/nm-<run>-findings.txt\`
    naming every ask-user finding id from that gate. The status line only points at the file; it never restates or summarizes a finding's content.
+EOF
+}
+
+fm_verification_plan_block() {  # <brief>
+  local root brief_q output_q builder_q
+  root=$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)
+  printf -v builder_q '%q' "$root/bin/fm-dod-lib.sh"
+  printf -v brief_q '%q' "$1"
+  printf -v output_q '%q' "${1%/*}/verification-plan.md"
+  cat <<EOF
+Before starting a new no-mistakes run, build the separate verification plan from the current durable task brief:
+\`bash $builder_q --verification-plan $brief_q > $output_q\`
+If plan construction fails, stop and report the error to firstmate; do not start a run with a partial plan.
+Pass \`--verification-plan $output_q\` when starting the run, alongside the unchanged \`--intent\` input described below.
+The installed no-mistakes input reads a nonempty UTF-8 file as separate run evidence, not user intent; omit that flag when reattaching to an existing run.
+
 EOF
 }
 
@@ -608,8 +793,12 @@ There is no pull request, no \`gh-axi\` call, and no forge CI result to report: 
 EOF
 }
 
-fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>]
-  local mode=$1 id=$2 forge=${4:-none} base=${5:-} consent=${6:-}
+fm_dod_block() {  # <mode> <task-id> [branch] [<forge>] [<base>] [<consent>] [<brief>]
+  local mode=$1 id=$2 forge=${4:-none} base=${5:-} consent=${6:-} brief=${7:-}
+  if [ "$mode" = no-mistakes ] && [ -z "$brief" ]; then
+    echo "error: fm_dod_block: mode=no-mistakes needs the durable task brief to build its verification plan" >&2
+    return 1
+  fi
   local branch=${3:-fm/$id} pr_base='' nm_base='' base_q contract_forge='' contract_consent='' forge_cli=gh-axi draft_check
   fm_forge_valid_for_mode "$forge" "$mode" fm_dod_block || return 1
   fm_base_branch_valid "$base" "$mode" "$forge" fm_dod_block || return 1
@@ -662,6 +851,7 @@ Firstmate will then instruct you to run /no-mistakes to validate.
 That first \`done:\` is the handoff that starts the pipeline; it is not a request to publish.
 
 EOF
+      fm_verification_plan_block "$brief"
       fm_nm_driving_block "$forge"
       cat <<EOF
 
@@ -723,6 +913,7 @@ Firstmate will then instruct you to run /no-mistakes to validate and ship a PR.
 That first \`done:\` is the handoff that starts the pipeline, which owns the push; it is not a request to push from this copy.
 ${nm_base}
 EOF
+      fm_verification_plan_block "$brief"
       fm_nm_driving_block "$forge"
       cat <<EOF
 
@@ -1009,3 +1200,18 @@ fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
   printf '%s\n' "named head $sha is unreachable outside the worker copy"
   return 1
 }
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  case "${1:-}" in
+    --verification-plan)
+      [ "$#" -eq 2 ] || { echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief>' >&2; exit 2; }
+      fm_brief_verification_plan "$2"
+      ;;
+    -h|--help)
+      printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
+        'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
+        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; legacy briefs state absent criteria and unrecognized exclusions.'
+      ;;
+    *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief> (or --help)' >&2; exit 2 ;;
+  esac
+fi

@@ -172,7 +172,7 @@
       "invariant": "a dispatch refuses a brief whose Captain's intent or Firstmate spec is still a scaffold placeholder",
       "layer": "runtime-block",
       "source": "brief text of ## Captain's intent and ## Firstmate spec",
-      "trigger": "either subsection body is exactly its scaffold token",
+      "trigger": "fm_brief_dispatch_problems finds an unfenced standalone scaffold token in its matching Task subsection",
       "remedy": "edit <brief> and replace {TASK} and {FIRSTMATE_SPEC}; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief",
       "budget": 1,
       "test": "tests/fm-brief.test.sh",

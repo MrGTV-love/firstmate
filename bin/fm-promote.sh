@@ -11,7 +11,11 @@
 # bin/fm-dod-lib.sh, the single owner an ordinary ship brief also uses - the
 # mode-specific Definition of done, so a promoted worker receives exactly the same
 # delivery contract as a briefed one, including the no-mistakes mode's ask-user
-# escalation rule and --yes ban. The instructions also carry `# Task` with
+# escalation rule, --yes ban and separate verification-plan instructions.
+# The plan is built from the durable brief: it labels the original task DoD and
+# exclusions as scout-time context, says the promoted ship intent governs on
+# conflict, and never treats promotion's build steps as captain intent.
+# The instructions also carry `# Task` with
 # `## Captain's intent` preserved from the scout brief and promotion's ship-time
 # instructions under `## Firstmate spec`; the scout-time spec remains context but
 # is not relabeled as the ship spec. Promotion refuses leftover `{TASK}` /
@@ -253,7 +257,7 @@ SCOUT_BRIEF="$DATA/$ID/brief.md"
 # promotion does not re-litigate it. The helper still lists both leftover
 # bodies in one pass instead of stopping at the first.
 if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$SCOUT_BRIEF" task-only); then
-  echo "error: $SCOUT_BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; every unfinished item is listed once:" >&2
+  echo "error: $SCOUT_BRIEF cannot be promoted; every unfinished Task body or malformed input is listed once:" >&2
   while IFS= read -r line; do
     printf '  %s\n' "$line" >&2
   done <<EOF
@@ -323,7 +327,7 @@ EOF
     printf '%s\n' "$PROMOTION_ASK_USER_BLOCK"
   fi
   printf '\n'
-  fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT"
+  fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT" "$SCOUT_BRIEF"
 }
 mkdir -p "$DATA/$ID"
 [ ! -d "$INSTRUCTIONS" ] || { echo "error: ship instructions path is a directory: $INSTRUCTIONS" >&2; exit 1; }

@@ -21,8 +21,16 @@
 #   guessed posture. A
 #   ship or scout spawn also refuses leftover `{TASK}` / `{FIRSTMATE_SPEC}`
 #   placeholders, an empty Task, an incomplete pair of Task subsections, or a
-#   `## Captain's intent` line opening with a Captain label or address. A fresh
-#   spawn also refuses a leftover `## Definition Of Done (task)` placeholder;
+#   `## Captain's intent` line opening with a Captain label or address.
+#   Fresh ships and scouts additionally refuse intent with no substantive lines
+#   after blank lines, ATX headings, fence delimiters and standalone HTML comments
+#   are removed, or with only standalone path-shaped tokens (a slash or filename
+#   extension), HTTP(S) URLs or Markdown links (optionally prefixed See, Read or
+#   Refer to). This is a mechanical minimum, not a semantic
+#   classifier: other prose is accepted. Legacy briefs use marked captain words
+#   when present, otherwise their Task body. Relaunches and secondmate charters
+#   do not run this concrete-ask check; bin/fm-dod-lib.sh owns the helper.
+#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder;
 #   one refusal lists every leftover Task body and DoD token in a single pass,
 #   then prints the repair, including the unfenced `DoD file: <absolute path>`
 #   line inside that section naming a finished criteria file, which is the only
@@ -32,8 +40,10 @@
 #   of Done was accepted at the fresh spawn; a secondmate charter never reaches
 #   the check (bin/fm-dod-lib.sh owns it).
 #   Every ship or scout spawn renders `launch-brief.md`; for a no-mistakes ship
-#   it also carries the current `--intent` contract and the extracted captain
-#   intent. A legacy mixed Task is accepted there only under bin/fm-dod-lib.sh's
+#   it also carries the current `--intent` contract, the extracted captain
+#   intent and current separate verification-plan instructions, even when the
+#   original brief predates the plan input. A legacy mixed Task is accepted there
+#   only under bin/fm-dod-lib.sh's
 #   provenance-marking rules; unmarked legacy Tasks stop for migration rather
 #   than becoming intent. That library owns the intent rules. When
 #   the explicit mode carries less rigor than the project's standing posture, a
@@ -4263,8 +4273,10 @@ print_brief_dispatch_refusal() { # <brief> <problem-lines>
     echo "error: $brief still contains {TASK} or {FIRSTMATE_SPEC}, and has an unfinished task Definition of Done; every unfinished item is listed once:" >&2
   elif [ "$dod_bad" -eq 1 ]; then
     echo "error: $brief has an unfinished task Definition of Done; every unfinished item is listed once:" >&2
-  else
+  elif [ "$task_bad" -eq 1 ]; then
     echo "error: $brief still contains {TASK} or {FIRSTMATE_SPEC}; every unfinished item is listed once:" >&2
+  else
+    echo "error: $brief cannot be dispatched; every input problem is listed once:" >&2
   fi
   while IFS= read -r line; do
     printf '  %s\n' "$line" >&2
@@ -4295,7 +4307,11 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     exit 1
   fi
   if ! fm_brief_task_content_valid "$BRIEF"; then
-    echo "error: $BRIEF must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn" >&2
+    echo "error: $BRIEF must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn; write the requested change or investigation and the substance of any referenced report, then rerun fm-spawn.sh to complete dispatch" >&2
+    exit 1
+  fi
+  if [ "$RELAUNCH" -eq 0 ] && ASK_PROBLEM=$(fm_brief_intent_ask_problem "$BRIEF"); then
+    echo "error: $BRIEF has no concrete ask ($ASK_PROBLEM); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask" >&2
     exit 1
   fi
   if ADDRESS_LINE=$(fm_brief_intent_address_line "$BRIEF"); then
@@ -4344,10 +4360,10 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
       fm_brief_worker_role "$STATE" "$ID" "$FM_ROOT" &&
         printf '\n' &&
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
-        cat "$SOURCE_BRIEF" &&
+        awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
-          fm_brief_intent_overlay "$CAPTAIN_INTENT"
+          fm_brief_intent_overlay "$CAPTAIN_INTENT" "$SOURCE_BRIEF"
         fi
     } >"$tmp" || {
       rm -f -- "$tmp"

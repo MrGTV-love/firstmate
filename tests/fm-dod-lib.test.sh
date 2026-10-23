@@ -68,6 +68,225 @@ EOF
   pass "unfenced DoD-file directives after fenced examples remain authoritative"
 }
 
+# Exercise the executable plan interface, including nested criteria and fenced
+# examples, rather than asserting the library's implementation text.
+test_verification_plan_keeps_criteria_separate_from_intent() {
+  local brief="$TMP_ROOT/plan-brief.md" plan out criteria="$TMP_ROOT/plan-criteria.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the stale badge.
+## Firstmate spec
+Firstmate-only build constraints must not become intent or review criteria.
+### Out of scope
+- Do not redesign the dashboard.
+### Implementation
+Keep the existing renderer.
+# Definition of done
+## Definition Of Done (task)
+The badge updates after a refresh.
+### Mandatory items
+- A failed refresh retains the last known value.
+## How You're Graded
+This grading prose is not a criterion.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") \
+    || fail "could not build verification plan"
+  assert_contains "$plan" 'The badge updates after a refresh.' 'plan lost task criteria'
+  assert_contains "$plan" 'A failed refresh retains the last known value.' 'plan lost nested criteria'
+  assert_contains "$plan" 'Do not redesign the dashboard.' 'plan lost the exclusions'
+  assert_not_contains "$plan" 'Keep the existing renderer.' 'plan included unrelated build instructions'
+  assert_not_contains "$plan" 'Firstmate-only build constraints' 'plan included mixed Firstmate specification'
+  assert_not_contains "$plan" 'This grading prose' 'plan included the grading section'
+  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
+  assert_contains "$plan" 'Grade every DoD mandatory item pass or fail by its id, with the evidence' 'plan lost per-item grading'
+  assert_contains "$plan" 'A failed DoD mandatory item: block.' 'plan lost the failed-item outcome'
+  assert_contains "$plan" 'A real defect that breaks the stated intent, even when no DoD item names it: block.' 'plan lost the intent-defect outcome'
+  assert_contains "$plan" 'An improvement outside the DoD: a follow-up note, never a block.' 'plan lost the follow-up outcome'
+  assert_contains "$plan" 'A fix that would add scope beyond the intent: escalate to Main for the owner' 'plan lost the scope-escalation outcome'
+  assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
+
+  printf '# Task\nLegacy task.\n' > "$brief"
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy plan crashed'
+  assert_contains "$plan" 'Task Definition Of Done: absent' 'legacy plan concealed absent criteria'
+  assert_contains "$plan" 'Out-of-scope list: no recognized' 'legacy plan concealed unrecognized exclusions'
+  assert_contains "$plan" 'check the Firstmate spec for inline exclusions' 'legacy plan did not send the reviewer to the spec'
+
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+## Firstmate spec
+Keep the existing renderer.
+Out of scope: Do not redesign the dashboard.
+- Do not change billing.
+
+Other build constraints must not become exclusions.
+### Out of scope
+# Setup
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'legacy exclusion paragraph failed'
+  assert_contains "$plan" 'Do not redesign the dashboard.' 'legacy scope paragraph was dropped'
+  assert_contains "$plan" 'Do not change billing.' 'legacy scope list was dropped'
+  assert_not_contains "$plan" 'Other build constraints' 'legacy scope paragraph consumed unrelated build constraints'
+  assert_contains "$plan" 'Task Definition Of Done: absent' 'missing DoD with exclusions was concealed'
+
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+## Firstmate spec
+Keep the existing renderer.
+- Out of scope: Jev skill picking (separate task), any other Jev call site.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'inline exclusion list item failed'
+  assert_not_contains "$plan" 'Out-of-scope list: absent' 'an inline exclusion list item was reported absent'
+  assert_contains "$plan" 'Out-of-scope list: no recognized' 'an unrecognized inline exclusion was not flagged'
+  assert_contains "$plan" 'check the Firstmate spec for inline exclusions' 'an unrecognized inline exclusion did not send the reviewer to the spec'
+
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+Out of scope: Do not touch the billing page.
+## Firstmate spec
+Keep the existing renderer.
+Out of scope: Do not rename the badge.
+### Out of scope
+- Do not redesign the dashboard.
+Out of scope: Do not change the dashboard layout.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'multi-source exclusions failed'
+  assert_contains "$plan" 'Do not touch the billing page.' "exclusions under Captain's intent were reported absent"
+  assert_contains "$plan" 'Do not rename the badge.' 'a legacy spec paragraph was dropped beside the subsection'
+  assert_contains "$plan" 'Do not redesign the dashboard.' 'the Out of scope subsection was dropped'
+  assert_not_contains "$plan" 'Out-of-scope list: no recognized' 'present exclusions were reported unrecognized'
+  [ "$(printf '%s\n' "$plan" | grep -c 'Do not change the dashboard layout.')" -eq 1 ] \
+    || fail 'a marker line inside the subsection was printed twice'
+
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+### Out of scope
+- Captain exclusion A.
+## Firstmate spec
+Keep the existing renderer.
+### Out of scope
+- Spec exclusion B.
+#### Detail
+- Spec exclusion C.
+### Implementation
+Build notes are not exclusions.
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'multi-subsection exclusions failed'
+  assert_contains "$plan" 'Captain exclusion A.' 'the first Out of scope subsection was dropped'
+  assert_contains "$plan" 'Spec exclusion B.' 'a later Out of scope subsection was dropped'
+  assert_contains "$plan" 'Spec exclusion C.' 'a nested list inside an Out of scope subsection was dropped'
+  assert_not_contains "$plan" 'Build notes are not exclusions.' 'a following subsection leaked into exclusions'
+  [ "$(printf '%s\n' "$plan" | grep -c 'exclusion [ABC]\.')" -eq 3 ] \
+    || fail 'an Out of scope subsection was printed more than once'
+  case "$plan" in
+    *'Captain exclusion A.'*'Spec exclusion B.'*) ;;
+    *) fail 'Out of scope subsections were not printed in brief order' ;;
+  esac
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the badge refresh.
+Out of scope: legacy list item one.
+#12 legacy list item two.
+## Firstmate spec
+Keep the existing renderer.
+### Out of scope
+- Keep A.
+#1 priority is B.
+- Keep C.
+EOF
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'hash-led exclusion lines failed'
+  assert_contains "$out" '#12 legacy list item two.' 'a hash-led line ended a legacy exclusion paragraph'
+  assert_contains "$out" '#1 priority is B.' 'a hash-led line ended an Out of scope subsection'
+  assert_contains "$out" '- Keep C.' 'exclusions after a hash-led line were dropped'
+  plan=$(cd "$ROOT/bin" && bash fm-dod-lib.sh --verification-plan "$brief" 2>&1) \
+    || fail "a relative builder path could not find the shared rubric: $plan"
+  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'a relative builder path lost the rubric'
+  if out=$(fm_dod_block no-mistakes no-brief-task 2>&1); then
+    fail 'a no-mistakes contract rendered without its durable brief'
+  fi
+  assert_contains "$out" 'needs the durable task brief' 'missing-brief refusal was not actionable'
+
+  printf 'A failed refresh retains the last known value.\n' > "$criteria"
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+\`\`\`text
+DoD file: $TMP_ROOT/not-a-directive.md
+\`\`\`
+DoD file: $criteria
+{DOD_MANDATORY_ITEMS}
+## How You're Graded
+EOF
+  plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'external criteria plan failed'
+  assert_contains "$plan" "A failed refresh retains the last known value." 'plan passed only a DoD-file pointer'
+  assert_not_contains "$plan" '{DOD_MANDATORY_ITEMS}' 'external criteria did not replace scaffold placeholders'
+  assert_contains "$plan" 'Out-of-scope list: no recognized' 'a brief with DoD but no exclusions concealed the omission'
+  rm "$criteria"
+  if plan=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'missing external criteria silently emitted a plan'
+  fi
+  assert_contains "$plan" "$criteria" 'missing criteria error did not name the missing file'
+  pass 'verification plans carry actual criteria, exclusions and rubric without broadening intent'
+}
+
+test_verification_plan_requires_its_shared_rubric() {
+  local isolated="$TMP_ROOT/isolated-code" brief="$TMP_ROOT/legacy-plan.md" out
+  mkdir -p "$isolated"
+  cp -R "$ROOT/bin" "$isolated/bin"
+  printf '# Task\nLegacy task.\n' > "$brief"
+  if out=$(bash "$isolated/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'plan succeeded without the shared rubric'
+  fi
+  assert_contains "$out" 'shared review rubric is not a readable file' 'missing rubric error was not actionable'
+  assert_contains "$out" "$isolated/docs/review-rubric.md" 'missing rubric error did not name its owner'
+  pass 'missing shared rubric refuses verification-plan construction'
+}
+
+test_verification_plan_preserves_crlf_criteria_and_refuses_nul() {
+  local brief="$TMP_ROOT/byte-plan.md" criteria="$TMP_ROOT/byte-criteria.md" out rc
+  printf "# Task\r\n## Captain's intent\r\nFix the badge.\r\nOut of scope: Keep billing.\r\n## Firstmate spec\r\nKeep the renderer.\r\n### Out of scope\r\n- Keep layout.\r\n## Definition Of Done (task)\r\n### Mandatory items\r\nM1: Refresh the badge.\r\n## How You're Graded\r\nNot a criterion.\r\n" > "$brief"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF plan construction failed'
+  assert_contains "$out" 'M1: Refresh the badge.' 'CRLF criteria were lost'
+  assert_contains "$out" 'Out of scope: Keep billing.' 'CRLF legacy exclusions were lost'
+  assert_contains "$out" '- Keep layout.' 'CRLF subsection exclusions were lost'
+  assert_not_contains "$out" 'Not a criterion.' 'CRLF grading boundary was lost'
+  assert_not_contains "$out" 'absent' 'CRLF criteria were misreported as absent'
+  printf 'M2: Preserve the last value on error.\r\n' > "$criteria"
+  printf '## Definition Of Done (task)\r\nDoD file: %s\r\n{DOD_MANDATORY_ITEMS}\r\n## How You'\''re Graded\r\n' "$criteria" > "$brief"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF criteria directive failed'
+  assert_contains "$out" 'M2: Preserve the last value on error.' 'CRLF external criteria were lost'
+  assert_not_contains "$out" '{DOD_MANDATORY_ITEMS}' 'CRLF directive did not replace the scaffold'
+  printf '\000' >> "$criteria"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail 'NUL external criteria silently emitted a plan'
+  assert_contains "$out" "malformed input $criteria: NUL bytes" 'criteria refusal did not name malformed input'
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'NUL external criteria passed dispatch validation'
+  assert_contains "$out" "malformed input $criteria: NUL bytes" 'dispatch misreported malformed criteria'
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'NUL external criteria passed the single-problem check'
+  assert_contains "$out" "malformed input $criteria: NUL bytes" 'single-problem check misreported malformed criteria'
+  printf '## Definition Of Done (task)\000\nM3: Keep the criterion.\n' > "$brief"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail 'NUL brief silently emitted a plan'
+  assert_contains "$out" "malformed input $brief: NUL bytes" 'brief refusal did not name malformed input'
+  assert_not_contains "$out" 'absent' 'NUL brief misreported criteria as absent'
+  pass 'CRLF criteria and exclusions survive; NUL briefs and external criteria refuse explicitly'
+}
+
+test_verification_plan_preserves_crlf_criteria_and_refuses_nul
+
+test_verification_plan_keeps_criteria_separate_from_intent
+test_verification_plan_requires_its_shared_rubric
+
 test_scout_done_is_not_gated() {
   local repo wt
   repo="$TMP_ROOT/scout-repo"
@@ -448,7 +667,7 @@ test_pr_based_dod_draft_check_uses_gh_axi() {
   local mode out
   for mode in direct-PR no-mistakes; do
     out="$TMP_ROOT/dod-$mode.md"
-    fm_dod_block "$mode" dod-draft-task > "$out"
+    fm_dod_block "$mode" dod-draft-task fm/dod-draft-task none '' '' "$TMP_ROOT/dod-draft-task/brief.md" > "$out"
     assert_no_grep 'gh pr view' "$out" "$mode: DoD must not document a raw gh draft check"
     # shellcheck disable=SC2016  # single quotes are deliberate: the backticks must stay literal
     assert_grep 'confirm it is not a draft (`gh-axi pr view <number>` must print `draft: no`' "$out" \
@@ -566,9 +785,12 @@ test_dispatch_verdict_lists_all_problems_in_one_pass() {
 # Task
 ## Captain's intent
 {TASK}
+### Context
 
 ## Firstmate spec
 {FIRSTMATE_SPEC}
+### Out of scope
+- Preserve the existing renderer.
 
 ## Definition Of Done (task)
 Capability in plain words: {DOD_CAPABILITY}
@@ -849,5 +1071,26 @@ test_external_forge_brief_is_not_published() {
 test_external_forge_direct_pr_is_refused
 test_external_forge_brief_is_not_published
 test_worker_role_names_skill_and_fallback_file
+
+# Independent review readers may not hold a read grant for the rubric owner, so
+# the emitted launch role must carry its full text and refuse without it.
+test_worker_role_renders_shared_rubric() {
+  local role_file line missing="$TMP_ROOT/rubric-less-root"
+  role_file="$TMP_ROOT/worker-role-rubric.txt"
+  fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$ROOT" >"$role_file"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    grep -qxF -- "$line" "$role_file" || fail "worker role did not render rubric line: $line"
+  done <"$ROOT/docs/review-rubric.md"
+  assert_grep "apply the shared review rubric below, rendered from \`$ROOT/docs/review-rubric.md\`" "$role_file" \
+    "worker role did not introduce the rendered rubric"
+  mkdir -p "$missing"
+  if fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$missing" >/dev/null 2>&1; then
+    fail "worker role rendered without the shared rubric"
+  fi
+  pass "worker role renders the shared rubric and refuses without it"
+}
+
+test_worker_role_renders_shared_rubric
 
 echo "all fm-dod-lib tests passed"

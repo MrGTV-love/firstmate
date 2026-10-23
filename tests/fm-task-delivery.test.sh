@@ -929,6 +929,17 @@ EOF
     "empty Task subsections were not rejected semantically"
   assert_absent "$home/state/$id.meta" "empty-subsection spawn wrote task metadata"
 
+  id=delivery-heading-only-spec
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 \
+    || fail "heading-only-spec brief should scaffold"
+  fill_brief_subsections "$home/data/$id/brief.md" "Fix the badge." ""
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn of a spec holding only the scaffold subheading should exit non-zero"
+  assert_contains "$out" "must contain nonempty ## Captain's intent and ## Firstmate spec" \
+    "a scaffold subheading alone counted as Firstmate spec content"
+  assert_absent "$home/state/$id.meta" "heading-only-spec spawn wrote task metadata"
+
   id=promote-unfilled-e1
   meta="$home/state/$id.meta"
   mkdir -p "$home/state"
@@ -1083,6 +1094,190 @@ EOF
     "legacy promotion copied the scout Setup section into Firstmate spec"
   pass "fm-spawn/fm-promote: leftover Task placeholders are refused until both subsections are filled"
 }
+
+test_fresh_spawn_requires_a_concrete_ask() {
+  local rec home proj fakebin kind id body out rc n=0
+  local args=()
+  rec=$(make_home concrete-ask)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout; do
+    for body in '' $'### Context\n<!-- report pointer only -->' '/tmp/report.md' 'See report.md.' 'src/app/login.py' 'docs/plan.html' 'report.csv' $'```text\n \n```' $'~~~\n\t\n~~~' 'https://example.test/report' '[report](https://example.test/report)'; do
+      n=$((n + 1))
+      id="ask-$kind-$n"
+      write_brief "$home" "$id" direct-PR
+      cat > "$home/data/$id/brief.md" <<EOF
+# Task
+## Captain's intent
+$body
+## Firstmate spec
+Keep the investigation bounded.
+EOF
+      if [ "$kind" = ship ]; then args=(--mode direct-PR --yolo off); else args=(--scout); fi
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}"); rc=$?
+      [ "$rc" -ne 0 ] || fail "$kind: empty/pointer-only intent was admitted"
+      if [ -n "$body" ]; then
+        assert_contains "$out" 'has no concrete ask' "$kind: wrong refusal for pointer/comment-only intent"
+      fi
+      assert_contains "$out" 'write the requested change or investigation and the substance' 'refusal omitted the accepted proof'
+      assert_contains "$out" 'rerun fm-spawn.sh to complete dispatch' 'refusal omitted the completing action'
+      assert_absent "$home/data/$id/launch-brief.md" 'refused ask was handed to a worker'
+      assert_absent "$home/state/$id.meta" 'refused ask created task state'
+    done
+    id="ask-$kind-good"
+    write_brief "$home" "$id" direct-PR
+    cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+<!-- Context is optional. --> Fix the badge after refresh using https://example.test/report.
+See report.md.
+## Firstmate spec
+Keep unrelated redesign out of scope.
+EOF
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_not_contains "$out" 'has no concrete ask' 'substantive ask plus reference was refused'
+    assert_present "$home/data/$id/launch-brief.md" 'substantive ask never reached launch rendering'
+    assert_grep "$ROOT/docs/review-rubric.md" "$home/data/$id/launch-brief.md" 'independent readers did not receive the single rubric owner'
+    assert_grep 'Every factual claim in a PR body must be backed by a record' "$home/data/$id/launch-brief.md" 'independent readers did not receive the rendered rubric text'
+  done
+  # A marked pointer cannot be rescued by unmarked Firstmate build substance.
+  id=ask-legacy-pointer
+  write_brief "$home" "$id" direct-PR
+  cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+[captain] See report.md.
+Firstmate build instructions are not a substitute for the captain's ask.
+EOF
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" 'has no concrete ask' 'legacy build prose rescued a pointer-only ask'
+  assert_absent "$home/data/$id/launch-brief.md" 'legacy pointer-only ask reached a worker'
+  pass 'fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks'
+}
+
+test_scaffold_spec_placeholder_blocks_dispatch_and_promotion() {
+  local rec home proj fakebin id brief kind out rc
+  local args=()
+  rec=$(make_home spec-placeholder)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout promotion; do
+    id="spec-placeholder-$kind"
+    if [ "$kind" = ship ]; then
+      args=(--mode direct-PR --yolo off)
+      FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail 'could not scaffold ship'
+    else
+      args=(--scout)
+      FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail 'could not scaffold scout'
+    fi
+    brief="$home/data/$id/brief.md"
+    fill_task_subsections "$brief" 'Fix the badge.' '{FIRSTMATE_SPEC}'
+    fill_whole_dod "$brief"
+    if [ "$kind" = promotion ]; then
+      printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+      out=$(FM_HOME="$home" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1); rc=$?
+      assert_grep 'kind=scout' "$home/state/$id.meta" 'unfinished spec changed promotion state'
+      assert_absent "$home/data/$id/ship-instructions.md" 'unfinished spec published ship instructions'
+    else
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}"); rc=$?
+      assert_absent "$home/data/$id/launch-brief.md" 'unfinished spec reached a worker'
+    fi
+    [ "$rc" -ne 0 ] || fail "$kind: unfinished spec was admitted"
+    assert_contains "$out" '## Firstmate spec still holds {FIRSTMATE_SPEC}' "$kind: scaffold heading hid the placeholder"
+    fill_task_subsections "$brief" 'Fix the badge.' $'Keep the renderer.\n```text\n{FIRSTMATE_SPEC}\n```'
+    if [ "$kind" = promotion ]; then
+      out=$(FM_HOME="$home" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1) \
+        || fail "finished promotion failed: $out"
+      assert_grep 'kind=ship' "$home/state/$id.meta" 'finished promotion did not change state'
+    else
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+      assert_present "$home/data/$id/launch-brief.md" 'a fenced placeholder example prevented launch rendering'
+    fi
+  done
+  pass 'scaffold headings cannot hide active spec placeholders; fenced examples remain valid'
+}
+
+test_spawn_accepts_crlf_and_refuses_nul_briefs() {
+  local rec home proj fakebin kind id brief out body
+  local args=()
+  rec=$(make_home brief-bytes)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout; do
+    id="brief-bytes-$kind"
+    if [ "$kind" = ship ]; then
+      args=(--mode no-mistakes --yolo off)
+      FM_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes >/dev/null 2>&1 || fail 'could not scaffold ship'
+    else
+      args=(--scout)
+      FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail 'could not scaffold scout'
+    fi
+    brief="$home/data/$id/brief.md"
+    fill_brief_subsections "$brief" 'Fix the badge using https://example.test/report.' 'Keep the renderer.'
+    awk '{ printf "%s\r\n", $0 }' "$brief" > "$brief.crlf"
+    mv "$brief.crlf" "$brief"
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_present "$home/data/$id/launch-brief.md" "$kind: complete CRLF ask failed admission: $out"
+    assert_not_contains "$out" 'mismatch' "$kind: CRLF changed the delivery contract"
+    if [ "$kind" = ship ]; then
+      body=$(awk '$0 == "## Captain intent authorized for --intent" { emit=1; next } emit { print }' "$home/data/$id/launch-brief.md")
+      assert_contains "$body" 'Fix the badge using https://example.test/report.' 'CRLF lost authorized intent'
+      assert_not_contains "$body" 'Keep the renderer.' 'CRLF mixed specification into authorized intent'
+    fi
+    rm "$home/data/$id/launch-brief.md"
+    printf '\000' >> "$brief"
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_contains "$out" "malformed input $brief: NUL bytes" "$kind: NUL brief was silently normalized"
+    assert_absent "$home/data/$id/launch-brief.md" "$kind: NUL brief reached a worker"
+  done
+  pass 'complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly'
+}
+
+test_scaffold_spec_placeholder_blocks_dispatch_and_promotion
+test_spawn_accepts_crlf_and_refuses_nul_briefs
+
+test_fresh_spawn_requires_a_concrete_ask
+
+# A promoted scout's plan is built by the command the ship instructions hand the
+# worker. Scout-time criteria stay visible but must not read as ship criteria.
+test_promoted_plan_labels_scout_criteria() {
+  local rec home proj fakebin id=promote-plan instructions command plan
+  rec=$(make_home promote-plan)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+  mkdir -p "$home/data/$id"
+  cat > "$home/data/$id/brief.md" <<'EOF'
+# Task
+## Captain's intent
+Find why the guard blocks large writes.
+## Firstmate spec
+Measure the guard on recorded sessions.
+Out of scope: changing guard code.
+# Definition of done
+## Definition Of Done (task)
+The report names the blocking threshold.
+## How You're Graded
+EOF
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$PROMOTE" "$id" --mode no-mistakes --yolo off >/dev/null 2>&1 \
+    || fail 'promotion to no-mistakes failed'
+  instructions="$home/data/$id/ship-instructions.md"
+  command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$instructions")
+  [ -n "$command" ] || fail 'promoted instructions carry no plan-build command'
+  bash -c "$command" || fail 'promoted plan-build command failed'
+  plan="$home/data/$id/verification-plan.md"
+  assert_grep 'The report names the blocking threshold.' "$plan" 'promoted plan dropped the scout DoD'
+  assert_grep 'Out of scope: changing guard code.' "$plan" 'promoted plan dropped the scout exclusions'
+  assert_grep '## Task Definition Of Done (scout-time context)' "$plan" 'scout DoD read as ship criteria'
+  assert_grep '## Out-of-scope list (scout-time context)' "$plan" 'scout exclusions read as ship exclusions'
+  assert_grep 'the promoted ship intent governs' "$plan" 'promoted plan did not say which intent governs'
+  pass 'fm-promote: a promoted plan labels scout DoD and exclusions as context under the ship intent'
+}
+
+test_promoted_plan_labels_scout_criteria
 
 # Exercise the serialized input a worker is told to pass to no-mistakes, not
 # just the presence of words somewhere in its much larger launch brief.
