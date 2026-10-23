@@ -1,0 +1,92 @@
+== run 1 (driver execute refuses: cleanup_policy_not_allowed)
+$ fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/perm	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 44075 is gone
+FAILED	<world>/th/pool1/1/repo/.claude/worktrees/perm	the copy was left: REFUSED: Vernant's closeout driver did not release <world>/th/pool1/1/repo/.claude/worktrees/perm (exit 3): cleanup_policy_not_allowed: {"allowed": false, "reason": "cleanup_policy_not_allowed"}?
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+[exit 1]
+--- state
+perm: on disk; lock=vernant-session-active owner=launcher:44075 launcher=44075
+worktree list:
+<world>/th/pool1/1/repo                        c88d567 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/perm cc43ea9 [fm/perm] locked
+driver calls:
+<world>/th/pool1/1/repo	perm	plan	git=<world>/bin/git
+<world>/th/pool1/1/repo	perm	execute	git=<world>/bin/git
+receipts:
+f68a842385b30bd8b3057967129657cee5791fc5bbaf82f1915771682cc80881
+preserved files:
+copy-sweep.log:
+git calls logged: 48 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+
+== run 2
+$ fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/perm	driver retained this copy: exit 3: cleanup_policy_not_allowed: {"allowed": false, "reason": "cleanup_policy_not_allowed"}?; no retry until its retained disposition is reconciled
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+[exit 0]
+--- state
+perm: on disk; lock=vernant-session-active owner=launcher:44075 launcher=44075
+worktree list:
+<world>/th/pool1/1/repo                        c88d567 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/perm cc43ea9 [fm/perm] locked
+driver calls:
+receipts:
+f68a842385b30bd8b3057967129657cee5791fc5bbaf82f1915771682cc80881
+preserved files:
+copy-sweep.log:
+git calls logged: 8 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+
+== report run
+$ fm-copy-sweep.sh 
+copy-sweep: mode=report containers=1 copies=1
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/perm	driver retained this copy: exit 3: cleanup_policy_not_allowed: {"allowed": false, "reason": "cleanup_policy_not_allowed"}?; no retry until its retained disposition is reconciled
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+[exit 0]
+--- state
+perm: on disk; lock=vernant-session-active owner=launcher:44075 launcher=44075
+worktree list:
+<world>/th/pool1/1/repo                        c88d567 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/perm cc43ea9 [fm/perm] locked
+driver calls:
+receipts:
+f68a842385b30bd8b3057967129657cee5791fc5bbaf82f1915771682cc80881
+preserved files:
+copy-sweep.log:
+git calls logged: 7 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+
+lab and world removed: yes

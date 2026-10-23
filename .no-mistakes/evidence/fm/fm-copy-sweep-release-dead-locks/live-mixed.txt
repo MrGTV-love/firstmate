@@ -1,0 +1,138 @@
+$ fm-copy-sweep.sh 
+copy-sweep: mode=report containers=1 copies=6
+PENDING-DRIVER	0.06 GiB	<world>/th/pool1/1/repo/.claude/worktrees/deadlock	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21935 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/foreign	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/livelock	worktree lock: vernant-session-active owner=launcher:22140 launcher=22140 (launcher 22140 is alive; start age=2s; lock mtime=1792752086)
+REAPABLE-PROVEN	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/plain	clean, no process, no record, HEAD contained in a remote branch
+PENDING-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/planrefused	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 22219 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-UNPUSHED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=2
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.06 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.06 GiB of 20 GiB, ok
+[exit 0]
+--- state
+deadlock: on disk; lock=vernant-session-active owner=launcher:21935 launcher=21935
+livelock: on disk; lock=vernant-session-active owner=launcher:22140 launcher=22140
+planrefused: on disk; lock=vernant-session-active owner=launcher:22219 launcher=22219
+unpushed: on disk; lock=vernant-session-active owner=launcher:22426 launcher=22426
+foreign: on disk; lock=hand-held by an operator
+plain: on disk; lock=none
+worktree list:
+<world>/th/pool1/1/repo                               5222550 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/deadlock    8ad3461 [fm/deadlock] locked
+<world>/th/pool1/1/repo/.claude/worktrees/foreign     762b93a [fm/foreign] locked
+<world>/th/pool1/1/repo/.claude/worktrees/livelock    eb27bb0 [fm/livelock] locked
+<world>/th/pool1/1/repo/.claude/worktrees/plain       5154636 [fm/plain]
+<world>/th/pool1/1/repo/.claude/worktrees/planrefused e232ceb [fm/planrefused] locked
+<world>/th/pool1/1/repo/.claude/worktrees/unpushed    5f530ea [fm/unpushed] locked
+driver calls:
+receipts:
+preserved files:
+copy-sweep.log:
+git calls logged: 52 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+
+$ fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/foreign	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/livelock	worktree lock: vernant-session-active owner=launcher:22140 launcher=22140 (launcher 22140 is alive; start age=4s; lock mtime=1792752086)
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/planrefused	its closeout driver would not release it (exit 3): pull_request_not_merged: {"allowed": false, "reason": "pull_request_not_merged"}
+HELD-UNPUSHED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/plain	branch fm/plain at 5154636535a6, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/deadlock	branch fm/deadlock at 8ad3461458e0, copy 0.06 GiB, preserved 0.00 GiB, net freed 0.06 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21935 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=6 GiB=0.06 reaped=2 freed=0.06
+[exit 0]
+--- state
+deadlock: GONE
+livelock: on disk; lock=vernant-session-active owner=launcher:22140 launcher=22140
+planrefused: on disk; lock=vernant-session-active owner=launcher:22219 launcher=22219
+unpushed: on disk; lock=vernant-session-active owner=launcher:22426 launcher=22426
+foreign: on disk; lock=hand-held by an operator
+plain: GONE
+worktree list:
+<world>/th/pool1/1/repo                               5222550 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/foreign     762b93a [fm/foreign] locked
+<world>/th/pool1/1/repo/.claude/worktrees/livelock    eb27bb0 [fm/livelock] locked
+<world>/th/pool1/1/repo/.claude/worktrees/planrefused e232ceb [fm/planrefused] locked
+<world>/th/pool1/1/repo/.claude/worktrees/unpushed    5f530ea [fm/unpushed] locked
+driver calls:
+<world>/th/pool1/1/repo	planrefused	plan	git=<world>/bin/git
+<world>/th/pool1/1/repo	deadlock	plan	git=<world>/bin/git
+<world>/th/pool1/1/repo	deadlock	execute	git=<world>/bin/git
+receipts:
+preserved files:
+<labhome>/data/copy-sweep/20261023T104131Z.24245-8ad3461458e0018bb4f01cebd6806d1778385813/nested-copy-preserved/93a726b1439c1e7c8522bf7131f34cb887d633232a417968a54a38493e538905/copy-path
+<labhome>/data/copy-sweep/20261023T104131Z.24245-8ad3461458e0018bb4f01cebd6806d1778385813/nested-copy-preserved/93a726b1439c1e7c8522bf7131f34cb887d633232a417968a54a38493e538905/SHA256SUMS
+<labhome>/data/copy-sweep/20261023T104131Z.24245-8ad3461458e0018bb4f01cebd6806d1778385813/nested-copy-preserved/93a726b1439c1e7c8522bf7131f34cb887d633232a417968a54a38493e538905/outbox.log
+copy-sweep.log:
+2026-10-23T10:41:33Z	removed	<world>/th/pool1/1/repo/.claude/worktrees/plain	clone=<world>/th/pool1/1/repo	head=5154636535a6c38acbaa6c7baad4482053f59a80	branch=fm/plain	kib=12	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-23T10:41:35Z	removed	<world>/th/pool1/1/repo/.claude/worktrees/deadlock	clone=<world>/th/pool1/1/repo	head=8ad3461458e0018bb4f01cebd6806d1778385813	branch=fm/deadlock	kib=62516	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21935 is gone
+git calls logged: 117 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+driver	worktree unlock <world>/th/pool1/1/repo/.claude/worktrees/deadlock
+driver	worktree remove <world>/th/pool1/1/repo/.claude/worktrees/deadlock
+
+$ fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/foreign	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/livelock	worktree lock: vernant-session-active owner=launcher:22140 launcher=22140 (launcher 22140 is alive; start age=11s; lock mtime=1792752086)
+HELD-LOCKED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/planrefused	its closeout driver would not release it (exit 3): pull_request_not_merged: {"allowed": false, "reason": "pull_request_not_merged"}
+HELD-UNPUSHED	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=3
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=0 freed=0.00
+[exit 0]
+--- state
+deadlock: GONE
+livelock: on disk; lock=vernant-session-active owner=launcher:22140 launcher=22140
+planrefused: on disk; lock=vernant-session-active owner=launcher:22219 launcher=22219
+unpushed: on disk; lock=vernant-session-active owner=launcher:22426 launcher=22426
+foreign: on disk; lock=hand-held by an operator
+plain: GONE
+worktree list:
+<world>/th/pool1/1/repo                               5222550 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/foreign     762b93a [fm/foreign] locked
+<world>/th/pool1/1/repo/.claude/worktrees/livelock    eb27bb0 [fm/livelock] locked
+<world>/th/pool1/1/repo/.claude/worktrees/planrefused e232ceb [fm/planrefused] locked
+<world>/th/pool1/1/repo/.claude/worktrees/unpushed    5f530ea [fm/unpushed] locked
+driver calls:
+<world>/th/pool1/1/repo	planrefused	plan	git=<world>/bin/git
+receipts:
+preserved files:
+<labhome>/data/copy-sweep/20261023T104131Z.24245-8ad3461458e0018bb4f01cebd6806d1778385813/nested-copy-preserved/93a726b1439c1e7c8522bf7131f34cb887d633232a417968a54a38493e538905/copy-path
+<labhome>/data/copy-sweep/20261023T104131Z.24245-8ad3461458e0018bb4f01cebd6806d1778385813/nested-copy-preserved/93a726b1439c1e7c8522bf7131f34cb887d633232a417968a54a38493e538905/SHA256SUMS
+<labhome>/data/copy-sweep/20261023T104131Z.24245-8ad3461458e0018bb4f01cebd6806d1778385813/nested-copy-preserved/93a726b1439c1e7c8522bf7131f34cb887d633232a417968a54a38493e538905/outbox.log
+copy-sweep.log:
+2026-10-23T10:41:33Z	removed	<world>/th/pool1/1/repo/.claude/worktrees/plain	clone=<world>/th/pool1/1/repo	head=5154636535a6c38acbaa6c7baad4482053f59a80	branch=fm/plain	kib=12	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-23T10:41:35Z	removed	<world>/th/pool1/1/repo/.claude/worktrees/deadlock	clone=<world>/th/pool1/1/repo	head=8ad3461458e0018bb4f01cebd6806d1778385813	branch=fm/deadlock	kib=62516	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21935 is gone
+git calls logged: 44 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+
+lab and world removed: yes

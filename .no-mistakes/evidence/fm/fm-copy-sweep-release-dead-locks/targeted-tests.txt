@@ -1,0 +1,48 @@
+== test_dead_launcher_lock_is_released_by_the_driver
+ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - fm-copy-sweep
+rc=0
+== test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
+ok - an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; the same refusal after an unlock stays held with its preserve
+ok - fm-copy-sweep
+rc=0
+== test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal
+ok - a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code
+ok - fm-copy-sweep
+rc=0
+== test_a_refused_plan_holds_the_copy_copies_nothing_and_exits_zero
+ok - a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it
+ok - fm-copy-sweep
+rc=0
+== test_ownership_or_lock_change_during_preservation_prevents_release
+ok - a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock
+ok - fm-copy-sweep
+rc=0
+== test_recycled_launcher_lock_is_held
+ok - a live recycled launcher pid holds its copy and unchanged lock, with age and lock mtime reported
+ok - fm-copy-sweep
+rc=0
+== test_nothing_is_forced_deleted_cleaned_or_returned
+ok - apply never forces, cleans, unlocks, recursively deletes or calls treehouse
+ok - fm-copy-sweep
+rc=0
+== test_a_stale_retention_receipt_does_not_hold_a_new_copy_at_the_same_path
+ok - a retention receipt whose copy is gone or whose path now holds a different copy, locked or not, is ignored by classification, left by report, and removed and listed by apply, so a new copy at that path is judged on its own proofs
+ok - fm-copy-sweep
+rc=0
+== test_retained_ignored_payload_is_kept_once_without_growth
+ok - exit-3 ignored-payload retention is KEPT, keeps its lock and source, and repeated sweeps neither preserve nor execute again
+ok - fm-copy-sweep
+rc=0
+== test_locked_copy_with_an_unpushed_equivalence_is_still_held
+ok - a locked copy with an unpushed but content-equivalent commit is held, and the driver never runs
+ok - fm-copy-sweep
+rc=0
+== test_live_foreign_or_unreleasable_locks_are_kept
+ok - a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched
+ok - fm-copy-sweep
+rc=0
+== test_valid_lock_replacement_during_plan_prevents_release
+ok - a different but valid Vernant lock appearing during the plan is never released
+ok - fm-copy-sweep
+rc=0

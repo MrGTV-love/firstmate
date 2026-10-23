@@ -1,0 +1,99 @@
+== run 1 (driver execute says cleanup_skipped_live_or_unknown)
+$ fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/tmp	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 33044 is gone
+FAILED	<world>/th/pool1/1/repo/.claude/worktrees/tmp	the copy was left: REFUSED: Vernant's closeout driver did not release <world>/th/pool1/1/repo/.claude/worktrees/tmp (exit 3): cleanup_skipped_live_or_unknown: {"allowed": false, "reason": "cleanup_skipped_live_or_unknown"}?; the driver names this refusal temporary and released nothing, so this run's preserve was discarded and the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+[exit 1]
+--- state
+tmp: on disk; lock=vernant-session-active owner=launcher:33044 launcher=33044
+worktree list:
+<world>/th/pool1/1/repo                       b3a8796 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/tmp db06b77 [fm/tmp] locked
+driver calls:
+<world>/th/pool1/1/repo	tmp	plan	git=<world>/bin/git
+<world>/th/pool1/1/repo	tmp	execute	git=<world>/bin/git
+receipts:
+preserved files:
+copy-sweep.log:
+git calls logged: 49 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+
+== run 2 (same temporary refusal)
+$ fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	<world>/th/pool1/1/repo/.claude/worktrees/tmp	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 33044 is gone
+FAILED	<world>/th/pool1/1/repo/.claude/worktrees/tmp	the copy was left: REFUSED: Vernant's closeout driver did not release <world>/th/pool1/1/repo/.claude/worktrees/tmp (exit 3): cleanup_skipped_live_or_unknown: {"allowed": false, "reason": "cleanup_skipped_live_or_unknown"}?; the driver names this refusal temporary and released nothing, so this run's preserve was discarded and the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool <world>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <world>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+[exit 1]
+--- state
+tmp: on disk; lock=vernant-session-active owner=launcher:33044 launcher=33044
+worktree list:
+<world>/th/pool1/1/repo                       b3a8796 [main]
+<world>/th/pool1/1/repo/.claude/worktrees/tmp db06b77 [fm/tmp] locked
+driver calls:
+<world>/th/pool1/1/repo	tmp	plan	git=<world>/bin/git
+<world>/th/pool1/1/repo	tmp	execute	git=<world>/bin/git
+receipts:
+preserved files:
+copy-sweep.log:
+git calls logged: 49 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+
+== run 3 (driver now allows)
+$ fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	<world>/th/pool1/1/repo/.claude/worktrees/tmp	branch fm/tmp at db06b77b29cf, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 33044 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+[exit 0]
+--- state
+tmp: GONE
+worktree list:
+<world>/th/pool1/1/repo b3a8796 [main]
+driver calls:
+<world>/th/pool1/1/repo	tmp	plan	git=<world>/bin/git
+<world>/th/pool1/1/repo	tmp	execute	git=<world>/bin/git
+receipts:
+preserved files:
+<labhome>/data/copy-sweep/20261023T104147Z.39816-db06b77b29cf241f32850026c42183121c3c576e/nested-copy-preserved/987e3871a99831e0d769c4c7006c8c65d92de0c38dab8b95ede4083fad3356ac/copy-path
+<labhome>/data/copy-sweep/20261023T104147Z.39816-db06b77b29cf241f32850026c42183121c3c576e/nested-copy-preserved/987e3871a99831e0d769c4c7006c8c65d92de0c38dab8b95ede4083fad3356ac/SHA256SUMS
+<labhome>/data/copy-sweep/20261023T104147Z.39816-db06b77b29cf241f32850026c42183121c3c576e/nested-copy-preserved/987e3871a99831e0d769c4c7006c8c65d92de0c38dab8b95ede4083fad3356ac/outbox.log
+copy-sweep.log:
+2026-10-23T10:41:50Z	removed	<world>/th/pool1/1/repo/.claude/worktrees/tmp	clone=<world>/th/pool1/1/repo	head=db06b77b29cf241f32850026c42183121c3c576e	branch=fm/tmp	kib=16	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 33044 is gone
+git calls logged: 51 total; sweep git calls touching lock/unlock/force/prune: 0
+driver git calls:
+driver	worktree unlock <world>/th/pool1/1/repo/.claude/worktrees/tmp
+driver	worktree remove <world>/th/pool1/1/repo/.claude/worktrees/tmp
+
+lab and world removed: yes
