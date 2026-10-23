@@ -37,6 +37,7 @@ export function apply(ctx, config) {
   let launchInput = false;
   let holding;
   let holdingIds;
+  let claimed = [];
   let generation = 0;
   const ownMessages = new Set();
   const wakeMessages = new Set();
@@ -219,6 +220,7 @@ export function apply(ctx, config) {
     leading = undefined;
     holding = undefined;
     holdingIds = undefined;
+    claimed = [];
     launchInput = source === 'startup';
     if (launchInput) leading = new Promise(accept => { lead = input => accept(input ? [input] : []); });
     const own = text => {
@@ -252,13 +254,20 @@ export function apply(ctx, config) {
   // resets the failure budget. The downstream pre-step runs first: DSH's
   // checkpoint there makes the open turn durable before the digest wait.
   // DSH drops a cancelled or failed step's claimed batch without restoring it
-  // (a non-user cancel also clears the inbox), so the digest and that batch
-  // stay held until one of them is logged; a turn that ends first hands them
-  // to the next step.
+  // (a non-user cancel also clears the inbox), and it claims before this
+  // waterfall runs. So while the digest is outstanding every claim is held,
+  // and the digest and that batch stay held until one of them is logged; a
+  // turn that ends first hands them to the next step.
+  ctx.on('agent/inbox/claimed', ({agent: owner, message: input}) => {
+    if (owner !== agent || !leading || !input) return;
+    if (launchInput) ownMessages.add(input.id);
+    if (!claimed.some(held => held.id === input.id)) claimed.push(input);
+  });
   ctx.on('agent/pre-step', async (payload, next) => {
     if (payload.agent !== agent || !leading) return next();
     const pending = leading;
     leading = undefined;
+    claimed = [];
     if (launchInput) for (const input of payload.messages) ownMessages.add(input.id);
     launchInput = false;
     const ids = new Set(payload.messages.map(input => input.id));
@@ -287,7 +296,16 @@ export function apply(ctx, config) {
       if (!ownMessages.delete(id) && event.data?.source?.kind === 'user') { guardNudged = false; failedArm = false; }
     }
     if (event.type === 'turn/end') {
-      if (holding) { leading = holding; holding = undefined; holdingIds = undefined; }
+      if (holding) {
+        leading = holding;
+        holding = undefined;
+        holdingIds = undefined;
+      } else if (leading && claimed.length) {
+        const lost = claimed;
+        leading = leading.then(held => [...held, ...lost]);
+        claimed = [];
+        launchInput = false;
+      }
       failedArm = false;
       log('turn-end', {seq: event.seq});
       queueMicrotask(() => { void ensure().catch(failure); });

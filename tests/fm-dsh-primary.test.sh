@@ -53,10 +53,14 @@ function setup(name, {failArm = false, failStart = false, slowStart = false} = {
   const emit = (type, payload) => handlers.get(type)?.(payload);
   const step = messages => handlers.get('agent/pre-step')({agent, messages, turn: 1, step: 1, signal: new AbortController().signal},
     async () => ({kind: 'enter', messages}));
-  // DSH's own step: claim the whole inbox, run the waterfall, then drop the
-  // batch if the turn was cancelled meanwhile.
-  const run = async (inbox, signal, owner = agent, downstream = () => {}) => {
+  // DSH's own step: claim the whole inbox (announcing each claim), assemble
+  // the system prompt, run the waterfall, then drop the batch if the turn was
+  // cancelled meanwhile.
+  const run = async (inbox, signal, owner = agent, downstream = () => {}, assemble = async () => {}) => {
     const claimed = inbox.splice(0);
+    for (const message of claimed) handlers.get('agent/inbox/claimed')?.({agent: owner, message, turn: 1});
+    await assemble();
+    signal.throwIfAborted();
     const decision = await handlers.get('agent/pre-step')({agent: owner, messages: claimed, turn: 1, step: 1, signal},
       async () => { downstream(); return {kind: 'enter', messages: claimed}; });
     signal.throwIfAborted();
@@ -109,14 +113,20 @@ assert.deepEqual(await cancelled.run(inbox, new AbortController().signal), [type
 cancelled.stop();
 // The installed DSH awaits agent/created, so the digest is ready before the
 // first step; the real cancel windows are later. DSH drops a claimed batch
-// without restoring it when a downstream pre-step throws on abort, or when it
-// aborts after the waterfall returns but before the step starts.
-for (const window of ['downstream-throw', 'aborted-before-step-start']) {
+// without restoring it when the step is cancelled or fails while assembling
+// the system prompt (before this waterfall), when a downstream pre-step throws
+// on abort, or when it aborts after the waterfall returns but before the step
+// starts.
+for (const window of ['assemble-abort', 'assemble-throw', 'downstream-throw', 'aborted-before-step-start']) {
   const held = setup(`startup-${window}`);
   await held.emit('agent/created', {agent: held.agent});
   const queue = [brief];
   const cancel = new AbortController();
-  if (window === 'downstream-throw') {
+  if (window === 'assemble-abort') {
+    await assert.rejects(held.run(queue, cancel.signal, held.agent, undefined, async () => { cancel.abort(); }), {name: 'AbortError'});
+  } else if (window === 'assemble-throw') {
+    await assert.rejects(held.run(queue, cancel.signal, held.agent, undefined, async () => { throw new Error('assembly failed'); }), /assembly failed/);
+  } else if (window === 'downstream-throw') {
     await assert.rejects(held.run(queue, cancel.signal, held.agent, () => { cancel.abort(); cancel.signal.throwIfAborted(); }), {name: 'AbortError'});
   } else {
     const entered = await held.step(queue.splice(0));
