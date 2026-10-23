@@ -236,6 +236,40 @@ test_verification_plan_requires_its_shared_rubric() {
   pass 'missing shared rubric refuses verification-plan construction'
 }
 
+test_verification_plan_preserves_crlf_criteria_and_refuses_nul() {
+  local brief="$TMP_ROOT/byte-plan.md" criteria="$TMP_ROOT/byte-criteria.md" out rc
+  printf "# Task\r\n## Captain's intent\r\nFix the badge.\r\nOut of scope: Keep billing.\r\n## Firstmate spec\r\nKeep the renderer.\r\n### Out of scope\r\n- Keep layout.\r\n## Definition Of Done (task)\r\n### Mandatory items\r\nM1: Refresh the badge.\r\n## How You're Graded\r\nNot a criterion.\r\n" > "$brief"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF plan construction failed'
+  assert_contains "$out" 'M1: Refresh the badge.' 'CRLF criteria were lost'
+  assert_contains "$out" 'Out of scope: Keep billing.' 'CRLF legacy exclusions were lost'
+  assert_contains "$out" '- Keep layout.' 'CRLF subsection exclusions were lost'
+  assert_not_contains "$out" 'Not a criterion.' 'CRLF grading boundary was lost'
+  assert_not_contains "$out" 'absent' 'CRLF criteria were misreported as absent'
+  printf 'M2: Preserve the last value on error.\r\n' > "$criteria"
+  printf '## Definition Of Done (task)\r\nDoD file: %s\r\n{DOD_MANDATORY_ITEMS}\r\n## How You'\''re Graded\r\n' "$criteria" > "$brief"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF criteria directive failed'
+  assert_contains "$out" 'M2: Preserve the last value on error.' 'CRLF external criteria were lost'
+  assert_not_contains "$out" '{DOD_MANDATORY_ITEMS}' 'CRLF directive did not replace the scaffold'
+  printf '\000' >> "$criteria"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail 'NUL external criteria silently emitted a plan'
+  assert_contains "$out" "malformed input $criteria: NUL bytes" 'criteria refusal did not name malformed input'
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'NUL external criteria passed dispatch validation'
+  assert_contains "$out" "malformed input $criteria: NUL bytes" 'dispatch misreported malformed criteria'
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'NUL external criteria passed the single-problem check'
+  assert_contains "$out" "malformed input $criteria: NUL bytes" 'single-problem check misreported malformed criteria'
+  printf '## Definition Of Done (task)\000\nM3: Keep the criterion.\n' > "$brief"
+  out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); rc=$?
+  [ "$rc" -ne 0 ] || fail 'NUL brief silently emitted a plan'
+  assert_contains "$out" "malformed input $brief: NUL bytes" 'brief refusal did not name malformed input'
+  assert_not_contains "$out" 'absent' 'NUL brief misreported criteria as absent'
+  pass 'CRLF criteria and exclusions survive; NUL briefs and external criteria refuse explicitly'
+}
+
+test_verification_plan_preserves_crlf_criteria_and_refuses_nul
+
 test_verification_plan_keeps_criteria_separate_from_intent
 test_verification_plan_requires_its_shared_rubric
 
@@ -733,9 +767,12 @@ test_dispatch_verdict_lists_all_problems_in_one_pass() {
 # Task
 ## Captain's intent
 {TASK}
+### Context
 
 ## Firstmate spec
 {FIRSTMATE_SPEC}
+### Out of scope
+- Preserve the existing renderer.
 
 ## Definition Of Done (task)
 Capability in plain words: {DOD_CAPABILITY}

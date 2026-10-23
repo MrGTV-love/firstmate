@@ -1103,7 +1103,7 @@ test_fresh_spawn_requires_a_concrete_ask() {
 $rec
 EOF
   for kind in ship scout; do
-    for body in '' $'### Context\n<!-- report pointer only -->' '/tmp/report.md' 'See report.md.' 'https://example.test/report' '[report](https://example.test/report)'; do
+    for body in '' $'### Context\n<!-- report pointer only -->' '/tmp/report.md' 'See report.md.' 'src/app/login.py' 'docs/plan.html' 'report.csv' $'```text\n \n```' $'~~~\n\t\n~~~' 'https://example.test/report' '[report](https://example.test/report)'; do
       n=$((n + 1))
       id="ask-$kind-$n"
       write_brief "$home" "$id" direct-PR
@@ -1130,7 +1130,7 @@ EOF
     cat > "$home/data/$id/brief.md" <<'EOF'
 # Task
 ## Captain's intent
-<!-- Context is optional. --> Fix the badge after refresh.
+<!-- Context is optional. --> Fix the badge after refresh using https://example.test/report.
 See report.md.
 ## Firstmate spec
 Keep unrelated redesign out of scope.
@@ -1154,6 +1154,89 @@ EOF
   assert_absent "$home/data/$id/launch-brief.md" 'legacy pointer-only ask reached a worker'
   pass 'fm-spawn: fresh ships/scouts refuse empty or pointer-only asks and admit substantive asks'
 }
+
+test_scaffold_spec_placeholder_blocks_dispatch_and_promotion() {
+  local rec home proj fakebin id brief kind out rc
+  local args=()
+  rec=$(make_home spec-placeholder)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout promotion; do
+    id="spec-placeholder-$kind"
+    if [ "$kind" = ship ]; then
+      args=(--mode direct-PR --yolo off)
+      FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail 'could not scaffold ship'
+    else
+      args=(--scout)
+      FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail 'could not scaffold scout'
+    fi
+    brief="$home/data/$id/brief.md"
+    fill_task_subsections "$brief" 'Fix the badge.' '{FIRSTMATE_SPEC}'
+    fill_whole_dod "$brief"
+    if [ "$kind" = promotion ]; then
+      printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$home/state/$id.meta"
+      out=$(FM_HOME="$home" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1); rc=$?
+      assert_grep 'kind=scout' "$home/state/$id.meta" 'unfinished spec changed promotion state'
+      assert_absent "$home/data/$id/ship-instructions.md" 'unfinished spec published ship instructions'
+    else
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}"); rc=$?
+      assert_absent "$home/data/$id/launch-brief.md" 'unfinished spec reached a worker'
+    fi
+    [ "$rc" -ne 0 ] || fail "$kind: unfinished spec was admitted"
+    assert_contains "$out" '## Firstmate spec still holds {FIRSTMATE_SPEC}' "$kind: scaffold heading hid the placeholder"
+    fill_task_subsections "$brief" 'Fix the badge.' $'Keep the renderer.\n```text\n{FIRSTMATE_SPEC}\n```'
+    if [ "$kind" = promotion ]; then
+      out=$(FM_HOME="$home" "$PROMOTE" "$id" --mode direct-PR --yolo off 2>&1) \
+        || fail "finished promotion failed: $out"
+      assert_grep 'kind=ship' "$home/state/$id.meta" 'finished promotion did not change state'
+    else
+      out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+      assert_present "$home/data/$id/launch-brief.md" 'a fenced placeholder example prevented launch rendering'
+    fi
+  done
+  pass 'scaffold headings cannot hide active spec placeholders; fenced examples remain valid'
+}
+
+test_spawn_accepts_crlf_and_refuses_nul_briefs() {
+  local rec home proj fakebin kind id brief out body
+  local args=()
+  rec=$(make_home brief-bytes)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  for kind in ship scout; do
+    id="brief-bytes-$kind"
+    if [ "$kind" = ship ]; then
+      args=(--mode no-mistakes --yolo off)
+      FM_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes >/dev/null 2>&1 || fail 'could not scaffold ship'
+    else
+      args=(--scout)
+      FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail 'could not scaffold scout'
+    fi
+    brief="$home/data/$id/brief.md"
+    fill_brief_subsections "$brief" 'Fix the badge using https://example.test/report.' 'Keep the renderer.'
+    awk '{ printf "%s\r\n", $0 }' "$brief" > "$brief.crlf"
+    mv "$brief.crlf" "$brief"
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_present "$home/data/$id/launch-brief.md" "$kind: complete CRLF ask failed admission: $out"
+    assert_not_contains "$out" 'mismatch' "$kind: CRLF changed the delivery contract"
+    if [ "$kind" = ship ]; then
+      body=$(awk '$0 == "## Captain intent authorized for --intent" { emit=1; next } emit { print }' "$home/data/$id/launch-brief.md")
+      assert_contains "$body" 'Fix the badge using https://example.test/report.' 'CRLF lost authorized intent'
+      assert_not_contains "$body" 'Keep the renderer.' 'CRLF mixed specification into authorized intent'
+    fi
+    rm "$home/data/$id/launch-brief.md"
+    printf '\000' >> "$brief"
+    out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
+    assert_contains "$out" "malformed input $brief: NUL bytes" "$kind: NUL brief was silently normalized"
+    assert_absent "$home/data/$id/launch-brief.md" "$kind: NUL brief reached a worker"
+  done
+  pass 'complete CRLF briefs preserve admission and intent; NUL briefs fail explicitly'
+}
+
+test_scaffold_spec_placeholder_blocks_dispatch_and_promotion
+test_spawn_accepts_crlf_and_refuses_nul_briefs
 
 test_fresh_spawn_requires_a_concrete_ask
 
