@@ -598,6 +598,7 @@ write_forgejo_status_json() {
     # Build the payload with jq, not a printf plus an inline sed: the sed form
     # lost its inner quoting under the runner and emitted invalid JSON, which
     # the merge read as an unreadable combined status.
+    # shellcheck disable=SC2016 # jq expands the variables supplied by --arg.
     "$JQ_BIN" -n --arg state "$state" --argjson total "$total" \
       '{state:$state,total_count:$total,statuses:[range($total) as $i | {context:("ci-" + (($i + 1) | tostring)), status:$state}]}' \
       > "$file"
