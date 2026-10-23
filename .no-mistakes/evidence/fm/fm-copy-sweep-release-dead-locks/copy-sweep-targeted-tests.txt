@@ -1,0 +1,12 @@
+== test_dead_launcher_lock_is_released_by_the_driver
+ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - fm-copy-sweep
+rc=
+== test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
+ok - an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; after a preserved original changed in the copy the same refusal keeps its preserve of the old content and the next run still retries the copy; the same refusal after an unlock stays held with its preserve
+ok - fm-copy-sweep
+rc=
+== test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
+ok - a copy whose preserved content changed during a temporary refusal reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve
+ok - fm-copy-sweep
+rc=

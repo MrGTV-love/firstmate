@@ -1,0 +1,395 @@
+==================================================================
+S1-S3: report, check, then hourly --apply on a dead-launcher locked copy
+==================================================================
+lock: vernant-session-active owner=launcher:87972 launcher=87972
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh    (exit 0)
+copy-sweep: mode=report containers=1 copies=3
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+PENDING-DRIVER	0.09 GiB	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 87972 is gone; driver verdict not checked in report mode, not yet proven removable
+REAPABLE-PROVEN	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/plain	clean, no process, no record, HEAD contained in a remote branch
+summary: REAPABLE-PROVEN=1
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=1
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1: 0.09 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo: 0.09 GiB of 20 GiB, ok
+
+PASS  S1 report exits 0
+PASS  S1 report classes the dead-launcher copy PENDING-DRIVER
+PASS  S1 report says not yet proven removable
+PASS  S1 report never ran the closeout driver
+PASS  S1 report kept every copy
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh check   (exit 0)
+
+
+PASS  S2 check exits 0
+PASS  S2 check never ran the closeout driver
+PASS  S2 check removed nothing
+PASS  S2 lock bytes unchanged after report and check
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-DIRTY	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/plain	branch fm/plain at 4ee35d509851, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/locked	branch fm/locked at 1e43871f8f2a, copy 0.09 GiB, preserved 0.00 GiB, net freed 0.09 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 87972 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=3 GiB=0.09 reaped=2 freed=0.09
+
+PASS  S3 apply exits 0
+PASS  S3 apply printed a REMOVED line for the locked copy
+PASS  S3 REMOVED line reports copy, preserved and net freed GiB
+PASS  S3 locked copy is gone from disk and from git
+PASS  S3 driver was asked to plan, then to execute, from the slot
+PASS  S3 unique ignored file preserved with exact bytes
+PASS  S3 preserve has a SHA-256 manifest
+PASS  S3 regenerable node_modules was not preserved
+PASS  S3 branch keeps the exact commit locally and on the remote
+PASS  S3 unlocked proven copy removed too
+PASS  S3 dirty copy kept
+PASS  S3 final accounting line reports reaped and freed GiB
+PASS  S3 removal log line carries proof and preserved bytes
+PASS  S3 sweep itself issued no unlock, lock, or force git command
+PASS  S3 no retention receipt or waiting record left
+removal log:
+2026-10-23T21:19:19Z	removed	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/plain	clone=/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo	head=4ee35d50985125e0912c3d01d213c0f8b4abc2ed	branch=fm/plain	kib=12	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch
+2026-10-23T21:19:22Z	removed	/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo/.claude/worktrees/locked	clone=/Users/charlesabrooker/tmp/fm-lab.vnDGJ0/world/th/pool1/1/repo	head=1e43871f8f2ac843bcca5921eaad1590a7924c71	branch=fm/locked	kib=98320	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 87972 is gone
+preserve manifest:
+e29d8626cc1c2640fbab1dd30af29010c13a6c219b0db8e7509ab75f976aad0c  unique.dat
+==================================================================
+S4: copies that must never reach the driver
+==================================================================
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=1 copies=4
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.bPLGtk/world/th/pool1/1/repo/.claude/worktrees/foreign	worktree lock: hand-held by an operator (not the supported Vernant creation-lock format)
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.bPLGtk/world/th/pool1/1/repo/.claude/worktrees/live	worktree lock: vernant-session-active owner=launcher:1696 launcher=1696 (launcher 1696 is alive; start age=2s; lock mtime=1792790363)
+HELD-LIVE-TASK	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.bPLGtk/world/th/pool1/1/repo/.claude/worktrees/proc	process 2152 is running inside it
+HELD-UNPUSHED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.bPLGtk/world/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=1
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.bPLGtk/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.bPLGtk/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S4 apply exits 0
+PASS  S4 live-launcher copy HELD-LOCKED
+PASS  S4 live launcher pid named alive
+PASS  S4 foreign-lock copy HELD-LOCKED
+PASS  S4 unpushed dead-launcher copy HELD-UNPUSHED
+PASS  S4 copy with a live process inside HELD-LIVE-TASK (real lsof)
+PASS  S4 the driver was never called
+PASS  S4 live still registered with byte-identical lock
+PASS  S4 foreign still registered with byte-identical lock
+PASS  S4 unpushed still registered with byte-identical lock
+PASS  S4 proc still registered with byte-identical lock
+PASS  S4 sweep itself issued no unlock, lock, or force git command
+==================================================================
+S5: driver plan refuses
+==================================================================
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.JQe8gL/world/th/pool1/1/repo/.claude/worktrees/locked	its closeout driver would not release it (exit 3): pull_request_not_merged: {"allowed": false, "reason": "pull_request_not_merged"}
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.JQe8gL/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.JQe8gL/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S5 a refused plan is not a failure (exit 0)
+PASS  S5 copy HELD-LOCKED
+PASS  S5 driver's own reason recorded
+PASS  S5 driver planned only, never executed
+PASS  S5 nothing preserved
+PASS  S5 copy and lock unchanged
+PASS  S5 lock bytes unchanged
+==================================================================
+S6: driver execute refuses permanently
+==================================================================
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1/1/repo/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 8847 is gone
+FAILED	/Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1/1/repo/.claude/worktrees/locked	the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1/1/repo/.claude/worktrees/locked (exit 3): refused: pull request is not merged?next: wait for the merge?
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S6 run 1 exits 1
+PASS  S6 FAILED line carries the driver's own refusal text
+PASS  S6 copy stays
+PASS  S6 retention receipt written
+PASS  S6 preserve kept
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1/1/repo/.claude/worktrees/locked	driver retained this copy: exit 3: refused: pull request is not merged?next: wait for the merge?; no retry until its retained disposition is reconciled
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.ghBLIT/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S6 run 2 exits 0
+PASS  S6 run 2 holds the copy HELD-LOCKED by its receipt
+PASS  S6 run 2 did not call the driver again
+PASS  S6 run 2 added no preserve
+==================================================================
+S7: driver execute refuses with a temporary reason, next run releases
+==================================================================
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.EIcabC/world/th/pool1/1/repo/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 15080 is gone
+FAILED	/Users/charlesabrooker/tmp/fm-lab.EIcabC/world/th/pool1/1/repo/.claude/worktrees/locked	the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-lab.EIcabC/world/th/pool1/1/repo/.claude/worktrees/locked (exit 3): cleanup_lease_conflict: {"allowed": false, "reason": "cleanup_lease_conflict"}?; the driver names this refusal temporary and released nothing, so no preserve from this run is kept; the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.EIcabC/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.EIcabC/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S7 run 1 exits 1
+PASS  S7 FAILED line carries the driver's reason
+PASS  S7 FAILED line says the next run plans it again
+PASS  S7 no retention receipt
+PASS  S7 this run's preserve discarded
+PASS  S7 original still in the copy, lock unchanged
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.EIcabC/world/th/pool1/1/repo/.claude/worktrees/locked	branch fm/locked at 3f38d605e826, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 15080 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+
+PASS  S7 run 2 exits 0
+PASS  S7 run 2 REMOVED the copy
+PASS  S7 run 2 planned and executed again (4 driver calls total)
+PASS  S7 exactly one preserve with the original bytes
+PASS  S7 sweep itself issued no unlock, lock, or force git command
+==================================================================
+S8: content keeps changing -> WAITING, first quiet run preserves once and releases
+==================================================================
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1/1/repo/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 24765 is gone
+FAILED	/Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1/1/repo/.claude/worktrees/locked	the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1/1/repo/.claude/worktrees/locked (exit 3): cleanup_skipped_live_or_unknown: {"allowed": false, "reason": "cleanup_skipped_live_or_unknown"}?; the driver names this refusal temporary and released nothing, so this run's preserve stays, because not every preserved original is still unchanged in the copy; later runs wait while the copy's content keeps changing and preserve again only content that differs from it; the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S8 run 1 exits 1
+PASS  S8 run 1 keeps its preserve of the old content
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1/1/repo/.claude/worktrees/locked	content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S8 run 2 exits 0
+PASS  S8 run 2 classes the copy WAITING (not HELD)
+PASS  S8 run 2 did not call the driver
+PASS  S8 run 2 added no preserve
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.FVbYq6/world/th/pool1/1/repo/.claude/worktrees/locked	branch fm/locked at 5860b02375af, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 24765 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+
+PASS  S8 run 3 (quiet) exits 0
+PASS  S8 run 3 REMOVED the copy
+PASS  S8 run 3 preserved once: v0 and v2 kept
+PASS  S8 waiting record cleared
+==================================================================
+S9: content changes back to its earlier preserve -> release reports unmeasured freed
+==================================================================
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.06 GiB	/Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1/1/repo/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 36489 is gone
+FAILED	/Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1/1/repo/.claude/worktrees/locked	the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1/1/repo/.claude/worktrees/locked (exit 3): cleanup_lease_conflict: {"allowed": false, "reason": "cleanup_lease_conflict"}?; the driver names this refusal temporary and released nothing, so this run's preserve stays, because not every preserved original is still unchanged in the copy; later runs wait while the copy's content keeps changing and preserve again only content that differs from it; the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1: 0.06 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1/1/repo: 0.06 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.06 reaped=0 freed=0.00
+
+PASS  S9 run 1 exits 1
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.06 GiB	/Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1/1/repo/.claude/worktrees/locked	content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1: 0.06 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1/1/repo: 0.06 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.06 reaped=0 freed=0.00
+
+PASS  S9 run 2 WAITING
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 0)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.w2S6o5/world/th/pool1/1/repo/.claude/worktrees/locked	branch fm/locked at 40e0c06ae38f, copy 0.06 GiB, preserved - GiB (preserved in an earlier run), net freed - GiB, unmeasured (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 36489 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 1 removed copies unmeasured
+copies=1 GiB=0.06 reaped=1 freed=0.00
+
+PASS  S9 run 3 exits 0
+PASS  S9 REMOVED line says preserved in an earlier run, net freed unmeasured
+PASS  S9 sizes line discloses the unmeasured removal
+PASS  S9 final freed total does not count unmeasured bytes
+PASS  S9 removal log records preserved_kib=-
+PASS  S9 no duplicate preserve
+==================================================================
+S10: lock replaced with another valid dead-launcher lock while the plan runs
+==================================================================
+
+$ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply   (exit 1)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.oY2toW/world/th/pool1/1/repo/.claude/worktrees/locked	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 48404 is gone
+FAILED	/Users/charlesabrooker/tmp/fm-lab.oY2toW/world/th/pool1/1/repo/.claude/worktrees/locked	the copy was left: REFUSED: /Users/charlesabrooker/tmp/fm-lab.oY2toW/world/th/pool1/1/repo/.claude/worktrees/locked changed HEAD or creation-lock bytes after its plan; it was not released.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.oY2toW/world/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.oY2toW/world/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+
+PASS  S10 copy not removed
+PASS  S10 no REMOVED line
+PASS  S10 driver never executed
+==================================================================
+RESULT: 84 passed, 0 failed
+labs removed: 8
