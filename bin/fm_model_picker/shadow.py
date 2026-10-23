@@ -927,6 +927,14 @@ def task_key_for(brief_path):
     return path.stem or None
 
 
+def resolver_mark_path(data_root, task_key):
+    """One-shot marker a resolver row leaves so the spawn hook does not log the same
+    dispatch twice; None when the task key cannot name a file."""
+    if not task_key or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", task_key):
+        return None
+    return Path(data_root) / "resolver-rows" / task_key
+
+
 def _load_optional(path):
     if not path or not os.path.exists(path):
         return {}
@@ -965,26 +973,44 @@ def observe(args, key, helper, data_root):
     if status not in ("withheld", "error") and isinstance(rule_profile, dict) \
             and isinstance(rule_profile.get("harness"), str):
         rule["worker"] = normalize_route(rule_profile.get("harness"), rule_profile.get("model"))
-        rule["effort"] = rule_profile.get("effort") if isinstance(rule_profile.get("effort"), str) else None
+        effort = rule_profile.get("effort")
+        rule["effort"] = effort if isinstance(effort, str) and effort else None
     task_key = task_key_for(brief) if brief else None
+    mark = resolver_mark_path(data_root, task_key)
+    if args.get("hook") == "spawn":
+        if mark is not None:
+            try:
+                mark.unlink()
+                return 0
+            except OSError:
+                pass
+        mark = None
+
+    def record(row):
+        if write_row(data_root, row) is not None and mark is not None:
+            try:
+                mark.parent.mkdir(parents=True, exist_ok=True)
+                mark.touch()
+            except OSError as error:
+                warn("could not leave the resolver row marker (%s); dispatch unchanged" % error)
 
     if status == "withheld":
-        write_row(data_root, simple_row("withheld", reason or "request withheld", task_key, rule))
+        record(simple_row("withheld", reason or "request withheld", task_key, rule))
         return 0
     if status == "error":
-        write_row(data_root, simple_row("resolver-error", reason or "resolver error", task_key, rule))
+        record(simple_row("resolver-error", reason or "resolver error", task_key, rule))
         return 0
 
     trusted, verdict_reason, _ = verdict_state(data_root)
     if not trusted:
-        write_row(data_root, simple_row("no-trusted-snapshot", verdict_reason, task_key, rule,
-                                        verdict_reason))
+        record(simple_row("no-trusted-snapshot", verdict_reason, task_key, rule,
+                          verdict_reason))
         return 0
 
     try:
         table = load_table(args["table"])
     except (OSError, ValueError) as error:
-        write_row(data_root, simple_row("error", "route table unusable: %s" % error, task_key, rule))
+        record(simple_row("error", "route table unusable: %s" % error, task_key, rule))
         return 0
 
     det_complexity, det_components = deterministic_complexity(task_text, rules_doc)
@@ -993,7 +1019,7 @@ def observe(args, key, helper, data_root):
     body, error = jev_call(request, key, never_send_path(args), helper, args["scratch"])
     if error:
         status = "withheld" if error.startswith("request withheld") else "picker-error"
-        write_row(data_root, simple_row(status, error, task_key, rule))
+        record(simple_row(status, error, task_key, rule))
         return 0
     responses = [("classification", body)]
     try:
@@ -1001,7 +1027,7 @@ def observe(args, key, helper, data_root):
     except ValueError as error:
         row = simple_row("invalid-response", str(error), task_key, rule)
         row["jev_raw_payload"] = body
-        write_row(data_root, row)
+        record(row)
         return 0
 
     option = classified["work_type"]["choice"]
@@ -1045,7 +1071,7 @@ def observe(args, key, helper, data_root):
                 [b.decode("utf-8", "replace") for _, b in responses]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
             spend=spend, snapshot_age=snapshot_age)
-        write_row(data_root, row)
+        record(row)
         return 0
 
     validators = [c for c in candidates
@@ -1062,7 +1088,7 @@ def observe(args, key, helper, data_root):
                 [b.decode("utf-8", "replace") for _, b in responses]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
             spend=spend, snapshot_age=snapshot_age)
-        write_row(data_root, row)
+        record(row)
         return 0
     responses.append(("pick", body))
     try:
@@ -1077,7 +1103,7 @@ def observe(args, key, helper, data_root):
             raw_support=json.dumps([b.decode("utf-8", "replace") for _, b in responses[:-1]]).encode("utf-8"),
             candidate_version=candidate_version, gates=gates_base, pareto=pareto_pruned,
             spend=spend, snapshot_age=snapshot_age)
-        write_row(data_root, row)
+        record(row)
         return 0
 
     by_id = {c["id"]: c for c in candidates}
@@ -1139,7 +1165,7 @@ def observe(args, key, helper, data_root):
                      if support else None),
         candidate_version=candidate_version, gates=gates, pareto=pareto_pruned,
         spend=spend, snapshot_age=snapshot_age)
-    write_row(data_root, row)
+    record(row)
     return 0
 
 
@@ -1275,6 +1301,8 @@ Observe one dispatch in shadow mode. Never prints or returns a dispatch route.
   --reason TEXT      a coarse reason, never brief text
   --never-send PATH  never-send policy (default <FM_CONFIG_OVERRIDE or FM_HOME/config>/dispatch-never-send)
   --project NAME     project name
+  --hook spawn       launch-path observation: skipped, consuming the marker, when the
+                     resolver already logged this task; any other run leaves that marker
   --data-root PATH   data root overriding FM_MODEL_PICKER_DATA
 
 The data root is FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else

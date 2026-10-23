@@ -1966,6 +1966,7 @@ diff -u "$TMP_ROOT/off.txt" "$TMP_ROOT/on.txt" > "$TMP_ROOT/diff.txt" \
   || fail "flag-on stdout changed beyond timings: $(cat "$TMP_ROOT/diff.txt")"
 [ "$(count)" -gt "$off_calls" ] || fail 'flag on made no picker request'
 assert_equals 1 "$(shadow_sql "select count(*) from dispatch_log where mode='shadow'")" 'exactly one shadow row'
+[ -e "$SHADOW_DATA/resolver-rows/$(shadow_sql "select task_key from dispatch_log")" ] || fail 'the resolver row leaves the one-shot marker the spawn hook consumes'
 [ "$(shadow_sql "select count(*) from outcomes")" = 0 ] || fail 'the shadow path wrote an outcome'
 assert_equals 'accepted' "$(shadow_sql "select picker_status from dispatch_log")" 'the picker accepted its pick'
 rule_worker=$(sed -n 's/^  profile:.*--harness \([^ ]*\) --model \([^ ]*\).*/\1:\2/p' <<<"$ON" | tr -d "'")

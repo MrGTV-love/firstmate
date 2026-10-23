@@ -83,7 +83,11 @@ def _ensure_columns(conn, table, columns):
     have = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
     for name, decl in columns.items():
         if name not in have:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+            except sqlite3.OperationalError as error:
+                if "duplicate column name" not in str(error):
+                    raise
 
 
 def init_calibration(conn):

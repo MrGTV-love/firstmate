@@ -979,12 +979,17 @@ No value enables live behavior, and no code path writes a `mode 'live'` row.
 
 The picker observes from two places, because no single one sees every dispatch.
 Inside `bin/fm-dispatch-resolve.sh`, after that resolver has computed and printed its own result, it reuses the sanitized brief text, the resolved rules and the one `quota-axi` snapshot the typed decision uses, under a hard `fm_run_timed` bound of 20 seconds.
-Inside `bin/fm-spawn.sh`, after the launch has been delivered, `bin/fm-model-picker-shadow-spawn.sh` observes the route that actually launched with the launch brief and one bounded quota read, under a 30-second bound that delays only the spawn command's return because the worker is already running.
+Inside `bin/fm-spawn.sh`, after a ship or scout launch has been delivered, `bin/fm-model-picker-shadow-spawn.sh` observes the route that actually launched with the launch brief, the launch project and one quota read bounded at 5 seconds.
+It runs detached with every stream discarded, so the spawn command returns without waiting for it; its observe call has the resolver hook's 20-second bound, and the whole capture has an outer bound of 40 seconds that covers both inner bounds plus brief extraction, rule resolution and start-up.
+It resolves the TypeSafe key with the same `fm_typesafe_key` lookup the resolver uses (the environment, `<home>/.env`, then the primary home's `.env`); with no key it writes no row.
+A launch with no concrete `--model` (empty or `default`) records no rule route, and an empty or `default` effort records a NULL `rule_effort`.
 The spawn hook exists because real dispatches can bypass the typed resolver, and an unobserved dispatch cannot become calibration evidence.
+One dispatch gets one row: each resolver row leaves a one-shot marker `<data root>/resolver-rows/<task id>`, and the spawn hook that finds the marker deletes it and writes nothing, while a manual launch with no resolver row still gets its spawn-hook row.
+A relaunch (`--relaunch`) is the same dispatch, so the spawn hook does not observe it again.
 Both hooks discard their output and swallow every failure, so the printed status, profile line, exit code and spawn result are never derived from the picker.
 A resolve that never reaches a decision (an error, a withheld request, or no rules) either records a reason-only row or writes nothing; those rows carry no rule route, and a row the classifier never saw leaves `work_type`, `classification_uncertain` and `snapshot_stale` NULL.
 A spawn that never launches (a refused or failed launch) writes no spawn-hook row.
-The report applies the same additive migration the write path uses, so it reads a Phase-1 store without error.
+The report applies the same additive migration the write path uses, so it reads a Phase-1 store without error; concurrent first opens of a Phase-1 store each finish that migration, because a column another process added first is not an error.
 
 ### What one shadow run does
 
@@ -3813,7 +3818,7 @@ FM_DATA_OVERRIDE=        # alternate data dir, mainly for tests
 FM_PROJECTS_OVERRIDE=    # alternate projects dir, mainly for tests
 FM_CONFIG_OVERRIDE=      # alternate config dir, mainly for tests
 FM_MODEL_PICKER_DATA=    # data root of the model-picker benchmark collector and shadow picker; unset means model-picker/ under the data directory (see "Model-picker benchmark data")
-FM_MODEL_PICKER_SHADOW=  # opt-in observe-only shadow model picker inside fm-dispatch-resolve.sh; unset means off (see "Shadow model picker")
+FM_MODEL_PICKER_SHADOW=  # opt-in observe-only shadow model picker inside fm-dispatch-resolve.sh and after fm-spawn.sh launches; unset means off (see "Shadow model picker")
 FM_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads in fm-wake-lib.sh and fm-teardown.sh, mainly for tests
 FM_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 FM_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"

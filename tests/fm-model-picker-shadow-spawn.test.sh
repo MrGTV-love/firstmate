@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016  # wait_until conditions are expanded on every poll.
 # End-to-end shadow capture through bin/fm-spawn.sh: a real ship spawn with a fake
 # tmux/treehouse/harness writes exactly one dispatch_log row carrying the route that
-# actually launched, and the flag-off launch writes none. The picker's Jev endpoint is
-# scripted; quota-axi is a fixture. This is the launch path that bypasses the typed
-# resolver, so it is the capture path this test exists to prove.
+# actually launched, and the flag-off launch writes none. The capture runs detached, so
+# every positive check polls the store with a deadline. A typed dispatch whose resolver
+# already logged its row, and a relaunch, add no second row. The TypeSafe key lives only
+# in the home's .env, and the scripted Jev endpoint refuses any other bearer, so an
+# accepted pick proves the hook resolved it. quota-axi is a fixture. This is the launch
+# path that bypasses the typed resolver, so it is the capture path this test exists to prove.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -27,7 +31,11 @@ printf '%s\n' '{"rules":[{"when":"Any task in the fixture.","use":[{"harness":"c
 fm_test_spawn_home "$HOME_DIR" claude
 cp "$CASE/crew-dispatch.json" "$HOME_DIR/config/crew-dispatch.json"
 fm_git_worktree "$PROJ" "$WT" "wt-shadow-capture"
-fm_test_spawn_brief "$HOME_DIR" "shadow-capture" "Prove the launch capture path."
+for id in shadow-off shadow-capture shadow-typed shadow-manual shadow-nomodel shadow-noeffort; do
+  fm_test_spawn_brief "$HOME_DIR" "$id" "Prove the launch capture path."
+done
+printf 'TYPESAFE_API_KEY=synthetic-key\n' > "$HOME_DIR/.env"
+unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE
 FAKEBIN=$(fm_test_make_spawn_fakebin "$CASE/fake")
 fm_fake_exit0 "$FAKEBIN" claude
 cat > "$FAKEBIN/quota-axi" <<'SH'
@@ -46,6 +54,10 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get('content-length', '0'))
         body = self.rfile.read(n)
+        if self.headers.get('authorization') != 'Bearer synthetic-key':
+            self.send_response(401)
+            self.end_headers()
+            return
         with open(calls_path, 'ab') as fh:
             fh.write(body + b'\n')
         settings = json.loads(open(settings_path).read())
@@ -86,45 +98,110 @@ trap '[ -z "$SERVER" ] || kill "$SERVER" 2>/dev/null; fm_test_cleanup' EXIT
 for _ in {1..100}; do [ ! -f "$CASE/port" ] || break; sleep .05; done
 [ -f "$CASE/port" ] || fail "scripted endpoint did not start"
 
-row_count() {
-  python3 -I -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where mode=\"shadow\"").fetchone()[0])' "$DATA/aa.sqlite" 2>/dev/null || echo 0
+row_count() {  # [task-key]
+  python3 -I -c 'import sqlite3,sys; q="select count(*) from dispatch_log where mode=\"shadow\""; a=sys.argv[2:]; print(sqlite3.connect(sys.argv[1]).execute(q+(" and task_key=?" if a else ""), a).fetchone()[0])' "$DATA/aa.sqlite" "$@" 2>/dev/null || echo 0
 }
-row_field() {
-  python3 -I -c 'import sqlite3,sys; r=sqlite3.connect(sys.argv[1]).execute("select "+sys.argv[2]+" from dispatch_log where mode=\"shadow\" order by id desc limit 1").fetchone(); print(r[0] if r else "")' "$DATA/aa.sqlite" "$1"
+row_field() {  # <column> <task-key>
+  python3 -I -c 'import sqlite3,sys; r=sqlite3.connect(sys.argv[1]).execute("select "+sys.argv[2]+" from dispatch_log where mode=\"shadow\" and task_key=? order by id desc limit 1", (sys.argv[3],)).fetchone(); print("" if r is None or r[0] is None else r[0])' "$DATA/aa.sqlite" "$1" "$2"
 }
-run_launch() {  # <flag> [extra args]
-  local flag=$1
-  shift
+# The capture is detached from the spawn, so wait for its evidence with a deadline
+# above the 40-second outer bound.
+wait_until() {  # <shell-condition>
+  local deadline=$((SECONDS + 60))
+  until eval "$1"; do
+    [ "$SECONDS" -lt "$deadline" ] || return 1
+    sleep .2
+  done
+}
+FM_TYPESAFE_TEST_ENDPOINT="http://127.0.0.1:$(cat "$CASE/port")"
+export FM_MODEL_PICKER_DATA="$DATA" FM_TEST_SEAM=1 FM_TYPESAFE_TEST_ENDPOINT \
+  QUOTA_AXI_FIXTURE="$CASE/quota.json"
+run_launch() {  # <flag> <id> [extra args]
+  local flag=$1 id=$2
+  shift 2
   OUT='' CODE=0
   # fm_test_run_spawn starts fm-spawn.sh with its own env prefix, so the picker
   # settings must be exported to survive into the child.
-  ENDPOINT_URL="http://127.0.0.1:$(cat "$CASE/port")"
-  export TYPESAFE_API_KEY=synthetic-key FM_MODEL_PICKER_SHADOW="$flag" \
-    FM_MODEL_PICKER_DATA="$DATA" FM_TEST_SEAM=1 \
-    FM_TYPESAFE_TEST_ENDPOINT="$ENDPOINT_URL" \
-    QUOTA_AXI_FIXTURE="$CASE/quota.json"
-  OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" \
-    fm_test_run_spawn "$HOME_DIR" "$WT" "$FAKEBIN" "shadow-capture" "$PROJ" \
+  export FM_MODEL_PICKER_SHADOW="$flag"
+  OUT=$(fm_test_run_spawn "$HOME_DIR" "$WT" "$FAKEBIN" "$id" "$PROJ" \
       --mode no-mistakes --yolo off --harness claude --model opus --effort high "$@") || CODE=$?
 }
+# A relaunch needs the recorded window listed and its pane at an idle shell.
+run_relaunch() {  # <id>
+  local id=$1 bin="$CASE/relaunch-shell"
+  mkdir -p "$bin"
+  cat > "$bin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *pane_current_command*) printf 'zsh\\n'; exit 0 ;;
+esac
+exec "$FAKEBIN/tmux" "\$@"
+SH
+  chmod +x "$bin/tmux"
+  OUT='' CODE=0
+  export FM_MODEL_PICKER_SHADOW=1
+  OUT=$(FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
+    fm_test_run_spawn "$HOME_DIR" "$WT" "$bin:$FAKEBIN" "$id" --relaunch) || CODE=$?
+}
 
-rm -f "$DATA/aa.sqlite"; : > "$CALLS"
-run_launch ''
+rm -f "$DATA/aa.sqlite"; rm -rf "$DATA/resolver-rows"; : > "$CALLS"
+run_launch '' shadow-off
 assert_equals 0 "$CODE" 'flag-off spawn succeeds'
-assert_contains "$OUT" "spawned shadow-capture" 'flag-off spawn reports its task'
-assert_equals 0 "$(row_count)" 'flag-off launch writes no shadow row'
+assert_contains "$OUT" "spawned shadow-off" 'flag-off spawn reports its task'
 assert_equals 0 "$(wc -l < "$CALLS" | tr -d ' ')" 'flag-off launch makes no picker request'
 
-rm -f "$DATA/aa.sqlite"; : > "$CALLS"
-run_launch 1
+run_launch 1 shadow-capture
 assert_equals 0 "$CODE" 'flag-on spawn succeeds'
 assert_contains "$OUT" "spawned shadow-capture" 'flag-on spawn output is unchanged'
+wait_until '[ "$(row_count)" -ge 1 ]' || fail 'the detached capture wrote no row before the deadline'
 assert_equals 1 "$(row_count)" 'one real launch writes exactly one shadow row'
-assert_equals 'claude:opus' "$(row_field rule_worker)" 'the row records the route that actually launched'
-assert_equals 'high' "$(row_field rule_effort)" 'the row records the launched effort'
-assert_equals 'accepted' "$(row_field picker_status)" 'the picker accepted its pick'
-[ -n "$(row_field chosen_worker)" ] || fail 'the row records the picker worker'
-[ -n "$(row_field jev_raw_payload)" ] || fail 'the row retains the raw Jev result'
+assert_equals 0 "$(row_count shadow-off)" 'flag-off launch writes no shadow row'
+assert_equals 'claude:opus' "$(row_field rule_worker shadow-capture)" 'the row records the route that actually launched'
+assert_equals 'high' "$(row_field rule_effort shadow-capture)" 'the row records the launched effort'
+assert_equals 'accepted' "$(row_field picker_status shadow-capture)" 'the picker accepted its pick with the .env key'
+[ -n "$(row_field chosen_worker shadow-capture)" ] || fail 'the row records the picker worker'
+[ -n "$(row_field jev_raw_payload shadow-capture)" ] || fail 'the row retains the raw Jev result'
 [ "$(wc -l < "$CALLS" | tr -d ' ')" -ge 2 ] || fail 'the launch observation made its bounded calls'
+assert_equals project "$(python3 -I -c 'import json,sys; print(sorted({json.loads(l)["state"]["project"] for l in open(sys.argv[1]) if l.strip()}) == ["project"] and "project" or "missing")' "$CALLS")" 'every launch request carries the launch project'
 
-pass 'spawn capture: a real launch writes one row with the launched route; flag off writes none'
+run_relaunch shadow-capture
+assert_equals 0 "$CODE" "relaunch succeeds: $OUT"
+
+# The typed path: the resolver hook's own observe call logs the row first.
+FM_MODEL_PICKER_SHADOW=1 FM_HOME="$HOME_DIR" bash "$ROOT/bin/fm-model-picker-shadow.sh" --observe \
+  --brief "$HOME_DIR/data/shadow-typed/brief.md" --task-text "$HOME_DIR/data/shadow-typed/brief.md" \
+  --rules "$CASE/crew-dispatch.json" --result /dev/null --quota "$CASE/quota.json" --status clear \
+  --project project 3< <(printf 'synthetic-key') >/dev/null 2>&1
+assert_equals 1 "$(row_count shadow-typed)" 'the resolver hook logs the typed dispatch'
+[ -e "$DATA/resolver-rows/shadow-typed" ] || fail 'the resolver row leaves its one-shot marker'
+run_launch 1 shadow-typed
+assert_equals 0 "$CODE" 'the typed launch succeeds'
+wait_until '[ ! -e "$DATA/resolver-rows/shadow-typed" ]' || fail 'the spawn hook did not consume the resolver marker'
+
+# A manual launch with no resolver row still gets its row; it lands after the
+# relaunch and typed-spawn captures would have, so their absence is settled.
+run_launch 1 shadow-manual
+assert_equals 0 "$CODE" 'the manual launch succeeds'
+wait_until '[ "$(row_count shadow-manual)" -ge 1 ]' || fail 'the manual launch wrote no row before the deadline'
+assert_equals 1 "$(row_count shadow-capture)" 'a relaunch writes no second row'
+assert_equals 1 "$(row_count shadow-typed)" 'a typed dispatch keeps exactly one row'
+assert_equals 1 "$(row_count shadow-manual)" 'a manual launch with no resolver row gets one row'
+assert_equals 3 "$(row_count)" 'one row per dispatch'
+
+# A launch with no concrete model records no rule route; no effort records NULL.
+spawn_hook() {  # <id> [hook args]
+  local id=$1
+  shift
+  FM_MODEL_PICKER_SHADOW=1 FM_HOME="$HOME_DIR" bash "$ROOT/bin/fm-model-picker-shadow-spawn.sh" \
+    --brief "$HOME_DIR/data/$id/brief.md" --harness claude --rules "$CASE/crew-dispatch.json" \
+    --never-send "$HOME_DIR/config/dispatch-never-send" --kind ship --project project "$@"
+}
+spawn_hook shadow-nomodel --model default --effort high
+assert_equals 1 "$(row_count shadow-nomodel)" 'a default-model launch is still observed'
+assert_equals '' "$(row_field rule_worker shadow-nomodel)" 'a default-model launch records no rule route'
+spawn_hook shadow-noeffort --model opus --effort ''
+assert_equals 'claude:opus' "$(row_field rule_worker shadow-noeffort)" 'an effortless launch keeps its route'
+assert_equals '' "$(row_field rule_effort shadow-noeffort)" 'an empty effort is not a rule effort'
+assert_equals 1 "$(python3 -I -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where task_key=? and rule_effort is null", (sys.argv[2],)).fetchone()[0])' "$DATA/aa.sqlite" shadow-noeffort)" 'an empty effort is stored as NULL'
+
+pass 'spawn capture: one row per launched dispatch with the launched route; flag off, relaunch and an already-resolved dispatch add none'
