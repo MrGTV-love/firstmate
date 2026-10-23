@@ -1677,7 +1677,12 @@ fm_treehouse_project_lock_path() {  # <project-dir>
     top=$(CDPATH='' cd -- "$top" 2>/dev/null && pwd -P) || return 1
     identity=$top
   fi
-  hash=$(printf '%s' "$identity" | git hash-object --stdin 2>/dev/null) || return 1
+  # git hash-object reads only stdin but still resolves a repository from the
+  # caller's CWD, so a caller inside a task copy whose git directory cannot be
+  # resolved made this return 1 and teardown refused before its pending close
+  # was published. Anchor it at the recorded project, which is already proved
+  # to be a git work tree above.
+  hash=$(printf '%s' "$identity" | git -C "$project" hash-object --stdin 2>/dev/null) || return 1
   [ -d "$root/state" ] || return 1
   printf '%s/.treehouse-project-%s.lock\n' "$root/state" "$hash"
 }

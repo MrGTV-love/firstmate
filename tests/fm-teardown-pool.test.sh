@@ -2463,6 +2463,34 @@ test_idle_reap_retries_a_closed_task_whose_return_stalled() {
   pass 'a closed task whose return stalled survives session start and the next sweep finishes it behind a queued waiter'
 }
 
+# The shared Treehouse project lock identity is hashed from stdin, but git still
+# resolves a repository from the caller's CWD. A caller inside a task copy whose
+# git directory is unavailable must still derive the one shared lock path; when
+# it could not, teardown refused at the project-lock gate before its pending
+# close was published, which is the wrong gate for every pool-slot task.
+test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd() {
+  local case_dir dangling lock
+  case_dir=$(make_case project-lock-dangling-cwd)
+  mkdir -p "$case_dir/primary-home/state"
+  dangling="$case_dir/unresolvable-git-cwd"
+  mkdir "$dangling"
+  printf 'gitdir: %s\n' "$case_dir/no-such-git-directory" > "$dangling/.git"
+  ( cd "$dangling" && git rev-parse --show-toplevel >/dev/null 2>&1 ) \
+    && fail "project-lock-cwd: the fixture working directory still resolves a git worktree"
+
+  lock=$( cd "$dangling" && FM_HOME="$case_dir/primary-home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_treehouse_project_lock_path "$2"
+  ' _ "$ROOT" "$case_dir/project" ) || lock=
+  [ -n "$lock" ] \
+    || fail "project-lock-cwd: the shared project lock path could not be resolved from an unresolvable git directory"
+  case "$lock" in
+    "$case_dir/primary-home/state/.treehouse-project-"*.lock) ;;
+    *) fail "project-lock-cwd: unexpected shared project lock path $lock" ;;
+  esac
+  pass "the shared project lock path comes from the recorded project, not the caller's working directory"
+}
+
 # An endpoint that refuses to close after the slot was reserved and the
 # pending backlog close was published leaves a closed-or-closing task holding
 # a durable lease. Session start must not replay that close and retire the
@@ -2873,6 +2901,7 @@ SH
 }
 
 teardown_test_cases=(
+test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd
 test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
 test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp
 test_legacy_stamp_rollback_rebinds_the_return_pending_record
