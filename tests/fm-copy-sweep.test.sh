@@ -971,6 +971,36 @@ SH
   pass "a copy whose preserved content changed during a temporary refusal reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve"
 }
 
+test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries() {
+  local run line
+  make_locked_copy_case receipt-unwritable dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+  mkdir -p "$HOMED/data/copy-sweep"
+  : > "$HOMED/data/copy-sweep/retained"
+  for run in 1 2; do
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 1 ] || fail "run $run: a receipt that cannot be written should exit 1, got $RC: $OUT"
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
+      || fail "run $run: the refusal was not reported as FAILED: $OUT"
+    assert_contains "$line" "cannot record the driver release" "run $run: the receipt failure was not named"
+    assert_contains "$line" "no preserve from this run is kept" "run $run: the report did not say this run's preserve was discarded"
+    assert_contains "$line" "next sweep run plans it again" "run $run: the report did not say the copy is retried"
+    assert_equals '' "$(preserved_unique)" "run $run: a refusal before execute left this run's preserve behind"
+    assert_equals 0 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "run $run: the driver executed without a receipt"
+    assert_equals 'durable state' "$(cat "$(copy_path locked)/unique.dat")" "run $run: the copy's original ignored file changed"
+    registered locked || fail "run $run: the copy is no longer registered"
+  done
+  rm -f "$HOMED/data/copy-sweep/retained"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the run with a writable receipt failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the run with a writable receipt did not release the copy"
+  assert_equals 1 "$(preserved_unique | grep -c .)" "the release did not leave exactly one preserve"
+  assert_equals 'durable state' "$(cat "$(preserved_unique)")" "the released copy's preserve changed"
+  pass "a driver-retention receipt that cannot be written before execute stops the release, discards that run's preserve while the copy still holds its lock and originals, so repeated refusals add no preserve, and the next run that can write it preserves once and releases the copy"
+}
+
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
   local shape reason long line retained
   for shape in kept failed; do
@@ -2414,6 +2444,7 @@ run_case test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_noth
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal
 run_case test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
 run_case test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
+run_case test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries
 run_case test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
 run_case test_a_failed_preservation_leaves_no_staging_directory

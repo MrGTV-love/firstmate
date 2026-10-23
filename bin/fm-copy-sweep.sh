@@ -1455,7 +1455,8 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   fi
   if ! copy_still_holds "$copy" "$identity" "$7" \
     || ! record_driver_retention "$copy" "$7" "$identity" "driver release incomplete; the copy remains protected even if its lock was released"; then
-    echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
+    retry_after_preserve "$copy" "$identity" "$7" "$3"
+    echo "REFUSED: cannot record the driver release of $shown; it was not executed. $RETRY_PRESERVE; the next sweep run plans it again." >&2
     return 1
   fi
   rc=0
