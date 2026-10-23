@@ -14,7 +14,8 @@
 # for this project", never "how does this task ship". A task's delivery mode,
 # yolo, and ship-branch prefix are resolved by firstmate at intake and passed
 # explicitly to bin/fm-brief.sh, bin/fm-spawn.sh, and bin/fm-promote.sh (AGENTS.md
-# section 7; bin/fm-brief.sh's own header owns the --branch-prefix flag it accepts).
+# section 7 and the crew-brief-authoring skill; bin/fm-brief.sh's own header
+# owns the --branch-prefix flag it accepts).
 # The consumers are bin/fm-fleet-sync.sh (skip local-only clones),
 # bin/fm-home-seed.sh and bin/fm-remote-home-seed.sh (refuse local-only seeding,
 # run no-mistakes init), bin/fm-spawn.sh's advisory registry-deviation notice,
