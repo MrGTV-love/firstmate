@@ -465,6 +465,14 @@ test_worker_guard_project_scope() {
     id="omp-scope-$scope"
     rec=$(make_spawn_case "scope-$scope" omp "$id" "$project")
     read_case_record "$rec"
+    cat >> "$HOME_DIR/data/$id/brief.md" <<'BRIEF'
+
+## Authorized deletions
+
+```json
+["README.md"]
+```
+BRIEF
     out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${extra[@]+"${extra[@]}"})
     expect_code 0 $? "omp $scope spawn should succeed: $out"
     expected=off
@@ -473,9 +481,11 @@ test_worker_guard_project_scope() {
       "the task overlay must admit native find only for a firstmate-project worker"
     printf 'TYPESAFE_API_KEY=omp-scope-key\nOPENROUTER_API_KEY=omp-fallback-key\n' > "$HOME_DIR/.env"
     out=$(EXT_PATH="$HOME_DIR/state/$id.omp-ext.ts" PROJECT="$scope" WT="$WT_DIR" FM_TEST_SEAM=1 \
+      DELETION_AUDIT="$HOME_DIR/state/$id.authorized-deletions.jsonl" \
       node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 const requests = [];
@@ -510,6 +520,14 @@ try {
     assert.equal(result?.block, true);
     assert.deepEqual(requests.map(row => row.path), ["/direct"]);
     assert.ok(requests.every(row => row.state.path === "customer-record.txt"));
+    // The initial spawn snapshot, not a later worker edit of the brief, records this file.
+    const admitted = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf README.md" } }, { cwd: process.env.WT });
+    assert.equal(admitted, undefined);
+    assert.equal(requests.length, 1, "a spawn-authorized deletion must not reach the provider");
+    assert.deepEqual(JSON.parse(readFileSync(process.env.DELETION_AUDIT, "utf8").trim().split("\n").at(-1)).paths, ["README.md"],
+      "the spawn snapshot must record the admitted deletion");
+    execFileSync("rm", ["-f", `${process.env.WT}/README.md`]);
+    assert.throws(() => execFileSync("git", ["-C", process.env.WT, "diff", "--quiet"]), "the admitted deletion must actually change the task copy");
   } else {
     assert.throws(credential, "a non-firstmate worker must have no native judge credential");
     assert.equal(result, undefined);

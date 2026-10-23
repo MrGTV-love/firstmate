@@ -6751,6 +6751,15 @@ if [ "$SPAWN_META_LOCK_HELD" != 1 ]; then
   fm_lock_acquire_wait "$SPAWN_META_LOCK"
   SPAWN_META_LOCK_HELD=1
 fi
+# Freeze only a firstmate-written initial brief, never a worker-edited brief on
+# relaunch. Live updates use fm-jev-deletions.sh under this same metadata lock.
+JEV_DELETIONS_SHA256=
+if [ "$RELAUNCH" -eq 0 ] && [ "${guard_project:-}" = firstmate ] \
+  && grep -qE $'^## Authorized deletions\r?$' "$BRIEF"; then
+  # shellcheck source=bin/fm-jev-deletions.sh
+  . "$FM_ROOT/bin/fm-jev-deletions.sh"
+  JEV_DELETIONS_SHA256=$(fm_jev_deletions_runtime prepare "$STATE_REAL" "$ID" "$WT" "$BRIEF") || exit 1
+fi
 if [ "$RELAUNCH" -eq 1 ]; then
   SPAWN_META_TMP="$STATE/.$ID.meta.relaunch.${BASHPID:-$$}"
 else
@@ -6789,6 +6798,7 @@ preserve_relaunch_meta() {
   if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
     echo "jev_guard_policy=$guard_policy"
   fi
+  [ -z "$JEV_DELETIONS_SHA256" ] || echo "jev_deletions_sha256=$JEV_DELETIONS_SHA256"
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
   [ -z "$SKILL_SELECTION_PICKED" ] || echo "skill_selection_picked=$SKILL_SELECTION_PICKED"

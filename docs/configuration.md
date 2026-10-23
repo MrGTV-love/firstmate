@@ -2552,7 +2552,7 @@ The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; om
 
 Questions and numeric policy are code-owned:
 
-- Bash pre-calls receive no model judgment or TypeSafe request, do not depend on provider or audit availability, and create no pre-call guard audit row.
+- Bash pre-calls receive no model judgment or TypeSafe request, do not depend on provider or audit availability, and create no pre-call guard audit row, except the omp [brief-named deletion record](#brief-named-file-deletion-allowance).
   The guard does not assess shell effects or destructive intent and offers no shell deletion or write confinement guarantee.
 - Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
 
@@ -2561,6 +2561,44 @@ There is no result size budget or result-dependent read exemption.
 Launch and steering records use the existing [launch publisher](../bin/fm-operational-input.sh) and [steering-inbox owner](../bin/fm-task-inbox-lib.sh); they publish only the record bytes, with no guard receipt, and their delivery and acknowledgement contracts are unchanged.
 The steering carrier names the exact record, acknowledgement ordering and omp `:raw` hint in under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
 The removed result screen and the result-only decision points retired with it are recorded in [`docs/guards/retired.json`](guards/retired.json); their retirement tests, one per retired id, cover unchanged background notices, recorded bounded-wait help, launch/steering records, large results and result-free session accounting offline.
+
+### Brief-named file deletion allowance
+
+Bash pre-calls stay unjudged, so no deletion needs a model bypass; this allowance adds a deterministic consistency check and a mandatory record to one narrow omp shell form.
+On omp, a single literal `rm` qualifies only when **every** operand resolves to an explicitly listed, existing regular file tracked in the task worktree's `HEAD`.
+The file's canonical path must equal its resolved path inside that worktree: symlinks, symlinked parents, parent traversal, directories, gitlinks and files tracked only in the index do not qualify.
+The working directory must be inside the task worktree.
+The bounded parser accepts space/tab-separated literal operands, single/double quotes, `--`, the short flags `f`, `r`, `v`, and their long forms `--force`, `--recursive`, `--verbose`.
+It does not interpret shell expansions, backslashes, globs, substitutions, pipelines, redirects, compound commands or other flags.
+Those forms, mixed listed/unlisted operands and every other deletion keep the ordinary unjudged bash path: no Jev decision, no allowance record and no guard audit row.
+This is not a shell deletion guarantee and does not add Jev questions, thresholds or other guards.
+Claude has no `Bash` pre-call hook (see [Tool coverage and outbound calls](#tool-coverage-and-outbound-calls)), so Claude workers' deletions receive neither this check nor its record.
+A listed file may have local modifications; `HEAD` tracking proves a committed version exists, not that uncommitted contents can be restored.
+
+Firstmate declares the complete replacement list in one exact `## Authorized deletions` section of the brief, containing only a fenced `json` array of literal worktree-relative paths, for example:
+
+````markdown
+## Authorized deletions
+
+```json
+["bin/obsolete.sh", "tests/obsolete.test.sh"]
+```
+````
+
+Fresh guarded launches snapshot that section before the worker starts; relaunches retain the existing snapshot rather than rereading a potentially worker-edited brief.
+For a task already running, Firstmate edits that section and runs [`bin/fm-jev-deletions.sh`](../bin/fm-jev-deletions.sh) from the supervising home; its `--help` owns the exact invocation and override paths.
+The command validates the files and replaces the entire list under the task metadata lock; publishing a brief without the section revokes all allowances.
+The omp guard rereads the list and digest for each candidate deletion, so live additions and revocations require no worker restart once that worker has loaded this implementation.
+An omp worker already using older guard code must load this implementation through an authorized relaunch before it can consume a new list.
+
+The publisher writes `state/<task>.authorized-deletions.json` and its SHA-256 as `jev_deletions_sha256` in `state/<task>.meta`, binding the snapshot to the task and canonical worktree.
+Missing, unreadable, malformed or mismatched records grant no allowance, including during the two-file publication window.
+The list and its digest are firstmate-written; a worker running as the same OS user could forge both, so this guards against mistakes, not deliberate forgery.
+It is not producer authentication, an OS permission boundary, or a filesystem/process sandbox.
+Path and `HEAD` checks happen immediately before admission, not atomically with shell execution; concurrent filesystem or Git changes can invalidate that observation.
+Every admitted candidate first appends a task-local line to `state/<task>.authorized-deletions.jsonl` with `task`, canonical worktree-relative `paths`, `list_sha256` and ISO-8601 `time`, then a `branch=deterministic` row to `state/jev-guard.jsonl`.
+That line records permission before execution, not proof the shell succeeded; either an allowance-audit failure or the ordinary guard-audit failure refuses the call.
+The behavioral regression in [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises the omp handler, actual file removal, live publication/revocation, inconsistent lists, scope exclusions and the six obsolete cd-guard paths.
 
 The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
