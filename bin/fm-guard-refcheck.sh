@@ -73,12 +73,16 @@ registration_files() {
   { git -C "$ROOT" ls-files 2>/dev/null || find "$ROOT" -type f -print; } \
     | grep -E '^(\.claude/|\.codex/|\.cursor/|\.grok/|\.pi/|\.opencode/|\.omp/|\.kimi/)' \
     | grep -Ev '/(node_modules|dist|target|\.next|vendor)/' \
+    | grep -Ev '^\.claude/(hooks|scripts|commands/hooks/(validators|observability))/' \
     | grep -E '\.(json|toml|ya?ml|sh|py|ts|mjs|js)$' || true
   printf '%s' "$EXTRA_REGISTRATIONS" | grep . || true
 }
 
 normalize_token() {
   local t=$1
+  case "$t" in
+    *"~/"*) return 1 ;;
+  esac
   t=${t#\$\{CLAUDE_PROJECT_DIR\}/}
   t=${t#\$CLAUDE_PROJECT_DIR/}
   t=${t#\$\{FM_ROOT\}/}
@@ -100,7 +104,7 @@ while IFS= read -r file; do
   [ -n "$tokens" ] || continue
   while IFS= read -r raw; do
     [ -n "$raw" ] || continue
-    tok=$(normalize_token "$raw")
+    tok=$(normalize_token "$raw") || continue
     path_count=$((path_count + 1))
     if [ ! -e "$ROOT/$tok" ]; then
       missing=$((missing + 1))

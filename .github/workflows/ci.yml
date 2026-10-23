@@ -88,6 +88,13 @@ jobs:
       - uses: actions/checkout@v6
       - name: Prove complete regression partition
         run: bin/fm-test-run.sh --check-coverage
+      # The guard audit's Stage 0 machine: a registered hook path that does not
+      # exist, a registry path that does not resolve, or a retired guard named
+      # again in live code fails here instead of silently claiming coverage.
+      - name: Prove guard wiring and retirement references
+        run: bin/fm-guard-refcheck.sh
+      - name: Enforce the guard registry contract and its ratchet
+        run: bin/fm-guard-lint.sh --mode enforce --counts
 
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).

@@ -99,7 +99,7 @@ info() { [ "$JSON" -eq 1 ] || printf 'INFO %s: %s\n' "$1" "$2"; }
 # spec names: bin/, tests/, docs/, config/, state/, plus a bare script name.
 check_remedy_paths() {  # <id> <remedy>
   local id=$1 remedy=$2 tok
-  for tok in $(printf '%s' "$remedy" | tr ' ()`",;' '\n\n\n\n\n\n\n\n' | grep -E '^(bin|tests|docs|config|state)/' || true); do
+  for tok in $(printf '%s' "$remedy" | tr ' ()`",;' '\n\n\n\n\n\n\n\n' | grep -E '^(bin|scripts|tests|docs|config|state|\.claude|\.codex|\.github|\.pi|\.grok|\.omp|\.cursor|\.opencode|\.tac)/' || true); do
     tok=${tok%"${tok##*[!.,;:]}"}
     case "$tok" in
       config/*|state/*|projects/*) continue ;;
@@ -110,7 +110,7 @@ check_remedy_paths() {  # <id> <remedy>
 
 has_executable_token() {  # <remedy>
   local r=$1
-  printf '%s' "$r" | grep -Eq '(^|[[:space:]"(])(bin|tests|docs|config|state)/' && return 0
+  printf '%s' "$r" | grep -Eq '(^|[[:space:]"(])(bin|scripts|tests|docs|config|state|\.claude|\.codex|\.github|\.tac)/' && return 0
   printf '%s' "$r" | grep -Eq '`[^`]+`' && return 0
   printf '%s' "$r" | grep -Eq '(^|[[:space:](])env -u ' && return 0
   printf '%s' "$r" | grep -Eq '(^|[[:space:](])git [a-z]' && return 0
@@ -230,8 +230,20 @@ while IFS= read -r entry; do
   if [ "$instrumented" = true ]; then
     if [ -z "$owner" ]; then
       violation R8 "$id" "instrumented guard has no owner"
-    elif ! grep -qs 'fm_guard_event' "$ROOT/$owner"; then
-      violation R8 "$id" "instrumented guard never calls fm_guard_event in $owner"
+    else
+      # The writer call must live in the guard's owner, or in a host file the
+      # registry names under emitters when the invariant is decided in a caller.
+      emitters=$(printf '%s\n' "$entry" | jq -r '(.emitters // [])[]?' 2>/dev/null)
+      found=0
+      for candidate in "$owner" $emitters; do
+        if grep -qsE 'fm_guard_event|fm-guard-event\.sh' "$ROOT/$candidate"; then
+          found=1
+          break
+        fi
+      done
+      if [ "$found" -eq 0 ]; then
+        violation R8 "$id" "instrumented guard never calls the guard event writer in $owner${emitters:+ or its emitters}"
+      fi
     fi
   fi
 
@@ -266,10 +278,12 @@ if [ "$COUNTS" -eq 1 ]; then
   active=$(jq -r '.guards | length' "$REGISTRY")
   retired_n=$(jq -r 'length' "$RETIRED" 2>/dev/null || echo 0)
   excluded_n=$(jq -r '(.excluded // []) | length' "$REGISTRY")
-  total=$((active + retired_n + excluded_n))
+  unregistered_n=$(jq -r '(.unregistered_ids // []) | length' "$REGISTRY")
+  beyond_n=$(jq -r '(.beyond_audit_retired // []) | length' "$REGISTRY")
+  total=$((active + retired_n - beyond_n + excluded_n + unregistered_n))
   [ "$total" -eq "$audited" ] \
-    || violation R1 "inventory" "active($active) + retired($retired_n) + excluded($excluded_n) = $total, audited=$audited"
-  info inventory "active=$active retired=$retired_n excluded=$excluded_n audited=$audited"
+    || violation R1 "inventory" "active($active) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) + unregistered($unregistered_n) = $total, audited=$audited"
+  info inventory "active=$active retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$unregistered_n audited=$audited"
 fi
 
 # --------------------------------------------------------------- ratchet gate
