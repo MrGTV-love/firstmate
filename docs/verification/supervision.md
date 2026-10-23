@@ -334,7 +334,7 @@ The native `user/message` event carries `UserMessage` directly in `data`, includ
 The DSH primary bridge uses that identity to distinguish its own consumed notifications and guard continuations from new external input.
 On Node 26.4.0, `nice -n 20 bash tests/fm-dsh-primary.test.sh` passed with native-shaped events and explicit consumption of synthetic messages before their next turn end.
 It exercised one continuation per failed episode, a fresh budget for a genuinely new user message, a bounded guard continuation for a consumed but unacknowledged wake, no duplicate accepted notification, acknowledgement before re-arm, delegated-child exclusion, ordinary process-group retirement, and native SIGKILL cleanup of a TERM-resistant descendant.
-The real `FM_DSH_PRIMARY_LIVE=1 nice -n 20 bash tests/fm-dsh-primary-live-e2e.test.sh` then passed native startup, registered-check wake consumption, shared guard recovery, interrupt, exit, same-conversation resume and forced-native-death watcher cleanup in a named Herdr lab, with `cleanup_exit=0`.
+The real `FM_DSH_PRIMARY_LIVE=1 nice -n 20 bash tests/fm-dsh-primary-live-e2e.test.sh` then passed native startup, registered-check wake consumption, shared guard recovery, interrupt, exit, same-conversation resume and forced-native-death watcher cleanup (the queue-drain and cleanup checks fail only since the 2026-10-23 refresh in runtime verification) in a named Herdr lab, with `cleanup_exit=0`.
 [Runtime verification](runtime-backends.md#native-primary-and-secondmate-lifecycle) owns the detailed live record, commands and limits; the passive boundary cannot block a completed DSH turn.
 
 ### Claude mid-turn Lavish feedback, 2026-09-30

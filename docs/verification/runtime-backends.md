@@ -3965,17 +3965,17 @@ cleanup_exit=0
 | Boundary | Evidence |
 | --- | --- |
 | Startup | The native Cordis plugin loaded from the private launch patch; the real session log contained the DSH-specific ordered startup digest and supervision protocol |
-| Native notification | A registered check produced a durable epoch/sequence row; native follow-up caused the model to drain and acknowledge it, and the guard required unique delivery keys |
+| Native notification | A registered check produced a durable epoch/sequence row; native follow-up caused the model to drain and acknowledge it, and the guard required unique delivery keys; this run's queue-empty check could not fail, so the 2026-10-23 refresh below is the enforcing evidence |
 | Turn end | The shared guard recorded `2` without supervision and `0` after the native adapter restored its tracked watcher |
 | Interrupt | The real key-plane call delivered Escape and proved agent survival; cancellation completion remains unconfirmed |
 | Exit and resume | Ordinary exit disposed the native adapter; control/spawn relaunched it in the same endpoint and log, and a new assistant reply recovered the earlier conversation's secret word, which was absent from its charter |
-| Forced crash | SIGKILL of the exact native owner bypassed disposal; both the recorded private arm and home watcher PIDs disappeared before a second same-conversation resume and final exit |
+| Forced crash | SIGKILL of the exact native owner bypassed disposal before a second same-conversation resume and final exit; this run's check that the arm and watcher PIDs disappeared could not fail, so the 2026-10-23 refresh below is the enforcing evidence |
 | Cleanup | Guarded named-session teardown and the default-session tripwire completed successfully; final watcher stop reported none running |
 
 The complete live guard took a measured 217.94 seconds; this is an observation, not a launch or watcher deadline.
 That run injected the digest without awaiting it, so its Startup row proves the digest reached the log but not that it preceded the first provider turn.
 Primary and secondmate launches now pass the opening prompt or brief positionally, and the plugin's awaited `agent/pre-step` waterfall enters the digest ahead of it in the first step.
-A 2026-10-23 refresh of the same guard on that shape, with the `dsh-tui` 0.16.1 launcher and profile, DSH CLI 0.2.1-rc.2 and Node v26.4.0, passed in a measured 213 seconds with `cleanup_exit=0`, after the adapter began holding claims made before its first-step waterfall.
+A 2026-10-23 refresh of the same guard on that shape, with the `dsh-tui` 0.16.1 launcher and profile, DSH CLI 0.2.1-rc.2 and Node v26.4.0, passed in a measured 224 seconds with `cleanup_exit=0`, after the adapter began holding claims made before its first-step waterfall and after the guard's wake-drain and crash-cleanup checks were made to fail on a non-empty queue or a surviving arm or watcher; earlier runs' versions of those two checks could not fail and are not evidence for them.
 Its final checks read the real session logs: in the primary and in the fresh secondmate, the startup digest was the first user message and the positional opening prompt or charter followed it before any assistant reply.
 The primary passed wake delivery and acknowledgement, guard recovery after typed steering, an interrupt asserted to land after the model started the requested sleep tool (`verified=agent-alive cancel=unconfirmed`), exit, two same-endpoint relaunches through the secondmate spawn path that recovered the earlier conversation's secret word, and forced native SIGKILL cleanup of the private arm and watcher.
 The guard then ran a real `fm-spawn.sh --secondmate --backend herdr` into a new lab home through `prepare-primary`, with no prior conversation, while a lab-only `bash` wrapper first on that spawn's `PATH` held just that home's `fm-sessionstart-run.sh` at a FIFO barrier.

@@ -22,13 +22,13 @@ An arm owner is the component in each primary harness that starts watcher cycles
 
 The host runs by default on a Claude primary and is opt-in per home on the other five primaries it supports; [configuration.md](configuration.md#supervision-host-configsupervision-host) owns the home gate and inherited opt-out.
 A home that does not run the host behaves exactly as it does without it.
-Today it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: away on all six, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
+Today it runs beside a Claude, Cursor, OpenCode, omp, DSH, Grok, or Codex primary: away on all seven, and attended on Claude and Cursor, the primaries with a verified [dialog mirror](#the-dialog-mirror).
 
 ### Behavior by posture and harness
 
 - Attended (no away record: no `state/.afk-contract`, or quiet mode's) on Claude and Cursor, the engine takes the wakes the Pi branch would take and never wakes main for a routine outcome; see [Postures](#postures).
   Every other close reaches main exactly as the plain watcher arm delivers it.
-- Attended on OpenCode, omp, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
+- Attended on OpenCode, omp, DSH, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
 - Away (an away record exists), the host hands each close to the engine.
   Main stays parked unless the host hands the wake back.
 - `/afk` launches no away daemon on a home of those harnesses that runs the host, because the host is the away session there.
@@ -70,6 +70,7 @@ The host's header owns the output contract they read.
 | Cursor | the `stop` hook park, `bin/fm-turnend-guard-cursor.sh` | the park's `watcher` follow-up |
 | OpenCode | the TUI plugin, `.opencode/plugins/fm-primary-watch-arm.js`, which restarts its own successor after each close | a `watcher` prompt through `promptAsync` |
 | omp | the watch extension, `.omp/extensions/fm-primary-omp-watch.ts`, which restarts its own successor after each close | the extension's `watcher` message; [watcher continuity](watcher-continuity.md#omp-stale-wake-gating) owns delivery |
+| DSH | the native primary plugin, `.dsh/fm-primary.mjs`, which starts its next park after the turn that handles a close | the plugin's `watcher` follow-up |
 | Grok | the model's tracked background call, rendered as `bin/fm-supervision-host.sh park` at session start | the background task's completion notification |
 | Codex | the foreground checkpoint, `bin/fm-watch-checkpoint.sh`, in the watcher's place | the checkpoint's own output |
 
@@ -291,7 +292,7 @@ But a host absorbs its own wakes, so it ends its park itself before that registr
 
 `FM_SUPERVISION_HOST_PARK_SECONDS` sets that boundary (default 27,000).
 A value that is not a positive integer below 28,800 is treated as the default.
-The OpenCode, omp, and Grok owners have no hook timeout and keep the same default, so their parks end on the same cadence.
+The OpenCode, omp, DSH, and Grok owners have no hook timeout and keep the same default, so their parks end on the same cadence.
 
 ### At the boundary
 
@@ -300,7 +301,7 @@ Main drains and acknowledges, and the owner starts the next park:
 
 | Primary | When the next park starts |
 |---|---|
-| Claude and Cursor | At the next turn end. |
+| Claude, Cursor, and DSH | At the next turn end. |
 | OpenCode and omp | At once. |
 | Grok | At the model's re-arm. |
 
@@ -402,7 +403,7 @@ The default model is `sonnet`, which handled every measured wake correctly at a 
 `config/supervision-host` can name another.
 
 The Claude engine runs beside any of the six primaries, but only a Claude primary selects it by default when the host is enabled, even with no file.
-A Cursor, OpenCode, omp, Grok, or Codex home names it (`claude`, optionally with a model) in `config/supervision-host`.
+A Cursor, OpenCode, omp, DSH, Grok, or Codex home names it (`claude`, optionally with a model) in `config/supervision-host`.
 `/afk` there says so when the file selects no engine.
 
 ## Verification

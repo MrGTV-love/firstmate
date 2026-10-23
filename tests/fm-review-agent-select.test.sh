@@ -157,6 +157,17 @@ assert_equals null "$(jq -c .selected <<<"$OUT")" 'no choice is offered without 
 write_rules "$DEFAULT_USE" "[$DEEPSEEK]"
 pass 'one account out keeps the pool; every account out opens only the declared fallback'
 
+# ---- a DeepSeek use profile is refused before any candidate is assessed -------------
+write_rules "[$DEEPSEEK,$SONNET]"
+rm -f "$LOG"
+select_run --dry-run --log
+expect_code 2 "$CODE" 'a DeepSeek use profile must refuse the review rule'
+assert_contains "$(cat "$ERR")" 'harness dsh has no no-mistakes review agent' 'the refusal names the missing review agent'
+assert_equals error "$(tail -n 1 "$LOG" | jq -r .status)" 'the refused rule is recorded as an error'
+assert_equals null "$(tail -n 1 "$LOG" | jq -c .selected)" 'a refused rule records no selection'
+write_rules "$DEFAULT_USE" "[$DEEPSEEK]"
+pass 'a DeepSeek use profile is refused loudly and never selected'
+
 # ---- unknown evidence is never read as healthy or as zero ---------------------------
 : > "$QUOTA"
 jq -n '{schemaVersion: 5, providers: []}' > "$QUOTA"

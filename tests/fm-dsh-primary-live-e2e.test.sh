@@ -148,7 +148,10 @@ for _ in $(seq 1 120); do
   [ ! -s "$LAB_HOME/state/.wake-queue" ] && [ ! -f "$LAB_HOME/state/probe-wake" ] && break
   sleep 1
 done
-[ ! -s "$LAB_HOME/state/.wake-queue" ] && [ ! -f "$LAB_HOME/state/probe-wake" ]
+if [ -s "$LAB_HOME/state/.wake-queue" ] || [ -f "$LAB_HOME/state/probe-wake" ]; then
+  echo 'the wake was not drained and acknowledged' >&2
+  exit 1
+fi
 # Wait for the acknowledged cycle's actual replacement before depriving the
 # primary of supervision; initial startup's 2 -> 0 must not satisfy this case.
 for _ in $(seq 1 120); do
@@ -209,7 +212,10 @@ for _ in $(seq 1 120); do
   if ! kill -0 "$ARM_PID" 2>/dev/null && ! kill -0 "$WATCH_PID" 2>/dev/null; then break; fi
   sleep 1
 done
-! kill -0 "$ARM_PID" 2>/dev/null && ! kill -0 "$WATCH_PID" 2>/dev/null
+if kill -0 "$ARM_PID" 2>/dev/null || kill -0 "$WATCH_PID" 2>/dev/null; then
+  echo 'native owner death left the private arm or watcher alive' >&2
+  exit 1
+fi
 printf 'ok - forced native owner death retired private arm and watcher\n'
 control "$ID" relaunch --harness dsh --model deepseek/deepseek-v4-flash --effort high --note 'Native primary was force-killed to prove owner-bound watcher cleanup. Continue the same conversation under the lab charter.'
 lab pane send-text "$PANE" 'Reply FMCRASHRESUMED and the secret word remembered earlier. Do not inspect files or run commands.'
