@@ -19,19 +19,22 @@ export FM_HERDR_LAB_STATE_DIR="$TASK/primary-herdr-safety"
 SESSION=$("$HELPER" name dsh-primary)
 LAB_HOME=$(mktemp -d /tmp/fm-dsh-primary.XXXXXX)
 PARENT=$(mktemp -d /tmp/fm-dsh-parent.XXXXXX)
+SECOND=$(mktemp -d /tmp/fm-dsh-second.XXXXXX)
 LAB_HOME=$(cd "$LAB_HOME" && pwd -P)
 PARENT=$(cd "$PARENT" && pwd -P)
+SECOND=$(cd "$SECOND" && pwd -P)
 cleanup() {
   local rc=$?
   trap - EXIT
   # Retire the native owner first: stopping only its watcher while the TUI
   # remains alive permits a legitimate turn-end callback to re-arm it.
   PATH="$ORIGINAL_PATH" "$HELPER" teardown "$SESSION" || rc=1
-  if [ -d "$LAB_HOME/state" ]; then
-    FM_HOME="$LAB_HOME" FM_ROOT_OVERRIDE="$LAB_HOME" FM_STATE_OVERRIDE="$LAB_HOME/state" bash "$ROOT/bin/fm-watch-arm.sh" --stop || rc=1
-  fi
+  for home in "$LAB_HOME" "$SECOND"; do
+    [ -d "$home/state" ] || continue
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_STATE_OVERRIDE="$home/state" bash "$ROOT/bin/fm-watch-arm.sh" --stop || rc=1
+  done
   "$LAB_HELPER" teardown "$LAB_HOME" || rc=1
-  printf 'primary_home=%s\nparent_home=%s\ncleanup_exit=%s\n' "$LAB_HOME" "$PARENT" "$rc"
+  printf 'primary_home=%s\nparent_home=%s\nsecondmate_home=%s\ncleanup_exit=%s\n' "$LAB_HOME" "$PARENT" "$SECOND" "$rc"
   exit "$rc"
 }
 trap cleanup EXIT
@@ -67,6 +70,8 @@ FM_HOME="$LAB_HOME" FM_ROOT_OVERRIDE="$LAB_HOME" FM_STATE_OVERRIDE="$LAB_HOME/st
 cat > "$TASK/bin/herdr" <<EOF
 #!/usr/bin/env bash
 set -eu
+# The spawn's client-version preflight names no session; answer it from the lab.
+[ "\$*" != 'status --json' ] || exec env PATH='$ORIGINAL_PATH' '$HELPER' run '$SESSION' status --json
 args=("\$@")
 n=\${#args[@]}
 [ "\$n" -ge 2 ] && [ "\${args[\$((n-2))]}" = --session ] && [ "\${args[\$((n-1))]}" = '$SESSION' ] || { echo 'primary lab refuses an unscoped Herdr call' >&2; exit 98; }
@@ -155,10 +160,18 @@ lab pane send-keys "$PANE" enter
 wait_reply FMGUARDPROOF
 sleep 3
 jq -s -e --argjson offset "$GUARD_OFFSET" '.[$offset:] | any(.[]; .event == "turnend-guard" and .code == 2) and any(.[]; .event == "turnend-guard" and .code == 0)' "$EVENTS" >/dev/null
+sleep_calls() { python3 -c 'import sys; print(sum(1 for line in open(sys.argv[1]) if "\"type\":\"tool/call\"" in line.replace(" ", "") and "sleep 40" in line))' "$LOG"; }
+# Let the guard recovery turn finish, then interrupt mid-task: only once the
+# model has started the requested sleep, so no unanswered request remains.
+for _ in $(seq 1 120); do
+  [ "$(python3 "$ROOT/bin/fm-dsh.py" state "$PARENT/state" "$ID")" = idle ] && break
+  sleep 1
+done
+CALLS=$(sleep_calls)
 lab pane send-text "$PANE" 'Run sleep 40 with Bash, then reply FMINTERUPTPROBE. Do not do anything else.'
 lab pane send-keys "$PANE" enter
 for _ in $(seq 1 60); do
-  [ "$(python3 "$ROOT/bin/fm-dsh.py" state "$PARENT/state" "$ID")" = busy ] && break
+  [ "$(python3 "$ROOT/bin/fm-dsh.py" state "$PARENT/state" "$ID")" = busy ] && [ "$(sleep_calls)" -gt "$CALLS" ] && break
   sleep 1
 done
 control "$ID" interrupt
@@ -172,12 +185,14 @@ AFTER=$(python3 "$ROOT/bin/fm-dsh.py" position "$PARENT/state" "$ID")
 # A forced native crash bypasses Cordis disposal. Prove the kernel-observed
 # death retires the precise private arm and watcher before resuming again.
 NATIVE_PID=$(jq -s -er '[.[] | select(.event == "startup")][-1].pid' "$EVENTS")
+# An armed cycle can close and re-arm on a wake at any moment; take the
+# newest arm only while it and the home watcher are both alive.
 for _ in $(seq 1 120); do
-  ARM_PID=$(jq -s -r --argjson pid "$NATIVE_PID" '[.[] | select(.event == "watcher-ready" and .pid == $pid)][-1].arm // empty' "$EVENTS")
-  [ -n "$ARM_PID" ] && [ -s "$LAB_HOME/state/.watch.lock/pid" ] && break
+  ARM_PID=$(jq -s -r --argjson pid "$NATIVE_PID" '[.[] | select(.pid == $pid and (.event == "watcher-ready" or .event == "watcher-close"))] | last | select(.event == "watcher-ready") | .arm // empty' "$EVENTS")
+  WATCH_PID=$(cat "$LAB_HOME/state/.watch.lock/pid" 2>/dev/null || true)
+  [ -n "$ARM_PID" ] && [ -n "$WATCH_PID" ] && kill -0 "$ARM_PID" 2>/dev/null && kill -0 "$WATCH_PID" 2>/dev/null && break
   sleep 1
 done
-WATCH_PID=$(cat "$LAB_HOME/state/.watch.lock/pid")
 for pid in "$NATIVE_PID" "$ARM_PID" "$WATCH_PID"; do
   case "$pid" in ''|*[!0-9]*) echo 'invalid private lifecycle pid' >&2; exit 1 ;; esac
   kill -0 "$pid"
@@ -215,4 +230,55 @@ for line in open(sys.argv[2]):
 assert before and 'Mode: DSH native Cordis supervision.' in before[0], 'the startup digest must be the first user message'
 assert any('ORCHID73' in words for words in before[1:]), 'the positional opening prompt must follow the digest before any reply'
 print('ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume')
+PY
+# A fresh secondmate: the real spawn prepares a new home's private runtime,
+# loads the plugin with no prior conversation, and must pass its start proof
+# and composer check while its first step still waits on the digest.
+SECOND_ID="dsh-second-$$"
+"$LAB_HELPER" create "$SECOND"
+mkdir "$SECOND/operator-home"
+printf '%s\n' "$SECOND_ID" > "$SECOND/.fm-secondmate-home"
+git init -q "$SECOND"
+cp "$ROOT/AGENTS.md" "$SECOND/AGENTS.md"
+ln -s "$ROOT/bin" "$SECOND/bin"
+ln -s "$ROOT/.agents" "$SECOND/.agents"
+ln -s "$ROOT/docs" "$SECOND/docs"
+printf 'manual\n' > "$SECOND/config/backlog-backend"
+printf 'herdr\n' > "$SECOND/config/runtime-backend"
+printf 'off\n' > "$SECOND/config/supervision-host-off"
+printf '# Backlog\n\n## Queued\n\n## In flight\n\n## Done\n' > "$SECOND/data/backlog.md"
+# A secondmate's launch brief is its home charter.
+printf '%s\n' 'This is an isolated Firstmate runtime lab secondmate, not real operational work. Do not investigate, read outside this home, load skills, edit code or dispatch work. Ignore startup diagnostics. Remember the word TULIP42 only in this conversation, then reply exactly FMSECONDREADY. On resuming this conversation reply FMSECONDRESUMED and the secret word remembered earlier, without inspecting files.' > "$SECOND/data/charter.md"
+spawned_at=$(date +%s)
+FM_POLL=1 FM_CHECK_INTERVAL=1 FM_DSH_OPERATOR_HOME="$SECOND/operator-home" HERDR_SESSION="$SESSION" FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$ROOT" \
+  FM_STATE_OVERRIDE="$PARENT/state" FM_CONFIG_OVERRIDE="$PARENT/config" FM_SPAWN_NO_GUARD=1 \
+  bash "$ROOT/bin/fm-spawn.sh" "$SECOND_ID" "$SECOND" dsh --secondmate --backend herdr --model deepseek/deepseek-v4-flash --effort high
+printf 'secondmate spawn returned after %ss\n' "$(( $(date +%s) - spawned_at ))"
+SECOND_LOG=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND_ID")
+python3 - "$SECOND_LOG" <<'PY'
+import json,sys
+events=[json.loads(line) for line in open(sys.argv[1]) if line.strip()]
+types=[event.get('type') for event in events]
+print('secondmate log at spawn return: turn/start=%s user/message=%s' % ('turn/start' in types, 'user/message' in types))
+PY
+[ "$(sed -n 's/^backend=//p' "$PARENT/state/$SECOND_ID.meta")" = herdr ] && [ "$(sed -n 's/^herdr_session=//p' "$PARENT/state/$SECOND_ID.meta")" = "$SESSION" ] || { echo 'the secondmate spawn left the named Herdr lab' >&2; exit 1; }
+SECOND_PANE=$(sed -n 's/^herdr_pane_id=//p' "$PARENT/state/$SECOND_ID.meta")
+LOG="$SECOND_LOG" PANE="$SECOND_PANE" wait_reply FMSECONDREADY
+control "$SECOND_ID" relaunch --harness dsh --model deepseek/deepseek-v4-flash --effort high --note 'Reply FMSECONDRESUMED and the secret word from the earlier conversation. Do not inspect files, investigate, load skills or dispatch work.'
+[ "$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND_ID")" = "$SECOND_LOG" ]
+LOG="$SECOND_LOG" PANE="$SECOND_PANE" wait_reply 'FMSECONDRESUMED TULIP42'
+control "$SECOND_ID" exit
+cp "$SECOND/state/.dsh-primary-events.jsonl" "$TASK/dsh-secondmate-events.jsonl"
+python3 - "$SECOND_LOG" <<'PY'
+import json,sys
+before=[]
+for line in open(sys.argv[1]):
+    try: event=json.loads(line)
+    except ValueError: continue
+    if event.get('type')=='assistant/message': break
+    if event.get('type')=='user/message':
+        before.append('\n'.join(part.get('text','') for part in event['data'].get('content',[]) if part.get('type')=='text'))
+assert before and 'Mode: DSH native Cordis supervision.' in before[0], 'the secondmate startup digest must be the first user message'
+assert any('TULIP42' in words for words in before[1:]), 'the secondmate brief must follow the digest before any reply'
+print('ok - fresh dsh-tui secondmate spawn into a new home, digest ahead of its brief, same-conversation relaunch and exit')
 PY

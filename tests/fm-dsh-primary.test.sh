@@ -21,7 +21,7 @@ async function until(predicate) {
     await delay(25);
   }
 }
-function setup(name, {failArm = false, failStart = false} = {}) {
+function setup(name, {failArm = false, failStart = false, slowStart = false} = {}) {
   const dir = join(tmp, name);
   const bin = join(dir, 'bin');
   const home = join(dir, 'home');
@@ -29,7 +29,7 @@ function setup(name, {failArm = false, failStart = false} = {}) {
   mkdirSync(join(home, 'state'), {recursive: true});
   symlinkSync(join(root, 'bin/fm-timeout-lib.sh'), join(bin, 'fm-timeout-lib.sh'));
   const executable = (name, body) => writeFileSync(join(bin, name), '#!/usr/bin/env bash\nset -eu\n' + body + '\n', {mode: 0o700});
-  executable('fm-sessionstart-run.sh', failStart ? "echo 'fixture startup fault' >&2; exit 1" : "printf 'SESSION START - fixture\\n'");
+  executable('fm-sessionstart-run.sh', failStart ? "echo 'fixture startup fault' >&2; exit 1" : `${slowStart ? 'sleep 1; ' : ''}printf 'SESSION START - fixture\\n'`);
   executable('fm-dsh-primary.sh', "printf 'watch\\n'");
   executable('fm-turnend-guard.sh', "if [ -f \"$FM_HOME/state/ready\" ]; then exit 0; fi; echo 'no live supervisor' >&2; exit 2");
   executable('fm-wake-drain.sh', 'cat "$FM_HOME/state/queue"');
@@ -53,10 +53,19 @@ function setup(name, {failArm = false, failStart = false} = {}) {
   const emit = (type, payload) => handlers.get(type)?.(payload);
   const step = messages => handlers.get('agent/pre-step')({agent, messages, turn: 1, step: 1, signal: new AbortController().signal},
     async () => ({kind: 'enter', messages}));
+  // DSH's own step: claim the whole inbox, run the waterfall, then drop the
+  // batch if the turn was cancelled meanwhile.
+  const run = async (inbox, signal) => {
+    const claimed = inbox.splice(0);
+    const decision = await handlers.get('agent/pre-step')({agent, messages: claimed, turn: 1, step: 1, signal},
+      async () => ({kind: 'enter', messages: claimed}));
+    signal.throwIfAborted();
+    return decision.kind === 'enter' ? decision.messages : [];
+  };
   const end = () => handlers.get('session/event')(agent.session, {type: 'turn/end', seq: 1});
   const consume = input => handlers.get('session/event')(agent.session, {type: 'user/message', data: input});
   const stop = () => {for (const fn of stops) fn();};
-  return {home, agent, followups, injected, emit, step, end, consume, stop};
+  return {home, agent, followups, injected, emit, step, run, end, consume, stop};
 }
 // DSH submits the positional brief at once and does not await agent/created.
 // The awaited pre-step of the first step must enter the digest ahead of it.
@@ -70,7 +79,27 @@ assert.deepEqual((await opened.step([brief])).messages, [brief], 'later steps mu
 await openedStart;
 assert.equal(opened.followups.length + opened.injected.length, 0, 'startup must not queue a second turn or park the digest');
 opened.stop();
-const broken = setup('startup-failure', {failStart: true});
+// Cancelling the held first step drops its batch and clears the inbox, as
+// DSH does. The digest and the claimed brief must lead the next step once.
+const cancelled = setup('startup-cancel', {slowStart: true});
+const cancelledStart = cancelled.emit('agent/created', {agent: cancelled.agent});
+const inbox = [brief];
+const interrupt = new AbortController();
+const interrupted = cancelled.run(inbox, interrupt.signal);
+await delay(100);
+interrupt.abort();
+inbox.length = 0;
+await assert.rejects(interrupted, {name: 'AbortError'}, 'the cancelled step must enter nothing');
+await cancelledStart;
+const typed = {id: 'typed', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'continue'}]};
+inbox.push(typed);
+const resumed = await cancelled.run(inbox, new AbortController().signal);
+assert.deepEqual(resumed.map(input => input.content[0].text), ['SESSION START - fixture\n', 'opening brief', 'continue'], 'the next step must carry the digest, then the brief, then new input');
+assert.equal(new Set(resumed.map(input => input.id)).size, resumed.length, 'nothing may be delivered twice');
+inbox.push(typed);
+assert.deepEqual(await cancelled.run(inbox, new AbortController().signal), [typed], 'the held messages must be delivered only once');
+cancelled.stop();
+const broken = setup('startup-failure', {failStart: true, failArm: true});
 const brokenStart = broken.emit('agent/created', {agent: broken.agent});
 const failedStep = await broken.step([brief]);
 assert.match(failedStep.messages[0].content[0].text, /session start failed: fixture startup fault/, 'a failed startup must report the fault in the first step');
@@ -78,6 +107,15 @@ assert.equal(failedStep.messages[1], brief, 'a failed startup must keep the brie
 await brokenStart;
 assert.equal(broken.followups.length, 0, 'a failed startup must not queue another turn');
 assert.match(readFileSync(join(broken.home, 'state/.dsh-primary-events.jsonl'), 'utf8'), /"event":"error"/, 'a failed startup must be recorded');
+// DSH logs each entered message. The launch brief is not new external input,
+// so it must not reopen the failure budget the startup notice used.
+for (const input of failedStep.messages) broken.consume(input);
+broken.end();
+await delay(1000);
+assert.equal(broken.followups.length, 0, 'the launch brief must not reset the startup failure budget');
+broken.consume({id: 'external-after-failure', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'Retry.'}]});
+broken.end();
+await until(() => broken.followups.length === 1);
 broken.stop();
 const fail = setup('failed-arm', {failArm: true});
 await fail.emit('agent/created', {agent: fail.agent});

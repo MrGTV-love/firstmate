@@ -10,6 +10,10 @@ const instances = new Map();
 const message = text => Object.freeze({id: randomUUID(), role: 'user',
   source: Object.freeze({kind: 'user'}),
   content: Object.freeze([Object.freeze({type: 'text', text})])});
+const aborted = signal => new Promise(accept => {
+  if (signal.aborted) accept();
+  else signal.addEventListener('abort', accept, {once: true});
+});
 
 export function apply(ctx, config) {
   const root = resolve(config.root);
@@ -30,6 +34,7 @@ export function apply(ctx, config) {
   let guardNudged = false;
   let started = false;
   let leading;
+  let launchInput = false;
   let generation = 0;
   const ownMessages = new Set();
   const wakeMessages = new Set();
@@ -208,7 +213,10 @@ export function apply(ctx, config) {
     // prompt at once. The first pre-step of a fresh process holds until this
     // resolves, so the digest enters that step ahead of the opening prompt.
     let lead;
-    if (source === 'startup') leading = new Promise(accept => { lead = accept; });
+    if (source === 'startup') {
+      leading = new Promise(accept => { lead = input => accept(input ? [input] : []); });
+      launchInput = true;
+    }
     const own = text => {
       const input = message(text);
       ownMessages.add(input.id);
@@ -236,14 +244,26 @@ export function apply(ctx, config) {
       lead(own(failed(error)));
     }
   });
+  // The held step's claimed launch input is this adapter's own, so it never
+  // resets the failure budget. Cancellation drops an aborted step's batch and
+  // clears the inbox; the held messages then lead the next step instead.
   ctx.on('agent/pre-step', async (payload, next) => {
     if (payload.agent !== agent || !leading) return next();
     const pending = leading;
     leading = undefined;
-    const first = await pending;
+    if (launchInput) for (const input of payload.messages) ownMessages.add(input.id);
+    launchInput = false;
+    const first = await Promise.race([pending, aborted(payload.signal)]);
+    if (payload.signal.aborted) {
+      leading = pending.then(held => [...held, ...payload.messages]);
+      return {kind: 'reject'};
+    }
     const decision = await next();
-    if (!first || decision.kind !== 'enter') return decision;
-    return {kind: 'enter', messages: [first, ...decision.messages]};
+    if (decision.kind !== 'enter' || payload.signal.aborted) {
+      leading = Promise.resolve(decision.kind === 'enter' ? [...first, ...payload.messages] : first);
+      return decision;
+    }
+    return {kind: 'enter', messages: [...first, ...decision.messages]};
   });
   ctx.on('session/event', (session, event) => {
     if (session !== agent?.session) return;
