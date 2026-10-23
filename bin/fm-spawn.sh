@@ -3259,7 +3259,7 @@ else
 fi
 
 if [ "$RAW_LAUNCH" = 0 ]; then
-  if [ -z "$ARG3" ] && fm_control_harness_supports_kind dsh "$KIND" && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
+  if [ -z "$ARG3" ] && [ "$KIND" != secondmate ] && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
     HARNESS=dsh
     LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
   fi
