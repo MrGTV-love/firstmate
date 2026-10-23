@@ -90,16 +90,11 @@ set -u
 # bounds below it has no wall-clock cutoff. fm-duration.py owns the Python
 # runner; the Perl-core fallback preserves Python-optional shell readers with
 # the same CPU/output rule. Both forward signals, clean up the owned command
-# group and write no duration records.
+# group and write no duration records. A nested call keeps its own bound, so a
+# hung inner read is stopped by its own owner and the outer work continues.
 fm_run_progress() {
   local seconds=$1 helper
   shift
-  # An outer collector already observes this whole tree. Counting an inner
-  # sampler's CPU as work would hide a hung source forever.
-  if [ "${FM_PROGRESS_MANAGED:-0}" = 1 ]; then
-    "$@"
-    return $?
-  fi
   helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
   if command -v python3 >/dev/null 2>&1; then
     python3 "$helper" keep-going "$seconds" -- "$@"
@@ -112,9 +107,10 @@ fm_run_progress() {
 }
 
 # Preserve the existing Python-optional shell readers. Perl core modules relay
-# both streams and sample the same identity-bound ps CPU facts as fm-duration.py.
-# The bound is inactivity only, including TERM cleanup; an unavailable sample
-# never proves a stall. Parent death and signals clean up the owned command group.
+# both streams and sample the same identity-bound /proc-or-ps CPU facts as
+# fm-duration.py. The bound is inactivity only, including TERM cleanup; while no
+# sample is available one warning names the platform and nothing is stopped for
+# inactivity. Parent death and signals clean up the owned command group.
 fm_run_perl_progress() {
   local owner=${BASHPID:-$$}
   # shellcheck disable=SC2016 # Perl, not the sourcing shell, expands this program.
@@ -139,7 +135,6 @@ fm_run_perl_progress() {
       open STDOUT, ">&", $out_w or die "stdout: $!";
       open STDERR, ">&", $err_w or die "stderr: $!";
       close $out_w; close $err_w;
-      $ENV{FM_PROGRESS_MANAGED} = 1;
       exec @ARGV;
       exit 127;
     }
@@ -148,27 +143,43 @@ fm_run_perl_progress() {
     STDOUT->autoflush(1); STDERR->autoflush(1);
     my $streams = IO::Select->new($out_r, $err_r);
     my %sink = (fileno($out_r) => \*STDOUT, fileno($err_r) => \*STDERR);
-    my (%observed, $last_cpu);
+    my (%observed, $last_cpu, $blind, $warned);
     my $last_progress = clock_gettime(CLOCK_MONOTONIC);
     my $next_sample = 0;
     my $cadence = $idle / 4 < 1 ? $idle / 4 : 1;
+    my $proc = $ENV{FM_PROC_ROOT_OVERRIDE} || "/proc";
+    my $ticks = eval { POSIX::sysconf(POSIX::_SC_CLK_TCK()) } || 100;
     my $cpu = sub {
-      local $ENV{LC_ALL} = "C";
-      open my $ps, "-|", "ps", "-axo", "pid=,ppid=,time=,lstart=" or return;
       my (%children, %times);
-      while (my $line = <$ps>) {
-        my ($child, $parent, $clock, $identity) = split " ", $line, 4;
-        next unless defined $identity && $child =~ /^\d+$/ && $parent =~ /^\d+$/;
-        chomp $identity;
-        my $seconds = 0;
-        $seconds = $1 * 86400 if $clock =~ s/^(\d+)-//;
-        my $part = 0;
-        $part = $part * 60 + $_ for split /:/, $clock;
-        push @{$children{$parent}}, $child;
-        $times{$child} = [$seconds + $part, $identity];
+      # A Linux-compatible /proc (Git Bash/MSYS too, whose ps rejects these
+      # -o fields) is chosen by capability; stat fields 4, 14+15 and 22.
+      if (-r "$proc/$pid/stat" && opendir my $dir, $proc) {
+        for my $child (grep { /^\d+$/ } readdir $dir) {
+          open my $stat, "<", "$proc/$child/stat" or next;
+          my $line = <$stat>;
+          next unless defined $line && (my $at = rindex $line, ")") >= 0;
+          my @field = split " ", substr($line, $at + 1);
+          next unless @field >= 20 && $field[1] =~ /^\d+$/;
+          push @{$children{$field[1]}}, $child;
+          $times{$child} = [($field[11] + $field[12]) / $ticks, "proc $field[19]"];
+        }
+        closedir $dir;
+      } else {
+        local $ENV{LC_ALL} = "C";
+        open my $ps, "-|", "ps", "-axo", "pid=,ppid=,time=,lstart=" or return;
+        while (my $line = <$ps>) {
+          my ($child, $parent, $clock, $identity) = split " ", $line, 4;
+          next unless defined $identity && $child =~ /^\d+$/ && $parent =~ /^\d+$/;
+          chomp $identity;
+          my $seconds = 0;
+          $seconds = $1 * 86400 if $clock =~ s/^(\d+)-//;
+          my $part = 0;
+          $part = $part * 60 + $_ for split /:/, $clock;
+          push @{$children{$parent}}, $child;
+          $times{$child} = [$seconds + $part, $identity];
+        }
+        close $ps or return;
       }
-      close $ps or return;
-      return unless exists $times{$pid};
       my @todo = ($pid);
       while (@todo) {
         my $child = pop @todo;
@@ -219,11 +230,15 @@ fm_run_perl_progress() {
       my $now = clock_gettime(CLOCK_MONOTONIC);
       if ($now >= $next_sample) {
         my $sample = $cpu->();
-        $last_progress = $now if !defined $sample || !defined $last_cpu || $sample > $last_cpu;
+        $blind = !defined $sample;
+        if ($blind && !$warned++) {
+          print STDERR "cpu_telemetry_unavailable: neither /proc/<pid>/stat nor ps can sample process CPU on $^O; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled\n";
+        }
+        $last_progress = $now if defined $sample && (!defined $last_cpu || $sample > $last_cpu);
         $last_cpu = $sample if defined $sample;
         $next_sample = $now + $cadence;
       }
-      if ($now - $last_progress >= $idle) {
+      if ($now - $last_progress >= $idle && ($stopping || !$blind)) {
         if ($stopping) { kill "KILL", -$pid; }
         else {
           print STDERR "no_progress: command made no output or CPU progress\n";

@@ -214,6 +214,43 @@ done
   || fail "the latch repeated a known-wedged backend read: $(cat "$PROBE_LOG")"
 pass "after the first bound hit the sweep continues and names every remaining item without paying the bound again"
 
+# The same sweep under an outer progress owner, as the open-loops collector and
+# the home-summary refresh worker run it: the inner per-item bound still fires,
+# and the latch still spares every later item another wedged read.
+NESTED_OUT="$UNIT/nested-probe.out"
+NESTED_LOG="$UNIT/nested-probe.log"
+NESTED_START=$(date +%s)
+# shellcheck disable=SC2016  # The child shell expands its own arguments.
+PATH="$UNIT_FAKEBIN:$BASE_PATH" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+  FM_TEST_TASKS_AXI_HANG_LOG="$NESTED_LOG" \
+  python3 "$ROOT/bin/fm-duration.py" keep-going 60 -- bash -c '
+    set -u
+    . "$1/bin/fm-tasks-axi-lib.sh"
+    . "$1/bin/fm-backlog-transition-lib.sh"
+    for id in wedged-one wedged-two wedged-three; do
+      fm_backlog_row_probe "$2" "$id" && printf "unexpected-success\n"
+      printf "error:%s=%s\n" "$id" "$FM_BACKLOG_ROW_ERROR"
+    done
+  ' _ "$ROOT" "$UNIT/data" > "$NESTED_OUT" 2>&1
+NESTED_ELAPSED=$(( $(date +%s) - NESTED_START ))
+[ "$NESTED_ELAPSED" -lt "$BOUND_CEILING" ] \
+  || fail "the nested sweep took ${NESTED_ELAPSED}s, so the inner bound did not fire: $(cat "$NESTED_OUT")"
+grep -q '^unexpected-success$' "$NESTED_OUT" \
+  && fail "a nested hanging tasks-axi show reported a successful row read: $(cat "$NESTED_OUT")"
+case "$(sed -n 's/^error:wedged-one=//p' "$NESTED_OUT")" in
+  *wedged-one*bound*) ;;
+  *) fail "the nested timed-out read must name the item and its bound: $(cat "$NESTED_OUT")" ;;
+esac
+for SKIPPED in wedged-two wedged-three; do
+  case "$(sed -n "s/^error:$SKIPPED=//p" "$NESTED_OUT")" in
+    *"$SKIPPED"*skipped*) ;;
+    *) fail "the nested sweep must name $SKIPPED as skipped: $(cat "$NESTED_OUT")" ;;
+  esac
+done
+[ "$(cat "$NESTED_LOG")" = wedged-one ] \
+  || fail "the nested latch repeated a known-wedged backend read: $(cat "$NESTED_LOG")"
+pass "under an outer progress owner the per-item bound fires and the latch spares later items"
+
 # --- a bound hit is not absence ---------------------------------------------
 #
 # Turning a hang into a fast 124 reaches every caller that reads a non-zero row

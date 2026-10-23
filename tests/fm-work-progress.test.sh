@@ -285,6 +285,78 @@ def fleet():
             'slow task observation was discarded: ' + result.stdout)
 case('fleet_slow_cpu_task_observation_is_included', fleet)
 
+def summary_hung_lane():
+    home, env = fixture('summary-hung-lane')
+    for lane in ('quick', 'hung'):
+        (home / f'state/{lane}.meta').write_text(f'window=fm:fm-{lane}\nkind=scout\nharness=claude\n')
+    (home / 'data/backlog.md').write_text('## In flight\n- [ ] quick - Quick lane (repo: firstmate) (kind: scout)\n'
+                                          '- [ ] hung - Hung lane (repo: firstmate) (kind: scout)\n\n## Queued\n\n## Done\n')
+    # The hung lane's read never returns and does no work.
+    script(home / 'bin/fm-crew-state.sh', 'case "$1" in hung) exec sleep 600 ;; esac\n'
+           'printf "state: working · source: pane · %s lane observed\\n" "$1"\n')
+    script(home / 'fakebin/tmux', "printf 'fm-quick\\nfm-hung\\n'\n")
+    # The refresh worker's own owner is far longer than the lane bound.
+    env.update(FM_SNAPSHOT_CREW_STATE_TIMEOUT='2', FM_HOME_SUMMARY_TIMEOUT='60')
+    result = run([home / 'bin/fm-home-summary-refresh.sh'], env)
+    require(result.returncode == 0, f'one hung lane lost the publication: {result.returncode} {result.stderr}')
+    document = json.loads((home / 'state/home-summary.json').read_text())
+    states = {endpoint['id']: endpoint['state'] for endpoint in document['endpoints']}
+    require(states == {'quick': 'working', 'hung': 'unknown'}, 'lane states: ' + json.dumps(document['endpoints']))
+    require(document['invalidity'].get('ids') == ['hung'], 'only the hung lane is unavailable: ' + json.dumps(document))
+case('summary_worker_cuts_only_the_hung_lane', summary_hung_lane)
+
+# Git Bash/MSYS: a /proc-only host whose ps cannot sample. Each fixture process
+# publishes its own stat line (fields 4, 14+15 and 22) under FM_PROC_ROOT_OVERRIDE.
+proc_stat = ('my $d = "$ENV{FM_PROC_ROOT_OVERRIDE}/$$"; mkdir $d;'
+             'sub stat_line { open my $f, ">", "$d/stat.tmp" or die; '
+             'print $f "$$ (fixture) S 1 0 0 0 0 0 0 0 0 0 $_[0] 0 0 0 20 0 1 0 777\\n"; close $f; '
+             'rename "$d/stat.tmp", "$d/stat" or die; }')
+proc_programs = {
+    'still': proc_stat + 'stat_line(0); sleep 30;',
+    'growing': proc_stat + 'for my $i (1..16) { stat_line($i * 10); sleep 0.25; } exit 0;',
+    'blind': 'sleep 3; exit 0;',
+}
+
+def proc_runner(name, runner, program):
+    home, env = fixture(f'proc-{runner}-{name}')
+    proc = home / 'proc'
+    proc.mkdir()
+    tools = home / 'tools'
+    tools.mkdir()
+    script(tools / 'ps', 'exit 1\n')
+    env['FM_PROC_ROOT_OVERRIDE'] = str(proc)
+    if runner == 'python':
+        env['PATH'] = str(tools) + ':' + env['PATH']
+        command = [sys.executable, home / 'bin/fm-duration.py', 'keep-going', '1', '--',
+                   'perl', '-MTime::HiRes=sleep', '-e', program]
+    else:
+        for tool in ('bash', 'perl', 'dirname'):
+            (tools / tool).symlink_to(shutil.which(tool))
+        env['PATH'] = str(tools)
+        command = ['bash', '-c', '. "$1"; command -v python3 && exit 99; '
+                   'fm_run_progress 1 perl -MTime::HiRes=sleep -e "$2"',
+                   '_', home / 'bin/fm-timeout-lib.sh', program]
+    started = time.monotonic()
+    result = run(command, env)
+    return result, time.monotonic() - started
+
+def proc_sampler():
+    for runner in ('python', 'perl'):
+        result, elapsed = proc_runner('still', runner, proc_programs['still'])
+        require(result.returncode == 124 and elapsed < 25,
+                f'{runner}: a /proc-only tree with still CPU was not cut: {result.returncode} {elapsed:.1f}s {result.stderr}')
+        result, _ = proc_runner('growing', runner, proc_programs['growing'])
+        require(result.returncode == 0,
+                f'{runner}: a /proc-only tree with growing CPU was cut: {result.returncode} {result.stderr}')
+        result, elapsed = proc_runner('blind', runner, proc_programs['blind'])
+        warnings = [line for line in result.stderr.splitlines() if line.startswith('cpu_telemetry_unavailable:')]
+        require(result.returncode == 0 and elapsed >= 3, f'{runner}: work with no CPU sampler was stopped: '
+                f'{result.returncode} {elapsed:.1f}s {result.stderr}')
+        require(len(warnings) == 1 and 'hung work cannot be recovered' in warnings[0]
+                and ' on ' + sys.platform + ';' in warnings[0],
+                f'{runner}: missing one loud platform warning: {result.stderr}')
+case('proc_only_sampler_cuts_still_keeps_growing_and_warns_when_blind', proc_sampler)
+
 def load_collector():
     spec = importlib.util.spec_from_file_location('progress_collector', root / 'bin/fm_open_loops.py')
     module = importlib.util.module_from_spec(spec)
@@ -334,7 +406,6 @@ def perl_progress():
         require(executable is not None, 'required progress fallback tool missing: ' + name)
         (tools / name).symlink_to(executable)
     env['PATH'] = str(tools)
-    env.pop('FM_PROGRESS_MANAGED', None)
     cpu = '''my $pid = fork; die unless defined $pid;
 if (!$pid) { my $until = time + 4; while (time < $until) { my $n = 0; $n += $_*$_ for 1..1000; } exit 0; }
 waitpid($pid,0); print "subtree completed\\n";'''
@@ -354,7 +425,6 @@ def perl_stall():
     for name in ('bash', 'perl', 'ps', 'dirname'):
         (tools / name).symlink_to(shutil.which(name))
     env['PATH'] = str(tools)
-    env.pop('FM_PROGRESS_MANAGED', None)
     program = '$|=1; my $pid=fork; die unless defined $pid; if (!$pid) {sleep 120;exit;} print "$pid\\n"; sleep 120;'
     result = run(['bash', '-c', '. "$1"; command -v python3 && exit 99; fm_run_progress 1 perl -e "$2"',
                   '_', home / 'bin/fm-timeout-lib.sh', program], env)

@@ -1840,14 +1840,19 @@ assert identity
 time.sleep(120)
 ''')
 (code / 'bin/fm-crew-state.sh').chmod(0o755)
+# The nested per-lane read owns its own no-progress bound, far inside the
+# collector's: the hung lane is cut there and the snapshot source still answers.
 try:
     expired = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--heartbeat', '--json'],
-                             env=env, text=True, capture_output=True, timeout=60)
+                             env=dict(env, FM_SNAPSHOT_CREW_STATE_TIMEOUT='2'), text=True,
+                             capture_output=True, timeout=60)
     assert expired.returncode == 0, (expired.stdout, expired.stderr)
     report = json.loads(expired.stdout)
     assert not report['complete'], report
     coverage = [row for row in report['rows'] if row['category'] == 'coverage']
-    assert len(coverage) == 1 and 'fleet snapshot' in coverage[0]['evidence'], report
+    assert (len(coverage) == 1 and 'fleet snapshot' not in coverage[0]['evidence']
+            and 'worker: current-state command failed (exit 124)' in coverage[0]['evidence']), report
+    assert any(row['category'] == 'unanswered_question' for row in report['rows']), report
     assert (home / 'crew-pid').exists(), 'real snapshot must reach its nested bounded worker read'
     pid = int((home / 'crew-pid').read_text())
     identity = (home / 'crew-identity').read_text().strip()
@@ -1857,7 +1862,7 @@ try:
         if not alive or time.monotonic() >= until:
             break
         time.sleep(0.01)
-    assert not alive, 'snapshot nested timeout group must not outlive collector cancellation'
+    assert not alive, 'the nested no-progress cut must not leave the worker read running'
     assert not list(temporary.glob('fm-fleet-*')), list(temporary.iterdir())
     assert json.loads((home / 'state/open-loops.json').read_text()) == report
 finally:
@@ -1868,7 +1873,7 @@ finally:
                 os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-print('PASS: real snapshot cancellation reaps nested groups and removes temporary inventory', flush=True)
+print('PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory', flush=True)
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 import datetime as dt, json, os, re, shutil, subprocess, sys, time

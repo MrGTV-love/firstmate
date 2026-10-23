@@ -231,13 +231,12 @@ class Collector:
 
     def run(self, args, cwd=None, missing_ok=False, env=None):
         command = [str(a) for a in args]
-        child_env = dict(self.env if env is None else env, FM_PROGRESS_MANAGED="1")
-        child = subprocess.Popen(command, cwd=cwd, env=child_env,
+        child = subprocess.Popen(command, cwd=cwd, env=self.env if env is None else env,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
                                  stdin=subprocess.DEVNULL, start_new_session=True)
         try:
-            # This owner sees the entire source tree. Inner shell readers
-            # inherit FM_PROGRESS_MANAGED so sampler CPU cannot mask a stall.
+            # Inner progress-owned reads keep their own bounds, so one hung
+            # lane is cut there and this source still answers.
             stdout, stderr = COMMUNICATE_PROGRESS(child, self.timeout)
         except BaseException:
             self.stop_command(child)
