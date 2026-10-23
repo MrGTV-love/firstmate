@@ -161,7 +161,7 @@ SH
 # bound must outlive that kill and still interrupt its watcher, or the orphaned
 # watcher keeps the lock and every later checkpoint reports it as foreign.
 test_group_killed_checkpoint_still_stops_its_watcher() {
-  local home checkpoint_pid watcher_pid status started deadline now
+  local home checkpoint_pid watcher_pid status started deadline now gone
   home=$(make_home group-killed)
   TMPDIR="$home" FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
     perl -e 'setpgrp(0, 0); exec @ARGV' "$CHECKPOINT" --seconds 180 \
@@ -178,12 +178,14 @@ test_group_killed_checkpoint_still_stops_its_watcher() {
   kill -KILL -- "-$checkpoint_pid"
   wait "$checkpoint_pid" 2>/dev/null || true
   while :; do
+    gone=1
+    kill -0 "$watcher_pid" 2>/dev/null && gone=0
     now=$(monotonic_ms)
     if [ "$now" -gt "$deadline" ]; then
       kill -KILL "$watcher_pid" 2>/dev/null || true
       fail "the watcher outlived its group-killed checkpoint's ${GROUP_KILL_LIMIT_MS}ms cleanup limit ($((now - started))ms)"
     fi
-    kill -0 "$watcher_pid" 2>/dev/null || break
+    [ "$gone" -eq 1 ] && break
     sleep 0.05
   done
   printf '# group-kill ordinary stop_ms=%s\n' "$((now - started))"
