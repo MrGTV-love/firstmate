@@ -5,7 +5,8 @@
 # actually launched, and the flag-off launch writes none. The capture runs detached, so
 # every positive check polls the store with a deadline. A typed dispatch whose resolver
 # already logged its row, and a relaunch, add no second row; a re-resolve supersedes the
-# earlier resolver row, and a stale or edited-brief marker gets its own row. The TypeSafe key lives only
+# earlier resolver row, and a stale or edited-brief marker gets its own launch row that
+# supersedes the resolver row, so the report counts each dispatch once. The TypeSafe key lives only
 # in the home's .env, and the scripted Jev endpoint refuses any other bearer, so an
 # accepted pick proves the hook resolved it. quota-axi is a fixture. This is the launch
 # path that bypasses the typed resolver, so it is the capture path this test exists to prove.
@@ -246,16 +247,16 @@ gate_field() {  # <row-id> <key>
 live_count() {  # <task-key>: rows the report counts, i.e. not superseded
   python3 -I -c 'import json,sqlite3,sys; print(sum("superseded_by" not in json.loads(g or "{}") for (g,) in sqlite3.connect(sys.argv[1]).execute("select gates from dispatch_log where task_key=?", (sys.argv[2],))))' "$DATA/aa.sqlite" "$1"
 }
-report_no_route() {
+report_runs() {  # the dispatches --report counts: the sum of its runs column
   FM_MODEL_PICKER_DATA="$DATA" bash "$ROOT/bin/fm-model-picker-shadow.sh" --report 2>/dev/null \
-    | sed -n 's/.*; \([0-9][0-9]*\) rows have no rule route\..*/\1/p'
+    | sed -n '/^work_type /,/^Denominators:/p' | sed '1d;$d' | cut -c35- | awk '{s+=$1} END {print s+0}'
 }
 AMBIGUOUS='{"status":"ambiguous","candidates":[]}'
 
 # Two resolves for one task then one launch: the first row is superseded, the second
 # carries the launched route, and the report counts the dispatch once.
-no_route_before=$(report_no_route)
-[ -n "$no_route_before" ] || fail 'the report states its no-rule-route count'
+runs_before=$(report_runs)
+[ "$runs_before" -gt 0 ] || fail 'the report counts the dispatches logged so far'
 resolver_observe shadow-rerun ambiguous "$AMBIGUOUS"
 first=$(row_field id shadow-rerun)
 resolver_observe shadow-rerun ambiguous "$AMBIGUOUS"
@@ -268,9 +269,11 @@ assert_equals 'claude:opus' "$(row_field rule_worker shadow-rerun)" 'the newest 
 [ "$(gate_field "$second" launch_attached)" != missing ] || fail 'the launch attached to the newest resolver row'
 assert_equals missing "$(gate_field "$first" launch_attached)" 'the superseded row is not attached'
 [ ! -e "$DATA/resolver-rows/shadow-rerun" ] || fail 'the spawn hook consumed the re-resolve marker'
-assert_equals "$no_route_before" "$(report_no_route)" 'the report leaves the superseded row out'
+assert_equals "$((runs_before + 1))" "$(report_runs)" 'the report counts the re-resolved dispatch once'
 
-# A marker older than one hour is deleted and the launch writes its own row.
+# A marker older than one hour is deleted and the launch writes its own row, which
+# supersedes the stale resolver row so the dispatch still counts once.
+runs_before=$(report_runs)
 resolver_observe shadow-stale ambiguous "$AMBIGUOUS"
 stale=$(row_field id shadow-stale)
 python3 -I -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["created_at"]-=7200; open(p,"w").write(json.dumps(d))' \
@@ -282,8 +285,13 @@ assert_equals 2 "$(row_count shadow-stale)" 'a stale marker leaves the launch it
 assert_equals 'claude:opus' "$(row_field rule_worker shadow-stale)" 'the launch row carries the launched route'
 assert_equals missing "$(gate_field "$stale" launch_attached)" 'the stale resolver row is not attached'
 assert_equals '' "$(python3 -I -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select rule_worker from dispatch_log where id=?", (int(sys.argv[2]),)).fetchone()[0] or "")' "$DATA/aa.sqlite" "$stale")" 'the stale resolver row keeps its own route'
+assert_equals "$(row_field id shadow-stale)" "$(gate_field "$stale" superseded_by)" 'the launch row supersedes the stale resolver row'
+assert_equals 1 "$(live_count shadow-stale)" 'exactly one non-superseded row for the stale-marker dispatch'
+assert_equals "$((runs_before + 1))" "$(report_runs)" 'the report counts the stale-marker dispatch once'
 
-# A marker written for a brief that changed before the launch is not this dispatch's.
+# A marker written for a brief that changed before the launch does not attach; the
+# launch row supersedes that resolver row so the dispatch still counts once.
+runs_before=$(report_runs)
 resolver_observe shadow-edited ambiguous "$AMBIGUOUS"
 edited=$(row_field id shadow-edited)
 printf '%s\n' 'One more detail.' >> "$HOME_DIR/data/shadow-edited/brief.md"
@@ -291,5 +299,8 @@ spawn_hook shadow-edited --model opus --effort high
 assert_equals 2 "$(row_count shadow-edited)" 'an edited-brief marker leaves the launch its own row'
 [ ! -e "$DATA/resolver-rows/shadow-edited" ] || fail 'the spawn hook deleted the edited-brief marker'
 assert_equals missing "$(gate_field "$edited" launch_attached)" 'the edited-brief resolver row is not attached'
+assert_equals "$(row_field id shadow-edited)" "$(gate_field "$edited" superseded_by)" 'the launch row supersedes the edited-brief resolver row'
+assert_equals 1 "$(live_count shadow-edited)" 'exactly one non-superseded row for the edited-brief dispatch'
+assert_equals "$((runs_before + 1))" "$(report_runs)" 'the report counts the edited-brief dispatch once'
 
 pass 'spawn capture: one row per launched dispatch carrying the launched route; a typed launch attaches to its fresh same-brief resolver row; a re-resolve supersedes; flag off and relaunch add none'

@@ -966,22 +966,22 @@ def mark_row_id(doc):
 
 
 def take_mark(mark, identity):
-    """Consume the resolver's marker. The resolver row id when the marker was written for
-    this same brief within RESOLVER_MARK_FRESH_SECONDS; otherwise None, and the stale
-    marker is gone, so the launch gets its own row."""
+    """Consume the resolver's marker: its row id, and whether it was written for this same
+    brief within RESOLVER_MARK_FRESH_SECONDS. A stale marker's row is superseded by the
+    launch's own row, so the dispatch still counts once."""
     doc = read_mark(mark)
     try:
         mark.unlink()
     except OSError:
-        return None
-    if doc is None or identity is None \
+        return None, False
+    row_id = mark_row_id(doc)
+    if row_id is None or identity is None \
             or any(doc.get(name) != value for name, value in identity.items()):
-        return None
+        return row_id, False
     created = doc.get("created_at")
-    if not isinstance(created, (int, float)) or isinstance(created, bool) \
-            or not 0 <= time.time() - created <= RESOLVER_MARK_FRESH_SECONDS:
-        return None
-    return mark_row_id(doc)
+    fresh = isinstance(created, (int, float)) and not isinstance(created, bool) \
+        and 0 <= time.time() - created <= RESOLVER_MARK_FRESH_SECONDS
+    return row_id, fresh
 
 
 def parse_gates(text):
@@ -1081,9 +1081,10 @@ def observe(args, key, helper, data_root):
     task_key = task_key_for(brief) if brief else None
     mark = resolver_mark_path(data_root, task_key)
     identity = brief_identity(brief) if mark is not None else None
+    marked_row = None
     if launch:
-        dispatch_id = take_mark(mark, identity) if mark is not None else None
-        if dispatch_id is not None and attach_launch(data_root, dispatch_id, rule):
+        marked_row, fresh = take_mark(mark, identity) if mark is not None else (None, False)
+        if fresh and attach_launch(data_root, marked_row, rule):
             return 0
         mark = None
     elif identity is None:
@@ -1091,11 +1092,13 @@ def observe(args, key, helper, data_root):
 
     def record(row):
         dispatch_id = write_row(data_root, row)
-        if dispatch_id is None or mark is None:
+        if dispatch_id is None:
             return
-        previous = mark_row_id(read_mark(mark))
+        previous = mark_row_id(read_mark(mark)) if mark is not None else marked_row
         if previous is not None:
             supersede(data_root, previous, dispatch_id)
+        if mark is None:
+            return
         try:
             mark.parent.mkdir(parents=True, exist_ok=True)
             mark.write_text(json.dumps(dict(identity, row_id=dispatch_id, created_at=time.time()),
@@ -1413,9 +1416,10 @@ Observe one dispatch in shadow mode. Never prints or returns a dispatch route.
   --project NAME     project name
   --hook spawn       launch-path observation: when the resolver logged this task within
                      the last hour from the same brief, consume its marker and set that
-                     row's rule route to the launched route instead of writing a row; a
-                     run without it leaves that marker and supersedes the task's
-                     earlier resolver row
+                     row's rule route to the launched route instead of writing a row;
+                     a stale marker's row is superseded by the launch's own row; a run
+                     without it leaves that marker and supersedes the task's earlier
+                     resolver row
   --data-root PATH   data root overriding FM_MODEL_PICKER_DATA
 
 The data root is FM_MODEL_PICKER_DATA, else <FM_DATA_OVERRIDE>/model-picker, else

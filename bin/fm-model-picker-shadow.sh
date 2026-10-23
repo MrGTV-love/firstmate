@@ -18,7 +18,8 @@
 #   brief's real path and content hash, and its creation time, and flags the task's earlier
 #   resolver row superseded; bin/fm-model-picker-shadow-spawn.sh passes --hook spawn, which
 #   consumes that marker and, when it is under an hour old and names the launch brief, sets
-#   that row's rule route to the route that actually launched, so one dispatch is one row.
+#   that row's rule route to the route that actually launched; otherwise its own launch row
+#   supersedes the row the stale marker named, so one dispatch counts once.
 # --report prints the per-work-type shadow disagreement report from aa.sqlite. It is routing
 #   evidence, never outcome labels, and prints "0 shadow dispatches logged" for an empty log.
 # --check-routes is read-only: it resolves every concrete route in config/crew-dispatch.json

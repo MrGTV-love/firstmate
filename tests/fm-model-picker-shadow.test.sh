@@ -631,14 +631,30 @@ cols=$(python3 -I -c 'import sqlite3,sys;print(" ".join(r[1] for r in sqlite3.co
 check 'grep -q "confidence_band" <<<"$cols"' "the report applied the additive migration"
 finish
 
+# report_runs: the dispatches --report counts, the sum of its runs column.
+report_runs() {
+  FM_MODEL_PICKER_DATA="$DATA" bash "$BIN" --report 2>/dev/null \
+    | sed -n '/^work_type /,/^Denominators:/p' | sed '1d;$d' | cut -c35- | awk '{s+=$1} END {print s+0}'
+}
+# parallel_briefs <prefix>: one distinct task brief per parallel dispatch.
+parallel_briefs() {
+  local i
+  for i in 1 2 3 4 5; do
+    mkdir -p "$TMP_ROOT/home/data/$1-$i"
+    cp "$TMP_ROOT/brief.md" "$TMP_ROOT/home/data/$1-$i/brief.md"
+  done
+}
+
 begin "five parallel dispatches write five rows"
 settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
 rm -f "$DATA/aa.sqlite"
+parallel_briefs par
 pids=()
 for i in 1 2 3 4 5; do
   ( FM_HOME="$TMP_ROOT/home" FM_MODEL_PICKER_DATA="$DATA" FM_MODEL_PICKER_SHADOW=1 \
       FM_TEST_SEAM=1 FM_TYPESAFE_TEST_ENDPOINT="$ENDPOINT" \
-      bash "$BIN" --observe --brief "$TMP_ROOT/brief.md" --task-text "$TMP_ROOT/brief.md" \
+      bash "$BIN" --observe --brief "$TMP_ROOT/home/data/par-$i/brief.md" \
+        --task-text "$TMP_ROOT/home/data/par-$i/brief.md" \
         --rules "$TMP_ROOT/rules-base.json" --result "$TMP_ROOT/result.json" \
         --quota "$TMP_ROOT/quota.json" --status clear \
         3< <(printf 'synthetic-canary-key\n') >"$TMP_ROOT/par.$i.out" 2>"$TMP_ROOT/par.$i.err" ) &
@@ -649,6 +665,7 @@ count=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).exe
 check '[ "$count" = 5 ]' "five parallel dispatches give five rows"
 accepted=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where picker_status=\"accepted\"").fetchone()[0])' "$DATA/aa.sqlite")
 check '[ "$accepted" = 5 ]' "all five picks are accepted"
+check '[ "$(report_runs)" = 5 ]' "the report counts five parallel dispatches"
 finish
 
 begin "a migration that finds its column already added by another writer still completes"
@@ -679,11 +696,13 @@ finish
 begin "five parallel first opens of a Phase-1 store write five rows"
 settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
 phase1_store
+parallel_briefs par1
 pids=()
 for i in 1 2 3 4 5; do
   ( FM_HOME="$TMP_ROOT/home" FM_MODEL_PICKER_DATA="$DATA" FM_MODEL_PICKER_SHADOW=1 \
       FM_TEST_SEAM=1 FM_TYPESAFE_TEST_ENDPOINT="$ENDPOINT" \
-      bash "$BIN" --observe --brief "$TMP_ROOT/brief.md" --task-text "$TMP_ROOT/brief.md" \
+      bash "$BIN" --observe --brief "$TMP_ROOT/home/data/par1-$i/brief.md" \
+        --task-text "$TMP_ROOT/home/data/par1-$i/brief.md" \
         --rules "$TMP_ROOT/rules-base.json" --result "$TMP_ROOT/result.json" \
         --quota "$TMP_ROOT/quota.json" --status clear \
         3< <(printf 'synthetic-canary-key\n') >"$TMP_ROOT/par1.$i.out" 2>"$TMP_ROOT/par1.$i.err" ) &
@@ -692,6 +711,7 @@ done
 wait "${pids[@]}"
 count=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log where mode=\"shadow\" and picker_status=\"accepted\"").fetchone()[0])' "$DATA/aa.sqlite")
 check '[ "$count" = 5 ]' "five parallel first opens of a Phase-1 store give five accepted rows: $(cat "$TMP_ROOT"/par1.*.err)"
+check '[ "$(report_runs)" = 5 ]' "the report counts five parallel first-open dispatches"
 finish
 
 [ "$FAILED" -eq 0 ] || fail "$FAILED shadow picker case(s) failed"
