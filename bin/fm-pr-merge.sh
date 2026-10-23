@@ -16,7 +16,7 @@
 # default_merge_style, read live, and a merge is refused when it cannot be read.
 # A GitHub merge is refused unless every pre-merge condition holds, each read
 # live at merge time rather than taken from recorded metadata: the pull request
-# is open, not a draft, mergeable, free of conflicts, every unwaived check
+# is open, not a draft, not REVIEW_REQUIRED, mergeable, free of conflicts, every unwaived check
 # is green at the exact current head commit, where github_checks_not_green below
 # owns what makes a check green and judges each one by its current run, and
 # every unwaived check the forge requires for the base branch has reported at
@@ -1036,13 +1036,13 @@ github_verify_mergeable() {
   local json fields line red name covered missing unreported producers runs rollup required
   local total=0 named=0 refusals='' mergeable_refusal='' source_unreadable=false
   local other_refusals=''
-  local state='' draft='' mergeable='' merge_state='' live_head='' base=''
+  local state='' draft='' review_decision='' mergeable='' merge_state='' live_head='' base=''
   local kind action req_text required_known=true
   local any_pending=false any_failed=false
   local -a unwaived_red=() unwaived_missing=()
   FM_PR_GREEN_HEAD_BLOCKED=false
 
-  if ! json=$(gh pr view "$URL" --json state,isDraft,mergeable,mergeStateStatus,headRefOid,baseRefName 2>/dev/null) \
+  if ! json=$(gh pr view "$URL" --json state,isDraft,reviewDecision,mergeable,mergeStateStatus,headRefOid,baseRefName 2>/dev/null) \
     || [ -z "$json" ]; then
     echo "error: could not read the GitHub pull request state before merging" >&2
     return 4
@@ -1050,6 +1050,7 @@ github_verify_mergeable() {
   if ! fields=$(printf '%s' "$json" | jq -r '
       if type == "object" then
         "state=" + ((.state // "") | tostring),
+        "review_decision=" + ((.reviewDecision // "") | tostring),
         "mergeable=" + ((.mergeable // "") | tostring),
         "merge_state=" + ((.mergeStateStatus // "") | tostring),
         "head=" + ((.headRefOid // "") | tostring),
@@ -1064,6 +1065,7 @@ github_verify_mergeable() {
     total=$((total + 1))
     case "$line" in
       state=*) state=${line#state=} ;;
+      review_decision=*) review_decision=${line#review_decision=} ;;
       mergeable=*) mergeable=${line#mergeable=} ;;
       merge_state=*) merge_state=${line#merge_state=} ;;
       head=*) live_head=${line#head=} ;;
@@ -1074,7 +1076,7 @@ github_verify_mergeable() {
   done <<FIELDS
 $fields
 FIELDS
-  if [ "$named" -ne 5 ] || [ "$total" -ne 5 ] || [ -z "$base" ]; then
+  if [ "$named" -ne 6 ] || [ "$total" -ne 6 ] || [ -z "$base" ]; then
     echo "error: could not read the GitHub pull request state before merging" >&2
     return 4
   fi
@@ -1110,6 +1112,9 @@ FIELDS
   esac
   [ "$draft" = false ] \
     || refusals="$refusals  - the pull request is a draft
+"
+  [ "$review_decision" != REVIEW_REQUIRED ] \
+    || refusals="$refusals  - reviewDecision is REVIEW_REQUIRED (a review is required at this head)
 "
   [ "$mergeable" = MERGEABLE ] \
     || mergeable_refusal="  - mergeable is \"${mergeable:-unreadable}\", not MERGEABLE
@@ -1286,6 +1291,7 @@ github_read_outcome_with_gh() {
     total=$((total + 1))
     case "$line" in
       state=*) state=${line#state=} ;;
+      review_decision=*) review_decision=${line#review_decision=} ;;
       merged=*) merged=${line#merged=} ;;
       queued=*) queued=${line#queued=} ;;
       base=*) base=${line#base=} ;;

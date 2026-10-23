@@ -2987,6 +2987,31 @@ test_github_zero_exit_queue_required_refuses_with_exact_retry
 test_github_closed_unqueued_outcome_omits_retry_flags
 test_github_agreeing_queue_rules_keep_retry_guidance
 test_github_conflicting_queue_rules_report_ambiguity
+test_github_review_required_refuses() {
+  local case_dir rc head
+  head=5555555555555555555555555555555555555555
+  case_dir=$(make_case github-review-required)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" "$head"
+  jq -c '.reviewDecision = "REVIEW_REQUIRED"' "$case_dir/github-view.json" > "$case_dir/github-view.tmp"
+  mv "$case_dir/github-view.tmp" "$case_dir/github-view.json"
+  : > "$case_dir/gh-axi.log"
+  : > "$case_dir/gh.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/86 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "github-review-required: a PR awaiting review must refuse"
+  assert_grep 'reviewDecision is REVIEW_REQUIRED' "$case_dir/stderr" \
+    "github-review-required: the refusal did not name the review requirement"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "github-review-required: gh pr merge ran on a PR awaiting review"
+  pass "fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED"
+}
+
 test_verified_merge_records_pr_and_head
 test_pr_metadata_is_recorded_before_the_forge_call
 test_merge_failure_propagates_after_recording
@@ -5106,3 +5131,4 @@ test_green_head_refusal_names_each_check_and_its_repair
 test_away_waiver_refusal_names_the_posture_and_the_attended_path
 test_held_task_refusal_prints_the_exact_release_command
 test_guard_events_record_the_merge_decisions_without_changing_them
+test_github_review_required_refuses
