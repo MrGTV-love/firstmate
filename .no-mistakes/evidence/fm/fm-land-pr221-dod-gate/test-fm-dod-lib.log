@@ -1,0 +1,38 @@
+ok - CRLF criteria and exclusions survive; NUL briefs and external criteria refuse explicitly
+ok - verification plans carry actual criteria, exclusions and rubric without broadening intent
+ok - missing shared rubric refuses verification-plan construction
+ok - fenced DoD-file examples do not refuse actual criteria
+ok - unfenced DoD-file directives after fenced examples remain authoritative
+ok - scout done: is not gated
+ok - unpushed ship done: is refused
+ok - no-mistakes pre-validation done: is not gated
+ok - named head on a remote-tracking ref is accepted
+ok - a moved remote branch that lacks the named head is refused
+ok - a 40-hex token in the note is not the named head
+ok - a recorded merged PR satisfies the gate after prune
+ok - the merged-PR short-circuit applies only to the recorded PR the done line names
+ok - a forge-recorded head for the named PR is accepted without a local object
+ok - a direct-PR recorded head does not cover a later unpushed commit
+ok - CI-ready notes require checks green and an actual PR reference
+ok - no-mistakes CI-ready done: with extra text is gated
+ok - keyed and spaced ship done: lines are gated
+ok - local-only linked named branch is reachable from the project clone
+ok - local-only detached HEAD only in the disposable copy is refused
+ok - standalone local-only done: requires the named head in the project clone
+ok - non-done lines are not gated
+ok - fenced and indented Captain lines are not authorized intent
+ok - PR-based DoD draft check uses gh-axi
+ok - a task owns several PRs only on positive evidence in its own records
+ok - promotion keeps a scout's recorded base branch and refuses local-only for it
+ok - the dispatch verdict lists every leftover Task and Definition of Done token in one pass
+ok - a fully filled brief passes the dispatch verdict with no output
+ok - the dispatch verdict reports an empty DoD file with its path
+ok - the dispatch verdict lists every token a DoD file still holds
+ok - the task-only dispatch scope skips the Definition of Done and the full scope checks it
+ok - promotion lists every Task placeholder in one refusal with its scout-time boundary and the repair
+ok - external-forge direct-PR is refused with the exact supported-forge diagnostic
+ok - external-forge direct-PR instructions are refused without publishing a brief
+ok - worker role names the skill and its fallback skill file
+ok - worker role renders the shared rubric and refuses without it
+all fm-dod-lib tests passed
+bash tests/$t.test.sh  4.09s user 9.32s system 92% cpu 14.507 total

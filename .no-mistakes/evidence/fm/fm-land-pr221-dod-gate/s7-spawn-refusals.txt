@@ -1,0 +1,22 @@
+== ship ask-10282 intent: See /tmp/report.md.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.9OLcZB
+error: /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/ask-10282/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+rc=1
+brief.md
+(no state for ask-10282)
+== ship ask-27784 intent: https://example.test/report
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.9OLcZB
+error: /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/ask-27784/brief.md has no concrete ask (only file or report pointers, with no ask written in); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+rc=1
+brief.md
+(no state for ask-27784)
+== ship ask-3223 intent: <!-- pointer only -->
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.9OLcZB
+error: /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/ask-3223/brief.md has no concrete ask (no substantive ask after blank lines, headings, fence delimiters and standalone comments); write the requested change or investigation and the substance of any referenced report in ## Captain's intent, then rerun fm-spawn.sh to complete dispatch; a file or report pointer alone is not proof of the ask
+rc=1
+brief.md
+(no state for ask-3223)
+== scout ask-heading-only spec holds only the ### Out of scope scaffold heading
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.9OLcZB
+error: /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/ask-heading-only/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn; write the requested change or investigation and the substance of any referenced report, then rerun fm-spawn.sh to complete dispatch
+rc=1

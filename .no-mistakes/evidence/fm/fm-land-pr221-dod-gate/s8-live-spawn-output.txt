@@ -1,0 +1,8 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.5J1fRg
+skill selection for live-ship: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned live-ship harness=claude kind=ship mode=no-mistakes yolo=off window=primary:fm-live-ship worktree=/Users/charlesabrooker/tmp/fm-lab.5J1fRg/projects/demo/.treehouse/demo-cdbd4b/1/demo
+SPAWN_RC=0

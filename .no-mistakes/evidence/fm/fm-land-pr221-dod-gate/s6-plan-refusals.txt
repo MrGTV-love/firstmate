@@ -1,0 +1,32 @@
+== DoD file CRLF stripped? (count of CR bytes in plan)
+       0
+== CRLF brief
+rc=0 CR bytes=       0
+2
+== NUL brief
+error: malformed input /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/edge/nul.md: NUL bytes are not supported; replace them with text or line endings
+rc=1
+== NUL DoD file
+error: malformed input /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/edge/criteria.md: NUL bytes are not supported; replace them with text or line endings
+rc=1
+== missing DoD file
+error: verification-plan DoD file is not a readable file: /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/edge/criteria.md
+rc=1
+== missing brief
+error: verification-plan brief is not a readable file: /Users/charlesabrooker/tmp/fm-lab.9OLcZB/data/edge/nope.md
+rc=1
+== missing rubric (copied code root)
+error: shared review rubric is not a readable file: /Users/charlesabrooker/tmp/fm-coderoot.KTqC/docs/review-rubric.md; restore it before building the verification plan
+rc=1
+1
+rc(with rubric)=
+== bad usage
+error: use bash bin/fm-dod-lib.sh --verification-plan <brief>
+rc=2
+error: use bash bin/fm-dod-lib.sh --verification-plan <brief> (or --help)
+rc=2
+== help
+Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>
+Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.
+CRLF input is accepted; unreadable or NUL-bearing input refuses construction; legacy briefs state absent criteria and unrecognized exclusions.
+rc=0

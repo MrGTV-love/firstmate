@@ -1,0 +1,37 @@
+  What I did:
+  1. I checked that I am in my own task worktree, not the main checkout. I am.
+  2. I made the branch fm/live-ship.
+  3. I ran no-mistakes doctor. It found no problems and did not ask for init.
+  4. I added Lab check passed. to the end of README.md, after one blank line. The file still uses the same format.
+  5. I committed the change as dcc57c8 on fm/live-ship.
+  6. I sent a done: line to /Users/charlesabrooker/tmp/fm-lab.5J1fRg/state/live-ship.status.
+  Did it work: Yes.
+  - README.md is the only file that changed.
+  - The file now ends with Lab check passed.
+  - The worktree is clean.
+  - I started no services.
+  - The steering inbox has no new messages.
+  What happens now: You do not need to do anything. Firstmate will tell me when to run /no-mistakes. That run builds the check plan, then pushes and opens the PR. I did not push.
+✻ Baked for 56s · done 2:58 PM
+❯ : Firstmate instruction waiting: 'live-ship.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+  Ran 3 shell commands
+⏺ I did what message 001.msg asked. I did not start no-mistakes, and I did not push.
+  What I did:
+  1. I ran the plan build command from the brief, as written. It worked (exit 0).
+  2. It wrote /Users/charlesabrooker/tmp/fm-lab.5J1fRg/data/live-ship/verification-plan.md (2365 bytes).
+  3. I moved 001.msg to live-ship.inbox/handled/. That move tells Firstmate I got the message.
+  The out-of-scope list from that file:
+  ## Out-of-scope list
+  - EXCL-1: Do not touch any other file.
+  State now:
+  - The worktree is still clean.
+  - The branch fm/live-ship is still at commit dcc57c8.
+  - I did not add a status line, because the message said to stop.
+  - The file 001.msg.consistency.json is still in the inbox. The rule says to move only the .msg file, so I left it there.
+  What you do now: Nothing. I stopped here, as the message said. I am waiting for the next message from Firstmate.
+✻ Brewed for 23s · done 2:59 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 5% 50k/1.0M fm/live-ship demo:958e4404
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent

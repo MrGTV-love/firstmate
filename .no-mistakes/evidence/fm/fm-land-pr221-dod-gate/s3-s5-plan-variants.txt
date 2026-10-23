@@ -1,0 +1,49 @@
+===== inline-oos
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+Task Definition Of Done: absent from this brief.
+
+## Out-of-scope list
+Out-of-scope list: no recognized `### Out of scope` subsection or column-0 `Out of scope:` paragraph was found in this brief; check the Firstmate spec for inline exclusions.
+
+rc=
+===== legacy-para
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+Task Definition Of Done: absent from this brief.
+
+## Out-of-scope list
+Out of scope: dashboard redesign,
+- theme changes
+- icon set
+
+rc=
+===== dodfile
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+DOD-FILE-CONTENT: M1 the badge refreshes.
+
+## Out-of-scope list
+- EXCL-A
+
+rc=
+===== promoted
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+This task was promoted from a scout: the Task Definition Of Done and Out-of-scope list below are scout-time context from the original scout brief, not ship criteria.
+Where they conflict with the promoted ship intent, the promoted ship intent governs.
+
+## Task Definition Of Done (scout-time context)
+SCOUT-DOD: report names threshold.
+
+## Out-of-scope list (scout-time context)
+- SCOUT-EXCL
+
+rc=

@@ -1,0 +1,6 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.5J1fRg/data/projects.md; defaulting demo to no-mistakes off
+promoted live-scout to ship mode=no-mistakes yolo=off (teardown protection restored)
+wrote ship instructions for mode=no-mistakes: /Users/charlesabrooker/tmp/fm-lab.5J1fRg/data/live-scout/ship-instructions.md
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.5J1fRg bin/fm-send.sh fm-live-scout "$(cat /Users/charlesabrooker/tmp/fm-lab.5J1fRg/data/live-scout/ship-instructions.md)"
+PROMOTE_RC=0
