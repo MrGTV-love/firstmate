@@ -136,17 +136,18 @@
 # Exit 3 whose one JSON document refuses with cleanup_lease_conflict or
 # cleanup_skipped_live_or_unknown, which the driver names temporary, while the same
 # copy still holds exactly the lock bytes the plan saw, released nothing: the run
-# exits 1 with the driver's words, removes the preserve directory this run built
-# (the copy still holds its originals) and the receipt, so the next run plans,
-# preserves and executes that copy again without adding a second preserve. Such a
-# refusal after the lock changed or went is a partial release and is retained like
-# any other failure, with its preserve. A proof that fails after preservation
-# discards this run's preserve the same way, and only while the same copy still
-# holds the plan's lock bytes. Either way the preserve is discarded only while
-# every preserved file, symlink and directory is still in the copy with the same
-# bytes or target; when any original is missing, different or cannot be compared,
-# the preserve stays, and a temporary execute refusal is then retained like any
-# other failure. A preserve from an earlier run is never removed or replaced.
+# exits 1 with the driver's words, removes the receipt and discards the preserve
+# directory this run built, so the next run plans, preserves and executes that copy
+# again without adding a second preserve. Such a refusal after the lock changed or
+# went is a partial release and is retained like any other failure, with its
+# preserve. A proof that fails after preservation writes no receipt and discards
+# this run's preserve the same way, and only while the same copy still holds the
+# plan's lock bytes. Either way the preserve is discarded only while every
+# preserved file, symlink and directory is still in the copy with the same bytes
+# or target; when any original is missing, different or cannot be compared, the
+# preserve stays because it holds the old content, the copy is still retried by
+# the next run, and that run adds a new preserve only because the content changed.
+# A preserve from an earlier run is never removed or replaced.
 # Other execution failures exit 1, record the driver's text, and retain the copy.
 # Never a force flag, hand unlock, lock-file write, recursive deletion of a copy,
 # or Treehouse call. Only the preservation library cleans its own staging data;
@@ -1252,7 +1253,7 @@ discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
 # REFUSED line on stderr, because the library's envelope names a teardown command
 # built from the release id, which is no task id.
 teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity kept
   shown=$(fm_refuse_text "$copy")
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
   if ! identity=$(copy_identity "$copy"); then
@@ -1281,11 +1282,14 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
     words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
-    if execute_refusal_is_temporary "$rc" \
-      && discard_run_preserve "$copy" "$identity" "$7" "$3" \
-      && rm -f -- "$(retained_receipt "$copy")"; then
-      echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so this run's preserve was discarded and the next sweep run plans it again." >&2
-      return 1
+    if execute_refusal_is_temporary "$rc" && copy_still_holds "$copy" "$identity" "$7"; then
+      kept="this run's preserve was discarded"
+      discard_run_preserve "$copy" "$identity" "$7" "$3" \
+        || kept="this run's preserve stays, because not every preserved original is still unchanged in the copy"
+      if rm -f -- "$(retained_receipt "$copy")"; then
+        echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words; the driver names this refusal temporary and released nothing, so $kept and the next sweep run plans it again." >&2
+        return 1
+      fi
     fi
     record_driver_retention "$copy" "$7" "$identity" "exit $rc: $words" || true
     echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words" >&2

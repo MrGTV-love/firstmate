@@ -883,11 +883,22 @@ SH
   chmod +x "$FAKEBIN/cp"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 1 ] || fail "a temporary refusal after an overwrite should exit 1, got $RC: $OUT"
-  assert_not_contains "$OUT" "plans it again" "a copy whose original changed after preservation was reported retryable"
+  assert_contains "$OUT" "plans it again" "a temporary refusal after an overwrite was not reported retryable"
+  assert_contains "$OUT" "this run's preserve stays" "the report did not say the old content was kept"
   assert_equals 'new owner state' "$(cat "$(copy_path locked)/unique.dat")" "the copy's changed ignored file was touched"
   assert_equals 'durable state' "$(cat "$(preserved_unique)")" "a temporary refusal discarded the only saved original"
+  [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "a temporary refusal after an overwrite left a retention receipt"
   registered locked || fail "a copy whose original changed after preservation was removed"
-  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; the same refusal after an unlock, or after a preserved original changed in the copy, stays held with its preserve"
+  rm -f "$FAKEBIN/cp" "$W/execute-output"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the retry after an overwrite failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the next run did not retry and release the overwritten copy"
+  ! registered locked || fail "the overwritten copy is still registered after the retry"
+  assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the retry did not plan and execute again"
+  assert_equals 2 "$(preserved_unique | grep -c .)" "the retry did not add exactly one preserve for the changed content"
+  assert_equals "durable state"$'\n'"new owner state" "$(preserved_unique | while IFS= read -r kept; do cat "$kept"; done | sort)" \
+    "the preserved old content or the new content is missing"
+  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; after a preserved original changed in the copy the same refusal keeps its preserve of the old content and the next run still retries the copy; the same refusal after an unlock stays held with its preserve"
 }
 
 test_a_long_sorted_key_refusal_still_shows_the_drivers_reason() {
