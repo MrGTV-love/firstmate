@@ -1780,7 +1780,7 @@ spawn_remote_secondmate() {
     echo "error: remote secondmate $id launched, but its reply source could not be armed; endpoint metadata is preserved" >&2
     return 1
   fi
-  [ ! -e "$CONFIG/fleet-ledger" ] || [ "$remote_outcome" = already-running ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
+  [ ! -e "$CONFIG/fleet-ledger" ] || [ "$remote_outcome" != spawned ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
   echo "$remote_outcome $id harness=$harness kind=secondmate mode=secondmate yolo=off window=remote:$id worktree=$home remote=$host backend=$remote_backend"
   case "$remote_outcome" in
     already-running) echo "notice: the existing remote agent was kept running; no replacement was performed" ;;

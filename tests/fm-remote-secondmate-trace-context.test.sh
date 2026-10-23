@@ -460,11 +460,28 @@ REUSED_OUT=$(FM_TEST_ROUTE_REPLY=$(route_reply omp already-running) \
 expect_code 0 "$REUSED_RC" "a reused remote agent was rejected"$'\n'"$REUSED_OUT"
 assert_contains "$REUSED_OUT" 'already-running ios2 harness=omp' "a reused agent must be reported as already-running"
 [ "$(ledger_dispatches)" = 0 ] || fail "a reused remote agent recorded a task.dispatched ledger event"
+# A missing or unknown disposition cannot confirm a launch either, so it must
+# keep the saved status offset and the ledger history exactly as they were.
+printf 'working: earlier status\n' > "$PARENT/state/ios2.status"
+printf '%s\n' 24 > "$PARENT/state/.ios2.fleet-ledger-offset"
+printf '%s\n' '{"v":1,"ts":1,"event":"task.status","task":"ios2","state":"working","key":null,"text":" earlier status"}' >> "$LEDGER"
+cp "$LEDGER" "$TMP_ROOT/ledger-before-unconfirmed.jsonl"
+for disposition in '' future-label; do
+  UNCONFIRMED_OUT=$(FM_TEST_ROUTE_REPLY=$(route_reply omp "$disposition") \
+    remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex 2>&1); UNCONFIRMED_RC=$?
+  expect_code 0 "$UNCONFIRMED_RC" "an unconfirmed remote route was rejected"$'\n'"$UNCONFIRMED_OUT"
+  assert_contains "$UNCONFIRMED_OUT" 'running ios2 harness=omp' "an unconfirmed route must be reported as running"
+  [ "$(cat "$PARENT/state/.ios2.fleet-ledger-offset" 2>/dev/null)" = 24 ] \
+    || fail "an unconfirmed remote route (launch='$disposition') reset the saved ledger offset"
+  cmp -s "$TMP_ROOT/ledger-before-unconfirmed.jsonl" "$LEDGER" \
+    || fail "an unconfirmed remote route (launch='$disposition') changed the ledger history"
+done
+rm -f "$PARENT/state/ios2.status" "$PARENT/state/.ios2.fleet-ledger-offset"
 FRESH_OUT=$(FM_TEST_ROUTE_REPLY=$(route_reply codex spawned) \
   remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness codex 2>&1); FRESH_RC=$?
 expect_code 0 "$FRESH_RC" "a fresh remote launch was rejected"$'\n'"$FRESH_OUT"
 [ "$(ledger_dispatches)" = 1 ] || fail "a fresh remote launch did not record exactly one task.dispatched ledger event"
 rm -f "$PARENT/config/fleet-ledger"
-pass "fleet ledger: a reused remote agent records no dispatch, a fresh launch records one"
+pass "fleet ledger: a reused or unconfirmed remote route records no dispatch and keeps its offset, a fresh launch records one"
 
 echo "ALL TESTS PASSED"
