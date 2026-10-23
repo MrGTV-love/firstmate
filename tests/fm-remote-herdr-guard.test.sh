@@ -7,7 +7,8 @@
 # environment and ancestry carry the birth markers the guard reads. It pins
 # the decision table: no server -> start; an Aqua-born owner -> leave it; an
 # SSH-born or unprovable owner -> stop it, wait for the socket, start; a failed
-# status or an unproven stop -> wait, never a second server. Nothing
+# status, an unproven stop, or an unreleased socket -> keep waiting with no
+# deadline, never a second server. Nothing
 # here touches the runner's own herdr servers, launch agents, or login
 # session, and no live harness guard applies: the verdict comes from process
 # environment and ancestry, which are kernel facts rather than vendor output.
@@ -274,6 +275,22 @@ live_twin() {
   done
 }
 
+# assert_still_waiting <notice> <msg>: the backgrounded guard printed <notice>
+# and is still alive, waiting, with no server started.
+assert_still_waiting() {
+  wait_for_output "$1"
+  /bin/sleep 0.5
+  kill -0 "$GUARD_PID" 2>/dev/null || fail "$2: the guard exited instead of waiting"$'\n'"$(cat "$CASE_STATE/guard.out")"
+  assert_not_started "$2: a second server started"
+}
+
+stop_guard() {
+  kill "$GUARD_PID" 2>/dev/null || true
+  wait "$GUARD_PID" 2>/dev/null || true
+}
+
+UNRELEASED_NOTICE='has not released its socket after 8 tenths of a second; still waiting'
+
 herdr_calls() { cat "$CASE_LOG"; }
 assert_started() { # <msg>
   [ -f "$CASE_STATE/started" ] || fail "$1"
@@ -511,17 +528,17 @@ assert_contains "$GUARD_OUT" 'lsof does not resolve' "the guard did not report t
 assert_stop_before_start
 pass "a host without lsof cannot prove an Aqua birth, so the session is taken over"
 
-# --- a foreign owner that keeps the socket makes the guard fail for a retry --
+# --- a foreign owner that keeps the socket leaves the guard waiting -----------
 
 new_case running
 printf '%s\n' "$SSH_PID" > "$CASE_OWNER"
 touch "$CASE_STATE/stop-ignored"
-guard
-expect_code 1 "$GUARD_RC" "the guard did not exit 1 when the foreign server kept its socket"
-assert_not_started "the guard started a server while the foreign one still held the socket"
+guard_bg
+assert_still_waiting "$UNRELEASED_NOTICE" "a foreign server kept its socket"
+stop_guard
 assert_contains "$(herdr_calls)" "server stop --session $SESSION" "the guard never asked the foreign server to stop"
-assert_contains "$GUARD_OUT" 'did not release its socket within 8 tenths' "the guard did not report the bounded wait"
-pass "a foreign server that never releases the socket yields exit 1 so launchd retries"
+[ "$(grep -c "$UNRELEASED_NOTICE" "$CASE_STATE/guard.out")" = 1 ] || fail "the long-wait notice was not logged exactly once"
+pass "a foreign server that never releases the socket leaves the guard waiting, with one notice"
 
 # --- the release wait is polled, not assumed ---------------------------------
 
@@ -568,23 +585,28 @@ pass "a stopped status starts only after the old server process is proven gone"
 new_case running
 printf '%s\n' "$SSH_PID" > "$CASE_OWNER"
 printf 'always\n' > "$CASE_STATE/stop-fails"
-guard
-expect_code 1 "$GUARD_RC" "the guard did not exit 1 for a retry when server stop and status both failed"
-assert_not_started "a failed server stop and status started a second server"
-assert_contains "$GUARD_OUT" "herdr status failed; waiting and re-checking" "the takeover did not say why it waited"
-pass "a failed takeover stop with failing status starts no second server"
+guard_bg
+assert_still_waiting "$UNRELEASED_NOTICE" "a failed server stop with failing status"
+stop_guard
+assert_contains "$(cat "$CASE_STATE/guard.out")" "herdr status failed; waiting and re-checking" "the takeover did not say why it waited"
+pass "a failed takeover stop with failing status keeps waiting and starts no second server"
 
 live_twin
 new_case running
 printf '%s\n' "$SSH_PID" > "$CASE_OWNER"
 touch "$CASE_STATE/stop-fails-stopped"
-guard
+guard_bg
+assert_still_waiting "$UNRELEASED_NOTICE" "a failed takeover stop beside the live server process"
+assert_contains "$(cat "$CASE_STATE/guard.out")" "server process and socket absence is unproven" "the takeover did not report the unproven stop"
 kill "$TWIN_PID" 2>/dev/null || true
 wait "$TWIN_PID" 2>/dev/null || true
-expect_code 1 "$GUARD_RC" "the guard did not exit 1 while the stopped server's process stayed alive"
-assert_not_started "a failed takeover stop started a second server beside the live process"
-assert_contains "$GUARD_OUT" "server process and socket absence is unproven" "the takeover did not report the unproven stop"
-pass "a failed takeover stop whose status says stopped starts nothing while the old process lives"
+set +e
+wait "$GUARD_PID"
+rc=$?
+set -e
+expect_code 0 "$rc" "the guard failed after the old server process exited"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the takeover did not start exactly one server once the old process was gone"
+pass "a failed takeover stop whose status says stopped waits for the old process, then starts one server"
 
 # --- usage errors never touch a server ---------------------------------------
 

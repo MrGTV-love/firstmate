@@ -36,7 +36,10 @@
 #                                          so the socket is rebound before a
 #                                          reconnecting SSH attach can start
 #                                          another foreign server
-#   the foreign server does not release the socket in time -> exit 1
+#   the foreign server does not release the socket -> keep waiting and
+#                                          re-checking, with no deadline, and
+#                                          never start while status fails or
+#                                          absence is unproven
 # Each exec first asks herdr-server-start.py --hold-for-exec for permission.
 # That helper takes the session's Firstmate start lock, the same lock every
 # other Firstmate starter holds, re-proves absence under it, and keeps holding
@@ -46,8 +49,9 @@
 # A takeover closes every pane in that session; the parent firstmate's
 # secondmate liveness sweep relaunches its mates into the Aqua-born server.
 # bin/fm-remote-herdr-owner-lib.sh owns the owner discovery and the birth
-# markers; FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) bounds the
-# release wait in tenths of a second.
+# markers; after FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) tenths of
+# a second without a proven release, the guard logs one notice and keeps
+# waiting.
 # Every socket-owner decision prints one line to stdout, which launchd routes
 # to the agent's log; prerequisite refusals print to stderr.
 set -u
@@ -155,7 +159,7 @@ log "session $SESSION is served by ${OWNER:+pid }${OWNER:-an unproven process} b
 HERDR_SESSION="$SESSION" "$HERDR_BIN" server stop --session "$SESSION" >/dev/null 2>&1 \
   || log "herdr server stop for session $SESSION did not succeed; waiting for the socket anyway"
 i=0
-while [ "$i" -lt "$STOP_WAIT_TENTHS" ]; do
+while :; do
   read_state
   case "$STATE" in
     absent)
@@ -165,8 +169,8 @@ while [ "$i" -lt "$STOP_WAIT_TENTHS" ]; do
     running) ;;
     *) wait_note "$STATE" ;;
   esac
+  [ "$i" -ne "$STOP_WAIT_TENTHS" ] \
+    || log "the foreign server for session $SESSION has not released its socket after $STOP_WAIT_TENTHS tenths of a second; still waiting and re-checking rather than starting a second server"
   sleep 0.1
   i=$((i + 1))
 done
-log "the foreign server for session $SESSION did not release its socket within $STOP_WAIT_TENTHS tenths of a second; exiting 1 so launchd retries"
-exit 1
