@@ -1,0 +1,2 @@
+ok - spawn capture: one row per launched dispatch carrying the launched route; a typed launch attaches to its resolver row; flag off and relaunch add none
+bash tests/fm-model-picker-shadow-spawn.test.sh  9.05s user 12.19s system 50% cpu 42.037 total

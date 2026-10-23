@@ -1,0 +1,32 @@
+ok route table maps every configured route to a real projection
+ok one shadow run records both picks, the raw Jev body and the classification
+ok same-family candidates are pruned only by strict Pareto dominance
+ok a cross-currency pair is flagged as a trial and never pruned
+ok a route the table cannot map stays a candidate with UNKNOWN facts
+ok a malformed Jev payload is retained and rejected, never acted on
+ok an HTTP failure never changes the dispatch and still records the attempt
+ok benchmark facts are read only from a TRUSTED snapshot
+ok a pick that fails the post-pick effort re-check is rejected, never replaced
+ok a same-family validator answer falls back to a different family
+ok a single-family candidate set records a NULL validator with its reason
+ok the shadow path never writes outcomes, rework or captain acceptance
+ok the report counts disagreements by work type and never calls an empty log zero disagreements
+ok the never-send filter withholds the request and the key never leaks
+ok the flag is off by default and off means no data-root read or write
+ok snapshot age is the real age and staleness is disclosed, never a drop
+ok every work type is classified, and an unknown label is none-fit
+ok the request carries computed facts, never raw projection JSON
+ok the tool documents itself
+ok the confidence bands are applied in code and only logged
+ok two dispatches write two rows and keep both picks
+ok a resolver error or withheld resolve records no rule route and no classification
+ok a route outside the resolver's candidates reads only its applicable quota rows
+ok a validator answer outside the offered options or a bad range is rejected, never clamped
+ok a validator must pass the same eligibility gate as a worker
+ok a standalone observe run checks the home never-send policy by default
+ok the report migrates a Phase-1 store before reading its own columns
+ok five parallel dispatches write five rows
+ok a migration that finds its column already added by another writer still completes
+ok five parallel first opens of a Phase-1 store write five rows
+ok - shadow picker: gates, Pareto, currency separation, unknown routes, Jev failures, trusted data, re-check, validator pairing, report, privacy and flag
+bash tests/fm-model-picker-shadow.test.sh  7.20s user 10.54s system 48% cpu 36.675 total

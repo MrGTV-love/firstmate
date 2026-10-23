@@ -1,0 +1,149 @@
+
+===== S1 flag off vs flag on: spawn output and launch command =====
+rc=0 off: warning: task s1-off: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/s1-off/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/s1-off/launch-brief.md records no ship branch; defaulting to legacy branch fm/s1-off
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/s1-off/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for s1-off: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned s1-off harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-s1-off worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-s1off
+rc=0 on:  warning: task s1-on: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/s1-on/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/s1-on/launch-brief.md records no ship branch; defaulting to legacy branch fm/s1-on
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/s1-on/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for s1-on: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned s1-on harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-s1-on worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-s1on
+normalized output identical: yes
+launch command identical (inbox message file name normalized): yes
+rows: task_key|rule_worker|rule_effort|picker_status|chosen_worker
+s1-on|claude:opus|high|accepted|claude:opus
+
+===== S2 five parallel real fm-spawn launches =====
+spawned par-1 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-par-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-par1 rc=0 
+spawned par-2 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-par-2 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-par2 rc=0 
+spawned par-3 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-par-3 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-par3 rc=0 
+spawned par-4 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-par-4 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-par4 rc=0 
+spawned par-5 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-par-5 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-par5 rc=0 
+all five spawns returned in 19 s
+row count: 5
+par-1|claude:opus|high|accepted
+par-2|claude:opus|high|accepted
+par-3|claude:opus|high|accepted
+par-4|claude:opus|high|accepted
+par-5|claude:opus|high|accepted
+
+===== S3 scout launch is captured =====
+rc=0 warning: task scout-1: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/scout-1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for scout-1: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned scout-1 harness=claude kind=scout window=firstmate:fm-scout-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-scout1
+scout-1|claude:opus|high|accepted
+
+===== S4 slow endpoint (35 s per call): spawn returns at once; capture is bounded =====
+rc=0 warning: task slow-1: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/slow-1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/slow-1/launch-brief.md records no ship branch; defaulting to legacy branch fm/slow-1
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/slow-1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for slow-1: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned slow-1 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-slow-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-slow
+spawn wall time: 5.18 s
+detached helpers right after spawn: 3
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 54921)
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 436, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 424, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/provider.py", line 39, in do_POST
+    self.wfile.write(out)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+detached helpers 45 s later: 0
+slow row (bounded observe): slow-1|claude:opus|picker-error
+
+===== S5 dead endpoint: spawn unchanged, failure swallowed =====
+rc=0 warning: task dead-1: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/dead-1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/dead-1/launch-brief.md records no ship branch; defaulting to legacy branch fm/dead-1
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/dead-1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for dead-1: none - this project has no skills to judge
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned dead-1 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-dead-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-dead
+row: dead-1|claude:opus|picker-error|{"policy_version": "2026-10-19.1", "seed_label": "uncalibrated seed policy", "verdict": "Jev HTTP 000"}
+
+===== S6 no TypeSafe key: spawn unchanged, no row =====
+rc=0 warning: task nokey-1: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/nokey-1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/nokey-1/launch-brief.md records no ship branch; defaulting to legacy branch fm/nokey-1
+warning: /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/nokey-1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for nokey-1: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned nokey-1 harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-nokey-1 worktree=/Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/wt-nokey
+rows for nokey-1: 0
+
+===== S7 refused launch (no brief) writes no row =====
+rc=1 error: task refused-1 has no brief at inaccessible data path /Users/charlesabrooker/tmp/fm-shadow-live-drive.hRs7Ob/case/home/data/refused-1/brief.md
+rows for refused-1: 0
+
+===== S8 --report on the store written by real launches =====
+Shadow disagreement report - routing evidence, not outcome labels.
+These rows show what the picker would have chosen; they cannot show how an unrun pick would have performed.
+work_type                           runs  rule noRte noPick  wDen wDiff  vDen vDiff  eDen eDiff dispatch   ask escal stale
+Feature / capability                   6     6     0      0     6     0     0     0     6     0        6     0     0     0
+unclassified                           2     2     0      2     0     0     0     0     0     0        0     0     0     0
+Denominators: worker disagreement over 6 rows where both the rule and the picker named a worker; validator disagreement over 0 rows where both named a validator; effort disagreement over 6 rows where both named an effort. 2 rows have no picker pick; 0 rows have no rule route.
+Bands: dispatch=6 ask=0 escalate=0 unknown=2; stale snapshots=0; none-fit=0; rejected picks=0.
+rc=0
+
+===== S9 Phase-1 store: report, then a real launch migrates and writes, report again =====
+phase-1 columns: 22
+Shadow disagreement report - routing evidence, not outcome labels.
+These rows show what the picker would have chosen; they cannot show how an unrun pick would have performed.
+work_type                           runs  rule noRte noPick  wDen wDiff  vDen vDiff  eDen eDiff dispatch   ask escal stale
+unclassified                           1     1     0      0     1     0     0     0     0     0        0     0     0     0
+Denominators: worker disagreement over 1 rows where both the rule and the picker named a worker; validator disagreement over 0 rows where both named a validator; effort disagreement over 0 rows where both named an effort. 0 rows have no picker pick; 0 rows have no rule route.
+Bands: dispatch=0 ask=0 escalate=0 unknown=1; stale snapshots=0; none-fit=0; rejected picks=0.
+report rc=0
+columns after report: 33
+reset to a Phase-1 store; launching five in parallel plus a concurrent --report
+concurrent report rc=0: 0 shadow dispatches logged
+rows on migrated Phase-1 store: 5 accepted of 5
+Shadow disagreement report - routing evidence, not outcome labels.
+These rows show what the picker would have chosen; they cannot show how an unrun pick would have performed.
+work_type                           runs  rule noRte noPick  wDen wDiff  vDen vDiff  eDen eDiff dispatch   ask escal stale
+Feature / capability                   5     5     0      0     5     0     0     0     5     0        5     0     0     0
+Denominators: worker disagreement over 5 rows where both the rule and the picker named a worker; validator disagreement over 0 rows where both named a validator; effort disagreement over 5 rows where both named an effort. 0 rows have no picker pick; 0 rows have no rule route.
+Bands: dispatch=5 ask=0 escalate=0 unknown=0; stale snapshots=0; none-fit=0; rejected picks=0.
+report rc=0
+outcomes rows (must be 0): 0

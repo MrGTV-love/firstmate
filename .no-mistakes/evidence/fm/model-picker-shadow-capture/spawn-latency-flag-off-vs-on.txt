@@ -1,0 +1,6 @@
+run 1 flag=off rc=0 spawn wall time 4.92 s
+run 1 flag=1   rc=0 spawn wall time 4.72 s
+run 2 flag=off rc=0 spawn wall time 4.83 s
+run 2 flag=1   rc=0 spawn wall time 4.94 s
+run 3 flag=off rc=0 spawn wall time 5.02 s
+run 3 flag=1   rc=0 spawn wall time 4.89 s
