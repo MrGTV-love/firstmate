@@ -2,8 +2,9 @@
 Shadow benchmark-informed model picker.
 
 Observes one dispatch, decides what it WOULD have chosen from measured Artificial Analysis
-data plus bounded Jev judgments, and records that beside the route config/crew-dispatch.json
-actually chose. It never returns, prints or writes a dispatch route: the resolver ignores
+data plus bounded Jev judgments, and records that beside the dispatch's route: the route that
+actually launched, or the route config/crew-dispatch.json chose when no launch was attached.
+It never returns, prints or writes a dispatch route: the resolver and the spawn hook ignore
 every value this module computes.
 
 Contract: docs/configuration.md "Shadow model picker (FM_MODEL_PICKER_SHADOW)".

@@ -946,7 +946,7 @@ At its default location the whole root is private and gitignored with `data/`.
 | `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
 | `projection/<slug>.json` | One wire-format projection per catalog model, written last |
 
-`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the current dispatch rule's choice; [Shadow model picker](#shadow-model-picker-fm_model_picker_shadow) owns the picker's additive columns and every row it writes.
+`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the dispatch's own route; [Shadow model picker](#shadow-model-picker-fm_model_picker_shadow) owns the picker's additive columns and every row it writes.
 A matrix rebuild never touches `dispatch_log` or `outcomes`.
 The matrix is a pure function of the cache, so a rebuild gives the same row counts.
 A consumer must not read the matrix while `verdict.json` says `UNTRUSTED`.
@@ -1036,7 +1036,7 @@ The confidence bands are applied in code and only logged: `dispatch` at 0.85 or 
 
 ### The shadow disagreement report
 
-`bin/fm-model-picker-shadow.sh --report` prints, per work type over `mode 'shadow'` rows, the run count, the rows with a rule route, the rows with no rule route, the rows with no picker pick, the worker/validator/effort disagreement counts with their denominators, the confidence-band counts, the stale-snapshot count, the none-fit count and the rejected-pick count.
+`bin/fm-model-picker-shadow.sh --report` prints, per work type over `mode 'shadow'` rows that no later row superseded (`gates.superseded_by`), the run count, the rows with a rule route, the rows with no rule route, the rows with no picker pick, the worker/validator/effort disagreement counts with their denominators, the confidence-band counts, the stale-snapshot count, the none-fit count and the rejected-pick count.
 A row counts toward a disagreement denominator only when both the rule and the picker named that value, so a picker error or refusal is counted as no picker pick, never as agreement.
 It prints `0 shadow dispatches logged` for an empty log and never reports "zero disagreements" for an empty compared set.
 
