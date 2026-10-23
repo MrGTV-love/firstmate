@@ -1,6 +1,6 @@
 # Slack watch verification
 
-Date: 2026-10-22 (UTC); live read-only probe evidence below remains dated 2026-10-19.
+Date: 2026-10-23 (UTC) for the latest targeted suite run; the 2026-10-22 replay refresh and the 2026-10-19 live read-only probe are recorded separately below.
 Host: macOS arm64, shared operator host.
 Validation tool: no-mistakes v1.86.1-private.f6.startup-deadline.20261008 (bb545cc).
 No fixture opened a socket, created a real DM, bound the real source, armed the real poll, or posted to Slack.
@@ -14,6 +14,12 @@ It invokes the real `fm-captain-hold.sh` intake and `tasks-axi` against each dis
 No repository-wide test run is claimed; each section below records the targeted command and observed result for one guarantee.
 The 2026-10-22 targeted replay refresh ran `bash /Users/charlesabrooker/firstmate/bin/fm-proc-budget.sh -- python3 /Users/charlesabrooker/firstmate/bin/fm-duration.py run test.tests/fm-slack-watch.test.sh -- nice -n 20 bash bin/fm-test-run.sh tests/fm-slack-watch.test.sh --jobs 1`.
 It printed `ok - all Slack watch checks` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1444534`.
+The 2026-10-23 test phase at commit `ca4fcbe71` ran `tests/fm-slack-watch.test.sh`, `tests/fm-slack-intake-unchanged.test.sh`, and `tests/fm-slack-secret-scan.test.sh` one after another under `nice -n 20` through `bin/fm-test-run.sh`, one suite per run.
+Its logs record each suite's markers and results but not the full command line, so no command line is quoted for that run.
+`tests/fm-slack-watch.test.sh` ran from 2026-10-23T06:50:14Z to 06:58:17Z, printed an `ok -` line for every check listed below and `ok - all Slack watch checks`, and ended with `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=483340`.
+`tests/fm-slack-intake-unchanged.test.sh` printed `ok - intake refusals hold` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=13029`.
+`tests/fm-slack-secret-scan.test.sh` printed `ok - scan redacted and detected both planted copies` and `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=26574`.
+The same phase also drove the real entry points by hand against replay transcripts: removing the `:two:` reaction alone left the call open, a fresh typed `3` then recorded `abort` once, and the widest conflict wake line measured 473 characters.
 The suite exercised DOD-01 through DOD-10, DOD-12 through DOD-17, S1 through S3, and X1 through X22; DOD-11, S4, and ACT-1 were not run.
 The targeted commands below are the DoD's Verify commands with the fixture home exported as `FM_HOME`, `FM_STATE_OVERRIDE`, `FM_DATA_OVERRIDE`, and `FM_CONFIG_OVERRIDE`.
 
