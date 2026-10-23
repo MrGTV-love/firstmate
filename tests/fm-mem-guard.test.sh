@@ -59,7 +59,8 @@ report = verdict(audit("linux", meminfo=linux), "OK", 0)
 assert report["summary"] == {"mem_total_gb": 32.0, "mem_available_gb": 16.0,
                              "mem_used_pct": 50.0, "swap_total_gb": 4.0,
                              "swap_used_gb": 1.0, "swap_used_pct": 25.0}
-verdict(audit("linux", meminfo=linux, thresholds=("--warn-mem-pct", "50")), "WARNING", 1)
+report = verdict(audit("linux", meminfo=linux, thresholds=("--warn-mem-pct", "50")), "WARNING", 1)
+assert "bin/fm-mem-guard.py --json" in report["recommendation"], report
 verdict(audit("linux", meminfo=linux, thresholds=("--crit-mem-pct", "50")), "CRITICAL", 1)
 verdict(audit("linux", meminfo=linux, thresholds=("--crit-swap-pct", "25")), "CRITICAL", 1)
 report = verdict(audit("linux", meminfo=linux.replace("SwapFree: 3145728 kB\n", "")), "OK", 0)

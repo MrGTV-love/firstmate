@@ -24,7 +24,8 @@ Invariants:
     own 400ms budget; unavailable commands/timeouts withhold the affected
     measurement rather than blocking the caller.
   - Status is OK, WARNING, CRITICAL, or UNKNOWN; recommendation is diagnostic
-    text for the operator, never a command.
+    text for the operator, and a WARNING names the rerun probe without running
+    it.
 """
 
 import argparse
@@ -236,7 +237,9 @@ def audit_memory(
             status = "WARNING"
             recommendation = (
                 f"{condition} is above a warning threshold but below a "
-                "critical one; degraded but explained, see the top RSS processes."
+                "critical one; degraded but explained, see the top RSS processes. "
+                "Rerun bin/fm-mem-guard.py --json to print the measured pressure "
+                "and the verdict the recovery playbook uses."
             )
         else:
             status = "OK"

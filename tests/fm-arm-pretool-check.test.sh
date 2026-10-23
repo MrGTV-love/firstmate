@@ -531,6 +531,17 @@ test_default_mode_stdout_has_grok_json_on_deny() {
   pass "default mode: stdout carries Grok-shaped decision JSON on deny"
 }
 
+test_deny_names_the_foreground_remedy() {
+  local grok cursor
+  grok=$("$CHECK" --command 'bin/fm-watch-arm.sh &' 2>/dev/null)
+  cursor=$("$CHECK" --cursor --command 'bin/fm-watch-arm.sh &' 2>/dev/null)
+  printf '%s' "$grok" | jq -e '.reason | contains("bin/fm-watch-checkpoint.sh --seconds <n>") and contains("bin/fm-supervision-instructions.sh --repair-line")' >/dev/null 2>&1 \
+    || fail "the Grok deny must name the foreground alternative: $grok"
+  printf '%s' "$cursor" | jq -e '.user_message | contains("bin/fm-watch-checkpoint.sh --seconds <n>") and contains("bin/fm-supervision-instructions.sh --repair-line")' >/dev/null 2>&1 \
+    || fail "the Cursor deny must name the foreground alternative: $cursor"
+  pass "a backgrounded arm names the foreground checkpoint and the harness-native repair line in Grok and Cursor renderings"
+}
+
 test_allow_is_silent_both_modes() {
   local out1 out2
   out1=$("$CHECK" --command 'exec bin/fm-watch-arm.sh' 2>&1)
@@ -578,5 +589,6 @@ test_failopen_missing_jq
 test_failopen_missing_node
 test_claude_mode_stdout_empty_on_deny
 test_default_mode_stdout_has_grok_json_on_deny
+test_deny_names_the_foreground_remedy
 test_allow_is_silent_both_modes
 test_shellcheck_clean

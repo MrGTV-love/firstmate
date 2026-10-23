@@ -18,7 +18,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const REASONS = {
-  "watcher-background": "a protected watcher command cannot run in an asynchronous shell list or through nohup/disown",
+  "watcher-background": "a protected watcher command cannot run in an asynchronous shell list or through nohup/disown; run it in the foreground with bin/fm-watch-checkpoint.sh --seconds <n>, or use the harness-native repair line printed by bin/fm-supervision-instructions.sh --repair-line",
   "watcher-pipeline": "a protected watcher command must not participate in a pipeline",
   "watcher-redirection": "a protected watcher command must not use shell redirection",
   "watcher-bundled": "a protected watcher command must be the sole final command after approved setup nodes",

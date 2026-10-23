@@ -91,6 +91,24 @@ pass "check reads the user's process count and reports its limit or UNKNOWN"
 if "$GUARD" check --check --limit 1 >/dev/null; then fail "--check exited zero on a CRITICAL verdict"; fi
 pass "check classifies the count against the limit and --check exits on WARNING or CRITICAL"
 
+# The warning must carry the rerun probe, so a reader is never left to invent it.
+# A small burst makes a WARNING reachable even on a quiet host with a tiny count.
+for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 60 & done
+warning_pids=$(jobs -p)
+sleep 0.2
+warning_count=$("$GUARD" check --json | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["count"])')
+warning_limit=$(python3 -I -c 'import sys; print(max(3, int(int(sys.argv[1]) / 0.75)))' "$warning_count")
+warning_json=$("$GUARD" check --json --limit "$warning_limit")
+for warning_pid in $warning_pids; do kill "$warning_pid" 2>/dev/null || true; done
+wait $warning_pids 2>/dev/null || true
+printf '%s\n' "$warning_json" | python3 -I -c '
+import json, sys
+j = json.load(sys.stdin)
+assert j["status"] == "WARNING", j
+assert "bin/fm-proc-guard.py check --json" in j["recommendation"], j
+' || fail "a WARNING recommendation must carry the rerun probe: $warning_json"
+pass "the warning carries the exact rerun probe and the census command"
+
 for command in check census watch; do
   for bad in "--warn-pct 60" "--clear-pct 50" "--crit-pct 90" "--keep 20"; do
     # shellcheck disable=SC2086
