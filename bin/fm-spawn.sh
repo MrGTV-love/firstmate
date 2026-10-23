@@ -22,13 +22,15 @@
 #   ship or scout spawn also refuses leftover `{TASK}` / `{FIRSTMATE_SPEC}`
 #   placeholders, an empty Task, an incomplete pair of Task subsections, or a
 #   `## Captain's intent` line opening with a Captain label or address. A fresh
-#   spawn also refuses a leftover `## Definition Of Done (task)` placeholder,
-#   naming the section and the placeholder; an unfenced `DoD file: <absolute
-#   path>` line inside that section naming a finished criteria file is the only
+#   spawn also refuses a leftover `## Definition Of Done (task)` placeholder;
+#   one refusal lists every leftover Task body and DoD token in a single pass,
+#   then prints the repair, including the unfenced `DoD file: <absolute path>`
+#   line inside that section naming a finished criteria file, which is the only
 #   escape. A
 #   fresh spawn of a brief with no such section warns once on stderr and
-#   proceeds. A relaunch and a secondmate charter never reach the check
-#   (bin/fm-dod-lib.sh owns it).
+#   proceeds. A relaunch re-checks only the Task bodies, because the Definition
+#   of Done was accepted at the fresh spawn; a secondmate charter never reaches
+#   the check (bin/fm-dod-lib.sh owns it).
 #   Every ship or scout spawn renders `launch-brief.md`; for a no-mistakes ship
 #   it also carries the current `--intent` contract and the extracted captain
 #   intent. A legacy mixed Task is accepted there only under bin/fm-dod-lib.sh's
@@ -157,7 +159,9 @@
 #   (tmux backend) the tmux session or global environment the new window
 #   inherits, because Claude Code prefers an API key over a claude.ai
 #   subscription login and silently bills the API. A config/claude-account pin
-#   strips both variables, so a pinned launch is not refused. The opt-in is
+#   strips both variables, so a pinned launch is not refused. The refusal prints
+#   the exact `env -u` relaunch that clears an ambient value and this flag as
+#   the deliberate alternative. The opt-in is
 #   recorded as api_key=allow in the task metadata and carried by fm-control
 #   relaunch. Does not apply to non-claude harnesses.
 #   A herdr crewmate or scout is placed in the exact workspace of the firstmate
@@ -2304,13 +2308,22 @@ fi
 # recorded in meta only when it is NOT tmux (fm-teardown.sh and fm-watch.sh's
 # window_backend/fm_backend_of_meta already treat an absent backend= as tmux),
 # so the default path's meta stays byte-identical.
+# fm_backend_validate_spawn (bin/fm-backend.sh) names the known and
+# spawn-supported backend tables and refuses one that cannot hold a task
+# endpoint, but it cannot know the invocation to rerun. This wrapper keeps that
+# refusal and appends the runnable command, so the block ends in a repair.
+spawn_require_spawn_capable_backend() { # <backend>
+  fm_backend_validate_spawn "$1" && return 0
+  echo "error: repair: relaunch on a spawn-capable backend (spawn-capable: $FM_BACKEND_SPAWN): bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off> --backend <name>" >&2
+  return 1
+}
 if [ "$RELAUNCH" -eq 0 ]; then
   if [ "$BACKEND_SET" -eq 1 ]; then
     BACKEND=$BACKEND_ARG
   else
     BACKEND=$(fm_backend_name)
   fi
-  fm_backend_validate_spawn "$BACKEND" || exit 1
+  spawn_require_spawn_capable_backend "$BACKEND" || exit 1
   fm_backend_source "$BACKEND" || exit 1
   if [ "$BACKEND" = orca ] && [ "$KIND" = secondmate ]; then
     echo "error: backend=orca does not support --secondmate spawns yet" >&2
@@ -2370,7 +2383,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   BACKEND=$FM_BACKEND_VALIDATED_BACKEND
   RELAUNCH_PRIOR_BACKEND=$BACKEND
   RELAUNCH_TARGET=$FM_BACKEND_VALIDATED_TARGET
-  fm_backend_validate_spawn "$BACKEND" || exit 1
+  spawn_require_spawn_capable_backend "$BACKEND" || exit 1
   fm_backend_source "$BACKEND" || exit 1
   # A relaunch must PROVE the previous agent is gone before it launches another
   # one into the same endpoint, and only tmux and herdr have a recovery-grade
@@ -2450,7 +2463,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
       echo "error: configured backend '$BACKEND' is not herdr; refusing to replace task $ID's proven-gone tmux endpoint" >&2
       exit 1
     }
-    fm_backend_validate_spawn "$BACKEND" || exit 1
+    spawn_require_spawn_capable_backend "$BACKEND" || exit 1
     fm_backend_source "$BACKEND" || exit 1
   fi
   MODE=$(fm_meta_get "$RELAUNCH_META" mode)
@@ -4212,18 +4225,51 @@ fi
   echo "error: task $ID has no brief at inaccessible data path $BRIEF" >&2
   exit 1
 }
-if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
-  if fm_brief_task_placeholders_present "$BRIEF"; then
-    echo "error: $BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; fill ## Captain's intent and ## Firstmate spec before spawn" >&2
-    exit 1
+# Print the single refusal a dispatch verdict produces: the brief path, every
+# problem in one list, and the repair that clears all of them, including the
+# alternative of pointing the section at a finished criteria file.
+print_brief_dispatch_refusal() { # <brief> <problem-lines>
+  local brief=$1 problems=$2 line task_bad=0 dod_bad=0
+  case "$problems" in
+  *'{TASK}'* | *'{FIRSTMATE_SPEC}'*) task_bad=1 ;;
+  esac
+  case "$problems" in
+  *'{DOD_'*) dod_bad=1 ;;
+  esac
+  if [ "$task_bad" -eq 1 ] && [ "$dod_bad" -eq 1 ]; then
+    echo "error: $brief still contains {TASK} or {FIRSTMATE_SPEC}, and has an unfinished task Definition of Done; every unfinished item is listed once:" >&2
+  elif [ "$dod_bad" -eq 1 ]; then
+    echo "error: $brief has an unfinished task Definition of Done; every unfinished item is listed once:" >&2
+  else
+    echo "error: $brief still contains {TASK} or {FIRSTMATE_SPEC}; every unfinished item is listed once:" >&2
   fi
+  while IFS= read -r line; do
+    printf '  %s\n' "$line" >&2
+  done <<EOF
+$problems
+EOF
+  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
+}
+if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
+  # One verdict, one refusal: the helper lists every unfinished Task body and
+  # Definition of Done item, so a half-filled scaffold costs one round trip.
+  # A relaunch re-checks only the Task bodies; the Definition of Done was
+  # accepted at the fresh spawn and is never re-litigated.
   if [ "$RELAUNCH" -eq 0 ]; then
-    if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
-      echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
-    elif DOD_PROBLEM=$(fm_brief_task_dod_problem "$BRIEF"); then
-      echo "error: $BRIEF has an unfinished task Definition of Done ($DOD_PROBLEM); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md \"Task Definition of Done\")" >&2
+    if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF"); then
+      print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
+      # One event per decision: this refusal is the decision the brief gate took.
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
       exit 1
     fi
+    "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --cleared-by proceed 2>/dev/null || true
+    if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
+      echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
+    fi
+  elif DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF" task-only); then
+    print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
+    "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
+    exit 1
   fi
   if ! fm_brief_task_content_valid "$BRIEF"; then
     echo "error: $BRIEF must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn" >&2
@@ -4459,6 +4505,8 @@ validate_spawn_worktree() { # <source> <inspect-target>
   local source=$1 inspect_target=$2
   if ! fm_task_copy_isolated "$WT" "$PROJ_ABS"; then
     echo "error: $source did not yield an isolated worktree (resolved '$WT'; worktree root '${FM_TASK_COPY_TOP:-none}'; spawning project '$PROJ_ABS'); refusing to launch to avoid tangling the primary checkout. Inspect target $inspect_target" >&2
+    echo "error: repair: relaunch with the registered project clone and its exact flags: bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off>; for an existing task, re-point its record at the replacement copy instead: bin/fm-control.sh <task> reassociate --worktree <replacement-copy>" >&2
+    "$SCRIPT_DIR/fm-guard-event.sh" spawn-worktree-isolation deny --source-ok true 2>/dev/null || true
     exit 1
   fi
 }
@@ -6031,8 +6079,11 @@ BUSY_GEN=
       # Resolve host envelopes through the duration owner, retaining the existing
       # fallback above the guard handler's own deadline.
       j_guard_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-guard.claude-hook --fallback 330 --percentile 99 --margin 3) || exit 1
-      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],\"PostToolUse\":[{\"matcher\":\"^(Bash|Read)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
-      submit_entries="$submit_entries,{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}"
+      # Only PreToolUse reaches the adapter. Its post-tool advisory and prompt
+      # doorbell were retired because they could not withhold anything, so the
+      # PostToolUse and UserPromptSubmit registrations are deliberately absent:
+      # a registration that the adapter ignores is a dead guard, not coverage.
+      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
     fi
     stop_entry=
     if [ "$KIND" = secondmate ] && grep -qF '.fm-busy-stop' "$WT/bin/fm-turnend-guard.sh" 2>/dev/null; then
