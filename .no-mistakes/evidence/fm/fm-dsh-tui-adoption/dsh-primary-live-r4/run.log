@@ -1,0 +1,53 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.TaVb9I
+/private/tmp/fm-dsh-parent.rXSDfD
+registered: state/primary-probe.check.sh
+watcher: none running
+
+  Welcome to dsh-TUI  Step 1 of 4
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   ❯ API key and connectivity · Language and theme · Model and workspace · Shortcuts and commands
+
+    Confirm DEEPSEEK_API_KEY is in place and actually reach the API.
+
+    ✓ DEEPSEEK_API_KEY detected
+      Source: unknown
+
+    ✓ Connected
+      1 models available
+      Balance USD 33.91
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    ←/→ step · Enter act on this step / go next · Esc skip the guide
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.TaVb9I
+parent_home=/private/tmp/fm-dsh-parent.rXSDfD
+cleanup_exit=1
+exit=1 elapsed=181s

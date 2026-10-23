@@ -1,0 +1,59 @@
+FM_TEST_BEGIN 2026-10-23T06:06:06Z tests/fm-dsh-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+warning: /Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/worker-live/home-1792735570/data/dsh-ship-43817/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/worker-live/home-1792735570/data/dsh-ship-43817/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-43817 ships mode=local-only while the standing posture for fm-dsh-lab-project.E5m8b8 is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-43817 ships branch=lab-copy while fm-dsh-lab-project.E5m8b8 registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-43817) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-43817: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-ship-43817 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-live-49621-6590:w1:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+observed dsh-ship-43817 busy
+first session=/Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/worker-live/home-1792735570/state/dsh-ship-43817.dsh/s1792735572.50162.1919/dsh/sessions/--private-tmp-fm-dsh-lab-project.E5m8b8-copy--/787eda91-21b4-4453-8942-47907c2afdec/session.v4.jsonl
+busy composer=empty
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+steer acknowledged by dsh-ship-43817
+observed dsh-ship-43817 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-ship-43817 busy
+interrupt-delivered dsh-ship-43817 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-ship-43817 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-49621-6590:w1:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+warning: /Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/worker-live/home-1792735570/data/dsh-ship-43817/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/worker-live/home-1792735570/data/dsh-ship-43817/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-43817 ships mode=local-only while the standing posture for fm-dsh-lab-project.E5m8b8 is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-43817 ships branch=lab-copy while fm-dsh-lab-project.E5m8b8 registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-43817) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-43817: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-ship-43817 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-49621-6590:w1:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+resumed the earlier conversation in place
+stopped dsh-ship-43817 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-49621-6590:w1:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+skill selection for dsh-scout-43817: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-scout-43817 harness=dsh kind=scout window=fm-lab-dsh-live-49621-6590:w2:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+observed dsh-scout-43817 busy
+first session=/Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/worker-live/home-1792735570/state/dsh-scout-43817.dsh/s1792735659.45857.12406/dsh/sessions/--private-tmp-fm-dsh-lab-project.E5m8b8-copy--/100a67be-159b-41a4-9e71-a89449fa6989/session.v4.jsonl
+busy composer=empty
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+steer acknowledged by dsh-scout-43817
+observed dsh-scout-43817 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-scout-43817 busy
+interrupt-delivered dsh-scout-43817 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-scout-43817 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-49621-6590:w2:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+skill selection for dsh-scout-43817: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-scout-43817 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-49621-6590:w2:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+resumed the earlier conversation in place
+stopped dsh-scout-43817 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-49621-6590:w2:p1 worktree=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+ok - live dsh-tui scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+lab_project=/private/tmp/fm-dsh-lab-project.E5m8b8
+lab_copy=/private/tmp/fm-dsh-lab-project.E5m8b8-copy
+lab_home=/Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/worker-live/home-1792735570
+cleanup_exit=0
+FM_TEST_END 2026-10-23T06:09:18Z tests/fm-dsh-live-e2e.test.sh exit=0 duration_ms=191401 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=191879
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=191401 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-dsh-live-e2e.test.sh duration_ms=191401
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

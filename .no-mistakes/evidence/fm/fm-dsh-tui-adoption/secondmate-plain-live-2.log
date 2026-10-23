@@ -1,0 +1,15 @@
+spawn start 01:16:22
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.xhqXPD
+warning: secondmate dsh-second-69659 sync skipped before launch: primary default-branch commit cannot be resolved
+spawned dsh-second-69659 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-second-69662-17277:w1:p2 worktree=/private/tmp/fm-lab.qvKYy1
+spawn exit=0 elapsed=77s end 01:17:39
+plugin startup +65.6s
+plugin turnend-guard +68.3s
+plugin turn-end +76.8s
+plugin turnend-guard +77.1s
+plugin watcher-close +77.2s
+plugin turnend-guard +77.5s
+plugin followup +77.5s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.xhqXPD
+stopped dsh-second-69659 harness=dsh backend=herdr endpoint=fm-lab-dsh-second-69662-17277:w1:p2 worktree=/private/tmp/fm-lab.qvKYy1
+parent=/private/tmp/fm-lab.xhqXPD second=/private/tmp/fm-lab.qvKYy1 cleanup_exit=0

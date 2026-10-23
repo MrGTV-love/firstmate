@@ -1,0 +1,54 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.edw0vy
+/private/tmp/fm-dsh-parent.hmwWqJ
+registered: state/primary-probe.check.sh
+watcher: stopped pid=99221
+interrupt-delivered dsh-primary-78922 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-primary-78922 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-83629-4968:w1:p1 worktree=/private/tmp/fm-dsh-primary.edw0vy
+warning: secondmate dsh-primary-78922 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-78922 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-83629-4968:w1:p1 worktree=/private/tmp/fm-dsh-primary.edw0vy
+ok - forced native owner death retired private arm and watcher
+warning: secondmate dsh-primary-78922 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.edw0vy/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-78922 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-83629-4968:w1:p1 worktree=/private/tmp/fm-dsh-primary.edw0vy
+stopped dsh-primary-78922 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-83629-4968:w1:p1 worktree=/private/tmp/fm-dsh-primary.edw0vy
+ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume
+/private/tmp/fm-dsh-second.o4T9BX
+warning: secondmate dsh-second-78922 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+spawned dsh-second-78922 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-primary-83629-4968:w2:p2 worktree=/private/tmp/fm-dsh-second.o4T9BX
+secondmate spawn returned after 16s
+secondmate log at spawn return: turn/start=True user/message=True
+warning: secondmate dsh-second-78922 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-second.o4T9BX/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-second-78922 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-83629-4968:w2:p2 worktree=/private/tmp/fm-dsh-second.o4T9BX
+stopped dsh-second-78922 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-83629-4968:w2:p2 worktree=/private/tmp/fm-dsh-second.o4T9BX
+ok - fresh dsh-tui secondmate spawn into a new home, digest ahead of its brief, same-conversation relaunch and exit
+watcher: none running
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.edw0vy
+parent_home=/private/tmp/fm-dsh-parent.hmwWqJ
+secondmate_home=/private/tmp/fm-dsh-second.o4T9BX
+cleanup_exit=0
+exit=0 elapsed=133s

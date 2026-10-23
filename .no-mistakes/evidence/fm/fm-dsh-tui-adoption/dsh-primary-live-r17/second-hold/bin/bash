@@ -1,0 +1,10 @@
+#!/bin/bash
+case "${1:-}" in
+  */bin/fm-sessionstart-run.sh)
+    if [ "${FM_HOME:-}" = '/private/tmp/fm-dsh-second.n07Or8' ]; then
+      : > '/Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/dsh-primary-live-r17/second-hold/reached'
+      read -r _ < '/Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/dsh-primary-live-r17/second-hold/release'
+    fi
+    ;;
+esac
+exec '/bin/bash' "$@"

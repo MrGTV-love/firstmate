@@ -1,0 +1,59 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.RiIx1u
+/private/tmp/fm-dsh-parent.bXZ6we
+registered: state/primary-probe.check.sh
+watcher: stopped pid=46685
+interrupt-delivered dsh-primary-9904 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-primary-9904 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-14723-10059:w1:p1 worktree=/private/tmp/fm-dsh-primary.RiIx1u
+warning: secondmate dsh-primary-9904 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.RiIx1u/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.RiIx1u/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.RiIx1u/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.RiIx1u/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.RiIx1u/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-9904 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-14723-10059:w1:p1 worktree=/private/tmp/fm-dsh-primary.RiIx1u
+     … +13 lines (ctrl+o to expand)
+
+  ⚓ Thinking (ctrl+o to expand)
+
+  • Bash(cat state/.watch-cycle-exits.log; echo "=== deliveries ==="; cat state/.watch-deliveries.log; echo "===   ·
+        watcher-down ==="; cat state/.watcher-down)                                                               0s
+   ⎿ arm_pid=26880   watcher_pid=26969       origin=started  started_at=1792729409   ended_at=1792729416
+     exit_code=0     signal=none     reason=actionable-check beacon_age=2    lock_before=pid:26969|identity:Thu Oct 22
+     23:23:29 2026     bash
+     /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/bin/fm-watch.sh
+     lock_after=pid:none|identity:none       successor=none
+     arm_pid=46605   watcher_pid=46685       origin=started  started_at=1792729424   ended_at=1792729425
+     exit_code=143   signal=TERM     reason=signal-exit      beacon_age=0    lock_before=pid:46685|identity:Thu Oct 22
+     23:23:44 2026     bash
+     /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/bin/fm-watch.sh
+     lock_after=pid:none|identity:none       successor=none
+     arm_pid=52836   watcher_pid=52886       origin=started  started_at=1792729428   ended_at=1792729430
+     exit_code=0     signal=none     reason=actionable-check beacon_age=0    lock_before=pid:52886|identity:Thu Oct 22
+     23:23:48 2026     bash
+     /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/bin/fm-watch.sh
+     lock_after=pid:none|identity:none       successor=none
+     … +8 lines (ctrl+o to expand)
+
+  ⚓ Thinking · 5s (ctrl+o to expand)
+
+  ⏺ Queue is drained and the last delivered notification is acknowledged (--ack-through 2 recorded), so no
+    acknowledgement is still outstanding; the remaining warning is the watcher being down after its cycle was
+    terminated. There is no watcher to repair by hand here — the native plugin re-arms on turn end, so ending this
+    recovery turn is the repair step.
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                               ⛶
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                       32k/1.0M 3.2%
+   deepseek-v4-flash · high · cache 96.2% · ≈¥0.05 idle · fm-dsh-primary.RiIx1u                  ctx 3.2% (32k/1.0m)
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.RiIx1u
+parent_home=/private/tmp/fm-dsh-parent.bXZ6we
+secondmate_home=/private/tmp/fm-dsh-second.UPXqhN
+cleanup_exit=1
+exit=1 elapsed=203s

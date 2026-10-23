@@ -1,0 +1,180 @@
+    - Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+    - Away/quiet mode: inactive.
+    - X mode: inactive; use the default watcher cadence.
+    - Ordinary wake: follow the continuation in the harness protocol below; do not use shell &.
+    - Completion check: when you judge whether a ship or scout is finished, read its brief's "## Definition Of
+    Done (task)" and "## How You're Graded" sections; a done: line only starts that check. When the Definition Of
+    Done section carries a "DoD file: <absolute path>" line, that file holds the criteria: read it as the
+    criteria and do not report the section's placeholders. Report a missing or placeholder section, never invent
+    criteria.
+
+    Mode: DSH native Cordis supervision.
+
+    For open-loop-ledger wakes and heartbeat row handling, follow [Event-driven
+    supervision](../architecture.md#event-driven-supervision).
+
+    Launch the primary with `bin/fm-dsh-primary.sh`; its task-local patch loads `.dsh/fm-primary.mjs` without
+    editing the operator's DSH profile.
+    A bare `dsh-tui` is detectable, but is not a supervised Firstmate primary unless that plugin is loaded.
+    The native `agent/created` callback runs the shared session-start entry point, and the first step of a fresh
+    process waits for it, so its ordered digest enters ahead of the opening prompt.
+    The native `session/event` turn-end callback runs the shared turn-end guard and owns one tracked
+    `bin/fm-watch-arm.sh` child, or the existing supervision host when this home enables it.
+    Do not arm another watcher, run shell `&`, or substitute a foreground wait.
+
+    When this session owns supervision:
+    1. First cycle: the native plugin arms automatically when the shared supervision-need predicate requires it.
+    2. Ordinary notification: run `bin/fm-wake-drain.sh` first, handle all presented wakes, open decisions and
+    unread statuses, then run its exact `WAKE_ACK_REQUIRED` acknowledgement.
+    3. The native plugin re-arms through the existing home-scoped singleton and injects a queue-read
+    notification, never a replay of an old headline.
+    4. Waiting is silent; no model turn is needed for tokenless watcher waits.
+    5. Failure only: diagnose the concrete guard feedback and the home-local `.dsh-primary-events.jsonl` record.
+       End the recovery turn to recheck supervision; if the native plugin is missing or cannot run, the launching
+    owner must restart with `bin/fm-dsh-primary.sh --resume` rather than claim supervision is healthy.
+
+    DSH exposes passive durable turn-end events, not a blocking Stop hook.
+    The strongest verified equivalent is the shared guard plus at most one native follow-up for a failed
+    supervision episode; it does not claim to prevent the terminal from becoming idle.
+    A later external user message resets that bounded follow-up budget.
+    The plugin retires its own tracked process group on unload and never signals another home's watcher.
+    Its shared owner-bound Perl watchdog also retires that private subtree when the native process dies without
+    running disposal; it imposes no watcher lifetime deadline.
+    [Turn-end guard](../turnend-guard.md) owns the shared predicate and passive-adapter limit.
+
+
+    ================================================================================
+    READ-ONCE CONTRACT
+    ================================================================================
+    Everything below is printed in full for this session start: every state/*.meta,
+    a compact data/backlog.md listing, a bounded tail of every state/*.status,
+    data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+    and data/learnings.md.
+    Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+    data/backlog.md or state/*.status: re-reading everything defeats the entire
+    point of this command.
+
+    Go to a source directly only when:
+      - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+      - its contents looked unparseable or corrupt,
+      - an individual full status log is needed for older wake-event history, or a
+        status line was capped and its tail matters (each task's full log path is
+        printed with its tail),
+      - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+      - the backlog listing disclosed omitted queued items and this turn needs them,
+      - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+        turn needs their verdict (bin/fm-startup-network.sh report),
+      - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+        which case that stage's sources were never emitted and must be reconciled.
+
+    ================================================================================
+    FLEET STATE
+    ================================================================================
+
+    data/backlog.md
+    --------------------------------------------------------------------------------
+    compact backlog listing (manual backend; done rows omitted; every in-flight, held, and blocked title line
+    kept; other queued bounded to 20; indented task bodies omitted)
+    ## Queued
+    ## In flight
+    (no backlog item title lines found)
+    Full task bodies remain available on demand: bin/fm-tasks-axi.sh show <id> --full when compatible tasks-axi
+    is available, or data/backlog.md.
+
+    Work under way (state/*.meta)
+    --------------------------------------------------------------------------------
+    (none)
+
+    Orphan status logs (state/*.status without matching .meta)
+    --------------------------------------------------------------------------------
+    (none)
+
+    AFK
+    --------------------------------------------------------------------------------
+    absent
+
+    ================================================================================
+    NETWORK CHECKS
+    ================================================================================
+    IN PROGRESS - the deferred network checks have not finished yet.
+    NOT yet confirmed: GitHub authentication, recorded Herdr launch recovery, dead-secondmate relaunch,
+    secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and
+    inactive terminal-outcome reconciliation.
+    Started 2s ago, bounded at 120s.
+    Only a FAILED or otherwise actionable result arrives as a `check: startup-network` wake; a clean success
+    stays silent.
+    The durable result is readable on demand with /private/tmp/fm-dsh-primary.qu035p/bin/fm-startup-network.sh
+    report; until it finishes, treat none of it as confirmed.
+
+    ================================================================================
+    CONTEXT
+    ================================================================================
+
+    data/projects.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ABSENT
+
+    data/secondmates.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/captain.md
+    data/captain.md
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    data/learnings.md
+    --------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------
+    ABSENT
+
+    ================================================================================
+    NEXT STEP
+    ================================================================================
+    Follow the supervision operating instructions block above for harness 'dsh'.
+    This script never starts supervision itself.
+
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+
+  ❯ FIRSTMATE_OP: v1 launch-brief: Isolated runtime lab. Do not investigate, read outside this home, load skills,
+    dispatch or edit code. Ignore startup diagnostics from this throwaway home. On watcher notification drain and
+    acknowledge. On resuming this conversation reply FMPRIMARYRESUMED and the secret word remembered earlier,
+    without inspecting files. Follow only the supplied tiny runtime checks.
+
+  ⚓ Thinking (ctrl+o to expand)
+
+  ⏺ FMPRIMARYRESUMED ORCHID73
+
+  ❯ Reply FMCRASHRESUMED and the secret word remembered earlier. Do not inspect files or run commands.
+
+  ⏺ FMCRASHRESUMED ORCHID73
+
+  ❯ Firstmate watcher notification: durable work may be waiting. Run bin/fm-wake-drain.sh first, handle every
+    presented item, then run its exact WAKE_ACK_REQUIRED command. Follow the emitted DSH protocol.
+
+  ✗ Bash(bin/fm-wake-drain.sh) · 0s
+   ⎿ AbortError: ABORTED — Error: tool call aborted
+     ctrl+t for the full trajectory
+  ╭─ commands · 1 items ────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ ❯ exit     Exit dsh-tui                                                                                         │
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯ /exit                                                                                                         ⛶
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                       30k/1.0M 3.0%
+   deepseek-v4-flash · high · cache 99.4% · ≈¥0.04 idle · fm-dsh-primary.qu035p                  ctx 3.0% (30k/1.0m)
+
+
+
+Resume with the command below:
+DSH_TUI_RESUME_SESSION=6b871ab8-6157-4ee8-aa58-1de09e6e06f2 dsh --profile dsh-tui
+charlesabrooker@Mac-Studio fm-dsh-primary.qu035p %
+charlesabrooker@Mac-Studio fm-dsh-primary.qu035p %
+charlesabrooker@Mac-Studio fm-dsh-primary.qu035p %

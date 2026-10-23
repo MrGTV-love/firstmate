@@ -1,0 +1,61 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.M5Zcrn
+/private/tmp/fm-dsh-parent.P7uWDq
+registered: state/primary-probe.check.sh
+watcher: stopped pid=16596
+interrupt-delivered dsh-primary-94182 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-primary-94182 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-98706-13078:w1:p1 worktree=/private/tmp/fm-dsh-primary.M5Zcrn
+warning: secondmate dsh-primary-94182 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.M5Zcrn/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.M5Zcrn/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.M5Zcrn/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.M5Zcrn/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.M5Zcrn/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-94182 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-98706-13078:w1:p1 worktree=/private/tmp/fm-dsh-primary.M5Zcrn
+
+  ⚓ Thinking (ctrl+o to expand)
+
+  ⏺ FMWAKEHANDLED
+
+  ❯ Firstmate supervision needs repair. The delivered wake still needs its generation-bound acknowledgement.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+    ●  1 registered custom check(s), but no live watcher holds this home lock (last beat: 14s ago).
+    ●  repair missing watcher supervision through the native DSH primary plugin; diagnose its feedback, then let
+    the recovery turn end recheck the watcher, or have the launching owner restart bin/fm-dsh-primary.sh --resume
+    if the plugin is missing.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    Run bin/fm-wake-drain.sh first, then follow the emitted DSH supervision protocol.
+
+  ⚓ Thinking · 1s (ctrl+o to expand)
+
+  • Bash(bin/fm-wake-drain.sh) · 0s
+   ⎿ [stderr]
+     WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this
+     episode.
+
+  ⚓ Thinking · 4s (ctrl+o to expand)
+
+  ⏺ Queue is drained: nothing is pending, and the delivered sequences were already acknowledged through sequence 3 with
+    the required generation token, so no second acknowledgement is due.
+
+    The only outstanding item is the watcher report itself, which is the throwaway home's own supervision process
+    rather than durable work. Nothing in the queue needs handling, so I'm ending this turn to let the supervision check
+    re-run.
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                               ⛶
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                       28k/1.0M 2.8%
+   deepseek-v4-flash · high · cache 99.3% · ≈¥0.04 idle · fm-dsh-primary.M5Zcrn                  ctx 2.8% (28k/1.0m)
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.M5Zcrn
+parent_home=/private/tmp/fm-dsh-parent.P7uWDq
+secondmate_home=/private/tmp/fm-dsh-second.IHY1GZ
+cleanup_exit=1
+exit=1 elapsed=192s

@@ -1,0 +1,27 @@
+/tmp/fm-lab.JIyP6b
+lab_home=/tmp/fm-lab.JIyP6b
+== adversarial: --harness omp --model deepseek/deepseek-v4-flash
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.JIyP6b
+error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+exit=1
+lab workspaces after refusal: []
+ok - DeepSeek forced onto omp refused before launch; no task meta; no launch bound
+== implicit: no harness, --model deepseek/deepseek-v4-flash, crew default omp
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.JIyP6b
+warning: task dsh-route-scout-83885: /tmp/fm-lab.JIyP6b/data/dsh-route-scout-83885/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+waiting: treehouse get to enter an isolated worktree; foreground unknown; elapsed 60s; no path/output progress for 59s; last path '/private/tmp/fm-route-proj.4syAGt' (it is the project checkout itself)
+skill selection for dsh-route-scout-83885: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-route-scout-83885 harness=dsh kind=scout window=fm-lab-dsh-route-83897-3310:w1:p2 worktree=/private/tmp/fm-route-proj.4syAGt/.treehouse/fm-route-proj.4syAGt-92634c/1/fm-route-proj.4syAGt
+harness=dsh
+kind=scout
+model=deepseek/deepseek-v4-flash
+backend=herdr
+herdr_session=fm-lab-dsh-route-83897-3310
+dsh session log: /private/tmp/fm-lab.JIyP6b/state/dsh-route-scout-83885.dsh/s1792735974.85063.22966/dsh/sessions/--private-tmp-fm-route-proj.4syAGt-.treehouse-fm-route-proj.4syAGt-92634c-1-fm-route-proj.4syAGt--/066a471d-5e5d-485f-82fc-df7464cb6a89/session.v4.jsonl
+dsh state: idle
+detected harness: claude
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.JIyP6b
+stopped dsh-route-scout-83885 harness=dsh backend=herdr endpoint=fm-lab-dsh-route-83897-3310:w1:p2 worktree=/private/tmp/fm-route-proj.4syAGt/.treehouse/fm-route-proj.4syAGt-92634c/1/fm-route-proj.4syAGt
+ok - DeepSeek model with no harness launched real dsh-tui (crew default omp ignored), answered, exited
+cleanup_exit=0

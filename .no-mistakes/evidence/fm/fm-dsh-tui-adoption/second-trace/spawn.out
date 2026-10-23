@@ -1,0 +1,8 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.sZMsHg
+warning: secondmate dsh-second-90938 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-lab.2q10th/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-lab.2q10th/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-lab.2q10th/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-lab.2q10th/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-lab.2q10th/config: destination does not allow inherited item (not gitignored or guard failed)
+spawned dsh-second-90938 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-second-90951-4225:w1:p2 worktree=/private/tmp/fm-lab.2q10th

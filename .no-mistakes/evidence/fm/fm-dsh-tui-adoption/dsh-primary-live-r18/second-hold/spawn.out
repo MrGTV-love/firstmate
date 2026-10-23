@@ -1,0 +1,7 @@
+warning: secondmate dsh-second-17683 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-second.ZM1gdt/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-second.ZM1gdt/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-second.ZM1gdt/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-second.ZM1gdt/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-second.ZM1gdt/config: destination does not allow inherited item (not gitignored or guard failed)
+spawned dsh-second-17683 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-primary-26468-31665:w2:p2 worktree=/private/tmp/fm-dsh-second.ZM1gdt

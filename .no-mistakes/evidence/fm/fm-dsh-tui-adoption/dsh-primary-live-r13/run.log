@@ -1,0 +1,80 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.qu035p
+/private/tmp/fm-dsh-parent.DTHz4b
+registered: state/primary-probe.check.sh
+watcher: stopped pid=21739
+interrupt-delivered dsh-primary-92781 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-primary-92781 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-99115-1887:w1:p1 worktree=/private/tmp/fm-dsh-primary.qu035p
+warning: secondmate dsh-primary-92781 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-92781 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-99115-1887:w1:p1 worktree=/private/tmp/fm-dsh-primary.qu035p
+ok - forced native owner death retired private arm and watcher
+warning: secondmate dsh-primary-92781 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.qu035p/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-92781 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-99115-1887:w1:p1 worktree=/private/tmp/fm-dsh-primary.qu035p
+stopped dsh-primary-92781 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-99115-1887:w1:p1 worktree=/private/tmp/fm-dsh-primary.qu035p
+ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume
+/private/tmp/fm-dsh-second.FG1fYr
+warning: secondmate dsh-second-92781 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-second.FG1fYr/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-second.FG1fYr/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-second.FG1fYr/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-second.FG1fYr/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-second.FG1fYr/config: destination does not allow inherited item (not gitignored or guard failed)
+spawned dsh-second-92781 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-primary-99115-1887:w2:p2 worktree=/private/tmp/fm-dsh-second.FG1fYr
+secondmate spawn returned after 73s
+secondmate log at spawn return: turn/start=True user/message=True
+    load skills, dispatch or edit code. Ignore startup diagnostics from this throwaway home.
+
+  ⚓ Thinking · 2s (ctrl+o to expand)
+
+  ⏺ Captain, shipshape — this lab home is empty and idle. No queued work, nothing under way, and no supervision cycle
+    is needed yet, so I'll stay quietly on deck until work is routed here.
+
+  ❯ Firstmate watcher notification: durable work may be waiting. Run bin/fm-wake-drain.sh first, handle every
+    presented item, then run its exact WAKE_ACK_REQUIRED command. Follow the emitted DSH protocol.
+
+  ⚓ Thinking · 1s (ctrl+o to expand)
+
+  • Bash(bin/fm-wake-drain.sh 2>&1 | head -200) · 0s
+   ⎿ 1792729973      1       check   startup-network check: startup-network: deferred startup network checks finished
+     (done); read them with /private/tmp/fm-dsh-second.FG1fYr/bin/fm-startup-network.sh report
+     WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation
+     75967.1792729973.eDVKU2
+     ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     … +7 lines (ctrl+o to expand)
+
+  ⚓ Thinking · 2s (ctrl+o to expand)
+
+  • Bash(bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 75967.1792729973.eDVKU2 2>&1 | head -60) · 0s
+   ⎿ (no output)
+
+  ⚓ Thinking · 1s (ctrl+o to expand)
+
+  ⏺ Captain, shipshape — the only queued notification was the deferred startup diagnostic, which I've cleared and
+    disregarded per this lab home's instructions. Nothing actionable today; staying idle until work is routed here.
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                               ⛶
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                       24k/1.0M 2.4%
+   deepseek-v4-flash · high · cache 99.0% · ≈¥0.02 idle · fm-dsh-second.FG1fYr                   ctx 2.4% (24k/1.0m)
+watcher: none running
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.qu035p
+parent_home=/private/tmp/fm-dsh-parent.DTHz4b
+secondmate_home=/private/tmp/fm-dsh-second.FG1fYr
+cleanup_exit=1
+exit=1 elapsed=318s

@@ -1,0 +1,16 @@
+spawn start 01:35:32
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.sZMsHg
+warning: secondmate dsh-second-90938 sync skipped before launch: primary default-branch commit cannot be resolved
+spawned dsh-second-90938 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-second-90951-4225:w1:p2 worktree=/private/tmp/fm-lab.2q10th
+spawn exit=0 elapsed=13s end 01:35:45
+plugin startup +8.2s
+plugin error +8.2s
+plugin turn-end +12.5s
+plugin read-only +12.7s
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.sZMsHg
+stopped dsh-second-90938 harness=dsh backend=herdr endpoint=fm-lab-dsh-second-90951-4225:w1:p2 worktree=/private/tmp/fm-lab.2q10th
+/Users/charlesabrooker/.no-mistakes/evidence/01M5JRFS63G46A60XJZCFYZJPQ/second-trace/../probe-scripts/second-trace.sh: line 14: 91892 Terminated: 15          ( for k in $(seq 1 30);
+do
+    sleep 3; echo "=== +$(( $(date +%s)-start ))s"; ps -axo pid,ppid,etime,command | grep -E "dsh|$SECOND|fm-spawn|launch-brief|op-input" | grep -v grep | cut -c1-400;
+done ) > "$TASK/ps-trace.txt" 2>&1
+parent=/private/tmp/fm-lab.sZMsHg second=/private/tmp/fm-lab.2q10th cleanup_exit=0

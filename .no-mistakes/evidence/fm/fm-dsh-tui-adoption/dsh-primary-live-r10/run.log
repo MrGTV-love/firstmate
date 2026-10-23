@@ -1,0 +1,58 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.IRVZm3
+/private/tmp/fm-dsh-parent.Mo5zY5
+registered: state/primary-probe.check.sh
+watcher: stopped pid=79027
+interrupt-delivered dsh-primary-49577 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-primary-49577 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-54821-23505:w1:p1 worktree=/private/tmp/fm-dsh-primary.IRVZm3
+warning: secondmate dsh-primary-49577 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.IRVZm3/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.IRVZm3/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.IRVZm3/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.IRVZm3/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.IRVZm3/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-49577 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-54821-23505:w1:p1 worktree=/private/tmp/fm-dsh-primary.IRVZm3
+  ⚓ Thinking (ctrl+o to expand)
+
+  • Bash(bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 79027.1792729174.naZlz3) · 0s
+   ⎿ (no output)
+
+  ⏺ FMWAKEHANDLED
+
+  ❯ Firstmate supervision needs repair. The delivered wake still needs its generation-bound acknowledgement.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  TURN WOULD END BLIND - SUPERVISION IS OFF
+    ●  1 registered custom check(s), but no live watcher holds this home lock (last beat: 49s ago).
+    ●  repair missing watcher supervision through the native DSH primary plugin; diagnose its feedback, then let
+    the recovery turn end recheck the watcher, or have the launching owner restart bin/fm-dsh-primary.sh --resume
+    if the plugin is missing.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    Run bin/fm-wake-drain.sh first, then follow the emitted DSH supervision protocol.
+
+  ⚓ Thinking (ctrl+o to expand)
+
+  • Bash(bin/fm-wake-drain.sh) · 0s
+   ⎿ [stderr]
+     WARNING: watcher still down (same stale episode; last beat: 1s ago, grace 300s) - full banner already printed this
+     episode.
+
+  ⚓ Thinking · 6s (ctrl+o to expand)
+
+  ⏺ FMWAKEHANDLED
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                               ⛶
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                       30k/1.0M 3.0%
+   deepseek-v4-flash · high · cache 99.3% · ≈¥0.05 idle · fm-dsh-primary.IRVZm3                  ctx 3.0% (30k/1.0m)
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.IRVZm3
+parent_home=/private/tmp/fm-dsh-parent.Mo5zY5
+secondmate_home=/private/tmp/fm-dsh-second.kaTquA
+cleanup_exit=1
+exit=1 elapsed=208s

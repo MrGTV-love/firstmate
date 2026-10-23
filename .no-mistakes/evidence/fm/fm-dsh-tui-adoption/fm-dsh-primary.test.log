@@ -1,0 +1,9 @@
+FM_TEST_BEGIN 2026-10-23T05:55:04Z tests/fm-dsh-primary.test.sh family=unclassified expected_gate_skip=none
+ok - DSH primary enters its digest ahead of the brief in the first step, reports startup failure there, bounds guard follow-ups, preserves wake acknowledgement, excludes children, and retires watcher descendants on disposal and native SIGKILL
+FM_TEST_END 2026-10-23T05:55:23Z tests/fm-dsh-primary.test.sh exit=0 duration_ms=18785 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=19159
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=18785 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-dsh-primary.test.sh duration_ms=18785
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+nice -n 20 bash bin/fm-test-run.sh tests/fm-dsh-primary.test.sh  1.53s user 5.77s system 37% cpu 19.403 total

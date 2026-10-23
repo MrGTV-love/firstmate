@@ -1,0 +1,15 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.pjbIf7
+/private/tmp/fm-dsh-parent.Kd5SMG
+registered: state/primary-probe.check.sh
+fm-herdr-lab: fleet-state tripwire requires exactly one running default session
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-dsh-primary-34306-14756'; refusing destructive calls
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.pjbIf7
+parent_home=/private/tmp/fm-dsh-parent.Kd5SMG
+cleanup_exit=1
+exit=1 elapsed=5s

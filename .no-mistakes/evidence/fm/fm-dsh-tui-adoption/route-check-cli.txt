@@ -1,0 +1,21 @@
+# route MODEL [PROVIDER] -> harness
+route deepseek/deepseek-v4-flash   -> dsh
+route deepseek/deepseek-v4-pro     -> dsh
+route deepseek-v4-flash deepseek   -> dsh
+route claude-opus-4-1              -> claude
+route claude-sonnet-5-5            -> claude
+route openai/gpt-5                 -> omp
+route zai/glm-5                    -> omp
+route moonshot/kimi-k2             -> omp
+route deepseek-v4-flash            -> omp
+# check HARNESS MODEL [PROVIDER] (contradiction guard)
+check dsh deepseek/deepseek-v4-flash     -> rc=0 
+check omp deepseek/deepseek-v4-flash     -> rc=1 error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+check claude deepseek/deepseek-v4-flash  -> rc=1 error: DeepSeek runs through dsh-tui, not claude; select --harness dsh
+check pi deepseek/deepseek-v4-flash      -> rc=1 error: DeepSeek runs through dsh-tui, not pi; select --harness dsh
+check dsh claude-opus-4-1                -> rc=1 error: dsh runs only DeepSeek models, not 'claude-opus-4-1'
+check dsh openai/gpt-5                   -> rc=1 error: dsh runs only DeepSeek models, not 'openai/gpt-5'
+check dsh deepseek/                      -> rc=1 error: dsh requires an explicit DeepSeek model id
+check omp openai/gpt-5                   -> rc=0 
+check claude claude-opus-4-1             -> rc=0 
+check omp deepseek-v4-flash deepseek     -> rc=1 error: DeepSeek runs through dsh-tui, not omp; select --harness dsh

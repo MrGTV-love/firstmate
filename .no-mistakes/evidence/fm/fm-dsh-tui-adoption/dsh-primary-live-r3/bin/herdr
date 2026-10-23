@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -eu
+args=("$@")
+n=${#args[@]}
+[ "$n" -ge 2 ] && [ "${args[$((n-2))]}" = --session ] && [ "${args[$((n-1))]}" = 'fm-lab-dsh-primary-74841-19513' ] || { echo 'primary lab refuses an unscoped Herdr call' >&2; exit 98; }
+args=("${args[@]:0:$((n-2))}")
+exec env PATH='/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources' '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JRFS63G46A60XJZCFYZJPQ/bin/fm-herdr-lab.sh' run 'fm-lab-dsh-primary-74841-19513' "${args[@]}"

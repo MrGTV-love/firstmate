@@ -1,0 +1,43 @@
+DSH primary live runtime:
+@deepseek-harness-tui/dsh-tui 0.16.1 (launcher)
+profile: 0.16.1  /Users/charlesabrooker/.dsh/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui
+DSH CLI: 0.2.1-rc.2
+Node: v26.4.0
+/private/tmp/fm-dsh-primary.74lzIY
+/private/tmp/fm-dsh-parent.rBzor2
+registered: state/primary-probe.check.sh
+watcher: stopped pid=58381
+interrupt-delivered dsh-primary-2388 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-primary-2388 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-11490-30512:w1:p1 worktree=/private/tmp/fm-dsh-primary.74lzIY
+warning: secondmate dsh-primary-2388 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-2388 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-11490-30512:w1:p1 worktree=/private/tmp/fm-dsh-primary.74lzIY
+ok - forced native owner death retired private arm and watcher
+warning: secondmate dsh-primary-2388 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-primary.74lzIY/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-primary-2388 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-primary-11490-30512:w1:p1 worktree=/private/tmp/fm-dsh-primary.74lzIY
+stopped dsh-primary-2388 harness=dsh backend=herdr endpoint=fm-lab-dsh-primary-11490-30512:w1:p1 worktree=/private/tmp/fm-dsh-primary.74lzIY
+ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume
+/private/tmp/fm-dsh-second.bk2MmQ
+warning: secondmate dsh-second-2388 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-second.bk2MmQ/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-second.bk2MmQ/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-second.bk2MmQ/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-second.bk2MmQ/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-second.bk2MmQ/config: destination does not allow inherited item (not gitignored or guard failed)
+error: dsh-tui session log: no depth-zero dsh session log yet; inspect window fm-lab-dsh-primary-11490-30512:w2:p2
+watcher: none running
+watcher: none running
+primary_home=/private/tmp/fm-dsh-primary.74lzIY
+parent_home=/private/tmp/fm-dsh-parent.rBzor2
+secondmate_home=/private/tmp/fm-dsh-second.bk2MmQ
+cleanup_exit=1
+exit=1 elapsed=241s

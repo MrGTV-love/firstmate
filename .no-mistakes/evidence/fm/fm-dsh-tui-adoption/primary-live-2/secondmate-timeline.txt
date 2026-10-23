@@ -1,0 +1,12 @@
+Run 2 secondmate spawn timeline (local time, 2026-10-23), from file mtimes and logged epoch-ms:
+01:02:19  lab bash-wrapper dir created; fm-spawn.sh --secondmate starts
+01:02:23  prepare-primary binds runtime (state/dsh-second-24340.dsh-session); launch file staged and sent to pane
+01:03:23  dsh-tui writes its first runtime file (dsh/.anonymous-user-id)
+01:03:24.665  plugin 'startup' row; lab barrier 'reached' (fm-sessionstart-run.sh invoked)
+~01:03:30  test releases the barrier (after its 5 s settle + held-state assertions)
+01:03:32  session start complete
+01:03:33.046  session log turn/start (digest + positional brief claimed)
+01:03:36  spawn fails: "dsh-tui screen: could not parse the composer frame or its input content; refusing launch"
+Pane at failure (secondmate-screens.txt): normal dsh frame; status row "deepseek-v4-flash · high · <home>" has no ctx cell yet, "Holding for a token / Give me a sec · 0 tokens".
+dsh_wait_for_start budget: FM_DSH_START_POLLS=120 x 0.5 s + per-poll python, ~72 s from launch; ~60 s of it elapsed before dsh-tui wrote any runtime file.
+Run 1 (same failure): spawn 00:58:58, barrier reached 01:00:02, failed 01:00:15.
