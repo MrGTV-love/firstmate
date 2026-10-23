@@ -17,6 +17,8 @@ CONFIG="$TMP_ROOT/config"
 CALLS="$TMP_ROOT/calls.jsonl"
 SETTINGS="$TMP_ROOT/settings.json"
 mkdir -p "$DATA/projection" "$CONFIG"
+# Fixture projections are reduced copies of data/model-picker/projection/<slug>.json from
+# the 2026-10-16 snapshot; every number below is the source projection's own value.
 for slug in claude-sonnet-5-5-high claude-opus-5-5-high claude-haiku-5-5 \
             gpt-6-1-sol-high gpt-6-luna-low deepseek-v4-flash; do
   cp "$ROOT/tests/fixtures/model-picker-shadow/projection/$slug.json" "$DATA/projection/" \
@@ -104,7 +106,7 @@ ENDPOINT="http://127.0.0.1:$(cat "$TMP_ROOT/port")"
 run_observe() {  # <status> [extra args...]
   local status=$1
   shift
-  rm -f "$DATA/aa.sqlite"
+  [ "${KEEP_DB:-0}" = 1 ] || rm -f "$DATA/aa.sqlite"
   : > "$CALLS"
   OUT='' ERR='' CODE=0
   FM_HOME="$TMP_ROOT/home" FM_MODEL_PICKER_DATA="$DATA" FM_MODEL_PICKER_SHADOW=1 \
@@ -463,6 +465,29 @@ check 'grep -q -- "--report" <<<"$OUT"' "help lists --report"
 check 'grep -q -- "--check-routes" <<<"$OUT"' "help lists --check-routes"
 check 'grep -q "FM_MODEL_PICKER_SHADOW" <<<"$OUT"' "help names the flag"
 check 'grep -q "Exit codes" <<<"$OUT"' "help states exit codes"
+finish
+
+
+begin "the confidence bands are applied in code and only logged"
+for pair in '0.95|dispatch' '0.85|dispatch' '0.8499|ask' '0.55|ask' '0.5499|escalate' '0.10|escalate'; do
+  confidence=${pair%%|*}; band=${pair#*|}
+  settings "{\"work_type\":\"feature\",\"worker\":\"candidate_3\",\"validator\":\"candidate_6\",\"worker_confidence\":$confidence}"
+  run_observe clear
+  got=$(row ".confidence_band")
+  check '[ "$got" = "'"$band"'" ]' "confidence $confidence is band $band"
+done
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6","worker_confidence":null}'
+run_observe clear
+check '[ "$(row ".confidence_band")" = null ]' "a missing confidence takes no band"
+finish
+
+begin "two dispatches write two rows and keep both picks"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+rm -f "$DATA/aa.sqlite"
+KEEP_DB=1 run_observe clear
+KEEP_DB=1 run_observe clear
+count=$(python3 -I -c 'import sqlite3,sys;print(sqlite3.connect(sys.argv[1]).execute("select count(*) from dispatch_log").fetchone()[0])' "$DATA/aa.sqlite")
+check '[ "$count" = 2 ]' "two dispatches give two rows"
 finish
 
 [ "$FAILED" -eq 0 ] || fail "$FAILED shadow picker case(s) failed"

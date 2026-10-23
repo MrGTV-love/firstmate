@@ -1943,14 +1943,15 @@ shadow_sql() { python3 -I -c 'import sqlite3,sys; print("\n".join("|".join(str(c
 
 run_shadow ''
 OFF=$OUT
-off_calls=$(count)
 [ ! -e "$SHADOW_DATA/aa.sqlite" ] || fail 'flag off created the picker store'
-run_shadow ''
 strip_diag "$OFF" > "$TMP_ROOT/off1.txt"
+run_shadow ''
 strip_diag "$OUT" > "$TMP_ROOT/off2.txt"
 diff -u "$TMP_ROOT/off1.txt" "$TMP_ROOT/off2.txt" > "$TMP_ROOT/offdiff.txt" \
   || fail "two flag-off resolves differ: $(cat "$TMP_ROOT/offdiff.txt")"
-assert_equals "$off_calls" "$(count)" 'flag off adds no Jev request'
+assert_equals 2 "$(grep -c '"rule"' "$CALLS" || true)" 'two flag-off resolves make only their own rule calls'
+assert_equals 0 "$(grep -c '"work_type"' "$CALLS" || true)" 'flag off adds no picker request'
+off_calls=$(count)
 run_shadow 1
 ON=$OUT
 strip_diag "$OFF" > "$TMP_ROOT/off.txt"

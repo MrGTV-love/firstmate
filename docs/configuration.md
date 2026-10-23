@@ -1032,7 +1032,6 @@ It exits 1 when a mapped projection is missing or its asserted name does not mat
 Paired runs, calibration and weight fitting, confidence-band curves, the ±0.1 stability test, re-clustering, flipping any work type live, OpenRouter and its key, the validator-lane currency decision, a mandatory validator scope per work type, and the paid Artificial Analysis Data API remain later, captain-gated phases.
 This section documents them only; none is built or enabled here.
 The extension points are a new route-table entry, a new seed mix or floor under a new `POLICY_VERSION`, and a later live phase that would need its own captain decision.
-
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 
 The optional local, gitignored `config/turnend-churn-absorb` presence flag opts this home into a default-off third form of positive work evidence in watcher triage.
