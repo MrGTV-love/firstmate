@@ -190,7 +190,20 @@ SH
   assert_equals deepseek/deepseek-v4-pro "$(journal_field "$dir" smd to_model)" \
     "the replacement must carry the calling DSH session's bound model"
   [ "$(cat "$dir/fake/command")" = claude ] || fail "the pending-composer refusal stopped the running agent"
-  pass "fm-control relaunch: a config dsh secondmate with no model carries the DSH session's bound model and refuses without one before stopping"
+  # A secondmate already on dsh keeps its recorded model and effort, so the
+  # replacement resumes its conversation rather than adopting the primary's.
+  rm -f "$home/state/smd.control-relaunch"
+  sed -e 's/^harness=claude$/harness=dsh/' -e 's|^model=default$|model=deepseek/recorded-model|' -e 's/^effort=default$/effort=max/' \
+    "$dir/prior.meta" > "$home/state/smd.meta"
+  printf 'dsh' > "$dir/fake/command"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_contains "$out" "composer visibly holds pending text" "the recorded profile must pass every pre-stop admission"
+  assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" \
+    "a dsh secondmate must keep its recorded model rather than the calling session's"
+  assert_equals max "$(journal_field "$dir" smd to_effort)" "a dsh secondmate must keep its recorded effort"
+  [ "$(cat "$dir/fake/command")" = dsh ] || fail "the pending-composer refusal stopped the running dsh agent"
+  pass "fm-control relaunch: a config dsh secondmate with no model keeps a recorded dsh profile, else carries the DSH session's bound model, and refuses without one before stopping"
 }
 
 test_relaunch_omp_billing_admission_preserves_running_agents() {

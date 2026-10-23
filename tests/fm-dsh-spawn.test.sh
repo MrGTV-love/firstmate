@@ -315,7 +315,7 @@ run_dsh_spawn() {  # <id> <spawn-args...>
   shift
   python3 "$TMP_ROOT/dsh-session-writer.py" "$HOME_DIR/state" "$id" "$LAUNCH_LOG" &
   writer=$!
-  out=$(DSH_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="${FM_FAKE_CAPTURE_FILE:-$CASE_DIR/screen}" \
+  out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="${FM_FAKE_CAPTURE_FILE:-$CASE_DIR/screen}" \
     fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" "$@")
   status=$?
   kill "$writer" 2>/dev/null
@@ -460,7 +460,7 @@ test_mirrored_dsh_primary_carries_its_bound_model() {
 }
 
 # Spawn a dsh secondmate of the current case into its own seeded home.
-secondmate_spawn() {  # <id> -> spawn output
+secondmate_spawn() {  # <id> [spawn-args...] -> spawn output
   local sm="$CASE_DIR/sm-$1" writer status out
   mkdir -p "$sm/bin" "$sm/data" "$sm/state" "$sm/config" "$sm/projects"
   cp "$ROOT/bin/fm-turnend-guard.sh" "$sm/bin/fm-turnend-guard.sh"
@@ -471,9 +471,9 @@ secondmate_spawn() {  # <id> -> spawn output
   : > "$LAUNCH_LOG"
   python3 "$TMP_ROOT/dsh-session-writer.py" "$HOME_DIR/state" "$1" "$LAUNCH_LOG" &
   writer=$!
-  out=$(DSH_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 \
+  out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 \
     FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
-    fm_test_run_spawn "$HOME_DIR" "$sm" "$FAKEBIN_DIR" "$1" "$sm" dsh --secondmate --model "$DSH_MODEL")
+    fm_test_run_spawn "$HOME_DIR" "$sm" "$FAKEBIN_DIR" "$1" "$sm" dsh --secondmate --model "$DSH_MODEL" "${@:2}")
   status=$?
   kill "$writer" 2>/dev/null
   wait "$writer" 2>/dev/null
@@ -500,6 +500,66 @@ test_secondmate_launch_carries_brief_and_operator_home() {
   assert_equals -- "$(sed -n 3p "$log.args")" "the brief must reach dsh-tui as its positional opening prompt"
   [ -n "$(sed -n 4p "$log.args")" ] || fail "the secondmate brief must not be empty: $(cat "$log.args")"
   pass "fm-spawn: a dsh secondmate starts on its positional brief and carries the operator's DSH install and home to nested spawns"
+}
+
+# A plain relaunch of a dsh secondmate keeps its recorded model and effort even
+# when the calling DSH primary is bound to another model, so it resumes the
+# same generation's conversation instead of replacing it.
+test_secondmate_plain_relaunch_resumes_its_recorded_dsh_profile() {
+  local id=dsh-sm-resume sm primary binding generation session out status bin writer
+  make_dsh_case secondmate-resume "$id" claude
+  mkdir -p "$CASE_DIR/spawner-operator" "$CASE_DIR/sentinel-source/profiles/dsh-tui/node_modules"
+  printf '{}\n' > "$CASE_DIR/sentinel-source/profiles/dsh-tui/package.json"
+  printf 'sentinel-inherited-source\n' > "$CASE_DIR/sentinel-source/.credentials.yaml"
+  printf 'dsh\n' > "$HOME_DIR/config/secondmate-harness"
+  out=$(FM_DSH_SOURCE_HOME="$CASE_DIR/sentinel-source" secondmate_spawn "$id" --effort high 2>&1)
+  status=$?
+  expect_code 0 "$status" "a dsh secondmate must spawn: $out"
+  sm="$CASE_DIR/sm-$id"
+  binding="$HOME_DIR/state/$id.dsh-session"
+  generation=$(jq -r .root "$binding")
+  assert_equals secret "$(cat "$generation/dsh/.credentials.yaml")" \
+    "the spawn helper must stage from the fixture install, not an inherited FM_DSH_SOURCE_HOME"
+  session=$(head -n 1 "$generation/dsh/sessions/workspace/session/session.v4.jsonl" | jq -r .id)
+  primary=$(FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" python3 "$ROOT/bin/fm-dsh.py" prepare-primary \
+    "$CASE_DIR/primary-state" dsh-primary g1 "$HOME_DIR/user-home/.dsh" deepseek/deepseek-v4-pro max "$HOME_DIR" "$ROOT") \
+    || fail "the DSH primary runtime fixture could not be prepared"
+  bin="$CASE_DIR/relaunch-shell"
+  mkdir -p "$bin"
+  cat > "$bin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *pane_current_command*) printf 'zsh\\n'; exit 0 ;;
+esac
+exec "$FAKEBIN_DIR/tmux" "\$@"
+SH
+  chmod +x "$bin/tmux"
+  : > "$LAUNCH_LOG"
+  python3 - "$generation/dsh/sessions/workspace/session/session.v4.jsonl" "$LAUNCH_LOG" <<'PY' &
+import json, os, sys, time
+log, launch = sys.argv[1:]
+deadline = time.time() + 120
+while time.time() < deadline and not (os.path.exists(launch) and os.path.getsize(launch) > 0):
+    time.sleep(0.02)
+with open(log, "a") as stream:
+    stream.write(json.dumps({"type": "turn/end", "seq": 2}) + "\n" + json.dumps({"type": "turn/start", "seq": 3}) + "\n")
+PY
+  writer=$!
+  out=$(DSH_HOME="$primary/dsh" FM_DSH_SOURCE_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux \
+    FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
+    FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
+    fm_test_run_spawn "$HOME_DIR" "$sm" "$bin:$FAKEBIN_DIR" "$id" --relaunch 2>&1)
+  status=$?
+  kill "$writer" 2>/dev/null
+  wait "$writer" 2>/dev/null
+  expect_code 0 "$status" "a plain relaunch of a dsh secondmate must resume it: $out"
+  assert_grep "model=$DSH_MODEL" "$HOME_DIR/state/$id.meta" "the relaunch must keep the recorded model, not the primary's"
+  assert_grep "effort=high" "$HOME_DIR/state/$id.meta" "the relaunch must keep the recorded effort"
+  assert_equals "$generation" "$(jq -r .root "$binding")" "the relaunch must resume the bound generation"
+  assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "the relaunch must neither delete nor add a generation"
+  assert_equals "$session" "$(jq -r '.[0].config.sessionId' "$generation/launch.yml")" \
+    "the relaunch must resume the recorded conversation"
+  pass "fm-spawn: a plain dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation"
 }
 
 test_launch_policy_admits_dsh() {
@@ -665,6 +725,7 @@ test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_mirrored_dsh_primary_carries_its_bound_model
 test_secondmate_launch_carries_brief_and_operator_home
+test_secondmate_plain_relaunch_resumes_its_recorded_dsh_profile
 test_launch_policy_admits_dsh
 test_deepseek_cannot_launch_on_omp
 test_omp_default_cannot_hide_a_deepseek_route

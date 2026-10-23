@@ -3228,6 +3228,12 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
+if [ "$RELAUNCH" = 1 ] && [ "$MODEL_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
+  prior_dsh=$(fm_meta_get "$RELAUNCH_META" model)
+  [ "$prior_dsh" = default ] || MODEL=$prior_dsh
+  prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
+  [ "$EFFORT_SET" -eq 1 ] || [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
+fi
 if [ "$RAW_LAUNCH" = 0 ] && [ -z "$ARG3" ] && [ "$HARNESS" = dsh ] && { [ -z "$MODEL" ] || [ "$MODEL" = default ]; }; then
   MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) || {
     echo "error: the dsh harness from config/crew-harness, config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness" >&2

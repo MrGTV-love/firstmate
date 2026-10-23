@@ -2230,13 +2230,19 @@ resolve_relaunch_profile() {
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the
   # caller names them too.
+  local dsh_prior_kept=0
   if [ "$MODEL_SET" = 1 ]; then
     TARGET_MODEL=$NEW_MODEL
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_MODEL=${CONFIG_MODEL:-default}
     if [ "$TARGET_HARNESS" = dsh ] && [ "$TARGET_MODEL" = default ]; then
-      TARGET_MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) \
-        || die "the dsh harness from config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness. The running agent was not stopped"
+      if [ "$PRIOR_HARNESS" = dsh ] && [ "$PRIOR_MODEL" != default ]; then
+        TARGET_MODEL=$PRIOR_MODEL
+        dsh_prior_kept=1
+      else
+        TARGET_MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) \
+          || die "the dsh harness from config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness. The running agent was not stopped"
+      fi
     fi
   elif [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
     TARGET_MODEL=$PRIOR_MODEL
@@ -2245,6 +2251,8 @@ resolve_relaunch_profile() {
   fi
   if [ "$EFFORT_SET" = 1 ]; then
     TARGET_EFFORT=$NEW_EFFORT
+  elif [ "$dsh_prior_kept" = 1 ] && [ -z "$CONFIG_EFFORT" ]; then
+    TARGET_EFFORT=$PRIOR_EFFORT
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_EFFORT=${CONFIG_EFFORT:-default}
   elif [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
