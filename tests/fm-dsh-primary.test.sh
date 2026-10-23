@@ -95,15 +95,43 @@ await delay(100);
 interrupt.abort();
 inbox.length = 0;
 await assert.rejects(interrupted, {name: 'AbortError'}, 'the cancelled step must enter nothing');
+cancelled.end();
 await cancelledStart;
 const typed = {id: 'typed', role: 'user', source: {kind: 'user'}, content: [{type: 'text', text: 'continue'}]};
 inbox.push(typed);
 const resumed = await cancelled.run(inbox, new AbortController().signal);
 assert.deepEqual(resumed.map(input => input.content[0].text), ['SESSION START - fixture\n', 'opening brief', 'continue'], 'the next step must carry the digest, then the brief, then new input');
 assert.equal(new Set(resumed.map(input => input.id)).size, resumed.length, 'nothing may be delivered twice');
+for (const input of resumed) cancelled.consume(input);
+cancelled.end();
 inbox.push(typed);
 assert.deepEqual(await cancelled.run(inbox, new AbortController().signal), [typed], 'the held messages must be delivered only once');
 cancelled.stop();
+// The installed DSH awaits agent/created, so the digest is ready before the
+// first step; the real cancel windows are later. DSH drops a claimed batch
+// without restoring it when a downstream pre-step throws on abort, or when it
+// aborts after the waterfall returns but before the step starts.
+for (const window of ['downstream-throw', 'aborted-before-step-start']) {
+  const held = setup(`startup-${window}`);
+  await held.emit('agent/created', {agent: held.agent});
+  const queue = [brief];
+  const cancel = new AbortController();
+  if (window === 'downstream-throw') {
+    await assert.rejects(held.run(queue, cancel.signal, held.agent, () => { cancel.abort(); cancel.signal.throwIfAborted(); }), {name: 'AbortError'});
+  } else {
+    const entered = await held.step(queue.splice(0));
+    assert.equal(entered.messages.length, 2, 'the waterfall must offer the digest and the brief');
+  }
+  held.end();
+  queue.push(typed);
+  const next = await held.run(queue, new AbortController().signal);
+  assert.deepEqual(next.map(input => input.content[0].text), ['SESSION START - fixture\n', 'opening brief', 'continue'], `${window}: the next step must restore the digest and the brief`);
+  for (const input of next) held.consume(input);
+  held.end();
+  queue.push(typed);
+  assert.deepEqual(await held.run(queue, new AbortController().signal), [typed], `${window}: restored messages must be delivered once`);
+  held.stop();
+}
 // Escape cancels with keepInbox: input queued during the held step survives
 // and enters after the held digest and brief.
 const escaped = setup('startup-escape', {slowStart: true});
@@ -120,6 +148,7 @@ const early = {id: 'early', role: 'user', source: {kind: 'user'}, content: [{typ
 kept.push(early);
 escape.abort();
 await assert.rejects(escapedStep, {name: 'AbortError'}, 'the escaped step must enter nothing');
+escaped.end();
 await escapedStart;
 const afterEscape = await escaped.run(kept, new AbortController().signal);
 assert.deepEqual(afterEscape.map(input => input.content[0].text), ['SESSION START - fixture\n', 'opening brief', 'queued during the hold'], 'the kept inbox must follow the held digest and brief');

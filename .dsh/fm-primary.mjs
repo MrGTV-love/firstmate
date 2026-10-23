@@ -35,6 +35,8 @@ export function apply(ctx, config) {
   let started = false;
   let leading;
   let launchInput = false;
+  let holding;
+  let holdingIds;
   let generation = 0;
   const ownMessages = new Set();
   const wakeMessages = new Set();
@@ -215,6 +217,8 @@ export function apply(ctx, config) {
     // resolves, so the digest enters that step ahead of the opening prompt.
     let lead;
     leading = undefined;
+    holding = undefined;
+    holdingIds = undefined;
     launchInput = source === 'startup';
     if (launchInput) leading = new Promise(accept => { lead = input => accept(input ? [input] : []); });
     const own = text => {
@@ -247,36 +251,43 @@ export function apply(ctx, config) {
   // The held step's claimed launch input is this adapter's own, so it never
   // resets the failure budget. The downstream pre-step runs first: DSH's
   // checkpoint there makes the open turn durable before the digest wait.
-  // Cancellation drops an aborted step's claimed batch (a non-user cancel also
-  // clears the inbox); the held messages then lead the next step instead.
+  // DSH drops a cancelled or failed step's claimed batch without restoring it
+  // (a non-user cancel also clears the inbox), so the digest and that batch
+  // stay held until one of them is logged; a turn that ends first hands them
+  // to the next step.
   ctx.on('agent/pre-step', async (payload, next) => {
     if (payload.agent !== agent || !leading) return next();
     const pending = leading;
     leading = undefined;
     if (launchInput) for (const input of payload.messages) ownMessages.add(input.id);
     launchInput = false;
+    const ids = new Set(payload.messages.map(input => input.id));
+    holding = pending.then(held => [...held, ...payload.messages]);
+    holdingIds = ids;
+    void pending.then(held => { for (const input of held) ids.add(input.id); });
     const decision = await next();
     if (decision.kind !== 'enter') {
+      holding = undefined;
+      holdingIds = undefined;
       leading = pending;
       return decision;
     }
     const first = await Promise.race([pending, aborted(payload.signal)]);
-    if (payload.signal.aborted) {
-      leading = pending.then(held => [...held, ...payload.messages]);
-      return decision;
-    }
+    if (payload.signal.aborted) return decision;
     return {kind: 'enter', messages: [...first, ...decision.messages]};
   });
   ctx.on('session/event', (session, event) => {
     if (session !== agent?.session) return;
     if (event.type === 'user/message') {
       const id = event.data?.id;
+      if (holdingIds?.has(id)) { holding = undefined; holdingIds = undefined; }
       if (wakeMessages.delete(id)) wakeConsumed = true;
       // DSH also logs its own runtime context as user/message; only real
       // user input reopens the bounded follow-up budget.
       if (!ownMessages.delete(id) && event.data?.source?.kind === 'user') { guardNudged = false; failedArm = false; }
     }
     if (event.type === 'turn/end') {
+      if (holding) { leading = holding; holding = undefined; holdingIds = undefined; }
       failedArm = false;
       log('turn-end', {seq: event.seq});
       queueMicrotask(() => { void ensure().catch(failure); });

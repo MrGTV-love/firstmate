@@ -241,10 +241,14 @@ PY
 # A fresh secondmate: the real spawn prepares a new home's private runtime and
 # loads the plugin with no prior conversation. A lab-only bash wrapper, first
 # on that spawn's PATH, holds just this home's session-start digest at a FIFO
-# barrier. DSH awaits the plugin's startup before it publishes the session, so
-# while held no turn may start and the spawn may not yet pass its start proof;
-# after release the spawn's start proof and composer check must pass and the
-# digest, then the charter, must enter ahead of any reply.
+# barrier. An earlier requirement that the spawn's start proof and composer
+# check pass while the digest is held cannot hold on this runtime: DSH awaits
+# the plugin's agent/created startup before it publishes the session, so no
+# turn exists until the digest is ready. Asserted instead: while held, the
+# plugin's startup has begun, the spawn has not reported started, and no
+# durable session log holds a turn or user message; after release the spawn
+# reports started, which it does only after its start proof and composer
+# check pass, and the digest, then the charter, enter ahead of any reply.
 SECOND_ID="dsh-second-$$"
 "$LAB_HELPER" create "$SECOND"
 mkdir "$SECOND/operator-home"
@@ -279,21 +283,31 @@ EOF
 chmod +x "$HOLD/bin/bash"
 PATH="$HOLD/bin:$PATH" FM_POLL=1 FM_CHECK_INTERVAL=1 FM_DSH_OPERATOR_HOME="$SECOND/operator-home" HERDR_SESSION="$SESSION" FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$ROOT" \
   FM_STATE_OVERRIDE="$PARENT/state" FM_CONFIG_OVERRIDE="$PARENT/config" FM_SPAWN_NO_GUARD=1 \
-  bash "$ROOT/bin/fm-spawn.sh" "$SECOND_ID" "$SECOND" dsh --secondmate --backend herdr --model deepseek/deepseek-v4-flash --effort high &
+  bash "$ROOT/bin/fm-spawn.sh" "$SECOND_ID" "$SECOND" dsh --secondmate --backend herdr --model deepseek/deepseek-v4-flash --effort high > "$HOLD/spawn.out" 2>&1 &
 SPAWN_PID=$!
 for _ in $(seq 1 120); do
   [ -e "$HOLD/reached" ] && break
-  kill -0 "$SPAWN_PID" 2>/dev/null || break
   sleep 1
 done
-[ -e "$HOLD/reached" ] || { echo 'the secondmate session start never reached the lab barrier' >&2; exit 1; }
+[ -e "$HOLD/reached" ] || { cat "$HOLD/spawn.out"; echo 'the secondmate session start never reached the lab barrier' >&2; exit 1; }
 sleep 5
-kill -0 "$SPAWN_PID" || { echo 'the secondmate spawn ended while its session start was held' >&2; exit 1; }
-HELD_LOG=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND_ID")
-[ -z "$HELD_LOG" ] || ! grep -q '"type":"turn/start"' "$HELD_LOG" || { echo 'a turn started before the held session-start digest' >&2; exit 1; }
-echo 'ok - while the session start was held, no turn started and the spawn had not passed its start proof'
+grep -q '"event":"startup"' "$SECOND/state/.dsh-primary-events.jsonl" || { echo 'the held secondmate plugin never recorded its startup' >&2; exit 1; }
+! grep -q "^spawned $SECOND_ID " "$HOLD/spawn.out" || { echo 'the spawn reported started while its session start was held' >&2; exit 1; }
+python3 - "$PARENT/state/$SECOND_ID.dsh-session" <<'PY'
+import json,sys
+from pathlib import Path
+root=Path(json.load(open(sys.argv[1]))['root'])
+assert root.is_dir(), 'the held spawn must have prepared its runtime'
+logs=sorted((root/'dsh'/'sessions').glob('*/*/session.v*.jsonl'))
+for log in logs:
+    types=[json.loads(line).get('type') for line in open(log) if line.strip()]
+    assert 'turn/start' not in types and 'user/message' not in types, f'{log} holds a turn while the session start is held'
+print('held: durable session logs=%d, none with a turn or user message; spawn not yet reported started' % len(logs))
+PY
 echo release > "$HOLD/release"
-wait "$SPAWN_PID" || { echo 'the secondmate spawn failed after its session start was released' >&2; exit 1; }
+wait "$SPAWN_PID" || { cat "$HOLD/spawn.out"; echo 'the secondmate spawn failed after its session start was released' >&2; exit 1; }
+grep "^spawned $SECOND_ID " "$HOLD/spawn.out" || { cat "$HOLD/spawn.out"; echo 'the released spawn never reported started' >&2; exit 1; }
+echo 'ok - held session start: no turn and no started report; released: start proof and composer check passed'
 SECOND_LOG=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND_ID")
 [ "$(sed -n 's/^backend=//p' "$PARENT/state/$SECOND_ID.meta")" = herdr ] && [ "$(sed -n 's/^herdr_session=//p' "$PARENT/state/$SECOND_ID.meta")" = "$SESSION" ] || { echo 'the secondmate spawn left the named Herdr lab' >&2; exit 1; }
 SECOND_PANE=$(sed -n 's/^herdr_pane_id=//p' "$PARENT/state/$SECOND_ID.meta")
