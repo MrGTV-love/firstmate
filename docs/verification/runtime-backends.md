@@ -19,7 +19,7 @@ These checks use real disposable Git repositories, `lsof` and `tasks-axi` where 
 Refresh the portable coverage with:
 
 ```sh
-bash bin/fm-test-run.sh tests/fm-project-capacity.test.sh tests/fm-teardown.test.sh tests/fm-teardown-endpoint-safety.test.sh tests/fm-secondmate-safety.test.sh
+bash bin/fm-test-run.sh tests/fm-project-capacity.test.sh tests/fm-teardown.test.sh tests/fm-teardown-pool.test.sh tests/fm-teardown-cleanup.test.sh tests/fm-teardown-endpoint-safety.test.sh tests/fm-secondmate-safety.test.sh
 ```
 
 [`bin/fm-teardown.sh`](../../bin/fm-teardown.sh)'s header owns durable reservation, short project custody, refusal retention and return-before-record-release mechanics.
