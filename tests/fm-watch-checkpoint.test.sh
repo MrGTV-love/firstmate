@@ -115,7 +115,9 @@ printf 'signal: unusable-perl.status\n'
 SH
   chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
   for tool in timeout gtimeout; do
-    ln -s "$timeout_path" "$fallback_bin/$tool"
+    # Preserve the installed tool's argv[0]; multicall coreutils reject aliases.
+    printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$timeout_path" > "$fallback_bin/$tool"
+    chmod +x "$fallback_bin/$tool"
     status=0
     PATH="$fallback_bin" PERL5LIB="$home/perl-lib" FM_HOME="$home" "$home/root/bin/fm-watch-checkpoint.sh" --seconds 5 \
       >"$home/out.txt" 2>"$home/err.txt" || status=$?
