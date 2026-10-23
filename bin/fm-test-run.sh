@@ -1074,10 +1074,10 @@ tests/fm-task-inbox.test.sh 99758
 tests/fm-tasks-axi.test.sh 95465
 tests/fm-teamclaude-launch-live-e2e.test.sh 413
 tests/fm-teamclaude-launch.test.sh 13322
-tests/fm-teardown-cleanup.test.sh 876070
+tests/fm-teardown-cleanup.test.sh 917727
 tests/fm-teardown-endpoint-safety.test.sh 75589
-tests/fm-teardown-pool.test.sh 439235
-tests/fm-teardown.test.sh 272355
+tests/fm-teardown-pool.test.sh 333924
+tests/fm-teardown.test.sh 307312
 tests/fm-test-fixture-cleanup.test.sh 7305
 tests/fm-test-fixtures.test.sh 19579
 tests/fm-test-isolation-proof.test.sh 5078
