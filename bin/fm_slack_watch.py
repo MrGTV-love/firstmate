@@ -37,6 +37,7 @@ QUEUE_RESERVE = 16
 LABEL_LIMIT = 168  # Leave room for two candidates, a long thread ts, the longest remedy, and the queue marker.
 CARD_LIMIT = 38000
 SLACK_LINK = re.compile(r'<((?:https?://|mailto:)[^<>|\s]+)(?:\|([^<>]*))?>')
+PARTIAL_ENTITY = re.compile(r'&[a-z]*$')
 
 
 def run(script, *args, text=None):
@@ -79,6 +80,16 @@ def flat(value):
 
 def short(value, limit=LABEL_LIMIT):
     return value if len(value) <= limit else value[:limit - 3] + '...'
+
+
+def slack_escape(value):
+    """Slack reads &, <, and > as markup; escape them so a posted value shows literally."""
+    return str(value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+
+def clip(value, limit):
+    """Cut Slack-escaped text to limit characters without splitting an entity."""
+    return PARTIAL_ENTITY.sub('', value[:limit])
 
 
 def typed_text(value):
@@ -344,6 +355,7 @@ class Watch:
             for i, option in enumerate(options, 1):
                 hint = ' - ' + option['hint'] if option.get('hint') else ''
                 fields.append((f'{i}. ', f"{option['label']} ({option['value']}){hint}"))
+        fields = [(prefix, slack_escape(value)) for prefix, value in fields]
         footer = ['Affordance: ' + ('text' if not options else 'reaction' if usable else 'single-character')]
         if usable and options:
             footer.append('React with ' + '/'.join(REACTIONS[:len(options)])
@@ -371,7 +383,8 @@ class Watch:
                 limit = share
                 break
             budget -= length
-        text = [prefix + short(value, limit) for prefix, value in fields]
+        text = [prefix + (value if len(value) <= limit else clip(value, limit - 3) + '...')
+                for prefix, value in fields]
         return '\n'.join(text + footer), options, usable
 
     def messages(self, thread):
@@ -399,7 +412,7 @@ class Watch:
             if message.get('metadata', {}).get('event_payload', {}).get('id') == marker:
                 return message['ts']
         if len(text) > 39000:
-            text = text[:38000] + '\nFull text remains in the local backlog.'
+            text = clip(text, 38000) + '\nFull text remains in the local backlog.'
         args = {'channel': channel, 'text': text,
                 'client_msg_id': str(uuid.uuid5(uuid.NAMESPACE_URL, event)),
                 'metadata': {'event_type': STATE_KEY, 'event_payload': {'id': marker}},
@@ -559,11 +572,11 @@ class Watch:
                 continue
             if standing == 'replaced':
                 self.post('superseded:' + occurrence,
-                          'Superseded: ' + record['key'] + ' was held again. Answer in its newer thread.',
+                          'Superseded: ' + slack_escape(record['key']) + ' was held again. Answer in its newer thread.',
                           record['ts'])
             else:
                 self.post('resolved:' + occurrence,
-                          'Resolved: ' + record['key']
+                          'Resolved: ' + slack_escape(record['key'])
                           + '\nThe decision is no longer open. Full resolution remains in the local backlog.',
                           record['ts'])
             record['retired'] = True
@@ -693,7 +706,7 @@ class Watch:
                 else:
                     remedy = 'Please reply once.'
                 self.notice(event, key, record['ts'],
-                            'Conflicting signals: ' + labels + '. No answer was recorded. ' + remedy,
+                            'Conflicting signals: ' + slack_escape(labels) + '. No answer was recorded. ' + remedy,
                             'check: slack %s - conflicting signals: %s. %s' % (record['ts'], labels, remedy),
                             [r['event'] for r in new_replies])
                 remaining -= 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X22.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X23.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1088,5 +1088,47 @@ assert_eq "$(thread_field open-b retired)" True "X22 the read thread was not ret
 assert_contains "$(thread_texts "$ts_b")" 'Resolved: open-b' "X22 the retired thread was not resolved"
 assert_not_contains "$out" 'unmatched reply' "X22 the late reply surfaced twice"
 printf 'ok - X22\n'
+
+# X23: literal &, <, and > in posted text reach Slack escaped, so the owner sees them as written
+entities_whole() { python3 -c 'import re, sys; sys.exit("&" in re.sub(r"&(amp|lt|gt);", "", sys.stdin.read()))'; }
+new_home card-payload
+bind
+mirror card-payload >/dev/null
+printf 'Option 1: Keep <old> & new (keep) - when a > b\nOption 2: Wait (wait)\nRecommendation: keep\n' > "$FM_HOME/literal.body"
+(cd "$FM_HOME" && tasks-axi add literal-card "R&D <beta> rollout" --kind captain --repo sample --body-file "$FM_HOME/literal.body" >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold literal-card --reason "Run fm-captain-hold.sh bind <source-id> & confirm" >/dev/null
+mirror card-payload >/dev/null
+card=$(python3 "$HELPER" card-text "$(replay_file)" literal-card)
+assert_contains "$card" 'Decision: R&amp;D &lt;beta&gt; rollout' "X23 the decision title was not escaped"
+assert_contains "$card" 'Question: Run fm-captain-hold.sh bind &lt;source-id&gt; &amp; confirm' "X23 the command placeholder was not escaped"
+assert_contains "$card" '1. Keep &lt;old&gt; &amp; new (keep) - when a &gt; b' "X23 the option text was not escaped"
+assert_not_contains "$card" '[<>]' "X23 a raw angle bracket reached Slack"
+printf '%s' "$card" | entities_whole || fail "X23 the card has a bare ampersand"
+(cd "$FM_HOME" && tasks-axi add literal-oversized "Oversized literal" --kind captain --repo sample --body-file "$FM_HOME/literal.body" >/dev/null)
+FM_CAPTAIN_HOLD_NOW=2026-10-01T00:00:00Z "$CAPTAIN" hold literal-oversized --reason "Escape budget $(python3 -c 'print("<" * 45000)')" >/dev/null
+mirror card-payload >/dev/null
+card=$(python3 "$HELPER" card-text "$(replay_file)" literal-oversized)
+[ "${#card}" -le 38000 ] || fail "X23 escaping pushed an oversized card past the card budget"
+assert_contains "$card" 'Question: Escape budget &lt;&lt;' "X23 the oversized question lost its escaped text"
+assert_contains "$card" 'If you both tap and type:' "X23 the oversized card lost precedence"
+printf '%s' "$card" | entities_whole || fail "X23 the card budget split an entity"
+ts=$(thread_field literal-card ts)
+python3 "$HELPER" stage-notice "$(state_file)" "$ts" literal-card 9000 '&amp;'
+out=$(poll card-payload)
+assert_contains "$(thread_texts "$ts")" 'Full text remains in the local backlog.' "X23 an oversized escaped post was not cut"
+python3 "$HELPER" thread-posts "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" "$ts" | entities_whole \
+  || fail "X23 the post cut split an entity"
+new_home resolution
+bind
+mirror resolution >/dev/null
+reply_to 900.000001 900.000021 'use &lt;source-id&gt; &amp; go'
+reply_to 900.000001 900.000022 'skip &amp; wait'
+out=$(poll resolution)
+assert_eq "$(check_count "$out")" 1 "X23 the conflict surfaces once"
+notice=$(python3 "$HELPER" thread-posts "$FM_STATE_OVERRIDE/slack-watch/outbound.jsonl" 900.000001)
+assert_contains "$notice" 'Conflicting signals: skip &amp; wait vs use &lt;source-id&gt; &amp; go. No answer was recorded. Please reply once.' "X23 the conflict notice was not escaped"
+assert_contains "$out" 'conflicting signals: skip & wait vs use <source-id> & go. Please reply once.' "X23 the conflict wake line is not plain text"
+assert_open resolve-call 0 "X23 the conflict records nothing"
+printf 'ok - X23\n'
 
 printf 'ok - all Slack watch checks\n'
