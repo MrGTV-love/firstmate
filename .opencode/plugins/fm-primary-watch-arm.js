@@ -38,6 +38,7 @@ let armClose = new WeakMap();
 let armReadiness = new WeakMap();
 let armRecovery = new WeakMap();
 let armHostMode = new WeakMap();
+let armLeftStarting = new WeakSet();
 
 function positiveInteger(name, fallback) {
   const value = Number(process.env[name]);
@@ -377,6 +378,7 @@ async function restoreAfterActionableClose(paths, sessionID, client, predecessor
     if (status === "wake") return { failure: "", recovery: armRecovery.get(armChild) };
     // A successor still starting is left running and reports its own result.
     if (status === "starting") {
+      armLeftStarting.add(armChild);
       return { failure: "", notice: `watcher: successor pid=${armChild?.pid ?? "unknown"} still starting; it keeps running and reports its own result` };
     }
     failure = restorationFailure(status);
@@ -446,9 +448,11 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
     resolveReadiness = resolve;
   });
   armReadiness.set(armChild, readiness);
+  let confirmed = false;
   const settleReadiness = (status) => {
     if (readinessSettled) return;
     readinessSettled = true;
+    confirmed = status === "armed" || status === "external";
     resolveReadiness(status);
   };
   const closed = new Promise((resolveClosedChild) => {
@@ -505,6 +509,9 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
       });
       return;
     }
+    // A successor left still starting when its wake went out reports its own
+    // later startup failure here, where this close is observed.
+    if (armLeftStarting.has(armChild) && !confirmed) surfaceFailure(paths, client, sessionID, classification.message);
     if (restorationInFlight) {
       setArmStatus("failed");
       return;

@@ -66,8 +66,32 @@ def arm():
             f'productive startup was refused: rc={result.returncode} {result.stdout} {result.stderr}')
 case('arm_slow_cpu_start_completes', arm)
 
-def omp_readiness():
-    home, env = fixture('omp-readiness')
+def arm_late_failure(waiter_left):
+    home, env = fixture('arm-late-failure-' + ('left' if waiter_left else 'waiting'))
+    script(home / 'bin/fm-watch.sh', "sleep 2\nprintf 'watcher: FAILED - fixture late startup failure\\n'\nexit 1\n")
+    mark = home / 'state/successor.unattended'
+    env['FM_WATCH_LATE_FAILURE_MARK'] = str(mark)
+    arm_process = subprocess.Popen([str(home / 'bin/fm-watch-arm.sh')], env=env,
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if waiter_left:
+        time.sleep(0.5)
+        mark.touch()
+    output = arm_process.communicate()[0]
+    queue = home / 'state/.wake-queue'
+    rows = queue.read_text() if queue.exists() else ''
+    require(arm_process.returncode != 0 and 'fixture late startup failure' in output,
+            f'the fixture arm did not fail: {arm_process.returncode} {output}')
+    if waiter_left:
+        require('watcher-successor-failed' in rows and 'fixture late startup failure' in rows
+                and 'still starting when its wake went out' in rows and not mark.exists(),
+                f'a late failure was not queued durably: {rows!r} mark={mark.exists()}')
+    else:
+        require('watcher-successor-failed' not in rows, f'a failure its waiter saw was queued again: {rows!r}')
+case('arm_late_failure_reaches_the_wake_queue_once_its_waiter_left', lambda: arm_late_failure(True))
+case('arm_failure_seen_by_its_waiter_is_not_queued_again', lambda: arm_late_failure(False))
+
+def omp_readiness(mode):
+    home, env = fixture('omp-readiness-' + mode)
     for name in ('.omp/extensions', '.pi/extensions/lib'):
         shutil.copytree(root / name, home / name)
     package = home / 'node_modules/typebox'
@@ -78,6 +102,10 @@ def omp_readiness():
 from pathlib import Path
 home = Path(os.environ['FM_HOME'])
 signal.signal(signal.SIGTERM, lambda *_: exit(0))
+if os.environ['FM_TEST_SUCCESSOR_MODE'] == 'late-failed':
+    (home / 'late-failed').touch()
+    print('watcher: FAILED - fixture late startup failure', flush=True)
+    raise SystemExit(1)
 print(f'watcher: started pid={os.getpid()} (beacon fresh)', flush=True)
 (home / 'ready-completed').touch()
 while True: time.sleep(0.1)
@@ -92,7 +120,7 @@ if [ ! -e "$FM_HOME/fired" ]; then
   exit 0
 fi
 exec python3 -c ''' + __import__('shlex').quote(source) + '\n')
-    env.update(FM_OMP_ARM_READY_TIMEOUT_MS='50', FM_WATCH_REARM_RETRY_LIMIT='1')
+    env.update(FM_OMP_ARM_READY_TIMEOUT_MS='50', FM_WATCH_REARM_RETRY_LIMIT='1', FM_TEST_SUCCESSOR_MODE=mode)
     js = '''import {pathToFileURL} from 'node:url';
 import {writeFileSync, existsSync} from 'node:fs';
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\\n`);
@@ -103,21 +131,28 @@ mod.default(api);
 try {
   await handlers.get('before_agent_start')({}, {isIdle:()=>true});
   const result = await tool.execute();
-  for (let i = 0; i < 500 && sent.length === 0; i++) await new Promise(r=>setTimeout(r,100));
-  if (!result.details.ok || sent.length !== 1 || !sent[0].includes('signal: slow readiness wake')
-      || !sent[0].includes('still starting') || sent[0].includes('FAILED'))
+  const delivered = () => sent.some(m=>m.includes('signal: slow readiness wake')) && sent.some(m=>m.includes('still starting'));
+  for (let i = 0; i < 500 && !delivered(); i++) await new Promise(r=>setTimeout(r,100));
+  if (!result.details.ok || !delivered() || sent.some(m=>m.includes('FAILED')))
     throw new Error('slow readiness held or failed the wake: '+JSON.stringify({result,sent}));
-  if (existsSync(`${process.env.FM_HOME}/ready-completed`))
-    throw new Error('the wake waited for the successor to become ready');
-  for (let i = 0; i < 300 && !existsSync(`${process.env.FM_HOME}/ready-completed`); i++) await new Promise(r=>setTimeout(r,100));
-  if (!existsSync(`${process.env.FM_HOME}/ready-completed`))
-    throw new Error('the still-starting successor was not left to become ready');
+  if (existsSync(`${process.env.FM_HOME}/ready-completed`) || existsSync(`${process.env.FM_HOME}/late-failed`))
+    throw new Error('the wake waited for the successor to report');
+  if (process.env.FM_TEST_SUCCESSOR_MODE === 'late-failed') {
+    for (let i = 0; i < 300 && !sent.some(m=>m.includes('fixture late startup failure')); i++) await new Promise(r=>setTimeout(r,100));
+    if (!sent.some(m=>m.includes('fixture late startup failure')))
+      throw new Error('the late successor failure was not surfaced: '+JSON.stringify(sent));
+  } else {
+    for (let i = 0; i < 300 && !existsSync(`${process.env.FM_HOME}/ready-completed`); i++) await new Promise(r=>setTimeout(r,100));
+    if (!existsSync(`${process.env.FM_HOME}/ready-completed`))
+      throw new Error('the still-starting successor was not left to become ready');
+  }
 } finally {await handlers.get('session_shutdown')({}, {});}
 process.exit(0);
 '''
     result = run(['node', '--input-type=module', '-e', js], env)
     require(result.returncode == 0, result.stdout + result.stderr)
-case('omp_slow_readiness_does_not_hold_the_wake', omp_readiness)
+case('omp_slow_readiness_does_not_hold_the_wake', lambda: omp_readiness('slow'))
+case('omp_late_successor_failure_is_surfaced', lambda: omp_readiness('late-failed'))
 
 def claude_readiness(mode):
     home, env = fixture('claude-readiness-' + mode)
@@ -135,6 +170,9 @@ if os.environ.get('FM_WATCH_PREDECESSOR_ARM_PID'):
     if os.environ['FM_TEST_SUCCESSOR_MODE'] == 'failed':
         print('watcher: FAILED - fixture startup failure', flush=True)
         raise SystemExit(1)
+    if os.environ['FM_TEST_SUCCESSOR_MODE'] == 'late-failed':
+        time.sleep(5)
+        os.execv('/bin/bash', ['bash', str(home / 'bin/fm-watch-arm-real.sh')])
     until = time.monotonic() + 5
     while time.monotonic() < until: sum(i*i for i in range(1000))
     print(f'watcher: started pid={os.getpid()} (beacon fresh)', flush=True)
@@ -144,6 +182,8 @@ else:
     (home / 'state/.watcher-down').write_text('pending:downtime:fixture-generation\\n')
     print('signal: task.status done: fixture peer cycle ended', flush=True)
 '''
+    shutil.copy2(home / 'bin/fm-watch-arm.sh', home / 'bin/fm-watch-arm-real.sh')
+    script(home / 'bin/fm-watch.sh', "printf 'watcher: FAILED - fixture late startup failure\\n'\nexit 1\n")
     script(home / 'bin/fm-watch-arm.sh', 'exec python3 -c ' + __import__('shlex').quote(source) + '\n')
     env.update(FM_ARM_CONFIRM_TIMEOUT='1', FM_TEST_SUCCESSOR_MODE=mode)
     try:
@@ -156,6 +196,17 @@ else:
         if mode == 'failed':
             require('did not confirm' in result.stderr and 'fixture startup failure' in result.stderr,
                     'the successor failure was not reported: ' + detail)
+            return
+        if mode == 'late-failed':
+            require('still starting' in result.stderr and 'fixture late startup failure' not in result.stderr,
+                    'the wake waited on the slow successor: ' + detail)
+            queue = home / 'state/.wake-queue'
+            for _ in range(200):
+                if queue.exists() and 'fixture late startup failure' in queue.read_text(): break
+                time.sleep(0.1)
+            rows = queue.read_text() if queue.exists() else ''
+            require('watcher-successor-failed' in rows and 'still starting when its wake went out' in rows,
+                    'the late successor failure was not queued durably: ' + repr(rows) + detail)
             return
         require('still starting' in result.stderr and 'did not confirm' not in result.stderr
                 and not (home / 'successor-completed').exists(), 'the wake waited on the slow successor: ' + detail)
@@ -171,6 +222,7 @@ else:
             except ProcessLookupError: pass
 case('claude_slow_successor_does_not_hold_the_rewake', lambda: claude_readiness('slow'))
 case('claude_failed_successor_is_reported_in_the_rewake', lambda: claude_readiness('failed'))
+case('claude_late_successor_failure_reaches_the_wake_queue', lambda: claude_readiness('late-failed'))
 
 def watchdog():
     home, env = fixture('watchdog')

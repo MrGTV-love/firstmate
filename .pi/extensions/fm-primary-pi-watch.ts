@@ -1287,6 +1287,11 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       if (!generationIsLive(owner)) return;
+      // A successor left still starting when its wake went out reports its own
+      // later startup failure here, where this close is observed.
+      if (armLeftStarting.has(armChild) && !verified && !armRetired.has(armChild)) {
+        surfaceFailure(owner, classification.message);
+      }
       if (owner.restoring) {
         // The pipeline is still delivering the wake this successor was
         // started for. A verified or still-starting successor that failed on

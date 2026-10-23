@@ -357,21 +357,24 @@ run_arm() {  # <output file, or empty for none>
 # away from the hook's pipes, and its own process group. Its one status line
 # is awaited within the arm's own confirmation window plus slack, a notice
 # window only: past it the wake is not held, the banner says the successor is
-# still starting, and the successor keeps running untouched to report its own
-# result (the arm owns startup no-progress detection). Sets SUCCESSOR_NOTE to
-# the banner line for a successor that failed or is still starting.
+# still starting, and the successor keeps running untouched (the arm owns
+# startup no-progress detection). A later startup failure reaches the durable
+# wake queue through the arm's FM_WATCH_LATE_FAILURE_MARK (bin/fm-watch-arm.sh
+# header). Sets SUCCESSOR_NOTE to the banner line for a successor that failed
+# or is still starting.
 SUCCESSOR_NOTE=
 start_handling_successor() {  # <closed-arm-pid>
-  local out pid deadline budget line monitor_was_on=0
+  local out mark pid deadline budget line monitor_was_on=0
   budget=${FM_ARM_CONFIRM_TIMEOUT:-30}
   case "$budget" in ''|*[!0-9]*) budget=30 ;; esac
   if ! out=$(mktemp "$STATE/.claude-autoarm-successor.XXXXXX"); then
     SUCCESSOR_NOTE='The handling successor did not confirm a live watcher (its output file could not be created); this handling turn runs uncovered until the next turn end re-arms.'
     return 1
   fi
+  mark="$out.unattended"
   case $- in *m*) monitor_was_on=1 ;; esac
   set -m 2>/dev/null || true
-  FM_WATCH_PREDECESSOR_ARM_PID=$1 FM_GUARD_GRACE="$GRACE" \
+  FM_WATCH_LATE_FAILURE_MARK=$mark FM_WATCH_PREDECESSOR_ARM_PID=$1 FM_GUARD_GRACE="$GRACE" \
     nohup "$SCRIPT_DIR/fm-watch-arm.sh" >"$out" 2>&1 </dev/null &
   pid=$!
   [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
@@ -384,6 +387,12 @@ start_handling_successor() {  # <closed-arm-pid>
     grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
     fm_pid_alive "$pid" || break
     if [ "$(date +%s)" -ge "$deadline" ]; then
+      : > "$mark" 2>/dev/null || true
+      if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
+        rm -f "$out" "$mark" 2>/dev/null || true
+        return 0
+      fi
+      grep -q '^watcher: FAILED' "$out" 2>/dev/null && rm "$mark" 2>/dev/null && break
       rm -f "$out" 2>/dev/null || true
       SUCCESSOR_NOTE="The handling successor pid=$pid is still starting; this wake is not held for it, and it keeps running to report its own result."
       return 0

@@ -471,9 +471,11 @@ start_arm() {  # <predecessor-arm-pid or empty> [--restart]; sets the started pi
   # (the shape start_handling_successor in bin/fm-claude-stop-autoarm.sh uses).
   [ "${ARM_OWN_GROUP:-0}" -ne 1 ] || set -m 2>/dev/null || true
   if [ -n "$predecessor" ]; then
-    FM_WATCH_PREDECESSOR_ARM_PID=$predecessor FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
+    FM_WATCH_LATE_FAILURE_MARK="$out.unattended" FM_WATCH_PREDECESSOR_ARM_PID=$predecessor FM_GUARD_GRACE="$GRACE" \
+      "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
   else
-    FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
+    FM_WATCH_LATE_FAILURE_MARK="$out.unattended" FM_GUARD_GRACE="$GRACE" \
+      "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
   fi
   pid=$!
   [ "${ARM_OWN_GROUP:-0}" -ne 1 ] || set +m 2>/dev/null || true
@@ -654,7 +656,9 @@ stand_down() {  # <why>
 
 # Start the successor cycle and wait until it proves a live watcher or reports
 # its own failure, for at most READY_TIMEOUT. Returns 0 when verified, 1 when it
-# failed, and 2 when it is still starting; that successor is left running. Sets
+# failed, and 2 when it is still starting; that successor is left running and a
+# later startup failure reaches the durable wake queue through the arm's
+# FM_WATCH_LATE_FAILURE_MARK (bin/fm-watch-arm.sh header). Sets
 # SUCCESSOR_WATCHER and SUCCESSOR_GENERATION (empty when the arm attached).
 SUCCESSOR_STARTING_LINE="supervision-host: the successor watcher cycle is still starting; it keeps running and reports its own result"
 start_successor() {  # <predecessor-arm-pid>
@@ -677,7 +681,15 @@ start_successor() {  # <predecessor-arm-pid>
     fi
     fm_pid_alive "$SUCCESSOR_PID" || return 1
     ! grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null || return 1
-    [ "$(date +%s)" -lt "$deadline" ] || return 2
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      : > "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
+      if ! grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$SUCCESSOR_OUT" 2>/dev/null; then
+        grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null && rm "$SUCCESSOR_OUT.unattended" 2>/dev/null && return 1
+        return 2
+      fi
+      rm -f "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
+      continue
+    fi
     sleep 0.2
   done
 }

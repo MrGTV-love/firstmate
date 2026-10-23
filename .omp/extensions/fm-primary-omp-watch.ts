@@ -1425,8 +1425,8 @@ export default function (pi: ExtensionAPI) {
             releaseClaim();
             return;
           }
-          if (restoration.failure && !operationalHandback(pending.message)) surfaceFailure(owner, restoration.failure);
           const note = restoration.failure || restoration.notice;
+          if (note && !operationalHandback(pending.message)) surfaceFailure(owner, note);
           const message = note ? `${pending.message}\n\n${note}` : pending.message;
           const delivered = await deliverActionableWake(owner, message, pending, restoration.recovery);
           if (!delivered) {
@@ -1724,6 +1724,11 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       if (!generationIsLive(owner)) return;
+      // A successor left still starting when its wake went out reports its own
+      // later startup failure here, where this close is observed.
+      if (armLeftStarting.has(armChild) && !verified && !armRetired.has(armChild)) {
+        surfaceFailure(owner, classification.message);
+      }
       if (owner.restoring) {
         // The pipeline is still delivering the wake this successor was
         // started for. A verified or still-starting successor that failed on

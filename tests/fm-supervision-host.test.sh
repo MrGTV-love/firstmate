@@ -782,6 +782,34 @@ test_slow_successor_does_not_hold_the_close() {
   pass "host: a successor slower than the readiness notice window does not hold the close and is left running"
 }
 
+# A successor still starting when its close goes out, which then fails after the
+# host has exited and cleaned up, still reaches firstmate: the arm appends its
+# own FAILED line to the durable wake queue, without being signalled.
+test_late_successor_failure_reaches_the_wake_queue() {
+  local home host late f queue
+  home=$(make_home late-successor attended)
+  late="$home/late-bin"
+  mkdir -p "$late"
+  for f in "$ROOT"/bin/*; do ln -s "$f" "$late/${f##*/}"; done
+  rm -f "$late/fm-watch-arm.sh" "$late/fm-watch.sh"
+  cp "$ROOT/bin/fm-watch-arm.sh" "$late/fm-watch-arm.sh"
+  printf '#!/usr/bin/env bash\nprintf "watcher: FAILED - fixture late startup failure\\n"\nexit 1\n' > "$late/fm-watch.sh"
+  chmod +x "$late/fm-watch-arm.sh" "$late/fm-watch.sh"
+  host=$(host_bin_with_successor "$home" "sleep 3; exec '$late/fm-watch-arm.sh' \"\$@\"")
+  FM_SUPERVISION_HOST_READY_TIMEOUT=1 HOST="$host" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "late successor: the host never started a watcher cycle"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 300 host_exited "$home" || fail "late successor: the decision close did not reach main: $(cat "$home/state/.supervision-host.log")"
+  assert_re '^supervision-host: the successor watcher cycle is still starting' "$home/host.out" "the close must say the successor is still starting"
+  assert_no_re 'fixture late startup failure' "$home/host.out" "the close must not wait for the successor's result"
+  queue="$home/state/.wake-queue"
+  wait_until 150 grep -qs 'fixture late startup failure' "$queue" \
+    || fail "late successor: its failure never reached the wake queue: $(cat "$queue" 2>/dev/null)"
+  assert_re 'watcher-successor-failed.*fixture late startup failure.*still starting when its wake went out' "$queue" \
+    "the queued failure must carry the successor's own FAILED line"
+  pass "host: a successor that fails after its still-starting close delivers its failure through the wake queue"
+}
+
 # A successor that reports its own startup failure ends the wait at once, even
 # while that arm process lingers.
 test_failed_successor_fails_fast() {
@@ -2196,6 +2224,7 @@ run_host_case test_off_written_while_parked_passes_the_next_attended_close_to_ma
 run_host_case test_main_only_pass_through_leaves_the_successor_watcher_running
 run_host_case test_slow_successor_does_not_hold_the_close
 run_host_case test_failed_successor_fails_fast
+run_host_case test_late_successor_failure_reaches_the_wake_queue
 run_host_case test_attended_close_with_unidentified_main_session_passes_to_main
 run_host_case test_close_accepted_away_that_turns_attended_passes_to_main
 run_host_case test_attended_close_that_turns_main_only_before_its_turn_passes_to_main

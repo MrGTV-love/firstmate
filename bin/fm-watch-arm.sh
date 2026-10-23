@@ -35,6 +35,12 @@
 #   watcher: FAILED - attached watcher pid=<N> stalled (beacon <age>s at or past hard bound <bound>s)
 #                                                        - the followed holder is alive but its beacon
 #                                                          reached the stall bound
+# A handling successor launched with FM_WATCH_LATE_FAILURE_MARK=<path> reports a
+# startup failure that comes after its waiter stopped waiting: the waiter creates
+# that file when it delivers the wake without the successor's result, and the
+# arm that removes it appends its FAILED line to the durable wake queue. Whoever
+# removes the file first, this arm or its waiter, is the one that reports, so the
+# failure is delivered once. A started or attached arm removes it unreported.
 # It NEVER reports started/attached/healthy off a stale beacon or a dead/reused pid: a
 # stale-beacon or dead-pid holder either self-heals (the fresh child steals the
 # dead lock per the singleton self-eviction/steal path and is confirmed) or this
@@ -124,6 +130,26 @@ if [ "${FM_GATE_REFUSE_BYPASS:-}" != 1 ]; then
 fi
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+
+ARM_STARTED=0
+ARM_FAILURE_LINE=
+arm_started() {
+  ARM_STARTED=1
+  [ -z "${FM_WATCH_LATE_FAILURE_MARK:-}" ] || rm -f "$FM_WATCH_LATE_FAILURE_MARK" 2>/dev/null || true
+}
+arm_failed() {  # <FAILED line>
+  ARM_FAILURE_LINE=$1
+  echo "$1"
+}
+# shellcheck disable=SC2329 # Invoked by the EXIT trap.
+report_late_failure() {
+  local mark=${FM_WATCH_LATE_FAILURE_MARK:-}
+  [ -n "$mark" ] && [ "$ARM_STARTED" -eq 0 ] && [ -n "$ARM_FAILURE_LINE" ] || return 0
+  rm "$mark" 2>/dev/null || return 0
+  fm_wake_append signal watcher-successor-failed \
+    "$ARM_FAILURE_LINE (handling successor arm pid=$$ was still starting when its wake went out)" || true
+}
+trap report_late_failure EXIT
 
 WATCH="$SCRIPT_DIR/fm-watch.sh"
 WATCH_LOCK="$STATE/.watch.lock"
@@ -320,6 +346,7 @@ healthy_watcher() {
 report_attached() {
   local age
   age=$(fm_path_age "$BEAT")
+  arm_started
   echo "watcher: attached pid=$HEALTHY_PID (beacon ${age}s)"
 }
 
@@ -339,7 +366,7 @@ wait_for_healthy_successor() {
 }
 
 fail_unexplained_cycle() {
-  echo "watcher: FAILED - cycle ended without an actionable reason"
+  arm_failed "watcher: FAILED - cycle ended without an actionable reason"
   return 1
 }
 
@@ -690,7 +717,7 @@ trap 'handle_arm_signal TERM 143' TERM
 trap 'handle_arm_signal INT 130' INT
 
 child_out=$(mktemp "$STATE/.watch-arm-output.XXXXXX") || {
-  echo "watcher: FAILED - no live watcher with a fresh beacon"
+  arm_failed "watcher: FAILED - no live watcher with a fresh beacon"
   exit 1
 }
 # date(1) exposes whole seconds. Keep the configured confirmation budget from
@@ -750,8 +777,10 @@ owned_child_finished() {
   [ "$signal" = none ] || reason_type="signal-exit"
   cycle_log_append "$rc" "$signal" "$reason_type" none
   print_watch_output "$child_out"
-  if ! grep -q '^watcher: FAILED' "$child_out" 2>/dev/null; then
-    echo "watcher: FAILED - watcher cycle exited $rc without an actionable reason"
+  if grep -q '^watcher: FAILED' "$child_out" 2>/dev/null; then
+    ARM_FAILURE_LINE=$(grep -m 1 '^watcher: FAILED' "$child_out")
+  else
+    arm_failed "watcher: FAILED - watcher cycle exited $rc without an actionable reason"
   fi
   rm -f "$child_out" 2>/dev/null || true
   child=
@@ -780,11 +809,12 @@ while :; do
         cleanup_child
         wait "$child" 2>/dev/null || true
         cycle_log_append 1 none handling-handoff-failed none
-        echo "watcher: FAILED - established successor could not inspect handling state"
+        arm_failed "watcher: FAILED - established successor could not inspect handling state"
         exit 1
       fi
       cycle_mark_predecessor_successor "started:$child"
       [ "$TAKEN_OVER" -eq 0 ] || cycle_mark_predecessor_successor "started:$child" "$ARM_PID"
+      arm_started
       if [ -n "$handling_generation" ]; then
         echo "watcher: started pid=$child (beacon fresh) recovery-generation=$handling_generation"
       else
@@ -824,5 +854,5 @@ cleanup_child
 wait "$child" 2>/dev/null
 rc=$?
 cycle_log_append "$rc" "$(cycle_signal_name "$rc")" confirmation-no-progress none
-echo "watcher: FAILED - no live watcher with a fresh beacon"
+arm_failed "watcher: FAILED - no live watcher with a fresh beacon"
 exit 1

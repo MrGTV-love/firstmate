@@ -154,7 +154,9 @@ With a wedged backend the stage's ceiling is tasks times that per-read bound and
 [`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) owns reconciliation's conditional bulk-read fast path and per-worker metadata and lifecycle lock handling.
 
 The per-item backlog row reads inside bootstrap's reconcile and close-replay sweeps are the exception.
-Each of those reads uses `FM_BACKLOG_ROW_TIMEOUT_SECS` as a no-output/no-process-tree-CPU interval (default 900s) through `bin/fm-backlog-transition-lib.sh`, never a wall-clock kill of productive work.
+Each of those reads stops only after an interval with no output and no process-tree CPU, through `bin/fm-backlog-transition-lib.sh`.
+At session start that interval is a third of the time left in the digest's own `FM_SESSION_START_TIMEOUT` bound when bootstrap starts (an `FM_BACKLOG_ROW_TIMEOUT_SECS` value stays an upper limit), so a wedged backend is cut by the read's own no-progress bound and the rest of the digest still prints; a productive read longer than that is still cut by the session-start bound itself.
+Outside session start the interval is `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 900s).
 Only a proven no-progress stop latches the sweep.
 Later reads in that sweep then return immediately while still naming their own item.
 

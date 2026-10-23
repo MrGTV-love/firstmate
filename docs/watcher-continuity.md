@@ -243,7 +243,8 @@ A failed confirmation is never swallowed.
 
 Pi, omp, OpenCode and the supervision host wait for the successor's own result (started or attached; OpenCode also healthy or a wake) or its actual failure: a `watcher: FAILED` line or the arm's exit.
 That wait never holds the wake past each site's short readiness notice window (FM_PI_ARM_READY_TIMEOUT_MS, FM_OMP_ARM_READY_TIMEOUT_MS, FM_OPENCODE_ARM_READY_TIMEOUT_MS, FM_SUPERVISION_HOST_READY_TIMEOUT).
-Past it, the wake goes out with one line saying the successor is still starting, and the successor keeps running untouched; a later failure reaches firstmate through that successor's own failure path.
+Past it, the wake goes out with one line saying the successor is still starting, and the successor keeps running untouched.
+A later startup failure of that successor still reaches firstmate: Pi, omp and OpenCode observe its close and surface its failure line; for the detached Claude and supervision-host successors, the arm appends its FAILED line to the durable wake queue (`FM_WATCH_LATE_FAILURE_MARK` in the `bin/fm-watch-arm.sh` header).
 Startup no-progress detection is owned by `bin/fm-watch-arm.sh`, so no adapter or host stops productive startup work.
 omp's separate idle queue-read deadline remains fixed at 10000ms.
 A successor that reported failure gets TERM and a bounded retirement confirmation before the next lock-verified exponential retry.

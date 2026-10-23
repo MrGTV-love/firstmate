@@ -11,8 +11,11 @@
 # Both halves are proved here:
 #   - a deliberately hanging `tasks-axi show` cannot exceed the per-item bound,
 #     and the failure names the item it could not read
-#   - a session start against that same wedged backend still completes end to
-#     end, with every digest section present and a loud partial reconcile
+#   - a session start against that same wedged backend, at the shipped
+#     defaults, still completes end to end, with every digest section present
+#     and a loud partial reconcile: session start gives bootstrap's reads a
+#     third of its remaining FM_SESSION_START_TIMEOUT as their no-progress
+#     interval, so the read's own bound fires before the digest's
 #
 # The progress rule is independent of a tasks-axi version: the productive
 # fixture performs real CPU work before returning a complete row/inventory,
@@ -523,14 +526,16 @@ SHOW_LOG="$E2E/show.log"
 MUTATION_LOG="$E2E/mutation.log"
 DIGEST_START=$(date +%s)
 env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  -u FM_BACKLOG_ROW_TIMEOUT_SECS -u FM_SESSION_START_TIMEOUT \
   FM_HOME="$E2E_HOME" FM_ROOT_OVERRIDE="$E2E_ROOT" PATH="$E2E_FAKEBIN:$BASE_PATH" \
-  FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   FM_TEST_TASKS_AXI_SHOW_LOG="$SHOW_LOG" FM_TEST_TASKS_AXI_MUTATION_LOG="$MUTATION_LOG" \
   "$ROOT/bin/fm-session-start.sh" > "$DIGEST" 2>&1 || true
 DIGEST_ELAPSED=$(elapsed_since "$DIGEST_START")
 
 [ "$DIGEST_ELAPSED" -lt 120 ] \
   || fail "session start took ${DIGEST_ELAPSED}s against a wedged backlog backend"
+! grep -q 'STARTUP TRUNCATED - ' "$DIGEST" \
+  || fail "the digest was truncated by its own bound against a wedged backlog backend: $(cat "$DIGEST")"
 
 for SECTION in 'WAKE QUEUE' 'SUPERVISION OPERATING INSTRUCTIONS' 'FLEET STATE' 'CONTEXT'; do
   grep -q "$SECTION" "$DIGEST" \
