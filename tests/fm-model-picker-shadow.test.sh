@@ -65,7 +65,9 @@ class H(http.server.BaseHTTPRequestHandler):
                 else:
                     name = qid
                 pick = settings.get(name) or keys[0]
-                if pick not in keys:
+                if settings.get('force_question') == qid and settings.get('force_choice'):
+                    pick = settings['force_choice']
+                if pick not in keys and settings.get('force_question') != qid:
                     pick = keys[0]
                 answers[qid] = {'type': 'choice', 'choice': pick,
                                 'confidence': settings.get(qid + '_confidence', 0.9),
@@ -357,6 +359,110 @@ check '[ "$(calls)" -eq 0 ]' "no request is made when the flag is off"
 check '[ ! -e "$DATA/aa.sqlite" ]' "no store is created when the flag is off"
 FM_MODEL_PICKER_SHADOW=live bash "$BIN" --observe --brief "$TMP_ROOT/brief.md" --status clear >/dev/null 2>"$TMP_ROOT/err"
 check 'grep -q "cannot enable live" "$TMP_ROOT/err"' "a live value is refused with a warning"
+finish
+
+
+begin "snapshot age is the real age and staleness is disclosed, never a drop"
+printf '%s\n' '{"rules":[{"when":"Any task.","use":[{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"}]}]}' > "$TMP_ROOT/rules-age.json"
+python3 -I - "$DATA/projection/gpt-6-1-sol-high.json" 20100 >/dev/null <<'PY'
+import datetime, json, sys
+path, minutes_ago = sys.argv[1], int(sys.argv[2])
+doc = json.load(open(path))
+stamp = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=minutes_ago)).strftime('%Y-%m-%dT%H:%M:%SZ')
+for metric in doc['metrics'].values():
+    metric['observed_at'] = stamp
+doc['as_of'] = stamp
+json.dump(doc, open(path, 'w'))
+PY
+settings '{"work_type":"feature","worker":"candidate_1","validator":"candidate_1"}'
+cp "$TMP_ROOT/result.json" "$TMP_ROOT/result-age.json"
+python3 -I - "$TMP_ROOT/result-age.json" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+doc['chosen'] = {'profile': {'harness': 'omp', 'model': 'openai-codex/gpt-6.1-sol', 'effort': 'high'}}
+json.dump(doc, open(sys.argv[1], 'w'))
+PY
+RULES_FILE="$TMP_ROOT/rules-age.json" RESULT_FILE="$TMP_ROOT/result-age.json" run_observe clear
+age=$(row ".snapshot_age")
+check '[ "$(row ".snapshot_stale")" = 0 ]' "13 days 23 hours is not stale"
+check '[ "$(python3 -c "print(1 if 20090*60 <= float($age) <= 20110*60 else 0)")" = 1 ]' "the age is the real observed_at age"
+python3 -I - "$DATA/projection/gpt-6-1-sol-high.json" 20161 >/dev/null <<'PY'
+import datetime, json, sys
+path, minutes_ago = sys.argv[1], int(sys.argv[2])
+doc = json.load(open(path))
+stamp = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=minutes_ago)).strftime('%Y-%m-%dT%H:%M:%SZ')
+for metric in doc['metrics'].values():
+    metric['observed_at'] = stamp
+doc['as_of'] = stamp
+json.dump(doc, open(path, 'w'))
+PY
+RULES_FILE="$TMP_ROOT/rules-age.json" run_observe clear
+check '[ "$(row ".snapshot_stale")" = 1 ]' "14 days 1 minute is flagged stale"
+check '[ "$(row ".picker_status")" = accepted ]' "a stale snapshot is disclosed, not dropped"
+python3 -I - "$DATA/projection/gpt-6-1-sol-high.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+doc = json.load(open(path))
+for metric in doc['metrics'].values():
+    metric.pop('observed_at', None)
+doc.pop('as_of', None)
+json.dump(doc, open(path, 'w'))
+PY
+RULES_FILE="$TMP_ROOT/rules-age.json" run_observe clear
+check '[ "$(row ".snapshot_age")" = null ]' "an unknown age is NULL, never zero"
+check '[ "$(row ".snapshot_stale")" = 0 ]' "an unknown age is not called stale"
+finish
+
+begin "every work type is classified, and an unknown label is none-fit"
+failed_types=0
+for pair in 'defect_fix|Defect fix' 'diagnosis|Diagnosis / investigation' 'feature|Feature / capability' \
+            'hardening|Hardening / edge-case closure' 'verification|Verification' 'code_review|Code review' \
+            'research|Research / question-answering' 'analysis|Analysis (data & financial)' \
+            'design|Design / planning' 'ops|Ops / infrastructure' 'writing|Writing / comms' \
+            'upstream|Upstream engagement' 'none_fit|none-fit'; do
+  option=${pair%%|*}; label=${pair#*|}
+  settings "{\"work_type\":\"$option\",\"worker\":\"candidate_3\",\"validator\":\"candidate_6\"}"
+  run_observe clear
+  got=$(row ".work_type")
+  [ "$got" = "$label" ] || { echo "FAIL $CASE: $option -> $got"; failed_types=1; }
+done
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6","force_question":"work_type","force_choice":"not_in_the_set"}'
+run_observe clear
+check '[ "$(row ".work_type")" = none-fit ]' "an out-of-set label is none-fit"
+check '[ "$(row ".classification_uncertain")" = 1 ]' "an out-of-set label is disclosed as uncertain"
+check '[ "$failed_types" = 0 ]' "all twelve mined types round-trip"
+check '[ "$(row ".complexity_score")" != null ]' "the complexity read is recorded"
+finish
+
+begin "the request carries computed facts, never raw projection JSON"
+settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
+run_observe clear
+assertions=$(python3 -I - "$CALLS" <<'PY'
+import json, sys
+lines = [json.loads(l) for l in open(sys.argv[1])]
+pick = [d for d in lines if 'worker' in d['questions']][-1]
+types = {q['type'] for q in pick['questions'].values()}
+candidate = pick['state']['candidates'][0]
+raw = json.dumps(pick)
+print(int(types <= {'choice', 'score', 'noul'}))
+print(int('metrics' not in candidate and 'summary' in candidate))
+print(int('"value"' not in json.dumps(candidate)))
+print(int('fit' in candidate['summary']))
+PY
+)
+check 'grep -qx 1 <<<"$(sed -n 1p <<<"$assertions")"' "only Choice, Score and Noul questions are sent"
+check 'grep -qx 1 <<<"$(sed -n 2p <<<"$assertions")"' "candidates are code-computed summaries, not raw projections"
+check 'grep -qx 1 <<<"$(sed -n 4p <<<"$assertions")"' "the normalized fit is in the facts Jev sees"
+finish
+
+begin "the tool documents itself"
+OUT=$("$BIN" --help 2>&1); RC=$?
+check '[ "$RC" -eq 0 ]' "--help exits 0"
+check 'grep -q -- "--observe" <<<"$OUT"' "help lists --observe"
+check 'grep -q -- "--report" <<<"$OUT"' "help lists --report"
+check 'grep -q -- "--check-routes" <<<"$OUT"' "help lists --check-routes"
+check 'grep -q "FM_MODEL_PICKER_SHADOW" <<<"$OUT"' "help names the flag"
+check 'grep -q "Exit codes" <<<"$OUT"' "help states exit codes"
 finish
 
 [ "$FAILED" -eq 0 ] || fail "$FAILED shadow picker case(s) failed"

@@ -1938,7 +1938,7 @@ run_shadow() {  # <flag-value>
     bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" --project firstmate 2> "$TMP_ROOT/error") \
     || fail "resolver failed with shadow flag '$1': $(cat "$TMP_ROOT/error")"
 }
-strip_diag() { printf '%s\n' "$1" | grep -v -e '^  timings:' -e '^  usage:'; }
+strip_diag() { printf '%s\n' "$1" | grep -v -e '^  timings:' -e '^  usage:' -e '^  model:'; }
 shadow_sql() { python3 -I -c 'import sqlite3,sys; print("\n".join("|".join(str(c) for c in r) for r in sqlite3.connect(sys.argv[1]).execute(sys.argv[2])))' "$SHADOW_DATA/aa.sqlite" "$1" 2>/dev/null || true; }
 
 run_shadow ''

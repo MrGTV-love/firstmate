@@ -718,8 +718,11 @@ def parse_answers(raw, request):
             raise ValueError("malformed Jev payload: %s answer missing or wrong type" % qid)
         if question["type"] == "choice":
             choice = answer.get("choice")
-            if not isinstance(choice, str) or choice not in question["criteria"]:
-                raise ValueError("Jev answer for %s names an option outside the question" % qid)
+            # An option outside the criteria is a contract violation. Keep it here so the
+            # caller can fail closed: an unknown work type becomes none-fit and an unknown
+            # worker or validator answer is rejected by the re-check, never used.
+            if not isinstance(choice, str) or not choice:
+                raise ValueError("Jev answer for %s has no choice" % qid)
             probabilities = answer.get("probabilities")
             if not isinstance(probabilities, dict):
                 raise ValueError("malformed Jev payload: %s has no probabilities" % qid)
