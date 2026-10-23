@@ -2233,16 +2233,22 @@ resolve_relaunch_profile() {
   local dsh_prior_kept=0
   if [ "$MODEL_SET" = 1 ]; then
     TARGET_MODEL=$NEW_MODEL
+    if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$NEW_MODEL" = "$PRIOR_MODEL" ]; then
+      dsh_prior_kept=1
+    fi
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_MODEL=${CONFIG_MODEL:-default}
-    if [ "$TARGET_HARNESS" = dsh ] && [ "$TARGET_MODEL" = default ]; then
-      if [ "$PRIOR_HARNESS" = dsh ] && [ "$PRIOR_MODEL" != default ]; then
-        TARGET_MODEL=$PRIOR_MODEL
-        dsh_prior_kept=1
-      else
-        TARGET_MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) \
-          || die "the dsh harness from config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness. The running agent was not stopped"
+    if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$PRIOR_MODEL" != default ] \
+       && { [ "$TARGET_MODEL" = default ] || [ "$EFFORT_SET" = 0 ]; }; then
+      if [ "$EFFORT_SET" = 0 ] && { [ "${CONFIG_MODEL:-$PRIOR_MODEL}" != "$PRIOR_MODEL" ] \
+         || [ "${CONFIG_EFFORT:-$PRIOR_EFFORT}" != "$PRIOR_EFFORT" ]; }; then
+        die "task $ID's bound dsh conversation runs model $PRIOR_MODEL at effort $PRIOR_EFFORT, but config/secondmate-harness names model ${CONFIG_MODEL:-(none)} at effort ${CONFIG_EFFORT:-(none)}; a plain relaunch would discard that conversation. Pass an explicit --model and --effort to start a fresh conversation on the configured profile. The running agent was not stopped"
       fi
+      TARGET_MODEL=$PRIOR_MODEL
+      dsh_prior_kept=1
+    elif [ "$TARGET_HARNESS" = dsh ] && [ "$TARGET_MODEL" = default ]; then
+      TARGET_MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) \
+        || die "the dsh harness from config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness. The running agent was not stopped"
     fi
   elif [ "$TARGET_HARNESS" = "$PRIOR_HARNESS" ]; then
     TARGET_MODEL=$PRIOR_MODEL
@@ -2251,7 +2257,7 @@ resolve_relaunch_profile() {
   fi
   if [ "$EFFORT_SET" = 1 ]; then
     TARGET_EFFORT=$NEW_EFFORT
-  elif [ "$dsh_prior_kept" = 1 ] && [ -z "$CONFIG_EFFORT" ]; then
+  elif [ "$dsh_prior_kept" = 1 ]; then
     TARGET_EFFORT=$PRIOR_EFFORT
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_EFFORT=${CONFIG_EFFORT:-default}

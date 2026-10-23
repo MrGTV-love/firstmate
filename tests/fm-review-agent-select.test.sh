@@ -31,7 +31,7 @@ cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
   usage) cat "$POOL" ;;
-  models) printf '%s\n' '{"models":[{"selector":"openai-codex/gpt-6.1-sol"}]}' ;;
+  models) printf '%s\n' '{"models":[{"selector":"openai-codex/gpt-6.1-sol"},{"selector":"lab/native-model"}]}' ;;
   *) exit 2 ;;
 esac
 SH
@@ -66,6 +66,7 @@ write_rules() {  # <review rule use array> [fallback array]; the review rule is 
 SOL='{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high","provider":"codex"}'
 SONNET='{"harness":"claude","model":"claude-sonnet-5-5[1m]","effort":"high"}'
 OPUS='{"harness":"claude","model":"opus","effort":"high"}'
+LAB_OMP='{"harness":"omp","model":"lab/native-model","effort":"high"}'
 DEEPSEEK='{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"high"}'
 DEFAULT_USE="[$SOL,$SONNET]"
 
@@ -148,6 +149,12 @@ assert_equals null "$(jq -c .selected <<<"$OUT")" 'no unsupported transport is s
 assert_equals dsh "$(jq -r '.candidates[] | select(.tier == "fallback") | .harness' <<<"$OUT")" 'DeepSeek retains the dsh identity'
 assert_equals false "$(jq -r '.candidates[] | select(.tier == "fallback") | .eligible' <<<"$OUT")" 'an unverified review transport is ineligible'
 assert_contains "$(jq -r '.candidates[] | select(.tier == "fallback") | .reason' <<<"$OUT")" 'no verified no-mistakes review-agent transport' 'the missing capability is explicit'
+write_rules "$DEFAULT_USE" "[$LAB_OMP]"
+select_json
+expect_code 0 "$CODE" 'proven exhaustion uses an eligible non-DeepSeek declared fallback'
+assert_equals fallback "$(jq -r .selected.tier <<<"$OUT")" 'the tier is reported'
+assert_equals "$LAB_OMP" "$(jq -c '.selected | {harness, model, effort}' <<<"$OUT")" 'the declared fallback is selected exactly'
+assert_contains "$(jq -r .reason <<<"$OUT")" 'proven exhausted' 'the reason states proven exhaustion'
 write_rules "$DEFAULT_USE"
 select_json
 expect_code 1 "$CODE" 'exhaustion with no declared fallback does not select'

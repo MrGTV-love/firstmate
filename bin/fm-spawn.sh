@@ -3228,11 +3228,13 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
-if [ "$RELAUNCH" = 1 ] && [ "$MODEL_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
+if [ "$RELAUNCH" = 1 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
   prior_dsh=$(fm_meta_get "$RELAUNCH_META" model)
-  [ "$prior_dsh" = default ] || MODEL=$prior_dsh
-  prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
-  [ "$EFFORT_SET" -eq 1 ] || [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
+  [ "$MODEL_SET" -eq 1 ] || [ "$prior_dsh" = default ] || MODEL=$prior_dsh
+  if [ "$EFFORT_SET" -eq 0 ] && [ "$MODEL" = "$prior_dsh" ]; then
+    prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
+    [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
+  fi
 fi
 if [ "$RAW_LAUNCH" = 0 ] && [ -z "$ARG3" ] && [ "$HARNESS" = dsh ] && { [ -z "$MODEL" ] || [ "$MODEL" = default ]; }; then
   MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) || {

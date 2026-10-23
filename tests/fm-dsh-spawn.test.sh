@@ -506,7 +506,7 @@ test_secondmate_launch_carries_brief_and_operator_home() {
 # when the calling DSH primary is bound to another model, so it resumes the
 # same generation's conversation instead of replacing it.
 test_secondmate_plain_relaunch_resumes_its_recorded_dsh_profile() {
-  local id=dsh-sm-resume sm primary binding generation session out status bin writer
+  local id=dsh-sm-resume sm primary binding generation session out status bin writer seq args
   make_dsh_case secondmate-resume "$id" claude
   mkdir -p "$CASE_DIR/spawner-operator" "$CASE_DIR/sentinel-source/profiles/dsh-tui/node_modules"
   printf '{}\n' > "$CASE_DIR/sentinel-source/profiles/dsh-tui/package.json"
@@ -534,32 +534,39 @@ esac
 exec "$FAKEBIN_DIR/tmux" "\$@"
 SH
   chmod +x "$bin/tmux"
-  : > "$LAUNCH_LOG"
-  python3 - "$generation/dsh/sessions/workspace/session/session.v4.jsonl" "$LAUNCH_LOG" <<'PY' &
+  # A plain relaunch, an explicit bound model without --effort, and the exact
+  # profile bin/fm-control.sh hands over each resume the same conversation.
+  seq=2
+  for args in '' "--model $DSH_MODEL" "--harness dsh --model $DSH_MODEL --effort high"; do
+    : > "$LAUNCH_LOG"
+    python3 - "$generation/dsh/sessions/workspace/session/session.v4.jsonl" "$LAUNCH_LOG" "$seq" <<'PY' &
 import json, os, sys, time
-log, launch = sys.argv[1:]
+log, launch, seq = sys.argv[1], sys.argv[2], int(sys.argv[3])
 deadline = time.time() + 120
 while time.time() < deadline and not (os.path.exists(launch) and os.path.getsize(launch) > 0):
     time.sleep(0.02)
 with open(log, "a") as stream:
-    stream.write(json.dumps({"type": "turn/end", "seq": 2}) + "\n" + json.dumps({"type": "turn/start", "seq": 3}) + "\n")
+    stream.write(json.dumps({"type": "turn/end", "seq": seq}) + "\n" + json.dumps({"type": "turn/start", "seq": seq + 1}) + "\n")
 PY
-  writer=$!
-  out=$(DSH_HOME="$primary/dsh" FM_DSH_SOURCE_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux \
-    FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
-    FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
-    fm_test_run_spawn "$HOME_DIR" "$sm" "$bin:$FAKEBIN_DIR" "$id" --relaunch 2>&1)
-  status=$?
-  kill "$writer" 2>/dev/null
-  wait "$writer" 2>/dev/null
-  expect_code 0 "$status" "a plain relaunch of a dsh secondmate must resume it: $out"
-  assert_grep "model=$DSH_MODEL" "$HOME_DIR/state/$id.meta" "the relaunch must keep the recorded model, not the primary's"
-  assert_grep "effort=high" "$HOME_DIR/state/$id.meta" "the relaunch must keep the recorded effort"
-  assert_equals "$generation" "$(jq -r .root "$binding")" "the relaunch must resume the bound generation"
-  assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "the relaunch must neither delete nor add a generation"
-  assert_equals "$session" "$(jq -r '.[0].config.sessionId' "$generation/launch.yml")" \
-    "the relaunch must resume the recorded conversation"
-  pass "fm-spawn: a plain dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation"
+    writer=$!
+    # shellcheck disable=SC2086 # each case is a deliberate word list of flags
+    out=$(DSH_HOME="$primary/dsh" FM_DSH_SOURCE_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux \
+      FM_DSH_START_POLL_INTERVAL=0.05 FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
+      FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
+      fm_test_run_spawn "$HOME_DIR" "$sm" "$bin:$FAKEBIN_DIR" "$id" --relaunch $args 2>&1)
+    status=$?
+    kill "$writer" 2>/dev/null
+    wait "$writer" 2>/dev/null
+    seq=$((seq + 2))
+    expect_code 0 "$status" "a dsh secondmate relaunch '$args' must resume it: $out"
+    assert_grep "model=$DSH_MODEL" "$HOME_DIR/state/$id.meta" "relaunch '$args' must keep the recorded model, not the primary's"
+    assert_grep "effort=high" "$HOME_DIR/state/$id.meta" "relaunch '$args' must keep the recorded effort"
+    assert_equals "$generation" "$(jq -r .root "$binding")" "relaunch '$args' must resume the bound generation"
+    assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "relaunch '$args' must neither delete nor add a generation"
+    assert_equals "$session" "$(jq -r '.[0].config.sessionId' "$generation/launch.yml")" \
+      "relaunch '$args' must resume the recorded conversation"
+  done
+  pass "fm-spawn: a plain or same-model dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation"
 }
 
 test_launch_policy_admits_dsh() {
@@ -702,6 +709,27 @@ SH
       *) assert_not_contains "$out" 'FM_DSH_LAB_COPY is missing' "a supplied copy must not be reported missing" ;;
     esac
   done
+  mkdir -p "$dir/no-model" "$dir/primary-bin"
+  out=$(env -u FM_LIVE PATH="$dir/bin:$PATH" FM_DSH_LIVE=1 FM_DSH_LAB_PROJECT="$dir/project" FM_DSH_LAB_COPY="$dir/copy" \
+    FM_DSH_OPERATOR_HOME="$dir/no-model" bash "$guard" 2>&1)
+  status=$?
+  expect_code 1 "$status" "the live guard must fail when no DeepSeek model preference resolves: $out"
+  assert_contains "$out" 'choose one with /model in dsh-tui' "the refusal must name how to set the model preference"
+  for tool in herdr jq dsh-tui dsh node; do
+    cat > "$dir/primary-bin/$tool" <<SH
+#!/bin/sh
+case "\$*" in version|--version) printf 'fake\\n'; exit 0 ;; esac
+printf '%s\\n' "$tool \$*" >> "$dir/primary-calls"
+exit 97
+SH
+    chmod +x "$dir/primary-bin/$tool"
+  done
+  out=$(env -u FM_LIVE PATH="$dir/primary-bin:$PATH" FM_DSH_PRIMARY_LIVE=1 FM_DSH_OPERATOR_HOME="$dir/no-model" \
+    bash "$ROOT/tests/fm-dsh-primary-live-e2e.test.sh" 2>&1)
+  status=$?
+  expect_code 1 "$status" "the live primary guard must fail when no DeepSeek model preference resolves: $out"
+  assert_contains "$out" 'choose one with /model in dsh-tui' "the primary refusal must name how to set the model preference"
+  assert_absent "$dir/primary-calls" "a missing-model refusal must precede every lab action: $(cat "$dir/primary-calls" 2>/dev/null)"
   out=$(env -u FM_LIVE -u FM_DSH_LAB_PROJECT -u FM_DSH_LAB_COPY PATH="$dir/bin:$PATH" \
     FM_DSH_LIVE=1 FM_DURATION_FILE="$dir/durations.jsonl" "$ROOT/bin/fm-test-run.sh" "$guard" 2>&1)
   status=$?
@@ -713,7 +741,7 @@ SH
   expect_code 0 "$status" "the guard without its opt-in must stay an ordinary skip: $out"
   assert_contains "$out" 'skip: live: opt-in; set FM_DSH_LIVE=1 to run' "the opt-out skip must be unchanged"
   assert_absent "$dir/calls" "a missing-input refusal must not reach herdr, dsh-tui or jq: $(cat "$dir/calls" 2>/dev/null)"
-  pass "live guard: an opted-in run with a missing lab input fails before any lab action; the opt-out still skips"
+  pass "live guards: an opted-in run with a missing lab input or no DeepSeek model preference fails before any lab action; the opt-out still skips"
 }
 
 test_detection_anchored_names_argv_and_marker_precedence

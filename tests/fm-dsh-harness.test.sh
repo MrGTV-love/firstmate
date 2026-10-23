@@ -400,4 +400,17 @@ out=$(fm_dsh_live_cleanup 0 session "$TMP/teardown-fail" "$PATH") && rc=0 || rc=
 [ "$rc" -ne 0 ] || { echo 'a failed teardown must stay fatal' >&2; exit 1; }
 case "$out" in *cleanup_exit=1*) ;; *) echo "failed teardown lost its report: $out" >&2; exit 1 ;; esac
 fm_dsh_live_cleanup 0 session "$TMP/teardown-ok" "$PATH" >/dev/null || { echo 'a clean teardown must pass' >&2; exit 1; }
-printf 'ok - dsh executable-slot attribution, lifecycle capability and fatal cleanup contract\n'
+S=$TMP/scrub
+mkdir -p "$S/task/state/t.dsh/g1/dsh" "$S/task/state/t.dsh/g1/home" "$S/operator/o.dsh/g1/dsh" "$S/outside/state/t.dsh/g1/dsh"
+printf 'sentinel\n' > "$S/task/state/t.dsh/g1/dsh/.credentials.yaml"
+printf 'evidence\n' > "$S/task/state/t.dsh/g1/dsh/session.jsonl"
+printf 'sentinel\n' > "$S/operator/o.dsh/g1/dsh/.credentials.yaml"
+printf 'sentinel\n' > "$S/outside/state/t.dsh/g1/dsh/.credentials.yaml"
+ln -s "$S/operator" "$S/task/state/t.dsh/g1/home/operator"
+out=$(fm_dsh_live_cleanup 0 session "$TMP/teardown-fail" "$PATH" "$S/task" '' "$S/absent") && rc=0 || rc=$?
+[ "$rc" -ne 0 ] || { echo 'a failed teardown must stay fatal when it also scrubs' >&2; exit 1; }
+[ ! -e "$S/task/state/t.dsh/g1/dsh/.credentials.yaml" ] || { echo 'cleanup must scrub a staged credential copy even after a failed teardown' >&2; exit 1; }
+[ -s "$S/task/state/t.dsh/g1/dsh/session.jsonl" ] || { echo 'cleanup must keep non-secret evidence' >&2; exit 1; }
+[ -s "$S/operator/o.dsh/g1/dsh/.credentials.yaml" ] || { echo 'cleanup must not follow a private-home link to the operator install' >&2; exit 1; }
+[ -s "$S/outside/state/t.dsh/g1/dsh/.credentials.yaml" ] || { echo 'cleanup must touch only the named task homes' >&2; exit 1; }
+printf 'ok - dsh executable-slot attribution, lifecycle capability, fatal cleanup contract and task-home credential scrub\n'

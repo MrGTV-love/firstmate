@@ -10,6 +10,10 @@ printf 'DSH primary live runtime:\n'
 dsh-tui version
 printf 'DSH CLI: '; dsh --version
 printf 'Node: '; node --version
+DSH_MODEL=$(python3 "$ROOT/bin/fm-dsh.py" preferred-model "${FM_DSH_OPERATOR_HOME:-$HOME}") || {
+  echo 'not ok - no DeepSeek model to test: choose one with /model in dsh-tui, which saves it to ~/.dsh-tui/model.json' >&2
+  exit 1
+}
 TASK=${FM_DSH_EVIDENCE_DIR:-$(mktemp -d)}
 HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 LAB_HELPER=${LAB_HOME_HELPER:-$ROOT/bin/fm-lab-home.sh}
@@ -23,6 +27,8 @@ SECOND=$(mktemp -d /tmp/fm-dsh-second.XXXXXX)
 LAB_HOME=$(cd "$LAB_HOME" && pwd -P)
 PARENT=$(cd "$PARENT" && pwd -P)
 SECOND=$(cd "$SECOND" && pwd -P)
+# shellcheck source=tests/fm-dsh-live-cleanup.sh
+. "$ROOT/tests/fm-dsh-live-cleanup.sh"
 cleanup() {
   local rc=$?
   trap - EXIT
@@ -34,11 +40,12 @@ cleanup() {
   # Retire the native owner first: stopping only its watcher while the TUI
   # remains alive permits a legitimate turn-end callback to re-arm it.
   PATH="$ORIGINAL_PATH" "$HELPER" teardown "$SESSION" || rc=1
-  for home in "$LAB_HOME" "$SECOND"; do
+  for home in "$LAB_HOME" "$PARENT" "$SECOND"; do
     [ -d "$home/state" ] || continue
     FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_STATE_OVERRIDE="$home/state" bash "$ROOT/bin/fm-watch-arm.sh" --stop || rc=1
   done
   "$LAB_HELPER" teardown "$LAB_HOME" || rc=1
+  fm_dsh_live_scrub_credentials "$LAB_HOME" "$PARENT" "$SECOND" || rc=1
   printf 'primary_home=%s\nparent_home=%s\nsecondmate_home=%s\ncleanup_exit=%s\n' "$LAB_HOME" "$PARENT" "$SECOND" "$rc"
   exit "$rc"
 }
@@ -96,7 +103,7 @@ printf '%s\n' 'Isolated runtime lab. Do not investigate, read outside this home,
 # the pane runs a short command and the launch lives in a file.
 cat > "$TASK/start-primary.sh" <<EOF
 #!/usr/bin/env bash
-exec env FM_HOME='$LAB_HOME' FM_DSH_OPERATOR_HOME='$LAB_HOME/operator-home' PATH='$PATH' FM_POLL=1 FM_CHECK_INTERVAL=1 bash '$ROOT/bin/fm-dsh-primary.sh' --model deepseek/deepseek-v4-flash --effort high -- '$PROMPT'
+exec env FM_HOME='$LAB_HOME' FM_DSH_OPERATOR_HOME='$LAB_HOME/operator-home' PATH='$PATH' FM_POLL=1 FM_CHECK_INTERVAL=1 bash '$ROOT/bin/fm-dsh-primary.sh' --model '$DSH_MODEL' --effort high -- '$PROMPT'
 EOF
 lab pane run "$PANE" "bash '$TASK/start-primary.sh'"
 EVENTS="$LAB_HOME/state/.dsh-primary-events.jsonl"
@@ -134,7 +141,7 @@ harness=dsh
 kind=secondmate
 mode=secondmate
 yolo=off
-model=deepseek/deepseek-v4-flash
+model=$DSH_MODEL
 effort=high
 backend=herdr
 herdr_session=$SESSION
@@ -187,7 +194,7 @@ done
 control "$ID" interrupt
 control "$ID" exit
 BEFORE=$(python3 "$ROOT/bin/fm-dsh.py" position "$PARENT/state" "$ID")
-control "$ID" relaunch --harness dsh --model deepseek/deepseek-v4-flash --effort high --note 'Reply FMPRIMARYRESUMED and the secret word from the earlier conversation. Do not inspect files, investigate, load skills or dispatch work.'
+control "$ID" relaunch --harness dsh --model "$DSH_MODEL" --effort high --note 'Reply FMPRIMARYRESUMED and the secret word from the earlier conversation. Do not inspect files, investigate, load skills or dispatch work.'
 [ "$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$ID")" = "$LOG" ]
 wait_reply 'FMPRIMARYRESUMED ORCHID73'
 AFTER=$(python3 "$ROOT/bin/fm-dsh.py" position "$PARENT/state" "$ID")
@@ -217,7 +224,7 @@ if kill -0 "$ARM_PID" 2>/dev/null || kill -0 "$WATCH_PID" 2>/dev/null; then
   exit 1
 fi
 printf 'ok - forced native owner death retired private arm and watcher\n'
-control "$ID" relaunch --harness dsh --model deepseek/deepseek-v4-flash --effort high --note 'Native primary was force-killed to prove owner-bound watcher cleanup. Continue the same conversation under the lab charter.'
+control "$ID" relaunch --harness dsh --model "$DSH_MODEL" --effort high --note 'Native primary was force-killed to prove owner-bound watcher cleanup. Continue the same conversation under the lab charter.'
 lab pane send-text "$PANE" 'Reply FMCRASHRESUMED and the secret word remembered earlier. Do not inspect files or run commands.'
 lab pane send-keys "$PANE" enter
 wait_reply 'FMCRASHRESUMED ORCHID73'
@@ -289,7 +296,7 @@ EOF
 chmod +x "$HOLD/bin/bash"
 PATH="$HOLD/bin:$PATH" FM_POLL=1 FM_CHECK_INTERVAL=1 FM_DSH_OPERATOR_HOME="$SECOND/operator-home" HERDR_SESSION="$SESSION" FM_HOME="$PARENT" FM_ROOT_OVERRIDE="$ROOT" \
   FM_STATE_OVERRIDE="$PARENT/state" FM_CONFIG_OVERRIDE="$PARENT/config" FM_SPAWN_NO_GUARD=1 \
-  bash "$ROOT/bin/fm-spawn.sh" "$SECOND_ID" "$SECOND" dsh --secondmate --backend herdr --model deepseek/deepseek-v4-flash --effort high > "$HOLD/spawn.out" 2>&1 &
+  bash "$ROOT/bin/fm-spawn.sh" "$SECOND_ID" "$SECOND" dsh --secondmate --backend herdr --model "$DSH_MODEL" --effort high > "$HOLD/spawn.out" 2>&1 &
 SPAWN_PID=$!
 for _ in $(seq 1 120); do
   [ -e "$HOLD/reached" ] && break
@@ -318,7 +325,7 @@ SECOND_LOG=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND
 [ "$(sed -n 's/^backend=//p' "$PARENT/state/$SECOND_ID.meta")" = herdr ] && [ "$(sed -n 's/^herdr_session=//p' "$PARENT/state/$SECOND_ID.meta")" = "$SESSION" ] || { echo 'the secondmate spawn left the named Herdr lab' >&2; exit 1; }
 SECOND_PANE=$(sed -n 's/^herdr_pane_id=//p' "$PARENT/state/$SECOND_ID.meta")
 LOG="$SECOND_LOG" PANE="$SECOND_PANE" wait_reply FMSECONDREADY
-control "$SECOND_ID" relaunch --harness dsh --model deepseek/deepseek-v4-flash --effort high --note 'Reply FMSECONDRESUMED and the secret word from the earlier conversation. Do not inspect files, investigate, load skills or dispatch work.'
+control "$SECOND_ID" relaunch --harness dsh --model "$DSH_MODEL" --effort high --note 'Reply FMSECONDRESUMED and the secret word from the earlier conversation. Do not inspect files, investigate, load skills or dispatch work.'
 [ "$(python3 "$ROOT/bin/fm-dsh.py" session-file "$PARENT/state" "$SECOND_ID")" = "$SECOND_LOG" ]
 LOG="$SECOND_LOG" PANE="$SECOND_PANE" wait_reply 'FMSECONDRESUMED TULIP42'
 control "$SECOND_ID" exit

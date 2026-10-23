@@ -135,7 +135,7 @@ SH
 # A plain relaunch of a secondmate whose configured harness is a bare dsh takes
 # the calling DSH session's bound model, as the spawn does, before the stop.
 test_secondmate_config_dsh_relaunch_carries_own_session_model() {
-  local dir home source primary out rc
+  local dir home source primary out rc config named
   dir=$(new_case smdsh smd)
   home="$dir/home"
   mkdir -p "$home/config" "$home/data/smd"
@@ -203,7 +203,44 @@ SH
     "a dsh secondmate must keep its recorded model rather than the calling session's"
   assert_equals max "$(journal_field "$dir" smd to_effort)" "a dsh secondmate must keep its recorded effort"
   [ "$(cat "$dir/fake/command")" = dsh ] || fail "the pending-composer refusal stopped the running dsh agent"
-  pass "fm-control relaunch: a config dsh secondmate with no model keeps a recorded dsh profile, else carries the DSH session's bound model, and refuses without one before stopping"
+  # A configured profile that differs from the bound conversation refuses
+  # before the stop, leaving the generation and its log intact.
+  mkdir -p "$home/state/smd.dsh/g1/dsh/sessions/w/s"
+  printf '{"type":"session"}\n' > "$home/state/smd.dsh/g1/dsh/sessions/w/s/session.v4.jsonl"
+  printf '{"root":"%s"}\n' "$home/state/smd.dsh/g1" > "$home/state/smd.dsh-session"
+  cp "$home/state/smd.meta" "$dir/dsh.meta"
+  for config in 'dsh deepseek/other-model|deepseek/other-model at effort (none)' 'dsh deepseek/recorded-model high|deepseek/recorded-model at effort high'; do
+    named=${config#*|}
+    config=${config%%|*}
+    rm -f "$home/state/smd.control-relaunch"
+    printf '%s\n' "$config" > "$home/config/secondmate-harness"
+    out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch); rc=$?
+    expect_code 1 "$rc" "config '$config' must refuse a plain relaunch: $out"
+    assert_contains "$out" "bound dsh conversation runs model deepseek/recorded-model at effort max" "the refusal must name the bound profile ($config)"
+    assert_contains "$out" "names model $named" "the refusal must name the configured profile ($config)"
+    assert_contains "$out" "explicit --model and --effort to start a fresh conversation" "the refusal must name the explicit override ($config)"
+    [ "$(cat "$dir/fake/command")" = dsh ] || fail "config '$config' refusal stopped the running agent"
+    cmp -s "$dir/dsh.meta" "$home/state/smd.meta" || fail "config '$config' refusal changed task metadata"
+    assert_absent "$home/state/smd.control-relaunch" "config '$config' refusal must precede the relaunch transaction"
+    [ -s "$home/state/smd.dsh/g1/dsh/sessions/w/s/session.v4.jsonl" ] || fail "config '$config' refusal lost the bound conversation"
+  done
+  # A configured profile equal to the binding resumes it, and an explicit model
+  # equal to the bound one keeps the recorded effort.
+  rm -f "$home/state/smd.control-relaunch"
+  printf 'dsh deepseek/recorded-model max\n' > "$home/config/secondmate-harness"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_contains "$out" "composer visibly holds pending text" "an agreeing config must pass every pre-stop admission"
+  assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "an agreeing config keeps the bound model"
+  assert_equals max "$(journal_field "$dir" smd to_effort)" "an agreeing config keeps the bound effort"
+  rm -f "$home/state/smd.control-relaunch"
+  printf 'dsh deepseek/other-model high\n' > "$home/config/secondmate-harness"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch --model deepseek/recorded-model); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "the explicit model is the replacement model"
+  assert_equals max "$(journal_field "$dir" smd to_effort)" "an explicit bound model without --effort keeps the recorded effort"
+  [ "$(cat "$dir/fake/command")" = dsh ] || fail "the pending-composer refusal stopped the running dsh agent"
+  pass "fm-control relaunch: a config dsh secondmate keeps or refuses to discard its bound dsh profile, else carries the DSH session's bound model, and refuses without one before stopping"
 }
 
 test_relaunch_omp_billing_admission_preserves_running_agents() {

@@ -13,6 +13,10 @@ missing_input=0
 [ -n "${FM_DSH_LAB_PROJECT:-}" ] || { echo 'not ok - FM_DSH_LAB_PROJECT is missing: supply a disposable preallocated project' >&2; missing_input=1; }
 [ -n "${FM_DSH_LAB_COPY:-}" ] || { echo 'not ok - FM_DSH_LAB_COPY is missing: supply its separate preallocated linked copy' >&2; missing_input=1; }
 [ "$missing_input" -eq 0 ] || exit 1
+DSH_MODEL=$(python3 "$ROOT/bin/fm-dsh.py" preferred-model "${FM_DSH_OPERATOR_HOME:-$HOME}") || {
+  echo 'not ok - no DeepSeek model to test: choose one with /model in dsh-tui, which saves it to ~/.dsh-tui/model.json' >&2
+  exit 1
+}
 TASK=${FM_DSH_EVIDENCE_DIR:-$(mktemp -d)}
 HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 ORIGINAL_PATH=$PATH
@@ -24,11 +28,12 @@ mkdir -p "$TASK"
 cleanup() {
   local rc=$?
   trap - EXIT
-  fm_dsh_live_cleanup "$rc" "$SESSION" "$HELPER" "$ORIGINAL_PATH"
+  fm_dsh_live_cleanup "$rc" "$SESSION" "$HELPER" "$ORIGINAL_PATH" "${HOME_ROOT:-}"
   exit $?
 }
 trap cleanup EXIT
 unset HERDR_ENV HERDR_PANE_ID HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_SOCKET_PATH HERDR_SESSION
+unset FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE
 PROJECT=$(cd "$FM_DSH_LAB_PROJECT" && pwd -P)
 COPY=$(cd "$FM_DSH_LAB_COPY" && pwd -P)
 [ "$PROJECT" != "$COPY" ] || { echo 'project and linked copy must differ' >&2; exit 1; }
@@ -104,7 +109,7 @@ kind=$KIND
 mode=local-only
 yolo=off
 branch=$(git -C "$COPY" symbolic-ref --short HEAD)
-model=deepseek/deepseek-v4-flash
+model=$DSH_MODEL
 effort=high
 backend=herdr
 herdr_session=$SESSION
@@ -112,7 +117,7 @@ herdr_workspace_id=$(printf '%s' "$WS" | jq -er .result.workspace.workspace_id)
 herdr_tab_id=$(printf '%s' "$WS" | jq -er .result.root_pane.tab_id)
 herdr_pane_id=$PANE
 EOF
-  FM_HOME="$HOME_ROOT" FM_SPAWN_NO_GUARD=1 bash "$ROOT/bin/fm-spawn.sh" "$ID" --relaunch --model deepseek/deepseek-v4-flash --effort high
+  FM_HOME="$HOME_ROOT" FM_SPAWN_NO_GUARD=1 bash "$ROOT/bin/fm-spawn.sh" "$ID" --relaunch --model "$DSH_MODEL" --effort high
   wait_state busy
   first_session=$(python3 "$ROOT/bin/fm-dsh.py" session-file "$HOME_ROOT/state" "$ID")
   [ -n "$first_session" ] || { echo "no readable dsh session after launch" >&2; exit 1; }

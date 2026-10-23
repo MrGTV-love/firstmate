@@ -233,5 +233,8 @@ printf '#!/bin/sh\nprintf "probe-failed\n"\nexit 1\n' > "$FAKEBIN/dsh"
 if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$deepseek" '{"status":"exhausted"}' > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "a dsh runtime whose CLI probe fails must not fall back to omp"
 fi
+grep -q 'dsh --version failed' "$TMP_ROOT/error" \
+  || fail "the refusal must come from the failed dsh CLI probe: $(cat "$TMP_ROOT/error")"
+[ ! -s "$TMP_ROOT/result" ] || fail "a refused dsh replacement must select no profile: $(cat "$TMP_ROOT/result")"
 pass "DeepSeek replacements require dsh-tui under the session policy and never fall back to omp"
 printf '# all fm-dispatch-capacity tests passed\n'
