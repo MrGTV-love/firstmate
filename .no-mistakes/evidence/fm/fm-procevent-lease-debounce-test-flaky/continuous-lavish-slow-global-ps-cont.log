@@ -1,0 +1,3 @@
+ok - one exclusive listener survives disconnects and multiple unhandled answers, then retires on user end
+CASE-DONE
+exit=0 wall=30s slow_ps_hits=0

@@ -1,0 +1,3 @@
+run 1: FAIL rc=1 64s | not ok - the single failed lease read this case injects never happened 
+run 2: FAIL rc=1 67s | not ok - the single failed lease read this case injects never happened 
+TOTAL pass=0 fail=2 of 2

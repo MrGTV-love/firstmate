@@ -1,0 +1,4 @@
+run 1: pass rc=0 24s | ok - concurrent stale-claim replacement starts exactly one runner 
+run 2: pass rc=0 24s | ok - concurrent stale-claim replacement starts exactly one runner 
+run 3: pass rc=0 22s | ok - concurrent stale-claim replacement starts exactly one runner 
+TOTAL pass=3 fail=0 of 3

@@ -1,0 +1,3 @@
+run 1: pass rc=0 47s | ok - one unreadable read does not end a live runner 
+run 2: pass rc=0 48s | ok - one unreadable read does not end a live runner 
+TOTAL pass=2 fail=0 of 2

@@ -1,0 +1,6 @@
+run 1: FAIL rc=1 27s | not ok - one unreadable lease read ended a runner whose home was still alive 
+run 2: FAIL rc=1 30s | not ok - one unreadable lease read ended a runner whose home was still alive 
+run 3: FAIL rc=1 29s | not ok - one unreadable lease read ended a runner whose home was still alive 
+run 4: FAIL rc=1 29s | not ok - one unreadable lease read ended a runner whose home was still alive 
+run 5: FAIL rc=1 30s | not ok - one unreadable lease read ended a runner whose home was still alive 
+TOTAL pass=0 fail=5 of 5

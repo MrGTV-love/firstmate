@@ -1,0 +1,2 @@
+not ok - a page held by a leftover poller stranded the listener
+exit=1 wall=38s slow_ps_hits=1

@@ -1,0 +1,8 @@
+ok empty marker                 rc=1 out=<>
+ok non-numeric marker           rc=1 out=<>
+ok mixed marker                 rc=1 out=<>
+ok unterminated marker          rc=1 out=<>
+ok missing marker               rc=1 out=<>
+ok complete marker              rc=0 out=<4567>
+torn-race helper: 300 reads, correct=300 wrong_or_empty=0
+torn-race old pattern (wait -s then cat): 300 reads, empty=79

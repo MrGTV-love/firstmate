@@ -1,0 +1,4 @@
+ok - concurrent stale-claim replacement starts exactly one runner
+stagger-probe: first=arrival 1 at SECONDS=10 last=arrival 24 at SECONDS=148 elapsed_seconds=150 source_invocations=1
+CASE-DONE
+exit=0 wall=152s
