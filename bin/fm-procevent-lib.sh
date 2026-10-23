@@ -46,7 +46,7 @@ fm_procevent_registry_dir() {
 fm_procevent_inbox_dir()    { printf '%s\n' "$1/procevent-inbox"; }
 fm_procevent_capture_reservation_dir() { printf '%s\n' "$1/procevent-capture-reservations"; }
 
-FM_PROCEVENT_LIB_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+FM_PROCEVENT_LIB_ROOT=$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)
 
 adapter_script() {
   local root=${FM_ROOT:-${FM_ROOT_OVERRIDE:-$FM_PROCEVENT_LIB_ROOT}}

@@ -519,6 +519,9 @@ The default 300-second grace is unchanged.
 Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
 The main shell enforces each capture deadline even if its timeout controller stops responding.
+It observes check completion through a private pipe using Bash's timed read, waking immediately on pipe closure and rechecking the leader once per second if a descendant retains the writer, instead of starting a sleep process on each poll tick.
+Group cleanup retains its existing grace and stop bounds, with one process per bounded wait rather than one per stop poll.
+That process is Perl, which ends the wait as soon as the group is gone; a host without Perl uses a single `sleep` for the whole bound instead.
 Home-summary publication runs separately so its inventory-sized work does not delay the main poll.
 The [process-event operating contract](configuration.md#process-to-event-sources-stateprocevent) owns background source reconciliation and queued-result delivery.
 The [pending-reply library](../bin/fm-pending-reply-lib.sh) owns retained-reply scanning and escalation-close retries.
@@ -619,6 +622,8 @@ A deterministic late-publication fixture acknowledges poll-discovered recovery a
 - Bounded and successor-linked lifecycle rows.
 - A SIGSTOP counterfactual that distinguishes a live PID from a stale beacon before classifying termination.
 - A single slow, deadline-bounded check keeps the strict watcher predicate healthy beyond grace, while stopping that same main poll makes its beacon stale even with its check child still alive.
+- A bounded check wait launches no sleep process per tick, and still returns the check's output and failure status, stops at its deadline, and removes a leftover descendant.
+- Group cleanup on a host without Perl stops a TERM-ignoring descendant with one sleep per bounded wait.
 
 `tests/fm-supervision-events.test.sh` covers recovery output/status transport and cooldown, plus real recovery command and descendant termination on PID-only owner TERM, owner death without cleanup, the inspection deadline, and an outer checkpoint deadline.
 Its TERM-resistant fixtures assert process survival before shutdown and disappearance afterward.
