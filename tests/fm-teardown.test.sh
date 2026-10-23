@@ -30,7 +30,8 @@
 #   (c) local-only + merged into local main, no remote         -> ALLOW  (no regression)
 #   (d) no-mistakes + real work pushed to origin, PR not merged -> REFUSE (pushed is not landed)
 #   (e) no-mistakes + unpushed, no PR, content not in default  -> REFUSE (safety)
-#   (f) local-only + truly unpushed + --force                  -> ALLOW  (escape hatch)
+#   (f) local-only + truly unpushed + --force                  -> ALLOW  (escape hatch;
+#       test_local_only_force_overrides_unpushed lives in tests/fm-teardown-cleanup.test.sh)
 #   (g) no-mistakes + squash-merged PR, exact PR head          -> ALLOW  (squash fix)
 #   (h) no-mistakes + no PR but content already in default     -> ALLOW  (content fallback)
 #   (i) no-mistakes + dirty worktree, even when work landed     -> REFUSE (dirty wins)

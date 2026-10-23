@@ -2944,7 +2944,16 @@ for requested_case in "$@"; do
   fi
 done
 
+# In the combined tests/fm-teardown.test.sh run,
+# test_local_only_fork_remote_allows left set -e in force for every case
+# registered after it. test_reassigned_dirty_slot_retires_only_finished_task
+# is the first such case here, so restore that errexit state once before it.
+errexit_restored=false
 for test_case in "${teardown_test_cases[@]}"; do
+  if [ "$errexit_restored" = false ] && [ "$test_case" = test_reassigned_dirty_slot_retires_only_finished_task ]; then
+    set -e
+    errexit_restored=true
+  fi
   if [ "$#" -eq 0 ]; then
     "$test_case"
     continue
