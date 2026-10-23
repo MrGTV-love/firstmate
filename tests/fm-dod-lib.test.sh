@@ -552,6 +552,218 @@ EOF
   pass "promotion keeps a scout's recorded base branch and refuses local-only for it"
 }
 
+# A half-filled brief costs one refusal, not one round trip per placeholder: the
+# dispatch verdict prints every leftover Task body and Definition of Done token
+# in one pass, in scaffold order, and only where the scaffold puts them.
+test_dispatch_verdict_lists_all_problems_in_one_pass() {
+  local brief out rc token count
+  brief="$TMP_ROOT/dispatch-half-filled.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+{TASK}
+
+## Firstmate spec
+{FIRSTMATE_SPEC}
+
+## Definition Of Done (task)
+Capability in plain words: {DOD_CAPABILITY}
+
+### Mandatory items
+{DOD_MANDATORY_ITEMS}
+
+### Supporting items
+Ship the listed behavior.
+
+### Hard gates
+Keep the existing safety guard.
+
+### Honesty rule
+{DOD_HONESTY_RULE}
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a half-filled brief was reported dispatchable"
+  for token in '{TASK}' '{FIRSTMATE_SPEC}' '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_HONESTY_RULE}'; do
+    count=$(printf '%s\n' "$out" | grep -cF -- "$token")
+    [ "$count" -ge 1 ] || fail "the dispatch verdict omitted $token: $out"
+  done
+  for token in '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}'; do
+    if printf '%s\n' "$out" | grep -qF -- "$token"; then
+      fail "the dispatch verdict reported the filled token $token: $out"
+    fi
+  done
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -eq 5 ] \
+    || fail "the dispatch verdict did not print exactly one line per problem: $out"
+  pass "the dispatch verdict lists every leftover Task and Definition of Done token in one pass"
+}
+
+# A fully filled brief is dispatchable: no output, exit 1.
+test_dispatch_verdict_passes_a_filled_brief() {
+  local brief out rc
+  brief="$TMP_ROOT/dispatch-filled.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+Capability in plain words: A half-filled brief costs one refusal.
+
+### Mandatory items
+Source: the dispatch verdict. Expected: one list. Verify: this test. Edge/negative: none. Evidence place: the test output. Authority: the grader.
+
+### Supporting items
+None.
+
+### Hard gates
+Keep the existing refusals.
+
+### Honesty rule
+Report what ran.
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a fully filled brief did not pass the dispatch verdict: $out"
+  pass "a fully filled brief passes the dispatch verdict with no output"
+}
+
+# An empty DoD file is a named problem, with the path the operator must fill.
+test_dispatch_verdict_reports_an_empty_dod_file() {
+  local brief criteria out rc
+  brief="$TMP_ROOT/dispatch-empty-dod.md"
+  criteria="$TMP_ROOT/dispatch-empty-criteria.md"
+  : > "$criteria"
+  cat > "$brief" <<EOF
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+DoD file: $criteria
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "an empty DoD file was reported dispatchable"
+  assert_contains "$out" "DoD file $criteria is empty" "the dispatch verdict did not name the empty DoD file"
+  pass "the dispatch verdict reports an empty DoD file with its path"
+}
+
+# Every token a DoD file still holds is listed, not just the first one.
+test_dispatch_verdict_lists_every_token_in_the_dod_file() {
+  local brief criteria out rc
+  brief="$TMP_ROOT/dispatch-dod-file.md"
+  criteria="$TMP_ROOT/dispatch-dod-criteria.md"
+  printf '{DOD_CAPABILITY}\n\n{DOD_HARD_GATES}\n' > "$criteria"
+  cat > "$brief" <<EOF
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+DoD file: $criteria
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "an unfinished DoD file was reported dispatchable"
+  assert_contains "$out" "DoD file $criteria: ## Definition Of Done (task) still holds {DOD_CAPABILITY}" \
+    "the dispatch verdict omitted the DoD file's capability token"
+  assert_contains "$out" "DoD file $criteria: ### Hard gates still holds {DOD_HARD_GATES}" \
+    "the dispatch verdict omitted the DoD file's hard-gates token"
+  pass "the dispatch verdict lists every token a DoD file still holds"
+}
+
+# A relaunch re-checks only the Task bodies: the Definition of Done was accepted
+# at the fresh spawn and is never re-litigated.
+test_dispatch_verdict_task_only_skips_the_definition_of_done() {
+  local brief out rc
+  brief="$TMP_ROOT/dispatch-task-only.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+Capability in plain words: {DOD_CAPABILITY}
+
+### Mandatory items
+{DOD_MANDATORY_ITEMS}
+
+### Supporting items
+None.
+
+### Hard gates
+Keep the existing refusals.
+
+### Honesty rule
+Report what ran.
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief" task-only); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] \
+    || fail "the task-only dispatch scope re-litigated the Definition of Done: $out"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a leftover Definition of Done token was reported dispatchable"
+  pass "the task-only dispatch scope skips the Definition of Done and the full scope checks it"
+}
+
+# Promotion keeps its existing scope: it lists both leftover Task bodies in one
+# refusal, keeps its scout-versus-ship spec sentence, and prints the repair.
+test_promotion_refusal_lists_every_task_problem_in_one_pass() {
+  local home id meta brief out status token
+  home="$TMP_ROOT/promote-refusal-home"
+  id="promote-refusal-wp1"
+  meta="$home/state/$id.meta"
+  mkdir -p "$home/state" "$home/data/$id"
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
+  brief="$home/data/$id/brief.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+{TASK}
+
+## Firstmate spec
+{FIRSTMATE_SPEC}
+EOF
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-promote.sh" \
+    "$id" --mode direct-PR --yolo off 2>&1)
+  status=$?
+  expect_code 1 "$status" "an unfilled scout brief must not promote"
+  for token in '{TASK}' '{FIRSTMATE_SPEC}'; do
+    assert_contains "$out" "still holds $token" "promotion did not list $token"
+  done
+  assert_contains "$out" "  ## Captain's intent still holds {TASK}" "promotion indented the intent problem differently"
+  assert_contains "$out" "  ## Firstmate spec still holds {FIRSTMATE_SPEC}" "promotion indented the spec problem differently"
+  assert_contains "$out" "preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec" \
+    "promotion lost its scout-versus-ship spec boundary"
+  assert_contains "$out" "error: repair: edit $brief and replace {TASK} in ## Captain's intent and {FIRSTMATE_SPEC} in ## Firstmate spec before promotion" \
+    "promotion did not print the runnable repair"
+  assert_grep 'kind=scout' "$meta" "a refused promotion changed the task record"
+  pass "promotion lists every Task placeholder in one refusal with its scout-time boundary and the repair"
+}
+
 test_dod_file_examples_are_not_directives
 test_unfenced_dod_file_is_still_honored
 test_scout_done_is_not_gated
@@ -575,6 +787,12 @@ test_fenced_and_indented_captain_lines_are_not_intent
 test_pr_based_dod_draft_check_uses_gh_axi
 test_task_owns_several_prs_only_on_positive_evidence
 test_promotion_keeps_the_recorded_base_branch
+test_dispatch_verdict_lists_all_problems_in_one_pass
+test_dispatch_verdict_passes_a_filled_brief
+test_dispatch_verdict_reports_an_empty_dod_file
+test_dispatch_verdict_lists_every_token_in_the_dod_file
+test_dispatch_verdict_task_only_skips_the_definition_of_done
+test_promotion_refusal_lists_every_task_problem_in_one_pass
 
 # The launch role is the generated text a worker receives. It must keep the
 # skill name, so a session that registers the skill loads it by name, and must

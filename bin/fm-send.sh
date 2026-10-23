@@ -227,6 +227,10 @@ fm_refuse_if_gate_agent
 
 if [ -z "${FM_HOME+x}" ] || [ -z "${FM_HOME:-}" ]; then
   echo "error: FM_HOME is not set; fm-send refuses to resolve targets without an explicit firstmate home" >&2
+  echo "usage: FM_HOME=<home> bin/fm-send.sh <task> <message>" >&2
+  # Record the refusal as guard telemetry. The writer always exits 0; the
+  # fallback keeps a missing writer from changing the refusal's exit code.
+  "$SCRIPT_DIR/fm-guard-event.sh" send-home-fail-closed deny --source-ok true 2>/dev/null || true
   exit 1
 fi
 

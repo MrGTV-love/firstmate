@@ -115,10 +115,16 @@ test_unset_fm_home_fails() {
   dir="$TMP_ROOT/nohome"; mkdir -p "$dir"
   fb=$(make_stubs "$dir"); err="$dir/send.err"; log="$dir/tmux.log"; : > "$log"
 
+  : > "$dir/guard-events.jsonl"
   env -u FM_HOME PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$dir" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_GUARD_EVENT_LOG="$dir/guard-events.jsonl" \
     "$SEND" sess:win "hello" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "unset FM_HOME should fail"
   assert_contains "$(cat "$err")" "FM_HOME is not set" "unset FM_HOME diagnostic should be explicit"
+  assert_contains "$(cat "$err")" "FM_HOME=<home> bin/fm-send.sh" \
+    "unset FM_HOME diagnostic should show the working invocation"
+  [ "$(grep -c '"guard":"send-home-fail-closed".*"decision":"deny"' "$dir/guard-events.jsonl")" -eq 1 ] \
+    || fail "unset FM_HOME refusal should append exactly one deny event"
   [ ! -s "$log" ] || fail "unset FM_HOME still attempted a send"$'\n'"$(cat "$log")"
   pass "fm-send strict: unset FM_HOME fails before target resolution"
 }

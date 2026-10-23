@@ -133,7 +133,7 @@ It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, 
 A forced or legacy-record teardown prints a human-only exit for that refusal instead, because the printed command carries no force or legacy flags and so could not complete that run; the owner re-runs it with the owner's own flags.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
 Jev's size message, for shell calls and untrusted results, names the existing request/overlap budget and a human-only question without changing their screening or admission.
-A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; on Claude a tool result is advisory only, so an oversized result there is neither printed as `REFUSED` nor counted.
+A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; Claude runs no post-tool screening, so an oversized result there is neither printed as `REFUSED` nor counted.
 
 The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
 Only an explicit absolute `FM_HOME` selects the ledger; cwd and `FM_STATE_OVERRIDE` do not redirect it.
@@ -2356,12 +2356,13 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 ## Jev guard
 
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
-Claude result handling remains advisory-only/**no protection**, not quarantine.
+The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
+Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
-`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `UserPromptSubmit`, `PreToolUse` on `Bash|Write|Edit` and `PostToolUse` on `Bash|Read`.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Bash|Write|Edit` only; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
 There is no legacy exemption, automatic compatibility, receipt backfill or automatic republication.
@@ -2379,7 +2380,7 @@ Questions and numeric policy are code-owned:
 `supervisorReadAdmission` is the single isolated Firstmate-channel consistency check.
 It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
 The existing [launch publisher](../bin/fm-operational-input.sh) owns the consistency-receipt format, reused by the [numeric inbox publisher](../bin/fm-task-inbox-lib.sh); neither the reader nor a tool-result authority claim creates a receipt.
-omp captures native `before_agent_start` prompts in memory; Claude captures native `UserPromptSubmit` and persists only exact path/doorbell binding hashes in task/session-local context for its separate hook processes.
+omp captures native `before_agent_start` prompts in memory, and Claude no longer captures `UserPromptSubmit` because the read-screening that consumed those bindings was retired.
 Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no channel-consistency exception.
 The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
 Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases do not gain channel consistency and still receive ordinary result screening.
@@ -2392,10 +2393,10 @@ They do not exempt `bash` results or reads of other paths and do not authenticat
 An audit failure adds a notice beside the original trusted read rather than erasing it.
 Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice rather than erasing them.
 On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
-Claude keeps its distinct advisory `additionalContext`, containing neither the source text nor its path.
+Claude receives no result notice at all: its post-tool advisory was retired and the adapter ignores `PostToolUse`.
 The [steering-inbox owner](../bin/fm-task-inbox-lib.sh) defines record-specific delivery, ordered survivor announcements, checkpoint handling and publication-clock retry scheduling.
 Its shared carrier keeps the inbox reference independent of home depth and carries the exact record, acknowledgement ordering and omp `:raw` hint under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
-Native launch prompts carry the survivor doorbells separately from Claude's record-backed launch carrier, so the guard sees each binding without reading that carrier first; announcement never repairs a legacy receipt.
+Native launch prompts carry the survivor doorbells separately from the record-backed launch carrier, so omp sees each binding without reading that carrier first; announcement never repairs a legacy receipt.
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
 
@@ -2424,9 +2425,9 @@ A policy block (shell and write gate verdicts and deterministic refusals) tells 
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.
-On Claude, review notices arrive as added context next to the unchanged output.
-The current [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; this integration intentionally does not use that capability without installed-host verification.
-Advisory context is not evidence that Claude was prevented from seeing or acting on the original output.
+Claude receives no post-tool review notice, so an unreviewed result is exactly what the tool returned.
+The [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; re-adding post-tool screening would need that installed-host output-replacement proof, never advisory context.
+Advisory context is not evidence that Claude was prevented from seeing or acting on the original output, which is why the retired advisory was not protection.
 
 The captain data-egress decision 2026-10-08 authorizes Jev guard requests only for the `firstmate` project.
 `fm-spawn.sh` determines the project once by comparing physical roots: `firstmate` when the project root equals the Firstmate code root, otherwise the project directory's basename.
@@ -2451,7 +2452,7 @@ These checks can reject placeholders that resemble the listed shapes and miss un
 Every admitted write records unique UTF-8 content bytes as `write_coverage.model_screened_bytes` and `write_coverage.local_only_bytes`, excluding framing and repeated overlap; a nonzero local-only count adds an explicit unscreened-remainder note to the audit row.
 The never-send policy checks every model-screened piece of a write/edit before the first piece leaves; the remainder is never sent to a model, so that policy does not check it.
 A write/edit piece is checked alone, so a never-send value longer than about 1,000 JSON-escaped bytes as written, including the whitespace between its words, can be cut across a piece boundary, and then only fragments reach the model.
-The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while result handling retains the advisory-band and trusted-read exceptions above.
+The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while omp result handling retains the advisory-band and trusted-read exceptions above.
 A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
@@ -2478,14 +2479,14 @@ This is not sustained-outage permission to execute shell commands or write files
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
 Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
-On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude retains its existing advisory-only path.
+On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude runs no result screening at all because its post-tool advisory is retired.
 Clear scores at or below 0.20 pass without an advisory.
 Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.
 Non-text results that cannot be assessed also require review rather than an unexamined pass.
-Claude receives only the explicit advisory notice, not a quarantine claim.
-Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool execution with a stable error type; post-tool feedback cannot undo the tool's effects.
+Claude receives no result notice, because its post-tool advisory is retired.
+Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool execution with a stable error type, and no post-tool notice could undo a tool's effects.
 The command wrapper publishes only successful handler stdout, normalizes active nonzero runtime exits to exit 2, and emits `RuntimeExecutionError` with the observed numeric exit status instead of raw failure output.
-Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal or advisory output keeps its existing hook semantics.
+Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
 
 Other or absent project scopes and an omp worker's `--omp-no-helpers` posture are intentionally inactive/**no protection**, not inference outages.
 They perform no guard key lookup or provider request and retain deterministic path, root, native-device and edit-schema checks.

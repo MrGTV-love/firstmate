@@ -44,6 +44,10 @@ SEND="$ROOT/bin/fm-send.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 
 TMP=$(fm_test_tmproot fm-gate-refuse)
+# Keep guard telemetry inside the fixture root: a refusal must not write into
+# the checkout's own state directory while this suite runs.
+EVENTS="$TMP/guard-events.jsonl"
+export FM_GUARD_EVENT_LOG="$EVENTS"
 fm_git_identity fmtest fmtest@example.invalid
 
 # The env marker's exact stderr fragment (the primary signal).
@@ -107,9 +111,15 @@ run_guard_lib() {
 
 test_helper_env_marker_refuses() {
   local out rc
+  : > "$EVENTS"
   out=$(run_guard_lib "$NORMAL_CWD" set); rc=$?
   expect_code 3 "$rc" "helper: env marker must exit 3"
   assert_contains "$out" "$ENV_MSG" "helper: env-marker refusal message"
+  assert_contains "$out" 'bin/fm-lab-home.sh create' "helper: env-marker refusal must name the lab-home escape"
+  assert_contains "$out" 'a real home is intentionally unavailable to a gate agent' \
+    "helper: env-marker refusal must state the real home is unavailable"
+  [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"deny"' "$EVENTS")" -eq 1 ] \
+    || fail "helper: env-marker refusal must append exactly one deny event"
   pass "fm-gate-refuse-lib: refuses when NO_MISTAKES_GATE is set"
 }
 
@@ -123,11 +133,17 @@ test_helper_empty_env_marker_refuses() {
 
 test_helper_path_backstop_refuses() {
   local out rc
+  : > "$EVENTS"
   # Marker UNSET: only the git-common-dir backstop can fire here.
   out=$(run_guard_lib "$GATE_WT"); rc=$?
   expect_code 3 "$rc" "helper: gate worktree must exit 3 even with the marker unset"
   assert_contains "$out" "$PATH_MSG" "helper: path-backstop refusal message"
   assert_not_contains "$out" "$ENV_MSG" "helper: backstop must not be attributed to the env marker"
+  assert_contains "$out" 'bin/fm-lab-home.sh create' "helper: backstop refusal must name the lab-home escape"
+  assert_contains "$out" 'a real home is intentionally unavailable to a gate agent' \
+    "helper: backstop refusal must state the real home is unavailable"
+  [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"deny"' "$EVENTS")" -eq 1 ] \
+    || fail "helper: path-backstop refusal must append exactly one deny event"
   pass "fm-gate-refuse-lib: refuses from a gate worktree via git-common-dir (marker unset)"
 }
 

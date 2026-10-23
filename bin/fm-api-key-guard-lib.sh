@@ -10,6 +10,9 @@
 # It reads the invoking environment and, on tmux, the effective session/global
 # environment. Existing panes can hold older values; the launch command sheds
 # both credential variables when billing has not been opted into.
+# An ambient refusal prints the exact `env -u` relaunch that clears it plus the
+# `--allow-api-key` opt-in; a tmux refusal prints the tmux unset command,
+# because `env -u` cannot clear a value the new window inherits from the server.
 #
 # See docs/configuration.md "Claude API key guard" for semantics.
 
@@ -180,7 +183,8 @@ fm_api_key_guard() {
       esac
     fi
     if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-      echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
+      echo "error: $check_var is set and would reach the claude worker$route_text; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API" >&2
+      "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/fm-guard-event.sh" claude-api-billing deny --source-ok true 2>/dev/null || true
       return 1
     fi
   done

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "jev-posttool-advisory",
+    "system": "firstmate",
+    "invariant": "unscreened Bash or read output is never treated as Firstmate truth",
+    "retired": "2026-10-22",
+    "tier": "A",
+    "why": "it cannot withhold on Claude, so it reported itself as protection it did not provide; the note it appended was advisory only",
+    "replaced_by": "nothing; the same invariant is carried by the human review of tool output and by jev-pretool-deny for actions, not reads",
+    "retirement_test": "tests/fm-retired-jev-posttool-advisory.test.sh"
+  }
+]

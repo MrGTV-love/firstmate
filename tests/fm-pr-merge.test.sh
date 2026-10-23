@@ -757,6 +757,27 @@ write_away_record() {
     "$ROOT/bin/fm-afk-contract.sh" enter "$@" >/dev/null
 }
 
+# Place task-x1 under a live captain hold in the fixture home, through the same
+# script the merge message points the operator at, so the fixture cannot drift
+# from the real hold format. Args: case_dir
+hold_fixture_task() {
+  local case_dir=$1
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    TASKS_AXI_BACKEND=markdown \
+    "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
+      --title 'Fixture captain call' \
+      --reason 'the captain has not chosen the landing yet' >/dev/null \
+    || fail "could not place the fixture task under a captain hold"
+}
+
+# Count the guard events in <log> matching a guard and decision, so a test can
+# assert one event per decision without depending on line order.
+count_guard_events() {  # <log> <guard> <decision>
+  local log=$1 guard=$2 decision=$3
+  "$JQ_BIN" -s --arg guard "$guard" --arg decision "$decision" \
+    '[.[] | select(.guard == $guard and .decision == $decision)] | length' "$log"
+}
+
 test_verified_merge_records_pr_and_head() {
   local case_dir rc
   case_dir=$(make_case records-before-merge)
@@ -4807,6 +4828,212 @@ test_allow_missing_refused_on_forgejo() {
   pass "fm-pr-merge refuses --allow-missing on Forgejo"
 }
 
+# One coherent green-head refusal: each failing check is named with whether the
+# base branch requires it and whether it is still running or has failed, then
+# the exact re-run that waits and each exact attended waiver. The flags are the
+# ones the script really supports (--allow-red and --allow-missing); --wait and
+# --waive-check do not exist and must never be invented.
+test_green_head_refusal_names_each_check_and_its_repair() {
+  local case_dir rc head url
+  head=a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4
+  url=https://github.com/example/repo/pull/191
+  case_dir=$(make_case github-green-head-message)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(check_run ci COMPLETED FAILURE)" \
+    "$(check_run docs IN_PROGRESS -)"
+  write_github_required "$case_dir" classic:ci ruleset:validate
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "green-head-message: the refusal must keep its exit status"
+  assert_grep "check 'ci' is not green: it failed, and it is required by base branch main" \
+    "$case_dir/stderr" \
+    "green-head-message: the failed required check was not described in one line"
+  assert_grep "check 'docs' is not green: it is still running, and it is not required by base branch main" \
+    "$case_dir/stderr" \
+    "green-head-message: the pending check was not described as still running"
+  assert_grep "required check 'validate' has not reported at head $head" \
+    "$case_dir/stderr" \
+    "green-head-message: the unreported required check was not named"
+  assert_grep "Wait for the pending or unreported check to report, then re-run this merge: $PR_MERGE task-x1 $url" \
+    "$case_dir/stderr" \
+    "green-head-message: the wait repair was not printed as a runnable command"
+  assert_grep "A failed check clears only when the same check passes on a later run, then re-run this merge: $PR_MERGE task-x1 $url" \
+    "$case_dir/stderr" \
+    "green-head-message: the failed-check repair was not printed as a runnable command"
+  assert_grep "Attended only, waive one named check with: $PR_MERGE task-x1 $url --allow-red ci" \
+    "$case_dir/stderr" \
+    "green-head-message: the exact --allow-red repair was not printed"
+  assert_grep "Attended only, waive one named unreported required check with: $PR_MERGE task-x1 $url --allow-missing validate" \
+    "$case_dir/stderr" \
+    "green-head-message: the exact --allow-missing repair was not printed"
+  assert_no_grep '--waive-check' "$case_dir/stderr" \
+    "green-head-message: a waiver flag the script does not support was named"
+  assert_no_grep ' --wait' "$case_dir/stderr" \
+    "green-head-message: a --wait flag the script does not support was invented"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "green-head-message: gh pr merge ran on a refused head"
+  pass "fm-pr-merge prints one green-head refusal naming each check, its requirement, its next action, and the exact repair"
+}
+
+# The away refusal is the other half of the same authority question: it must
+# say that the away posture owns supervision now, that no waiver exists, and
+# what the captain runs when attended.
+test_away_waiver_refusal_names_the_posture_and_the_attended_path() {
+  local case_dir rc head url
+  head=acacacacacacacacacacacacacacacacacacacac
+  url=https://github.com/example/repo/pull/192
+  case_dir=$(make_case github-away-waiver-message)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_red_json "$case_dir" "$head" lint
+  write_away_record "$case_dir" --words 'merge task-x1 when green'
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" --allow-red lint \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 2 "$rc" "away-waiver-message: --allow-red must still be refused while away"
+  assert_grep '--allow-red is attended-only' "$case_dir/stderr" \
+    "away-waiver-message: the refusal no longer names attended-only"
+  assert_grep 'the away posture owns supervision now' "$case_dir/stderr" \
+    "away-waiver-message: the refusal did not name the away posture as the owner of supervision"
+  assert_grep "When the captain is attended, re-run this merge and waive that one check by name: $PR_MERGE task-x1 $url --allow-red lint" \
+    "$case_dir/stderr" \
+    "away-waiver-message: the attended path was not printed as a runnable command"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "away-waiver-message: gh pr merge ran despite the away refusal"
+
+  # The green-check refusal tells the same truth from the other side: while
+  # away, the failed check is named with no waiver offer at all.
+  case_dir=$(make_case github-away-green-head-message)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_red_json "$case_dir" "$head" lint
+  write_away_record "$case_dir" --words 'merge task-x1 when green'
+  set +e
+  run_pr_merge "$case_dir" task-x1 "https://github.com/example/repo/pull/196" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "away-waiver-message: an away red merge must still refuse"
+  assert_grep "check 'lint' is not green" "$case_dir/stderr" \
+    "away-waiver-message: the away green-head refusal did not name the check"
+  assert_grep 'No waiver is available in this away posture: the away record owns supervision now' \
+    "$case_dir/stderr" \
+    "away-waiver-message: the green-head refusal did not rule out the away waiver"
+  assert_no_grep '--allow-red lint' "$case_dir/stderr" \
+    "away-waiver-message: the green-head refusal offered a waiver while away"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "away-waiver-message: gh pr merge ran on an away red head"
+  pass "fm-pr-merge names the away posture and the attended waiver command when it refuses a waiver while away"
+}
+
+# A held task is a dead end unless the refusal carries the release command and
+# the task id it must be run against. The fixture then runs that exact command
+# to prove the printed remedy really clears the hold.
+test_held_task_refusal_prints_the_exact_release_command() {
+  local case_dir rc head url
+  head=aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae
+  url=https://github.com/example/repo/pull/193
+  case_dir=$(make_case github-held-task-message)
+  add_gh_mocks "$case_dir" "$head"
+  hold_fixture_task "$case_dir"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "held-task-message: a held task must still refuse the merge"
+  assert_grep 'task task-x1 is still held for the captain; nothing was merged' \
+    "$case_dir/stderr" \
+    "held-task-message: the refusal did not name the task and the consequence"
+  assert_grep "$ROOT/bin/fm-captain-hold.sh answer task-x1 --decision-file" \
+    "$case_dir/stderr" \
+    "held-task-message: the exact release command with the task id was not printed"
+  assert_grep '--release' "$case_dir/stderr" \
+    "held-task-message: the release flag was not printed"
+  assert_no_grep 'captain-hold.sh close' "$case_dir/stderr" \
+    "held-task-message: a release subcommand the script does not support was named"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "held-task-message: gh pr merge ran while the task was still held"
+
+  printf '%s\n' 'merge it once the checks are green' > "$case_dir/captain-answer"
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    TASKS_AXI_BACKEND=markdown \
+    "$ROOT/bin/fm-captain-hold.sh" answer task-x1 \
+      --decision-file "$case_dir/captain-answer" --release >/dev/null \
+    || fail "held-task-message: the printed release command did not release the hold"
+  run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout-released" 2> "$case_dir/stderr-released" \
+    || fail "held-task-message: the released hold still refused the merge: $(cat "$case_dir/stderr-released")"
+  assert_logged_gh_merge "$case_dir" 193 example/repo --squash
+  pass "fm-pr-merge prints the exact captain-hold release command with the real task id"
+}
+
+# One event per guard decision. A refused merge appends a single green-head
+# deny, a green merge appends allows, and an unwritable log cannot change the
+# merge's own exit status because the writer is never in a deciding condition.
+test_guard_events_record_the_merge_decisions_without_changing_them() {
+  local case_dir rc head url
+  head=afafafafafafafafafafafafafafafafafafafaf
+  url=https://github.com/example/repo/pull/194
+  case_dir=$(make_case github-guard-events-refused)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_red_json "$case_dir" "$head" lint
+
+  set +e
+  FM_GUARD_EVENT_LOG="$case_dir/refused-guard-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 "$url" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "guard-events: a refused merge must keep its exit status"
+  assert_grep "check 'lint' is not green" "$case_dir/stderr" \
+    "guard-events: the refused merge no longer names the red check"
+  assert_equals 1 "$(count_guard_events "$case_dir/refused-guard-events.jsonl" merge-green-head deny)" \
+    "guard-events: a refused merge must append exactly one merge-green-head deny"
+  assert_equals 1 "$(count_guard_events "$case_dir/refused-guard-events.jsonl" merge-held-task allow)" \
+    "guard-events: the released hold decision must append one merge-held-task allow"
+  assert_equals true "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
+    "$case_dir/refused-guard-events.jsonl")" \
+    "guard-events: the deny did not record a readable source"
+  assert_equals 0 "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].elapsed_ms' \
+    "$case_dir/refused-guard-events.jsonl")" \
+    "guard-events: the deny did not record elapsed-ms 0"
+
+  mkdir -p "$case_dir/guard-events-dir"
+  set +e
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events-dir" \
+    run_pr_merge "$case_dir" task-x1 "$url" \
+      > "$case_dir/stdout-unwritable" 2> "$case_dir/stderr-unwritable"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "guard-events: an unwritable log must not change the refusal's exit status"
+  assert_grep "check 'lint' is not green" "$case_dir/stderr-unwritable" \
+    "guard-events: an unwritable log changed what the refusal said"
+
+  url=https://github.com/example/repo/pull/195
+  case_dir=$(make_case github-guard-events-allowed)
+  add_gh_mocks "$case_dir" "$head"
+  FM_GUARD_EVENT_LOG="$case_dir/allowed-guard-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 "$url" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "guard-events: the green merge should have proceeded: $(cat "$case_dir/stderr")"
+  assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-green-head allow)" \
+    "guard-events: a green merge must append one merge-green-head allow"
+  assert_equals 1 "$(count_guard_events "$case_dir/allowed-guard-events.jsonl" merge-held-task allow)" \
+    "guard-events: a green merge must append one merge-held-task allow"
+  assert_equals retry "$("$JQ_BIN" -sr '[.[] | select(.guard == "merge-green-head" and .decision == "allow")][0].cleared_by' \
+    "$case_dir/allowed-guard-events.jsonl")" \
+    "guard-events: the allow did not record cleared-by retry"
+  pass "fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge"
+}
+
 test_gitlab_head_override_args_refuse_before_recording
 test_secondmate_merge_reports_upward_once
 test_secondmate_merge_reports_on_the_local_route
@@ -4874,3 +5101,7 @@ test_app_bound_required_status_context_matches_by_name
 test_required_partial_reads_report_all_failures
 test_allow_red_refused_on_forgejo
 test_allow_missing_refused_on_forgejo
+test_green_head_refusal_names_each_check_and_its_repair
+test_away_waiver_refusal_names_the_posture_and_the_attended_path
+test_held_task_refusal_prints_the_exact_release_command
+test_guard_events_record_the_merge_decisions_without_changing_them

@@ -1640,6 +1640,10 @@ for bad in \
   expect_code 2 "$CODE" "malformed rules exit 2: ${bad#*|}"
   assert_contains "$ERR" "malformed rules file: $RULES - ${bad#*|}" "malformed rules are named: ${bad#*|}"
 done
+printf '%s\n' '{"rules":[{"when":"x","use":{"harness":"claude"},"approval":"firstmate"}]}' > "$RULES"
+keyed -- "$BRIEF"
+expect_code 2 "$CODE" 'a malformed field still exits 2 with the repair path'
+assert_contains "$ERR" "resolved against $HOME_DIR/config/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>" 'a malformed rules file names the files to fix and the rerun'
 printf '%s\n' '{"rules":[{"when":"x","use":[{"harness":"opencode"},{"harness":"rovo"},{"harness":"codex"}]}],"default":[{"harness":"pi"},{"harness":"claude"}]}' > "$RULES"
 keyed -- "$BRIEF"
 expect_code 2 "$CODE" 'multiple provider-less profiles exit 2'
