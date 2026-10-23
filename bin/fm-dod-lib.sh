@@ -112,8 +112,9 @@
 # unfenced DoD file directive selects that file's contents instead of the inline
 # scaffold, matching the criteria check, and never passes only its path.
 # Exclusions are gathered from the unfenced lines of every ### Out of scope
-# subsection and every legacy Out of scope: paragraph anywhere in # Task
+# subsection and every legacy column-0 Out of scope: paragraph in # Task
 # (including its following list until a blank line), each printed once in order.
+# Other spellings, such as a `- Out of scope:` list item, are not extracted.
 # A promoted brief, marked by its # Current ship Firstmate spec heading, labels
 # that DoD and those exclusions as scout-time context; the promoted ship intent
 # governs where they conflict.
