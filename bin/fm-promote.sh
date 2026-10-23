@@ -248,8 +248,19 @@ PROMOTE_CONSENT_WORDS=
 [ -z "$UPSTREAM_CONSENT" ] || PROMOTE_CONSENT_WORDS=" upstream-consent=$UPSTREAM_CONSENT"
 
 SCOUT_BRIEF="$DATA/$ID/brief.md"
-if fm_brief_task_placeholders_present "$SCOUT_BRIEF"; then
-  echo "error: $SCOUT_BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec" >&2
+# Promotion re-checks only the two Task bodies, the scope it has always
+# enforced: the Definition of Done was accepted at the scout's fresh spawn and
+# promotion does not re-litigate it. The helper still lists both leftover
+# bodies in one pass instead of stopping at the first.
+if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$SCOUT_BRIEF" task-only); then
+  echo "error: $SCOUT_BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; every unfinished item is listed once:" >&2
+  while IFS= read -r line; do
+    printf '  %s\n' "$line" >&2
+  done <<EOF
+$DISPATCH_PROBLEMS
+EOF
+  echo "error: preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec" >&2
+  printf "error: repair: edit %s and replace {TASK} in ## Captain's intent and {FIRSTMATE_SPEC} in ## Firstmate spec before promotion\n" "$SCOUT_BRIEF" >&2
   exit 1
 fi
 if ! fm_brief_task_content_valid "$SCOUT_BRIEF"; then

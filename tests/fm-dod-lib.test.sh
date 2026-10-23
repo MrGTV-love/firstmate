@@ -300,6 +300,30 @@ test_direct_pr_recorded_head_does_not_cover_unpushed_commit() {
   pass "a direct-PR recorded head does not cover a later unpushed commit"
 }
 
+test_ci_ready_requires_pr_reference() {
+  local note
+  for note in \
+    'paused: PROD deploy watch, checks green on TEST' \
+    'paused: checks green on TEST, PROPERTIES watch' \
+    'PR checks green' \
+    'PR #12 checks pending'; do
+    if fm_dod_note_reports_ci_ready "$note"; then
+      fail "non-CI-ready note accepted: $note"
+    fi
+  done
+  for note in \
+    'PR https://github.com/o/r/pull/5 checks green' \
+    'checks green: https://github.com/o/r/pull/5' \
+    'PR #12 checks green' \
+    'checks green: PR#12' \
+    'https://gitlab.com/o/r/-/merge_requests/5 checks green' \
+    'https://git.example.org/team/repo/pulls/12 checks green'; do
+    fm_dod_note_reports_ci_ready "$note" \
+      || fail "CI-ready PR reference rejected: $note"
+  done
+  pass "CI-ready notes require checks green and an actual PR reference"
+}
+
 test_ci_ready_variants_are_gated() {
   local repo wt line rc
   repo="$TMP_ROOT/variant-repo"
@@ -528,6 +552,218 @@ EOF
   pass "promotion keeps a scout's recorded base branch and refuses local-only for it"
 }
 
+# A half-filled brief costs one refusal, not one round trip per placeholder: the
+# dispatch verdict prints every leftover Task body and Definition of Done token
+# in one pass, in scaffold order, and only where the scaffold puts them.
+test_dispatch_verdict_lists_all_problems_in_one_pass() {
+  local brief out rc token count
+  brief="$TMP_ROOT/dispatch-half-filled.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+{TASK}
+
+## Firstmate spec
+{FIRSTMATE_SPEC}
+
+## Definition Of Done (task)
+Capability in plain words: {DOD_CAPABILITY}
+
+### Mandatory items
+{DOD_MANDATORY_ITEMS}
+
+### Supporting items
+Ship the listed behavior.
+
+### Hard gates
+Keep the existing safety guard.
+
+### Honesty rule
+{DOD_HONESTY_RULE}
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a half-filled brief was reported dispatchable"
+  for token in '{TASK}' '{FIRSTMATE_SPEC}' '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_HONESTY_RULE}'; do
+    count=$(printf '%s\n' "$out" | grep -cF -- "$token")
+    [ "$count" -ge 1 ] || fail "the dispatch verdict omitted $token: $out"
+  done
+  for token in '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}'; do
+    if printf '%s\n' "$out" | grep -qF -- "$token"; then
+      fail "the dispatch verdict reported the filled token $token: $out"
+    fi
+  done
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -eq 5 ] \
+    || fail "the dispatch verdict did not print exactly one line per problem: $out"
+  pass "the dispatch verdict lists every leftover Task and Definition of Done token in one pass"
+}
+
+# A fully filled brief is dispatchable: no output, exit 1.
+test_dispatch_verdict_passes_a_filled_brief() {
+  local brief out rc
+  brief="$TMP_ROOT/dispatch-filled.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+Capability in plain words: A half-filled brief costs one refusal.
+
+### Mandatory items
+Source: the dispatch verdict. Expected: one list. Verify: this test. Edge/negative: none. Evidence place: the test output. Authority: the grader.
+
+### Supporting items
+None.
+
+### Hard gates
+Keep the existing refusals.
+
+### Honesty rule
+Report what ran.
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a fully filled brief did not pass the dispatch verdict: $out"
+  pass "a fully filled brief passes the dispatch verdict with no output"
+}
+
+# An empty DoD file is a named problem, with the path the operator must fill.
+test_dispatch_verdict_reports_an_empty_dod_file() {
+  local brief criteria out rc
+  brief="$TMP_ROOT/dispatch-empty-dod.md"
+  criteria="$TMP_ROOT/dispatch-empty-criteria.md"
+  : > "$criteria"
+  cat > "$brief" <<EOF
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+DoD file: $criteria
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "an empty DoD file was reported dispatchable"
+  assert_contains "$out" "DoD file $criteria is empty" "the dispatch verdict did not name the empty DoD file"
+  pass "the dispatch verdict reports an empty DoD file with its path"
+}
+
+# Every token a DoD file still holds is listed, not just the first one.
+test_dispatch_verdict_lists_every_token_in_the_dod_file() {
+  local brief criteria out rc
+  brief="$TMP_ROOT/dispatch-dod-file.md"
+  criteria="$TMP_ROOT/dispatch-dod-criteria.md"
+  printf '{DOD_CAPABILITY}\n\n{DOD_HARD_GATES}\n' > "$criteria"
+  cat > "$brief" <<EOF
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+DoD file: $criteria
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "an unfinished DoD file was reported dispatchable"
+  assert_contains "$out" "DoD file $criteria: ## Definition Of Done (task) still holds {DOD_CAPABILITY}" \
+    "the dispatch verdict omitted the DoD file's capability token"
+  assert_contains "$out" "DoD file $criteria: ### Hard gates still holds {DOD_HARD_GATES}" \
+    "the dispatch verdict omitted the DoD file's hard-gates token"
+  pass "the dispatch verdict lists every token a DoD file still holds"
+}
+
+# A relaunch re-checks only the Task bodies: the Definition of Done was accepted
+# at the fresh spawn and is never re-litigated.
+test_dispatch_verdict_task_only_skips_the_definition_of_done() {
+  local brief out rc
+  brief="$TMP_ROOT/dispatch-task-only.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+## Definition Of Done (task)
+Capability in plain words: {DOD_CAPABILITY}
+
+### Mandatory items
+{DOD_MANDATORY_ITEMS}
+
+### Supporting items
+None.
+
+### Hard gates
+Keep the existing refusals.
+
+### Honesty rule
+Report what ran.
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(fm_brief_dispatch_problems "$brief" task-only); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] \
+    || fail "the task-only dispatch scope re-litigated the Definition of Done: $out"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a leftover Definition of Done token was reported dispatchable"
+  pass "the task-only dispatch scope skips the Definition of Done and the full scope checks it"
+}
+
+# Promotion keeps its existing scope: it lists both leftover Task bodies in one
+# refusal, keeps its scout-versus-ship spec sentence, and prints the repair.
+test_promotion_refusal_lists_every_task_problem_in_one_pass() {
+  local home id meta brief out status token
+  home="$TMP_ROOT/promote-refusal-home"
+  id="promote-refusal-wp1"
+  meta="$home/state/$id.meta"
+  mkdir -p "$home/state" "$home/data/$id"
+  printf 'window=fm-%s\nkind=scout\nworktree=/tmp/wt\n' "$id" > "$meta"
+  brief="$home/data/$id/brief.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+{TASK}
+
+## Firstmate spec
+{FIRSTMATE_SPEC}
+EOF
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-promote.sh" \
+    "$id" --mode direct-PR --yolo off 2>&1)
+  status=$?
+  expect_code 1 "$status" "an unfilled scout brief must not promote"
+  for token in '{TASK}' '{FIRSTMATE_SPEC}'; do
+    assert_contains "$out" "still holds $token" "promotion did not list $token"
+  done
+  assert_contains "$out" "  ## Captain's intent still holds {TASK}" "promotion indented the intent problem differently"
+  assert_contains "$out" "  ## Firstmate spec still holds {FIRSTMATE_SPEC}" "promotion indented the spec problem differently"
+  assert_contains "$out" "preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec" \
+    "promotion lost its scout-versus-ship spec boundary"
+  assert_contains "$out" "error: repair: edit $brief and replace {TASK} in ## Captain's intent and {FIRSTMATE_SPEC} in ## Firstmate spec before promotion" \
+    "promotion did not print the runnable repair"
+  assert_grep 'kind=scout' "$meta" "a refused promotion changed the task record"
+  pass "promotion lists every Task placeholder in one refusal with its scout-time boundary and the repair"
+}
+
 test_dod_file_examples_are_not_directives
 test_unfenced_dod_file_is_still_honored
 test_scout_done_is_not_gated
@@ -540,6 +776,7 @@ test_recorded_merged_pr_is_landed_after_prune
 test_merge_marker_binds_to_the_named_pr
 test_forge_recorded_head_is_accepted_without_local_object
 test_direct_pr_recorded_head_does_not_cover_unpushed_commit
+test_ci_ready_requires_pr_reference
 test_ci_ready_variants_are_gated
 test_keyed_and_spaced_done_lines_are_gated
 test_local_only_linked_branch_is_accepted
@@ -550,6 +787,12 @@ test_fenced_and_indented_captain_lines_are_not_intent
 test_pr_based_dod_draft_check_uses_gh_axi
 test_task_owns_several_prs_only_on_positive_evidence
 test_promotion_keeps_the_recorded_base_branch
+test_dispatch_verdict_lists_all_problems_in_one_pass
+test_dispatch_verdict_passes_a_filled_brief
+test_dispatch_verdict_reports_an_empty_dod_file
+test_dispatch_verdict_lists_every_token_in_the_dod_file
+test_dispatch_verdict_task_only_skips_the_definition_of_done
+test_promotion_refusal_lists_every_task_problem_in_one_pass
 
 # The launch role is the generated text a worker receives. It must keep the
 # skill name, so a session that registers the skill loads it by name, and must
@@ -569,6 +812,115 @@ test_worker_role_names_skill_and_fallback_file() {
     "worker role claims the Skill tool never resolves the skill"
   pass "worker role names the skill and its fallback skill file"
 }
+
+# forge=external: a review tool uploads its own snapshot, so nothing is pushed.
+# The fixtures name an invented tool and an RFC 6761 reserved host only.
+EXT_CFG="$TMP_ROOT/external-config"
+mkdir -p "$EXT_CFG"
+# shellcheck disable=SC2016 # Backticks are literal adapter text.
+printf '%s\n' 'Run `review-tool upload --draft` and stop at a draft with checks green.' > "$EXT_CFG/external-review.md"
+
+test_external_forge_is_direct_pr_only() {
+  local out
+  fm_forge_valid_for_mode external direct-PR test 2>/dev/null || fail "forge=external direct-PR was refused"
+  out=$(fm_forge_valid_for_mode external no-mistakes test 2>&1) && fail "forge=external no-mistakes was accepted"
+  assert_contains "$out" "ships direct-PR only for now" "the no-mistakes refusal did not say why"
+  out=$(fm_forge_valid_for_mode external local-only test 2>&1) && fail "forge=external local-only was accepted"
+  assert_contains "$out" "cannot ship mode=local-only" "the local-only refusal did not say why"
+  out=$(fm_base_branch_valid release direct-PR external test 2>&1) && fail "a base branch was accepted on forge=external"
+  pass "forge=external composes with direct-PR only and refuses a base branch"
+}
+
+test_external_rule_one_forbids_every_task_push() {
+  local rule
+  rule=$(CONFIG=$EXT_CFG fm_ship_rule_one direct-PR t1 fm/t1 external) || fail "external rule one did not render"
+  assert_contains "$rule" "Never push to \`origin\`" "external rule one does not forbid the origin push"
+  assert_contains "$rule" "never push your \`fm/t1\` branch or any \`fm/\`-prefixed branch to any remote" \
+    "external rule one does not forbid the task-prefixed push"
+  assert_not_contains "$rule" "push only your" "external rule one still invites a branch push"
+  assert_not_contains "$rule" "personal backup remote" "external rule one offers a backup nobody configured"
+  printf 'backup\n' > "$EXT_CFG/external-review-backup"
+  rule=$(CONFIG=$EXT_CFG fm_ship_rule_one direct-PR t1 fm/t1 external) || fail "external rule one with a backup did not render"
+  rm -f "$EXT_CFG/external-review-backup"
+  assert_contains "$rule" "\`git push backup HEAD:refs/heads/backup/t1\`" "external rule one does not name the backup copy"
+  pass "external rule one forbids origin and task-prefixed pushes and names only the backup copy"
+}
+
+test_external_dod_renders_the_adapter() {
+  local dod out
+  dod=$(CONFIG=$EXT_CFG fm_dod_block direct-PR t1 fm/t1 external) || fail "external DoD did not render"
+  assert_contains "$dod" "Delivery contract: mode=direct-PR forge=external" "external DoD lacks its contract line"
+  assert_contains "$dod" "done [at=<epoch>]: review {url} uploaded for review" "external DoD lacks the ready grammar"
+  assert_contains "$dod" "## Review tool instructions (home configuration)" "external DoD lacks the adapter section"
+  assert_contains "$dod" "review-tool upload --draft" "external DoD lacks the adapter body"
+  assert_not_contains "$dod" "push your branch and open a PR" "external DoD still asks for a pushed PR"
+  out=$(CONFIG="$TMP_ROOT/no-such-config" fm_dod_block direct-PR t1 fm/t1 external 2>&1) \
+    && fail "external DoD rendered with no adapter"
+  assert_contains "$out" "external-review.md" "the missing-adapter refusal did not name the file"
+  pass "external DoD renders the contract, the review grammar, and the adapter, and refuses without one"
+}
+
+# A review-tool fixture: a worker copy, its meta recording forge=external, and
+# optionally a backup remote. Sets EXT_WT, EXT_REPO, EXT_META.
+external_fixture() {  # <name> [backup]
+  local name=$1 backup=${2:-}
+  EXT_REPO="$TMP_ROOT/$name-repo"
+  EXT_WT="$TMP_ROOT/$name-wt"
+  fm_git_worktree "$EXT_REPO" "$EXT_WT" "fm/$name"
+  git -C "$EXT_WT" commit -q --allow-empty -m 'change only in the copy'
+  EXT_META="$TMP_ROOT/$name.meta"
+  if [ -n "$backup" ]; then
+    fm_write_meta "$EXT_META" kind=ship mode=direct-PR forge=external backup_remote=backup backup_prefix=backup/
+  else
+    fm_write_meta "$EXT_META" kind=ship mode=direct-PR forge=external
+  fi
+}
+
+ext_accept() {  # <line>
+  CONFIG=$EXT_CFG fm_dod_accept_ship_done ship direct-PR "$EXT_WT" "$EXT_REPO" "$1" "$TMP_ROOT" ext "$EXT_META"
+}
+
+test_external_review_done_without_backup_is_accepted_on_the_url() {
+  local reason
+  external_fixture ext-nobackup
+  ext_accept 'done [at=1]: review https://review.example.test/r/123 uploaded for review' \
+    || fail "an external review done with HEAD only in the copy was refused with no backup recorded"
+  reason=$(ext_accept 'done [at=1]: PR https://github.com/o/r/pull/1') && fail "a PR done on an external project was accepted"
+  assert_contains "$reason" "never a PR" "the PR refusal did not point at the review grammar"
+  for bad in 'http://review.example.test/r/1' 'https://review.example.test/r/1?x=1' \
+    'https://review.example.test/r/1#c' 'https://github.com/o/r/pull/1'; do
+    reason=$(ext_accept "done [at=1]: review $bad uploaded for review") && fail "review URL $bad was accepted"
+  done
+  printf '%s\n' '^https://review\.example\.test/r/[1-9][0-9]*$' > "$EXT_CFG/external-review-url"
+  reason=$(ext_accept 'done [at=1]: review https://other.example.test/r/1 uploaded for review') \
+    && fail "a review URL outside config/external-review-url was accepted"
+  ext_accept 'done [at=1]: review https://review.example.test/r/7 uploaded for review' \
+    || fail "a review URL matching config/external-review-url was refused"
+  rm -f "$EXT_CFG/external-review-url"
+  pass "external review done: accepted on a canonical URL alone without a backup; PR, non-https, query, fragment, forge, and pattern mismatches refused"
+}
+
+test_external_review_done_with_backup_needs_the_copy() {
+  local reason sha
+  external_fixture ext-backup backup
+  sha=$(git -C "$EXT_WT" rev-parse HEAD)
+  reason=$(ext_accept 'done [at=1]: review https://review.example.test/r/9 uploaded for review') \
+    && fail "a backed-up external done was accepted before the copy existed"
+  assert_contains "$reason" "not on the backup remote backup" "the backup refusal did not name the remote"
+  git -C "$EXT_WT" update-ref refs/remotes/backup/fm/ext-backup "$sha"
+  reason=$(ext_accept 'done [at=1]: review https://review.example.test/r/9 uploaded for review') \
+    && fail "a copy outside the backup prefix satisfied the backup gate"
+  git -C "$EXT_WT" update-ref refs/remotes/backup/backup/ext-backup "$sha"
+  ext_accept 'done [at=1]: review https://review.example.test/r/9 uploaded for review' \
+    || fail "a backed-up external done was refused once HEAD was on the backup namespace"
+  pass "external review done with a backup: refused until HEAD is under refs/remotes/backup/backup/, then accepted"
+}
+
+test_external_forge_is_direct_pr_only
+test_external_rule_one_forbids_every_task_push
+test_external_dod_renders_the_adapter
+test_external_review_done_without_backup_is_accepted_on_the_url
+test_external_review_done_with_backup_needs_the_copy
 
 test_worker_role_names_skill_and_fallback_file
 

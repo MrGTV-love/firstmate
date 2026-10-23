@@ -129,6 +129,11 @@ case "$action" in
     exit 0
     ;;
 esac
+if [ "${FM_FAKE_RELAUNCH_MODE:-}" = host-control ]; then
+  [ "$cmd" = fm-remote-secondmate-control.sh ] && [ "$action" = relaunch ] || exit 93
+  FM_HOME="$FM_FAKE_DEST_HOME" \
+    exec "$FM_FAKE_SOURCE_HOME/../host-root/bin/fm-remote-secondmate-control.sh" "${args[@]:1}"
+fi
 harness=${args[3]}
 model=${args[4]}
 effort=${args[5]}
@@ -732,5 +737,44 @@ assert_not_contains "$(cat "$TMP/native/launch")" 'openai/later' \
   "the replacement launch consumed the later selection"
 assert_absent "$NUDGE_MARKER" "confirmed frozen-pair replacement retained remote reread intent"
 pass "after-stage source mutation leaves resolution, inheritance, destination validation, and spawn on the frozen pair"
+
+# --- a captain pin reaches the host-side control plane -----------------------
+# The host runs the real cmd_relaunch from a root whose fm-control.sh records the
+# arguments it receives, so the pin is followed from the parent wrapper across
+# the transport to the host-local relaunch it drives.
+STALE_PIN=openai-codex/gpt-5.6-luna
+mkdir -p "$TMP/host-root/bin"
+for HOST_FILE in "$ROOT"/bin/*; do
+  ln -sf "$HOST_FILE" "$TMP/host-root/bin/"
+done
+rm "$TMP/host-root/bin/fm-control.sh"
+cat > "$TMP/host-root/bin/fm-control.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$FM_FAKE_SOURCE_HOME/../host-control.args"
+SH
+chmod +x "$TMP/host-root/bin/fm-control.sh"
+reset_meta
+rm -f "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/crew-dispatch.json" \
+  "$DEST_HOME/config/model-index.json" "$DEST_HOME/config/crew-dispatch.json" "$TMP/host-control.args"
+fm_write_meta "$DEST_HOME/state/parent-route/ios.meta" \
+  "window=fm-remote:p1" "endpoint_task_id=ios" \
+  "worktree=$DEST_HOME" "project=$DEST_HOME" "home=$DEST_HOME" \
+  "backend=herdr" "herdr_session=fm-remote" "herdr_workspace_id=w1" \
+  "herdr_tab_id=t1" "herdr_pane_id=p1" \
+  "harness=omp" "kind=secondmate" "mode=secondmate" "yolo=off" \
+  "model=$STALE_PIN" "effort=medium"
+FM_FAKE_RELAUNCH_MODE='host-control'
+OUT=$(run_relaunch ios omp "$STALE_PIN" - --captain-model-pin "$STALE_PIN"); RC=$?
+unset FM_FAKE_RELAUNCH_MODE
+expect_code 0 "$RC" "a pinned remote relaunch should reach the host and succeed"$'\n'"$OUT"
+assert_present "$TMP/host-control.args" "the host-side control plane was not run"
+HOST_ARGS=$(cat "$TMP/host-control.args")
+assert_contains "$HOST_ARGS" $'--captain-model-pin\n'"$STALE_PIN" \
+  "the host-side fm-control did not receive the captain pin"
+assert_contains "$HOST_ARGS" $'--model\n'"$STALE_PIN" \
+  "the host-side fm-control did not receive the requested model"
+assert_grep "model=$STALE_PIN" "$HOME_DIR/state/ios.meta" \
+  "the parent record did not pick up the confirmed model"
+pass "a captain pin passed to the remote relaunch wrapper reaches the host-side fm-control"
 
 echo "ALL TESTS PASSED"

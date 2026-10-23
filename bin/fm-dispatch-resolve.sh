@@ -96,6 +96,9 @@
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
 #   existing unreadable rules file, malformed rules, model-index/profile
 #   resolution failure, or missing jq), which is actionable, never selected around.
+#   A malformed or unresolvable rules error names the offending field, the rules
+#   file, the model index it resolves against, and the rerun command, so the
+#   intake can repair the file without guessing.
 #
 # Result log: every resolve that reaches a status appends one JSON line to
 #   data/dispatch-resolve.jsonl (FM_DATA_OVERRIDE moves its directory). Off paths
@@ -169,6 +172,12 @@ log_result() {
 }
 
 die() { printf 'error: %s\n' "$1" >&2; exit 2; }
+# A malformed rules file is only actionable when the reader knows which field,
+# which files produce the answer, and how to ask again. The detail comes from the
+# validator's one-line field diagnostic, so the fix stays on one stderr line.
+die_rules() {
+  die "malformed rules file: $RULES_PATH - $1; fix that field in $RULES_PATH resolved against $CONFIG/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>"
+}
 no_rules() {
   log_result escalate 'no rules to match'
   printf 'dispatch-resolve:\n  status: escalate\n  reason: no rules to match\n'
@@ -206,7 +215,7 @@ LAT_MS=null QUOTA_MS=null RESPONSE_VALID=0
 [ -n "$BRIEF" ] || die "brief file required (see --help)"
 [ -r "$BRIEF" ] || die "brief file not readable: $BRIEF"
 [ -e "$RULES_PATH" ] || [ -L "$RULES_PATH" ] || no_rules
-[ -r "$RULES_PATH" ] || die "rules file not readable: $RULES_PATH"
+[ -r "$RULES_PATH" ] || die "rules file not readable: $RULES_PATH; fix that path or its permissions, then rerun bin/fm-dispatch-resolve.sh <brief>"
 command -v jq >/dev/null 2>&1 || die "jq required"
 RULES=$(mktemp) || die "mktemp failed"
 trap 'rm -f "$RULES"' EXIT
@@ -216,11 +225,12 @@ if [ -e "$CONFIG/model-index.json" ] || [ -L "$CONFIG/model-index.json" ]; then
   cp "$CONFIG/model-index.json" "$MODEL_CONFIG/model-index.json" || die "could not snapshot model index"
 fi
 cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
-jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not JSON)"
+jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not JSON); fix the JSON syntax in $RULES_PATH resolved against $CONFIG/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>"
 # Resolve roles against the frozen index offline; only the chosen profile's
 # catalog is checked, after the never-send filter permits this intake to reach
 # the network.
-RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES") || die "model index/profile resolution failed"
+RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES") \
+  || die "profiles in $RULES_PATH do not resolve against $CONFIG/model-index.json; fix the harness, model, role, or effort field named above, then rerun bin/fm-dispatch-resolve.sh <brief>"
 printf '%s\n' "$RESOLVED_RULES" > "$RULES" || die "could not write resolved rules snapshot"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
@@ -282,11 +292,11 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   elif has("default") and any(profiles(.default)[]; (verified(.harness) | not)) then "each default profile must name a verified harness"
   elif has("default") and any(profiles(.default)[]; (effort_ok(.harness; .model; .effort) | not)) then "each default profile effort must be supported by its harness and model"
   else empty end
-' "$RULES" 2>/dev/null) || die "malformed rules file: $RULES_PATH (not JSON)"
-[ -z "$rules_err" ] || die "malformed rules file: $RULES_PATH - $rules_err"
+' "$RULES" 2>/dev/null) || die "malformed rules file: $RULES_PATH (not JSON); fix the JSON syntax in $RULES_PATH resolved against $CONFIG/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>"
+[ -z "$rules_err" ] || die_rules "$rules_err"
 jq -e "$FM_DISPATCH_VALID_FALLBACK_JQ"'all((.rules // [])[]; (has("fallback") | not) or (.fallback | valid_fallback)) and
   ((has("default_fallback") | not) or (.default_fallback | valid_fallback))' "$RULES" >/dev/null 2>&1 \
-  || die "malformed rules file: $RULES_PATH - invalid fallback configuration"
+  || die_rules "invalid fallback configuration"
 
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -302,7 +312,7 @@ if [ -n "$missing_provider" ]; then
   while IFS=$'\t' read -r location harness; do
     missing_provider_detail="${missing_provider_detail:+$missing_provider_detail; }$location profiles whose harness lacks one authoritative provider family require provider: $harness"
   done <<< "$missing_provider"
-  die "malformed rules file: $RULES_PATH - $missing_provider_detail"
+  die_rules "$missing_provider_detail"
 fi
 
 # ---- harness -> provider map, from the single owner in fm-quota-axi-lib.sh -----

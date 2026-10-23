@@ -45,6 +45,11 @@
 # github_branch_rules_unavailable_on_plan owns the narrow plan-unavailable
 # exception; every other unreadable required source refuses.
 # Every failing condition is reported, not just the first.
+# A refused check names each failing check, whether the base branch requires
+# it, whether it is still running or has failed, and whether a named waiver is
+# available in this posture; an away record never offers one.
+# The refusal then prints the exact re-run that waits for the check, and each
+# attended waiver command by name.
 # The verified head is then passed to gh as
 # --match-head-commit, so a push that lands between that read and the merge
 # fails the merge instead of landing commits nothing verified. Reading that
@@ -135,8 +140,9 @@
 # Before either forge merge, the task's existing per-task control lock
 # serializes the captain-hold check through the forge command. A still-held or
 # unreadable row refuses before that command, so a captain approval must be
-# recorded as an `answer --release` before this entrypoint is invoked. While
-# an away record exists (a quiet-mode record is a present captain, so its
+# recorded as an `answer --release` before this entrypoint is invoked.
+# A refused hold prints that exact release command with the task's own id.
+# While an away record exists (a quiet-mode record is a present captain, so its
 # merges stay attended: bin/fm-afk-contract.sh mode) any green merge may
 # proceed under away authority:
 # the record's presence is the whole mechanical fact, and which merge the
@@ -155,6 +161,8 @@
 # A failed forge command releases the lock after it returns. A successful one
 # retains the lock until the accepted merge authority is persisted against the
 # still-matching task metadata.
+# The green-check and captain-hold decisions each emit one event through
+# bin/fm-guard-event.sh, whose writer always exits 0 and never decides a merge.
 #
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
@@ -848,10 +856,15 @@ github_read_check_rollup() {
 }
 
 # Every GitHub check that is not green in the given live pull-request JSON, one
-# name per line. An entry is green when it is a status context whose state is
-# SUCCESS, or a check run that completed with SUCCESS, NEUTRAL, or SKIPPED (so
-# a pending check is not green either). Exits nonzero when the rollup cannot be
-# read, so a malformed answer is a failed read and never an empty red set.
+# "<state><tab><name>" entry per line, where state is "pending" or "failed". An
+# entry is green when it is a status context whose state is SUCCESS, or a check
+# run that completed with SUCCESS, NEUTRAL, or SKIPPED (so a pending check is
+# not green either). The state is what the refusal's next-action line needs: a
+# still-running check is waited out, while a completed failure needs a later
+# passing run or a named waiver. Exits nonzero when the rollup cannot be read,
+# so a malformed answer is a failed read and never an empty red set. The state
+# is a reporting detail only: the decision below still turns on the same set of
+# non-green names it always did.
 #
 # The rollup can hold several runs of one check name at the same head, because
 # GitHub cancels a pull request's in-flight run when the base branch advances
@@ -893,14 +906,19 @@ github_checks_not_green() {
             }
             | . + {group: (if .name == "" then ["", $i] else [.name, -1] end)}
           else
-            {kind: "status_context", name: (.context // ""), ok: (.state == "SUCCESS")}
+            {
+              kind: "status_context",
+              name: (.context // ""),
+              ok: (.state == "SUCCESS"),
+              pending: (.state == "PENDING" or .state == "EXPECTED")
+            }
           end
       ]
     | . as $entries
     | (
         ($entries[]
           | select(.kind == "status_context" and (.ok | not))
-          | .name
+          | {name: .name, pending: .pending}
         ),
         ($entries
           | [.[] | select(.kind == "check_run")]
@@ -918,10 +936,11 @@ github_checks_not_green() {
                 or ([.reds[] | .at] | max) >= .newest_green
               )
             )
-          | .name
+          | {name: .name, pending: any(.reds[]; (.completed | not))}
         )
       )
-    | if . == "" then "(unnamed check)" else . end
+    | if .name == "" then .name = "(unnamed check)" else . end
+    | (if .pending then "pending" else "failed" end) + "\t" + .name
   ' 2>/dev/null || return 1
 }
 
@@ -1018,6 +1037,10 @@ github_verify_mergeable() {
   local total=0 named=0 refusals='' mergeable_refusal='' source_unreadable=false
   local other_refusals=''
   local state='' draft='' mergeable='' merge_state='' live_head='' base=''
+  local kind action req_text required_known=true
+  local any_pending=false any_failed=false
+  local -a unwaived_red=() unwaived_missing=()
+  FM_PR_GREEN_HEAD_BLOCKED=false
 
   if ! json=$(gh pr view "$URL" --json state,isDraft,mergeable,mergeStateStatus,headRefOid,baseRefName 2>/dev/null) \
     || [ -z "$json" ]; then
@@ -1068,6 +1091,16 @@ FIELDS
     return 4
   fi
 
+  # Read the required set before judging individual checks, so each refusal
+  # line can say whether the base branch requires that check. The refusals this
+  # source produces are appended below, in the same order as before.
+  required_known=true
+  if ! github_read_required_contexts "$base"; then
+    required_known=false
+    source_unreadable=true
+  fi
+  required=$FM_PR_GITHUB_REQUIRED
+
   case "$state" in
     [oO][pP][eE][nN]) ;;
     *)
@@ -1086,7 +1119,7 @@ FIELDS
 "
 
   uncovered=''
-  while IFS= read -r name; do
+  while IFS=$'\t' read -r kind name; do
     [ -n "$name" ] || continue
     covered=0
     if [ "${#ALLOW_RED[@]}" -gt 0 ]; then
@@ -1094,19 +1127,36 @@ FIELDS
         [ "$check" = "$name" ] && covered=1
       done
     fi
-    [ "$covered" -eq 1 ] || {
-      refusals="$refusals  - check '$name' is not green
+    [ "$covered" -eq 1 ] && continue
+    if [ "$required_known" = true ] \
+      && printf '%s' "$required" | jq -e --arg name "$name" 'any(.[]; .context == $name)' >/dev/null 2>&1; then
+      req_text="required by base branch $base"
+    elif [ "$required_known" = true ]; then
+      req_text="not required by base branch $base"
+    else
+      req_text="of unknown requirement, because the base branch's required set could not be read"
+    fi
+    case "$kind" in
+      pending)
+        action='it is still running'
+        any_pending=true
+        ;;
+      *)
+        action='it failed'
+        any_failed=true
+        ;;
+    esac
+    refusals="$refusals  - check '$name' is not green: $action, and it is $req_text
 "
-      uncovered="${uncovered:+$uncovered, }$name"
-    }
+    unwaived_red+=("$name")
+    uncovered="${uncovered:+$uncovered, }$name"
   done <<EOF
 $red
 EOF
 
   other_refusals=$refusals
   unreported=''
-  if ! github_read_required_contexts "$base"; then
-    source_unreadable=true
+  if [ "$required_known" = false ]; then
     while IFS= read -r line; do
       refusals="$refusals  - $line, so a required check that has not reported cannot be ruled out
 "
@@ -1115,7 +1165,6 @@ $FM_PR_GITHUB_REQUIRED_ERROR
 EOF
   fi
   producers='[]'
-  required=$FM_PR_GITHUB_REQUIRED
   if printf '%s' "$required" | jq -e 'any(.[]; .app_id != null)' >/dev/null; then
     if ! runs=$(gh api --paginate "repos/$PR_OWNER/$PR_REPO/commits/$live_head/check-runs" 2>/dev/null) \
       || [ -z "$runs" ] \
@@ -1149,7 +1198,9 @@ EOF
       [ "${#ALLOW_MISSING[@]}" -gt 0 ] && [ "${ALLOW_MISSING[0]}" = "$name" ] && continue
       refusals="$refusals  - required check '$name' has not reported at head $live_head
 "
+      unwaived_missing+=("$name")
       unreported="${unreported:+$unreported, }$name"
+      any_pending=true
     done <<EOF
 $missing
 EOF
@@ -1163,10 +1214,38 @@ EOF
   fi
 
   if [ -n "$refusals" ]; then
+    # One event per green-check decision: a denial needs a definite check it
+    # read, while a refusal whose source could not be read carries no verdict
+    # to report.
+    if [ -n "$uncovered" ] || [ -n "$unreported" ]; then
+      FM_PR_GREEN_HEAD_BLOCKED=true
+    fi
     printf 'error: refusing to merge %s\n' "$URL" >&2
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
+    if [ -n "$uncovered" ] || [ -n "$unreported" ]; then
+      if [ "$any_pending" = true ]; then
+        printf 'Wait for the pending or unreported check to report, then re-run this merge: %s %s %s\n' \
+          "$0" "$ID" "$URL" >&2
+      fi
+      if [ "$any_failed" = true ]; then
+        printf 'A failed check clears only when the same check passes on a later run, then re-run this merge: %s %s %s\n' \
+          "$0" "$ID" "$URL" >&2
+      fi
+      if [ "$FM_PR_AWAY_POSTURE" = true ]; then
+        printf 'No waiver is available in this away posture: the away record owns supervision now, so every check must pass, or the captain clears the named one when attended.\n' >&2
+      else
+        for check in "${unwaived_red[@]+"${unwaived_red[@]}"}"; do
+          printf 'Attended only, waive one named check with: %s %s %s --allow-red %s\n' \
+            "$0" "$ID" "$URL" "$check" >&2
+        done
+        for check in "${unwaived_missing[@]+"${unwaived_missing[@]}"}"; do
+          printf 'Attended only, waive one named unreported required check with: %s %s %s --allow-missing %s\n' \
+            "$0" "$ID" "$URL" "$check" >&2
+        done
+      fi
+    fi
     [ "$source_unreadable" = false ] || return 4
     if [ -z "$other_refusals" ] && [ -n "$unreported" ] \
       && { [ "$mergeable" = MERGEABLE ] || [ "$mergeable" = UNKNOWN ]; }; then
@@ -1396,12 +1475,21 @@ require_released_captain_hold() {
     "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --distinguish-absent || hold_status=$?
   case "$hold_status" in
     0)
-      echo "error: task $ID is still held for the captain; release it before merging" >&2
+      printf 'error: task %s is still held for the captain; nothing was merged\n' "$ID" >&2
+      printf "Release it with the captain's own words, then re-run this merge: %s answer %s --decision-file <captain-answer-file> --release\n" \
+        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-held-task deny --source-ok true --elapsed-ms 0 2>/dev/null
       return 1
       ;;
-    1|3) return 0 ;;
+    1|3)
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-held-task allow --cleared-by retry 2>/dev/null
+      return 0
+      ;;
     *)
-      echo "error: could not determine whether task $ID is still held for the captain; refusing to merge" >&2
+      printf 'error: could not determine whether task %s is still held for the captain; refusing to merge, and nothing was merged\n' \
+        "$ID" >&2
+      printf 'Re-read the hold and release it if it is open, then re-run this merge: %s open %s\n' \
+        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
       return 1
       ;;
   esac
@@ -1440,23 +1528,29 @@ require_current_away_authority() {
   if fm_afk_contract_away_present "$STATE"; then
     FM_PR_AWAY_POSTURE=true
     if [ "$PROVIDER" = github ] && [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ]; then
-      echo "error: --auto is attended-only; while the away-posture record exists only a synchronous merge may run under its authority lock" >&2
+      printf 'error: --auto is attended-only; the away posture owns supervision now, so no asynchronous merge may be queued while the away record exists\n' >&2
+      printf 'When the captain is attended, re-run the same request with --attended-override before the -- separator.\n' >&2
       return 2
     fi
     if [ "$PROVIDER" = gitlab ] \
       && { [ "$FM_PR_GITLAB_ASYNC_REQUESTED" = true ] || [ "$FM_PR_GITLAB_ASYNC_CONFIGURED" = true ]; }; then
-      echo "error: GitLab auto-merge is attended-only; while the away-posture record exists only an immediate merge may run under its authority lock" >&2
+      printf 'error: GitLab auto-merge is attended-only; the away posture owns supervision now, so no merge may be queued while the away record exists\n' >&2
+      printf 'When the captain is attended, re-run the same merge request and it may merge once the pipeline succeeds.\n' >&2
       return 2
     fi
   fi
   fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
   resolve_merge_authority || return 1
   if [ "$FM_PR_AWAY_POSTURE" = true ] && [ "${#ALLOW_RED[@]}" -gt 0 ]; then
-    echo "error: --allow-red is attended-only; while the away-posture record exists the green check is absolute" >&2
+    printf 'error: --allow-red is attended-only; the away posture owns supervision now, so no check can be waived while the away record exists\n' >&2
+    printf 'When the captain is attended, re-run this merge and waive that one check by name: %s %s %s --allow-red %s\n' \
+      "$0" "$ID" "$URL" "${ALLOW_RED[0]}" >&2
     return 2
   fi
   if [ "$FM_PR_AWAY_POSTURE" = true ] && [ "${#ALLOW_MISSING[@]}" -gt 0 ]; then
-    echo "error: --allow-missing is attended-only; while the away-posture record exists every required check must report" >&2
+    printf 'error: --allow-missing is attended-only; the away posture owns supervision now, so a required check that has not reported cannot be waived while the away record exists\n' >&2
+    printf 'When the captain is attended, re-run this merge and waive that one unreported check by name: %s %s %s --allow-missing %s\n' \
+      "$0" "$ID" "$URL" "${ALLOW_MISSING[0]}" >&2
     return 2
   fi
 }
@@ -1714,6 +1808,14 @@ case "$PROVIDER" in
       sleep "$mergeable_retry_delay"
       mergeable_attempt=$((mergeable_attempt + 1))
     done
+    # One event per green-check decision, after the retries settle it. The
+    # writer always exits 0 and never sits in a condition, so telemetry cannot
+    # change what this merge does.
+    if [ "$mergeable_status" -eq 0 ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --cleared-by retry 2>/dev/null
+    elif [ "$FM_PR_GREEN_HEAD_BLOCKED" = true ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok true --elapsed-ms 0 2>/dev/null
+    fi
     cat "$MERGE_VERIFY_LOG" >&2
     rm -f "$MERGE_VERIFY_LOG"
     MERGE_VERIFY_LOG=

@@ -133,6 +133,15 @@
 # all (scaffolded before it existed) is not refused: a fresh spawn warns once and
 # the supervision sweep reports a missing or placeholder section instead of
 # inventing criteria.
+# fm_brief_dispatch_problems is the single dispatch verdict over the same brief:
+# it prints every unfinished Task body and every leftover Definition of Done
+# placeholder in one pass, in the order an operator fills them, so a half-filled
+# scaffold costs one refusal instead of one round trip per token. bin/fm-spawn.sh
+# prints that list as one refusal with the repair, and bin/fm-promote.sh calls it
+# with the task-only scope it already enforced; fm_brief_task_dod_problem remains
+# the single-problem reading used by bin/fm-live-lab.test.sh and by tests.
+# A relaunch re-checks only the Task bodies, because the Definition of Done was
+# accepted at the fresh spawn and is never re-litigated.
 # fm_ship_rule_one owns the mode-specific first ship safety rule shared by an
 # ordinary ship brief and the durable contract written during scout promotion.
 # It takes the same optional forge and base arguments as fm_dod_block, because
@@ -344,6 +353,91 @@ fm_dod_text_placeholder() {  # <text>
     fi
   done
   return 1
+}
+
+# Print one "<section> still holds <token>" line for every task Definition of
+# Done placeholder still standing in <text>, in scaffold order, and return 0
+# when at least one remains; return 1 when none does. The match rules are
+# fm_dod_text_placeholder's, so a token counts only where the scaffold puts it.
+fm_dod_text_problem_list() {  # <text>
+  local pair token section remaining=1
+  for pair in "${FM_TASK_DOD_PLACEHOLDERS[@]}"; do
+    token=${pair%%|*}
+    section=${pair#*|}
+    if printf '%s\n' "$1" | awk -v token="$token" '
+      {
+        line = $0
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      }
+      line == token { found = 1; exit }
+      token == "{DOD_CAPABILITY}" && index(line, "Capability in plain words:") == 1 && substr(line, length(line) - length(token) + 1) == token { found = 1; exit }
+      END { exit !found }
+    '; then
+      printf '%s still holds %s\n' "$section" "$token"
+      remaining=0
+    fi
+  done
+  return "$remaining"
+}
+
+# Print every reason a ship or scout brief cannot be dispatched, one line per
+# problem, and return 0 when at least one exists; return 1 when none does.
+# Covers, in the order an operator fills them, a `## Captain's intent` body that
+# is exactly {TASK}, a `## Firstmate spec` body that is exactly {FIRSTMATE_SPEC},
+# every DoD token from FM_TASK_DOD_PLACEHOLDERS still standing in its section,
+# and an unfenced `DoD file:` line naming a missing, unreadable, or empty file,
+# or one that still holds a token. Each file problem names the path to edit.
+# A DoD file line replaces the section-body check exactly as it does in
+# fm_brief_task_dod_problem. A brief with no Definition Of Done section reports
+# nothing here: bin/fm-spawn.sh warns once for a legacy brief and still
+# dispatches it.
+# The optional second argument `task-only` stops after the two Task bodies,
+# which is the scope a relaunch and scout promotion re-check: the Definition of
+# Done was accepted at the fresh spawn, exactly as before.
+fm_brief_dispatch_problems() {  # <brief> [task-only]
+  local brief=$1 scope=${2:-all} intent spec span dod_file more line problems=1
+  [ -f "$brief" ] || return 1
+  intent=$(fm_brief_task_heading_body "$brief" "## Captain's intent")
+  spec=$(fm_brief_task_heading_body "$brief" "## Firstmate spec")
+  if [ "$(printf '%s' "$intent" | tr -d '[:space:]')" = '{TASK}' ]; then
+    printf '%s\n' "## Captain's intent still holds {TASK}"
+    problems=0
+  fi
+  if [ "$(printf '%s' "$spec" | tr -d '[:space:]')" = '{FIRSTMATE_SPEC}' ]; then
+    printf '%s\n' "## Firstmate spec still holds {FIRSTMATE_SPEC}"
+    problems=0
+  fi
+  [ "$scope" != task-only ] || return "$problems"
+  fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return "$problems"
+  span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
+  # Keep examples in span for criteria checks, but never activate a fenced
+  # DoD-file directive. The heading reader owns the fence boundaries.
+  dod_file=$(fm_brief_heading_parse "$brief" "$FM_TASK_DOD_SECTION_TITLE" unfenced-body "$FM_TASK_DOD_GRADED_TITLE" \
+    | sed -n 's/^DoD file: \(\/.*\)$/\1/p' | head -n 1)
+  if [ -n "$dod_file" ]; then
+    if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
+      printf 'DoD file %s is not a readable file\n' "$dod_file"
+      return 0
+    fi
+    if [ -z "$(tr -d '[:space:]' < "$dod_file")" ]; then
+      printf 'DoD file %s is empty\n' "$dod_file"
+      return 0
+    fi
+    if more=$(fm_dod_text_problem_list "$(cat "$dod_file")"); then
+      while IFS= read -r line; do
+        printf 'DoD file %s: %s\n' "$dod_file" "$line"
+      done <<EOF
+$more
+EOF
+      return 0
+    fi
+    return "$problems"
+  fi
+  if more=$(fm_dod_text_problem_list "$span"); then
+    printf '%s\n' "$more"
+    problems=0
+  fi
+  return "$problems"
 }
 
 # Print what keeps a ship or scout brief's task Definition of Done from being
@@ -660,9 +754,15 @@ fm_dod_ref_contains() {  # <repo> <ref-namespace> <sha>
 # green`, with any surrounding text). bin/fm-crew-state.sh takes its CI-ready
 # path on this same test, so every CI-ready line it acts on is gated.
 fm_dod_note_reports_ci_ready() {  # <note>
-  case "$1" in
-    *PR*"checks green"*|*"checks green"*PR*) return 0 ;;
-  esac
+  # A note is CI-ready only when it names a checks-green result and an actual
+  # pull request reference. "PR checks green" and "PROD ... checks green" name
+  # no reference, and a substring match made "PROD" read as one.
+  local note=$1
+  [[ $note == *"checks green"* ]] || return 1
+  [[ $note =~ (^|[^[:alnum:]])PR[[:space:]]*#[0-9]+ ]] && return 0
+  [[ $note =~ /pull/[0-9]+ ]] && return 0
+  [[ $note =~ /merge_requests/[0-9]+ ]] && return 0
+  [[ $note =~ /pulls/[0-9]+ ]] && return 0
   return 1
 }
 

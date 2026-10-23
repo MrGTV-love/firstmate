@@ -36,16 +36,18 @@
 # watcher one-shot, restarting it after every wake, so the watch lock is
 # regularly unheld at a turn boundary with nothing wrong. A live
 # identity-matched daemon holding this home, plus a fresh beacon, is what
-# proves supervision there - see fm_afk_daemon_owns_supervision in
-# bin/fm-wake-lib.sh. The beacon freshness test there uses AFK_GRACE
-# (fm_poll_derived_grace, docs/turnend-guard.md "Guard grace and the poll
-# cadence"), not the flat $GRACE every other check on this page uses: the
-# daemon starts a fresh one-shot watcher only after it finishes handling the
-# previous wake, and that handling can legitimately run past a flat 300s
-# window under load (a slow registered check, a busy supervisor pane) with the
-# daemon perfectly healthy throughout. The strict watcher predicate and $GRACE
-# are unchanged everywhere else, including for a dead daemon pid or a beacon
-# older than AFK_GRACE, which still block.
+# proves supervision there. The shared predicate and its away/quiet-daemon
+# proof live in bin/fm-supervision-liveness-lib.sh, which this guard branches
+# on; that library owns the beacon-age, lock-owner, and daemon checks, while
+# every harness-specific path below stays here. The away beacon freshness test
+# there uses AFK_GRACE (fm_poll_derived_grace, docs/turnend-guard.md "Guard
+# grace and the poll cadence"), not the flat $GRACE every other check on this
+# page uses: the daemon starts a fresh one-shot watcher only after it finishes
+# handling the previous wake, and that handling can legitimately run past a flat
+# 300s window under load (a slow registered check, a busy supervisor pane) with
+# the daemon perfectly healthy throughout. The strict watcher predicate and
+# $GRACE are unchanged everywhere else, including for a dead daemon pid or a
+# beacon older than AFK_GRACE, which still block.
 #
 # Loop-guard, codex/Grok (default) mode: never block twice in the same turn.
 # Codex uses stop_hook_active and Grok uses stopHookActive; typed camel-case
@@ -199,6 +201,12 @@ fm_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
 # --- the actual predicate ----------------------------------------------------
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# The shared verdict this guard blocks on, and the reason vocabulary every
+# supervision guard now shares. Sourced only after the primary-scope check:
+# bin/fm-wake-lib.sh creates the state directory on load, and an exempt child
+# worktree must stay untouched.
+# shellcheck source=bin/fm-supervision-liveness-lib.sh
+. "$SCRIPT_DIR/fm-supervision-liveness-lib.sh"
 if [ "$CLAUDE_MODE" -eq 1 ]; then
   # shellcheck source=bin/fm-session-lock-lib.sh
   . "$SCRIPT_DIR/fm-session-lock-lib.sh"
@@ -217,43 +225,56 @@ budget_reset() {
   fm_lock_release "$BUDGET_LOCK"
 }
 
-fm_supervision_status "$STATE" "$GRACE"
-if [ "$FM_SUP_NEEDED" = false ]; then
+if ! fm_supervision_in_flight "$STATE" "$GRACE"; then
   [ -e "$FAILURE_NOTICE" ] || budget_reset
   exit 0
 fi
+SUP_EPISODE_UNHEALTHY=0
+
+# Guard telemetry (docs/guard-spec.md "Instrumentation"). bin/fm-guard-event.sh
+# is the single writer and always exits 0, and both calls are best-effort, so
+# telemetry can never change this guard's decision or output.
+guard_event() {
+  "$SCRIPT_DIR/fm-guard-event.sh" turnend-supervision-block "$@" 2>/dev/null || true
+}
+
+# An allow is a recovery only when this episode was unhealthy earlier: either
+# this stop found supervision off, or a Claude block budget/notice from an
+# earlier stop in the same episode is still open. A stop that was healthy from
+# the start is not a recovery and emits nothing (the non-Claude path keeps no
+# episode state, so it emits only its deny).
+guard_event_allow() {
+  [ "$SUP_EPISODE_UNHEALTHY" -eq 1 ] || return 0
+  guard_event allow --source-ok "${FM_SUP_SOURCE_OK:-true}" --cleared-by continue
+}
+
 # One owner of the "supervision is on, let this turn end" exit contract, shared
 # by every proof of supervision below.
 allow_supervised_stop() {
   [ "$CLAUDE_MODE" -eq 1 ] || exit 0
+  guard_event_allow
   fm_failure_episode_reset "$STATE" && exit 0
   exit 2
 }
 
-if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
-  allow_supervised_stop
+# The strict verdict in bin/fm-supervision-liveness-lib.sh now owns the
+# beacon-age, lock-owner, and away/quiet-daemon checks this guard used to
+# compose inline: a live identity-matched watcher, or away/quiet mode's live
+# daemon with a beacon inside the poll-derived grace. A live verdict is the only
+# thing that lets this turn end here; off and unknown keep blocking below.
+fm_supervision_liveness "$STATE" "$GRACE" "$WATCH" "$FM_HOME"
+if [ "$FM_SUP_LIVE" != live ]; then
+  SUP_EPISODE_UNHEALTHY=1
+elif [ "$CLAUDE_MODE" -eq 1 ] \
+  && { [ -e "$BUDGET_FILE" ] || [ -e "$FAILURE_NOTICE" ]; }; then
+  SUP_EPISODE_UNHEALTHY=1
 fi
-
-# Away mode transfers supervision ownership from the watcher to the away-mode
-# daemon, which runs the watcher one-shot and starts its replacement after every
-# wake (bin/fm-supervise-daemon.sh). A turn boundary regularly lands in that
-# hand-off, when no watcher process holds the lock and nothing is wrong, so
-# requiring one here alarmed on healthy away-mode supervision. A live
-# identity-matched daemon holding this home is the right owner to test for.
-# The beacon half of the predicate still applies: a daemon that stops
-# restarting its watcher still blocks once the beacon passes grace, and a home
-# with no daemon and no watcher blocks exactly as before. It uses AFK_GRACE
-# (poll-cadence-derived, see the comment above) instead of the flat $GRACE
-# every other check on this page uses, so a daemon that is genuinely still
-# cycling - just slower than a fixed 300s window - is not misread as down.
-AFK_GRACE=${FM_GUARD_GRACE:-$(fm_poll_derived_grace)}
-if [ "$(fm_path_age "$STATE/.last-watcher-beat")" -lt "$AFK_GRACE" ] \
-  && fm_afk_daemon_owns_supervision "$STATE"; then
+if [ "$FM_SUP_LIVE" = live ]; then
   allow_supervised_stop
 fi
 
 block_stop() {
-  local afk x_mode reason rule
+  local afk x_mode reason rule repeat source_ok
   afk=0
   [ -e "$STATE/.afk" ] && afk=1
   x_mode=0
@@ -281,6 +302,13 @@ block_stop() {
     printf '●  %s\n' "$reason"
     printf '●%s\n' "$rule"
   } >&2
+  # One deny row per blocked stop. --repeat is this guard's own attempt count:
+  # the Claude continuation count when the cooperative path charged one, else 1.
+  repeat=${COUNT:-1}
+  case "$repeat" in ''|*[!0-9]*|0) repeat=1 ;; esac
+  source_ok=true
+  [ "${FM_SUP_SOURCE_OK:-true}" = false ] && source_ok=false
+  guard_event deny --source-ok "$source_ok" --repeat "$repeat"
   exit 2
 }
 
@@ -290,6 +318,12 @@ block_stop() {
 # stealing ownership, so blocking its Stop would create an impossible loop.
 # Report the ownership conflict as a diagnostic and let this turn end safely;
 # the owning session remains responsible for restoring the watcher.
+# This is the one allow that is deliberately not a "cleared by continue"
+# recovery - the read-only session cannot act, and the owning session's own
+# continuation owns the recovery - so it emits no allow event. It is the
+# shared API's documented carve-out for this guard, kept here because the
+# foreign-owner identity proof is Claude's cooperative-mode decision, not a
+# liveness verdict.
 if [ "$CLAUDE_MODE" -eq 1 ] && fm_session_lock_foreign_owner_live "$STATE"; then
   printf '{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid %s). Allowing this turn to end safely; the owning session must restore supervision."}\n' \
     "$FM_SESSION_LOCK_FOREIGN_OWNER_PID"
@@ -380,13 +414,13 @@ budget_account_current_epoch() {  # [observe|block]
 
 autoarm_owns_recovery() {
   local pid role outcome age
-  fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME" && return 0
+  fm_supervision_watcher_live "$STATE" "$WATCH" "$GRACE" "$FM_HOME" && return 0
   # A live OPEN generation claim owns recovery: the ledger names a live,
   # identity-matched owner still arming that is not stuck (fm_autoarm_claim_open
-  # in bin/fm-wake-lib.sh owns that predicate). A finished, dead,
-  # identity-mismatched, or stuck claim deliberately fails it and falls
-  # through, because treating such a claim as ownership is what let a dead
-  # watcher go unnoticed for turn after turn; the outcome cases below still
+  # in bin/fm-wake-lib.sh owns that predicate, including session reachability).
+  # A finished, dead, identity-mismatched, or stuck claim deliberately fails it
+  # and falls through, because treating such a claim as ownership is what let a
+  # dead watcher go unnoticed for turn after turn; the outcome cases below still
   # cover a claim that finished moments ago, so a genuine handoff is not
   # duplicated, while a stale one now reaches the block.
   if fm_autoarm_claim_open "$STATE" "$GRACE"; then
@@ -476,7 +510,7 @@ terminal_fail_open() {
     fm_lock_release "$OWNER_LOCK"
     return 1
   fi
-  if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+  if fm_supervision_watcher_live "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
     if ! fm_failure_episode_reset "$STATE" held; then
       fm_lock_release "$BUDGET_LOCK"
       fm_lock_release "$OWNER_LOCK"
@@ -519,18 +553,20 @@ failure_episode_verified() {
 i=0
 while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
   if autoarm_owns_recovery; then
-    if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+    if fm_supervision_watcher_live "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
       fm_failure_episode_reset "$STATE" || exit 2
     fi
+    guard_event_allow
     exit 0
   fi
   sleep 0.1
   i=$((i + 1))
 done
 if autoarm_owns_recovery; then
-  if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+  if fm_supervision_watcher_live "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
     fm_failure_episode_reset "$STATE" || exit 2
   fi
+  guard_event_allow
   exit 0
 fi
 
@@ -552,7 +588,11 @@ if [ "$terminal_status" -eq 0 ]; then
     NEED_DESC="X-mode relay polling active"
   fi
   printf '{"systemMessage":"FIRSTMATE SUPERVISION IS GENUINELY DOWN: %s, the Stop-owned auto-arm exhausted its bounded retries and one failure notice, no watcher or automatic continuation exists, and the block budget is exhausted. Keep this session attended and diagnose the automatic Stop-hook and watcher startup before relying on unattended supervision."}\n' "$NEED_DESC"
+  guard_event_allow
   exit 0
 fi
-[ "$terminal_status" -eq 2 ] && exit 0
+if [ "$terminal_status" -eq 2 ]; then
+  guard_event_allow
+  exit 0
+fi
 block_stop

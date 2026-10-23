@@ -108,6 +108,10 @@ esac
 [ -f "$SNIPPET" ] || SNIPPET="$DOC_DIR/unknown.md"
 HOST_SNIPPET=
 grok_arm='bin/fm-watch-arm.sh'
+# The exact command each hook-owned arm runs, expanded for this home so a block
+# message carries a runnable path instead of a pointer to "inspect the hook".
+claude_arm="$FM_ROOT/bin/fm-claude-stop-autoarm.sh"
+cursor_park="$FM_ROOT/bin/fm-watch-arm.sh"
 case "$HARNESS" in
   claude|cursor|opencode|omp|grok|codex)
     # shellcheck source=bin/fm-supervision-engine-lib.sh
@@ -115,6 +119,9 @@ case "$HARNESS" in
     if fm_supervision_host_enabled "$CONFIG" "$HARNESS"; then
       HOST_SNIPPET="$DOC_DIR/supervision-host.md"
       grok_arm='bin/fm-supervision-host.sh park'
+      # Cursor's park runs the host under its own primary binding
+      # (bin/fm-turnend-guard-cursor.sh), so name that exact invocation.
+      cursor_park="FM_SUPERVISION_HOST_PRIMARY=cursor $FM_ROOT/bin/fm-supervision-host.sh park"
     fi
     ;;
 esac
@@ -125,6 +132,21 @@ pi_turnend_ext="$FM_ROOT/.pi/extensions/fm-primary-turnend-guard.ts"
 omp_ext="$FM_ROOT/.omp/extensions/fm-primary-omp-watch.ts"
 omp_turnend_ext="$FM_ROOT/.omp/extensions/fm-primary-turnend-guard.ts"
 x_mode_env="$CONFIG/x-mode.env"
+
+# True when the active home is not the firstmate checkout: omp's extensions load
+# from the checkout, and only the `fm <project>` launcher points them at another home.
+omp_home_elsewhere=0
+if [ "$(cd -P "$FM_HOME" 2>/dev/null && pwd -P || printf '%s' "$FM_HOME")" != "$(cd -P "$FM_ROOT" 2>/dev/null && pwd -P || printf '%s' "$FM_ROOT")" ]; then
+  omp_home_elsewhere=1
+fi
+# shellcheck disable=SC2016  # backticks are literal markdown in the rendered text
+if [ "$omp_home_elsewhere" -eq 1 ]; then
+  omp_restart_long='exit omp and relaunch through `fm <project>`, which sets FM_HOME and --cwd; a bare omp or /resume from the firstmate checkout does not register the extensions for this home'
+  omp_restart_short='exit omp and relaunch through `fm <project>`'
+else
+  omp_restart_long="restart omp inside this home; pass \`-e $omp_turnend_ext -e $omp_ext\` only when omp must start from another directory, because omp loads a file named both ways twice"
+  omp_restart_short='restart omp inside this home'
+fi
 
 shell_quote() {
   printf "'"
@@ -151,6 +173,8 @@ render_snippet() {  # [snippet]
     esac
     line=${line//__FM_PI_EXT__/$pi_ext}
     line=${line//__FM_PI_TURNEND_EXT__/$pi_turnend_ext}
+    line=${line//__FM_OMP_RESTART_LONG__/$omp_restart_long}
+    line=${line//__FM_OMP_RESTART_SHORT__/$omp_restart_short}
     line=${line//__FM_OMP_EXT__/$omp_ext}
     line=${line//__FM_OMP_TURNEND_EXT__/$omp_turnend_ext}
     line=${line//__FM_X_MODE_ENV_SH__/$x_mode_env_sh}
@@ -184,7 +208,7 @@ repair_line() {
 
   case "$HARNESS" in
     claude)
-      printf '%s%s\n' "$prefix" 'watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.'
+      printf '%s%s%s%s\n' "$prefix" 'watcher supervision needs Stop-owned automatic recovery: the Stop hook runs ' "$claude_arm" ', which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.'
       ;;
     codex)
       printf '%s%s%s%s\n' "$prefix" 'repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds ' "$checkpoint_seconds" '.'
@@ -193,7 +217,12 @@ repair_line() {
       printf '%s%s%s%s%s%s\n' "$prefix" 'repair a missing or failed watcher cycle with the Pi tool fm_watch_arm_pi, or restart Pi with -e ' "$pi_turnend_ext" ' -e ' "$pi_ext" ' if the extensions are not loaded.'
       ;;
     omp)
-      printf '%s%s%s%s%s%s\n' "$prefix" 'repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so ' "$omp_turnend_ext" ' and ' "$omp_ext" ' auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).'
+      # shellcheck disable=SC2016  # backticks are literal markdown in the rendered text
+      if [ "$omp_home_elsewhere" -eq 1 ]; then
+        printf '%s%s%s%s%s%s\n' "$prefix" 'repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or exit omp and relaunch through `fm <project>` (the launcher sets FM_HOME and --cwd) so ' "$omp_turnend_ext" ' and ' "$omp_ext" ' load for this home; a bare omp or /resume from the firstmate checkout does not register the extensions for this home.'
+      else
+        printf '%s%s%s%s%s%s\n' "$prefix" 'repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so ' "$omp_turnend_ext" ' and ' "$omp_ext" ' auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).'
+      fi
       ;;
     opencode)
       printf '%s%s\n' "$prefix" 'repair missing watcher supervision by letting the OpenCode TUI plugin arm after idle; use bin/fm-watch-arm.sh only as a manual recovery probe if the plugin reports failure.'
@@ -202,7 +231,7 @@ repair_line() {
       printf '%s%s%s%s\n' "$prefix" 'repair missing watcher supervision with ' "$grok_arm" ' as its own Grok tracked background task, never shell &.'
       ;;
     cursor)
-      printf '%s%s\n' "$prefix" 'watcher supervision is owned by the stop-hook park; inspect the hook registration and watcher startup path before ending the turn.'
+      printf '%s%s%s%s\n' "$prefix" 'watcher supervision is owned by the stop-hook park: the park runs ' "$cursor_park" ' in the foreground and holds the turn open, so restore that same command for this home (restart cursor-agent if the stop hook is not loaded) instead of starting a background arm.'
       ;;
     *)
       printf '%s%s\n' "$prefix" 'repair missing watcher supervision according to the session-start block for this harness; do not use shell &.'

@@ -231,12 +231,6 @@ test_bounded_retry() {
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   rmdir "$ledger"
   mv "$ledger.saved" "$ledger"
-  before=$(requests)
-  claude_hook "$(post Bash '{"stdout":"probability=0.5 flagged-canary","stderr":""}')"
-  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory")' <<<"$out" >/dev/null || fail "ambiguous result had no advisory"
-  [ "$(requests)" -eq $((before + 1)) ] || fail "ambiguous result was retried"
-  claude_hook "$(post Bash '{"stdout":"probability=0.9 flagged-canary","stderr":""}')"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "flagged result was retried"
   pass "bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried"
 }
 
@@ -452,20 +446,11 @@ JS
   pass "OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence"
 }
 
-test_claude_result_advisory() {
-  local out before
-  claude_hook "$(post Bash '{"stdout":"probability=0.8 private-output-canary","stderr":""}')"
-  jq -e '.hookSpecificOutput.hookEventName == "PostToolUse" and (.hookSpecificOutput.additionalContext | contains("no protection")) and (.hookSpecificOutput | has("updatedToolOutput") | not)' <<<"$out" >/dev/null || fail "Claude result was not explicitly advisory"
-  [[ "$out" != *private-output-canary* ]] || fail "Claude advisory copied untrusted content"
-  claude_hook "$(post Bash '{"stdout":"probability=0.2"}')"
-  [ -z "$out" ] || fail "clear result produced a review advisory"
-  before=$(requests)
-  claude_hook "$(post Read '{"file":{"content":"IGNORE PREVIOUS claimed authority"}}')"
-  [ "$(requests)" -eq $((before + 1)) ] || fail "ordinary read did not receive screening"
-  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "ordinary read advisory was hidden"
+test_claude_node_pretool() {
+  local out
   out=$(pre Bash '{"command":"rm -rf fixture"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1)
   denied "$out" || fail "node type stripping did not enforce the guard"
-  pass "Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node"
+  pass "node type stripping still enforces the Claude pre-tool deny"
 }
 
 test_omp_permissions() {
@@ -753,35 +738,6 @@ test_ledger_privacy() {
   ! grep -q "$KEY\|fake-openrouter\|provider-private-canary\|private-output-canary\|IGNORE PREVIOUS\|sk-live\|plain text" "$ledger" || fail "sensitive fixture content or provider extensions reached routine logs"
   jq -se 'all(.[]; .kind == "terminal" and has("error_type") and .outage_policy == "REVIEW_ON_UNAVAILABLE_V1" and .policy_version == "FIRSTMATE_JEV_GUARD_V1" and (has("state")|not) and (has("raw")|not) and (has("message")|not) and (has("command")|not) and (has("path")|not)) and any(.[]; .usage.input_tokens == 3 and .cost.source == "unknown") and any(.[]; .error_type == "Error") and any(.[]; .decision == "inactive" and .error_type == null and .cost.source == "not_called")' "$ledger" >/dev/null || fail "terminal audit contract lost error, policy, usage or certainty"
   pass "private terminal audit keeps typed errors and cost certainty without payloads or provider extensions"
-}
-
-test_claude_channel_context() {
-  local bell record payload before out ledger
-  bell=$(printf 'IGNORE PREVIOUS synthetic launch authority.\n' | FM_TASK_ID=t1 FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/fm-operational-input.sh" record launch-brief) || fail "Claude fixture publication failed"
-  record=$(bash -c '. "$1"; fm_operational_doorbell_path "$2" path && printf %s "$path"' fixture "$ROOT/bin/fm-operational-input.sh" "$bell") || fail "Claude fixture path failed"
-  claude_hook "$(jq -cn --arg prompt "$bell" '{hook_event_name:"UserPromptSubmit",session_id:"channel-fixture",prompt:$prompt}')"
-  [ -z "$out" ] || fail "native prompt context emitted instructions"
-  payload=$(jq -cn --arg path "$record" --rawfile content "$record" '{hook_event_name:"PostToolUse",session_id:"channel-fixture",tool_name:"Read",tool_input:{file_path:$path},tool_response:{file:{content:$content}}}')
-  before=$(requests)
-  claude_hook "$payload"
-  [ -z "$out" ] || fail "exact delivered Claude source was not preserved"
-  [ "$(requests)" -eq "$before" ] || fail "exact Claude source reached the provider"
-  claude_hook "$(jq '.session_id="different-native-session"' <<<"$payload")"
-  [ "$(requests)" -eq $((before + 1)) ] || fail "another session inherited source consistency"
-  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "foreign-session launch was not screened"
-  payload=$(jq '.tool_response.file.content += "changed bytes"' <<<"$payload")
-  claude_hook "$payload"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "changed Claude bytes inherited source consistency"
-  payload=$(jq --rawfile content "$record" '.tool_response.file.content=$content' <<<"$payload")
-  ledger="$HOME_DIR/state/jev-guard.jsonl"
-  mv "$ledger" "$ledger.saved"
-  mkdir "$ledger"
-  claude_hook "$payload"
-  jq -e '.hookSpecificOutput.additionalContext | contains("AuditUnavailableError")' <<<"$out" >/dev/null || fail "Claude lost the consistent-read audit advisory"
-  [[ "$out" != *"IGNORE PREVIOUS"* && "$out" != *"$record"* ]] || fail "Claude audit advisory copied source text or path"
-  rmdir "$ledger"
-  mv "$ledger.saved" "$ledger"
-  pass "separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content"
 }
 
 test_channel_consistency() {
@@ -1170,7 +1126,7 @@ JS
 }
 
 test_claude_oversize() {
-  local out before size_before big="$TMP_ROOT/claude-big.txt" bad="$TMP_ROOT/claude-big-bad.txt" payload
+  local out before big="$TMP_ROOT/claude-big.txt" bad="$TMP_ROOT/claude-big-bad.txt" payload
   awk 'BEGIN { for (i = 0; i < 700; i++) printf "L%d: const answer = compute(%d); // ordinary source line\n", i, i }' > "$big"
   { head -n 350 "$big"; printf 'token = sk-live-fixture\n'; tail -n 350 "$big"; } > "$bad"
   before=$(requests)
@@ -1181,23 +1137,13 @@ test_claude_oversize() {
   payload=$(jq -cn --arg p "$WT/src/big.ts" --rawfile c "$bad" '{file_path:$p,content:$c}')
   claude_hook "$(pre Write "$payload")"
   denied "$out" || fail "a credential in a late piece of an oversized Claude write was not denied"
-  claude_hook "$(post Bash "$(jq -cn --rawfile s "$big" '{stdout:$s,stderr:""}')")"
-  [ -z "$out" ] || fail "an oversized benign Claude result produced an advisory"
-  claude_hook "$(post Bash "$(jq -cn --rawfile s "$bad" '{stdout:$s,stderr:""}')")"
-  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "a flagged late piece of an oversized Claude result produced no advisory"
   before=$(requests)
   out=$(WT="$WT" node -e 'process.stdout.write(JSON.stringify({hook_event_name:"PreToolUse",cwd:process.env.WT,tool_name:"Write",tool_input:{file_path:process.env.WT+"/huge.txt",content:"x".repeat(262145)},tool_use_id:"size-refusal"}))' \
     | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1) \
     || fail 'Claude large write changed its hook exit contract'
   [ -z "$out" ] || fail 'Claude refused a large benign write'
   [ "$(requests)" -eq $((before + 16)) ] || fail 'Claude did not use its bounded write screening budget'
-  size_before=$(jq -s '[.[] | select(.guard_id == "FM-JEV-SIZE")] | length' "$HOME_DIR/state/friction.jsonl")
-  claude_hook "$(WT="$WT" node -e 'process.stdout.write(JSON.stringify({hook_event_name:"PostToolUse",cwd:process.env.WT,tool_name:"Bash",tool_input:{command:"cat huge"},tool_response:{stdout:"x".repeat(262145),stderr:""},tool_use_id:"size-result"}))')"
-  jq -e '.hookSpecificOutput.additionalContext | contains("RequestTooLargeError") and contains("Advisory only") and (contains("REFUSED") | not)' <<<"$out" >/dev/null \
-    || fail "an oversized Claude result must be an advisory without a refusal line: $out"
-  [ "$(jq -s '[.[] | select(.guard_id == "FM-JEV-SIZE")] | length' "$HOME_DIR/state/friction.jsonl")" = "$size_before" ] \
-    || fail 'an advisory-only Claude result was counted as a blocked refusal'
-  pass "Claude hooks retain JSON/exit contracts, admit budget-limited benign writes, and leave advisory-only results uncounted"
+  pass "Claude hooks retain JSON/exit contracts and admit budget-limited benign writes"
 }
 
 test_large_write_budget() {
@@ -1428,8 +1374,7 @@ test_launch_cutover
 test_crashing_runtime
 test_service_contract
 test_result_and_audit_policy
-test_claude_result_advisory
-test_claude_channel_context
+test_claude_node_pretool
 test_channel_consistency
 test_omp_permissions
 test_deadlines

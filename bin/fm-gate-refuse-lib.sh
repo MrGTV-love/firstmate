@@ -36,9 +36,10 @@
 # lifecycle against an FM_HOME that carries the FM_GATE_LAB_MARKER file, because
 # bin/fm-lab-home.sh stamps it only on an empty directory
 # (fm_gate_lab_mark refuses a populated dir, so the helper cannot mark a real home).
-# The allowance additionally requires every FM_*_OVERRIDE to be empty or unset,
-# so the lab call uses the marked home's stock layout and no override can split
-# part of the "lab" back onto the real fleet. The threat model stays a CONFUSED
+# The allowance accepts only the production branch's redundant overrides:
+# the tracked code root and the marked home's stock state/config directories.
+# All paths must be canonical, with no symlinked stock directories or marker;
+# every other nonempty override refuses. The threat model stays a CONFUSED
 # agent: a hostile agent that would hand-forge the marker file is the
 # adversarial case no-mistakes' neutral-execution-context and the
 # HEAD-continuity guard already own, so authorization checks only the first-line
@@ -101,15 +102,31 @@ fm_gate_lab_mark() {
   printf '%s\n' "$FM_GATE_LAB_TOKEN" > "$home/$FM_GATE_LAB_MARKER"
 }
 
-# fm_gate_lab_permitted: return 0 when the current call targets a marked lab
-# home through a stock layout - $FM_HOME carries the marker and no
-# FM_*_OVERRIDE relocation has a nonempty value.
+# fm_gate_lab_permitted: allow only the marked stock home and the redundant
+# root/state/config overrides injected by production supervision.
 fm_gate_lab_permitted() {
-  local v
+  local v home code_root dir expected
   fm_gate_lab_home "${FM_HOME:-}" || return 1
+  [ ! -L "$FM_HOME/$FM_GATE_LAB_MARKER" ] || return 1
+  home=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || return 1
+  [ "$FM_HOME" = "$home" ] || return 1
+  code_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P) || return 1
+  for dir in state config data projects; do
+    expected="$home/$dir"
+    [ "$(cd "$expected" 2>/dev/null && pwd -P)" = "$expected" ] || return 1
+  done
   for v in "${!FM_@}"; do
     case "$v" in
-      *_OVERRIDE) [ -z "${!v}" ] || return 1 ;;
+      *_OVERRIDE)
+        [ -n "${!v}" ] || continue
+        case "$v" in
+          FM_ROOT_OVERRIDE) expected=$code_root ;;
+          FM_STATE_OVERRIDE) expected="$home/state" ;;
+          FM_CONFIG_OVERRIDE) expected="$home/config" ;;
+          *) return 1 ;;
+        esac
+        [ "${!v}" = "$expected" ] || return 1
+        ;;
     esac
   done
   return 0
@@ -139,6 +156,15 @@ fm_is_gate_agent() {
   return 1
 }
 
+# fm_gate_refuse_event: record the refusal as guard telemetry. bin/fm-guard-event.sh
+# always exits 0, and the fallback keeps a missing or broken writer from
+# changing the refusal's exit code under set -e.
+fm_gate_refuse_event() {
+  local dir
+  dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd) || return 0
+  "$dir/fm-guard-event.sh" gate-agent-containment deny --source-ok true 2>/dev/null || true
+}
+
 # fm_refuse_if_gate_agent: exit FM_GATE_REFUSE_EXIT with a clear stderr message if
 # this process looks like a no-mistakes gate agent without a permitted lab home.
 # Call before any fleet mutation. No-ops (returns 0) for a normal firstmate
@@ -155,5 +181,8 @@ fm_refuse_if_gate_agent() {
   else
     echo "error: refusing fleet lifecycle from inside a no-mistakes gate worktree ($FM_GATE_REFUSE_COMMON)" >&2
   fi
+  echo 'error: the one permitted escape is a disposable lab home: LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"); bin/fm-lab-home.sh create "$LAB"; FM_HOME=$LAB <command>' >&2
+  echo 'error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.' >&2
+  fm_gate_refuse_event
   exit "$FM_GATE_REFUSE_EXIT"
 }
