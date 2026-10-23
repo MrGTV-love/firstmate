@@ -803,8 +803,10 @@
 # disposition this parent recognizes (an older host sends none). Neither outcome
 # claims a replacement. Only a spawned launch must carry the requested harness.
 # The recorded profile is the endpoint's confirmed harness/model/effort, not the
-# requested launch profile; a model or effort the host does not report keeps the
-# requested value.
+# requested launch profile. Only a confirmed spawned launch of the requested
+# harness keeps the requested model or effort when the host omits that key; an
+# omitted key on an already-running or running route is recorded empty
+# (unknown), and a key the host reports empty stays empty.
 # A ship task records the explicit mode/yolo it was passed; a secondmate spawn records
 # mode=secondmate, yolo=off, home=, and projects=; a scout records neither, and both the
 # success line and state/<id>.meta omit them.
