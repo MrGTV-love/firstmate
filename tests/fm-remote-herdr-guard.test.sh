@@ -553,7 +553,11 @@ printf '%s\n' "$SSH_PID" > "$CASE_OWNER"
 touch "$CASE_STATE/stop-ignored"
 guard_bg
 assert_still_waiting "$UNRELEASED_NOTICE" "a foreign server kept its socket"
+/bin/sleep 10
+kill -0 "$GUARD_PID" 2>/dev/null || fail "the guard stopped waiting on a foreign server that kept its socket"
 stop_guard
+polls=$(grep -c "^status --json --session $SESSION$" "$CASE_LOG")
+[ "$polls" -le 12 ] || fail "the takeover re-check did not back off: $polls status reads in about 11 seconds"
 assert_contains "$(herdr_calls)" "server stop --session $SESSION" "the guard never asked the foreign server to stop"
 [ "$(grep -c "$UNRELEASED_NOTICE" "$CASE_STATE/guard.out")" = 1 ] || fail "the long-wait notice was not logged exactly once"
 pass "a foreign server that never releases the socket leaves the guard waiting, with one notice"
@@ -584,6 +588,19 @@ assert_contains "$GUARD_OUT" "pid $SSH_PID born outside the Aqua login session (
   "the guard did not re-run the ownership decision for the foreign server that won the start lock"
 [ "$(grep -c "^server stop --session $SESSION$" "$CASE_LOG")" = 2 ] || fail "the guard did not take the new foreign server over"
 [ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard did not start exactly one server after the second takeover"
+# The same pid keeps the socket, so only the start-lock verdict shows that the
+# server running now is not the one this takeover stopped.
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+printf '1\n' > "$CASE_STATE/stop-comes-back-once"
+printf '%s\n' "$UNMARKED_PID" > "$CASE_STATE/comes-back-owner"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not re-judge a server that came up under the start lock with the same socket owner"
+assert_contains "$GUARD_OUT" "came up under the start lock" "the guard did not report the server that won the start lock"
+assert_contains "$GUARD_OUT" "did not stop; re-running the ownership decision" \
+  "the start-lock verdict alone did not send the guard back to the ownership decision"
+[ "$(grep -c "^server stop --session $SESSION$" "$CASE_LOG")" = 2 ] || fail "the guard did not take the start-lock winner over"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard did not start exactly one server after re-judging"
 pass "a server that wins the start lock during a takeover gets a fresh ownership decision"
 
 # A reconnecting SSH attach replaces the stopped server before the re-check.

@@ -53,7 +53,8 @@
 # bin/fm-remote-herdr-owner-lib.sh owns the owner discovery and the birth
 # markers; after FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS (default 50) tenths of
 # a second without a proven release, the guard logs one notice and keeps
-# waiting.
+# waiting. The takeover re-check starts at 0.1s and doubles each pass up to 5s,
+# returning to 0.1s whenever the observed state changes.
 # Every socket-owner decision prints one line to stdout, which launchd routes
 # to the agent's log; prerequisite refusals print to stderr.
 set -u
@@ -175,8 +176,13 @@ while :; do
     || log "herdr server stop for session $SESSION did not succeed; waiting for the socket anyway"
   i=0
   FRESH=0
+  NOTICED=0
+  DELAY=1
+  PREVIOUS=
   while :; do
     read_state
+    [ "$STATE" = "$PREVIOUS" ] || DELAY=1
+    PREVIOUS=$STATE
     case "$STATE" in
       absent)
         log "session $SESSION released its socket after $i tenths of a second"
@@ -190,9 +196,13 @@ while :; do
         ;;
       *) wait_note "$STATE" ;;
     esac
-    [ "$i" -ne "$STOP_WAIT_TENTHS" ] \
-      || log "the foreign server for session $SESSION has not released its socket after $STOP_WAIT_TENTHS tenths of a second; still waiting and re-checking rather than starting a second server"
-    sleep 0.1
-    i=$((i + 1))
+    if [ "$NOTICED" = 0 ] && [ "$i" -ge "$STOP_WAIT_TENTHS" ]; then
+      log "the foreign server for session $SESSION has not released its socket after $STOP_WAIT_TENTHS tenths of a second; still waiting and re-checking rather than starting a second server"
+      NOTICED=1
+    fi
+    sleep "$((DELAY / 10)).$((DELAY % 10))"
+    i=$((i + DELAY))
+    DELAY=$((DELAY * 2))
+    [ "$DELAY" -le 50 ] || DELAY=50
   done
 done
