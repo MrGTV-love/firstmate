@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016,SC2034
 # Shadow model picker behavior through bin/fm-model-picker-shadow.sh: route identity against
 # real projections, gate eligibility, strict within-family Pareto pruning, currency separation
 # (a cross-currency trial is flagged, never pruned), unknown-route handling, Jev refusal and
@@ -134,7 +135,6 @@ for key in ('jev_raw_payload', 'jev_raw_support'):
         doc[key] = '<bytes:%d>' % len(doc[key])
 json.dump(doc, open(sys.argv[2], 'w'), sort_keys=True)
 PY
- 2>"$TMP_ROOT/dump.err" || echo "DUMPFAIL: $(cat "$TMP_ROOT/dump.err")" >&2
 }
 row() { dump_row; jq -r "$1" "$TMP_ROOT/row.json"; }
 calls() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; fi; }
