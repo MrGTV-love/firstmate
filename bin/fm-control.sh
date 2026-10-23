@@ -2168,6 +2168,13 @@ relaunch_rollback() {
   return 0
 }
 
+relaunch_pair_stage() {
+  [ -z "$RELAUNCH_PAIR_DIR" ] || return 0
+  RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
+  FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
+    fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR"
+}
+
 resolve_relaunch_profile() {
   PRIOR_HARNESS=$HARNESS
   PRIOR_RECORDED_HARNESS=$RECORDED_HARNESS
@@ -2230,17 +2237,26 @@ resolve_relaunch_profile() {
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the
   # caller names them too.
-  local dsh_prior_kept=0
+  local dsh_prior_kept=0 dsh_model
   if [ "$MODEL_SET" = 1 ]; then
     TARGET_MODEL=$NEW_MODEL
-    if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$NEW_MODEL" = "$PRIOR_MODEL" ]; then
-      dsh_prior_kept=1
+    if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$NEW_MODEL" != default ]; then
+      relaunch_pair_stage || return 1
+      dsh_model=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" "$SCRIPT_DIR/fm-model-index.sh" model dsh "$NEW_MODEL") || return 1
+      if [ "$dsh_model" = "$PRIOR_MODEL" ]; then
+        dsh_prior_kept=1
+      fi
     fi
   elif [ "$HARNESS_SET" = 0 ] && [ -n "$CONFIG_HARNESS" ]; then
     TARGET_MODEL=${CONFIG_MODEL:-default}
     if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$PRIOR_MODEL" != default ] \
        && { [ "$TARGET_MODEL" = default ] || [ "$EFFORT_SET" = 0 ]; }; then
-      if [ "$EFFORT_SET" = 0 ] && { [ "${CONFIG_MODEL:-$PRIOR_MODEL}" != "$PRIOR_MODEL" ] \
+      dsh_model=$PRIOR_MODEL
+      if [ "$TARGET_MODEL" != default ]; then
+        relaunch_pair_stage || return 1
+        dsh_model=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" "$SCRIPT_DIR/fm-model-index.sh" model dsh "$TARGET_MODEL") || return 1
+      fi
+      if [ "$EFFORT_SET" = 0 ] && { [ "$dsh_model" != "$PRIOR_MODEL" ] \
          || [ "${CONFIG_EFFORT:-$PRIOR_EFFORT}" != "$PRIOR_EFFORT" ]; }; then
         die "task $ID's bound dsh conversation runs model $PRIOR_MODEL at effort $PRIOR_EFFORT, but config/secondmate-harness names model ${CONFIG_MODEL:-(none)} at effort ${CONFIG_EFFORT:-(none)}; a plain relaunch would discard that conversation. Pass an explicit --model and --effort to start a fresh conversation on the configured profile. The running agent was not stopped"
       fi
@@ -2269,9 +2285,7 @@ resolve_relaunch_profile() {
   # A role reference, or a model the index has since retired, is resolved or
   # refused here, before the stop, exactly as the launch owner would.
   if [ "$TARGET_MODEL" != default ] || [ "$KIND" != secondmate ]; then
-    RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
-    FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
-      fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR" || return 1
+    relaunch_pair_stage || return 1
     if [ "$TARGET_MODEL" != default ]; then
       TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
         "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1

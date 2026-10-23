@@ -3228,13 +3228,9 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
-if [ "$RELAUNCH" = 1 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
+if [ "$RELAUNCH" = 1 ] && [ "$MODEL_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
   prior_dsh=$(fm_meta_get "$RELAUNCH_META" model)
-  [ "$MODEL_SET" -eq 1 ] || [ "$prior_dsh" = default ] || MODEL=$prior_dsh
-  if [ "$EFFORT_SET" -eq 0 ] && [ "$MODEL" = "$prior_dsh" ]; then
-    prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
-    [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
-  fi
+  [ "$prior_dsh" = default ] || MODEL=$prior_dsh
 fi
 if [ "$RAW_LAUNCH" = 0 ] && [ -z "$ARG3" ] && [ "$HARNESS" = dsh ] && { [ -z "$MODEL" ] || [ "$MODEL" = default ]; }; then
   MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) || {
@@ -3264,6 +3260,11 @@ if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
   if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
 else
   MODEL_INDEXED=0
+fi
+if [ "$RELAUNCH" = 1 ] && [ "$EFFORT_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ] \
+   && [ "$MODEL" = "$(fm_meta_get "$RELAUNCH_META" model)" ]; then
+  prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
+  [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
 fi
 
 if [ "$RAW_LAUNCH" = 0 ]; then

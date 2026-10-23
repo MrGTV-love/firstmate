@@ -239,6 +239,37 @@ SH
   expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
   assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "the explicit model is the replacement model"
   assert_equals max "$(journal_field "$dir" smd to_effort)" "an explicit bound model without --effort keeps the recorded effort"
+  # Role tokens compare by the model they resolve to, never by their name.
+  printf '%s\n' '{"version":1,"roles":{"bound":{"dsh":{"model":"deepseek/recorded-model"}}},"retired":[]}' > "$home/config/model-index.json"
+  rm -f "$home/state/smd.control-relaunch"
+  printf 'dsh role:bound\n' > "$home/config/secondmate-harness"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_contains "$out" "composer visibly holds pending text" "a config role naming the bound model must pass every pre-stop admission"
+  assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "a config role naming the bound model keeps it"
+  assert_equals max "$(journal_field "$dir" smd to_effort)" "a config role naming the bound model keeps the bound effort"
+  rm -f "$home/state/smd.control-relaunch"
+  printf 'dsh deepseek/other-model high\n' > "$home/config/secondmate-harness"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch --model role:bound); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "an explicit role resolves to the bound model"
+  assert_equals max "$(journal_field "$dir" smd to_effort)" "an explicit role naming the bound model without --effort keeps the recorded effort"
+  for config in 'dsh role:absent' ''; do
+    rm -f "$home/state/smd.control-relaunch"
+    if [ -n "$config" ]; then
+      printf '%s\n' "$config" > "$home/config/secondmate-harness"
+      out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch); rc=$?
+    else
+      out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch --model role:absent); rc=$?
+    fi
+    expect_code 1 "$rc" "a missing role must refuse a relaunch (${config:---model role:absent}): $out"
+    assert_contains "$out" "absent" "the refusal must name the missing role (${config:---model role:absent})"
+    assert_not_contains "$out" "composer visibly holds pending text" "a missing role must refuse before the exit step"
+    assert_absent "$home/state/smd.control-relaunch" "a missing role must refuse before the relaunch transaction"
+    cmp -s "$dir/dsh.meta" "$home/state/smd.meta" || fail "a missing role refusal changed task metadata"
+    [ -s "$home/state/smd.dsh/g1/dsh/sessions/w/s/session.v4.jsonl" ] || fail "a missing role refusal lost the bound conversation"
+  done
+  rm -f "$home/config/model-index.json"
   [ "$(cat "$dir/fake/command")" = dsh ] || fail "the pending-composer refusal stopped the running dsh agent"
   pass "fm-control relaunch: a config dsh secondmate keeps or refuses to discard its bound dsh profile, else carries the DSH session's bound model, and refuses without one before stopping"
 }

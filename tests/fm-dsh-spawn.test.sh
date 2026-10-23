@@ -536,8 +536,9 @@ SH
   chmod +x "$bin/tmux"
   # A plain relaunch, an explicit bound model without --effort, and the exact
   # profile bin/fm-control.sh hands over each resume the same conversation.
+  printf '{"version":1,"roles":{"bound":{"dsh":{"model":"%s"}}},"retired":[]}\n' "$DSH_MODEL" > "$HOME_DIR/config/model-index.json"
   seq=2
-  for args in '' "--model $DSH_MODEL" "--harness dsh --model $DSH_MODEL --effort high"; do
+  for args in '' "--model $DSH_MODEL" "--model role:bound" "--harness dsh --model $DSH_MODEL --effort high"; do
     : > "$LAUNCH_LOG"
     python3 - "$generation/dsh/sessions/workspace/session/session.v4.jsonl" "$LAUNCH_LOG" "$seq" <<'PY' &
 import json, os, sys, time
@@ -566,7 +567,19 @@ PY
     assert_equals "$session" "$(jq -r '.[0].config.sessionId' "$generation/launch.yml")" \
       "relaunch '$args' must resume the recorded conversation"
   done
-  pass "fm-spawn: a plain or same-model dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation"
+  cp "$generation/dsh/sessions/workspace/session/session.v4.jsonl" "$CASE_DIR/session.before"
+  out=$(DSH_HOME="$primary/dsh" FM_DSH_SOURCE_HOME='' FM_DSH_OPERATOR_HOME="$CASE_DIR/spawner-operator" FM_BACKEND=tmux \
+    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
+    FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
+    fm_test_run_spawn "$HOME_DIR" "$sm" "$bin:$FAKEBIN_DIR" "$id" --relaunch --model role:absent 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a relaunch onto a missing role must refuse: $out"
+  assert_contains "$out" "absent" "the refusal must name the missing role"
+  assert_equals "$generation" "$(jq -r .root "$binding")" "a missing role must keep the bound generation"
+  cmp -s "$CASE_DIR/session.before" "$generation/dsh/sessions/workspace/session/session.v4.jsonl" \
+    || fail "a missing role must leave the bound conversation log untouched"
+  rm -f "$HOME_DIR/config/model-index.json"
+  pass "fm-spawn: a plain, same-model or same-model role dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation"
 }
 
 test_launch_policy_admits_dsh() {
