@@ -1353,7 +1353,7 @@ Local recovery converges this setting, verifies the tooling, and checks the reso
 Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
 
 For worker and secondmate launches, this opt-in permits supported native adapters, not provider-name matches.
-The canonical `omp` adapter remains admitted for non-DeepSeek work, and the canonical `dsh` adapter is admitted for DeepSeek workers; the verified native `tc run` launcher remains a prerequisite not yet implemented in this code root.
+The canonical `omp` adapter remains admitted for non-DeepSeek work, and the canonical `dsh` adapter is admitted for DeepSeek work; the verified native `tc run` launcher remains a prerequisite not yet implemented in this code root.
 A TeamClaude proxy wrapper that starts `claude` directly does not satisfy the literal `tc run` requirement and must not be treated as an allowed fallback.
 Opaque raw shell launch commands are refused, even when their first word is `omp`, because their eventual session executable cannot be established from that word.
 The `openai-codex` provider inside omp remains allowed; the restriction excludes the standalone Codex CLI, not its models or provider.
