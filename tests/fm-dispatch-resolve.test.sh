@@ -1931,7 +1931,7 @@ for slug in claude-sonnet-5-5-high claude-opus-5-5-high claude-haiku-5-5 \
   cp "$ROOT/tests/fixtures/model-picker-shadow/projection/$slug.json" "$SHADOW_DATA/projection/"
 done
 printf '%s\n' '{"verdict":"TRUSTED"}' > "$SHADOW_DATA/verdict.json"
-printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}' > "$SETTINGS"
+printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_5"}' > "$SETTINGS"
 run_shadow() {  # <flag-value>
   OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key \
     FM_MODEL_PICKER_SHADOW="$1" FM_MODEL_PICKER_DATA="$SHADOW_DATA" \
@@ -1941,6 +1941,7 @@ run_shadow() {  # <flag-value>
 strip_diag() { printf '%s\n' "$1" | grep -v -e '^  timings:' -e '^  usage:' -e '^  model:'; }
 shadow_sql() { python3 -I -c 'import sqlite3,sys; print("\n".join("|".join(str(c) for c in r) for r in sqlite3.connect(sys.argv[1]).execute(sys.argv[2])))' "$SHADOW_DATA/aa.sqlite" "$1" 2>/dev/null || true; }
 
+before_calls=$(count)
 run_shadow ''
 OFF=$OUT
 [ ! -e "$SHADOW_DATA/aa.sqlite" ] || fail 'flag off created the picker store'
@@ -1949,7 +1950,7 @@ run_shadow ''
 strip_diag "$OUT" > "$TMP_ROOT/off2.txt"
 diff -u "$TMP_ROOT/off1.txt" "$TMP_ROOT/off2.txt" > "$TMP_ROOT/offdiff.txt" \
   || fail "two flag-off resolves differ: $(cat "$TMP_ROOT/offdiff.txt")"
-assert_equals 2 "$(grep -c '"rule"' "$CALLS" || true)" 'two flag-off resolves make only their own rule calls'
+assert_equals 2 "$(( $(count) - before_calls ))" 'two flag-off resolves make only their own rule calls'
 assert_equals 0 "$(grep -c '"work_type"' "$CALLS" || true)" 'flag off adds no picker request'
 off_calls=$(count)
 run_shadow 1
@@ -1962,7 +1963,7 @@ diff -u "$TMP_ROOT/off.txt" "$TMP_ROOT/on.txt" > "$TMP_ROOT/diff.txt" \
 assert_equals 1 "$(shadow_sql "select count(*) from dispatch_log where mode='shadow'")" 'exactly one shadow row'
 [ "$(shadow_sql "select count(*) from outcomes")" = 0 ] || fail 'the shadow path wrote an outcome'
 assert_equals 'accepted' "$(shadow_sql "select picker_status from dispatch_log")" 'the picker accepted its pick'
-rule_worker=$(sed -n 's/^  profile:.*--harness \([^ ]*\) --model \([^ ]*\).*/\1:\2/p' <<<"$ON")
+rule_worker=$(sed -n 's/^  profile:.*--harness \([^ ]*\) --model \([^ ]*\).*/\1:\2/p' <<<"$ON" | tr -d "'")
 assert_equals "$rule_worker" "$(shadow_sql "select rule_worker from dispatch_log")" 'the row records the route the resolver chose'
 [ -n "$(shadow_sql "select chosen_worker from dispatch_log")" ] || fail 'the row records the picker pick'
 [ -n "$(shadow_sql "select jev_raw_payload from dispatch_log")" ] || fail 'the row retains the raw Jev result'
@@ -1980,7 +1981,7 @@ strip_diag "$OUT" > "$TMP_ROOT/on500.txt"
 diff -u "$TMP_ROOT/off.txt" "$TMP_ROOT/on500.txt" > "$TMP_ROOT/diff500.txt" \
   || fail "a picker 500 changed the resolver result: $(cat "$TMP_ROOT/diff500.txt")"
 assert_equals 'picker-error' "$(shadow_sql "select picker_status from dispatch_log order by id desc limit 1")" 'the picker failure is recorded'
-printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}' > "$SETTINGS"
+printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_5"}' > "$SETTINGS"
 
 # An UNTRUSTED verdict stops the picker before any benchmark fact is read or sent.
 printf '%s\n' '{"verdict":"UNTRUSTED","reason":"matrix rebuilt without chart-diff"}' > "$SHADOW_DATA/verdict.json"
