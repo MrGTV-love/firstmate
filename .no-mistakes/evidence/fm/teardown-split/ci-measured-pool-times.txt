@@ -1,0 +1,18 @@
+# CI measurements read back with `gh run view` / `gh run download` (read-only) on 2026-10-22
+
+## Before: run 39838628417 (main, success), workflow 19:16:24Z -> 19:52:04Z = 35m40s
+Behavior portable serial 2 (held the combined tests/fm-teardown.test.sh alone): 19:16:28Z -> 19:43:17Z = 26m49s
+Behavior portable serial 1: 19:16:27Z -> 19:39:45Z = 23m18s
+
+## After: run 39881107550 (fm/teardown-split @ c403b6b9, success), workflow 00:56:37Z -> 01:28:19Z = 31m42s
+Per-shard script-time sums from fm-test-timing-portable-serial-*.json (duration_ms):
+  shard 1  1410975 ms (fm-watch-triage-waits alone; job 01:04:12Z -> 01:28:07Z = 23m55s, started ~7.5 min late)
+  shard 4  1199945 ms  includes tests/fm-teardown-cleanup.test.sh 917727 ms exit=0 gate_skip=false
+  shard 17 1181211 ms  includes tests/fm-teardown.test.sh          307312 ms exit=0 gate_skip=false
+  shard 15  860782 ms  includes tests/fm-teardown-pool.test.sh     333924 ms exit=0 gate_skip=false
+  every other shard <= 1241334 ms (shard 2, fm-control-relaunch alone)
+Group sum 1558963 ms vs former combined 1587660 ms.
+These three duration_ms values are exactly the new hints in bin/fm-test-run.sh at c6fb1d46.
+
+Note: run 39881107550 is at c403b6b9, one commit before c6fb1d46 (errexit restore + matrix header pointer).
+The full local runs in full-run-*.log cover c6fb1d46 itself.

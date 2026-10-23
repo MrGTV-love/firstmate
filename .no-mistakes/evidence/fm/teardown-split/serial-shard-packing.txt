@@ -1,0 +1,44 @@
+# Serial shard packing at 20 shards: per-shard hint sums, from each tree's own bin/fm-test-run.sh --list --lane portable-serial-<k>of20
+## BASE 4d1dc7d5
+shard  1  scripts=  1  unhinted=0  hint_sum_ms= 1433371  teardown: -
+shard  2  scripts=  1  unhinted=0  hint_sum_ms= 1404727  teardown: fm-teardown.test.sh=1404727
+shard  3  scripts=  1  unhinted=0  hint_sum_ms= 1318470  teardown: -
+shard  4  scripts= 14  unhinted=0  hint_sum_ms= 1131884  teardown: -
+shard  5  scripts= 15  unhinted=0  hint_sum_ms= 1131893  teardown: -
+shard  6  scripts= 15  unhinted=0  hint_sum_ms= 1131995  teardown: -
+shard  7  scripts= 16  unhinted=0  hint_sum_ms= 1131894  teardown: -
+shard  8  scripts= 16  unhinted=0  hint_sum_ms= 1131867  teardown: -
+shard  9  scripts= 16  unhinted=1  hint_sum_ms= 1086734  teardown: -
+shard 10  scripts= 17  unhinted=0  hint_sum_ms= 1131889  teardown: -
+shard 11  scripts= 16  unhinted=1  hint_sum_ms= 1086858  teardown: -
+shard 12  scripts= 16  unhinted=0  hint_sum_ms= 1131873  teardown: -
+shard 13  scripts= 17  unhinted=0  hint_sum_ms= 1131852  teardown: -
+shard 14  scripts= 16  unhinted=0  hint_sum_ms= 1131859  teardown: -
+shard 15  scripts= 18  unhinted=1  hint_sum_ms= 1086946  teardown: -
+shard 16  scripts= 18  unhinted=1  hint_sum_ms= 1086893  teardown: fm-teardown-endpoint-safety.test.sh=75589
+shard 17  scripts= 18  unhinted=0  hint_sum_ms= 1131868  teardown: -
+shard 18  scripts= 18  unhinted=0  hint_sum_ms= 1131865  teardown: -
+shard 19  scripts= 17  unhinted=0  hint_sum_ms= 1131946  teardown: -
+shard 20  scripts= 18  unhinted=0  hint_sum_ms= 1131874  teardown: -
+
+## HEAD c6fb1d46
+shard  1  scripts=  1  unhinted=0  hint_sum_ms= 1433371  teardown: -
+shard  2  scripts=  1  unhinted=0  hint_sum_ms= 1358153  teardown: -
+shard  3  scripts= 14  unhinted=0  hint_sum_ms= 1165091  teardown: fm-teardown-cleanup.test.sh=917727
+shard  4  scripts= 13  unhinted=0  hint_sum_ms= 1165130  teardown: -
+shard  5  scripts= 15  unhinted=0  hint_sum_ms= 1165084  teardown: -
+shard  6  scripts= 15  unhinted=0  hint_sum_ms= 1165088  teardown: -
+shard  7  scripts= 16  unhinted=0  hint_sum_ms= 1165129  teardown: -
+shard  8  scripts= 15  unhinted=0  hint_sum_ms= 1165073  teardown: -
+shard  9  scripts= 16  unhinted=0  hint_sum_ms= 1165119  teardown: -
+shard 10  scripts= 16  unhinted=0  hint_sum_ms= 1165128  teardown: -
+shard 11  scripts= 16  unhinted=0  hint_sum_ms= 1165134  teardown: -
+shard 12  scripts= 15  unhinted=0  hint_sum_ms= 1164828  teardown: -
+shard 13  scripts= 15  unhinted=0  hint_sum_ms= 1165077  teardown: -
+shard 14  scripts= 16  unhinted=0  hint_sum_ms= 1165118  teardown: -
+shard 15  scripts= 17  unhinted=0  hint_sum_ms= 1164959  teardown: -
+shard 16  scripts= 17  unhinted=0  hint_sum_ms= 1165118  teardown: -
+shard 17  scripts= 17  unhinted=0  hint_sum_ms= 1165098  teardown: fm-teardown-endpoint-safety.test.sh=75589
+shard 18  scripts= 17  unhinted=0  hint_sum_ms= 1165095  teardown: -
+shard 19  scripts= 17  unhinted=0  hint_sum_ms= 1165092  teardown: fm-teardown-pool.test.sh=333924
+shard 20  scripts= 17  unhinted=0  hint_sum_ms= 1164971  teardown: fm-teardown.test.sh=307312

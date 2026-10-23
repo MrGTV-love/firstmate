@@ -1,0 +1,7 @@
+# Behavior parity: base combined tests/fm-teardown.test.sh (4d1dc7d5) vs three groups (c6fb1d46), full local runs
+base: rc=0 elapsed_s=2255, ok=336, not ok=0
+landed-work: rc=0 elapsed_s=417, ok=95
+pool: rc=0 elapsed_s=679, ok=53
+cleanup: rc=0 elapsed_s=1320, ok=188
+sorted ok-line lists (base vs union of groups): identical, 336 lines each
+errexit state at each of 333 case calls (base vs groups): identical (errexit-base-vs-split.diff is empty)

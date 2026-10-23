@@ -1,0 +1,35 @@
+# Owner file runs a case selected by name
+$ bash tests/fm-teardown.test.sh test_local_only_fork_remote_allows
+ok - local-only worktree with HEAD on a fork remote is torn down and the home summary is refreshed
+exit=0
+
+$ bash tests/fm-teardown-pool.test.sh test_reassigned_dirty_slot_retires_only_finished_task
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+exit=0
+
+$ bash tests/fm-teardown-cleanup.test.sh test_local_only_force_overrides_unpushed
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+exit=0
+
+# Non-owner file refuses the same name before running anything
+$ bash tests/fm-teardown.test.sh test_local_only_force_overrides_unpushed
+Unknown test case: test_local_only_force_overrides_unpushed
+Usage: bash tests/fm-teardown.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-teardown-cleanup.test.sh test_reassigned_dirty_slot_retires_only_finished_task
+Unknown test case: test_reassigned_dirty_slot_retires_only_finished_task
+Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-teardown-pool.test.sh test_local_only_fork_remote_allows
+Unknown test case: test_local_only_fork_remote_allows
+Usage: bash tests/fm-teardown-pool.test.sh [test_function_name ...]
+exit=2
+
+# A mixed list with one foreign name is refused as a whole (validate-before-run)
+$ bash tests/fm-teardown-pool.test.sh test_reassigned_dirty_slot_retires_only_finished_task test_local_only_fork_remote_allows
+Unknown test case: test_local_only_fork_remote_allows
+Usage: bash tests/fm-teardown-pool.test.sh [test_function_name ...]
+exit=2
+

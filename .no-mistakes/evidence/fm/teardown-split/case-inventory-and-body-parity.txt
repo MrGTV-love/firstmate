@@ -1,0 +1,28 @@
+# Case inventory and function-body parity: base 4d1dc7d5 tests/fm-teardown.test.sh vs split groups at c6fb1d46
+# Method: each file was sourced by bash with an unknown case name; a shadowed exit() dumped
+# the registered teardown_test_cases array and 'declare -f' for every defined function.
+
+base registered cases:            333
+base unique cases:                333
+tests/fm-teardown.test.sh registered: 92
+tests/fm-teardown-pool.test.sh registered: 53
+tests/fm-teardown-cleanup.test.sh registered: 188
+union (with duplicates):          333
+union unique:                     333
+duplicates across groups:         0
+in base, missing from groups:     0
+in groups, not in base:           0
+
+tests/fm-teardown.test.sh keeps base registration order: yes
+tests/fm-teardown-pool.test.sh keeps base registration order: yes
+tests/fm-teardown-cleanup.test.sh keeps base registration order: yes
+
+base functions:                   521
+base functions missing in all groups: 0
+(function,group) pairs compared:  897
+pairs whose declare -f differs:   0
+
+functions defined in groups but not in base:
+
+case functions defined in a group but registered in another group (should be 0):
+(end)

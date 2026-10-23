@@ -1,0 +1,30 @@
+$ (after editing tests/fm-teardown-helpers.sh) bin/fm-test-run.sh --list --changed --base 38b9114d97ce2bf380583d51158a77ff7a09b1c2 | grep -E 'teardown' ; families:
+  tests/fm-teardown-cleanup.test.sh
+  tests/fm-teardown-pool.test.sh
+  tests/fm-teardown.test.sh
+  total selected: 24  exit=0
+
+$ (after editing tests/git-lock-helpers.sh) bin/fm-test-run.sh --list --changed --base 38b9114d97ce2bf380583d51158a77ff7a09b1c2 | grep -E 'teardown' ; families:
+  tests/fm-teardown-cleanup.test.sh
+  tests/fm-teardown-pool.test.sh
+  tests/fm-teardown.test.sh
+  total selected: 24  exit=0
+
+$ (after editing tests/fm-teardown-pool.test.sh) bin/fm-test-run.sh --list --changed --base 38b9114d97ce2bf380583d51158a77ff7a09b1c2 | grep -E 'teardown' ; families:
+  tests/fm-teardown-pool.test.sh
+  total selected: 1  exit=0
+
+$ (after editing tests/fm-teardown-cleanup.test.sh) bin/fm-test-run.sh --list --changed --base 38b9114d97ce2bf380583d51158a77ff7a09b1c2 | grep -E 'teardown' ; families:
+  tests/fm-teardown-cleanup.test.sh
+  total selected: 1  exit=0
+
+$ (after editing tests/fm-teardown.test.sh) bin/fm-test-run.sh --list --changed --base 38b9114d97ce2bf380583d51158a77ff7a09b1c2 | grep -E 'teardown' ; families:
+  tests/fm-teardown.test.sh
+  total selected: 1  exit=0
+
+$ (after editing bin/fm-teardown.sh) bin/fm-test-run.sh --list --changed --base 38b9114d97ce2bf380583d51158a77ff7a09b1c2 | grep -E 'teardown' ; families:
+  tests/fm-teardown-cleanup.test.sh
+  tests/fm-teardown-pool.test.sh
+  tests/fm-teardown.test.sh
+  total selected: 13  exit=0
+

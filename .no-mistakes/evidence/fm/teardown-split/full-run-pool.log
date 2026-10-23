@@ -1,0 +1,53 @@
+ok - a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally
+ok - an interrupted legacy pool teardown keeps its record through session start and its retry returns the slot once
+ok - a rolled-back legacy stamp leaves its return-pending record bound to the unstamped record
+ok - a failed return-pending record write refuses before any destruction and the retry returns the slot once
+ok - a stale directory at the return-pending path refuses before any destruction and the retry returns the slot once
+ok - an unreadable return-pending generation refuses before any destruction and the retry returns the slot once
+ok - an endpoint refusal after reservation keeps its record through session start and the retry returns the slot
+ok - a waited return that meets a project-lock error exits 1, not the contention exit
+ok - a closed task whose return stalled survives session start and the next sweep finishes it behind a queued waiter
+ok - a refusal before cleanup leaves the pool slot unreserved, and the clean retry still returns it
+ok - recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot
+ok - an unleased pool slot is reserved only when the installed Treehouse has a lease command, else project custody covers the return
+ok - an automatic teardown that has closed its endpoint waits for project custody and returns its slot
+ok - ordinary pool return preserves dirt and new commits produced while final project custody is queued
+ok - a lease command without durable state proof cannot reap processes or return the slot, even with authorized discard
+ok - every forced return checks registered copies without pool inventory, and recovery names the owning home
+ok - an uncanonicalizable return target reports an explicit refusal and preserves its record
+ok - a custody refusal at a non-pool child return keeps the child worktree and its parked copy
+ok - a custody refusal at a deferred child pool return keeps the slot, its claim and its parked copy
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+ok - a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records
+ok - a fresh allocation in the reservation window retires only the retiring record, preserving the new owner
+ok - a slot reassigned in the reservation window is proved again from the retiring record, never from the claimant copy
+ok - a fresh allocation in the enclosing-slot window leaves the claimant slot and the retiring copy untouched
+ok - a slot claim decides slot administration while the retiring copy decides runtime retirement, for every claimant and copy shape
+ok - teardown of a reassociated record keeps the non-pool current copy and every prior copy untouched
+ok - teardown of a reassociated record still refuses unlanded work in the current copy
+ok - teardown of a record whose old slot was released keeps the non-pool current copy
+ok - teardown refuses to return a pool slot another record preserves as a prior copy
+ok - own prior copies refuse only a pool return that cannot prove them landed; a prior that is or encloses the slot does not block it, with or without --force
+ok - the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot
+ok - returning the enclosing slot aborts its parked run and retires its launch agent before the return
+ok - shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work
+ok - a stale-lock cleanup in the enclosing slot proves it again before the reset, with or without --force
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands
+ok - a plain re-run of a landed local-only nested ship is recorded as landed, not dropped
+ok - a refusal at the slot proof, the retire step, either proof before removal or the return is safe to re-run with a plain teardown
+ok - a removed nested copy is judged by its own branch ref: unlanded refuses, content landed by squash passes
+ok - a removed nested copy whose branch is gone is settled by its recorded PR: merged finishes as landed, otherwise it refuses
+ok - the enclosing slot is measured at its own HEAD, not proven by the nested copy's pipeline-input record
+ok - a removed nested copy whose branch was the merged run's input is proven by the run record
+ok - an endpoint-refused retry keeps the reservation until closure and records the nested ship landed
+ok - the post-lock proof does not refuse over nested copies teardown itself already removed
+ok - other home and prior custody overlap refuses in both directions, another task's worktree only on an exact match, and siblings never
+ok - forced descendant admission preserves prior copies inside child worktrees and retiring homes before any cascade cleanup
+ok - tasktmp admission preserves both the current nested replacement and a nested prior copy before signalling
+ok - tasktmp admission counts all cross-home copy fields in both containment directions
+ok - secondmate retirement preserves original copy custody in this home and registered peer homes
+ok - recursive retirement admits locked copies, preserves reassigned external slots, and refuses overlapping home custody
+ok - forced retirement preserves reassociated non-pool copies and refuses their checkout or shared-storage destruction before mutation
+ok - home, worktree, and tasktmp roots preserve Git storage of every foreign copy field in local and peer homes
+ok - tasktmp protects external reassociated current and prior copies' Git storage before endpoint or copy mutation
+ok - ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage
