@@ -2456,18 +2456,48 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
-Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
+Claude's guard runs at the pre-tool boundary for every tool, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
-`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Bash|Write|Edit` only; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse`; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
 There is no legacy exemption, automatic compatibility, receipt backfill or automatic republication.
 Pre-receipt records and receipts for an older doorbell never gain the consistency exception.
 To enable the guard for an already-running legacy task, Main must manually reissue its pending messages through the existing current publisher and normal delivery, verify acknowledgement, and only then retire the old pending identity before an authorized fresh guarded launch.
 This is an operator-only migration, not an automated retrofit; isolated verification is not production activation.
+
+### Tool coverage and outbound calls
+
+[`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls and result screening.
+Unknown tool names are refused instead of silently skipping the guard; omp also checks its live `getAllTools()` registry before each call and refuses an unclassified or unavailable registry.
+The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry without submitting a model turn, and proves that adding an unclassified tool fails coverage.
+Optional host tools need not be installed for the offline regression; the installed-host portion explicitly skips when omp is absent.
+Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
+Other harnesses remain outside this guard integration.
+
+Native semantic `find`, web search, browser automation, subagent dispatch, provider-backed tools and opaque code execution require a task egress grant before execution.
+Remote read/search paths and outbound shell entry points, including `curl`, `wget`, `ssh`, `scp`, GitHub calls, remote git operations, package installs and endpoint arguments, are checked at the same boundary.
+The rule is deterministic and needs neither a model verdict nor a working provider credential.
+A refusal names the destination classes whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
+
+Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","github"]`.
+The recognized destination classes are `semantic-search`, `web`, `browser`, `remote-shell`, `github`, `package-registry`, `provider`, `subagent`, `dynamic-code`, `remote-storage` and `telemetry`.
+An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
+Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
+Every required class must be granted, and a grant never bypasses existing path, credential, shell or privacy checks.
+
+Each outbound-call decision adds exactly one terminal audit row with the tool, destination class and fixed argument-shape labels, never raw arguments, query text or destination addresses.
+A granted shell or write call carries those labels on its existing policy row rather than adding a second row; a native paid `find` records its deterministic decision even though it has no shell/write model classification.
+Local `read` remains pre-tool unjudged, `bash` keeps shell screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
+This table detects exposed entry points, not arbitrary network behavior hidden in scripts, executable replacements, shell expansion, local configuration or tool internals.
+Opaque native evaluators and inline general-purpose code require a `dynamic-code` grant because their effects are not statically knowable; granting that class authorizes that execution capability, not a confinement guarantee.
+Shell detection recognizes literal executable paths, quoted/escaped command names, common wrappers and shell command strings, but does not claim to interpret every shell grammar.
+
+### Model policy
 
 Questions and numeric policy are code-owned:
 

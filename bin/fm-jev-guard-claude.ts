@@ -20,7 +20,10 @@ async function main(): Promise<void> {
   // nothing and exits 0 instead of appending advisory context to the result.
   if (payload.hook_event_name !== "PreToolUse") return;
   if (typeof payload.tool_name !== "string") throw new Error("Invalid hook input.");
-  const tool = payload.tool_name.toLowerCase();
+  const nativeTool = payload.tool_name.toLowerCase();
+  const aliases: Readonly<Record<string, string>> = { websearch: "web_search", agent: "task", todowrite: "todo",
+    askuserquestion: "ask", notebookedit: "notebook", enterplanmode: "goal", exitplanmode: "goal", skill: "eval" };
+  const tool = Object.hasOwn(aliases, nativeTool) ? aliases[nativeTool] : nativeTool;
   // GuardHost still requires all three registrations; this adapter drives only tool_call.
   type Handlers = { tool_call: GuardCallHandler; tool_result: GuardResultHandler; before_agent_start: GuardPromptHandler };
   const handlers: Partial<Handlers> = {};
@@ -29,8 +32,8 @@ async function main(): Promise<void> {
   const input = object(payload.tool_input) ? payload.tool_input : {};
   const ctx = { cwd: typeof payload.cwd === "string" ? payload.cwd : worktree };
   const toolCallId = typeof payload.tool_use_id === "string" ? payload.tool_use_id : undefined;
-  const mapped = tool === "bash" ? { command: input.command }
-    : { path: input.file_path, content: input.content, new_string: input.new_string };
+  const mapped = tool === "write" || tool === "edit"
+    ? { path: input.file_path, content: input.content, new_string: input.new_string } : input;
   const handler = handlers.tool_call;
   if (!handler) throw new Error("Missing pre-tool handler.");
   const result = await handler({ toolName: tool, toolCallId, input: mapped }, ctx);

@@ -42,6 +42,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
 - `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
   It checks privacy before key lookup, over the whole payload for shell calls and results and over every model-screened piece for writes, plans overlapping pieces that each fit the request ceiling, and retains strict complete-cover planning for shell calls and results (`plan`).
   Its write-only planner, coverage audit and content-free producer-field exclusion audit follow the [operator contract](../../docs/configuration.md#jev-guard).
+  Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only destination classes and fixed argument-shape labels from the egress policy, never outbound arguments or destinations.
   A write checks its pieces one at a time, so a never-send value longer than about 1,000 JSON-escaped bytes can be cut across a piece boundary and reach the model only as fragments.
   It uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.
@@ -55,7 +56,8 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 
 ## Firstmate glue outside this directory
 
-- `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
+- `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic tool coverage, egress authorization and input/root/device checks before model screening.
+  `bin/fm-jev-egress.ts` owns the tool classifications and outbound-call detection; the operator contract above owns task grants and the detector's non-sandbox limits.
   It judges every planned piece with the unchanged level 6 policies; calls pass only when every planned piece passes, while result handling applies the explicit advisory and trusted-read rules below.
   Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
   Its host response handling preserves answered middle-band results with an advisory and audit row.
@@ -65,7 +67,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
-- `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
+- `bin/fm-jev-guard-claude.ts` normalizes native tool names, forwards actual input/call identity and maps pre-tool refusal to Claude denial; its retired post-tool event produces no output.
   Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
   Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.

@@ -98,11 +98,13 @@ export interface GuardServiceContext {
 
 export interface GuardTerminal {
   hook: "tool_call" | "tool_result";
-  tool: "bash" | "read" | "write" | "edit";
+  tool: string;
   decision: "allow" | "block" | "clear" | "flag" | "review" | "inactive";
   enforcement: "pretool_allow" | "pretool_deny" | "result_pass" | "omp_replace"
     | "claude_advisory_only" | "inactive_no_protection";
-  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read" | "read_only" | "lab";
+  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read" | "read_only" | "lab" | "egress" | "coverage";
+  /** Fixed destination classes and argument categories only; no outbound text or addresses. */
+  egress?: { destination_class: string; argv_shape: string }[];
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
   /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */
@@ -368,6 +370,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         usage: answered.length > 0 ? { input_tokens: sum(answered.map((r) => r.usage.input_tokens)), output_tokens: sum(answered.map((r) => r.usage.output_tokens)) } : null,
         cost,
         chunks, planned_chunks: plannedChunks, answers,
+        ...(terminal.egress ? { egress: terminal.egress } : {}),
         ...(terminal.producer_fields ? { producer_fields: terminal.producer_fields } : {}),
         ...(terminal.write_coverage ? { write_coverage: terminal.write_coverage,
           ...(terminal.write_coverage.local_only_bytes > 0 ? { note: "unscreened remainder: deterministic local rules only" } : {}) } : {}),
