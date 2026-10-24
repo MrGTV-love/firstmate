@@ -6,7 +6,10 @@ import { dirname, resolve } from "node:path";
 export type DestinationClass = "semantic-search" | "web" | "browser" | "remote-shell" | "github"
   | "package-registry" | "provider" | "subagent" | "dynamic-code" | "remote-storage" | "telemetry";
 export interface EgressShape { destination_class: DestinationClass; argv_shape: string }
-type ToolPolicy = { call: "shell" | "write" | "edit" | "local" | "paths" | DestinationClass; result: "screen" | "unjudged" };
+type ToolPolicy = { result: "screen" | "unjudged" } & (
+  { call: "confinement"; confinement_owner: "T5" }
+  | { call: "shell" | "write" | "edit" | "local" | "paths" | DestinationClass; confinement_owner?: never }
+);
 
 // One coverage owner for native tools and extension tools exposed as xd devices.
 // "local" is an explicit unjudged classification, not an egress permission.
@@ -22,7 +25,9 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   webfetch: { call: "web", result: "unjudged" },
   browser: { call: "browser", result: "unjudged" },
   computer: { call: "browser", result: "unjudged" },
-  eval: { call: "dynamic-code", result: "unjudged" },
+  // T4 records ownership; T5 enforces writes at process launch, not by parsing code here.
+  eval: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  "xd://report_issue": { call: "telemetry", result: "unjudged" },
   python: { call: "dynamic-code", result: "unjudged" },
   task: { call: "subagent", result: "unjudged" },
   generate_image: { call: "provider", result: "unjudged" },
@@ -45,10 +50,59 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   ask: { call: "local", result: "unjudged" },
   todo: { call: "local", result: "unjudged" },
   wait: { call: "local", result: "unjudged" },
+  // Claude built-ins, lower-cased at the adapter boundary. Unknown extensions/MCP
+  // names still fail coverage; these rows classify capabilities, not trusted tools.
+  agent: { call: "subagent", result: "unjudged" },
+  artifact: { call: "provider", result: "unjudged" },
+  askuserquestion: { call: "local", result: "unjudged" },
+  croncreate: { call: "local", result: "unjudged" },
+  crondelete: { call: "local", result: "unjudged" },
+  cronlist: { call: "local", result: "unjudged" },
+  endconversation: { call: "local", result: "unjudged" },
+  enterplanmode: { call: "local", result: "unjudged" },
+  exitplanmode: { call: "local", result: "unjudged" },
+  enterworktree: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  exitworktree: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  listagents: { call: "remote-storage", result: "unjudged" },
+  listmcpresourcestool: { call: "remote-storage", result: "unjudged" },
+  monitor: { call: "dynamic-code", result: "unjudged" },
+  multiedit: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  notebookedit: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  powershell: { call: "dynamic-code", result: "unjudged" },
+  pushnotification: { call: "provider", result: "unjudged" },
+  readmcpresourcetool: { call: "remote-storage", result: "unjudged" },
+  remotetrigger: { call: "provider", result: "unjudged" },
+  reportfindings: { call: "local", result: "unjudged" },
+  schedulewakeup: { call: "local", result: "unjudged" },
+  sendfeedback: { call: "local", result: "unjudged" },
+  sendmessage: { call: "subagent", result: "unjudged" },
+  senduserfile: { call: "provider", result: "unjudged" },
+  shareonboardingguide: { call: "provider", result: "unjudged" },
+  skill: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  subagenthandback: { call: "subagent", result: "unjudged" },
+  taskcreate: { call: "local", result: "unjudged" },
+  taskget: { call: "local", result: "unjudged" },
+  tasklist: { call: "local", result: "unjudged" },
+  taskoutput: { call: "local", result: "unjudged" },
+  taskstop: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  taskupdate: { call: "local", result: "unjudged" },
+  todowrite: { call: "local", result: "unjudged" },
+  toolsearch: { call: "local", result: "unjudged" },
+  waitformcpservers: { call: "remote-storage", result: "unjudged" },
+  workflow: { call: "subagent", result: "unjudged" },
+  websearch: { call: "web", result: "unjudged" },
 });
 
 export function toolPolicy(name: string): ToolPolicy | undefined {
   return Object.hasOwn(TOOL_POLICY, name) ? TOOL_POLICY[name] : undefined;
+}
+/** A device exposed through write is still a tool invocation, not a file write. */
+export function callPolicy(tool: string, input: unknown): ToolPolicy | undefined {
+  if (tool === "write" && object(input) && typeof input.path === "string" && input.path.startsWith("xd://")) {
+    const device = toolPolicy(input.path);
+    if (device) return device;
+  }
+  return toolPolicy(tool);
 }
 export function uncoveredTools(names: readonly string[]): string[] {
   return [...new Set(names.filter((name) => !toolPolicy(name)))].sort();
@@ -159,8 +213,11 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 
 export function callEgress(tool: string, input: unknown): EgressShape[] {
-  const policy = toolPolicy(tool);
+  const policy = callPolicy(tool, input);
   if (!policy) return [];
+  if (policy.call === "confinement") return [];
+  if (tool === "write" && object(input) && typeof input.path === "string" && input.path.startsWith("xd://")
+    && destinationClass(policy.call)) return [{ destination_class: policy.call, argv_shape: "path" }];
   const args = object(input) ? input : {};
   if (policy.call === "shell") return typeof args.command === "string" ? shellEgress(args.command) : [];
   if (policy.call === "paths" || policy.call === "write" || policy.call === "edit") {
@@ -175,11 +232,8 @@ export function callEgress(tool: string, input: unknown): EgressShape[] {
         else if (/^mcp:\/\//i.test(path)) destination_class = "remote-storage";
         else if (tool === "write" && path.startsWith("xd://")) {
           const device = path.slice(5);
-          if (device === "report_issue") destination_class = "telemetry";
-          else {
-            const devicePolicy = toolPolicy(device);
-            if (devicePolicy && destinationClass(devicePolicy.call)) destination_class = devicePolicy.call;
-          }
+          const devicePolicy = toolPolicy(device);
+          if (devicePolicy && destinationClass(devicePolicy.call)) destination_class = devicePolicy.call;
         }
         if (destination_class && !shapes.some((s) => s.destination_class === destination_class)) shapes.push({ destination_class, argv_shape: "path" });
       }

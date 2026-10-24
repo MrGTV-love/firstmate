@@ -169,8 +169,37 @@ assert.equal(blocked.decision, 'block');
 assert.equal(blocked.attempts, 6);
 assert.equal(blocked.cost.incomplete, true);
 });
-// S2(a,b): the previously invisible native paid search is decided at the tool boundary.
-await test('S2(a,b): paid find requires a task grant and records exactly one content-free decision', async () => {
+await test('T4(a): telemetry upload requires its own grant and never logs the report body', async () => {
+  const event = { toolName: 'write', input: { path: 'xd://report_issue', content: 'private-report-canary' } };
+  let patch;
+  const denied = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
+  assert.equal(patch?.block, true);
+  assert.equal(denied.branch, 'egress');
+  assert.deepEqual(denied.egress, [{ destination_class: 'telemetry', argv_shape: 'path' }]);
+  writeFileSync(`${state}/audit.meta`, 'egress=["telemetry"]\n');
+  try {
+    const admitted = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
+    assert.equal(patch, undefined, 'the table, not a filesystem exception, owns telemetry dispatch');
+    assert.equal(admitted.decision, 'allow');
+    assert.equal(admitted.request_started, false);
+    assert.ok(!JSON.stringify(admitted).includes('private-report-canary'));
+  } finally { rmSync(`${state}/audit.meta`); }
+});
+await test('T4(c): eval explicitly records T5 as the write-boundary owner, not an egress permission', async () => {
+  const { toolPolicy, callEgress } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
+  assert.equal(toolPolicy('eval')?.call, 'confinement');
+  assert.equal(toolPolicy('eval')?.confinement_owner, 'T5');
+  assert.deepEqual(callEgress('eval', { language: 'py', code: 'print("private-eval-canary")' }), []);
+  const r = await fresh(async () => {
+    assert.equal(await handlers.tool_call({ toolName: 'eval', input: { language: 'py', code: 'print("private-eval-canary")' } }, { cwd: state }), undefined);
+  });
+  assert.equal(r.branch, 'confinement');
+  assert.equal(r.confinement_owner, 'T5');
+  assert.equal(r.request_started, false);
+  assert.ok(!JSON.stringify(r).includes('private-eval-canary'));
+});
+// T4(b): the previously invisible native paid search is decided at the tool boundary.
+await test('T4(b): paid find requires a task grant and records exactly one content-free decision', async () => {
   const event = { toolName: 'find', input: { query: 'private-query-canary', endpoint: 'https://paid-provider.invalid/search' } };
   let patch;
   let r = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
@@ -190,7 +219,7 @@ await test('S2(a,b): paid find requires a task grant and records exactly one con
     assert.ok(!JSON.stringify(r).includes('paid-provider.invalid'));
   } finally { rmSync(`${state}/audit.meta`); }
 });
-await test('S2(c): an installed tool absent from the policy table is rejected, not silently ignored', async () => {
+await test('T4(d): an installed tool absent from the policy table is rejected, not silently ignored', async () => {
   const { uncoveredTools } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
   assert.deepEqual(uncoveredTools(['read', 'bash', 'write', 'edit', 'find']), []);
   assert.deepEqual(uncoveredTools(['read', 'new-paid-host-tool']), ['new-paid-host-tool']);
@@ -198,6 +227,25 @@ await test('S2(c): an installed tool absent from the policy table is rejected, n
   const r = await fresh(async () => { patch = await handlers.tool_call({ toolName: 'new-paid-host-tool', input: {} }, { cwd: state }); });
   assert.equal(patch?.block, true);
   assert.equal(r.branch, 'coverage');
+});
+await test('T4(d): Claude built-in inventory is classified and an added tool fails coverage', async () => {
+  // Public host tool reference, retrieved 2026-10-24:
+  // https://code.claude.com/docs/en/tools-reference
+  const native = ['Agent', 'Artifact', 'AskUserQuestion', 'Bash', 'CronCreate', 'CronDelete', 'CronList',
+    'Edit', 'EndConversation', 'EnterPlanMode', 'EnterWorktree', 'ExitPlanMode', 'ExitWorktree',
+    'Glob', 'Grep', 'ListAgents', 'ListMcpResourcesTool', 'LSP', 'Monitor', 'NotebookEdit', 'PowerShell',
+    'PushNotification', 'Read', 'ReadMcpResourceTool', 'RemoteTrigger', 'ReportFindings', 'ScheduleWakeup',
+    'SendFeedback', 'SendMessage', 'SendUserFile', 'ShareOnboardingGuide', 'Skill', 'SubagentHandback',
+    'TaskCreate', 'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop', 'TaskUpdate', 'TodoWrite', 'ToolSearch',
+    'WaitForMcpServers', 'WebFetch', 'WebSearch', 'Workflow', 'Write', 'MultiEdit'];
+  const { uncoveredTools } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
+  assert.deepEqual(uncoveredTools(native.map(name => name.toLowerCase())), []);
+  assert.deepEqual(uncoveredTools([...native, 'NewHostTool'].map(name => name.toLowerCase())), ['newhosttool']);
+  const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
+  const output = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', adapter,
+    state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION],
+    { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'NewHostTool', tool_input: {}, cwd: state }), encoding: 'utf8' });
+  assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny');
 });
 await test('live registry drift and unavailable inventory refuse even a known local tool', async () => {
   for (const getAllTools of [() => [{ name: 'read' }, { name: 'new-paid-host-tool' }], () => { throw new Error('fixture inventory unavailable'); }]) {
@@ -282,7 +330,8 @@ await test('S2(d): local read and bash stay unjudged, write/edit keep credential
   assert.equal(rowCount(), before, 'a local read or shell call has no pre-tool model classification');
   for (const tool of ['write', 'edit']) {
     parts = [answer()]; next = 0;
-    const input = { path: 'file.ts', content: 'fixture', new_string: 'fixture' };
+    // A plain filename matching a tool must remain a file write, not device dispatch.
+    const input = { path: 'find', content: 'fixture', new_string: 'fixture' };
     let patch;
     const r = await fresh(async () => { patch = await handlers.tool_call({ toolName: tool, input }, { cwd: state }); });
     assert.equal(patch, undefined);
