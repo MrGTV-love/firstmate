@@ -2470,7 +2470,7 @@ Questions and numeric policy are code-owned:
 - Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
 omp and Claude tool results reach the worker unchanged: the guard installs no result handler, makes no TypeSafe request for results, and writes no `tool_result` audit rows.
 There is no result size budget or result-dependent read exemption.
-Launch and steering records use the existing [launch publisher](../bin/fm-operational-input.sh) and [steering-inbox owner](../bin/fm-task-inbox-lib.sh); their publication, delivery and acknowledgement contracts are unchanged.
+Launch and steering records use the existing [launch publisher](../bin/fm-operational-input.sh) and [steering-inbox owner](../bin/fm-task-inbox-lib.sh); they publish only the record bytes, with no guard receipt, and their delivery and acknowledgement contracts are unchanged.
 [`tests/fm-jev-guard-producer.test.sh`](../tests/fm-jev-guard-producer.test.sh) covers unchanged background notices, recorded bounded-wait help, launch/steering records and result-free session accounting offline.
 
 The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.

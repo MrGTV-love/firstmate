@@ -1774,7 +1774,7 @@ tmux has no agy identity probe, so an agy pane on tmux still reads `unknown`; th
 ## Steering-inbox doorbell
 
 On 2026-08-23, real workers followed the then-current drain-all doorbell on every installed verified harness, using tmux 3.6a, macOS arm64 and an isolated private socket, driving `bin/fm-send.sh` end to end with one mid-wait re-ring playing the watcher's role.
-That observation predates the current record-specific [inbox contract](../../bin/fm-task-inbox-lib.sh); it does not establish ordered per-record delivery or guard consistency admission.
+That observation predates the current record-specific [inbox contract](../../bin/fm-task-inbox-lib.sh); it does not establish ordered per-record delivery.
 
 ```sh
 FM_SEND_INBOX_LIVE_E2E=1 tests/fm-send-inbox-doorbell-live-e2e.test.sh

@@ -27,6 +27,7 @@ const server = createServer((req, res) => {
     appendFileSync(log, JSON.stringify({ path: req.url, auth: req.headers.authorization, body }) + '\n');
     const request = JSON.parse(body);
     const text = JSON.stringify(request.state);
+    if (text.includes('socket-reset')) { req.socket.destroy(); return; }
     if (text.includes('fail500') || text.includes('http402')) { res.statusCode = text.includes('http402') ? 402 : 500; res.end('{}'); return; }
     if (text.includes('flaky-once') && !seen.has(text)) { seen.add(text); res.statusCode = 500; res.end('{}'); return; }
     if (text.includes('stall-direct')) return;
@@ -391,11 +392,27 @@ const beforeInactive = requests();
 assert.equal(await inactive.tool_call({ toolName: 'bash', input: { command: 'rm -rf fixture' } }, ctx), undefined);
 assert.equal(requests(), beforeInactive);
 assert.equal((await inactive.tool_call({ toolName: 'write', input: { path: '/etc/hosts', content: 'fixture' } }, ctx)).block, true);
+const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const sent = () => requests().trim().split('\n').filter(Boolean).length;
+const beforeReset = sent();
+const reset = await handlers.tool_call({ toolName: 'bash', input: { command: 'deploy socket-reset' } }, ctx);
+assert.equal(reset.block, true, 'a network failure on every try requires review');
+assert.equal(row().error_type, 'TypeError');
+assert.equal(row().request_started, true);
+assert.equal(row().attempts, 3);
+assert.equal(sent(), beforeReset + 3, 'a network TypeError is retried within the try budget');
+for (const toolName of ['write', 'edit']) {
+  const path = '/etc/guard-refused';
+  const refused = await handlers.tool_call({ toolName, input: { path, content: 'x', new_string: 'x' } }, ctx);
+  assert.equal(refused.block, true);
+  assert.ok(refused.reason.includes(`Refused path: ${JSON.stringify(path)}`));
+  assert.equal(row().refused_path, path);
+}
 console.log('pretool-policy-ok');
 JS
 ) || fail "pre-tool/audit policy: $out"
   [ "$out" = pretool-policy-ok ] || fail "unexpected pre-tool policy output: $out"
-  pass "pre-tool complete credential tails, audit failure and inactive independence"
+  pass "pre-tool complete credential tails, audit failure, inactive independence, network TypeError retry and refused write/edit path"
 }
 test_claude_node_pretool() {
   local out
