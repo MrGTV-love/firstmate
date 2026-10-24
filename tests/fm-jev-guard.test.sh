@@ -1420,7 +1420,7 @@ const claude = async (command, cwd = worktree) => {
 const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
 const requestRows = () => requests().trim().split('\n').filter(Boolean).map(JSON.parse);
 const auditRows = () => readFileSync(auditPath, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
-const publish = () => execFileSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
+const publish = paths => execFileSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion', '--replace', ...paths], {
   env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_DATA_OVERRIDE: `${home}/data` }, encoding: 'utf8',
 });
 for (const call of [omp, claude]) {
@@ -1433,12 +1433,32 @@ const preparedDigest = execFileSync(process.execPath, ['--experimental-strip-typ
   'prepare', state, 'deletion', worktree, `${data}/brief.md`], { encoding: 'utf8' }).trim();
 writeFileSync(metaPath, `worktree=${worktree}\njev_deletions_sha256=${preparedDigest}\n`);
 assert.equal(await omp('rm -rf listed.txt'), false, 'initial spawn list is consumed');
+// A worker can edit its own brief, but that must not authorize live additions.
+publish(['listed.txt']);
+writeFileSync(`${data}/brief.md`, brief(['listed.txt', 'unlisted.txt']));
+publish(['listed.txt', 'nested/listed.txt']);
+const workerBriefResults = [];
+for (const [host, call] of [['omp', omp], ['claude', claude]]) {
+  workerBriefResults.push([host, await call('rm -rf unlisted.txt')]);
+}
+assert.deepEqual(workerBriefResults, [['omp', true], ['claude', true]], 'worker-edited brief must not supply live authorization');
+assert.deepEqual(JSON.parse(readFileSync(listPath, 'utf8')).paths, ['listed.txt', 'nested/listed.txt']);
+// Only Firstmate naming that extra path admits it, on both hosts.
+publish(['listed.txt', 'unlisted.txt']);
+for (const [host, call] of [['omp', omp], ['claude', claude]]) {
+  restore();
+  const before = requests();
+  assert.equal(await call('rm -rf unlisted.txt'), false, `${host}: explicit Firstmate operand authorizes the extra path`);
+  assert.equal(requests(), before);
+  execFileSync('/bin/sh', ['-c', 'rm -rf unlisted.txt'], { cwd: worktree });
+  assert.equal(existsSync(`${worktree}/unlisted.txt`), false);
+}
+restore();
 // The live publisher replaces the list; the existing omp handler must reread it.
-writeFileSync(`${data}/brief.md`, brief(['nested/listed.txt']));
-publish();
+publish(['nested/listed.txt']);
 for (const call of [omp, claude]) assert.equal(await call('rm -rf listed.txt'), true, 'revoked path must not stay cached');
-writeFileSync(`${data}/brief.md`, brief(listed));
-publish();
+writeFileSync(`${data}/brief.md`, '# Task\nWorker changed this to malformed declaration text.\n## Authorized deletions\nnot JSON\n');
+publish(listed);
 const originalList = readFileSync(listPath);
 const originalMeta = readFileSync(metaPath);
 const digest = createHash('sha256').update(originalList).digest('hex');
@@ -1548,17 +1568,23 @@ for (const [field, input] of [['cwd', { command: 'rm -f listed.txt', cwd: home }
   assert.ok(judged.every(row => JSON.parse(row.body).state.command === 'rm -f listed.txt'));
   assert.equal(auditRows().length, count, `omp ${field} input must not consume the allowance`);
 }
-// A malformed declaration cannot publish a new digest or silently broaden it.
-writeFileSync(`${data}/brief.md`, brief(['../outside.txt']));
-const bad = spawnSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
+// Invalid explicit paths cannot publish a new digest or silently broaden it.
+const bad = spawnSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion', '--replace', '../outside.txt'], {
   env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_DATA_OVERRIDE: `${home}/data` }, encoding: 'utf8',
 });
 assert.notEqual(bad.status, 0);
 assert.deepEqual(readFileSync(metaPath), originalMeta);
 assert.deepEqual(readFileSync(listPath), originalList);
-writeFileSync(`${data}/brief.md`, '# Task\nNo deletion list.\n');
-publish();
-for (const call of [omp, claude]) assert.equal(await call('rm -rf listed.txt'), true, 'empty publication revokes all');
+// No implicit brief-reading invocation remains; rejection preserves authorization.
+const legacy = spawnSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
+  env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state }, encoding: 'utf8',
+});
+assert.notEqual(legacy.status, 0);
+assert.deepEqual(readFileSync(metaPath), originalMeta);
+assert.deepEqual(readFileSync(listPath), originalList);
+unlinkSync(`${data}/brief.md`);
+publish([]);
+for (const call of [omp, claude]) assert.equal(await call('rm -rf listed.txt'), true, 'explicit empty replacement revokes all without a brief');
 console.log('authorized-deletions-ok');
 JS
 ) || fail "authorized deletions: $out"
