@@ -407,6 +407,64 @@ def reaped_between_samples():
         child.wait()
 case('reaped_child_cpu_between_observations_prevents_false_idle_then_true_idle_is_detected', reaped_between_samples)
 
+def darwin_root_native_failure():
+    import contextlib
+    import io
+    from unittest.mock import patch
+
+    home, _ = fixture('darwin-root-native-failure')
+    spec = importlib.util.spec_from_file_location('root_native_duration', home / 'bin/fm-duration.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    record = home / 'state/progress.json'
+    # Inject Darwin accounting portably: ps lacks the root's waited-child CPU,
+    # while a non-root native read may fail and retain its complete ps counter.
+    table = {100: (1, 0.0, ('root-start',), False),
+             101: (100, 1.0, ('child-start',), False)}
+    native_root = 2.0
+    now = 10.0
+    def native(pid):
+        return native_root if pid == 100 else None
+    def check():
+        errors = io.StringIO()
+        with contextlib.redirect_stderr(errors):
+            code = module.main()
+        return code, errors.getvalue()
+
+    with patch.object(module, 'proc_table', return_value=None), \
+         patch.object(module, 'ps_table', return_value=table), \
+         patch.object(module, 'darwin_cpu_reader', return_value=native), \
+         patch.object(sys, 'platform', 'darwin'), \
+         patch.object(sys, 'argv', ['fm-duration.py', 'progress-check', str(record), '100', '1']), \
+         patch.object(time, 'monotonic', side_effect=lambda: now):
+        require(check()[0] == 0, 'first complete sample must not stop work')
+        saved = record.read_bytes()
+        now = 12.0
+        native_root = None
+        code, errors = check()
+        require(code == 0 and 'cpu_telemetry_unavailable:' in errors,
+                f'unreadable native root was treated as idle: {code} {errors}')
+        require(record.read_bytes() == saved, 'root-blind observation replaced complete evidence')
+        # No prior record is also blind, not a complete baseline for a later stop.
+        record.unlink()
+        code, errors = check()
+        require(code == 0 and not record.exists() and 'cpu_telemetry_unavailable:' in errors,
+                f'first root-blind observation published idle evidence: {code} {errors}')
+        native_root = 2.0
+        require(check()[0] == 0, 'restored telemetry must start with a complete baseline')
+        # Non-root native failure must still use growing ps CPU, not go blind
+        # and not lose that progress. The following complete idle sample stops.
+        now = 14.0
+        table[101] = (100, 2.0, ('child-start',), False)
+        code, errors = check()
+        require(code == 0 and not errors,
+                f'non-root ps CPU progress was discarded: {code} {errors}')
+        now = 16.0
+        code, errors = check()
+        require(code == 124 and 'no_progress:' in errors and 'cpu_telemetry_unavailable:' not in errors,
+                f'complete truly idle tree was not stopped: {code} {errors}')
+case('darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle', darwin_root_native_failure)
+
 def unavailable_ctypes():
     home, env = fixture('unavailable-ctypes')
     modules = home / 'modules'
