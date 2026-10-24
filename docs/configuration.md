@@ -2525,10 +2525,11 @@ A legacy host tool absent from the current host references, such as Claude `Mult
 `report_issue` and Claude `SendFeedback` upload reports, so they must never receive a `TOOL_POLICY` row and are refused under every grant; every other unclassified tool gets a row classified by its real effect.
 A coverage refusal names the refused host tool and states that no call was made.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
-Claude `Monitor` and `PowerShell` run commands outside the screened `bash` path and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
+Claude `Monitor` and `PowerShell` run commands outside the `bash` tool and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
 The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the existing plain-path guard.
 Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, timing and a session of the task id joined to the decided tool name or destination class, so an allow of another tool or class never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
-The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision emits no Firstmate event.
+The egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
+The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.
 
 ### Model policy
 

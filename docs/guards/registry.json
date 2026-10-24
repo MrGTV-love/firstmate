@@ -765,7 +765,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "bin/fm-spawn.sh refuses an omp worker launch when .omp/fm-worker-overlay.yml is missing",
-      "telemetry_note": "not instrumented: omp refuses inside its own tool, so no Firstmate code observes the decision"
+      "telemetry_note": "not instrumented: this decision is omp's, not Firstmate's, and is visible only in the worker transcript; docs/guard-spec.md Rule 8 applies to Firstmate decision points"
     }
   ],
   "excluded": [

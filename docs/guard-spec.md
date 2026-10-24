@@ -68,7 +68,7 @@ because the captain or the runtime creates them per home.
 7. **Wiring is tested.** Every owner path, test path, and hook registration
    resolves to an existing file; `bin/fm-guard-refcheck.sh` fails the build when
    one does not.
-8. **Every guard emits one event per decision.** An instrumented guard that
+8. **Every Firstmate guard decision point emits one event per decision.** An instrumented guard that
    emits no event, or that never fires across 30 real opportunities, enters the
    cut list at the next threshold. A guard is not exempt because it was hard to
    write.

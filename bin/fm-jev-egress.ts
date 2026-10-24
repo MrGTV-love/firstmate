@@ -102,18 +102,21 @@ function destinationClass(value: string): value is DestinationClass {
   return Object.hasOwn(classes, value);
 }
 
-/** Missing grants deny; malformed, duplicate, unreadable or symlinked records never grant. */
-export function egressGranted(state: string, task: string, destination: DestinationClass): boolean {
+/** Missing grants deny; sourceOk records readability, not authorization validity. */
+export function egressGranted(state: string, task: string, destination: DestinationClass): { granted: boolean; sourceOk: boolean } {
+  let sourceOk = false;
   try {
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(task)) return false;
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(task)) return { granted: false, sourceOk };
     const path = resolve(state, `${task}.meta`);
-    if (!lstatSync(path).isFile()) return false;
-    const entries = readFileSync(path, "utf8").split("\n").filter((line) => line.startsWith("egress="));
-    if (entries.length !== 1) return false;
+    if (!lstatSync(path).isFile()) return { granted: false, sourceOk };
+    const content = readFileSync(path, "utf8");
+    sourceOk = true;
+    const entries = content.split("\n").filter((line) => line.startsWith("egress="));
+    if (entries.length !== 1) return { granted: false, sourceOk };
     const grant: unknown = JSON.parse(entries[0].slice("egress=".length));
-    if (!Array.isArray(grant) || !grant.every((entry: unknown) => typeof entry === "string" && destinationClass(entry))) return false;
-    return grant.includes(destination);
-  } catch { return false; }
+    if (!Array.isArray(grant) || !grant.every((entry: unknown) => typeof entry === "string" && destinationClass(entry))) return { granted: false, sourceOk };
+    return { granted: grant.includes(destination), sourceOk };
+  } catch { return { granted: false, sourceOk }; }
 }
 
 export function egressClass(tool: string): DestinationClass | undefined {

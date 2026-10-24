@@ -337,23 +337,31 @@ await test('M4: each coverage and egress decision emits one content-free central
     const before = events().length;
     await handlers.tool_call(event, { cwd: state });
     const added = events().slice(before);
-    assert.deepEqual(added.map(e => [e.guard, e.decision, e.session]), expected, event.toolName);
+    assert.deepEqual(added.map(e => [e.guard, e.decision, e.session, e.source_ok]), expected, event.toolName);
     for (const e of added) {
       assert.deepEqual(Object.keys(e).sort(), ['cleared_by', 'decision', 'elapsed_ms', 'guard', 'override', 'repeat', 'session', 'source_ok', 'system', 'ts', 'version']);
       assert.equal(e.system, 'firstmate');
-      assert.equal(e.source_ok, true);
       assert.ok(Number.isInteger(e.elapsed_ms));
       assert.ok(!JSON.stringify(e).includes('private-event-canary'), 'events carry no call content');
     }
   };
-  await decide({ toolName: 'read', input: { path: 'private-event-canary' } }, [['jev-tool-coverage', 'allow', 'audit:read']]);
-  await decide({ toolName: 'new-paid-host-tool', input: { q: 'private-event-canary' } }, [['jev-tool-coverage', 'deny', 'audit:new-paid-host-tool']]);
-  await decide({ toolName: 'find', input: { query: 'private-event-canary' } },
-    [['jev-tool-coverage', 'allow', 'audit:find'], ['jev-egress-grant', 'deny', 'audit:semantic-search']]);
+  await decide({ toolName: 'read', input: { path: 'private-event-canary' } }, [['jev-tool-coverage', 'allow', 'audit:read', true]]);
+  await decide({ toolName: 'new-paid-host-tool', input: { q: 'private-event-canary' } }, [['jev-tool-coverage', 'deny', 'audit:new-paid-host-tool', true]]);
+  const find = { toolName: 'find', input: { query: 'private-event-canary' } };
+  const denied = sourceOk => [['jev-tool-coverage', 'allow', 'audit:find', true], ['jev-egress-grant', 'deny', 'audit:semantic-search', sourceOk]];
+  await decide(find, denied(false)); // Missing record is not a readable authorization source.
+  for (const meta of ['project=firstmate\n', 'egress=["web"]\n', 'egress=invalid-json\n']) {
+    writeFileSync(`${state}/audit.meta`, meta);
+    try { await decide(find, denied(true)); }
+    finally { rmSync(`${state}/audit.meta`); }
+  }
+  mkdirSync(`${state}/audit.meta`);
+  try { await decide(find, denied(false)); }
+  finally { rmSync(`${state}/audit.meta`, { recursive: true }); }
   writeFileSync(`${state}/audit.meta`, 'egress=["semantic-search"]\n');
   try {
-    await decide({ toolName: 'find', input: { query: 'private-event-canary' } },
-      [['jev-tool-coverage', 'allow', 'audit:find'], ['jev-egress-grant', 'allow', 'audit:semantic-search']]);
+    await decide(find,
+      [['jev-tool-coverage', 'allow', 'audit:find', true], ['jev-egress-grant', 'allow', 'audit:semantic-search', true]]);
   } finally { rmSync(`${state}/audit.meta`); }
 });
 await test('M4: an unrelated allow never clears a later deny in the real metrics reader', async () => {
