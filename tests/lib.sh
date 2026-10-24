@@ -97,6 +97,13 @@ unset FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
 # against an ambient override sets TASKS_AXI_FILE itself.
 unset TASKS_AXI_FILE TASKS_AXI_BACKEND
 
+# Clear the arm's confirmation override an operator shell may export. It sets
+# the arm's post-cycle successor window and startup no-progress interval and the
+# Claude Stop hook's successor notice window, so an inherited value (60 on one
+# operator host) silently stretches every arm fixture past its assertion
+# deadline. A case that verifies the override sets it itself.
+unset FM_ARM_CONFIRM_TIMEOUT
+
 # Write the tracked default backlog configuration into a fixture home. Never copy
 # "$ROOT/.tasks.toml": an operator's primary checkout keeps a gitignored override
 # there (for example a beads backend at its live backlog), so a copy points the

@@ -12,16 +12,10 @@ EXT="$ROOT/.pi/extensions/fm-primary-pi-watch.ts"
 # unrelated to plugin output, which the assertions intentionally require empty.
 export NODE_NO_WARNINGS=1
 
-# One owner for the readiness budget every unready-successor test below spends
-# on purpose. Both plugins start a successor arm through a login shell and
-# SIGTERM it when it stays silent past this budget, so the budget has to outlast
-# a cold login-shell start. A successor killed before its first statement never
-# appends its arm row and never installs the TERM trap these tests observe, so
-# too small a budget reports a lost successor instead of the bounded recovery
-# under test. A stock login shell already costs about 200ms on an idle
-# workstation, and a loaded CI runner is slower, so keep an order of magnitude
-# over that rather than a value that only holds locally. The wait loops in those
-# tests are sized against this number.
+# The Pi/OpenCode readiness notice window for these tests: a wake waits this long
+# for its successor to report, then goes out with a still-starting line. The
+# successor is never stopped for it. The *_slow_successor_does_not_hold_the_wake
+# tests start their successor later than this window.
 ARM_READY_TIMEOUT_MS=2000
 
 install_pi_watch_extension_fixture() {
@@ -2820,6 +2814,7 @@ if [ "$count" -eq 1 ]; then
   printf 'signal: synthetic wake\n'
   exit 0
 fi
+printf 'watcher: FAILED - synthetic startup failure\n'
 trap 'exit 0' TERM INT
 while :; do sleep 0.02; done
 SH
@@ -2848,8 +2843,8 @@ writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 await tool.execute("tool-call-hung-successor", {}, undefined, undefined, {});
-// Three unready successors each cost the full readiness budget, so wait well
-// past their sum. The wait ends as soon as the wake lands.
+// Each successor reports its own startup failure, so restoration fails fast.
+// The wait ends as soon as the wake lands.
 for (let i = 0; i < 1500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
@@ -2866,7 +2861,7 @@ if (stableRows.length !== 4) throw new Error(`single-flight recovery launched ${
 EOF
 )
   status=$?
-  expect_code 0 "$status" "Pi must deliver the actionable wake after bounded hung-successor recovery"
+  expect_code 0 "$status" "Pi must deliver the actionable wake after bounded failed-successor recovery"
   [ -z "$out" ] || fail "Pi hung-successor test printed output: $out"
   pass "Pi hung successor falls back to one typed actionable wake"
 }
@@ -2895,6 +2890,7 @@ if [ "$count" -eq 0 ]; then
 fi
 trap '' TERM INT
 printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: FAILED - synthetic startup failure\n'
 while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.1; done
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
@@ -2967,6 +2963,7 @@ fi
 if [ "$count" -eq 2 ]; then
   trap 'printf "retired\\n" > "${FM_UNRETIRED_RETIRE_FILE:?}"' TERM INT
   printf 'ready\n' > "${FM_UNRETIRED_READY_FILE:?}"
+  printf 'watcher: FAILED - synthetic startup failure\n'
   while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.02; done
   [ "$FM_LATE_KIND" = actionable ] && printf 'signal: late wake\n'
   exit 0
@@ -3041,6 +3038,305 @@ EOF
     [ -z "$out" ] || fail "Pi late-$kind test printed output: $out"
   done
   pass "Pi late unretired closes resume classified supervision"
+}
+
+# The arm owns startup no-progress detection: a successor that starts later than
+# the readiness notice window does not hold the wake, which goes out saying it is
+# still starting, and the successor is left running until it reports.
+test_pi_slow_successor_does_not_hold_the_wake() {
+  local repo home plugin log retired startedfile stop out status
+  repo="$TMP_ROOT/pi-slow-successor-root"
+  home="$TMP_ROOT/pi-slow-successor-home"
+  log="$TMP_ROOT/pi-slow-successor.log"
+  retired="$TMP_ROOT/pi-slow-successor.retired"
+  startedfile="$TMP_ROOT/pi-slow-successor.started"
+  stop="$TMP_ROOT/pi-slow-successor.stop"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  install_pi_watch_extension_fixture "$repo"
+  plugin="$repo/.pi/extensions/fm-primary-pi-watch.ts"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+if [ "$count" -eq 1 ]; then
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  printf 'signal: synthetic wake\n'
+  exit 0
+fi
+trap 'printf "retired\\n" > "${FM_SLOW_RETIRED_FILE:?}"; exit 0' TERM INT
+sleep 5
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+: > "${FM_SLOW_STARTED_FILE:?}"
+while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_SLOW_STARTED_FILE="$startedfile" FM_STOP_FILE="$stop" FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+let tool = null;
+let prompt = "";
+const pi = {
+  on() {},
+  registerCommand() {},
+  registerTool(candidate) {
+    if (candidate.name === "fm_watch_arm_pi") tool = candidate;
+  },
+  sendUserMessage: async (message) => {
+    prompt += message;
+  },
+};
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+mod.default(pi);
+await tool.execute("tool-call-slow-successor", {}, undefined, undefined, {});
+for (let i = 0; i < 1500 && !prompt; i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
+if (!prompt.includes("still starting")) throw new Error(`the wake did not say the successor is still starting: ${prompt}`);
+if (prompt.includes("FAILED")) throw new Error(`a slow successor was reported as failed: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the wake waited for the slow successor to report");
+for (let i = 0; i < 1500 && !existsSync(process.env.FM_SLOW_STARTED_FILE); i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+const rows = existsSync(process.env.FM_ARM_LOG)
+  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  : [];
+if (!existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the still-starting successor never reported started");
+if (rows.length !== 2) throw new Error(`a slow successor was replaced: ${rows.join(" | ")}`);
+if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("a slow successor was retired");
+writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+await new Promise((resolve) => setTimeout(resolve, 80));
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "Pi must deliver the wake without holding it for a slow successor, and keep that successor"
+  [ -z "$out" ] || fail "Pi slow-successor test printed output: $out"
+  pass "Pi slow successor does not hold the wake and is never retired"
+}
+
+test_opencode_slow_successor_does_not_hold_the_wake() {
+  local plugin repo home log retired startedfile stop out status
+  plugin="$ROOT/.opencode/plugins/fm-primary-watch-arm.js"
+  repo="$TMP_ROOT/opencode-slow-successor-root"
+  home="$TMP_ROOT/opencode-slow-successor-home"
+  log="$TMP_ROOT/opencode-slow-successor.log"
+  retired="$TMP_ROOT/opencode-slow-successor.retired"
+  startedfile="$TMP_ROOT/opencode-slow-successor.started"
+  stop="$TMP_ROOT/opencode-slow-successor.stop"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  git init -q "$repo"
+  : > "$repo/AGENTS.md"
+  cp "$ROOT/bin/fm-supervision-lib.sh" "$repo/bin/fm-supervision-lib.sh"
+  : > "$home/state/task.meta"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+if [ "$count" -eq 1 ]; then
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  printf 'signal: synthetic wake\n'
+  exit 0
+fi
+trap 'printf "retired\\n" > "${FM_SLOW_RETIRED_FILE:?}"; exit 0' TERM INT
+sleep 5
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+: > "${FM_SLOW_STARTED_FILE:?}"
+while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_SLOW_STARTED_FILE="$startedfile" FM_STOP_FILE="$stop" FM_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+let prompt = "";
+const client = {
+  session: {
+    promptAsync: async (request) => {
+      prompt += request.body.parts[0].text;
+    },
+  },
+};
+const hooks = await mod.FmPrimaryWatchArm({
+  client,
+  directory: process.env.WORKTREE,
+  worktree: process.env.WORKTREE,
+});
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
+for (let i = 0; i < 1500 && !prompt; i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
+if (!prompt.includes("still starting")) throw new Error(`the wake did not say the successor is still starting: ${prompt}`);
+if (prompt.includes("FAILED")) throw new Error(`a slow successor was reported as failed: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the wake waited for the slow successor to report");
+for (let i = 0; i < 1500 && !existsSync(process.env.FM_SLOW_STARTED_FILE); i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+const rows = existsSync(process.env.FM_ARM_LOG)
+  ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")
+  : [];
+if (!existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the still-starting successor never reported started");
+if (rows.length !== 2) throw new Error(`a slow successor was replaced: ${rows.join(" | ")}`);
+if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("a slow successor was retired");
+writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+await new Promise((resolve) => setTimeout(resolve, 80));
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "OpenCode must deliver the wake without holding it for a slow successor, and keep that successor"
+  [ -z "$out" ] || fail "OpenCode slow-successor test printed output: $out"
+  pass "OpenCode slow successor does not hold the wake and is never retired"
+}
+
+test_pi_late_successor_failure_is_surfaced() {
+  local repo home plugin log retired startedfile stop out status
+  repo="$TMP_ROOT/pi-late-successor-root"
+  home="$TMP_ROOT/pi-late-successor-home"
+  log="$TMP_ROOT/pi-late-successor.log"
+  retired="$TMP_ROOT/pi-late-successor.retired"
+  startedfile="$TMP_ROOT/pi-late-successor.started"
+  stop="$TMP_ROOT/pi-late-successor.stop"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  install_pi_watch_extension_fixture "$repo"
+  plugin="$repo/.pi/extensions/fm-primary-pi-watch.ts"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+if [ "$count" -eq 1 ]; then
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  printf 'signal: synthetic wake\n'
+  exit 0
+fi
+trap 'printf "retired\\n" > "${FM_SLOW_RETIRED_FILE:?}"; exit 0' TERM INT
+if [ "$count" -eq 2 ]; then
+  sleep 5
+  : > "${FM_SLOW_STARTED_FILE:?}"
+  printf 'watcher: FAILED - fixture late startup failure\n'
+  exit 1
+fi
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_SLOW_STARTED_FILE="$startedfile" FM_STOP_FILE="$stop" FM_PI_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node --input-type=module 2>&1 <<'EOF'
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+let tool = null;
+let prompt = "";
+const pi = {
+  on() {},
+  registerCommand() {},
+  registerTool(candidate) {
+    if (candidate.name === "fm_watch_arm_pi") tool = candidate;
+  },
+  sendUserMessage: async (message) => {
+    prompt += message;
+  },
+};
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+mod.default(pi);
+await tool.execute("tool-call-late-successor", {}, undefined, undefined, {});
+for (let i = 0; i < 1500 && !prompt; i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
+if (!prompt.includes("still starting")) throw new Error(`the wake did not say the successor is still starting: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the wake waited for the slow successor to report");
+for (let i = 0; i < 1500 && !prompt.includes("fixture late startup failure"); i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (!prompt.includes("fixture late startup failure")) throw new Error(`the late successor failure was not surfaced: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("the still-starting successor was signalled");
+writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+await new Promise((resolve) => setTimeout(resolve, 80));
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "Pi must surface a late successor failure after delivering the wake"
+  [ -z "$out" ] || fail "Pi late-successor test printed output: $out"
+  pass "Pi late successor failure is surfaced after the still-starting wake"
+}
+
+test_opencode_late_successor_failure_is_surfaced() {
+  local plugin repo home log retired startedfile stop out status
+  plugin="$ROOT/.opencode/plugins/fm-primary-watch-arm.js"
+  repo="$TMP_ROOT/opencode-late-successor-root"
+  home="$TMP_ROOT/opencode-late-successor-home"
+  log="$TMP_ROOT/opencode-late-successor.log"
+  retired="$TMP_ROOT/opencode-late-successor.retired"
+  startedfile="$TMP_ROOT/opencode-late-successor.started"
+  stop="$TMP_ROOT/opencode-late-successor.stop"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  git init -q "$repo"
+  : > "$repo/AGENTS.md"
+  cp "$ROOT/bin/fm-supervision-lib.sh" "$repo/bin/fm-supervision-lib.sh"
+  : > "$home/state/task.meta"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+count=$(wc -l < "$FM_ARM_LOG" | tr -d '[:space:]')
+if [ "$count" -eq 1 ]; then
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  printf 'signal: synthetic wake\n'
+  exit 0
+fi
+trap 'printf "retired\\n" > "${FM_SLOW_RETIRED_FILE:?}"; exit 0' TERM INT
+if [ "$count" -eq 2 ]; then
+  sleep 5
+  : > "${FM_SLOW_STARTED_FILE:?}"
+  printf 'watcher: FAILED - fixture late startup failure\n'
+  exit 1
+fi
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$plugin" WORKTREE="$repo" FM_HOME="$home" FM_ARM_LOG="$log" FM_SLOW_RETIRED_FILE="$retired" FM_SLOW_STARTED_FILE="$startedfile" FM_STOP_FILE="$stop" FM_OPENCODE_ARM_READY_TIMEOUT_MS="$ARM_READY_TIMEOUT_MS" FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 FM_WATCH_REARM_RETRY_LIMIT=2 node 2>&1 <<'EOF'
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+let prompt = "";
+const client = {
+  session: {
+    promptAsync: async (request) => {
+      prompt += request.body.parts[0].text;
+    },
+  },
+};
+const hooks = await mod.FmPrimaryWatchArm({
+  client,
+  directory: process.env.WORKTREE,
+  worktree: process.env.WORKTREE,
+});
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
+for (let i = 0; i < 1500 && !prompt; i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (!prompt.includes("signal: synthetic wake")) throw new Error(`original wake was lost: ${prompt}`);
+if (!prompt.includes("still starting")) throw new Error(`the wake did not say the successor is still starting: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_STARTED_FILE)) throw new Error("the wake waited for the slow successor to report");
+for (let i = 0; i < 1500 && !prompt.includes("fixture late startup failure"); i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (!prompt.includes("fixture late startup failure")) throw new Error(`the late successor failure was not surfaced: ${prompt}`);
+if (existsSync(process.env.FM_SLOW_RETIRED_FILE)) throw new Error("the still-starting successor was signalled");
+writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+await new Promise((resolve) => setTimeout(resolve, 80));
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "OpenCode must surface a late successor failure after delivering the wake"
+  [ -z "$out" ] || fail "OpenCode late-successor test printed output: $out"
+  pass "OpenCode late successor failure is surfaced after the still-starting wake"
 }
 
 test_pi_empty_close_retries_instead_of_disappearing() {
@@ -5019,6 +5315,7 @@ if [ "$count" -eq 1 ]; then
   printf 'signal: synthetic wake\n'
   exit 0
 fi
+printf 'watcher: FAILED - synthetic startup failure\n'
 trap 'exit 0' TERM INT
 while :; do sleep 0.02; done
 SH
@@ -5047,8 +5344,8 @@ const hooks = await mod.FmPrimaryWatchArm({
 });
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 await hooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-// Three unready successors each cost the full readiness budget, so wait well
-// past their sum. The wait ends as soon as the wake lands.
+// Each successor reports its own startup failure, so restoration fails fast.
+// The wait ends as soon as the wake lands.
 for (let i = 0; i < 1500 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
@@ -5065,7 +5362,7 @@ if (stableRows.length !== 4) throw new Error(`single-flight recovery launched ${
 EOF
 )
   status=$?
-  expect_code 0 "$status" "OpenCode must deliver the actionable wake after bounded hung-successor recovery"
+  expect_code 0 "$status" "OpenCode must deliver the actionable wake after bounded failed-successor recovery"
   [ -z "$out" ] || fail "OpenCode hung-successor test printed output: $out"
   pass "OpenCode hung successor falls back to one typed actionable wake"
 }
@@ -5097,6 +5394,7 @@ if [ "$count" -eq 0 ]; then
 fi
 trap '' TERM INT
 printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: FAILED - synthetic startup failure\n'
 while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.1; done
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
@@ -5172,6 +5470,7 @@ fi
 if [ "$count" -eq 2 ]; then
   trap 'printf "retired\\n" > "${FM_UNRETIRED_RETIRE_FILE:?}"' TERM INT
   printf 'ready\n' > "${FM_UNRETIRED_READY_FILE:?}"
+  printf 'watcher: FAILED - synthetic startup failure\n'
   while [ ! -e "$FM_RELEASE_FILE" ]; do sleep 0.02; done
   [ "$FM_LATE_KIND" = actionable ] && printf 'signal: late wake\n'
   exit 0
@@ -5663,7 +5962,7 @@ test_pi_lifecycle_deadline_diagnostics() {
   out=$(node "$ROOT/tests/watch-lifecycle-expiry.mjs" pi "$repo" 2>&1)
   status=$?
   expect_code 0 "$status" "Pi lifecycle deadline diagnostics: $out"
-  pass "Pi shutdown, readiness, and unready retirement each log one expiry"
+  pass "Pi shutdown and failed-successor retirement each log one expiry; readiness has no wall-clock cutoff"
 }
 
 test_watch_instance_rebind_releases_predecessors
@@ -5700,6 +5999,8 @@ test_pi_deferred_close_starts_fresh_arm_over_dead_child
 test_pi_hung_successor_falls_back_to_typed_wake
 test_pi_unretired_successor_falls_back_without_retry
 test_pi_late_unretired_close_resumes_supervision
+test_pi_slow_successor_does_not_hold_the_wake
+test_pi_late_successor_failure_is_surfaced
 test_pi_empty_close_retries_instead_of_disappearing
 test_pi_established_empty_close_honors_retry_limit
 test_pi_actionable_close_rechecks_session_lock
@@ -5726,6 +6027,8 @@ test_opencode_pre_ready_actionable_close_preserves_its_successor
 test_opencode_hung_successor_falls_back_to_typed_wake
 test_opencode_unretired_successor_falls_back_without_retry
 test_opencode_late_unretired_close_resumes_supervision
+test_opencode_slow_successor_does_not_hold_the_wake
+test_opencode_late_successor_failure_is_surfaced
 test_opencode_empty_close_retries_instead_of_disappearing
 test_opencode_established_empty_close_honors_retry_limit
 test_opencode_actionable_close_rechecks_session_lock

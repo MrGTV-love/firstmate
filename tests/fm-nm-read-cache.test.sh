@@ -150,13 +150,16 @@ read_state() {  # <case-dir> <crew-state-script>
     FM_STATE_OVERRIDE="$1/state" "$2" cached 2>/dev/null
 }
 
-# The full home snapshot at its defaults, with the case's fakes.
-snapshot_json() {  # <case-dir>
+# The full home snapshot with a per-lane no-progress bound, with the case's fakes,
+# run under the shared progress owner its real callers (the open-loops collector
+# and the home-summary refresh worker) wrap it in.
+snapshot_json() {  # <case-dir> <lane-bound-seconds>
   local d=$1
-  env -u FM_SNAPSHOT_CREW_STATE_TIMEOUT \
+  FM_SNAPSHOT_CREW_STATE_TIMEOUT=$2 \
     FM_FAKE_NM_DIR="$d/nmfake" NM_HOME="$d/nm" PATH="$d/fakebin:$PATH" \
     FM_HOME="$d" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$d/state" \
     FM_DATA_OVERRIDE="$d/data" FM_CONFIG_OVERRIDE="$d/config" FM_PROJECTS_OVERRIDE="$d/projects" \
+    python3 "$ROOT/bin/fm-duration.py" keep-going 60 -- \
     "$ROOT/bin/fm-fleet-snapshot.sh" --home-input 2>"$d/snapshot.err"
 }
 
@@ -440,13 +443,12 @@ case_answers_are_classified_by_what_they_say() {
   pass 'answers are classified by what they say, and only a settled finished run is kept'
 }
 
-# The snapshot bound protects against a hang, not against a loaded read. One
-# snapshot at its default holds a lane whose responsive store lookups together
-# outlast the old 10-second bound, a quick lane, and a lane whose git read never
-# returns: the slow and quick lanes answer, the hung lane is cut at the default
-# 40 seconds, and the whole snapshot returns inside the callers' 60-second
-# default deadlines (bin/fm_open_loops.py, bin/fm-home-summary-refresh.sh).
-case_snapshot_default_cuts_only_the_hung_lane() {
+# The snapshot's per-lane no-progress bound isolates a hung lane even though the
+# snapshot, its owner and every crew read are progress-owned too. One snapshot holds a lane
+# whose store lookups burn CPU past the lane bound, a quick lane, and a lane
+# whose git read never returns (no output, no CPU): the slow and quick lanes
+# answer, only the hung lane is cut to unknown, and the snapshot completes.
+case_snapshot_cuts_only_the_hung_lane() {
   local d lane real_git out start elapsed state
   d=$(new_case hung-lane)
   serve_run "$d" 01RUN completed passed
@@ -459,7 +461,9 @@ case_snapshot_default_cuts_only_the_hung_lane() {
   mv "$d/fakebin/no-mistakes" "$d/fakebin/nm-response"
   cat > "$d/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
-case "$PWD" in */wt) sleep 4 ;; esac
+case "$PWD" in
+  */wt) end=$((SECONDS + 4)); while [ "$SECONDS" -lt "$end" ]; do :; done ;;
+esac
 exec "${0%/*}/nm-response" "$@"
 SH
   real_git=$(command -v git)
@@ -472,7 +476,7 @@ exec "$real_git" "\$@"
 SH
   chmod +x "$d/fakebin/no-mistakes" "$d/fakebin/git"
   start=$SECONDS
-  out=$(snapshot_json "$d") || fail "the hung lane lost the snapshot: $(cat "$d/snapshot.err")"
+  out=$(snapshot_json "$d" 3) || fail "the hung lane lost the snapshot: $(cat "$d/snapshot.err")"
   elapsed=$((SECONDS - start))
   assert_equals 3 "$(printf '%s\n' "$out" | jq '.tasks | length')" 'every lane is in the snapshot'
   for lane in cached quick; do
@@ -482,12 +486,10 @@ SH
   done
   state=$(printf '%s\n' "$out" | jq -c '.tasks[] | select(.id == "hung") | .current_state')
   assert_equals unknown "$(printf '%s\n' "$state" | jq -r '.state')" 'the hung lane is unknown'
-  assert_contains "$state" 'current-state command failed (exit 124)' 'the hung lane is cut by the whole-read bound'
-  [ "$elapsed" -ge 39 ] || fail "the hung lane was cut after ${elapsed}s, before the 40-second default"
-  [ "$elapsed" -lt 60 ] || fail "the snapshot took ${elapsed}s, past the callers' 60-second deadlines"
-  pass "the default whole-read bound cuts only the hung lane, after ${elapsed}s"
+  assert_contains "$state" 'current-state command failed (exit 124)' 'the hung lane is cut by its own no-progress bound'
+  [ "$elapsed" -ge 3 ] || fail "the hung lane was cut after ${elapsed}s, before its 3-second no-progress bound"
+  pass "the per-lane no-progress bound cuts only the hung lane, after ${elapsed}s"
 }
-
 
 # --- (d) mutation checks ----------------------------------------------------------------
 
@@ -520,7 +522,7 @@ expect_mutant_caught() {  # <label> <case-function> <override>
 
 main() {
   local fn
-  case_snapshot_default_cuts_only_the_hung_lane
+  case_snapshot_cuts_only_the_hung_lane
   for fn in \
     case_finished_run_is_kept_until_the_id_changes \
     case_finished_run_needs_the_database \

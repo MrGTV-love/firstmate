@@ -85,6 +85,203 @@
 # (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
+# fm_run_progress <no-progress-seconds> <command...>: keep slow work running
+# while stdout, stderr or cumulative process-tree CPU advances. Unlike the hard
+# bounds below it has no wall-clock cutoff. fm-duration.py owns the Python
+# runner; the Perl-core fallback preserves Python-optional shell readers with
+# the same CPU/output rule. Both forward signals, clean up the owned command
+# group and write no duration records. A nested call keeps its own bound, so a
+# hung inner read is stopped by its own owner and the outer work continues.
+fm_run_progress() {
+  local seconds=$1 helper
+  shift
+  helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
+  if fm_posix_python; then
+    python3 "$helper" keep-going "$seconds" -- "$@"
+  elif command -v perl >/dev/null 2>&1; then
+    fm_run_perl_progress "$seconds" "$@"
+  else
+    printf 'fm_run_progress: Python 3 or Perl is required to observe command progress\n' >&2
+    return 127
+  fi
+}
+
+# fm_posix_python: 0 when python3 is a POSIX interpreter able to run
+# fm-duration.py's process-group runners. A native Windows python3 on a Git Bash
+# PATH is not, so callers fall back instead of failing every read. The answer is
+# kept for the rest of this shell.
+fm_posix_python() {
+  if [ -z "${_FM_POSIX_PYTHON:-}" ]; then
+    _FM_POSIX_PYTHON=0
+    if command -v python3 >/dev/null 2>&1 \
+      && python3 -c 'import os, sys; sys.exit(os.name != "posix")' >/dev/null 2>&1; then
+      _FM_POSIX_PYTHON=1
+    fi
+  fi
+  [ "$_FM_POSIX_PYTHON" = 1 ]
+}
+
+# fm_progress_check <record> <pid> <no-progress-seconds> [path...]: fm-duration.py
+# progress-check, the identity-bound proof that pid's process tree and the paths
+# made no progress for the interval (124 only then). Without a POSIX python3
+# nothing can be proven, so it never returns 124 and writes one
+# cpu_telemetry_unavailable line per shell instead of failing each call.
+fm_progress_check() {
+  local helper
+  if ! fm_posix_python; then
+    if [ "${_FM_PROGRESS_CHECK_WARNED:-0}" != 1 ]; then
+      _FM_PROGRESS_CHECK_WARNED=1
+      printf 'cpu_telemetry_unavailable: no POSIX python3 can check process progress here; hung work cannot be proven, so nothing is stopped for inactivity\n' >&2
+    fi
+    return 0
+  fi
+  helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
+  python3 "$helper" progress-check "$@"
+}
+
+# Preserve the existing Python-optional shell readers. Perl core modules relay
+# both streams and sample the same identity-bound /proc-or-ps CPU facts as
+# fm-duration.py. The bound is inactivity only, including TERM cleanup; while no
+# sample is available one warning names the platform and nothing is stopped for
+# inactivity. Parent death and signals clean up the owned command group.
+fm_run_perl_progress() {
+  local owner=${BASHPID:-$$}
+  # shellcheck disable=SC2016 # Perl, not the sourcing shell, expands this program.
+  perl -MPOSIX=WNOHANG -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -MIO::Select -MIO::Handle -e '
+    my ($owner, $idle) = (shift, shift);
+    die "inactivity must be positive\n" unless $idle =~ /^\d+(?:[.]\d+)?$/ && $idle > 0;
+    my $parent = getppid();
+    my ($pending, $stopping, $exit_code) = (0, 0, 0);
+    $SIG{TERM} = sub { $pending ||= 143 };
+    $SIG{INT} = sub { $pending ||= 130 };
+    $SIG{HUP} = sub { $pending ||= 129 };
+    $SIG{PIPE} = sub { $pending ||= 143 };
+    setpgrp(0, 0) or die "setpgrp: $!";
+    pipe(my $out_r, my $out_w) or die "pipe: $!";
+    pipe(my $err_r, my $err_w) or die "pipe: $!";
+    my $pid = fork;
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+      $SIG{$_} = "DEFAULT" for qw(TERM INT HUP);
+      setpgrp(0, 0);
+      close $out_r; close $err_r;
+      open STDOUT, ">&", $out_w or die "stdout: $!";
+      open STDERR, ">&", $err_w or die "stderr: $!";
+      close $out_w; close $err_w;
+      exec @ARGV;
+      exit 127;
+    }
+    setpgrp($pid, $pid);
+    close $out_w; close $err_w;
+    STDOUT->autoflush(1); STDERR->autoflush(1);
+    my $streams = IO::Select->new($out_r, $err_r);
+    my %sink = (fileno($out_r) => \*STDOUT, fileno($err_r) => \*STDERR);
+    my (%observed, $last_cpu, $blind, $warned);
+    my $last_progress = clock_gettime(CLOCK_MONOTONIC);
+    my $next_sample = 0;
+    my $cadence = $idle / 4 < 1 ? $idle / 4 : 1;
+    my $proc = $ENV{FM_PROC_ROOT_OVERRIDE} || "/proc";
+    my $ticks = eval { POSIX::sysconf(POSIX::_SC_CLK_TCK()) } || 100;
+    my $cpu = sub {
+      my (%children, %times);
+      # A Linux-compatible /proc (Git Bash/MSYS too, whose ps rejects these
+      # -o fields) is chosen by capability; stat fields 4, 14+15 and 22.
+      if (-r "$proc/$pid/stat" && opendir my $dir, $proc) {
+        for my $child (grep { /^\d+$/ } readdir $dir) {
+          open my $stat, "<", "$proc/$child/stat" or next;
+          my $line = <$stat>;
+          next unless defined $line && (my $at = rindex $line, ")") >= 0;
+          my @field = split " ", substr($line, $at + 1);
+          next unless @field >= 20 && $field[1] =~ /^\d+$/;
+          push @{$children{$field[1]}}, $child;
+          $times{$child} = [($field[11] + $field[12]) / $ticks, "proc $field[19]"];
+        }
+        closedir $dir;
+      } else {
+        local $ENV{LC_ALL} = "C";
+        open my $ps, "-|", "ps", "-axo", "pid=,ppid=,time=,lstart=" or return;
+        while (my $line = <$ps>) {
+          my ($child, $parent, $clock, $identity) = split " ", $line, 4;
+          next unless defined $identity && $child =~ /^\d+$/ && $parent =~ /^\d+$/;
+          chomp $identity;
+          my $seconds = 0;
+          $seconds = $1 * 86400 if $clock =~ s/^(\d+)-//;
+          my $part = 0;
+          $part = $part * 60 + $_ for split /:/, $clock;
+          push @{$children{$parent}}, $child;
+          $times{$child} = [$seconds + $part, $identity];
+        }
+        close $ps or return;
+      }
+      my @todo = ($pid);
+      while (@todo) {
+        my $child = pop @todo;
+        if (exists $times{$child}) {
+          my ($seconds, $identity) = @{$times{$child}};
+          my $key = "$child:$identity";
+          $observed{$key} = $seconds if !exists $observed{$key} || $seconds > $observed{$key};
+        }
+        push @todo, @{$children{$child} || []};
+      }
+      my $total = 0;
+      $total += $_ for values %observed;
+      return $total;
+    };
+    my $relay = sub {
+      my $stream = shift;
+      my $count = sysread($stream, my $buffer, 65536);
+      if (defined $count && $count > 0) {
+        print {$sink{fileno($stream)}} $buffer;
+        $last_progress = clock_gettime(CLOCK_MONOTONIC);
+      } elsif (defined $count) {
+        $streams->remove($stream); close $stream;
+      } elsif (!$!{EINTR}) {
+        $pending ||= 1;
+      }
+    };
+    while (1) {
+      my $done = waitpid $pid, WNOHANG;
+      my $status = $?;
+      if ($done == $pid) {
+        kill "KILL", -$pid if $stopping;
+        while (my @ready = $streams->can_read(0)) { $relay->($_) for @ready; }
+        exit($stopping ? $exit_code : (($status & 127) ? 128 + ($status & 127) : $status >> 8));
+      }
+      exit 127 if $done == -1;
+      $pending ||= 143 if getppid() != $parent || !kill(0, $owner);
+      if ($pending) {
+        if ($stopping) { kill "KILL", -$pid; }
+        else {
+          $stopping = 1; $exit_code = $pending;
+          $last_progress = clock_gettime(CLOCK_MONOTONIC);
+          kill "TERM", -$pid;
+        }
+        $pending = 0;
+      }
+      if ($streams->count) { $relay->($_) for $streams->can_read($cadence); }
+      else { select undef, undef, undef, $cadence; }
+      my $now = clock_gettime(CLOCK_MONOTONIC);
+      if ($now >= $next_sample) {
+        my $sample = $cpu->();
+        $blind = !defined $sample;
+        if ($blind && !$warned++) {
+          print STDERR "cpu_telemetry_unavailable: neither /proc/<pid>/stat nor ps can sample process CPU on $^O; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled\n";
+        }
+        $last_progress = $now if defined $sample && (!defined $last_cpu || $sample > $last_cpu);
+        $last_cpu = $sample if defined $sample;
+        $next_sample = $now + $cadence;
+      }
+      if ($now - $last_progress >= $idle && ($stopping || !$blind)) {
+        if ($stopping) { kill "KILL", -$pid; }
+        else {
+          print STDERR "no_progress: command made no output or CPU progress\n";
+          $pending = 124;
+        }
+      }
+    }
+  ' "$owner" "$@"
+}
+
 fm_timeout_mechanism() {
   if [ "${FM_TIMEOUT_MECHANISM_OVERRIDE:-}" = bash ]; then
     printf 'bash\n'

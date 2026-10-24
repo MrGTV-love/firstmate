@@ -873,7 +873,7 @@ Create the optional local `config/open-loops.json` to override the limits:
 ```json
 {
   "age_limits_seconds": { "silent_report": 900, "stalled_worker": 3600, "unlanded_commit": 86400 },
-  "command_timeout_seconds": 60,
+  "command_timeout_seconds": 900,
   "review_lanes": { "owner/repository": ["independent-review"] }
 }
 ```
@@ -883,8 +883,9 @@ Age limits are non-negative integer seconds for the categories above.
 For each configured lane, the latest logical status event mentioning the exact PR URL must contain `PASS`, the full live head SHA, and a nonfuture numeric `[at=...]` timestamp; a FAIL or REJECTED event, a stale head, or the implementation task's own verdict cannot qualify.
 The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
 Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
-`command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
-On either deadline, cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run.
+`command_timeout_seconds` selects each source command's no-output/no-process-tree-CPU interval, defaults to 900 seconds, and accepts integers from 1 through 900.
+Productive commands finish and contribute their results regardless of elapsed time; there is no overall collection alarm.
+Only a proven no-progress source is cancelled: cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run.
 It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
 An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
 A malformed configuration is reported as an error rather than ignored.
@@ -3897,7 +3898,8 @@ The two read files use different parsing rules:
 
 Runtime tuning via environment variables (defaults shown):
 
-`FM_BACKLOG_ROW_TIMEOUT_SECS` covers lightweight and full-body reads, including start/reopen and dispatch; the first timeout prevents later backend reads in the same process.
+`FM_BACKLOG_ROW_TIMEOUT_SECS` covers lightweight, full-body and inventory reads, including start/reopen and dispatch, as a no-output/no-process-tree-CPU interval rather than a wall-clock limit.
+Productive reads finish and do not latch the sweep; only a proven no-progress stop prevents later backend reads in the same process.
 
 ```sh
 FM_HOME=                 # optional operational home for most scripts, unset means this repo root; fm-send requires it explicitly
@@ -3922,7 +3924,7 @@ CMUX_SOCKET_PASSWORD=   # cmux-only: socket password fallback when config/cmux-s
 FM_SESSION_START_STATUS_TAIL=5   # state/*.status lines printed per task in the session-start digest; each line is capped by bin/fm-line-cap-lib.sh
 FM_SESSION_START_QUEUED_LIMIT=20   # plain queued backlog rows in the session-start digest; in-flight, held, and blocked rows are never bounded and done rows are never listed
 FM_SESSION_START_ENDPOINT_TIMEOUT=10   # seconds bounding each per-task endpoint liveness read in the session-start digest (bin/fm-session-start.sh); nonpositive or invalid values fall back to 10; a read that hits the bound or dies becomes that task's own `endpoint: error` line and the digest continues
-FM_BACKLOG_ROW_TIMEOUT_SECS=10   # seconds bounding each backlog row read (bin/fm-backlog-transition-lib.sh); nonpositive or invalid values fall back to 10; the first bound hit latches the sweep so later reads return immediately, each still naming its own item
+FM_BACKLOG_ROW_TIMEOUT_SECS=900   # no-output/no-process-tree-CPU seconds for backlog row/inventory reads (bin/fm-backlog-transition-lib.sh); nonpositive or invalid values fall back to 900; inside session start's bootstrap the interval is a third of the time left in FM_SESSION_START_TIMEOUT, with this value as an upper limit (docs/sessionstart-nudge.md); only a proven no-progress stop latches later reads, each still naming its own item
 FM_BOOTSTRAP_DETECT_ONLY=0   # internal/read-only session-start mode: skip bootstrap's mutating sweeps and print advisory TANGLE wording
 FM_BOOTSTRAP_NETWORK=all   # internal session-start phase split; bin/fm-bootstrap.sh header owns values and phase membership
 FM_STARTUP_NETWORK_TIMEOUT=120   # deferred-stage bound in seconds; bin/fm-startup-network.sh header/help owns covered work, lock waits, and timeout reporting
@@ -3947,10 +3949,10 @@ FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by
 FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
 FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
-FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60
+FM_HOME_SUMMARY_TIMEOUT=900    # no-output/no-CPU seconds for home-summary initialization through atomic publication, never a wall-clock cutoff; independent failure-accounting bounds are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 900
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2
-FM_SNAPSHOT_CREW_STATE_TIMEOUT=40   # seconds bounding each whole local current-state read inside bin/fm-fleet-snapshot.sh: 2.46x the slowest loaded read measured (16.28, the Case workspace lane's loaded secondmate home on 2026-10-17, before the 02:52Z reboot; reads after the reboot took 2.0 to 3.3) and 20 under the 60-second default deadlines of the open-loops collector and the home-summary refresh that wait on it; reads run FM_SNAPSHOT_LOCAL_READ_CONCURRENCY at a time, so more hung reads than that queue another wave, and a shortened caller deadline can still end first; remote endpoint liveness is not probed here
+FM_SNAPSHOT_CREW_STATE_TIMEOUT=900   # no-output/no-process-tree-CPU seconds for a local current-state read; productive reads finish and are included regardless of elapsed time; remote endpoint liveness is not probed here
 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=8   # maximum concurrent tasks in each local observation or task-composition stage; scheduling is owned by docs/architecture.md
 FM_SNAPSHOT_BUDGET=5                # one total seconds budget for all concurrent remote home-ledger reads
 FM_SNAPSHOT_CACHE_DIR=$FM_HOME/state/secondmate-summary-cache   # private parent-side cache of successfully fetched remote home ledgers
@@ -3982,7 +3984,7 @@ FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=3   # fallback window; see "Confirm detached
 FM_WHEN_OUTPUT_TAIL_BYTES=8192          # bound on the command-output tail inside one condition->action outcome document
 FM_CODEX_WATCH_CHECKPOINT=180   # seconds per foreground watcher checkpoint in Codex primary supervision
 FM_CODEX_WATCH_CHECKPOINT_AWAY=3600  # requested away checkpoint bound on a home that runs the supervision host; longer of this and attended bound, capped at 27000
-FM_CREW_STATE_NM_TIMEOUT=10   # seconds allowed per no-mistakes query inside fm-crew-state.sh, and per state-database run-inventory read behind a capped AXI overview; a run-attribution lookup it cuts is skipped and the line ends with `run-store: skipped (read budget exceeded)` (contract owner: bin/fm-crew-state.sh header)
+FM_CREW_STATE_NM_TIMEOUT=900   # no-output/no-process-tree-CPU seconds per no-mistakes read inside fm-crew-state.sh; slow productive answers remain authoritative (contract owner: bin/fm-crew-state.sh header)
 FM_TEARDOWN_NM_TIMEOUT=10    # seconds allowed per no-mistakes query or abort inside fm-teardown.sh
 FM_CREW_STATE_RUNS_LIMIT=200  # plain runs-ledger rows scanned for fallback attribution; does not change the CLI's AXI overview window (selection owner: bin/fm-nm-run-lib.sh)
 FM_CREW_STATE_NM_CACHE=on   # off makes every no-mistakes read inside fm-crew-state.sh fresh; on keeps only a finished run's reads until its run id changes and reads everything else fresh every time (contract owner: bin/fm-nm-read-cache-lib.sh)
@@ -4017,21 +4019,22 @@ FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
 FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
-FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm waits to confirm a fresh watcher before reporting FAILED; default 30 on Git Bash/MSYS
+FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm observes a finished cycle for a verified successor (default 30 on Git Bash/MSYS); when set it also replaces the 900-second startup no-progress interval, and it never ends a startup that is making progress; the Claude Stop hook's handling-successor notice window is this value (default 30) plus 2 seconds
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
-FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds the OpenCode primary watcher plugin waits for an arm attempt to report started, healthy, wake, or failure; default 35000 on Windows to stay above the MSYS confirm budget
-FM_PI_ARM_READY_TIMEOUT_MS=12000   # milliseconds the Pi watcher extension waits for a successor arm to report started or attached; default 35000 on Windows to stay above the MSYS confirm budget
+FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds an OpenCode wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
+FM_PI_ARM_READY_TIMEOUT_MS=12000   # milliseconds a Pi wake waits for its successor arm to report before it goes out with a still-starting line; a notice window only, the successor is never stopped for it; default 35000 on Windows
+FM_OMP_ARM_READY_TIMEOUT_MS=12000   # milliseconds an omp wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
 FM_PI_SUCCESSOR_GRACE_MS=15000   # milliseconds after a Pi replacement shutdown before recording missing-successor diagnostics and expiry; never activates the outgoing runtime, and never applies to terminal quit
 FM_OMP_SUCCESSOR_GRACE_MS=15000   # milliseconds after omp shutdown retirement before missing-successor recovery checks home-lock ownership; an explicit arm call can repair sooner (.omp/extensions/fm-primary-omp-watch.ts header)
-FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for an unready successor arm to exit before abandoning retries; Pi/omp also bound shutdown child-close waits
+FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for a successor arm that reported failure to exit before abandoning retries; Pi/omp also bound shutdown child-close waits
 FM_WATCH_REARM_RETRY_BASE_MS=250   # Pi/omp/OpenCode adapter base delay for continuity restoration retries
 FM_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/omp/OpenCode adapter cap for exponential continuity retry delay
 FM_WATCH_REARM_RETRY_LIMIT=5   # Pi/omp/OpenCode adapter launch-failure retries before surfacing restoration failure
 FM_WATCH_CYCLE_LOG_MAX_BYTES=262144   # size cap for the arm-owned watcher lifecycle ledger
 FM_WATCH_CYCLE_LOG_KEEP_LINES=1000   # newest complete lifecycle rows considered when the ledger is capped
 FM_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (state/.watch-extension.log); unset, empty, non-numeric, zero, or negative disables logging, a positive value keeps that many newest rows; logging never changes supervision behavior
-FM_WATCHER_STALE_GRACE=300   # defaults to FM_GUARD_GRACE if set, else the poll-derived grace (docs/turnend-guard.md "Guard grace and the poll cadence"); seconds before a fresh arm refuses a live holder's stale beacon (attached arms: FM_WATCHER_STALL_BOUND); the session-end auto-relaunch is bounded to this grace minus a fixed margin and does not run when that leaves no room (bin/fm-session-end-relaunch-lib.sh header)
-FM_WATCHER_STALL_BOUND=       # live-holder stall bound; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"
+FM_WATCHER_STALE_GRACE=300   # defaults to FM_GUARD_GRACE if set, else the poll-derived grace (docs/turnend-guard.md "Guard grace and the poll cadence"); seconds after which a live holder's beacon is stale; a stale holder that does not prove the lock's recorded identity is refused, while an identity-matched one is attached to or reported running until fm_progress_check proves no CPU or beacon progress for FM_WATCHER_STALL_BOUND; the session-end auto-relaunch is bounded to this grace minus a fixed margin and does not run when that leaves no room (bin/fm-session-end-relaunch-lib.sh header)
+FM_WATCHER_STALL_BOUND=       # no-progress interval a live, identity-matched holder must be proven to make no CPU or beacon progress for before re-arm evicts it or an attached arm fails; beacon age alone is not enough; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"
 FM_SIGNAL_GRACE=30      # seconds to coalesce nearby status and turn-end signals into one wake
 FM_WATCHER_CLEANUP_LOCK_BOUND=   # optional watcher EXIT marker-lock wait; default and validation: docs/watcher-continuity.md
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present

@@ -96,7 +96,8 @@ if ! declare -F fm_pr_url_parse >/dev/null 2>&1; then
   . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-pr-lib.sh"
 fi
 
-# Latched when a row read hits its bound. fm_backlog_row_show runs inside a
+# Latched only after a row read stops for no progress, never elapsed duration.
+# fm_backlog_row_show runs inside a
 # command substitution, so the subshell can READ this latch but cannot set it;
 # the callers that capture its status own the write.
 FM_BACKLOG_ROW_SHOW_WEDGED=0
@@ -392,32 +393,26 @@ fm_tasks_axi() {
 # backend. Addressing or backend-resolution errors return before tasks-axi runs;
 # otherwise its exit status is preserved. Extra flags (--full) pass through.
 #
-# Every read is bounded, because a wedged backend read here is what blinds a
-# whole session start: bin/fm-bootstrap.sh's reconcile and close-replay sweeps
-# call this once per item, and one unbounded read consumes the entire
-# FM_SESSION_START_TIMEOUT and truncates the digest before the wake queue,
-# supervision instructions, fleet state and context sections ever print. The
-# bound turns that into a loud partial reconcile: the caller reports the item it
-# could not read and moves to the next one.
+# Reads keep going while output or cumulative process-tree CPU advances.
+# FM_BACKLOG_ROW_TIMEOUT_SECS selects a no-progress interval (default 900s),
+# never a wall-clock cutoff. This bound exists only to recover a genuinely hung
+# backend that would otherwise blind bootstrap's reconcile/close-replay sweeps.
+# Slow productive reads finish and never poison FM_BACKLOG_ROW_SHOW_WEDGED.
 #
-# A per-item bound alone is not enough on a home carrying a large fleet, because
-# N wedged items still cost N bounds and the digest is truncated anyway. So the
-# first bound hit latches FM_BACKLOG_ROW_SHOW_WEDGED and every later read in the
-# same sweep returns immediately, still naming its own item so nothing is
-# silently skipped. This function only READS that latch: it runs inside a
-# command substitution, and a write here would die with the subshell, so the
-# callers that capture its status set it. The latch is deliberately
-# process-wide because these scripts are short-lived and a backend that wedged
-# once will wedge again within the same run.
+# After a proven no-progress stop, callers latch that backend failure so a fleet
+# sweep does not repeat the same hung source once per item; every skipped item
+# still gets a named error, never an absent-row verdict. This function only
+# READS the latch because writes inside its command substitution would be lost.
+# bin/fm-duration.py owns the shared progress sampler and signal cleanup.
 fm_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
-  local data=$1 id=$2 out status addressing_status secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10}
+  local data=$1 id=$2 out status addressing_status secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-$((15 * 60))}
   shift 2
   # A non-positive bound is not a bound (fm-timeout-lib.sh), and a padded zero
   # such as 00 is still zero, so the digits test alone would let the very read
   # this bound exists to prevent back in. Compare arithmetically, tolerating a
   # value too large for the shell to compare at all.
-  case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
-  [ "$secs" -gt 0 ] 2>/dev/null || secs=10
+  case "$secs" in ''|*[!0-9]*) secs=$((15 * 60)) ;; esac
+  [ "$secs" -gt 0 ] 2>/dev/null || secs=$((15 * 60))
   fm_backlog_tasks_axi_addressing "$data"
   addressing_status=$?
   if [ "$addressing_status" -ne 0 ]; then
@@ -425,14 +420,15 @@ fm_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
     return "$addressing_status"
   fi
   if [ "$FM_BACKLOG_ROW_SHOW_WEDGED" = 1 ]; then
-    printf 'tasks-axi show %s skipped: the backlog backend already exceeded its %ss read bound\n' "$id" "$secs"
+    printf 'tasks-axi show %s skipped: the backlog backend already reached its %ss no-progress bound\n' "$id" "$secs"
     return 124
   fi
   if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
     set -- "$@" --file "$FM_BACKLOG_AXI_FILE"
   fi
+  fm_posix_python || true
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
-  out=$(fm_run_timed "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi show "$@"' \
+  out=$(fm_run_progress "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi show "$@"' \
     _ "$FM_BACKLOG_AXI_ROOT" "$id" "$@" 2>&1)
   status=$?
   # A backend that wrote a header or a progress line before wedging leaves that
@@ -440,7 +436,7 @@ fm_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
   # the failure reason. Whatever a timed-out read managed to emit is incomplete
   # by definition, so the bound speaks for it instead.
   if [ "$status" -eq 124 ]; then
-    printf 'tasks-axi show %s exceeded its %ss backlog read bound\n' "$id" "$secs"
+    printf 'tasks-axi show %s made no output or CPU progress for its %ss backlog read no-progress bound\n' "$id" "$secs"
   else
     printf '%s\n' "$out"
   fi
@@ -463,7 +459,7 @@ fm_backlog_row_list() {  # <resolved-data-dir> [flag...]
   fi
 }
 
-# One bounded read of every backlog row's id and state, printed as one
+# One progress-owned read of every backlog row's id and state, printed as one
 # "<id>:<state>" line per row, for a caller that must decide which of many task
 # records can need a closer look. A per-record `tasks-axi show` is a node process
 # each, so asking once replaces a start-time cost that grew with the number of
@@ -472,16 +468,17 @@ fm_backlog_row_list() {  # <resolved-data-dir> [flag...]
 # backend), the backend, or a row count that does not match what was parsed - and
 # the caller then probes each record exactly as it did before.
 fm_backlog_row_states() {  # <data-dir>
-  local data=$1 out secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10} line expected='' declared='' in_tasks=0 parsed=0 id rest rows='' status
+  local data=$1 out secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-$((15 * 60))} line expected='' declared='' in_tasks=0 parsed=0 id rest rows='' status
   local -a args=()
-  case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
-  [ "$secs" -gt 0 ] 2>/dev/null || secs=10
+  case "$secs" in ''|*[!0-9]*) secs=$((15 * 60)) ;; esac
+  [ "$secs" -gt 0 ] 2>/dev/null || secs=$((15 * 60))
   data=$(fm_backlog_data_absolute "$data") || return 1
   fm_backlog_tasks_axi_addressing "$data" || return 1
   [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 1
   [ -z "$FM_BACKLOG_AXI_FILE" ] || args+=(--file "$FM_BACKLOG_AXI_FILE")
+  fm_posix_python || true
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
-  out=$(fm_run_timed "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi list "$@"' \
+  out=$(fm_run_progress "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi list "$@"' \
     _ "$FM_BACKLOG_AXI_ROOT" ${args[@]+"${args[@]}"} 2>/dev/null)
   status=$?
   [ "$status" -eq 0 ] || return "$status"

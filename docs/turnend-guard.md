@@ -221,14 +221,14 @@ That is exactly what a long-poll home (`FM_POLL=300`) hit against the Claude Sto
 Two readers derive their default grace from the configured poll instead of a bare constant:
 
 - That hook.
-- `bin/fm-watch.sh`'s own pre-acquisition staleness check (the "lock held by live pid but heartbeat is stale" refusal).
+- `bin/fm-watch.sh`'s own pre-acquisition staleness check (the "lock held by live pid but heartbeat is stale" refusal for a holder that does not prove the lock's recorded identity).
 
 Both use `max(300, FM_POLL + 60)`.
 The default never drops below the historical 300-second floor for the common short-poll case, but grows with the poll cadence once that cadence would otherwise outrun it.
 `fm_poll_derived_grace` in `bin/fm-wake-lib.sh` is the single owner of that formula.
 
-That refusal has a ceiling.
-Once the live holder's beacon is stale past `FM_WATCHER_STALL_BOUND` (default three times the grace), the re-arm takes these steps:
+Beacon age alone never replaces or refuses a live holder that proves the lock's recorded identity: that holder is a slow cycle, which a fresh arm attaches to and a direct re-arm reports as already running.
+Only when `fm_progress_check` (`bin/fm-timeout-lib.sh`) proves that the holder's process tree and beacon made no progress for `FM_WATCHER_STALL_BOUND` (default three times the grace) does the re-arm take these steps:
 
 1. It re-verifies the holder against the lock's recorded identity.
 2. It retires the holder with TERM.
@@ -236,8 +236,8 @@ Once the live holder's beacon is stale past `FM_WATCHER_STALL_BOUND` (default th
 
 A watcher wedged mid-cycle can therefore no longer refuse every replacement indefinitely.
 `bin/fm-watch.sh`'s header owns the exact wording and the survives-TERM fallback.
-Below that bound a stale beacon alone does not end an attached arm's watch of a live, identity-matched holder; a changed lock can end it sooner.
-At the bound the arm reports a typed stalled-holder failure so its owner's retry can replace the holder.
+An attached arm keeps watching a live, identity-matched holder however old its beacon is, until the same proof; a changed lock can end it sooner.
+On that proof the arm reports a typed stalled-holder failure so its owner's retry can replace the holder.
 `fm_watcher_stall_bound` in `bin/fm-wake-lib.sh` owns the shared derivation; `bin/fm-watch-arm.sh`'s header owns the exact attached-arm close behavior.
 
 The auto-arm hook additionally exports its resolved `FM_GUARD_GRACE` when it forks `bin/fm-watch-arm.sh`.

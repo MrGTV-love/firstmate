@@ -154,11 +154,14 @@ With a wedged backend the stage's ceiling is tasks times that per-read bound and
 [`bin/fm-bootstrap.sh`](../bin/fm-bootstrap.sh) owns reconciliation's conditional bulk-read fast path and per-worker metadata and lifecycle lock handling.
 
 The per-item backlog row reads inside bootstrap's reconcile and close-replay sweeps are the exception.
-Each of those reads is bounded by `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 10s) through `bin/fm-backlog-transition-lib.sh`.
-The first bound hit latches the sweep.
+Each of those reads stops only after an interval with no output and no process-tree CPU, through `bin/fm-backlog-transition-lib.sh`.
+At session start that interval is a third of the time left in the digest's own `FM_SESSION_START_TIMEOUT` bound when bootstrap starts (an `FM_BACKLOG_ROW_TIMEOUT_SECS` value stays an upper limit), so a wedged backend is cut by the read's own no-progress bound and the rest of the digest still prints; a productive read longer than that is still cut by the session-start bound itself.
+Outside session start the interval is `FM_BACKLOG_ROW_TIMEOUT_SECS` (default 900s).
+Only a proven no-progress stop latches the sweep.
 Later reads in that sweep then return immediately while still naming their own item.
 
-`tests/fm-backlog-read-bound.test.sh` exercises hanging reads through hold, inventory verification (including migrated-prefix resolution), reconcile-request intake, and session start. It checks bounded completion, rejection without task creation or inventory attestation, and suppression of further backend reads after a timeout; diagnostic word order is not part of those CLI contracts.
+`tests/fm-backlog-read-bound.test.sh` exercises productive slow row/inventory reads and captain-held calls, plus genuinely inactive reads through hold, inventory verification (including migrated-prefix resolution), reconcile-request intake, and session start.
+It checks that productive work finishes without poisoning later reads, while true inactivity still prevents task creation or inventory attestation and suppresses further reads of the hung backend; diagnostic word order is not part of those CLI contracts.
 
 When timeout, gtimeout, and perl are unavailable, the shared timeout owner falls back to a pure-Bash process-group watchdog.
 So no supported host runs the digest unbounded.

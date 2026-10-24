@@ -293,6 +293,8 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
   # rather than silently removing the bound.
   case "$SESSION_START_BUDGET" in ''|*[!0-9]*) SESSION_START_BUDGET=120 ;; esac
   [ "$SESSION_START_BUDGET" -gt 0 ] 2>/dev/null || SESSION_START_BUDGET=120
+  # The child sizes its bounded backlog reads from what is left of this bound.
+  SESSION_START_DEADLINE=$(( $(date +%s) + SESSION_START_BUDGET ))
   SESSION_START_STAGE_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-stage.XXXXXX" 2>/dev/null) || SESSION_START_STAGE_FILE=
   if [ -z "$SESSION_START_STAGE_FILE" ]; then
     # Without a breadcrumb the bound still holds; only the banner's precision
@@ -302,20 +304,20 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
   if [ "$REEMIT" -eq 1 ]; then
     if [ -n "$SESSION_SOURCE" ]; then
       fm_run_timed "$SESSION_START_BUDGET" \
-        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
         "$SCRIPT_DIR/fm-session-start.sh" --reemit --source "$SESSION_SOURCE"
     else
       fm_run_timed "$SESSION_START_BUDGET" \
-        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+        env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
         "$SCRIPT_DIR/fm-session-start.sh" --reemit
     fi
   elif [ -n "$SESSION_SOURCE" ]; then
     fm_run_timed "$SESSION_START_BUDGET" \
-      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
       "$SCRIPT_DIR/fm-session-start.sh" --source "$SESSION_SOURCE"
   else
     fm_run_timed "$SESSION_START_BUDGET" \
-      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" \
+      env FM_SESSION_START_STAGE_FILE="$SESSION_START_STAGE_FILE" FM_SESSION_START_DEADLINE="$SESSION_START_DEADLINE" \
       "$SCRIPT_DIR/fm-session-start.sh"
   fi
   SESSION_START_RC=$?
@@ -743,16 +745,32 @@ fi
 # re-block this digest and race the worker's sweeps against themselves.
 stage bootstrap
 subsection "BOOTSTRAP"
+# Bootstrap's backlog reads keep their no-progress bound inside this digest's
+# runtime bound: each gets a third of the time left, so a wedged backend cut
+# once in each of bootstrap's two sweeps (close replay, reconcile) still leaves
+# a third for the sections after them. An operator value stays an upper limit.
+BOOT_BACKLOG_SECS=${FM_BACKLOG_ROW_TIMEOUT_SECS:-}
+case "${FM_SESSION_START_DEADLINE:-}" in
+  ''|*[!0-9]*) ;;
+  *)
+    boot_share=$(( (FM_SESSION_START_DEADLINE - $(date +%s)) / 3 ))
+    [ "$boot_share" -ge 1 ] || boot_share=1
+    case "$BOOT_BACKLOG_SECS" in
+      ''|*[!0-9]*) BOOT_BACKLOG_SECS=$boot_share ;;
+      *) [ "$BOOT_BACKLOG_SECS" -gt 0 ] && [ "$BOOT_BACKLOG_SECS" -le "$boot_share" ] || BOOT_BACKLOG_SECS=$boot_share ;;
+    esac
+    ;;
+esac
 if [ "$READ_ONLY" -eq 1 ]; then
-  BOOT_OUT=$(FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+  BOOT_OUT=$(FM_BACKLOG_ROW_TIMEOUT_SECS=$BOOT_BACKLOG_SECS FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
     FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/fm-bootstrap.sh" 2>&1)
 elif [ "$REEMIT" -eq 1 ]; then
-  BOOT_OUT=$(FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_LOCKED=1 FM_BOOTSTRAP_NETWORK=skip \
+  BOOT_OUT=$(FM_BACKLOG_ROW_TIMEOUT_SECS=$BOOT_BACKLOG_SECS FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_LOCKED=1 FM_BOOTSTRAP_NETWORK=skip \
     FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" "$SCRIPT_DIR/fm-bootstrap.sh" 2>&1)
 else
   BOOT_OUT=$(
     "$SCRIPT_DIR/fm-herdr-session-cleanup.sh" 2>&1 || true
-    FM_BOOTSTRAP_NETWORK=skip FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" \
+    FM_BACKLOG_ROW_TIMEOUT_SECS=$BOOT_BACKLOG_SECS FM_BOOTSTRAP_NETWORK=skip FM_TASKS_AXI_COMPATIBLE="$TASKS_AXI_COMPATIBLE" \
       "$SCRIPT_DIR/fm-bootstrap.sh" 2>&1
   )
 fi

@@ -422,7 +422,7 @@ family_for_basename() {
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
     fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
-    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
+    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     fm-afk-inject-herdr-e2e.test.sh|fm-afk-launch.test.sh|fm-backend-autodetect-smoke.test.sh|\

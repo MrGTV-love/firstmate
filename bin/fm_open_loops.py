@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import signal
 import sqlite3
 import subprocess
@@ -19,6 +20,8 @@ import tempfile
 import time
 
 BIN = Path(__file__).resolve().parent
+PROGRESS_API = runpy.run_path(str(BIN / "fm-duration.py"))
+COMMUNICATE_PROGRESS = PROGRESS_API["communicate_progress"]
 GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota floor
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
@@ -57,10 +60,6 @@ def is_local_origin(origin):
 
 SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.TimeoutExpired,
                  sqlite3.Error, json.JSONDecodeError)
-
-
-class CollectionDeadline(Exception):
-    pass
 
 
 class PrHeadMissing(Exception):
@@ -157,9 +156,9 @@ class Collector:
         self.ages.update(supplied)
         if any(type(v) is not int or v < 0 for v in self.ages.values()):
             raise ValueError("age limits must be non-negative integer seconds")
-        self.timeout = config.get("command_timeout_seconds", 60)
-        if type(self.timeout) is not int or not 1 <= self.timeout <= 300:
-            raise ValueError("command_timeout_seconds must be 1..300")
+        self.timeout = config.get("command_timeout_seconds", PROGRESS_API["NO_PROGRESS_LIMIT"])
+        if type(self.timeout) is not int or not 1 <= self.timeout <= PROGRESS_API["NO_PROGRESS_LIMIT"]:
+            raise ValueError("command_timeout_seconds must be 1..900 (no-progress seconds)")
 
     def process_table(self, pids=None):
         if pids is not None and not pids:
@@ -188,7 +187,6 @@ class Collector:
                 raise
 
     def stop_command(self, child):
-        previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
         descendants = {}
         try:
             try:
@@ -230,7 +228,6 @@ class Collector:
             child.wait()
             child.stdout.close()
             child.stderr.close()
-            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
 
     def run(self, args, cwd=None, missing_ok=False, env=None):
         command = [str(a) for a in args]
@@ -238,8 +235,10 @@ class Collector:
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
                                  stdin=subprocess.DEVNULL, start_new_session=True)
         try:
-            stdout, stderr = child.communicate(timeout=self.timeout)
-        except (subprocess.TimeoutExpired, CollectionDeadline):
+            # Inner progress-owned reads keep their own bounds, so one hung
+            # lane is cut there and this source still answers.
+            stdout, stderr = COMMUNICATE_PROGRESS(child, self.timeout)
+        except BaseException:
             self.stop_command(child)
             raise
         if child.returncode == 75 and command[0] == str(GH_REST):
@@ -1731,20 +1730,16 @@ def main():
         print("error: " + json.dumps(str(error)))
         return 1
 
-    def deadline(_signum, _frame):
-        raise CollectionDeadline("collection exceeded its deadline")
-    signal.signal(signal.SIGALRM, deadline)
-    signal.alarm(collector.timeout * 10)
+    # Source commands own no-progress detection. An overall alarm would kill
+    # a productive collection merely because several valid reads took time.
     try:
         collector.collect()
     except QuotaLow as low:
         collector.hold_last(str(low))
-    except (CollectionDeadline, *SOURCE_ERRORS) as error:
+    except SOURCE_ERRORS as error:
         collector.degraded.insert(0, "reconciler: " + str(error)[:160])
         collector.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                       None, evidence="; ".join(collector.degraded))
-    finally:
-        signal.alarm(0)
     try:
         if args.check_in:
             if collector.stale_reason:

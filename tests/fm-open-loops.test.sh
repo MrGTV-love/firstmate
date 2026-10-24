@@ -1408,7 +1408,7 @@ def process_alive(pid, identity):
     state, current = observed.stdout.strip().split(None, 1)
     return current.strip() == identity and not state.startswith('Z')
 
-for expiry in ('command', 'collection'):
+for expiry in ('command',):
     timeout_root = world / ('descendants-' + expiry)
     timeout_home, timeout_code = timeout_root / 'home', timeout_root / 'code'
     for name in ('state', 'data', 'config', 'projects'):
@@ -1428,8 +1428,6 @@ subprocess.Popen([sys.executable, '-c', body], start_new_session=True)
 until = time.monotonic() + 20
 while not (home / 'descendant-pid').exists() and time.monotonic() < until:
     time.sleep(0.01)
-if os.environ['EXPIRY'] == 'collection':
-    os.kill(os.getppid(), signal.SIGALRM)
 time.sleep(120)
 ''')
     try:
@@ -1437,10 +1435,7 @@ time.sleep(120)
                               env=dict(env, FM_HOME=str(timeout_home), EXPIRY=expiry), timeout=60))
         assert not timed['complete'] and len(rows(timed, 'coverage')) == 1, timed
         evidence = rows(timed, 'coverage')['ledger degraded']['evidence']
-        if expiry == 'collection':
-            assert 'collection exceeded its deadline' in evidence, timed
-        else:
-            assert 'fleet snapshot' in evidence or 'collection exceeded its deadline' in evidence, timed
+        assert 'fleet snapshot' in evidence, timed
         assert json.loads((timeout_home / 'state/open-loops.json').read_text()) == timed
         pids = [(int((timeout_home / (role + '-pid')).read_text()),
                  (timeout_home / (role + '-identity')).read_text().strip())
@@ -1459,84 +1454,64 @@ time.sleep(120)
                         os.kill(pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
-    print('PASS: ' + expiry + ' deadline owns resistant descendant cleanup', flush=True)
+    print('PASS: no-progress source failure owns resistant descendant cleanup', flush=True)
 
-# Overall deadlines escape every reader's normal error recovery and stop later work.
-for reader in ('origins', 'pr-checks', 'pr-state', 'questions'):
-    deadline_root = world / ('deadline-' + reader)
-    deadline_home, deadline_code, deadline_bin = (deadline_root / n for n in ('home', 'code', 'fakebin'))
-    for name in ('state', 'data', 'config', 'projects'):
-        (deadline_home / name).mkdir(parents=True)
-    deadline_bin.mkdir()
-    shutil.copytree(code / 'bin', deadline_code / 'bin')
-    # The named reader injects SIGALRM; allow normal REST-helper startup on loaded hosts.
-    (deadline_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=30)))
-    deadline_tasks = []
-    if reader == 'pr-state':
-        deadline_tasks = [task('failed-' + str(i), deadline_root / 'absent', state='failed', pr=PR_URL + str(i))
-                          for i in range(24)]
-        for deadline_task in deadline_tasks:
-            deadline_task['project'] = None
-    if reader in ('origins', 'pr-checks'):
-        for i in range(24 if reader == 'origins' else 1):
-            (deadline_home / 'projects' / str(i) / '.git').mkdir(parents=True)
-    if reader == 'questions':
-        for i in range(24):
-            (deadline_home / 'state' / (str(i) + '.status')).write_text('needs-decision [key=q]: question\n')
-    (deadline_home / 'attempts').write_text('')
-    (deadline_home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
-        tasks=deadline_tasks, backlog=dict(present=True, records=(
-            [dict(id='owns-prs', structured=True, state='done', links=[PR_URL + str(i) for i in range(24)])]
-            if reader == 'pr-checks' else [])))))  # owned PRs are the ones whose checks are fetched
-    script(deadline_code / 'bin/fm-fleet-snapshot.sh', '#!/usr/bin/env python3\n'
-           'import os\nfrom pathlib import Path\nhome = Path(os.environ["FM_HOME"])\n'
-           '(home / "collector-pid").write_text(str(os.getppid()))\nprint((home / "snapshot.json").read_text())\n')
-    driver = r'''#!/usr/bin/env python3
-import base64, json, os, signal, sys, time
+interval_home = world / 'interval-home'
+for name in ('state', 'data', 'config', 'projects'):
+    (interval_home / name).mkdir(parents=True)
+(interval_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=2)))
+script(world / 'inactive-source.py', r'''#!/usr/bin/env python3
+import os, subprocess, sys, time
 from pathlib import Path
-reader, command = os.environ['DEADLINE_READER'], Path(sys.argv[0]).name
-if command == 'git' and reader != 'origins':
-    print('https://github.com/test/project.git' if '--get' in sys.argv else '.git')
-    sys.exit(0)
-if command == 'git' and '--get' not in sys.argv:
-    print('.git')
-    sys.exit(0)
-if command == 'gh' and '/pulls?' in sys.argv[-1]:
-    pulls = [] if reader == 'pr-state' else [dict(number=i, html_url='https://github.com/test/project/pull/' + str(i),
-                  head=dict(sha='a' * 40), state='open') for i in range(24)]
-    sys.stdout.write('HTTP/2.0 200 OK\r\n\r\n' + json.dumps(pulls))
-    sys.exit(0)
-attempts = Path(os.environ['FM_HOME']) / 'attempts'
-with attempts.open('a') as stream:
-    stream.write(json.dumps([command, *sys.argv[1:]]) + '\n')
-if len(attempts.read_text().splitlines()) == 2:
-    (attempts.parent / 'deadline-trigger').write_text(json.dumps([command, *sys.argv[1:]]))
-    os.kill(int((attempts.parent / 'collector-pid').read_text()), signal.SIGALRM)
-time.sleep(0.7)
-print('source command failure', file=sys.stderr)
-sys.exit(1)
+home = Path(os.environ['FM_HOME'])
+identity = subprocess.check_output(['ps', '-p', str(os.getpid()), '-o', 'lstart='], text=True).strip()
+(home / 'source-identity').write_text(identity)
+(home / 'source-pid').write_text(str(os.getpid()))
+body = "import os,signal,subprocess,time;from pathlib import Path;signal.signal(signal.SIGTERM,signal.SIG_IGN);home=Path(os.environ['FM_HOME']);identity=subprocess.check_output(['ps','-p',str(os.getpid()),'-o','lstart='],text=True).strip();home.joinpath('descendant-identity').write_text(identity);home.joinpath('descendant-pid').write_text(str(os.getpid()));time.sleep(120)"
+subprocess.Popen([sys.executable, '-c', body], start_new_session=True)
+until = time.monotonic() + 20
+while not (home / 'descendant-pid').exists() and time.monotonic() < until:
+    time.sleep(0.01)
+print('source-started', flush=True)
+print('source-diagnostic', file=sys.stderr, flush=True)
+time.sleep(120)
+''')
+probe = r'''
+import json, runpy, subprocess, sys, time
+collector = runpy.run_path(sys.argv[1], run_name='fm_open_loops_probe')['Collector'](sys.argv[2], int(time.time()))
+text = lambda value: value.decode() if isinstance(value, bytes) else (value or '')
+try:
+    collector.run([sys.executable, sys.argv[3]])
+except subprocess.TimeoutExpired as error:
+    print(json.dumps(dict(timeout=error.timeout, stdout=text(error.output), stderr=text(error.stderr))))
+else:
+    print(json.dumps(None))
 '''
-    for command in (('git', 'gh', 'cat') if reader == 'questions' else ('git', 'gh')):
-        script(deadline_bin / command, driver)
-    deadline_env = dict(env, FM_HOME=str(deadline_home), DEADLINE_READER=reader,
-                        PATH=f'{deadline_bin}:{env["PATH"]}')
-    deadline_report = json.loads(out([deadline_code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'],
-                                    env=deadline_env, timeout=120))
-    assert not deadline_report['complete'] and len(rows(deadline_report, 'coverage')) == 1, deadline_report
-    assert 'collection exceeded its deadline' in rows(deadline_report, 'coverage')['ledger degraded']['evidence'], (reader, deadline_report)
-    attempts = [json.loads(line) for line in (deadline_home / 'attempts').read_text().splitlines()]
-    expected_requests = {
-        'origins': [['git', '-C', str(deadline_home / 'projects' / str(i)),
-                     'config', '--get', 'remote.origin.url'] for i in range(24)],
-        'pr-checks': [['gh', 'api', '-i',
-                       'repos/test/project/commits/' + 'a' * 40 + '/check-runs?per_page=100']],
-        'pr-state': [['gh', 'api', '-i', 'repos/test/project/pulls/' + str(i)] for i in range(24)],
-        'questions': [['cat', str(deadline_home / 'state' / (str(i) + '.status'))] for i in range(24)],
-    }
-    assert len(attempts) == 2 and all(request in expected_requests[reader] for request in attempts), (reader, attempts)
-    assert json.loads((deadline_home / 'deadline-trigger').read_text()) == attempts[-1], (reader, attempts)
-    assert json.loads((deadline_home / 'state/open-loops.json').read_text()) == deadline_report
-    print('PASS: deadline escapes ' + reader + ' source recovery', flush=True)
+try:
+    expired = json.loads(out([sys.executable, '-I', '-c', probe, code / 'bin/fm_open_loops.py', interval_home,
+                              world / 'inactive-source.py'], env=dict(env, FM_HOME=str(interval_home)), timeout=60))
+    assert expired is not None, 'inactive source must expire'
+    assert expired['timeout'] == 2, expired
+    assert 'source-started' in expired['stdout'] and 'source-diagnostic' in expired['stderr'], expired
+    pids = [(int((interval_home / (role + '-pid')).read_text()),
+             (interval_home / (role + '-identity')).read_text().strip())
+            for role in ('source', 'descendant')]
+    until = time.monotonic() + 2
+    while any(process_alive(pid, identity) for pid, identity in pids) and time.monotonic() < until:
+        time.sleep(0.01)
+    assert not any(process_alive(pid, identity) for pid, identity in pids), pids
+finally:
+    for role in ('source', 'descendant'):
+        pid_path, identity_path = (interval_home / (role + suffix) for suffix in ('-pid', '-identity'))
+        if pid_path.exists() and identity_path.exists():
+            pid, identity = int(pid_path.read_text()), identity_path.read_text().strip()
+            if process_alive(pid, identity):
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+print('PASS: no-progress expiry reports the configured interval and keeps captured output', flush=True)
+
 # Conditional reads and the quota floor: a repeated run over unchanged forge data is answered with 304s, and a run
 # that finds the recorded quota below the floor publishes the last rows marked stale with the reset time.
 double.pop('pulls_by_repo', None)
@@ -1921,14 +1896,19 @@ assert identity
 time.sleep(120)
 ''')
 (code / 'bin/fm-crew-state.sh').chmod(0o755)
+# The nested per-lane read owns its own no-progress bound, far inside the
+# collector's: the hung lane is cut there and the snapshot source still answers.
 try:
     expired = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--heartbeat', '--json'],
-                             env=env, text=True, capture_output=True, timeout=60)
+                             env=dict(env, FM_SNAPSHOT_CREW_STATE_TIMEOUT='2'), text=True,
+                             capture_output=True, timeout=60)
     assert expired.returncode == 0, (expired.stdout, expired.stderr)
     report = json.loads(expired.stdout)
     assert not report['complete'], report
     coverage = [row for row in report['rows'] if row['category'] == 'coverage']
-    assert len(coverage) == 1 and 'fleet snapshot' in coverage[0]['evidence'], report
+    assert (len(coverage) == 1 and 'fleet snapshot' not in coverage[0]['evidence']
+            and 'worker: current-state command failed (exit 124)' in coverage[0]['evidence']), report
+    assert any(row['category'] == 'unanswered_question' for row in report['rows']), report
     assert (home / 'crew-pid').exists(), 'real snapshot must reach its nested bounded worker read'
     pid = int((home / 'crew-pid').read_text())
     identity = (home / 'crew-identity').read_text().strip()
@@ -1938,7 +1918,7 @@ try:
         if not alive or time.monotonic() >= until:
             break
         time.sleep(0.01)
-    assert not alive, 'snapshot nested timeout group must not outlive collector cancellation'
+    assert not alive, 'the nested no-progress cut must not leave the worker read running'
     assert not list(temporary.glob('fm-fleet-*')), list(temporary.iterdir())
     assert json.loads((home / 'state/open-loops.json').read_text()) == report
 finally:
@@ -1949,7 +1929,7 @@ finally:
                 os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-print('PASS: real snapshot cancellation reaps nested groups and removes temporary inventory', flush=True)
+print('PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory', flush=True)
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 import datetime as dt, json, os, re, shutil, subprocess, sys, time

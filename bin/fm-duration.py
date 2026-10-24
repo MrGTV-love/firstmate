@@ -9,7 +9,28 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
+       fm-duration.py keep-going INACTIVITY_SECONDS -- COMMAND [ARGS...]
+       fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS [PATH...]
        fm-duration.py check-literals [--base REF | --report]
+
+keep-going is the record-free operational command runner: its only automatic
+stop is INACTIVITY_SECONDS without output or cumulative process-tree CPU growth.
+It has no absolute wall-clock bound and writes no timing or backlog records.
+Each nested runner keeps its own bound, so a hung inner read is stopped by its
+own owner and an outer owner sees an inner sampler's CPU only until then.
+Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
+(/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps. When neither can
+sample, one cpu_telemetry_unavailable line names the platform and nothing is
+stopped for inactivity: a missing sample is neither progress nor a stall.
+communicate_progress provides the same inactivity rule for captured Python
+sources whose caller owns descendant cleanup. progress-check keeps an atomic,
+identity-bound observation record for an existing PID plus optional file
+signatures; it returns 124 only after consecutive valid observations show no
+progress for the inactivity interval. First, failed, corrupt or reused-PID
+observations never authorize a stop. Missing telemetry does not prove a stall.
+These inactivity bounds exist to recover genuinely hung work, not to cap the
+duration of productive work. The default operational policy is 15 quiet minutes;
+callers' historical timeout overrides now select inactivity intervals instead.
 
 The JSONL table is FM_DURATION_FILE, otherwise FM_DURATION_HOME/data/command-durations.jsonl
 (the owning home fm-spawn exports to ship and scout workers), otherwise
@@ -164,7 +185,6 @@ import re
 import signal
 import shlex
 import selectors
-import sqlite3
 import stat
 import struct
 import subprocess
@@ -495,8 +515,14 @@ def own_timeout(key, milliseconds, event_id=None):
 
 
 def import_nm(database, run_id):
-    with contextlib.closing(sqlite3.connect(Path(database).absolute().as_uri() + '?mode=ro', uri=True)) as db:
-        steps = db.execute('SELECT id, step_name, duration_ms, exit_code FROM step_results WHERE run_id = ? AND completed_at IS NOT NULL AND duration_ms > 0 AND exit_code IS NOT NULL', (run_id,)).fetchall()
+    # Progress-only execution does not consume SQLite; load it only for statistics.
+    import sqlite3
+
+    try:
+        with contextlib.closing(sqlite3.connect(Path(database).absolute().as_uri() + '?mode=ro', uri=True)) as db:
+            steps = db.execute('SELECT id, step_name, duration_ms, exit_code FROM step_results WHERE run_id = ? AND completed_at IS NOT NULL AND duration_ms > 0 AND exit_code IS NOT NULL', (run_id,)).fetchall()
+    except sqlite3.Error as error:
+        raise RuntimeError(str(error)) from error
     with ledger() as (handle, rows):
         known = {r.get('sample_id') for r in rows}
         for identity, name, duration, code in steps:
@@ -508,14 +534,46 @@ def import_nm(database, run_id):
                                           cpus=None, recorded_at=now_iso()))
 
 
-def tree_cpu(pid, observed):
+def proc_table(pid):
+    """{pid: (ppid, cpu_seconds, identity)} from a Linux-compatible /proc, or None.
+
+    Git Bash/MSYS exposes /proc/<pid>/stat but its Cygwin ps rejects the -o
+    fields below, so the source is chosen by capability, never by platform name
+    (the same rule as fm_pid_identity in fm-wake-lib.sh).
+    """
+    root = Path(os.environ.get('FM_PROC_ROOT_OVERRIDE') or '/proc')
+    if not os.access(root / str(pid) / 'stat', os.R_OK):
+        return None
+    try:
+        ticks = os.sysconf('SC_CLK_TCK')
+    except (AttributeError, OSError, ValueError):
+        ticks = 100
+    table = {}
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return None
+    for name in names:
+        if not name.isdigit():
+            continue
+        try:
+            line = (root / name / 'stat').read_text()
+            # Fields after the final comm delimiter: [1] ppid (field 4),
+            # [11]+[12] utime+stime (fields 14+15), [19] starttime (field 22).
+            fields = line[line.rindex(')') + 1:].split()
+            table[int(name)] = (int(fields[1]), (int(fields[11]) + int(fields[12])) / ticks, ('proc', fields[19]))
+        except (OSError, ValueError, IndexError):
+            continue  # The process exited between the listing and the read.
+    return table
+
+
+def ps_table():
     try:
         result = subprocess.run(['ps', '-axo', 'pid=,ppid=,time=,lstart='], capture_output=True, text=True,
                                 env=dict(os.environ, LC_ALL='C'))
         if result.returncode:
             return None
-        children = collections.defaultdict(list)
-        times = {}
+        table = {}
         for line in result.stdout.splitlines():
             fields = line.split()
             if len(fields) < 4:
@@ -527,19 +585,122 @@ def tree_cpu(pid, observed):
             clock_seconds = 0.0
             for part in parts:
                 clock_seconds = clock_seconds * 60 + float(part)
-            seconds += clock_seconds
-            children[parent].append(child)
-            times[child] = (seconds, tuple(fields[3:]))
+            table[child] = (parent, seconds + clock_seconds, tuple(fields[3:]))
+        return table
     except (OSError, ValueError):
+        return None
+
+
+def tree_cpu(pid, observed):
+    """Cumulative CPU of pid's tree, or None when neither /proc nor ps can sample."""
+    table = proc_table(pid)
+    if table is None:
+        table = ps_table()
+    if table is None:
         return None  # A failed telemetry sample is no progress sample, never a stop reason.
+    children = collections.defaultdict(list)
+    for child, (parent, _, _) in table.items():
+        children[parent].append(child)
     todo = [pid]
     while todo:
         child = todo.pop()
-        if child in times:
-            seconds, identity = times[child]
+        if child in table:
+            _, seconds, identity = table[child]
             observed[(child, identity)] = max(observed.get((child, identity), 0), seconds)
         todo.extend(children[child])
     return sum(observed.values())
+
+
+def warn_blind_telemetry():
+    scalar('cpu_telemetry_unavailable', f'neither /proc/<pid>/stat nor ps can sample process CPU on '
+           f'{sys.platform}; hung work cannot be recovered here, so nothing is stopped '
+           'for inactivity while CPU cannot be sampled', sys.stderr)
+
+
+def communicate_progress(child, inactivity):
+    """Wait for a captured source, raising TimeoutExpired only on proven inactivity.
+
+    The caller owns cleanup so its existing descendant/identity discipline is
+    retained. TimeoutExpired carries accumulated output on each observation;
+    the raised one names the inactivity interval, not the short poll slice,
+    because callers publish str(error) as operator evidence.
+    """
+    observed = {}
+    previous_cpu, previous_bytes = -1, -1
+    last_progress = time.monotonic()
+    warned = False
+    while True:
+        try:
+            return child.communicate(timeout=min(1, inactivity / 4))
+        except subprocess.TimeoutExpired as error:
+            cpu = tree_cpu(child.pid, observed)
+            size = len(error.output or b'') + len(error.stderr or b'')
+            now = time.monotonic()
+            if (cpu is not None and cpu > previous_cpu) or size > previous_bytes:
+                last_progress = now
+            previous_bytes = size
+            if cpu is None:
+                if not warned:
+                    warned = True
+                    warn_blind_telemetry()
+                continue
+            previous_cpu = max(previous_cpu, cpu)
+            if now - last_progress >= inactivity:
+                error.timeout = inactivity
+                raise
+
+
+def progress_check(path, pid, inactivity, paths):
+    """124 only after repeated valid samples prove no CPU or file progress.
+
+    The saved process start identity fences PID reuse. A first/failed sample,
+    corrupt record, missing process, or clock reset never authorizes a signal.
+    Callers own their lock and must recheck its identity before acting.
+    """
+    observed = {}
+    cpu = tree_cpu(pid, observed)
+    if cpu is None:
+        warn_blind_telemetry()
+        return 0
+    if not any(child == pid for child, _ in observed):
+        return 0
+    identity = next(identity for (child, identity) in observed if child == pid)
+    files = []
+    for name in paths:
+        try:
+            info = os.stat(name)
+            files.append([name, info.st_ino, info.st_size, info.st_mtime_ns])
+        except FileNotFoundError:
+            files.append([name, None])
+        except OSError:
+            return 0
+    now = time.monotonic()
+    record = dict(pid=pid, identity=list(identity), files=files,
+                  cpu=[[child, list(start), value] for (child, start), value in observed.items()],
+                  since=now, sampled=now)
+    try:
+        previous = json.loads(path.read_text())
+        if (previous['pid'] == pid and previous['identity'] == list(identity)
+                and 0 <= previous['since'] <= previous['sampled'] <= now):
+            old = {(child, tuple(start)): value for child, start, value in previous['cpu']}
+            advancing = files != previous['files'] or any(value > old.get(key, -1) for key, value in observed.items())
+            if not advancing:
+                record['since'] = previous['since']
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    temporary = path.with_name(path.name + '.' + str(os.getpid()))
+    try:
+        temporary.write_text(json.dumps(record))
+        os.replace(temporary, path)
+    except OSError:
+        return 0  # Unpublishable evidence is not permission to stop work.
+    finally:
+        with contextlib.suppress(OSError):
+            temporary.unlink()
+    if now - record['since'] >= inactivity:
+        scalar('no_progress', f'pid={pid} no CPU or watched-file progress for {now - record["since"]:.1f}s', sys.stderr)
+        return 124
+    return 0
 
 
 def signal_group(child, sig):
@@ -800,20 +961,24 @@ def gate(key, command, log_fd, wait_file=None):
         release_slot(fd)
 
 
-def run(key, command, calibration_file):
+def run(key, command, calibration_file, *, inactivity=None):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
     import termios
-    try:
-        advisory = limit(key, 99, 3, 0)
-    except (OSError, ValueError) as error:
-        scalar('calibration_error', f'{error}; running {key} with no measured advisory', sys.stderr)
-        advisory = 0
-    no_progress = positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT)
-    absolute = positive_override('FM_DURATION_ABSOLUTE_SECS', ABSOLUTE_LIMIT)
+    advisory = 0
+    if inactivity is None:
+        try:
+            advisory = limit(key, 99, 3, 0)
+        except (OSError, ValueError) as error:
+            scalar('calibration_error', f'{error}; running {key} with no measured advisory', sys.stderr)
+    no_progress = positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT) if inactivity is None else inactivity
+    # Operational reads have no wall-clock cutoff: this mode owns only a
+    # no-output/no-CPU bound, to recover a genuinely stalled command.
+    absolute = positive_override('FM_DURATION_ABSOLUTE_SECS', ABSOLUTE_LIMIT) if inactivity is None else math.inf
     started = time.monotonic()
     load_start = load_now()
     child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key)
+    owner = os.getppid()
     if calibration_file is not None:
         child_env['FM_DURATION_CALIBRATION_FILE'] = str(calibration_file)
     child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -852,6 +1017,7 @@ def run(key, command, calibration_file):
     next_progress_report = started
     slower_reported = False
     killed = False
+    blind = warned_blind = False
     try:
         while child.poll() is None:
             if not streams.get_map():
@@ -865,11 +1031,15 @@ def run(key, command, calibration_file):
             if child.poll() is None and time.monotonic() >= next_cpu_sample:
                 sample = tree_cpu(child.pid, observed_cpu)
                 cpu = cpu if sample is None else sample
-                next_cpu_sample = time.monotonic() + 1  # observation cadence, not a deadline
+                blind = sample is None and inactivity is not None  # Missing evidence cannot prove a stall.
+                if blind and not warned_blind:
+                    warned_blind = True
+                    warn_blind_telemetry()
+                next_cpu_sample = time.monotonic() + min(1, no_progress / 4)  # Observation, not a deadline.
             now = time.monotonic()
             if cpu > previous_cpu or output_bytes > previous_bytes:
                 last_progress = now
-                if now >= next_progress_report:
+                if now >= next_progress_report and inactivity is None:
                     scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
                     next_progress_report = now + PROGRESS_REPORT_AFTER
                 previous_cpu, previous_bytes = max(previous_cpu, cpu), output_bytes
@@ -879,11 +1049,14 @@ def run(key, command, calibration_file):
                     signal_group(child, signal.SIGKILL)  # the cleanup stalled or outlived the absolute limit
             elif child.poll() is None:
                 idle = now - last_progress
-                if now - started >= absolute:
+                if inactivity is not None and os.getppid() != owner:
+                    interrupted.append(signal.SIGTERM)
+                    begin_stop()
+                elif now - started >= absolute:
                     expired = True
                     scalar('absolute_limit', f'{key} reached the {absolute}s absolute limit; stopping', sys.stderr)
                     begin_stop()
-                elif idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX):
+                elif idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX) and not blind:
                     expired = True
                     scalar('no_progress', f'{key} made no output or CPU progress for {idle:.0f}s; stopping', sys.stderr)
                     begin_stop()
@@ -907,6 +1080,8 @@ def run(key, command, calibration_file):
             code = 128 - code
         if interrupted:
             code = 128 + interrupted[-1]
+        if inactivity is not None:
+            return code  # Read-only operational mode never writes timing/backlog records.
         duration_ms = round((time.monotonic() - started) * 1000)
         calibration = calibration_file is None or not calibration_file.exists() or calibration_file.read_text().strip() == '1'
         timed_out = expired and not interrupted
@@ -1085,6 +1260,14 @@ def main():
     lim.add_argument('--margin', type=float, default=3); lim.add_argument('--fallback', type=nonnegative, default=0)
     runner = commands.add_parser('run')
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
+    progress = commands.add_parser('keep-going')
+    progress.add_argument('inactivity', type=float)
+    progress.add_argument('command', nargs=argparse.REMAINDER)
+    observer = commands.add_parser('progress-check')
+    observer.add_argument('record', type=Path)
+    observer.add_argument('pid', type=int)
+    observer.add_argument('inactivity', type=float)
+    observer.add_argument('paths', nargs='*')
     gater = commands.add_parser('gate')
     gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
     nm = commands.add_parser('import-nm')
@@ -1114,6 +1297,15 @@ def main():
         import_nm(args.database, args.run_id)
     elif args.action == 'check-literals':
         return check_literals(args.base, args.report)
+    elif args.action in ('keep-going', 'progress-check'):
+        if not math.isfinite(args.inactivity) or args.inactivity <= 0:
+            parser.error('inactivity must be finite and positive')
+        if args.action == 'progress-check':
+            return progress_check(args.record, args.pid, args.inactivity, args.paths)
+        command = args.command[1:] if args.command[:1] == ['--'] else args.command
+        if not command:
+            parser.error('keep-going requires -- COMMAND')
+        return run('operational-read', command, None, inactivity=args.inactivity)
     elif args.action == 'run':
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
@@ -1141,6 +1333,6 @@ def main():
 if __name__ == '__main__':
     try:
         sys.exit(main())
-    except (OSError, ValueError, RuntimeError, sqlite3.Error, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, RuntimeError, ImportError, subprocess.CalledProcessError) as error:
         scalar('error', str(error))
         sys.exit(1)

@@ -316,16 +316,6 @@ SH
   printf '%s\n' "$fb"
 }
 
-make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
-  local dir=$1 tb="$1/notimeoutbin" tool real
-  mkdir -p "$tb"
-  for tool in bash git grep sed head cut tail dirname perl sleep; do
-    real=$(command -v "$tool" || true)
-    [ -n "$real" ] || fail "missing tool for no-timeout path: $tool"
-    ln -s "$real" "$tb/$tool"
-  done
-  printf '%s\n' "$tb"
-}
 
 # Run the helper for one case dir. FM_FAKE_* env (run output, busy flag) are read
 # from the caller's environment by the fakes above.
@@ -3398,52 +3388,87 @@ test_dead_window_still_reports_active_run_step() {
   pass "closed pane still reports an active run-step"
 }
 
-test_no_timeout_uses_perl_bound() {
+make_python_free_toolbin() {  # <dir> -> echoes toolbin path
+  local dir=$1 tb="$1/nopythonbin" tool real
+  mkdir -p "$tb"
+  for tool in bash git grep sed head cut tail dirname perl sleep ps; do
+    real=$(command -v "$tool" || true)
+    [ -n "$real" ] || fail "missing tool for the Python-free path: $tool"
+    ln -s "$real" "$tb/$tool"
+  done
+  printf '%s\n' "$tb"
+}
+
+# A wedged daemon (no output, no CPU) costs one no-progress interval: its first
+# read is cut, no later run-store read runs, and the pane and status-log
+# fallback still answer, with the cut disclosed. Python-free, so the Perl
+# progress runner owns the bound.
+test_wedged_daemon_falls_back_to_pane() {
   reset_fakes
   local d toolbin out start elapsed calls_file calls pidfile i
-  d=$(new_case no-timeout)
-  make_repo_on_branch "$d/wt" fm/feat-timeout
+  d=$(new_case wedged-daemon)
+  make_repo_on_branch "$d/wt" fm/feat-wedged
   make_fakebin "$d" >/dev/null
   calls_file="$d/no-mistakes.calls"
   : > "$calls_file"
-  # The fake blocks past the bound, so the bound is what ends it. It records its
-  # pid so the test can prove the bound left nothing behind and reap it even when
-  # an assertion fails or the run is interrupted, and it stops itself at the
-  # suite's stub ceiling so a leaked one costs no CPU and ends on its own.
+  # The fake records its pid so the test can prove the bound left nothing
+  # behind, then blocks without output or CPU until the suite's stub ceiling.
   pidfile="$d/no-mistakes.pid"
   cat > "$d/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${FM_FAKE_NM_CALLS:-/dev/null}"
 fm_test_record_process "$FM_FAKE_NM_PIDFILE" || exit 1
-while [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done
+exec sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
 SH
   chmod +x "$d/fakebin/no-mistakes"
-  fm_test_track_process "$pidfile" "$d/fakebin/no-mistakes"
-  toolbin=$(make_no_timeout_toolbin "$d")
-  fm_write_meta "$d/state/feat-timeout.meta" "window=fm:fm-feat-timeout" "worktree=$d/wt" "kind=ship" \
+  fm_test_track_process "$pidfile" sleep
+  toolbin=$(make_python_free_toolbin "$d")
+  fm_write_meta "$d/state/feat-wedged.meta" "window=fm:fm-feat-wedged" "worktree=$d/wt" "kind=ship" \
     "harness=claude"
   FM_FAKE_BUSY=1
-  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-timeout)
-  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-timeout busy --gen "$gen" \
+  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-wedged)
+  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-wedged busy --gen "$gen" \
     --source claude-hook --event user-prompt-submit
   start=$SECONDS
-  out=$(FM_FAKE_NM_CALLS="$calls_file" FM_FAKE_NM_PIDFILE="$pidfile" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-timeout)
+  out=$(FM_FAKE_NM_CALLS="$calls_file" FM_FAKE_NM_PIDFILE="$pidfile" PATH="$d/fakebin:$toolbin" FM_STATE_OVERRIDE="$d/state" FM_CREW_STATE_NM_TIMEOUT=1 "$CREW_STATE" feat-wedged)
   elapsed=$((SECONDS - start))
   [ -s "$pidfile" ] || fail "the fake no-mistakes never ran, so the bound proved nothing"
   # The bound must take the fake down with it, not merely stop waiting for it.
   for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" || break
+    fm_test_process_alive "$pidfile" sleep || break
     sleep 0.1
   done
-  ! fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" \
-    || fail "the timed-out no-mistakes call was left running after the bound"
-  assert_contains "$out" "state: working" "timed-out no-mistakes falls back to pane"
-  assert_contains "$out" "source: pane" "timed-out no-mistakes -> pane source"
-  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed, not hidden"
-  [ "$elapsed" -lt 5 ] || fail "perl timeout did not bound no-mistakes calls (elapsed ${elapsed}s)"
+  ! fm_test_process_alive "$pidfile" sleep \
+    || fail "the stalled no-mistakes call was left running after the bound"
+  assert_contains "$out" "state: working" "a wedged daemon falls back to the pane"
+  assert_contains "$out" "source: pane" "a wedged daemon leaves the pane as the source"
+  assert_contains "$out" "run-store: skipped (no output or CPU progress)" "the cut lookup is disclosed, not hidden"
+  # 2026-10-24, Mac-Studio.local: eight loaded-host runs took 2,2,3,2,2,2,2,1s
+  # (worst 3s). CI run 40058102924 passed this same <10s check: integer elapsed
+  # <=9s is all its buffered log proves, not an exact per-case duration.
+  # Keep 10s above both observed bounds, without raising the ceiling: detect a
+  # broken sampler/latch waiting for the 120s stub instead of prompt pane fallback.
+  [ "$elapsed" -lt 10 ] || fail "the no-progress bound did not cut the wedged read (elapsed ${elapsed}s)"
   calls=$(awk 'END { print NR + 0 }' "$calls_file" 2>/dev/null || echo 0)
-  [ "$calls" -eq 1 ] || fail "empty no-mistakes status triggered extra lookups ($calls calls)"
-  pass "no timeout command uses perl bound"
+  [ "$calls" -eq 1 ] || fail "a wedged daemon was read again after the cut ($calls calls)"
+  pass "a wedged daemon costs one read and leaves the pane to answer (elapsed ${elapsed}s)"
+}
+
+# A healthy daemon pays no extra probe: a bound live run makes no daemon status call.
+test_healthy_daemon_read_makes_no_probe() {
+  reset_fakes
+  local d out probes
+  d=$(new_case healthy-no-probe)
+  make_repo_on_branch "$d/wt" fm/feat-healthy
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-healthy.meta" "window=fm:fm-feat-healthy" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_running fm/feat-healthy)"
+  FM_FAKE_DAEMON_PROBE_LOG="$d/probes"
+  out=$(run_crew_state "$d" feat-healthy)
+  assert_contains "$out" "source: run-step" "a healthy daemon's run answers"
+  probes=$(awk 'END { print NR + 0 }' "$d/probes" 2>/dev/null || echo 0)
+  [ "$probes" -eq 0 ] || fail "a healthy read made $probes daemon status probe(s)"
+  pass "a healthy daemon read makes no daemon status probe"
 }
 
 # A cut run-store lookup is skipped, so the pane still decides liveness: a dead
@@ -3471,7 +3496,7 @@ SH
   assert_not_contains "$out" "state: working" "an old working declaration cannot revive a dead worker"
   assert_contains "$out" "state: unknown" "a gone worker with a cut store reads unknown"
   assert_contains "$out" "backend target gone" "the pane still decides liveness after a cut lookup"
-  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed"
+  assert_contains "$out" "run-store: skipped (no output or CPU progress)" "the cut lookup is disclosed"
   pass "a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker"
 }
 
@@ -4444,15 +4469,20 @@ PY
   pass 'no run for this branch beside a live run elsewhere reads absent, not unreadable'
 }
 
-# The capped-overview sqlite reader runs inside the same per-read budget as
-# every other no-mistakes state read, so a contended database cannot stall a
-# crew poll: a reader that never returns must be killed and fall through to the
+# The capped-overview sqlite reader shares the operational no-progress bound.
+# A silent reader that does no CPU work must be stopped and fall through to the
 # reader-unavailable verdict, disclosed as a skipped run-store lookup.
+# Keep the interpreter for the independent progress owner real in this fixture.
 test_capped_inventory_reader_is_time_bounded() {
   make_capped_runs_case capped-slow-reader running pending hidden
   local d=$TMP_ROOT/capped-slow-reader out started elapsed
   cat > "$d/fakebin/python3" <<'SH'
 #!/usr/bin/env bash
+# Stall the inventory, not the independent progress monitor's interpreter or
+# its POSIX capability check; both run the real interpreter on this PATH.
+if [ "${1##*/}" = fm-duration.py ] || [ "${1:-}" = -c ]; then
+  exec "${FM_TEST_PROGRESS_PYTHON:?}" "$@"
+fi
 printf 'invoked\n' >> "${0%/*}/python3.calls"
 exec sleep 30
 SH
@@ -4460,14 +4490,16 @@ SH
   FM_CREW_STATE_NM_TIMEOUT=2
   export FM_CREW_STATE_NM_TIMEOUT
   started=$SECONDS
-  out=$(run_crew_state "$d" competing)
+  # The interpreter itself, not a version-manager shim that would put its own
+  # python3 ahead of this fixture's on PATH.
+  out=$(FM_TEST_PROGRESS_PYTHON="$(python3 -c 'import sys; print(sys.executable)')" run_crew_state "$d" competing)
   elapsed=$((SECONDS - started))
   unset FM_CREW_STATE_NM_TIMEOUT
   [ "$elapsed" -lt 10 ] || fail "the capped inventory reader ran unbounded for ${elapsed}s"
   assert_contains "$out" 'state: unknown' 'an unreachable inventory reader cannot establish a verdict'
   assert_contains "$out" 'reader unavailable' 'a killed reader reports the same unavailable reader path'
   [ -s "$d/fakebin/python3.calls" ] || fail 'the inventory reader never ran, so the bound proved nothing'
-  assert_contains "$out" 'run-store: skipped (read budget exceeded)' 'the killed reader is disclosed as a skipped lookup'
+  assert_contains "$out" 'run-store: skipped (no output or CPU progress)' 'the stopped reader is disclosed as a skipped lookup'
   pass 'the capped inventory reader is bounded by the crew read budget'
 }
 
@@ -6056,7 +6088,8 @@ test_dead_window_ignores_stale_status_log
 test_no_run_tmux_unreadable_reads_unreachable_not_gone
 test_dead_window_still_reports_terminal_run_step
 test_dead_window_still_reports_active_run_step
-test_no_timeout_uses_perl_bound
+test_wedged_daemon_falls_back_to_pane
+test_healthy_daemon_read_makes_no_probe
 test_cut_store_does_not_revive_dead_worker_from_old_status
 test_responsive_lookups_are_not_pooled
 test_scout_skips_run_lookup

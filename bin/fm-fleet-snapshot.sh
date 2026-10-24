@@ -158,15 +158,10 @@ esac
 # Cross-home bounds are explicit so one broken or unexpectedly large home cannot
 # hang or explode the parent snapshot.
 FM_SNAPSHOT_SECONDMATES=${FM_SNAPSHOT_SECONDMATES:-20}
-# Loaded whole reads reached 16.28s (Case workspace lane, a loaded secondmate home,
-# 2026-10-17, before the 02:52Z reboot; reads after the reboot took 2.0 to 3.3s),
-# so this bound stays above normal latency and cuts only a hung command; it is
-# 20s under the 60s defaults of the callers that wait on this command
-# (fm_open_loops.py, fm-home-summary-refresh.sh). Reads run
-# FM_SNAPSHOT_LOCAL_READ_CONCURRENCY at a time, so more hung reads than that queue
-# another wave, and a shortened caller deadline can still end first.
-# measured: value=40 date=2026-10-17 host=Mac-Studio.local margin=2.46
-FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-40}
+# Local reads use fm-duration.py's 15-minute no-output/no-CPU policy so a slow
+# source finishes and contributes its observation. This inactivity bound still
+# recovers truly hung sources; there is no per-task wall-clock cutoff.
+FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-$((15 * 60))}
 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=${FM_SNAPSHOT_LOCAL_READ_CONCURRENCY:-8}
 FM_SNAPSHOT_BUDGET=${FM_SNAPSHOT_BUDGET:-5}
 FM_SNAPSHOT_CACHE_DIR=${FM_SNAPSHOT_CACHE_DIR:-$STATE/secondmate-summary-cache}
@@ -237,6 +232,8 @@ esac
 # shellcheck source=bin/fm-timeout-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-timeout-lib.sh"  # fm_run_timed: the shared hard bound
+# Answer the Python capability probe once here: each lane read runs in a subshell.
+fm_posix_python || true
 # shellcheck source=bin/fm-landed-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-landed-lib.sh"  # FM_LANDED_JQ_DEFS: the shared landed selector
@@ -282,8 +279,9 @@ schema, even when it contains no captain holds; older summaries are rejected. A
 home with neither a valid current ledger nor a valid current cached copy is
 reported unreadable with the reason; collection never computes a summary in
 that home.
-Each local per-task current-state read is bounded by FM_SNAPSHOT_CREW_STATE_TIMEOUT
-(default 40 seconds); a read that hits the bound reports state unknown. Local task
+Each local per-task current-state read uses FM_SNAPSHOT_CREW_STATE_TIMEOUT
+(default 900 seconds) without output or process-tree CPU progress to detect a
+stalled source; productive reads have no wall-clock cutoff and are included. Local task
 observations run concurrently, up to FM_SNAPSHOT_LOCAL_READ_CONCURRENCY (default 8).
 Remote secondmate endpoint liveness is not probed by this command.
 Terminal contradiction evidence uses
@@ -381,13 +379,13 @@ last_nonempty_line_to() {  # <file> <out-var>
   printf -v "$2" '%s' "$last"
 }
 
-# A local crew-state read is bounded so one slow child cannot extend this
-# snapshot without limit. Remote secondmate endpoint liveness is never read here.
-# A local read that hits the bound folds to state unknown.
+# A local crew-state read is progress-owned so a productive slow child finishes.
+# A proven no-progress stall folds to state unknown. Remote secondmate endpoint
+# liveness is never read here.
 crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
   local id=$1 captured_meta=${2:-} captured_status=${3:-} raw rest state source detail sep rc=0
   raw=$(
-    fm_run_timed "$FM_SNAPSHOT_CREW_STATE_TIMEOUT" \
+    fm_run_progress "$FM_SNAPSHOT_CREW_STATE_TIMEOUT" \
       env FM_ROOT_OVERRIDE="$FM_ROOT" \
       FM_HOME="$FM_HOME" \
       FM_STATE_OVERRIDE="$STATE" \

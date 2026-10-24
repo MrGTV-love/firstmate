@@ -4203,7 +4203,7 @@ test_watch_lifecycle_deadline_diagnostics() {
   out=$(node "$ROOT/tests/watch-lifecycle-expiry.mjs" omp "$repo" 2>&1)
   status=$?
   expect_code 0 "$status" "omp lifecycle deadline diagnostics: $out"
-  pass "omp shutdown, arm and host readiness, and unready retirement each log one expiry"
+  pass "omp explicit shutdown logs its retirement expiry; readiness has no wall-clock cutoff"
 }
 
 test_spawn_fixed_family

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# tests/fm-backlog-read-bound.test.sh - behavior tests for the per-item bound on
-# bin/fm-backlog-transition-lib.sh's backlog row read.
+# tests/fm-backlog-read-bound.test.sh - productive-read survival and genuine
+# no-progress recovery for bin/fm-backlog-transition-lib.sh's backlog reads.
 #
 # The defect this pins: bin/fm-bootstrap.sh's reconcile and close-replay sweeps
 # read the backlog backend once per item, and an unbounded read of a wedged
@@ -11,17 +11,21 @@
 # Both halves are proved here:
 #   - a deliberately hanging `tasks-axi show` cannot exceed the per-item bound,
 #     and the failure names the item it could not read
-#   - a session start against that same wedged backend still completes end to
-#     end, with every digest section present and a loud partial reconcile
+#   - a session start against that same wedged backend, at the shipped
+#     defaults, still completes end to end, with every digest section present
+#     and a loud partial reconcile: session start gives bootstrap's reads a
+#     third of its remaining FM_SESSION_START_TIMEOUT as their no-progress
+#     interval, so the read's own bound fires before the digest's
 #
-# The bound must hold on its own, independent of any particular tasks-axi
-# install, so the fake here simply never returns.
+# The progress rule is independent of a tasks-axi version: the productive
+# fixture performs real CPU work before returning a complete row/inventory,
+# while the stalled fixture stays silent and consumes no CPU.
 set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
+BASE_PATH=${FM_TEST_BASE_PATH:-$(dirname "$(command -v python3)"):/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(fm_test_tmproot fm-backlog-read-bound-tests)
 trap fm_test_cleanup EXIT
 
@@ -90,7 +94,69 @@ elapsed_since() {  # <start-epoch>
   printf '%s\n' "$((now - $1))"
 }
 
-# --- half one: the per-item bound holds -------------------------------------
+# A read that takes longer than the former bound but is doing work must finish,
+# remain authoritative, and not poison later reads through the sweep latch.
+PROGRESS="$TMP_ROOT/progress"
+PROGRESS_FAKEBIN=$(fm_fakebin "$PROGRESS")
+mkdir -p "$PROGRESS/data" "$PROGRESS/state" "$PROGRESS/config"
+fm_test_tasks_toml "$PROGRESS/.tasks.toml"
+printf '# Backlog\n' > "$PROGRESS/data/backlog.md"
+make_hanging_tasks_axi "$PROGRESS_FAKEBIN"
+mv "$PROGRESS_FAKEBIN/tasks-axi" "$PROGRESS_FAKEBIN/tasks-axi-base"
+cat > "$PROGRESS_FAKEBIN/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = show ] || [ "${1:-}" = list ]; then
+  if [ "$1" = list ]; then
+    printf 'inventory\n' >> "$FM_TEST_TASKS_AXI_PROGRESS_LOG"
+  else
+    printf '%s\n' "$2" >> "$FM_TEST_TASKS_AXI_PROGRESS_LOG"
+  fi
+  python3 - <<'PY'
+import time
+until = time.monotonic() + 4
+while time.monotonic() < until:
+    sum(i*i for i in range(1000))
+PY
+  if [ "$1" = list ]; then
+    printf 'count: 1\ntasks[1]{id,state,kind,repo,title}:\n  slow-first,queued,ship,firstmate,Slow row\n'
+  else
+    printf 'task:\n  state: queued\n  held: yes\n  blocked: no\n  hold_kind: captain\n'
+  fi
+  exit 0
+fi
+exec "${0%/*}/tasks-axi-base" "$@"
+SH
+chmod +x "$PROGRESS_FAKEBIN/tasks-axi"
+PROGRESS_LOG="$PROGRESS/show.log"
+PROGRESS_OUT=$(PATH="$PROGRESS_FAKEBIN:$PATH" FM_BACKLOG_ROW_TIMEOUT_SECS=1 \
+  FM_TEST_TASKS_AXI_PROGRESS_LOG="$PROGRESS_LOG" bash -c '
+    . "$1/bin/fm-tasks-axi-lib.sh"
+    . "$1/bin/fm-backlog-transition-lib.sh"
+    for id in slow-first slow-second; do
+      fm_backlog_row_probe "$2" "$id" || { printf "%s\n" "$FM_BACKLOG_ROW_ERROR"; exit 1; }
+      printf "row:%s:%s:%s:wedged=%s\n" "$id" "$FM_BACKLOG_ROW_RESULT" "$FM_BACKLOG_ROW_STATE" "$FM_BACKLOG_ROW_SHOW_WEDGED"
+    done
+    inventory=$(fm_backlog_row_states "$2") || exit 1
+    printf "inventory:%s\n" "$inventory"
+  ' _ "$ROOT" "$PROGRESS/data") \
+  || fail "productive backlog read was killed or refused: $PROGRESS_OUT"
+assert_contains "$PROGRESS_OUT" 'row:slow-first:found:queued yes no:wedged=0' \
+  'the first slow backlog read remains authoritative without poisoning the latch'
+assert_contains "$PROGRESS_OUT" 'row:slow-second:found:queued yes no:wedged=0' \
+  'a later slow backlog read is not skipped after productive work'
+assert_contains "$PROGRESS_OUT" 'inventory:slow-first:queued' \
+  'a productive slow inventory is complete rather than discarded'
+assert_equals "$(printf 'slow-first\nslow-second\ninventory')" "$(cat "$PROGRESS_LOG")" \
+  'both productive rows and the inventory were actually read'
+PATH="$PROGRESS_FAKEBIN:$PATH" FM_HOME="$PROGRESS" \
+  FM_STATE_OVERRIDE="$PROGRESS/state" FM_DATA_OVERRIDE="$PROGRESS/data" \
+  FM_CONFIG_OVERRIDE="$PROGRESS/config" FM_BACKLOG_ROW_TIMEOUT_SECS=1 \
+  FM_TEST_TASKS_AXI_PROGRESS_LOG="$PROGRESS_LOG" \
+  "$ROOT/bin/fm-captain-hold.sh" open slow-held \
+  || fail 'a productive slow read was mistaken for an absent or unreadable captain call'
+pass 'productive slow backlog rows and captain-held calls finish without latching later reads'
+
+# --- half one: the per-item no-progress bound holds -------------------------
 
 UNIT="$TMP_ROOT/unit"
 UNIT_FAKEBIN=$(fm_fakebin "$UNIT")
@@ -151,28 +217,42 @@ done
   || fail "the latch repeated a known-wedged backend read: $(cat "$PROBE_LOG")"
 pass "after the first bound hit the sweep continues and names every remaining item without paying the bound again"
 
-# A padded zero is still zero, and `timeout 0` / `alarm 0` disable the deadline
-# outright, so a bound that only rejects the literal 0 silently restores the
-# unbounded read this whole change exists to prevent.
-PADDED_OUT="$UNIT/padded.out"
-PADDED_START=$(date +%s)
-PATH="$UNIT_FAKEBIN:$BASE_PATH" FM_BACKLOG_ROW_TIMEOUT_SECS=00 \
-  bash -c '
+# The same sweep under an outer progress owner, as the open-loops collector and
+# the home-summary refresh worker run it: the inner per-item bound still fires,
+# and the latch still spares every later item another wedged read.
+NESTED_OUT="$UNIT/nested-probe.out"
+NESTED_LOG="$UNIT/nested-probe.log"
+NESTED_START=$(date +%s)
+# shellcheck disable=SC2016  # The child shell expands its own arguments.
+PATH="$UNIT_FAKEBIN:$BASE_PATH" FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
+  FM_TEST_TASKS_AXI_HANG_LOG="$NESTED_LOG" \
+  python3 "$ROOT/bin/fm-duration.py" keep-going 60 -- bash -c '
     set -u
     . "$1/bin/fm-tasks-axi-lib.sh"
     . "$1/bin/fm-backlog-transition-lib.sh"
-    fm_backlog_row_probe "$2" padded-zero && printf "unexpected-success\n"
-    printf "error=%s\n" "$FM_BACKLOG_ROW_ERROR"
-  ' _ "$ROOT" "$UNIT/data" > "$PADDED_OUT" 2>&1
-PADDED_ELAPSED=$(elapsed_since "$PADDED_START")
-
-[ "$PADDED_ELAPSED" -lt "$BOUND_CEILING" ] \
-  || fail "a padded-zero bound disabled the deadline: the read ran ${PADDED_ELAPSED}s"
-case "$(sed -n 's/^error=//p' "$PADDED_OUT")" in
-  *padded-zero*bound*) ;;
-  *) fail "a padded-zero bound must fall back to the default bound and report it: $(cat "$PADDED_OUT")" ;;
+    for id in wedged-one wedged-two wedged-three; do
+      fm_backlog_row_probe "$2" "$id" && printf "unexpected-success\n"
+      printf "error:%s=%s\n" "$id" "$FM_BACKLOG_ROW_ERROR"
+    done
+  ' _ "$ROOT" "$UNIT/data" > "$NESTED_OUT" 2>&1
+NESTED_ELAPSED=$(( $(date +%s) - NESTED_START ))
+[ "$NESTED_ELAPSED" -lt "$BOUND_CEILING" ] \
+  || fail "the nested sweep took ${NESTED_ELAPSED}s, so the inner bound did not fire: $(cat "$NESTED_OUT")"
+grep -q '^unexpected-success$' "$NESTED_OUT" \
+  && fail "a nested hanging tasks-axi show reported a successful row read: $(cat "$NESTED_OUT")"
+case "$(sed -n 's/^error:wedged-one=//p' "$NESTED_OUT")" in
+  *wedged-one*bound*) ;;
+  *) fail "the nested timed-out read must name the item and its bound: $(cat "$NESTED_OUT")" ;;
 esac
-pass "a padded-zero bound falls back to the default instead of disabling the deadline"
+for SKIPPED in wedged-two wedged-three; do
+  case "$(sed -n "s/^error:$SKIPPED=//p" "$NESTED_OUT")" in
+    *"$SKIPPED"*skipped*) ;;
+    *) fail "the nested sweep must name $SKIPPED as skipped: $(cat "$NESTED_OUT")" ;;
+  esac
+done
+[ "$(cat "$NESTED_LOG")" = wedged-one ] \
+  || fail "the nested latch repeated a known-wedged backend read: $(cat "$NESTED_LOG")"
+pass "under an outer progress owner the per-item bound fires and the latch spares later items"
 
 # --- a bound hit is not absence ---------------------------------------------
 #
@@ -415,6 +495,7 @@ cat > "$E2E_FAKEBIN/ps" <<'SH'
 #!/usr/bin/env bash
 set -u
 case "$*" in
+  *"pid=,ppid=,time=,lstart="*) exec /bin/ps "$@" ;;
   *"comm="*) printf '%s\n' '/usr/local/bin/claude'; exit 0 ;;
   *"args="*) printf '%s\n' 'claude'; exit 0 ;;
   *"ppid="*) exit 1 ;;
@@ -445,14 +526,16 @@ SHOW_LOG="$E2E/show.log"
 MUTATION_LOG="$E2E/mutation.log"
 DIGEST_START=$(date +%s)
 env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  -u FM_BACKLOG_ROW_TIMEOUT_SECS -u FM_SESSION_START_TIMEOUT \
   FM_HOME="$E2E_HOME" FM_ROOT_OVERRIDE="$E2E_ROOT" PATH="$E2E_FAKEBIN:$BASE_PATH" \
-  FM_BACKLOG_ROW_TIMEOUT_SECS="$BOUND_SECS" \
   FM_TEST_TASKS_AXI_SHOW_LOG="$SHOW_LOG" FM_TEST_TASKS_AXI_MUTATION_LOG="$MUTATION_LOG" \
   "$ROOT/bin/fm-session-start.sh" > "$DIGEST" 2>&1 || true
 DIGEST_ELAPSED=$(elapsed_since "$DIGEST_START")
 
 [ "$DIGEST_ELAPSED" -lt 120 ] \
   || fail "session start took ${DIGEST_ELAPSED}s against a wedged backlog backend"
+! grep -q 'STARTUP TRUNCATED - ' "$DIGEST" \
+  || fail "the digest was truncated by its own bound against a wedged backlog backend: $(cat "$DIGEST")"
 
 for SECTION in 'WAKE QUEUE' 'SUPERVISION OPERATING INSTRUCTIONS' 'FLEET STATE' 'CONTEXT'; do
   grep -q "$SECTION" "$DIGEST" \
@@ -460,8 +543,8 @@ for SECTION in 'WAKE QUEUE' 'SUPERVISION OPERATING INSTRUCTIONS' 'FLEET STATE' '
 done
 pass "a wedged backlog backend still leaves a complete digest: wake queue, supervision instructions, fleet state, and context all print"
 
-grep -q '^BACKLOG_RECONCILE: wedged-task-a: .*could not be moved to In flight: .*exceeded' "$DIGEST" \
-  || fail "the full-body timeout must be reported for the first queued worker: $(cat "$DIGEST")"
+grep -q '^BACKLOG_RECONCILE: wedged-task-a: .*could not be moved to In flight: .*wedged-task-a.*bound' "$DIGEST" \
+  || fail "the no-progress stop must be reported for the first queued worker: $(cat "$DIGEST")"
 for ID in wedged-task-b wedged-task-c; do
   grep -q "^BACKLOG_RECONCILE: $ID: .*could not be read: .*skipped" "$DIGEST" \
     || fail "the later worker must be reported as skipped without repeating the timeout: $(cat "$DIGEST")"

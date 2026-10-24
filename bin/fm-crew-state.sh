@@ -42,13 +42,17 @@
 #       stale model the spawn gate let through (docs/configuration.md#model-freshness).
 # Absence of either component is not evidence of health: a session that has not
 # published a record (not omp, not yet started, or remote) adds nothing.
-# A run-attribution lookup cut by its own FM_CREW_STATE_NM_TIMEOUT (every lookup
-# has the full allowance) is never retried and ends the line with `run-store:
-# skipped (read budget exceeded)`. A cut first status read leaves the pane and
+# Each run-attribution lookup uses FM_CREW_STATE_NM_TIMEOUT as a no-output/no-CPU
+# interval (default 900 seconds), not a wall-clock deadline. Slow productive reads
+# finish and are used. A proven stalled lookup is never retried and ends the line
+# with `run-store: skipped (no output or CPU progress)`. A cut first status read leaves the pane and
 # status-log fallback below to answer. A cut overview, inventory, id-addressed
 # status or identity runs-list read reports an unknown run-step verdict. A cut
 # runs-list read after a bound run is skipped and the bare status answer stands;
 # a cut fallback runs-list leaves the pane and status-log fallback to answer.
+# After the first cut, no later no-mistakes read runs in that crew read: each
+# counts as cut without running (FM_NM_READ_STALLED in bin/fm-nm-run-lib.sh), so
+# a wedged daemon costs one interval and the fallbacks above still answer.
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
@@ -236,8 +240,15 @@ ID=${1:-}
 # state read resolves the same task generation selected by that snapshot.
 META=${FM_CREW_STATE_META_OVERRIDE:-"$STATE/$ID.meta"}
 LOG=${FM_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
-NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-10}
-case "$NM_TIMEOUT" in ''|*[!0-9]*) NM_TIMEOUT=10 ;; esac
+# The daemon may be working outside this process tree. Allow its quiet reads
+# the same 15-minute inactivity policy as fm-duration.py, never a 10s wall kill.
+NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-$((15 * 60))}
+case "$NM_TIMEOUT" in ''|*[!0-9]*|0) NM_TIMEOUT=$((15 * 60)) ;; esac
+# Shell-local: only this read-only consumer opts into the shared runner mode.
+FM_NM_READ_PROGRESS=1
+FM_NM_READ_STALLED=0
+# Answer the Python capability probe once here: every read runs in a subshell.
+fm_posix_python || true
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (fm_nm_runs_status_for_worktree in bin/fm-nm-run-lib.sh) scans for the legacy
 # fallback or an unfetched-head continuation (docs/configuration.md owns the
@@ -255,8 +266,9 @@ LIVE_NOTE=''
 # Disclose a lookup the bounded runner cut (exit 124), once per read.
 nm_note_cut() {  # <exit-status>
   [ "$1" = 124 ] || return 0
+  FM_NM_READ_STALLED=1
   case "$LIVE_NOTE" in *"${SEP}run-store: skipped"*) return 0 ;; esac
-  LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (read budget exceeded)"
+  LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (no output or CPU progress)"
 }
 
 # Emit the one canonical line and exit 0. Detail is optional.
@@ -850,7 +862,7 @@ nm_run_activity_is_recent() {
 # the run failed, although GitHub's own check state - the actual shippability
 # authority - is green and every substantive step completed.
 nm_failed_run_is_green_held_ci() {
-  local rows row rest step status saw_ci_failed
+  local rows row rest step status saw_ci_failed ci_state
   rows=$(nm_steps_rows)
   [ -n "$rows" ] || return 1
   saw_ci_failed=0
@@ -876,7 +888,8 @@ nm_failed_run_is_green_held_ci() {
 $rows
 EOF
   [ "$saw_ci_failed" = 1 ] || return 1
-  [ "$(nm_ci_checks_state)" = green ]
+  ci_state=$(nm_ci_checks_state) || nm_note_cut $?
+  [ "$ci_state" = green ]
 }
 
 # Apply the header's terminal-delivery safeguard. The earlier green log cannot
@@ -963,10 +976,8 @@ nm_daemon_probe_down() {
 # record it would drop a working crew back to a possibly-stale status log every
 # time the probe merely ran slow - the crew would flap between working and
 # failed on probe latency alone. 124 is the bounded call's own did-not-answer
-# code (both the timeout and perl arms of fm_nm_run_bounded use it), and proves
-# nothing about the daemon. The no-timeout-tool return of 1 cannot reach here:
-# without a timeout tool the `axi status` read above is empty too, so this whole
-# block is skipped.
+# code for a proven no-progress read, and proves nothing about daemon death.
+# A slow productive probe finishes before this classification is made.
 nm_daemon_answered_down() {
   nm_daemon_probe
   [ "$NM_DAEMON_ANSWER" = down ]
@@ -982,6 +993,7 @@ nm_daemon_probe() {
   local rc=0
   [ -n "$NM_DAEMON_ANSWER" ] && return 0
   fm_nm_run_checked "$WT" "$NM_TIMEOUT" daemon status >/dev/null || rc=$?
+  nm_note_cut "$rc"
   case "$rc" in
     0)   NM_DAEMON_ANSWER=up ;;
     124) NM_DAEMON_ANSWER=unanswered ;;
@@ -1036,12 +1048,14 @@ nm_effective_ci_step_status() {
 # ignores the line the same way, v1.32.2 through v1.79.0). Reading it as
 # not-ready held a green PR at working for as long as main kept advancing.
 nm_ci_checks_state() {
-  local run_id ci_log marker finished_run
+  local run_id ci_log marker finished_run rc=0
   run_id=$(strip_quotes "$(nm_field id)")
   [ -n "$run_id" ] || { printf 'unknown'; return; }
   # A finished run's ci log cannot change, so only that read is kept for good.
   fm_nm_run_is_active "$RUN_OUT" && finished_run='' || finished_run=$run_id
-  ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" --full) || true
+  ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" --full) || rc=$?
+  # This runs in its caller's command substitution, so the caller notes the cut.
+  [ "$rc" != 124 ] || { printf 'unknown'; return 124; }
   [ -n "$ci_log" ] || { printf 'unknown'; return; }
   marker=$(printf '%s\n' "$ci_log" \
     | grep -E 'CI checks passed|no CI checks reported - still monitoring|no CI checks reported yet|checks failed|issues detected|CI checks running' \
@@ -1359,7 +1373,7 @@ if [ "$HAVE_RUN" = 1 ]; then
         CI_STEP_STATUS=$(nm_effective_ci_step_status)
         case "$CI_STEP_STATUS" in
           running)
-            CI_LOG_STATE=$(nm_ci_checks_state)
+            CI_LOG_STATE=$(nm_ci_checks_state) || nm_note_cut $?
             if [ "$CI_LOG_STATE" = green ]; then
               RUN_STATE="done"
               RUN_DETAIL="checks green: PR ready for review (still monitoring for merge/close)"
@@ -1385,7 +1399,7 @@ if [ "$HAVE_RUN" = 1 ]; then
     if [ "$RUN_STATUS" = fixing ]; then
       CI_LOG_STATE=not-ready
     elif [ "$CI_STEP_STATUS" = running ] && [ -z "$CI_LOG_STATE" ]; then
-      CI_LOG_STATE=$(nm_ci_checks_state)
+      CI_LOG_STATE=$(nm_ci_checks_state) || nm_note_cut $?
     elif [ "$CI_STEP_STATUS" = fixing ]; then
       CI_LOG_STATE=not-ready
     fi
