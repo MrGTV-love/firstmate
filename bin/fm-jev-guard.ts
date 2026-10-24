@@ -413,7 +413,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       }
       if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
       if (typeof input.command !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-      const deletion = authorizedDeletion(input.command, ctx.cwd, c);
+      const deletion = input.cwd === undefined && input.env === undefined ? authorizedDeletion(input.command, ctx.cwd, c) : undefined;
       if (deletion) {
         if ("invalid" in deletion) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },

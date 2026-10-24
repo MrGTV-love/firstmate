@@ -1409,7 +1409,8 @@ writeFileSync(`${data}/brief.md`, '# Task\nNo deletion list.\n');
 const context = { home, config: `${home}/config`, state, task: 'deletion', worktree, data, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
 const handlers = {};
 installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
-const omp = async (command, cwd = worktree) => (await handlers.tool_call({ toolName: 'bash', input: { command } }, { cwd }))?.block === true;
+const ompTool = async (input, cwd = worktree) => (await handlers.tool_call({ toolName: 'bash', input }, { cwd }))?.block === true;
+const omp = async (command, cwd = worktree) => ompTool({ command }, cwd);
 const claude = async (command, cwd = worktree) => {
   const reply = execFileSync('bash', [`${bin}/fm-jev-guard-hook.sh`, home, context.config, state, context.task, worktree, data, 'firstmate', context.policy], {
     input: JSON.stringify({ hook_event_name: 'PreToolUse', cwd, tool_name: 'Bash', tool_input: { command } }), encoding: 'utf8',
@@ -1417,6 +1418,8 @@ const claude = async (command, cwd = worktree) => {
   return reply ? JSON.parse(reply).hookSpecificOutput.permissionDecision === 'deny' : false;
 };
 const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
+const requestRows = () => requests().trim().split('\n').filter(Boolean).map(JSON.parse);
+const auditRows = () => readFileSync(auditPath, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
 const publish = () => execFileSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
   env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_DATA_OVERRIDE: `${home}/data` }, encoding: 'utf8',
 });
@@ -1452,20 +1455,31 @@ for (const [host, call] of [['omp', omp], ['claude', claude]]) {
   const beforeFallback = requests();
   assert.equal(await call('rm -f unlisted.txt'), false, 'a valid list does not change ordinary judgment of unlisted files');
   assert.notEqual(requests(), beforeFallback);
-  for (const command of ['rm -rf -- listed.txt', "rm -rf 'plain space.txt'", `/bin/rm -rf ${worktree}/listed.txt`]) {
+  for (const [command, path] of [['rm -f listed.txt', 'listed.txt'], ['rm -rf -- listed.txt', 'listed.txt'],
+    ['rm -fr nested/listed.txt', 'nested/listed.txt'], [`rm -f ${worktree}/listed.txt`, 'listed.txt']]) {
     restore();
     const before = requests();
-    const count = readFileSync(auditPath, 'utf8').trim().split('\n').length;
-    assert.equal(await call(command), false, `${host}: listed tracked file`);
+    const count = auditRows().length;
+    assert.equal(await call(command), false, `${host}: ${command}`);
     assert.equal(requests(), before, 'proven deletion needs no model judgment');
-    const rows = readFileSync(auditPath, 'utf8').trim().split('\n').map(JSON.parse);
+    const rows = auditRows();
     assert.equal(rows.length, count + 1);
     assert.equal(rows.at(-1).task, 'deletion');
     assert.equal(rows.at(-1).list_sha256, digest);
     assert.ok(Number.isFinite(Date.parse(rows.at(-1).time)));
-    assert.deepEqual(rows.at(-1).paths, [command.includes('space') ? 'plain space.txt' : 'listed.txt']);
+    assert.deepEqual(rows.at(-1).paths, [path]);
     execFileSync('/bin/sh', ['-c', command], { cwd: worktree });
-    assert.equal(existsSync(`${worktree}/${rows.at(-1).paths[0]}`), false, 'admitted shell deletion actually removed the file');
+    assert.equal(existsSync(`${worktree}/${path}`), false, 'admitted shell deletion actually removed the file');
+  }
+  for (const [command, blocked] of [['/bin/rm -rf listed.txt', true], ['rm --force listed.txt', false], ['rm -v listed.txt', false], ["rm -rf 'plain space.txt'", true]]) {
+    restore();
+    const before = requestRows().length;
+    const count = auditRows().length;
+    assert.equal(await call(command), blocked, `${host}: ${command} keeps the ordinary verdict`);
+    const judged = requestRows().slice(before);
+    assert.ok(judged.length > 0, `${host}: ${command} must reach the ordinary policy`);
+    assert.ok(judged.every(row => JSON.parse(row.body).state.command === command), `${host}: the policy must judge ${command}`);
+    assert.equal(auditRows().length, count, `${host}: ${command} must not consume the allowance`);
   }
   restore();
   const denied = ['rm -rf unlisted.txt', 'rm -rf untracked.txt', `rm -rf ${home}/outside.txt`,
@@ -1522,6 +1536,17 @@ for (const [host, call] of [['omp', omp], ['claude', claude]]) {
   execFileSync('/bin/sh', ['-c', command], { cwd: worktree });
   for (const path of cdPaths) assert.equal(existsSync(`${worktree}/${path}`), false);
   restore();
+}
+// The omp bash cwd/env inputs are not part of the allowance.
+for (const [field, input] of [['cwd', { command: 'rm -f listed.txt', cwd: home }], ['env', { command: 'rm -f listed.txt', env: { PATH: '/usr/bin:/bin' } }]]) {
+  restore();
+  const before = requestRows().length;
+  const count = auditRows().length;
+  assert.equal(await ompTool(input), false, `omp ${field} input keeps ordinary screening`);
+  const judged = requestRows().slice(before);
+  assert.ok(judged.length > 0, `omp ${field} input must reach the ordinary policy`);
+  assert.ok(judged.every(row => JSON.parse(row.body).state.command === 'rm -f listed.txt'));
+  assert.equal(auditRows().length, count, `omp ${field} input must not consume the allowance`);
 }
 // A malformed declaration cannot publish a new digest or silently broaden it.
 writeFileSync(`${data}/brief.md`, brief(['../outside.txt']));

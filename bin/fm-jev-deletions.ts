@@ -57,41 +57,17 @@ function trackedFiles(root: string, paths: string[]): boolean {
 // operands is provable here. Expansions, globs, directories and compound shell
 // commands retain ordinary Jev screening, even when some operands are listed.
 function operands(command: string): string[] | undefined {
-  if (command.length > 16_384 || /[\\$`;&|<>(){}\[\]*?!~#\n\r\0]/.test(command)) return;
-  const words: string[] = [];
-  let word = "", quote = "", started = false;
-  for (const char of command) {
-    if (quote) {
-      if (char === quote) quote = "";
-      else word += char;
-      started = true;
-    } else if (char === "'" || char === '"') {
-      quote = char;
-      started = true;
-    } else if (char === " " || char === "\t") {
-      if (started) words.push(word);
-      word = "";
-      started = false;
-    } else {
-      word += char;
-      started = true;
-    }
-  }
-  if (quote) return;
-  if (started) words.push(word);
-  const executable = words.shift();
-  if (executable !== "rm" && executable !== "/bin/rm") return;
+  if (command.length > 16_384 || /[\\$`;&|<>(){}\[\]*?!~#'"\n\r\0]/.test(command)) return;
+  const [executable, ...words] = command.split(/[ \t]+/).filter(Boolean);
+  if (executable !== "rm") return;
   let options = true;
   const paths: string[] = [];
   for (const word of words) {
     if (options && word === "--") { options = false; continue; }
-    if (options && word.startsWith("-")) {
-      if (!/^-[frv]+$/.test(word) && !["--force", "--recursive", "--verbose"].includes(word)) return;
-    } else {
-      options = false;
-      if (!word || word.startsWith("-")) return;
-      paths.push(word);
-    }
+    if (options && /^-[fr]+$/.test(word)) continue;
+    if (word.startsWith("-")) return;
+    options = false;
+    paths.push(word);
   }
   return paths.length > 0 ? paths : undefined;
 }
