@@ -5051,7 +5051,7 @@ test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
     "held-notice: the output did not list the second held copy"
   assert_grep "pool slot $FOREIGN_SLOT is reserved under a durable lease and stays claimed, and nothing returns it automatically" "$FOREIGN_CASE/stdout" \
     "held-notice: the output did not say the slot is reserved under a durable lease and stays claimed with no automatic return"
-  assert_grep "a held copy is removed only on the owner's word naming it; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and never a copy locked by Vernant's creation lock or held for ignored files." "$FOREIGN_CASE/stdout" \
+  assert_grep "a held copy is removed only on the owner's word naming it; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock only through Vernant's closeout driver, only when its launcher is gone and every proof passes, including every commit on a remote; it never removes an unlocked copy held for unique ignored files." "$FOREIGN_CASE/stdout" \
     "held-notice: the output did not say how a copy held for commits is removed"
   holder=$(jq -r '.worktrees[0].lease_holder // empty' "$FOREIGN_CASE/pool/treehouse-state.json")
   [ -n "$holder" ] || fail "held-notice: the fixture slot has no lease holder"

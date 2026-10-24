@@ -86,7 +86,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - The append-only held-copy record `held-foreign-copies.log`, written by `bin/fm-teardown.sh` once a task has closed beside foreign copies it leaves standing; it lists them and returns nothing, and [Agent control](agent-control.md)'s held-copy rule owns its fields.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
-- The nested-copy sweep's append-only removal log `data/copy-sweep.log`, produced by `bin/fm-copy-sweep.sh --apply`.
+- The nested-copy sweep's removal log `data/copy-sweep.log` and preservation, driver-retention receipts and per-copy waiting records under `data/copy-sweep/`, owned by `bin/fm-copy-sweep.sh --apply`.
 - The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
 
 `state/` holds runtime records:
@@ -1966,7 +1966,13 @@ The values above are the built-in defaults for the lines that carry one, and a m
 A malformed file refuses the run and names its line.
 The script header owns how a budget is measured, when it is over, and when its wake fires.
 
-`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) is the only operator environment setting.
+`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) names the Treehouse root.
+`FM_TEARDOWN_VERNANT_PYTHON` (default `<clone>/.venv/bin/python`) names the interpreter that runs Vernant's closeout driver when `--apply` releases a locked copy, exactly as it does for teardown.
+The [closeout helper](../bin/fm-teardown-nested-lib.sh) owns the stdout-only verdict channel and the retained diagnostic-output contract.
+`FM_COPY_SWEEP_PLAN_TIMEOUT` (default `120`, in seconds) bounds the closeout driver's plan for a locked copy; a plan that does not answer in time holds the copy, and the script header owns how the plan is stopped.
+`FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT` (default `5`) caps the locked release slots used per `--apply` run: a copy uses one slot once the driver's execute has run for it, unless afterwards it is provably untouched (still present and registered, the same copy, the same creation-lock bytes); a refused plan, a failed preservation, a failed reproof and an execute refusal that left the copy provably untouched use none, and the candidates left once the slots are used are `DEFERRED` (per-run cap), eligible next run, with the script header owning the counting and invalid-value rules.
+Review the first batch's records before unattended operation.
+The header also owns the closeout-script liveness dependency and the proposed Vernant follow-ups that would replace this fallback, `vernant-lock-lease` and `vernant-commits-remote-before-lock`; neither is built yet, so the sweep keeps its own proofs.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
 [`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
@@ -3975,6 +3981,8 @@ FM_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git pro
 FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit FM_CHECK_TIMEOUT, and the cut is reported
 FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
 FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
+FM_COPY_SWEEP_PLAN_TIMEOUT=120   # seconds the nested-copy sweep waits for Vernant's closeout plan of a locked copy before it holds the copy; a non-positive or non-numeric value becomes 120 (see "Nested task copy sweep")
+FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=5   # maximum locked release slots per apply run; see the script header ("Nested task copy sweep")
 FM_PROCEVENT_MAX_OUTPUT_BYTES=1048576   # bound on one captured process-to-event result
 FM_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/firstmate/procevent-claims
 FM_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400

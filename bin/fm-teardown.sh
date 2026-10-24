@@ -4160,7 +4160,7 @@ teardown_held_copies_report() {
     entry=${TEARDOWN_FOREIGN_HELD[$i]}
     copy=${entry%%$'\t'*}
     copy_q=$(printf '%q' "$copy")
-    [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" != commits ] || sweep="; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and never a copy locked by Vernant's creation lock or held for ignored files"
+    [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" != commits ] || sweep="; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock only through Vernant's closeout driver, only when its launcher is gone and every proof passes, including every commit on a remote; it never removes an unlocked copy held for unique ignored files"
     echo "notice: held foreign copy $(fm_refuse_text "$copy") stays in pool slot $(fm_refuse_text "$slot"): $(fm_refuse_text "${entry#*$'\t'}")."
     if [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" = ignored ]; then
       echo "notice: next step for the owner of $(fm_refuse_text "$copy"): review its ignored files with git -C $copy_q status --ignored and save the ones you need, with any commits only it holds (git -C $copy_q log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with $return_cmd."

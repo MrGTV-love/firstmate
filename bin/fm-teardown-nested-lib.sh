@@ -70,6 +70,9 @@
 # TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT, TEARDOWN_HELD_SLOT) and functions
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
+# bin/fm-copy-sweep.sh also calls teardown_preserve_ignored, with DATA set to its
+# data directory and ID to a per-release id, and teardown_run_closeout, for a
+# locked copy it proved on its own.
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
@@ -100,6 +103,7 @@ TEARDOWN_FOREIGN_LOCK=
 TEARDOWN_FOREIGN_LOCK_FILE=
 TEARDOWN_SLOT_COPIES=()
 TEARDOWN_CLOSEOUT_OUT=
+TEARDOWN_CLOSEOUT_STDOUT=
 TEARDOWN_FOREIGN_RULE=
 TEARDOWN_FOREIGN_PID=
 TEARDOWN_REFUSED_COPIES=()
@@ -336,8 +340,9 @@ teardown_ignored_sha256() {  # [<path>]
 # SHA-256 in its SHA256SUMS. The new copy is built in a staging directory and
 # replaces an earlier preserve of the same copy only after every entry is copied
 # and hashed, so a failed run never costs the earlier one. Returns 1 when
-# anything cannot be listed, copied or hashed, and the caller then refuses the
-# copy rather than removing unpreserved content.
+# anything cannot be listed, copied or hashed, after removing the one staging
+# directory it built, and the caller then refuses the copy rather than removing
+# unpreserved content.
 teardown_preserve_ignored() {  # <copy>
   local copy=$1 root dest stage entries entry file hash
   entries=$(teardown_preservable_ignored "$copy") || return 1
@@ -347,22 +352,27 @@ teardown_preserve_ignored() {  # <copy>
   dest="$root/$hash"
   stage="$root/.staging-$hash"
   rm -rf "$stage" || return 1
-  mkdir -p "$stage" || return 1
-  printf '%s\n' "$copy" > "$stage/copy-path" || return 1
-  : > "$stage/SHA256SUMS" || return 1
-  while IFS= read -r entry; do
-    [ -n "$entry" ] || continue
-    case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
-    rm -rf "${stage:?}/$entry" || return 1
-    mkdir -p "$(dirname "$stage/$entry")" || return 1
-    cp -RPp "$copy/$entry" "$stage/$entry" || return 1
-  done <<< "$entries"
-  while IFS= read -r -d '' file; do
-    hash=$(teardown_ignored_sha256 "$file") || return 1
-    printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
-  done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
-  rm -rf "$dest" || return 1
-  mv "$stage" "$dest" || return 1
+  (
+    mkdir -p "$stage" || return 1
+    printf '%s\n' "$copy" > "$stage/copy-path" || return 1
+    : > "$stage/SHA256SUMS" || return 1
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
+      rm -rf "${stage:?}/$entry" || return 1
+      mkdir -p "$(dirname "$stage/$entry")" || return 1
+      cp -RPp "$copy/$entry" "$stage/$entry" || return 1
+    done <<< "$entries"
+    while IFS= read -r -d '' file; do
+      hash=$(teardown_ignored_sha256 "$file") || return 1
+      printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
+    done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
+    rm -rf "$dest" || return 1
+    mv "$stage" "$dest" || return 1
+  ) || {
+    rm -rf "$stage"
+    return 1
+  }
   echo "teardown: preserved ignored files from $(fm_refuse_text "$copy") in $dest" >&2
 }
 
@@ -734,10 +744,15 @@ teardown_foreign_procs_retire() {
 }
 
 # Runs Vernant's closeout driver on <copy>: it releases its own creation lock
-# and removes the copy. Output lands in TEARDOWN_CLOSEOUT_OUT. Exit 0 means the
-# driver allowed and ran the cleanup.
-teardown_run_closeout() {  # <slot> <copy>
-  local slot=$1 copy=$2 driver py rc=0
+# and removes the copy. With "plan" it omits --execute-cleanup, so the driver
+# only says whether it would. TEARDOWN_CLOSEOUT_STDOUT is verdict input;
+# TEARDOWN_CLOSEOUT_OUT retains stdout and stderr for display and refusal records.
+# An optional capture file belongs to the caller (so a killed plan can clean it).
+# Exit 0 means the driver allowed and, unless planning, ran the cleanup.
+teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
+  local slot=$1 copy=$2 execute=--execute-cleanup driver py rc=0 capture=${4:-} own_capture=0
+  [ "${3:-}" != plan ] || execute=
+  TEARDOWN_CLOSEOUT_STDOUT=
   TEARDOWN_CLOSEOUT_OUT=
   driver=$slot/scripts/git-stability/closeout_pr.py
   py=${FM_TEARDOWN_VERNANT_PYTHON:-$slot/.venv/bin/python}
@@ -745,15 +760,27 @@ teardown_run_closeout() {  # <slot> <copy>
     TEARDOWN_CLOSEOUT_OUT="Vernant's closeout driver $driver or its interpreter $py is not available"
     return 127
   fi
-  # The sentinel keeps command substitution from stripping the driver's trailing
-  # newlines, so a refusal can save exactly the output the driver produced.
+  if [ -z "$capture" ]; then
+    capture=$(mktemp "${TMPDIR:-/tmp}/fm-closeout-stdout.XXXXXX") || {
+      TEARDOWN_CLOSEOUT_OUT="Vernant's closeout stdout could not be captured"
+      return 1
+    }
+    own_capture=1
+  fi
+  # tee sees only stdout; stderr bypasses it into the display capture. pipefail
+  # preserves a driver refusal and treats a failed capture as no permission.
+  # Sentinels preserve trailing newlines in both output contracts.
   TEARDOWN_CLOSEOUT_OUT=$(
+    set -o pipefail
     local status=0
-    ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" --execute-cleanup ) 2>&1 || status=$?
+    { ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) | tee "$capture"; } 2>&1 || status=$?
     printf '.'
     exit "$status"
   ) || rc=$?
   TEARDOWN_CLOSEOUT_OUT=${TEARDOWN_CLOSEOUT_OUT%.}
+  TEARDOWN_CLOSEOUT_STDOUT=$(cat "$capture" || exit 1; printf '.') || rc=1
+  TEARDOWN_CLOSEOUT_STDOUT=${TEARDOWN_CLOSEOUT_STDOUT%.}
+  [ "$own_capture" = 0 ] || rm -f -- "$capture"
   return "$rc"
 }
 
