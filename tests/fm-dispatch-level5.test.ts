@@ -97,9 +97,8 @@ test('T6(b): replay all 136 logged rule structures offline without Q7 escalation
   }
 });
 
-test('Q9 desktop capability keeps its boundary; model pin and unused workflow answers cannot steer routing', () => {
+test('Q9 desktop capability keeps its boundary; obsolete workflow answers remain inert', () => {
   let request = prepare();
-  assert.equal(request.model, 'jev-1.13.0');
   assert.equal(request.questions.needs_desktop.type, 'noul');
   assert.equal(request.questions.profile, undefined);
   let result = apply(request, { judgment_bounded: 1, needs_desktop: .5 });

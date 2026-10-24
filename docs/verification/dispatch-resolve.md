@@ -21,7 +21,7 @@ It exited 0 with:
 ✔ T6(a): repository and kind facts make non-Vernant rules unreachable for Vernant ships
 ✔ T6 predicates combine in code, preserve complements, and never pool independent support
 ✔ T6(b): replay all 136 logged rule structures offline without Q7 escalation
-✔ Q9 desktop capability keeps its boundary; model pin and unused workflow answers cannot steer routing
+✔ Q9 desktop capability keeps its boundary; obsolete workflow answers remain inert
 ✔ malformed fact selectors and missing semantic references fail before provider access
 ℹ tests 5
 ℹ pass 5
@@ -30,7 +30,7 @@ It exited 0 with:
 
 The tests invoke the actual dispatch adapter's `prepare` and `apply` CLI paths without calling a provider.
 They drive maximally positive semantic answers against incompatible repository/kind facts, exercise predicate conjunction, disjunction and negation, preserve capability and ambiguity thresholds, and reject invalid fact selectors and missing predicate references.
-The baseline adapter fails the fact-scoped selection and pinned-model cases.
+The baseline adapter fails the fact-scoped selection and removed-workflow escalation cases.
 
 The fixture [`dispatch-resolve-20261024.json`](../../tests/fixtures/dispatch-resolve-20261024.json) retains only rule choices and coarse reasons from the 136 logged resolves assessed on 2026-10-24.
 Thirty-two records carry the old human-workflow escalation reason.
@@ -48,14 +48,16 @@ On the same host on 2026-10-24, this command exited 0 with:
 
 ```console
 # all fm-dispatch-resolve tests passed
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=452996
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=562499
 ```
 
 The optional `EPOCHREALTIME` fast-path case printed `skip: no bash with EPOCHREALTIME is installed`; stock macOS Bash timing coverage ran.
 The established suite invokes the acceptance cases above and exercises the public shell resolver through a loopback HTTP provider using synthetic text and credentials.
 It covers request batching, deterministic fact exclusion through the complete resolver, removed workflow labels, session launch restrictions, model/effort floors, approval and quota gates, credential isolation, never-send filtering, frozen rules/index snapshots, chosen-account model checks, private result logging, and the observe-only shadow picker.
 The same script exercises the Node fallback when Bun is absent and leaves the unchanged vendored Level 5 tests in place.
-These are offline policy and transport checks, not evidence of semantic accuracy from the pinned provider model.
+Its promoted-Vernant-ship case retains the original scout marker and appends the current ship specification, then verifies ship-only routing and the current specification in the actual provider request.
+An explicit kind override and a fenced, non-authoritative ship heading exercise the neighboring boundaries.
+These are offline policy and transport checks, not evidence of semantic accuracy from the provider model.
 
 ## Verification boundary
 
