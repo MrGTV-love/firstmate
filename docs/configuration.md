@@ -2201,8 +2201,9 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 **What the model receives**
 
-When on and at least one rule exists, the tool sends the project name, code-resolved brief kind, and task-specific text in one `JevClient.systemOne` call using the current `jev-latest` model.
+When on and at least one rule exists, the tool sends the project name and task-specific text in one `JevClient.systemOne` call using the current `jev-latest` model.
 Code eliminates rules whose project or kind facts do not match before assembling any semantic questions; an excluded rule cannot reappear in confidence fallback.
+The resolved brief kind stays in code and is never a request field.
 The remaining rules contribute only their referenced individual Noul judgments, each sent once even when several rules share it.
 The request also includes the upstream ambiguity, model-tier and reasoning-effort questions, plus a desktop-access Noul with concrete true/false criteria.
 The upstream workflow/profile Choice is not asked or applied: human, script and browser workflow labels cannot force dispatch escalation.
@@ -2266,7 +2267,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string in the complete assembled request, including project, kind, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string in the complete assembled request, including project, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.

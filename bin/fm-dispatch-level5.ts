@@ -1,7 +1,8 @@
 // Firstmate dispatch policy. CLI: validate <rules> (exit 65 for a malformed
 // schema); prepare <rules> <task>
 // <project> <ship|scout>; call (request on stdin, key on fd 3); apply <rules>
-// <response> <request> <allowed-harnesses-json> <cheap-class-re> <max-effort-re>.
+// <response> <request> <ship|scout> <allowed-harnesses-json> <cheap-class-re>
+// <max-effort-re>. Kind filters rules in code and is never sent to the provider.
 import { readFileSync, writeFileSync } from "node:fs";
 import { JevClient, ContractError, validateResponse } from "./ten-levels/src/core/client.ts";
 import { noul } from "./ten-levels/src/core/helpers.ts";
@@ -87,7 +88,7 @@ function prepare(cfg: Config, task: string, project: string, kind: string): Syst
       questions[`judgment_${id}`] = cfg.judgments[id];
     }
   }
-  return { model, state: { task, repository: project, kind }, questions };
+  return { model, state: { task, repository: project }, questions };
 }
 try {
   if (action === "validate") {
@@ -111,7 +112,7 @@ try {
         ? { baseUrl: process.env.FM_TYPESAFE_TEST_ENDPOINT } : {}) });
     console.log(JSON.stringify(await client.systemOne(request.state, request.questions, { model: request.model })));
   } else if (action === "apply") {
-    const [rulesPath, responsePath, requestPath, allowedJson, cheapPattern, maxEffortPattern] = args;
+    const [rulesPath, responsePath, requestPath, kind, allowedJson, cheapPattern, maxEffortPattern] = args;
     if (!cheapPattern || !maxEffortPattern) throw new Error("classes");
     const cheapClass = new RegExp(cheapPattern, "i");
     const maxEffort = new RegExp(maxEffortPattern, "i");
@@ -119,7 +120,7 @@ try {
     const request: unknown = JSON.parse(readFileSync(requestPath, "utf8"));
     validateRequest(request);
     if (!object(request.state) || typeof request.state.task !== "string" || typeof request.state.repository !== "string" ||
-      (request.state.kind !== "ship" && request.state.kind !== "scout")) throw new Error("request facts");
+      (kind !== "ship" && kind !== "scout")) throw new Error("request facts");
     const allowed: unknown = JSON.parse(allowedJson);
     if (!Array.isArray(allowed) || !allowed.every((h: unknown) => typeof h === "string")) throw new Error("allowed");
     const response: unknown = JSON.parse(readFileSync(responsePath, "utf8"));
@@ -132,7 +133,7 @@ try {
     };
     if (a.ambiguity.score > 1) route.escalate = "high task ambiguity requires firstmate judgment";
     else if (route.needsDesktopAccess) route.escalate = "desktop access requires an explicit capability decision";
-    const { repository, kind } = request.state;
+    const { repository } = request.state;
     const support: Record<string, number> = {};
     const judgment = (id: string) => {
       const answer = a[`judgment_${id}`];

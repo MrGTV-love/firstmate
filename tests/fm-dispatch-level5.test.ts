@@ -29,9 +29,12 @@ function cli(action: string, ...args: string[]) {
   assert.equal(r.status, 0, r.stderr);
   return r.stdout.trim() ? JSON.parse(r.stdout) : undefined;
 }
+let preparedKind = 'ship';
 function prepare(project = 'vernant', kind = 'ship', config: unknown = cfg) {
   writeFileSync(rulesPath, JSON.stringify(config));
   const request = cli('prepare', rulesPath, taskPath, project, kind);
+  assert.equal(Object.hasOwn(request.state, 'kind'), false);
+  preparedKind = kind;
   writeFileSync(requestPath, JSON.stringify(request));
   return request;
 }
@@ -49,7 +52,7 @@ function apply(request: SystemOneRequest, values: Record<string, number> = {}, e
       legend: Object.fromEntries(q.criteria.map((s: string, i: number) => [i, s])) }];
   }));
   writeFileSync(responsePath, JSON.stringify({ model: 'jev-1.13.0', usage: { input_tokens: 0, output_tokens: 0 }, answers: { ...answers, ...extra } }));
-  return cli('apply', rulesPath, responsePath, requestPath, '["claude"]', 'haiku|luna', 'haiku');
+  return cli('apply', rulesPath, responsePath, requestPath, preparedKind, '["claude"]', 'haiku|luna', 'haiku');
 }
 
 test('T6(a): repository and kind facts make non-Vernant rules unreachable for Vernant ships', () => {
