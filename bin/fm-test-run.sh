@@ -284,19 +284,18 @@ PORTABLE_PARALLEL_JOBS=3
 # raw job count, because a model that assumed perfect scaling would pass while
 # the real lane ran a third over its own budget. Raising the job count past
 # this changes neither the model nor the guard.
-# measured: value=3 date=2026-10-24 host=github-ubuntu-26.04 margin=1.02 (run 40063531528: lane 1 summed 3151026 ms and ran 1129 s, lane 2 summed 2862231 ms and ran 1120 s, so the lanes clear between 2.5 and 2.8 times their serial work; the three-bin model predicts 1105233 ms against the 1129 s lane while the two-bin model predicts 1428620 ms)
-PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
+# measured: value=2 date=2026-10-22 host=github-ubuntu-26.04 margin=1.0 (lane 1: 33.5 min serial, 57.9 min summed at three abreast, 20 min wall; run 39757092565)
+PORTABLE_PARALLEL_EFFECTIVE_JOBS=2
 
 # Modeled makespan budget for one portable-parallel job. The guard compares this
 # with the modeled makespan, not with wall time, and the model reads about
-# sixteen percent below what the runner measured: the lane that finished in 18.8
-# minutes on the 26.04 image models at 1105233 ms at three bins. So 1200000 ms
-# bounds a real lane near 21 minutes, about a tenth above the measured 18.8
-# minute lane, and a new
+# sixteen percent below what the runner measured: the lane that finished in 20
+# minutes on the 26.04 image models at 1004772 ms. So 1200000 ms bounds a real
+# lane near 24 minutes, a fifth above the measured 20 minute lane, and a new
 # member or a slow path fails the coverage guard instead of quietly stretching
 # the workflow. Like the serial target this is packing arithmetic, not an
 # execution timeout.
-# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.02 (the slowest parallel lane measured 1129 s in run 40063531528 and models at 1105233 ms at three bins)
+# measured: value=1200000 date=2026-10-22 host=github-ubuntu-26.04 margin=1.19 (the slowest parallel lane measured 20 minutes in run 39757092565 and models at 1004772 ms at two bins)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
 # Conservative balance hint for a portable-serial script with no measurement.
@@ -670,16 +669,16 @@ tests/fm-crew-state.test.sh 116812
 tests/fm-ensure-agents-md.test.sh 1673
 tests/fm-grok-harness.test.sh 8934
 tests/fm-herdr-lab.test.sh 27489
-tests/fm-lint.test.sh 1105233
+tests/fm-lint.test.sh 640000
 tests/fm-pi-primary-types.test.sh 2395
-tests/fm-pr-merge.test.sh 987295
+tests/fm-pr-merge.test.sh 571000
 tests/fm-review-diff.test.sh 7665
 tests/fm-send-popup-settle.test.sh 8997
 tests/fm-send-settle.test.sh 3498
 tests/fm-send-strict.test.sh 6756
 tests/fm-spawn-batch.test.sh 5826
 tests/fm-supervision-instructions.test.sh 1773
-tests/fm-test-run.test.sh 889567
+tests/fm-test-run.test.sh 515000
 tests/fm-tmux-submit-busy.test.sh 10242
 tests/fm-transition-lib.test.sh 613
 tests/fm-x-mode.test.sh 41640
@@ -709,7 +708,7 @@ tests/fm-pr-merge.test.sh
 tests/fm-test-run.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-reconcile.test.sh
-tests/fm-captain-hold-sweep.test.sh
+tests/fm-crew-state.test.sh
 tests/fm-arm-pretool-check.test.sh
 tests/fm-cd-pretool-check.test.sh
 tests/fm-tmux-submit-busy.test.sh
@@ -726,10 +725,10 @@ list_portable_parallel_2() {
   cat <<'EOF'
 tests/fm-lint.test.sh
 tests/fm-captain-hold-cleanup.test.sh
+tests/fm-captain-hold-sweep.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-archive.test.sh
-tests/fm-crew-state.test.sh
 tests/fm-backend-herdr.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
