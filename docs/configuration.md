@@ -2554,17 +2554,19 @@ Shell calls and untrusted results that would need more than 16 pieces still requ
 Write/edit content has no model-screening size limit and no model coverage audit.
 Credential checks run locally in the per-task `pre-commit` and `pre-push` hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope.
 [`bin/fm-git-secrets.py`](../bin/fm-git-secrets.py) scans only added content: the lines the staged index adds against `HEAD`, after the repository's pre-commit hook succeeds, including changes that hook stages, not their working-copy counterparts.
-Existing lines in a touched file are not scanned again, and a merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
-At push time it scans the lines each outgoing commit adds relative to all of its parents, including intermediate commits that a later commit cleans up.
+Existing and moved lines are not scanned again; only new lines are: within one diff, each removed copy of a line cancels one added copy of the same text in any file, so renaming, moving or splitting a file adds nothing new.
+A merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
+At push time it scans the lines each outgoing commit adds relative to all of its parents, with the same per-commit move cancellation, including intermediate commits that a later commit cleans up.
 A commit is outgoing unless an advertised old tip or any remote-tracking ref, of any remote, already reaches it, so pushing to a URL or a new remote does not rescan history already on another remote.
-Each commit and push decision appends one `git-commit-credential-shapes` or `git-push-credential-shapes` event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh).
+Each commit and push decision appends one `git-commit-credential-shapes` or `git-push-credential-shapes` event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh), whose `repeat` counts that check's consecutive refusals in the worktree; an allowed decision resets it.
+Past the budget of one refusal in a row, the refusal also prints an `escalate:` line telling the worker to stop retrying and report to Firstmate for a human decision; the commit or push stays refused while the new credential-shaped line remains.
 Ref deletions transfer no content and need no scan; project hooks still run and receive the original pre-push ref-update input.
 The scanner retains the existing anchored shapes: private-key headers, GitHub tokens, AWS access key IDs, Slack tokens and connection URLs with embedded passwords.
 It reports affected file names only, never matching values, and refuses when inspection fails.
 Writing a credential to an ignored `.env` is allowed and stages nothing; force-adding that file still subjects it to the commit check.
 Placeholders such as `replace-me` pass, but an added placeholder shaped like one of the listed credentials can fail; unfamiliar or encoded credentials can be missed.
 This is a client-side check, not a security boundary against hook bypass, alternate Git object writers, or pushes made outside the task launch environment.
-[`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, conflicted merges, outgoing history, URL and new-remote pushes and complete 396,924-byte report writes through both write adapters without provider calls.
+[`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, renamed and split files, conflicted merges, repeated refusals, outgoing history, URL and new-remote pushes and complete 396,924-byte report writes through both write adapters without provider calls.
 The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while omp result handling retains the advisory-band and trusted-read exceptions above.
 A piece that blocks a shell command blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.

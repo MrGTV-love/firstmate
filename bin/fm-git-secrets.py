@@ -5,14 +5,18 @@ Usage: fm-git-secrets.py pre-commit
        fm-git-secrets.py pre-push <remote-name> <remote-location>
 Only content new relative to every parent is inspected: the lines the staged
 index adds against HEAD and each MERGE_HEAD, and the lines each outgoing commit
-adds against all of its parents. Outgoing commits are those reachable from the
-pushed tips but not from an advertised old tip or any remote-tracking ref, so
-history already on a remote is not inspected again. Pre-push consumes Git's
-ref-update records on stdin; the hook wrapper preserves those bytes for the
-repository's own hook. No file content or match is printed, no provider is
-called, and no working-tree file is read. Each decision appends one event
-through fm-guard-event.sh. Exit 1 refuses the Git operation, including when
-inspection fails; exit 2 indicates invalid arguments.
+adds against all of its parents. Within one such diff, each removed copy of a
+line cancels one added copy anywhere, so moved or renamed content is not new.
+Outgoing commits are those reachable from the pushed tips but not from an
+advertised old tip or any remote-tracking ref, so history already on a remote
+is not inspected again. Pre-push consumes Git's ref-update records on stdin;
+the hook wrapper preserves those bytes for the repository's own hook. No file
+content or match is printed, no provider is called, and no working-tree file
+is read. Each decision appends one event through fm-guard-event.sh carrying
+the number of consecutive refusals in this worktree; past the budget of one,
+the refusal also escalates to a human decision, and the operation stays
+refused. Exit 1 refuses the Git operation, including when inspection fails;
+exit 2 indicates invalid arguments.
 """
 
 import codecs
@@ -22,6 +26,7 @@ import re
 import subprocess
 import sys
 import time
+from collections import Counter
 
 
 SHAPES = tuple(re.compile(pattern) for pattern in (
@@ -33,9 +38,10 @@ SHAPES = tuple(re.compile(pattern) for pattern in (
 OID = re.compile(rb"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 GUARDS = {"pre-commit": "git-commit-credential-shapes", "pre-push": "git-push-credential-shapes"}
 EVENT_WRITER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fm-guard-event.sh")
+BUDGET = 1
 # Whole-line patches with fixed prefixes, independent of user diff settings.
 DIFF = ("-p", "--text", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames",
-        "--submodule=short", "--src-prefix=a/", "--dst-prefix=b/", "--diff-filter=ACMT")
+        "--submodule=short", "--src-prefix=a/", "--dst-prefix=b/")
 
 
 def git(*args, data=None):
@@ -44,13 +50,15 @@ def git(*args, data=None):
 
 
 def added_lines(*args):
-    added, path, body = {}, None, False
+    added, removed, path, body = {}, Counter(), None, False
     for line in git(*args, *DIFF).split(b"\n"):
         if line.startswith(b"diff --git "):
             path, body = None, False
         elif body:
             if line.startswith(b"+") and path is not None:
-                added.setdefault(path, set()).add(line[1:])
+                added.setdefault(path, Counter())[line[1:]] += 1
+            elif line.startswith(b"-"):
+                removed[line[1:]] += 1
         elif line.startswith(b"@@ "):
             body = True
         elif line.startswith(b"+++ "):
@@ -59,13 +67,18 @@ def added_lines(*args):
             if name.startswith(b'"'):
                 name = codecs.escape_decode(name[1:-1])[0]
             path = name[2:] if name.startswith(b"b/") else None
+    for path in sorted(added):
+        moved = added[path] & removed
+        added[path] -= moved
+        removed -= moved
     return added
 
 
 def new_lines(diffs):
     first, *rest = diffs
-    return {path: lines.intersection(*(other.get(path, ()) for other in rest))
-            for path, lines in first.items()}
+    for other in rest:
+        first = {path: lines & other.get(path, Counter()) for path, lines in first.items()}
+    return first
 
 
 def staged_lines():
@@ -118,10 +131,30 @@ def refused(added):
             if any(shape.search(b"\n".join(lines)) for shape in SHAPES)}
 
 
-def record(guard, decision, source_ok, started):
+def repeat(guard, denied):
+    try:
+        state = git("rev-parse", "--git-path", "fm-" + guard + ".refusals").rstrip(b"\n")
+        if not denied:
+            if os.path.exists(state):
+                os.remove(state)
+            return 1
+        try:
+            with open(state, "rb") as counter:
+                count = int(counter.read() or b"0") + 1
+        except (OSError, ValueError):
+            count = 1
+        with open(state, "w") as counter:
+            counter.write(f"{count}\n")
+        return count
+    except (OSError, subprocess.SubprocessError):
+        return 1
+
+
+def record(guard, decision, source_ok, started, count):
     elapsed = str(int((time.monotonic() - started) * 1000))
     try:
-        subprocess.run([EVENT_WRITER, guard, decision, "--source-ok", source_ok, "--elapsed-ms", elapsed],
+        subprocess.run([EVENT_WRITER, guard, decision, "--source-ok", source_ok, "--elapsed-ms", elapsed,
+                        "--repeat", str(count)],
                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, check=False)
     except OSError:
         pass
@@ -141,19 +174,26 @@ def main():
         return 2
     guard, started = GUARDS[args[0]], time.monotonic()
     try:
-        paths = sorted(set().union(*(refused(added) for added in inspections())))
+        paths, source_ok = sorted(set().union(*(refused(added) for added in inspections()))), "true"
     except (OSError, ValueError, subprocess.SubprocessError):
-        record(guard, "deny", "false", started)
+        paths, source_ok = None, "false"
+    denied = paths is None or bool(paths)
+    count = repeat(guard, denied)
+    record(guard, "deny" if denied else "allow", source_ok, started, count)
+    if not denied:
+        return 0
+    if paths is None:
         print("error: credential inspection failed; commit or push refused")
         print("help: Restore readable Git objects and an available python3 runtime, then retry.")
-        return 1
-    record(guard, "deny" if paths else "allow", "true", started)
-    if paths:
+    else:
         print("error: credential-shaped content in lines that staged or outgoing commits add")
         print(f"files[{len(paths)}]: " + ", ".join(json.dumps(path.decode('utf-8', 'surrogateescape'), ensure_ascii=True) for path in paths))
         print("help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.")
-        return 1
-    return 0
+    if count > BUDGET:
+        print(f"escalate: this check refused {count} times in a row, past its budget of {BUDGET}; "
+              "stop retrying and report the refusal to Firstmate for a human decision. "
+              "The commit or push stays refused while the added content remains.")
+    return 1
 
 
 if __name__ == "__main__":

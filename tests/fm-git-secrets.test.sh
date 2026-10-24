@@ -228,6 +228,76 @@ test_push_baseline_is_every_remote() {
   pass "pushes to a URL, a new remote and a remote with no tracking refs skip origin's history and refuse a new credential"
 }
 
+test_moved_lines_are_not_rescanned() {
+  local repo remote hooks out before old=tests/fm-voice-relay.test.sh moved=tests/fm-voice-relay-e2e.test.sh lines
+  repo="$TMP_ROOT/moved-fixtures"
+  remote="$TMP_ROOT/moved-fixtures.git"
+  hooks="$TMP_ROOT/hooks-moved-fixtures"
+  make_repo "$repo"
+  mkdir -p "$repo/tests"
+  cp "$ROOT/$old" "$repo/$old"
+  git -C "$repo" add "$old"
+  git -C "$repo" commit -qm 'existing voice relay suite'
+  git init -q --bare "$remote"
+  git -C "$repo" remote add origin "$remote"
+  git -C "$repo" push -q origin main
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q -b topic
+  git -C "$repo" mv "$old" "$moved"
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'rename voice relay suite' 2>&1) ||
+    fail "R1: renaming a file that holds an existing fixture was refused: $out"
+  lines=$(wc -l <"$repo/$moved" | tr -d ' ')
+  head -n "$((lines / 2))" "$repo/$moved" >"$repo/tests/fm-voice-relay-a.test.sh"
+  tail -n "+$((lines / 2 + 1))" "$repo/$moved" >"$repo/tests/fm-voice-relay-b.test.sh"
+  git -C "$repo" rm -q "$moved"
+  git -C "$repo" add tests/fm-voice-relay-a.test.sh tests/fm-voice-relay-b.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'split voice relay suite' 2>&1) ||
+    fail "R1: splitting a file that holds an existing fixture was refused: $out"
+  with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic ||
+    fail "R1: pushing renamed and split fixture lines was refused"
+  before=$(git -C "$repo" rev-parse HEAD)
+  printf 'NEW_KEY=%s\n' "$(aws_shape)" >>"$repo/tests/fm-voice-relay-b.test.sh"
+  git -C "$repo" add tests/fm-voice-relay-b.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'new key in moved suite' 2>&1) &&
+    fail "R1: a new AKIA-shaped line inside a moved file was committed"
+  assert_contains "$out" tests/fm-voice-relay-b.test.sh "moved-file refusal did not name the file"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "refused moved-file commit moved HEAD"
+  git -C "$repo" commit -qm 'new key committed outside the task hooks'
+  out=$(with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic 2>&1) &&
+    fail "R1: a new AKIA-shaped line inside a moved file was pushed"
+  assert_contains "$out" tests/fm-voice-relay-b.test.sh "moved-file push refusal did not name the file"
+  pass "renamed and split files with existing fixtures commit and push; a new AKIA line inside a moved file refuses"
+}
+
+test_repeated_refusals_escalate_without_admitting() {
+  local repo hooks out log="$TMP_ROOT/repeat-events.jsonl"
+  repo="$TMP_ROOT/repeat"
+  hooks="$TMP_ROOT/hooks-repeat"
+  make_repo "$repo"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm first 2>&1) && fail "first attempt committed"
+  assert_not_contains "$out" "escalate:" "the first refusal escalated inside its budget"
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm second 2>&1) && fail "repeated attempt committed"
+  assert_contains "$out" "escalate:" "a refusal past the budget did not escalate"
+  assert_contains "$out" leak.txt "the escalated refusal lost the file name"
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm third 2>&1) && fail "exhausted budget admitted a credential"
+  assert_contains "$out" "escalate:" "the third refusal did not escalate"
+  assert_equals 1 "$(git -C "$repo" rev-list --count HEAD)" "a refused attempt created a commit"
+  printf 'TOKEN=replace-me\n' >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm placeholder || fail "placeholder after refusals did not commit"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm again 2>&1) && fail "new credential committed after reset"
+  assert_not_contains "$out" "escalate:" "an allowed decision did not reset the refusal count"
+  assert_equals 'deny:1 deny:2 deny:3 allow:1 deny:1' \
+    "$(jq -rs '[.[] | select(.guard == "git-commit-credential-shapes") | "\(.decision):\(.repeat)"] | join(" ")' "$log")" \
+    "commit decisions did not record one event each with their repeat count"
+  pass "refusals past the budget escalate to a human decision, stay refused, and an allow resets the count"
+}
+
 test_each_decision_emits_one_event() {
   local repo status
   repo="$TMP_ROOT/telemetry"
@@ -252,6 +322,8 @@ test_credentials_are_checked_at_commit_and_push 1
 test_existing_lines_are_not_rescanned_at_commit
 test_merges_scan_only_lines_new_to_every_parent
 test_push_baseline_is_every_remote
+test_moved_lines_are_not_rescanned
+test_repeated_refusals_escalate_without_admitting
 test_each_decision_emits_one_event
 
 export T3_ROOT="$ROOT" T3_TMP="$TMP_ROOT"
