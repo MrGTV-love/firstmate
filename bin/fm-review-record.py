@@ -25,10 +25,11 @@ accept any stored known family or unknown; verify derives every family again fro
 the stored model ids, so a later family change neither invalidates history nor
 lets a stale stored family decide independence.
 verify accepts the newest captain-word when it names the exact live head; it then
-stands in for the review and every trigger, unless the newest review of that live
-head appended after it is a FAIL (reviews of other heads never hide it): that FAIL
-is refused until the captain gives a new captain-word, while a captain-word
-appended after the FAIL stands. Otherwise
+stands in for the review and every trigger, unless a FAIL at that live head was
+appended after it and no later PASS at that head has a known reader family outside
+every known author family: that FAIL is refused until the captain gives a new
+captain-word, while a captain-word appended after the FAIL stands. Reviews of other
+heads and PASS reviews that are not independent never clear that FAIL. Otherwise
 the newest review must be PASS at the exact live head with a known reader family
 outside every known author family, and any yes trigger is refused. Captain words
 waive no existing forge/hold guard. The caller records as captain-word only a
@@ -207,18 +208,35 @@ def newest(fd, pr):
     return result, rows
 
 
+def dependence(review, head):
+    reader = model(review["reader_model"], "reader_model")
+    authors = [(group, a["model"], model(a["model"], "author_groups model"))
+               for group, models in review["author_groups"].items() for a in models]
+    unknown = [review["reader_model"]] if reader == "unknown" else []
+    unknown += [name for _, name, family in authors if family == "unknown"]
+    if unknown:
+        return f"model family unknown for {', '.join(unknown)}; an unknown family is never independent, so obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge"
+    for group, name, family in authors:
+        if family == reader:
+            return f"reader_family {reader} ({review['reader_model']}) matches author_groups {group} ({name}); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge"
+    return None
+
+
 def verify(records, rows, head):
     word = records["captain-word"]
     review = records["review"]
     if word is not None and word["head"] == head:
-        live = None
+        failed = None
         for row in rows:
             if row["kind"] == "captain-word":
-                live = None
+                failed = None
             elif row["head"] == head:
-                live = row
-        if live is not None and live["verdict"] == "FAIL":
-            raise RecordError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {live['reader_model']}, at {live['at']}, report {live['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
+                if row["verdict"] == "FAIL":
+                    failed = row
+                elif failed is not None and dependence(row, head) is None:
+                    failed = None
+        if failed is not None:
+            raise RecordError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {failed['reader_model']}, at {failed['at']}, report {failed['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
         return "captain-word"
     if review is None:
         raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
@@ -226,16 +244,9 @@ def verify(records, rows, head):
         raise RecordError("verdict is FAIL; obtain and record a new PASS with fm-review-record.py review, then retry the merge")
     if review["head"] != head:
         raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
-    reader = model(review["reader_model"], "reader_model")
-    authors = [(group, a["model"], model(a["model"], "author_groups model"))
-               for group, models in review["author_groups"].items() for a in models]
-    unknown = [review["reader_model"]] if reader == "unknown" else []
-    unknown += [name for _, name, family in authors if family == "unknown"]
-    if unknown:
-        raise RecordError(f"model family unknown for {', '.join(unknown)}; an unknown family is never independent, so obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
-    for group, name, family in authors:
-        if family == reader:
-            raise RecordError(f"reader_family {reader} ({review['reader_model']}) matches author_groups {group} ({name}); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge")
+    problem = dependence(review, head)
+    if problem is not None:
+        raise RecordError(problem)
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes:
         raise RecordError(f"{', '.join(yes)} is yes but captain-word is missing at live head {head}; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
