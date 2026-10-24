@@ -149,6 +149,25 @@ wait_for() {  # <file> [tries]
   return 1
 }
 
+# The runner writes its marker twice at startup, each time truncating before it
+# writes the same PID, so a file that is merely nonempty can be empty again by
+# the time it is read. Validate the value actually read: only a complete numeric
+# line is a PID, and anything else keeps polling and ends in a nonzero status
+# with nothing printed, never an empty PID for the caller to use.
+runner_pid() {  # <runner-marker> [tries]
+  local f=$1 n=${2:-100} pid
+  for _ in $(seq 1 "$n"); do
+    if IFS= read -r pid 2>/dev/null < "$f"; then
+      case $pid in
+        ''|*[!0-9]*) ;;
+        *) printf '%s\n' "$pid"; return 0 ;;
+      esac
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
 # Arm now starts the listener, so a later start would poll again. Wait for the
 # capture that listener is already producing, and for its runner to release the
 # claim: the result lands before the runner publishes and exits, and a retire or
@@ -3586,43 +3605,63 @@ pass "cross-home stale recovery removes abandoned output from the old state dire
 HR="$TMP_ROOT/hr"; new_home "$HR"
 RACE_TRIGGER="$TMP_ROOT/race-trigger"
 RACE_LOG="$TMP_ROOT/race-executions"
+RACE_PROGRESS="$TMP_ROOT/race-progress"
 RACE_BLOCKER="$TMP_ROOT/race-blocker.sh"
 cat > "$RACE_BLOCKER" <<'SH'
 #!/usr/bin/env bash
 printf 'started\n' >> "$1"
+idle_since=$SECONDS
+progress_seen=
 while [ ! -e "$2" ]; do
-  [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
+  progress=
+  [ -z "${3:-}" ] || IFS= read -r progress 2>/dev/null < "$3" || true
+  if [ "$progress" != "$progress_seen" ]; then
+    progress_seen=$progress
+    idle_since=$SECONDS
+  fi
+  [ "$((SECONDS - idle_since))" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ] || exit 75
   sleep 0.05
 done
 printf 'race result\n'
 SH
 chmod +x "$RACE_BLOCKER"
-pe_register "$HR" lavish race-src -- "$RACE_BLOCKER" "$RACE_LOG" "$RACE_TRIGGER" >/dev/null
+pe_register "$HR" lavish race-src -- "$RACE_BLOCKER" "$RACE_LOG" "$RACE_TRIGGER" "$RACE_PROGRESS" >/dev/null
 printf '%s\n%s\nold-token\nold-identity\n' "$TMP_ROOT/gone-home" 999999 > "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 race_pids=()
 for race_index in $(seq 1 24); do
+  : > "$TMP_ROOT/race-contender-$race_index.out"
   pe "$HR" start race-src > "$TMP_ROOT/race-contender-$race_index.out" 2>&1 &
   race_pids+=("$!")
 done
-# Wait for every loser to observe the winning claim before starting the source
-# marker deadline: the winner must reacquire the same source lock for its launch
-# floor after the contenders' expensive claim reads. The winner blocks until the
-# trigger, so every other contender finishing is the loser's own completion,
-# not a settle sleep that lets late contenders arrive after ownership is released.
+# Wait for every loser to record that it observed the winning claim before
+# waiting on the source marker: the winner must reacquire the same source lock
+# for its launch floor after the contenders' expensive claim reads. The winner
+# blocks until the trigger, so each loser's record is its own completion, not a
+# settle sleep that lets late contenders arrive after ownership is released.
+# Only a stretch with no new record fails this wait, however long the whole
+# group takes, and the winner's own safety exit counts from the last new record
+# through the progress file, so it stays blocked while records keep arriving.
 # A second runner also blocks, and stops this wait on its second start marker.
 race_expected_losers=$((${#race_pids[@]} - 1))
-race_deadline=$((SECONDS + 30))
+race_observed_losers() {
+  awk '/^already owned: race-src$/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
+    "$TMP_ROOT"/race-contender-*.out
+}
+race_progress=0
+race_progress_deadline=$((SECONDS + 30))
 while :; do
-  race_running=0
-  for race_pid in "${race_pids[@]}"; do
-    kill -0 "$race_pid" 2>/dev/null && race_running=$((race_running + 1))
-  done
-  [ "$race_running" -le 1 ] && break
+  race_losers=$(race_observed_losers)
+  [ "$race_losers" -ge "$race_expected_losers" ] && break
   [ ! -e "$RACE_LOG" ] || [ "$(wc -l < "$RACE_LOG" | tr -d ' ')" = 1 ] || break
-  if [ "$SECONDS" -ge "$race_deadline" ]; then
+  if [ "$race_losers" -gt "$race_progress" ]; then
+    race_progress=$race_losers
+    printf '%s\n' "$race_progress" > "$RACE_PROGRESS"
+    race_progress_deadline=$((SECONDS + 30))
+  fi
+  if [ "$SECONDS" -ge "$race_progress_deadline" ]; then
     cat "$TMP_ROOT"/race-contender-*.out >&2
-    fail "stale-claim contenders did not finish observing the winning owner"
+    fail "stale-claim contenders stopped observing the winning owner"
   fi
   sleep 0.1
 done
@@ -3630,8 +3669,7 @@ if ! wait_for "$RACE_LOG" 300; then
   cat "$TMP_ROOT"/race-contender-*.out >&2
   fail "no contender acquired the stale claim"
 fi
-race_losers=$(awk '/already owned/ && !seen[FILENAME]++ { n++ } END { print n+0 }' \
-  "$TMP_ROOT"/race-contender-*.out)
+race_losers=$(race_observed_losers)
 if [ "$race_losers" -ne "$race_expected_losers" ]; then
   cat "$TMP_ROOT"/race-contender-*.out >&2
   fail "not every stale-claim contender observed the winning owner"
@@ -5160,9 +5198,8 @@ pe_register "$HRECREATED" lavish recreated-src -- \
 FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HRECREATED" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HRECREATED"
-wait_for "$HRECREATED/state/procevent/recreated-src.runner" \
+RECREATED_RUNNER_PID=$(runner_pid "$HRECREATED/state/procevent/recreated-src.runner") \
   || fail "the recreated-path fixture never launched its source"
-RECREATED_RUNNER_PID=$(cat "$HRECREATED/state/procevent/recreated-src.runner")
 mv "$HRECREATED/state" "$TMP_ROOT/recreated-owner-old-state"
 pe_register "$HRECREATED" lavish recreated-src -- \
   "$BLOCKER" "$RECREATED_TRIGGER" "replacement payload" >/dev/null \
@@ -5258,9 +5295,8 @@ FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 FM_HOME="$
     "$ROOT/bin/fm-procevent.sh" start detached-attached-src \
     > "$TMP_ROOT/detached-attached.out" 2>&1 &
 DETACHED_START_PID=$!
-wait_for "$HDETACHED/state/procevent/detached-attached-src.runner" \
+DETACHED_RUNNER_PID=$(runner_pid "$HDETACHED/state/procevent/detached-attached-src.runner") \
   || fail "the detachable foreground start never launched its source"
-DETACHED_RUNNER_PID=$(cat "$HDETACHED/state/procevent/detached-attached-src.runner")
 kill "$DETACHED_START_PID"
 wait "$DETACHED_START_PID" 2>/dev/null || true
 detached_deadline=$((SECONDS + 8))
@@ -5296,9 +5332,8 @@ PATH="$REUSED_GROUP_BIN:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/no-reused-group-
   FM_PROCEVENT_OWNER_LEASE_SECONDS=30 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   pe "$HREUSED_GROUP" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HREUSED_GROUP"
-wait_for "$HREUSED_GROUP/state/procevent/reused-runner-group-src.runner" \
+REUSED_GROUP_RUNNER=$(runner_pid "$HREUSED_GROUP/state/procevent/reused-runner-group-src.runner") \
   || fail "the reused-group fixture runner did not start"
-REUSED_GROUP_RUNNER=$(cat "$HREUSED_GROUP/state/procevent/reused-runner-group-src.runner")
 touch "$REUSED_GROUP_MARKER"
 sleep 3
 kill -0 -"$REUSED_GROUP_RUNNER" 2>/dev/null \
@@ -5448,14 +5483,12 @@ orphan_pe "$HORPHAN" reconcile >/dev/null \
 orphan_pe "$HKEEP" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HKEEP"
 
-wait_for "$HORPHAN/state/procevent/orphan-src.runner" \
+ORPHAN_PID=$(runner_pid "$HORPHAN/state/procevent/orphan-src.runner") \
   || fail "the dead-owner listener never recorded its runner"
-wait_for "$HKEEP/state/procevent/keep-src.runner" \
+KEEP_PID=$(runner_pid "$HKEEP/state/procevent/keep-src.runner") \
   || fail "the live-owner listener never recorded its runner"
 wait_for "$TMP_ROOT/orphan-dead.descendant" \
   || fail "the dead-owner listener's child never spawned its own descendant"
-ORPHAN_PID=$(cat "$HORPHAN/state/procevent/orphan-src.runner")
-KEEP_PID=$(cat "$HKEEP/state/procevent/keep-src.runner")
 ORPHAN_DESCENDANT=$(cat "$TMP_ROOT/orphan-dead.descendant")
 
 # The reproduction condition itself: the listener is already an orphan in the
@@ -5577,9 +5610,8 @@ retry_pe register lavish retry-src -- "$ORPHAN_STUB" "$TMP_ROOT/stop-retry-marke
   || fail "fixture step failed: register retry-src"
 retry_pe reconcile >/dev/null \
   || fail "fixture step failed: reconcile retry_pe"
-wait_for "$RETRY_HOME/state/procevent/retry-src.runner" \
+RETRY_PID=$(runner_pid "$RETRY_HOME/state/procevent/retry-src.runner") \
   || fail "the retry listener never recorded its runner"
-RETRY_PID=$(cat "$RETRY_HOME/state/procevent/retry-src.runner")
 # Armed only now: the runner already proved its own process group at startup,
 # and arming earlier would fail that assertion instead of the stop under test.
 printf '%s\n' "$RETRY_PID" > "$RETRY_STATE/target"
@@ -5687,9 +5719,8 @@ PL
       pe "$HPROOF" start proof-src >"$HPROOF/start.log" 2>&1 &
   fi
   PROOF_START=$!
-  wait_for "$HPROOF/state/procevent/proof-src.runner" \
+  PROOF_PID=$(runner_pid "$HPROOF/state/procevent/proof-src.runner") \
     || fail "the signal-proof listener never recorded its runner"
-  PROOF_PID=$(cat "$HPROOF/state/procevent/proof-src.runner")
   wait_for "$PROOF_MARKER.child" || fail "the signal-proof child never started"
   PROOF_CHILD=$(cat "$PROOF_MARKER.child")
   [ "$(ps -o ppid= -p "$PROOF_CHILD" | tr -d '[:space:]')" = "$PROOF_PID" ] \
@@ -5758,7 +5789,8 @@ until [ -s "$HPGUARD/state/procevent/proof-guard-src.runner" ] \
   orphan_pe "$HPGUARD" reconcile >/dev/null 2>&1 || true
   sleep 0.25
 done
-GUARD_PID=$(cat "$HPGUARD/state/procevent/proof-guard-src.runner")
+GUARD_PID=$(runner_pid "$HPGUARD/state/procevent/proof-guard-src.runner") \
+  || fail "the guarded signal-proof listener never recorded its runner"
 GUARD_CHILD=$(cat "$TMP_ROOT/proof-guard.child")
 
 # Nothing refreshes this home's lease from here on, which is the whole input.
@@ -5884,11 +5916,10 @@ bound_pe register lavish bound-src -- "$QUIET_STUB" "$TMP_ROOT/guard-bound-marke
   || fail "fixture step failed: register bound-src"
 bound_pe reconcile >/dev/null \
   || fail "fixture step failed: reconcile bound_pe"
-wait_for "$HBOUND/state/procevent/bound-src.runner" \
+BOUND_PID=$(runner_pid "$HBOUND/state/procevent/bound-src.runner") \
   || fail "the bound fixture's listener never recorded its runner"
 wait_for "$TMP_ROOT/guard-bound-marker.descendant" \
   || fail "the bound fixture's listener never spawned its descendant"
-BOUND_PID=$(cat "$HBOUND/state/procevent/bound-src.runner")
 BOUND_DESCENDANT=$(cat "$TMP_ROOT/guard-bound-marker.descendant")
 # Elapsed is measured from the refresh the guard itself reads, not from a
 # wall-clock moment near it, so the fixture's own startup cost cannot be
@@ -6019,11 +6050,11 @@ pass "the owner guard defaults to a 60-second detection interval, read as two 30
 # separately so the two cannot be traded for each other by accident: against a
 # home that is still alive, an isolated failed read must not stop the runner.
 #
-# The failure is injected where the real path actually reads. ONE lease read
-# fails, exactly once, identified by the lease-age program's own text so no
-# other call in the runner is touched; every read before and after it is the
-# real command, and the home's lease stays long and fresh throughout. The single
-# failed read is therefore the only thing wrong that the guard can see.
+# Inject at the lease-age command boundary: ONE read fails after startup and
+# every other age is zero. A real lease refreshed only during reconcile can
+# expire while a loaded host schedules startup or the observation, making the
+# supposed isolated failure into consecutive misses. Expiry and detection bounds
+# have their own real-clock cases above; this case isolates read recovery.
 
 DEBOUNCE_HOME="$TMP_ROOT/lease-debounce"; new_home "$DEBOUNCE_HOME"
 fm_test_track_procevent_home "$DEBOUNCE_HOME"
@@ -6032,22 +6063,30 @@ DEBOUNCE_BIN=$(fm_fakebin "$TMP_ROOT/lease-debounce-bin")
 REAL_PERL=$(command -v perl) || fail "this host has no perl to build the debounce fixture on"
 cat > "$DEBOUNCE_BIN/perl" <<SH
 #!/usr/bin/env bash
-if [ -s "\$LEASE_DEBOUNCE_STATE/armed" ] && [ ! -s "\$LEASE_DEBOUNCE_STATE/spent" ]; then
-  for arg in "\$@"; do
-    case \$arg in
-      *'int(\$now - \$value)'*)
-        printf 'spent\n' > "\$LEASE_DEBOUNCE_STATE/spent"
-        exit 1
-        ;;
-    esac
-  done
-fi
+for arg in "\$@"; do
+  case \$arg in
+    *'int(\$now - \$value)'*)
+      if [ -s "\$LEASE_DEBOUNCE_STATE/armed" ]; then
+        if [ ! -s "\$LEASE_DEBOUNCE_STATE/spent" ]; then
+          printf 'spent\n' > "\$LEASE_DEBOUNCE_STATE/spent"
+          exit 1
+        elif [ ! -s "\$LEASE_DEBOUNCE_STATE/recovered" ]; then
+          printf 'recovered\n' > "\$LEASE_DEBOUNCE_STATE/recovered"
+        else
+          printf 'observed\n' > "\$LEASE_DEBOUNCE_STATE/observed"
+        fi
+      fi
+      printf '0\n'
+      exit 0
+      ;;
+  esac
+done
 exec "$REAL_PERL" "\$@"
 SH
 chmod +x "$DEBOUNCE_BIN/perl"
 
-# A long lease and a short check: many reads happen inside the observation
-# window, and none of them can go stale on their own during it.
+# Keep the ordinary lease/check settings; freshness is supplied independently
+# above, so scheduling delay cannot manufacture another failed lease check.
 DEBOUNCE_LEASE_SECONDS=30
 DEBOUNCE_CHECK_SECONDS=1
 debounce_pe() {
@@ -6060,18 +6099,21 @@ debounce_pe register lavish debounce-src -- "$QUIET_STUB" "$TMP_ROOT/lease-debou
   || fail "fixture step failed: register debounce-src"
 debounce_pe reconcile >/dev/null \
   || fail "fixture step failed: reconcile debounce_pe"
-wait_for "$DEBOUNCE_HOME/state/procevent/debounce-src.runner" \
+wait_for "$TMP_ROOT/lease-debounce-marker.descendant" \
+  || fail "the debounce fixture's source never started"
+DEBOUNCE_PID=$(runner_pid "$DEBOUNCE_HOME/state/procevent/debounce-src.runner") \
   || fail "the debounce fixture's listener never recorded its runner"
-DEBOUNCE_PID=$(cat "$DEBOUNCE_HOME/state/procevent/debounce-src.runner")
 # Armed only now. The guard proves the lease once before it reports ready, and
 # failing THAT read would refuse the runner outright instead of exercising the
 # debounce this case is about.
 printf 'armed\n' > "$DEBOUNCE_STATE/armed"
 wait_for "$DEBOUNCE_STATE/spent" \
   || fail "the single failed lease read this case injects never happened"
-# Several further checks at the configured interval. A guard that acted on one
-# failed read would have stopped the group during them.
-sleep $((DEBOUNCE_CHECK_SECONDS * 4))
+# The next read can begin only after the guard consumed the recovery result.
+# Waiting for that causal boundary proves the guard advanced past the miss;
+# a fixed observation sleep neither proves recovery nor keeps a lease fresh.
+wait_for "$DEBOUNCE_STATE/observed" \
+  || fail "one unreadable lease read ended a runner whose home was still alive"
 kill -0 -"$DEBOUNCE_PID" 2>/dev/null \
   || fail "one unreadable lease read ended a runner whose home was still alive"
 debounce_pe retire debounce-src >/dev/null \
@@ -6091,9 +6133,8 @@ pe_register "$HPROMPT" lavish prompt-src -- "$QUIET_STUB" "$TMP_ROOT/prompt-stop
   || fail "fixture step failed: register prompt-src"
 pe "$HPROMPT" start prompt-src >"$TMP_ROOT/prompt-start.log" 2>&1 &
 PROMPT_START_PID=$!
-wait_for "$HPROMPT/state/procevent/prompt-src.runner" \
+PROMPT_PID=$(runner_pid "$HPROMPT/state/procevent/prompt-src.runner") \
   || fail "the promptly-stopping listener never recorded its runner"
-PROMPT_PID=$(cat "$HPROMPT/state/procevent/prompt-src.runner")
 wait_for "$TMP_ROOT/prompt-stop.descendant" \
   || fail "the promptly-stopping listener's child never spawned its own descendant"
 stop_window_ms() {
@@ -6130,9 +6171,8 @@ pe_register "$HCRASH" lavish crash-src -- "$QUIET_STUB" "$TMP_ROOT/crash-leader"
   || fail "fixture step failed: register crash-src"
 pe "$HCRASH" reconcile >/dev/null \
   || fail "fixture step failed: reconcile HCRASH"
-wait_for "$HCRASH/state/procevent/crash-src.runner" \
+CRASH_PID=$(runner_pid "$HCRASH/state/procevent/crash-src.runner") \
   || fail "the crash-fixture listener never recorded its runner"
-CRASH_PID=$(cat "$HCRASH/state/procevent/crash-src.runner")
 wait_for "$TMP_ROOT/crash-leader.descendant" \
   || fail "the crash-fixture listener's child never spawned its own descendant"
 kill -KILL "$CRASH_PID" 2>/dev/null || fail "the crash fixture could not stop its own leader"
@@ -7199,6 +7239,18 @@ done
 cat "$CONT/round$n"
 SH
 chmod +x "$CONT/bin/lavish-axi"
+# The held-page round has no real second poller, so this fixture's view of every
+# poll process on the host is the empty one that round describes; every other
+# ps read, including each process's own identity, goes to the real ps.
+REAL_PS=$(command -v ps) || fail "the continuous-Lavish fixture requires ps"
+cat > "$CONT/bin/ps" <<SH
+#!/usr/bin/env bash
+if [ "\$#" -eq 2 ] && [ "\$1" = -axo ] && [ "\$2" = pid=,ppid=,pgid=,lstart=,command= ]; then
+  exit 0
+fi
+exec "$REAL_PS" "\$@"
+SH
+chmod +x "$CONT/bin/ps"
 export CONT
 cont_art="$CONT/review.html"
 printf '<h1>continuous review</h1>\n' > "$cont_art"
