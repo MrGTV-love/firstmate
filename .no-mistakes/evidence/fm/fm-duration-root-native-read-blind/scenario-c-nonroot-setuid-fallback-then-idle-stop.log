@@ -1,0 +1,8 @@
+# Scenario C: keep-going 3s inactivity; root shell natively readable; child setuid-root top natively UNREADABLE (real EPERM, no injection); top's ps CPU must count as progress for ~8s, then the truly idle tree must be stopped
+# host: Darwin 27.0.0 arm64; load: { 12.57 16.63 17.86 }
+base: exit=124 wall=13s stdout=[top-done ]
+    stderr: probe: top pid=76186 native_read=None root(shell) pid=76168 native_read=0.0
+    stderr: no_progress: "operational-read made no output or CPU progress for 3s; stopping"
+fixed: exit=124 wall=13s stdout=[top-done ]
+    stderr: probe: top pid=83321 native_read=None root(shell) pid=83319 native_read=0.0
+    stderr: no_progress: "operational-read made no output or CPU progress for 3s; stopping"

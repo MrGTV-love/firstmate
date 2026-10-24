@@ -1,0 +1,4 @@
+# Scenario A2: shell entry fm_progress_check (bin/fm-timeout-lib.sh, c5795eaad) on real root-owned idle daemon pid 361
+sample 1: exit=0 stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" record_exists=no
+sample 2: exit=0 stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" record_exists=no
+sample 3: exit=0 stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" record_exists=no

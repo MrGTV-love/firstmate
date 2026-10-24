@@ -1,0 +1,10 @@
+# Scenario A: real root-owned idle daemon (pid 361, root /usr/libexec/IOMFB_bics_daemon); native proc_pid_rusage fails with EPERM (not ours)
+# host: Darwin 27.0.0 arm64; load: { 16.48 18.47 18.59 }
+== base (30f233bc9) ==
+sample 1: exit=0 stderr= record_exists=yes
+sample 2: exit=124 stderr=no_progress: "pid=361 no CPU or watched-file progress for 1.7s" record_exists=yes
+sample 3: exit=124 stderr=no_progress: "pid=361 no CPU or watched-file progress for 3.4s" record_exists=yes
+== fixed (c5795eaad) ==
+sample 1: exit=0 stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" record_exists=no
+sample 2: exit=0 stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" record_exists=no
+sample 3: exit=0 stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" record_exists=no

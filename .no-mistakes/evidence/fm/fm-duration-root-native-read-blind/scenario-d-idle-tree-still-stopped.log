@@ -1,0 +1,7 @@
+# Scenario D: truly idle, fully readable tree is still stopped (fixed c5795eaad)
+# host: Darwin 27.0.0 arm64; load: { 13.75 16.53 17.77 }
+keep-going 2 -- sleep 30: exit=124 wall=3s
+    stderr: no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+progress-check own idle sleep pid=99276 sample 1: exit=0 stderr=
+progress-check own idle sleep pid=99276 sample 2: exit=124 stderr=no_progress: "pid=99276 no CPU or watched-file progress for 1.7s"
+progress-check own idle sleep pid=99276 sample 3: exit=124 stderr=no_progress: "pid=99276 no CPU or watched-file progress for 3.5s"

@@ -1,0 +1,14 @@
+# Scenario B: keep-going 2s inactivity around a 13s productive batch (24 reaped perl CPU bursts); only the root's native CPU read fails (injected at darwin_cpu_reader)
+# host: Darwin 27.0.0 arm64; load: { 14.02 17.66 18.29 }
+base run 1: exit=124 wall=5s stdout=[] stderr_lines=1
+    stderr: no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+base run 2: exit=124 wall=4s stdout=[] stderr_lines=1
+    stderr: no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+base run 3: exit=124 wall=5s stdout=[] stderr_lines=1
+    stderr: no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+fixed run 1: exit=0 wall=13s stdout=[batch-done ] stderr_lines=1
+    stderr: cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+fixed run 2: exit=0 wall=13s stdout=[batch-done ] stderr_lines=1
+    stderr: cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+fixed run 3: exit=0 wall=13s stdout=[batch-done ] stderr_lines=1
+    stderr: cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"

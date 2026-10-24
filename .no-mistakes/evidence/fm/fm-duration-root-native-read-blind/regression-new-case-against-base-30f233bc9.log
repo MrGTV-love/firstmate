@@ -1,0 +1,28 @@
+ok - arm_slow_cpu_start_completes
+ok - arm_late_failure_reaches_the_wake_queue_once_its_waiter_left
+ok - arm_failure_seen_by_its_waiter_is_not_queued_again
+ok - omp_slow_readiness_does_not_hold_the_wake
+ok - omp_late_successor_failure_is_surfaced
+ok - claude_slow_successor_does_not_hold_the_rewake
+ok - claude_failed_successor_is_reported_in_the_rewake
+ok - claude_late_successor_failure_reaches_the_wake_queue
+ok - watchdog_old_beacon_preserves_progress_but_stops_proven_stall
+ok - summary_slow_cpu_producer_publishes
+ok - crew_slow_cpu_read_is_authoritative
+ok - fleet_slow_cpu_task_observation_is_included
+ok - summary_worker_cuts_only_the_hung_lane
+ok - reaped_child_cpu_between_observations_prevents_false_idle_then_true_idle_is_detected
+not ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle: unreadable native root was treated as idle: 124 no_progress: "pid=100 no CPU or watched-file progress for 2.0s"
+
+ok - unavailable_ctypes_preserves_productive_work_with_blind_telemetry
+ok - proc_only_sampler_cuts_still_keeps_growing_and_warns_when_blind
+ok - host_samplers_stop_timed_poll_idle_and_keep_reaped_cpu_burst
+ok - contender_preserves_productive_old_beacon_holder
+ok - attached_arm_follows_productive_holder_after_beacon_ages
+ok - attached_arm_admits_productive_already_old_holder
+ok - contender_refuses_a_proven_stalled_holder_that_survives_term
+ok - arm_attaches_to_a_holder_that_resumed_while_its_child_started
+ok - collector_slow_cpu_source_returns
+ok - collector_productive_total_outlives_old_alarm
+ok - python_free_runner_preserves_subtree_cpu_and_output_progress
+ok - python_free_runner_stops_true_inactivity_and_reaps_descendants
