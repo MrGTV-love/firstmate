@@ -195,7 +195,10 @@ Every helper and case body was compared definition by definition against the pre
 `tests/fm-test-run.test.sh` holds the partition: `test_control_relaunch_groups_partition_one_inventory` requires the three registered lists to be a duplicate-free 155-case cover with every case registered by the file that defines it, `test_watch_triage_waits_groups_partition_one_inventory` requires the four call lists to be a duplicate-free 67-case cover against the shared helper, and `test_split_suites_stay_selectable_in_their_families` requires each group to stay independently selectable and to keep its family.
 
 The `watcher-wake-lock` and `backend-dispatch` family memberships are otherwise unchanged; `backend-dispatch` is not an admitted `--jobs` family, so the control groups add no concurrency admission, and the waits groups join the already-admitted `watcher-wake-lock` family.
-The group hints are apportioned from a local Ubuntu 26.04 container measurement of each group (waits 230 s, 465 s, 97 s, and 50 s; control 121 s, 243 s, and 255 s on the prefixes that did not hit a container-only node and harness gap), scaled by 0.95 so the unchanged twenty shards pack inside the 1200000 ms target.
+The waits hints (351000, 712000, 148000, and 76000 ms) scale the four local Ubuntu 26.04 container measurements (230 s, 465 s, 97 s, and 50 s) by about 1530 ms per measured second.
+The control hints (238000, 538000, and 447000 ms) are apportioned from the measured prefixes that did not hit a container-only node and harness gap.
+All seven were then set so the unchanged twenty shards pass `--check-coverage` at `serial_max_ms` 1198995.
+Each family's hints sum to about 0.90 of the combined suite's last CI measurement (1287000 against 1433371 ms for waits, 1223000 against 1358153 ms for control); they sit deliberately below it to leave the twenty-shard cover inside the 1200000 ms target.
 They are apportioned estimates, not CI measurements; the first `fm-test-timing-portable-serial-*` artifacts for the new files replace them, as the refresh procedure above requires.
 
 ## Portable serial remainder
@@ -303,6 +306,7 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 Its `fm_lint_partition_weight_hints` table contains the slowest successful per-root duration from the two partitions' `partition-N.roots.tsv` sidecars in the same three main runs used by the latest serial refresh.
 The seven captain-hold roots have no lint measurement of their own yet: their rows divide the former combined file's 12745 ms in proportion to each file's bytes, so refresh them from the next three main runs' sidecars.
 The four teardown rows (`tests/fm-teardown-cleanup.test.sh` 4219, `tests/fm-teardown-helpers.sh` 2194, `tests/fm-teardown-pool.test.sh` 2043, and `tests/fm-teardown.test.sh` 1830) divide the former combined file's measured 10286 ms by each file's line share; they are not measurements, so replace them from the lint sidecars of the next three Ubuntu main runs.
+The four control-relaunch rows (`tests/fm-control-relaunch.test.sh` 2922, `tests/fm-control-relaunch-recovery.test.sh` 2724, `tests/fm-control-relaunch-backends.test.sh` 2274, and `tests/fm-control-relaunch-helpers.sh` 1825) divide the former combined file's measured 9888 ms roughly by each file's line share; they are not measurements, so replace them from the lint sidecars of the next three Ubuntu main runs.
 The telemetry records ShellCheck 0.11.0 on Linux x86_64, Ubuntu 24, image `20261004.327.1`.
 Longest-processing-time packing uses those durations, not direct file bytes: equal byte totals previously carried 1240 and 1781 seconds of measured lint work in run 38312847224.
 The script header owns missing-root fallback and partition syntax; local worker balancing and its telemetry weight fields still use direct bytes.

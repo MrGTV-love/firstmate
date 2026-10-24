@@ -308,9 +308,10 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # target when that shard's own sum is also above its own largest script, so the
 # excess is packing. A shard holding one indivisible suite alone may exceed it;
 # another shard never borrows that suite's size. The guard reports the largest
-# single script as serial_indivisible_ms. Splitting
-# tests/fm-watch-triage-waits.test.sh is the way back under this target without
-# that exception (docs/fm-test-portable-shards.md).
+# single script as serial_indivisible_ms. The former indivisible members,
+# tests/fm-watch-triage-waits.test.sh and tests/fm-control-relaunch.test.sh, are
+# now split into separately packed groups (docs/fm-test-portable-shards.md,
+# "Split watch-triage-waits and control-relaunch").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
