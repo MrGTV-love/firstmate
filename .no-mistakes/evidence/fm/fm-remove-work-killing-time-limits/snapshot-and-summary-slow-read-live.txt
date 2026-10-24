@@ -1,0 +1,16 @@
+== base code: bin/fm-fleet-snapshot.sh --home-input, FM_SNAPSHOT_CREW_STATE_TIMEOUT=3, slow-busy no-mistakes; rc=0 elapsed=3s
+task slow -> {}
+
+== new code: bin/fm-fleet-snapshot.sh --home-input, FM_SNAPSHOT_CREW_STATE_TIMEOUT=3, slow-busy no-mistakes; rc=0 elapsed=19s
+task slow -> {}
+
+== base code: bin/fm-home-summary-refresh.sh, FM_HOME_SUMMARY_TIMEOUT=3, slow-busy no-mistakes; rc=124 elapsed=3s
+fm-home-summary-refresh: refresh exceeded its 3-second deadline
+
+home-summary.json NOT published
+
+== new code: bin/fm-home-summary-refresh.sh, FM_HOME_SUMMARY_TIMEOUT=3, slow-busy no-mistakes; rc=0 elapsed=19s
+
+
+published home-summary.json: valid=True state=active_child_work generated=2026-10-24T05:31:15Z
+

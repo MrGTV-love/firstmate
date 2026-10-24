@@ -1,0 +1,22 @@
+ 0:32  up 3 days, 10:03, 3 users, load averages: 45.04 42.53 37.22
+== base code: real watcher watcher: started pid=4554 (beacon fresh)
+beacon backdated to 1000s old (default FM_WATCHDOG_STALE_SECS=900)
+watchdog check 1: rc=1 :: watchdog: stale-watcher - recovery failed (attempt 1) 
+   watcher pid 4554 alive: NO
+watchdog check 2: rc=0 :: watchdog: stale-watcher - waiting out the retry interval 
+   watcher pid 4554 alive: NO
+watchdog log:
+   [2026-10-24T00:32:45-0500] verdict stale-watcher; recovery check attempt 1
+   [2026-10-24T00:32:45-0500] stopping the stale watcher pid=4554 through fm-watch-arm.sh --stop
+   watcher: stopped pid=4554
+   [2026-10-24T00:32:45-0500] no config/watchdog-resume; the session cannot be resumed from here
+   [2026-10-24T00:32:48-0500] recovery attempt 1 failed; verdict now stale-watcher
+
+== new code: real watcher watcher: started pid=13544 (beacon fresh)
+beacon backdated to 1000s old (default FM_WATCHDOG_STALE_SECS=900)
+watchdog check 1: rc=0 :: watchdog: healthy 
+   watcher pid 13544 alive: yes
+watchdog check 2: rc=0 :: watchdog: healthy 
+   watcher pid 13544 alive: yes
+watchdog log:
+

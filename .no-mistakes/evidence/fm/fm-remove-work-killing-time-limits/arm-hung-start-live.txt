@@ -1,0 +1,8 @@
+== new code, FM_ARM_CONFIRM_TIMEOUT=2, watcher start hangs idle (sleep 300)
+arm rc=1 after 3s:
+no_progress: "pid=26555 no CPU or watched-file progress for 2.8s"
+/Users/charlesabrooker/tmp/fm-new.G4HFtG/bin/fm-watch-arm.sh: line 716: 26555 Terminated: 15          "$WATCH" > "$child_out"
+watcher: FAILED - no live watcher with a fresh beacon
+cycle ledger:
+arm_pid=26518	watcher_pid=26555	origin=started	started_at=1792819770	ended_at=1792819773	exit_code=143	signal=TERM	reason=confirmation-no-progress	beacon_age=999999	lock_before=pid:none|identity:none	lock_after=pid:none|identity:none	successor=none
+leftover sleep 300 under lab: 0

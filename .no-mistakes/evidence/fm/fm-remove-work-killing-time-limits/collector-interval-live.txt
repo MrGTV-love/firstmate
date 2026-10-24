@@ -1,0 +1,10 @@
+== mode=idle config command_timeout_seconds=3 rc=0 elapsed=5s
+ledger row: ledger degraded | fleet snapshot: backlog is unavailable; project origin /Users/charlesabrooker/tmp/fm-lab.Wut1LD/projects/demo: Command '['git', '-C', '/Users/charlesabrooker/tmp/fm-lab.Wut1LD/projects/demo', 'config', '--get', 'remote.origin.url']' timed out after 3 seconds
+idle-source pid 83312 gone (cleaned up)
+idle-desc pid  gone (cleaned up)
+== mode=productive config command_timeout_seconds=3 rc=0 elapsed=8s
+ledger row: ledger degraded | fleet snapshot: backlog is unavailable; open PRs example/demo: gh: Not Found (HTTP 404)
+== rerun mode=idle (TERM-ignoring descendant) command_timeout_seconds=3 rc=0 elapsed=5s
+ledger row: ledger degraded | fleet snapshot: backlog is unavailable; project origin /Users/charlesabrooker/tmp/fm-lab.Wut1LD/projects/demo: Command '['git', '-C', '/Users/charlesabrooker/tmp/fm-lab.Wut1LD/projects/demo', 'config', '--get', 'remote.origin.url']' timed out after 3 seconds
+idle-source pid 26642 gone (cleaned up)
+idle-desc pid 26651 gone (cleaned up)

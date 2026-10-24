@@ -1,0 +1,26 @@
+== new code: real watcher watcher: started pid=36264 (beacon fresh); SIGSTOP its process tree (36264 37225 37303 37309 37379 37710 37229 37371 37666 ): true stall, no CPU, no beacon
+/tmp/fm-wd-stall.sh: line 13: kill: (37229) - No such process
+/tmp/fm-wd-stall.sh: line 13: kill: (37371) - No such process
+/tmp/fm-wd-stall.sh: line 13: kill: (37666) - No such process
+watchdog check 1 (FM_WATCHDOG_STALE_SECS=2): rc=0 :: watchdog: healthy 
+   watcher 36264 state: T   
+watchdog check 2 (FM_WATCHDOG_STALE_SECS=2): rc=1 :: watchdog: stale-watcher - recovery failed (attempt 1) 
+   watcher 36264 state: T   
+watchdog check 3 (FM_WATCHDOG_STALE_SECS=2): rc=0 :: watchdog: stale-watcher - waiting out the retry interval 
+   watcher 36264 state: T   
+watchdog log:
+   no_progress: "pid=36264 no CPU or watched-file progress for 3.0s"
+   [2026-10-24T00:38:15-0500] verdict stale-watcher; recovery check attempt 1
+   [2026-10-24T00:38:15-0500] stopping watcher pid=36264: no CPU or beacon progress for 2s, identity reverified; through fm-watch-arm.sh --stop
+   no_progress: "pid=36264 no CPU or watched-file progress for 3.4s"
+   watcher: FAILED - pid=36264 did not stop
+   [2026-10-24T00:38:24-0500] watcher stop reported a failure
+   [2026-10-24T00:38:24-0500] no config/watchdog-resume; the session cannot be resumed from here
+   no_progress: "pid=36264 no CPU or watched-file progress for 11.6s"
+   no_progress: "pid=36264 no CPU or watched-file progress for 13.9s"
+   [2026-10-24T00:38:26-0500] recovery attempt 1 failed; verdict now stale-watcher
+   no_progress: "pid=36264 no CPU or watched-file progress for 17.1s"
+after SIGCONT (pending TERM delivered), stalled watcher pid 36264 alive: no
+arm output:
+   watcher: started pid=36264 (beacon fresh)
+   watcher: FAILED - watcher cycle exited 143 without an actionable reason

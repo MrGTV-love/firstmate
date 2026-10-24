@@ -1,0 +1,4 @@
+== new code: bin/fm-crew-state.sh slow, FM_CREW_STATE_NM_TIMEOUT=2, no-mistakes hangs idle; rc=0 elapsed=3s
+state: unknown · source: none · backend unreachable (tmux endpoint state: unreadable) · run-store: skipped (no output or CPU progress)
+hung no-mistakes pids: 77836 
+still running 'sleep 297': 0

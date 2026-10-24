@@ -1,0 +1,16 @@
+== base code, FM_ARM_CONFIRM_TIMEOUT=2, watcher start burns 6 s CPU; uptime: load averages: 42.33 40.75 35.17
+first status after 4s:
+/Users/charlesabrooker/tmp/fm-base.Zwc2yL/bin/fm-watch-arm.sh: line 630: 93333 Terminated: 15          "$WATCH" > "$child_out"
+watcher: FAILED - no live watcher with a fresh beacon
+arm alive after +3s: no
+cycle ledger:
+arm_pid=93315	watcher_pid=93333	origin=started	started_at=1792819738	ended_at=1792819741	exit_code=143	signal=TERM	reason=confirmation-timeout	beacon_age=999999	lock_before=pid:none|identity:none	lock_after=pid:none|identity:none	successor=none
+watcher: none running
+
+== new code, FM_ARM_CONFIRM_TIMEOUT=2, watcher start burns 6 s CPU; uptime: load averages: 44.78 41.32 35.44
+first status after 7s:
+watcher: started pid=2853 (beacon fresh)
+arm alive after +3s: yes
+watcher pid 2853 alive: yes
+watcher: stopped pid=2853
+

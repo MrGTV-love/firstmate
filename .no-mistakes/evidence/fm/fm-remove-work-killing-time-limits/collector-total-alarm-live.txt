@@ -1,0 +1,6 @@
+== base code: open-loops, command_timeout_seconds=1 (old whole-collection alarm = 10 s), project-origin source busy 12 s; rc=0 elapsed=1s
+ledger row: ledger degraded | fleet snapshot: backlog is unavailable; project origin /Users/charlesabrooker/tmp/fm-lab.Wut1LD/projects/demo: Command '['git', '-C', '/Users/charlesabrooker/tmp/fm-lab.Wut1LD/projects/demo', 'config', '--get', 'remote.origin.url']' timed out after 1 seconds
+
+== new code: open-loops, command_timeout_seconds=1 (old whole-collection alarm = 10 s), project-origin source busy 12 s; rc=0 elapsed=13s
+ledger row: ledger degraded | fleet snapshot: backlog is unavailable; open PRs example/demo: gh: Not Found (HTTP 404)
+

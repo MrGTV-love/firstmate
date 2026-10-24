@@ -1,0 +1,6 @@
+== base code: bin/fm-crew-state.sh slow, FM_CREW_STATE_NM_TIMEOUT=2, no-mistakes answer takes 6 s of busy CPU; rc=0 elapsed=3s
+state: unknown · source: none · backend unreachable (tmux endpoint state: unreadable) · run-store: skipped (read budget exceeded)
+
+== new code: bin/fm-crew-state.sh slow, FM_CREW_STATE_NM_TIMEOUT=2, no-mistakes answer takes 6 s of busy CPU; rc=0 elapsed=19s
+state: working · source: run-step · validating (running)
+
