@@ -691,7 +691,8 @@ Services and records stay private to the test and cleanup stops its fixtures.
 
 ### Unchanged result delivery (2026-10-24)
 
-Verified on macOS arm64 with omp 18.12.4 and Claude Code 2.1.310, using only synthetic loopback providers:
+Verified on macOS arm64 with omp 18.12.4 and Claude Code 2.1.310, using only synthetic loopback providers.
+The runs used the uncommitted implementation that became commit `98556a11f41db7070228cbac1ef81caf71eddb7a`; they predate the later removal of the launch and steering consistency receipts and were not repeated on a later source:
 
 ```sh
 bash bin/fm-test-run.sh tests/fm-jev-guard-omp-live-e2e.test.sh

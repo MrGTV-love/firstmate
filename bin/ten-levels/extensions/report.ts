@@ -27,13 +27,15 @@ export const SIZE_REFUSAL_NOTICE = SIZE_REFUSAL_HEAD
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
 
-interface Budget { tryMs: number; tries: number; decisionMs: number; backoffMs: number; reserveWholeTry: boolean }
 // The per-try limit guards only against a judge that never answers; answered calls are far faster
 // (p99 535 ms over 15,640 calls, docs/configuration.md "Unreachable threshold").
-const WIDE_BUDGET: Budget = { tryMs: 90_000, tries: 3, decisionMs: 300_000, backoffMs: 1_000, reserveWholeTry: true };
+const TRY_MS = 90_000;
+const TRIES = 3;
+const DECISION_MS = 300_000;
+const BACKOFF_MS = 1_000;
 const RETRYABLE_FAILURES: ReadonlySet<GuardFailureType> = new Set(["TimeoutError", "TypeError", "Error"]);
 const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
-const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal; budget: Budget }>();
+const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
 
 export type GuardFailureType = "ContractError" | "QuestionValidationError" | "TimeoutError" | "AbortError"
   | "TypeError" | "Error" | "PrivacyWithheldError" | "CredentialUnavailableError" | "RequestTooLargeError"
@@ -123,22 +125,21 @@ export interface GuardService {
   record(terminal: GuardTerminal): void;
 }
 
-export async function withDecisionBudget<T>(run: (remainingMs: () => number) => Promise<T>): Promise<T> {
-  const budget = WIDE_BUDGET;
+export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), budget.decisionMs);
+  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), DECISION_MS);
   try {
-    return await budgets.run({ until: performance.now() + budget.decisionMs, signal: controller.signal, budget }, run, preflightTimeout);
+    return await budgets.run({ until: performance.now() + DECISION_MS, signal: controller.signal }, run);
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** A budget that reserves a whole try keeps room for one; otherwise the next try shares whatever remains before the host deadline. */
+/** A retry starts only while the decision budget still has room for one whole try after its backoff. */
 function mayRetry(cause: unknown, backoff: number): boolean {
   const store = budgets.getStore();
   if (store?.signal.aborted) return false;
-  if (store && store.until - performance.now() < (store.budget.reserveWholeTry ? store.budget.tryMs : 1) + backoff) return false;
+  if (store && store.until - performance.now() < TRY_MS + backoff) return false;
   return RETRYABLE_FAILURES.has(failureType(cause));
 }
 
@@ -210,7 +211,7 @@ function writePieces(text: string, room: number): { pieces: string[]; covered: n
 function preflightTimeout(): number {
   const budget = budgets.getStore();
   budget?.signal.throwIfAborted();
-  const remaining = budget ? Math.ceil(budget.until - performance.now()) : WIDE_BUDGET.decisionMs;
+  const remaining = budget ? Math.ceil(budget.until - performance.now()) : DECISION_MS;
   if (remaining <= 0) throw new DOMException("Jev handler timed out.", "TimeoutError");
   return remaining;
 }
@@ -219,7 +220,7 @@ function preflightTimeout(): number {
 export function createGuardService(context: GuardServiceContext): GuardService {
   const active = context.noHelpers !== true && context.project === "firstmate";
   let apiKey: string | undefined;
-  const clients = new Map<number, JevClient>();
+  let client: JevClient | undefined;
   const ledger = resolve(context.state, "jev-guard.jsonl");
 
   function permitted(requestText: string): void {
@@ -248,7 +249,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
   return {
     active,
     async decide(state, questions) {
-      const budget = budgets.getStore()?.budget ?? WIDE_BUDGET;
       let requestStarted = false;
       let tries = 0;
       let started = 0;
@@ -262,21 +262,17 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         validateRequest(snapshot);
         permitted(requestText);
         apiKey ??= typesafeKey();
-        let client = clients.get(budget.tryMs);
-        if (!client) {
-          client = new JevClient({ provider: "typesafe", apiKey, model: GUARD_MODEL, timeoutMs: budget.tryMs,
-            baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
-          clients.set(budget.tryMs, client);
-        }
+        const judge = client ??= new JevClient({ provider: "typesafe", apiKey, model: GUARD_MODEL, timeoutMs: TRY_MS,
+          baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
         requestStarted = true;
         started = performance.now();
         for (;;) {
           tries++;
           try {
-            return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
+            return await judge.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
           } catch (cause) {
-            const backoff = budget.backoffMs * tries;
-            if (tries >= budget.tries || !mayRetry(cause, backoff)) throw cause;
+            const backoff = BACKOFF_MS * tries;
+            if (tries >= TRIES || !mayRetry(cause, backoff)) throw cause;
             await sleep(backoff, undefined, { signal: budgets.getStore()?.signal });
           }
         }
