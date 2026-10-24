@@ -30,6 +30,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -182,7 +183,10 @@ def prove_socket_absence(path):
         try:
             probe.connect(path)
         except OSError as error:
-            if error.errno in (errno.ENOENT, errno.ECONNREFUSED):
+            # Linux also refuses a connect to a non-socket file; only a missing
+            # path or a socket with no listener is absence.
+            if error.errno == errno.ENOENT or (error.errno == errno.ECONNREFUSED
+                                               and stat.S_ISSOCK(os.stat(path).st_mode)):
                 return
             raise ValueError(f"socket absence is unknown: {error}") from error
     raise ValueError("the session socket still accepts connections")
