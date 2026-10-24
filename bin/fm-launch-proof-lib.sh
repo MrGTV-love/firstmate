@@ -3,9 +3,10 @@
 # fm-spawn stamps FM_SPAWN_GEN with the record's spawn_gen and records
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
 # For omp, a matching pin also requires current-session proof. Explicit adopt
-# repairs only a record whose PID is gone and whose live process has a readable
-# environment without a usable pin; without a pin, every adoption proof is
-# rechecked before the repaired live PID and session-file identity authorize
+# repairs only a record whose PID is gone or no longer an agent and whose live
+# process has a readable environment without a usable pin; without a pin,
+# every adoption proof is rechecked before the repaired live PID and
+# session-file identity authorize
 # lifecycle, and a pin for another generation never passes that recheck.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action
@@ -53,6 +54,16 @@ fm_launch_proof_pid_unpinned() { # <pid>
   environment=$(fm_remote_herdr_process_env "$1") || return 1
   printf '%s\n' "$environment" | grep -Eq '^(PATH|HOME)=' || return 1
   ! printf '%s\n' "$environment" | grep -Eq '^FM_SPAWN_GEN=.+$'
+}
+
+# Succeeds only for a live process whose readable identity classifies as an
+# agent; a gone, unreadable, or other process fails. Prints nothing.
+fm_launch_proof_pid_is_agent() { # <pid>
+  local pid=$1 comm args
+  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
+    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) \
+    && [ -n "$comm" ] && [ -n "$args" ] \
+    && [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$pid")" = agent ]
 }
 
 fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
@@ -110,7 +121,7 @@ fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
 # session reference supplies a file candidate, never authority on its own.
 # All five adoption checks live here so lifecycle readers can recheck them too.
 fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
-  local meta=$1 target session pane pid reference comm args
+  local meta=$1 target session pane pid reference
   target=$(fm_backend_meta_exact_value "$meta" window) || {
     echo 'adopt refused: endpoint proof needs one recorded window' >&2; return 1;
   }
@@ -124,10 +135,7 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
   }
   # A lingering registration must not turn whatever now runs in the worktree
   # into a lifecycle target: the resolved process itself has to be an agent.
-  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
-    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) \
-    && [ -n "$comm" ] && [ -n "$args" ] \
-    && [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$pid")" = agent ] || {
+  fm_launch_proof_pid_is_agent "$pid" || {
     echo 'adopt refused: process proof needs the resolved foreground process to be a readable agent process' >&2; return 1;
   }
   if fm_launch_proof_pid_pinned_elsewhere "$pid" "$(fm_meta_get "$meta" spawn_gen)"; then

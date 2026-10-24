@@ -85,17 +85,16 @@
 # when the field is absent) must identify the same persisted file as that
 # reference. Publication also needs a positively readable live environment
 # without a usable launch pin; a matching or different pin and unreadable
-# probing refuse before staging or capture. Only a record whose process is
-# gone is repaired. A record naming the live PID or any other live process is
-# the omp extension's to maintain and is refused unchanged, including the
-# extension's empty unproven mark and an activation naming another file, even
-# when Herdr still registers the task file. The repair writes version=1, the
-# unchanged spawn_gen, the live pid, task_session_file, and
-# current_session_file by setting the record aside, comparing it with the
-# bytes the proofs were gathered from, and linking the
-# new record without replacing, so a record the extension publishes meanwhile
-# is kept. It never unlocks a session, touches project files, starts or stops
-# an agent, or sends lifecycle input.
+# probing refuse before staging. A record naming the live PID or another live
+# agent process is the omp extension's to maintain and is refused unchanged,
+# including the extension's empty unproven mark and an activation naming
+# another file, even when Herdr still registers the task file. A recorded PID
+# that is gone, or that a process which is not an agent has since reused, does
+# not block repair. The repair writes version=1, the unchanged spawn_gen, the
+# live pid, task_session_file, and current_session_file, publishing by rename
+# only while the record still holds the bytes the proofs were gathered from.
+# It never unlocks a session, touches project files, starts or stops an agent,
+# or sends lifecycle input.
 # This widens lifecycle authorization: a repaired record can authorize a
 # restored omp without the launch environment pin, only while the launch-proof
 # owner can recheck all adoption proofs and the same live PID and session
@@ -363,8 +362,6 @@ CONTROL_LOCK_HELD=0
 CONTROL_META_LOCK=
 CONTROL_META_LOCK_HELD=0
 CONTROL_META_TMP=
-CONTROL_ADOPT_RECORD=
-CONTROL_ADOPT_CAPTURE=
 CONTROL_PROJECT_LOCK=
 CONTROL_PROJECT_LOCK_HELD=0
 REASSOCIATE_ACTIVE=0
@@ -385,15 +382,6 @@ control_cleanup() {
   if [ "$REASSOCIATE_ACTIVE" = 1 ] \
      && declare -F reassociate_rollback >/dev/null 2>&1; then
     reassociate_rollback || true
-  fi
-  if [ -n "$CONTROL_ADOPT_CAPTURE" ]; then
-    # adopt sets the live record aside while it publishes. Give it back unless a
-    # newer one has appeared, so an interrupted adoption never leaves none.
-    ln -- "$CONTROL_ADOPT_CAPTURE" "$CONTROL_ADOPT_RECORD" 2>/dev/null \
-      || [ -e "$CONTROL_ADOPT_RECORD" ] \
-      || mv -- "$CONTROL_ADOPT_CAPTURE" "$CONTROL_ADOPT_RECORD" 2>/dev/null \
-      || true
-    rm -f -- "$CONTROL_ADOPT_CAPTURE"
   fi
   [ -z "$CONTROL_META_TMP" ] || rm -f "$CONTROL_META_TMP"
   [ -z "$RELAUNCH_PAIR_DIR" ] || rm -rf -- "$RELAUNCH_PAIR_DIR"
@@ -1430,20 +1418,20 @@ if [ "$VERB" = adopt ]; then
     || die "adopt needs an existing readable session record with the metadata spawn_gen"
   adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
   # The omp extension rewrites the record of the process it runs in, by rename
-  # and without these locks, so a record naming a live process is the
-  # extension's evidence to keep. Only a record whose process is gone is repaired.
+  # and without these locks, so a record naming a live agent is the
+  # extension's evidence to keep. A PID reused by any other process after a
+  # restart names no extension and does not block repair.
+  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
   adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
     | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
   if [ -n "$adoption_recorded_pid" ] \
-    && { [ "$adoption_recorded_pid" = "$(printf '%s' "$adoption_record" | jq -r '.pid')" ] \
-      || ps -p "$adoption_recorded_pid" >/dev/null 2>&1; }; then
-    echo "adopt refused: record proof needs the recorded PID to be gone; $adoption_recorded_pid is a live process, so the omp extension owns this record and it was not changed" >&2
+    && { [ "$adoption_recorded_pid" = "$adoption_pid" ] \
+      || fm_launch_proof_pid_is_agent "$adoption_recorded_pid"; }; then
+    echo "adopt refused: record proof needs the recorded PID to be gone or no longer an agent process; $adoption_recorded_pid is a live agent process, so the omp extension owns this record and it was not changed" >&2
     exit 1
   fi
-  # Capture briefly removes the canonical task anchor. Only a positively
-  # readable unpinned process cannot run the extension's pinned publication
-  # path and rebind that missing anchor to a newly activated personal file.
-  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
+  # Only a positively readable unpinned process cannot run the extension's
+  # pinned publication path, so its extension never rewrites the record meanwhile.
   fm_launch_proof_pid_unpinned "$adoption_pid" \
     || die "adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates"
   CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
@@ -1456,20 +1444,8 @@ if [ "$VERB" = adopt ]; then
   [ "$adoption_record" = "$adoption_recheck" ] \
     && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
     || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
-  # A rename cannot be made conditional on what it replaces, and the extension
-  # publishes by rename too. Set the record aside so the comparison covers the
-  # bytes actually taken, then publish with link(2), which never replaces: a
-  # record the extension writes meanwhile is kept and the adoption refuses.
-  CONTROL_ADOPT_RECORD="$STATE/$ID.omp-session.json"
-  CONTROL_ADOPT_CAPTURE="$CONTROL_META_TMP.prior"
-  mv -- "$CONTROL_ADOPT_RECORD" "$CONTROL_ADOPT_CAPTURE" \
-    || die "adopt could not set the session record aside; no session record was changed"
-  if [ "$adoption_prior" != "$(cat "$CONTROL_ADOPT_CAPTURE" 2>/dev/null)" ] \
-    || ! ln -- "$CONTROL_META_TMP" "$CONTROL_ADOPT_RECORD" 2>/dev/null; then
-    die "adopt needs the session record unchanged until publication; a newer record was kept and no session record was overwritten"
-  fi
-  rm -f -- "$CONTROL_ADOPT_CAPTURE" "$CONTROL_META_TMP"
-  CONTROL_ADOPT_CAPTURE=
+  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
+    || die "adopt could not publish the session record; original record preserved"
   CONTROL_META_TMP=
   printf 'adopted: %s\n' "$ID"
   exit 0
