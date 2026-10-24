@@ -1,0 +1,17 @@
+## Serial shard placement of split groups (fm-test-run.sh --list --lane portable-serial-<k>of20)
+shard 2: tests/fm-watch-triage-waits-away.test.sh
+shard 6: tests/fm-watch-triage-waits-declared.test.sh
+shard 10: tests/fm-control-relaunch.test.sh
+shard 11: tests/fm-watch-triage-waits-pauses.test.sh
+shard 12: tests/fm-control-relaunch-backends.test.sh
+shard 16: tests/fm-control-relaunch-recovery.test.sh
+shard 17: tests/fm-watch-triage-waits.test.sh
+## Old monolithic suites also absent from parallel lanes?
+## Occurrence count across all 20 serial shards
+   1 tests/fm-control-relaunch-backends.test.sh
+   1 tests/fm-control-relaunch-recovery.test.sh
+   1 tests/fm-control-relaunch.test.sh
+   1 tests/fm-watch-triage-waits-away.test.sh
+   1 tests/fm-watch-triage-waits-declared.test.sh
+   1 tests/fm-watch-triage-waits-pauses.test.sh
+   1 tests/fm-watch-triage-waits.test.sh

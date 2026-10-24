@@ -1,0 +1,21 @@
+## fm-test-isolation-proof.sh --list-exclusions (watch-triage rows)
+fm-watch-triage-waits.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-declared.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-pauses.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-away.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+## family listings
+tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits.test.sh
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch.test.sh
+## independent selection
+fm-watch-triage-waits -> tests/fm-watch-triage-waits.test.sh
+fm-watch-triage-waits-declared -> tests/fm-watch-triage-waits-declared.test.sh
+fm-watch-triage-waits-pauses -> tests/fm-watch-triage-waits-pauses.test.sh
+fm-watch-triage-waits-away -> tests/fm-watch-triage-waits-away.test.sh
+fm-control-relaunch -> tests/fm-control-relaunch.test.sh
+fm-control-relaunch-recovery -> tests/fm-control-relaunch-recovery.test.sh
+fm-control-relaunch-backends -> tests/fm-control-relaunch-backends.test.sh

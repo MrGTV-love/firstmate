@@ -1,0 +1,20 @@
+## bash tests/fm-control-relaunch.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash tests/fm-control-relaunch.test.sh [test_function_name ...]
+exit=2
+## bash tests/fm-control-relaunch-recovery.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash tests/fm-control-relaunch-recovery.test.sh [test_function_name ...]
+exit=2
+## bash tests/fm-control-relaunch-backends.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2
+## removed wrapper: bash tests/fm-control-relaunch-backends.test.sh test_pinned_personal_session_refuses_lifecycle_boundaries
+Unknown test case: test_pinned_personal_session_refuses_lifecycle_boundaries
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2
+## cross-group case refused: bash tests/fm-control-relaunch-backends.test.sh test_spawn_relaunch_refuses_a_live_agent
+Unknown test case: test_spawn_relaunch_refuses_a_live_agent
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2

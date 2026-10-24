@@ -1,0 +1,91 @@
+{
+  "families": [
+    {
+      "count": 3,
+      "duration_ms": 1300957,
+      "failed": 0,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 4,
+      "duration_ms": 1350322,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-24T11:39:20Z",
+  "run_id": "fm-test-run-1792839307149-5302",
+  "scripts": [
+    {
+      "duration_ms": 348469,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-watch-triage-waits.test.sh"
+    },
+    {
+      "duration_ms": 764917,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-watch-triage-waits-declared.test.sh"
+    },
+    {
+      "duration_ms": 154554,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-watch-triage-waits-pauses.test.sh"
+    },
+    {
+      "duration_ms": 82382,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-watch-triage-waits-away.test.sh"
+    },
+    {
+      "duration_ms": 306747,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control-relaunch.test.sh"
+    },
+    {
+      "duration_ms": 482474,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control-relaunch-recovery.test.sh"
+    },
+    {
+      "duration_ms": 511736,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control-relaunch-backends.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-24T10:55:07Z",
+  "summary": {
+    "duration_ms": 2653237,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 7
+  }
+}

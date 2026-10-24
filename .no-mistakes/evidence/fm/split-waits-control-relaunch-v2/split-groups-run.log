@@ -1,24 +1,4 @@
-ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-FM_TEST_BEGIN 2026-10-24T05:37:21Z tests/fm-watch-triage-waits-declared.test.sh family=watcher-wake-lock expected_gate_skip=none
-FM_TEST_BEGIN 2026-10-24T05:37:21Z tests/fm-watch-triage-waits.test.sh family=watcher-wake-lock expected_gate_skip=none
-FM_TEST_BEGIN 2026-10-24T05:37:21Z tests/fm-watch-triage-waits-pauses.test.sh family=watcher-wake-lock expected_gate_skip=none
-FM_TEST_BEGIN 2026-10-24T05:37:21Z tests/fm-watch-triage-waits-away.test.sh family=watcher-wake-lock expected_gate_skip=none
-ok - AFK changed paused panes hand off plain stale identities for daemon-owned pause triage
-ok - a captain-held item is never rechecked while the away-posture record exists, and the recheck returns once the record is archived
-ok - a live captain-held pane is absorbed on first sight while the away-posture record exists
-ok - a delivery the captain already holds is never rechecked while the away-posture record exists
-ok - the daemon-owned one-shot never hands off a captain-held pane while the away-posture record exists
-ok - quiet mode's record silences no captain-held recheck, on the watcher's cadence or through a quiet daemon's one-shot
-FM_TEST_END 2026-10-24T05:38:42Z tests/fm-watch-triage-waits-away.test.sh exit=0 duration_ms=80469 gate_skip=false
-ok - work under an open captain call surfaces once, absorbs pane churn, then re-surfaces when the window elapses
-ok - a stale window with no open captain call keeps alarming on every new hash
-ok - a wake that never reached the durable queue arms no re-surface throttle
-ok - a released-then-re-held task is a distinct captain call whose first sight still alarms
-ok - a declared paused secondmate re-surfaces on the bounded normal-mode cadence
-ok - a captain-held secondmate re-surfaces on the bounded normal-mode cadence
-ok - a non-paused secondmate retains normal stale suppression
-ok - a resumed secondmate clears pause and stale tracking before stale exemption
-FM_TEST_END 2026-10-24T05:39:46Z tests/fm-watch-triage-waits-pauses.test.sh exit=0 duration_ms=144919 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T10:55:07Z tests/fm-watch-triage-waits.test.sh family=watcher-wake-lock expected_gate_skip=none
 ok - a stale pane sitting on a terminal status is surfaced (queue + exit)
 ok - a stale terminal-looking status is overridden and absorbed while a run is actively working, then wedge-escalated
 ok - provably-working non-terminal stale is absorbed on first sight, then wedge-escalated past the threshold
@@ -29,6 +9,7 @@ ok - a live wedged agent, an unattributable one, and an unreadable endpoint esca
 ok - the once-only gone report re-arms when the endpoint comes back, and reports a later death again
 ok - a second death after a same-window relaunch reports in full without a live probe, and an unchanged dead pane stays silent
 ok - a successor's byte-identical dead display reports in full, and the same incarnation still absorbs
+/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/bin/fm-watch.sh: line 2259: 58359 Terminated: 15          fm_backend_capture "$@" < /dev/null > "$FM_CAPTURE_OUTPUT"
 ok - a stuck pane capture goes stale; TERM stops its watcher and runs cleanup
 ok - the pending-reply pass beats between records (6 beacon updates in 13s)
 watcher: recovery state could not be persisted; retaining stale lock evidence
@@ -56,7 +37,9 @@ ok - a write deferral re-surfaces once on the bounded pause cadence, so a churni
 ok - a secondmate's own home supervision churn is not crew write evidence, so a pane recording that home keeps the unchanged escalation schedule
 ok - an idle-window timer repair drops a finished write-deferral chain, so the next deferral gets a fresh re-surface window
 ok - both first-sight paths through a captain-relevant status drop a finished write-deferral chain with the idle window
-FM_TEST_END 2026-10-24T05:43:46Z tests/fm-watch-triage-waits.test.sh exit=0 duration_ms=384302 gate_skip=false
+FM_TEST_END 2026-10-24T11:00:55Z tests/fm-watch-triage-waits.test.sh exit=0 duration_ms=348469 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T11:00:55Z tests/fm-watch-triage-waits-declared.test.sh family=watcher-wake-lock expected_gate_skip=none
 ok - own-work waits keep one first alert, then bounded rechecks without wedges; undeclared idle still alarms
 ok - absorbed paused and captain-held replacements each start their own re-surface cadence
 ok - a parked live worker surfaces once, absorbs pane churn for the whole re-surface window, then re-surfaces when it elapses
@@ -74,8 +57,29 @@ ok - a wait record missing a field the recheck must print, or carrying one it mu
 ok - a declared wait naming a near-future until time stays quiet until that time
 ok - a wrong-year declared time cannot silence the watcher beyond the recheck cadence
 ok - a declared wait whose until time has passed is rechecked at once, then held to the cadence
-FM_TEST_END 2026-10-24T05:50:36Z tests/fm-watch-triage-waits-declared.test.sh exit=0 duration_ms=794408 gate_skip=false
-FM_TEST_BEGIN 2026-10-24T05:50:36Z tests/fm-control-relaunch.test.sh family=backend-dispatch expected_gate_skip=none
+FM_TEST_END 2026-10-24T11:13:40Z tests/fm-watch-triage-waits-declared.test.sh exit=0 duration_ms=764917 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T11:13:41Z tests/fm-watch-triage-waits-pauses.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - work under an open captain call surfaces once, absorbs pane churn, then re-surfaces when the window elapses
+ok - a stale window with no open captain call keeps alarming on every new hash
+ok - a wake that never reached the durable queue arms no re-surface throttle
+ok - a released-then-re-held task is a distinct captain call whose first sight still alarms
+ok - a declared paused secondmate re-surfaces on the bounded normal-mode cadence
+ok - a captain-held secondmate re-surfaces on the bounded normal-mode cadence
+ok - a non-paused secondmate retains normal stale suppression
+ok - a resumed secondmate clears pause and stale tracking before stale exemption
+FM_TEST_END 2026-10-24T11:16:15Z tests/fm-watch-triage-waits-pauses.test.sh exit=0 duration_ms=154554 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T11:16:15Z tests/fm-watch-triage-waits-away.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - AFK changed paused panes hand off plain stale identities for daemon-owned pause triage
+ok - a captain-held item is never rechecked while the away-posture record exists, and the recheck returns once the record is archived
+ok - a live captain-held pane is absorbed on first sight while the away-posture record exists
+ok - a delivery the captain already holds is never rechecked while the away-posture record exists
+ok - the daemon-owned one-shot never hands off a captain-held pane while the away-posture record exists
+ok - quiet mode's record silences no captain-held recheck, on the watcher's cadence or through a quiet daemon's one-shot
+FM_TEST_END 2026-10-24T11:17:38Z tests/fm-watch-triage-waits-away.test.sh exit=0 duration_ms=82382 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T11:17:38Z tests/fm-control-relaunch.test.sh family=backend-dispatch expected_gate_skip=none
 ok - fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree
 ok - fm-control relaunch: unsupported omp preserves the running agent and task
 ok - omp relaunch billing admission preserves agents before refusal and accepts subscription routes
@@ -153,8 +157,9 @@ ok - fm-spawn --relaunch: refuses to start a replacement outside the copy holdin
 ok - fm-spawn --relaunch: a pane left in the task's prior copy is moved into the recorded copy before the replacement starts
 ok - fm-spawn --relaunch: a pane left in a released copy is moved into the recorded copy before the replacement starts
 ok - fm-spawn --relaunch: a pane in an unrecorded path is still refused
-FM_TEST_END 2026-10-24T05:56:11Z tests/fm-control-relaunch.test.sh exit=0 duration_ms=335501 gate_skip=false
-FM_TEST_BEGIN 2026-10-24T05:56:12Z tests/fm-control-relaunch-recovery.test.sh family=backend-dispatch expected_gate_skip=none
+FM_TEST_END 2026-10-24T11:22:45Z tests/fm-control-relaunch.test.sh exit=0 duration_ms=306747 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T11:22:45Z tests/fm-control-relaunch-recovery.test.sh family=backend-dispatch expected_gate_skip=none
 ok - held replacement admission refuses before touching the live owner
 ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority
 ok - automatic, direct, and ordinary replacement inherit recovery until explicit clearance, then remain ordinary
@@ -192,14 +197,16 @@ ok - relocation: --worktree belongs to relaunch only, and the launch owner repea
 ok - fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration
 ok - reclaim: a herdr pane that outlived its stopped server is adopted, never orphaned beside a new tab
 ok - fm-control exit: a herdr pane that outlived its stopped server is already-stopped, not gone
+ok - herdr recovery: a failed status or an accepting socket refuses exit and relaunch without launching a server
 ok - reclaim: a herdr rebind is created in the session the record names, never the ambient one
 ok - reclaim: a herdr agent that came back with its server refuses, so one worktree keeps one agent
 ok - reclaim: a herdr reclaim rebinds the endpoint and leaves the whole rest of the task alone
 ok - reclaim: a herdr secondmate whose endpoint is gone is sent to its own respawn owner
 ok - reclaim: a rebind refused from a plain shell reports the real cause, not a fabricated session mismatch
 ok - recovery fixture cleanup preserves preexisting task/launch directories and removes only its own claims
-FM_TEST_END 2026-10-24T06:05:07Z tests/fm-control-relaunch-recovery.test.sh exit=0 duration_ms=535206 gate_skip=false
-FM_TEST_BEGIN 2026-10-24T06:05:07Z tests/fm-control-relaunch-backends.test.sh family=backend-dispatch expected_gate_skip=none
+FM_TEST_END 2026-10-24T11:30:48Z tests/fm-control-relaunch-recovery.test.sh exit=0 duration_ms=482474 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T11:30:48Z tests/fm-control-relaunch-backends.test.sh family=backend-dispatch expected_gate_skip=none
 ok - bounded ticks inspect one recorded unmanaged launch, rotate past drafts, and wrap without mutation
 ok - bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes
 ok - bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch
@@ -285,16 +292,18 @@ ok - legacy Herdr records without a launch pin keep exit and relaunch
 ok - managed versioned and legacy launches retain interrupt, exit, busy-exit and same-pane relaunch
 ok - ordinary lifecycle accepts genuine unregistered shell panes with process-table proof
 ok - ordinary managed relaunch requires matching readable replacement pin for alive confirmation
-FM_TEST_END 2026-10-24T06:14:26Z tests/fm-control-relaunch-backends.test.sh exit=0 duration_ms=558559 gate_skip=false
-FM_TEST_SUMMARY total=7 failed=0 skipped_gate=0 duration_ms=2225405
-FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=1429266 failed=0
-FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=4 duration_ms=1404098 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-watch-triage-waits-declared.test.sh duration_ms=794408
-FM_TEST_SLOWEST rank=2 script=tests/fm-control-relaunch-backends.test.sh duration_ms=558559
-FM_TEST_SLOWEST rank=3 script=tests/fm-control-relaunch-recovery.test.sh duration_ms=535206
-FM_TEST_SLOWEST rank=4 script=tests/fm-watch-triage-waits.test.sh duration_ms=384302
-FM_TEST_SLOWEST rank=5 script=tests/fm-control-relaunch.test.sh duration_ms=335501
-FM_TEST_SLOWEST rank=6 script=tests/fm-watch-triage-waits-pauses.test.sh duration_ms=144919
-FM_TEST_SLOWEST rank=7 script=tests/fm-watch-triage-waits-away.test.sh duration_ms=80469
-fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M5P63F9JZSSXC8WA0W5W9YQD/split-groups-run.json
+FM_TEST_END 2026-10-24T11:39:20Z tests/fm-control-relaunch-backends.test.sh exit=0 duration_ms=511736 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=7 failed=0 skipped_gate=0 duration_ms=2653237
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=1300957 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=4 duration_ms=1350322 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-triage-waits-declared.test.sh duration_ms=764917
+FM_TEST_SLOWEST rank=2 script=tests/fm-control-relaunch-backends.test.sh duration_ms=511736
+FM_TEST_SLOWEST rank=3 script=tests/fm-control-relaunch-recovery.test.sh duration_ms=482474
+FM_TEST_SLOWEST rank=4 script=tests/fm-watch-triage-waits.test.sh duration_ms=348469
+FM_TEST_SLOWEST rank=5 script=tests/fm-control-relaunch.test.sh duration_ms=306747
+FM_TEST_SLOWEST rank=6 script=tests/fm-watch-triage-waits-pauses.test.sh duration_ms=154554
+FM_TEST_SLOWEST rank=7 script=tests/fm-watch-triage-waits-away.test.sh duration_ms=82382
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M5P63F9JZSSXC8WA0W5W9YQD/split-groups-timing.json
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5P63F9JZSSXC8WA0W5W9YQD/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
 exit=0
