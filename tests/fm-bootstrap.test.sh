@@ -724,7 +724,7 @@ ROWS
   pass "bootstrap: a session-provider backend gates its own CLI, never a false tmux requirement"
 }
 
-test_python3_is_required_only_for_herdr() {
+test_python3_is_required_for_every_backend() {
   local backend case_dir fakebin bash_env out expected
   expected="MISSING: python3 (install: brew install python3  # or the platform's package manager)"
   for backend in herdr tmux zellij cmux orca; do
@@ -748,13 +748,11 @@ python3() {
 SH
     out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
       FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
-    if [ "$backend" = herdr ]; then
-      [ "$out" = "$expected" ] || fail "Herdr without python3 must report supported install guidance, got: $out"
-    else
-      [ -z "$out" ] || fail "backend=$backend must not require Herdr's python3 dependency, got: $out"
-    fi
+    # Brief scaffolding needs python3 on every backend; Herdr also lists it in
+    # its own delta, and the shared tool must still be reported exactly once.
+    [ "$out" = "$expected" ] || fail "backend=$backend without python3 must report one install line, got: $out"
   done
-  pass "bootstrap: python3 is required for Herdr, never for an inactive backend"
+  pass "bootstrap: python3 is required once on every backend"
 }
 
 test_herdr_install_requires_manual_action() {
@@ -1817,7 +1815,7 @@ test_git_is_required_with_supported_install_instruction
 test_orca_backend_gates_orca_tool_only_when_selected
 test_session_provider_backends_do_not_require_tmux
 test_session_provider_backends_gate_own_cli_not_tmux
-test_python3_is_required_only_for_herdr
+test_python3_is_required_for_every_backend
 test_herdr_install_requires_manual_action
 test_cmux_bundled_cli_satisfies_dependency
 test_unknown_backend_reports_invalid_configuration

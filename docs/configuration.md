@@ -2741,6 +2741,7 @@ Every home requires:
 - Node 24+ with native TypeScript loading enabled, and git.
   Worker skill selection capability-checks imports of its vendored TypeScript client; unsupported TypeScript loading is a runtime prerequisite, while other import failures report a client-loading error.
 - gh, with GitHub authentication through `gh auth login`.
+- python3, because every ship and scout brief scaffold binds its project through `bin/fm-dispatch-project.py`.
 - no-mistakes v1.46.0 or newer.
 - Compatible gh-axi.
 - chrome-devtools-axi.
