@@ -2469,6 +2469,15 @@ Questions and numeric policy are code-owned:
 - Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
   The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
 
+Before omp result planning, a literal single invocation of a known local AXI command can exclude its producer-owned structural next-step fields from the screened copy only.
+The command/mode registry and structural rule have one owner in [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts); quoted or expanded shell arguments, executable paths, wrappers, pipelines, chains, redirections, unknown producers and raw-output modes receive ordinary complete screening.
+The supported envelopes cover no-mistakes AXI drive/status/respond, gh-axi PR/issue views and lists, tasks-axi detail/list, Lavish home/playbook, browser eval and quota home output; other modes remain screened unchanged rather than being guessed safe.
+Only root `help[N]` arrays with exactly the declared primitive entries and unquoted, childless root `next_action`, `progress` and `error` scalars are excluded.
+PR bodies, comments, findings, file content, quoted scalar values and other indented subtrees stay screened, including help-shaped text inside them; ambiguous or malformed framing is screened unchanged.
+The original result remains unmodified, and flags or unavailable screening of its remaining content still withhold it.
+This is a bounded trust in the local command's formatter, not executable authentication or a guarantee against same-user replacement of a PATH executable.
+[`tests/fm-jev-guard-producer.test.sh`](../tests/fm-jev-guard-producer.test.sh) exercises the recorded bounded-wait output, embedded injections and these fail-closed boundaries without model calls.
+
 `supervisorReadAdmission` is the single isolated Firstmate-channel consistency check.
 It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
 The existing [launch publisher](../bin/fm-operational-input.sh) owns the consistency-receipt format, reused by the [numeric inbox publisher](../bin/fm-task-inbox-lib.sh); neither the reader nor a tool-result authority claim creates a receipt.
@@ -2526,7 +2535,7 @@ The captain data-egress decision 2026-10-08 authorizes Jev guard requests only f
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
 The shared [guard service](../bin/ten-levels/extensions/report.ts) checks scope and the complete serialized request before resolving a credential or calling the provider.
 The same project decision governs omp's native model routes; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that separate launch contract.
-For authorized screening, shell state contains the command and working directory, write state contains the path and replacement-content pieces, and result state contains the tool name, `source_role: tool_result` and complete text output.
+For authorized screening, shell state contains the command and working directory, write state contains the path and replacement-content pieces, and result state contains the tool name, `source_role: tool_result` and text output after the bounded producer-field exclusion above.
 These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling.
@@ -2596,6 +2605,7 @@ They perform no guard key lookup or provider request and retain deterministic pa
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
 The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
+When producer-field exclusion applies, `producer_fields` records only the fixed producer name and `removed_bytes`, the removed UTF-8 byte count, never the excluded text.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
