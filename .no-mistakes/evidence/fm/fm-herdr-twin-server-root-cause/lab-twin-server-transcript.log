@@ -1,0 +1,68 @@
+== session fm-lab-twin-21420-11428  lab home /Users/charlesabrooker/tmp/fm-lab.NEUdoO
+== default server before: 30344 Thu Oct 22 17:49:46 2026     herdr server --session default
+== lab status: {"client":{"version":"0.9.5","channel":"stable","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"remote_host_bridge":true,"remote_bridge_idle_timeout":true,"binary":"/Users/charlesabrooker/.local/bin/herdr","session":"fm-lab-twin-21420-11428"},"server":{"status":"running","running":true,"version":"0.9.5","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true,"ssh_agent_registration":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-twin-21420-11428/herdr.sock","session":"fm-lab-twin-21420-11428","restart_needed":false,"server_binary_stale":false},"update":{"restart_needed":false,"server_binary_stale":false}}
+== lab socket: /Users/charlesabrooker/.config/herdr/sessions/fm-lab-twin-21420-11428/herdr.sock
+== pane list: {"id":"cli:pane:list","result":{"panes":[],"type":"pane_list"}}
+== pane: 
+== lab server processes after provision: 1
+21904 herdr server --session fm-lab-twin-21420-11428
+
+=== SCENARIO ensure / status=fail / base code
+error: herdr server for session 'fm-lab-twin-21420-11428' did not report running within 10s
+ensure rc=1
+launch attempts: 1
+SERVER-LAUNCH-ATTEMPT server
+real lab server processes now: 1
+
+=== SCENARIO ensure / status=fail / head code
+error: herdr server status for 'fm-lab-twin-21420-11428' is unknown; refusing startup
+ensure rc=1
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO ensure / status=timeout / base code
+error: herdr server for session 'fm-lab-twin-21420-11428' did not report running within 10s
+ensure rc=1
+launch attempts: 1
+SERVER-LAUNCH-ATTEMPT server
+real lab server processes now: 1
+
+=== SCENARIO ensure / status=timeout / head code
+error: herdr server status for 'fm-lab-twin-21420-11428' is unknown; refusing startup
+ensure rc=1
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO ensure / status=garbage / base code
+error: herdr server for session 'fm-lab-twin-21420-11428' did not report running within 10s
+ensure rc=1
+launch attempts: 1
+SERVER-LAUNCH-ATTEMPT server
+real lab server processes now: 1
+
+=== SCENARIO ensure / status=garbage / head code
+error: herdr server status for 'fm-lab-twin-21420-11428' is unknown; refusing startup
+ensure rc=1
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO ensure / status=stale-stopped / base code
+error: herdr server for session 'fm-lab-twin-21420-11428' did not report running within 10s
+ensure rc=1
+launch attempts: 1
+SERVER-LAUNCH-ATTEMPT server
+real lab server processes now: 1
+
+=== SCENARIO ensure / status=stale-stopped / head code
+error: refusing Herdr server startup: Herdr server process 21904 is still alive
+ensure rc=1
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO --prove-absent against the live lab server (stale stopped status on stdin)
+error: Herdr session absence is unproven: Herdr server process 21904 is still alive
+prove-absent rc=1
+real lab server processes now: 1
+== teardown fm-lab-twin-21420-11428
+teardown rc=0
+lab servers left for fm-lab-twin-21420-11428: 0

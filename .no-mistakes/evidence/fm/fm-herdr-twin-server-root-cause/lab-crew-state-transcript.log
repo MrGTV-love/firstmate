@@ -1,0 +1,66 @@
+== session fm-lab-crew-83908-17468
+{"id":"cli:workspace:create","result":{"root_pane":{"agent_status":"unknown","cwd":"/private/tmp/fmt.JrtT5Q/wt","focused":true,"foreground_cwd":"/private/tmp/fmt.JrtT5Q/wt","pane_id":"w1:p1","revision":0,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":40},"tab_id":"w1:t1","terminal_id":"term_65e8fda5ed7cf1","workspace_id":"w1"},"tab":{"agent_status":"unknown","focused":
+== pane list: {"id":"cli:pane:list","result":{"panes":[{"agent_status":"unknown","cwd":"/private/tmp/fmt.JrtT5Q/wt","focused":true,"foreground_cwd":"/private/tmp/fmt.JrtT5Q/wt","pane_id":"w1:p1","revision":0,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":40},"tab_id":"w1:t1","terminal_id":"term_65e8fda5ed7cf1","workspace_id":"w1"}],"type":"pane_list"}}
+== pane: w1:p1   servers: 1
+== meta:
+backend=herdr
+window=fm-lab-crew-83908-17468:w1:p1
+worktree=/tmp/fmt.JrtT5Q/wt
+kind=scout
+harness=claude
+
+=== SCENARIO fm-crew-state.sh twin1 / status=fail / base code
+state: unknown · source: none · backend target gone: fm-lab-crew-83908-17468:w1:p1 (agent gone, pane shell remains)
+launch attempts: 1
+real lab server processes now: 1
+
+=== SCENARIO fm-crew-state.sh twin1 / status=fail / head code
+state: unknown · source: none · backend target gone: fm-lab-crew-83908-17468:w1:p1 (agent gone, pane shell remains)
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO fm-crew-state.sh twin1 / status=timeout / base code
+state: unknown · source: none · backend target gone: fm-lab-crew-83908-17468:w1:p1 (agent gone, pane shell remains)
+launch attempts: 1
+real lab server processes now: 1
+
+=== SCENARIO fm-crew-state.sh twin1 / status=timeout / head code
+state: unknown · source: none · backend target gone: fm-lab-crew-83908-17468:w1:p1 (agent gone, pane shell remains)
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO fm-crew-state.sh twin1 / status=stale-stopped / base code
+state: unknown · source: none · backend target gone: fm-lab-crew-83908-17468:w1:p1 (agent gone, pane shell remains)
+launch attempts: 1
+real lab server processes now: 1
+
+=== SCENARIO fm-crew-state.sh twin1 / status=stale-stopped / head code
+state: unknown · source: none · backend target gone: fm-lab-crew-83908-17468:w1:p1 (agent gone, pane shell remains)
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO fm-crew-state.sh twin1 / status=pass / base code
+state: unknown · source: pane · harness state unavailable (unknown missing)
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO fm-crew-state.sh twin1 / status=pass / head code
+state: unknown · source: pane · harness state unavailable (unknown missing)
+launch attempts: 0
+real lab server processes now: 1
+
+=== SCENARIO fm_backend_agent_state herdr fm-lab-crew-83908-17468:w1:p1 / status=fail / head
+agent_state=dead
+launch attempts: 0
+
+=== SCENARIO fm_backend_agent_state herdr fm-lab-crew-83908-17468:w1:p1 / status=stale-stopped / head
+agent_state=dead
+launch attempts: 0
+
+=== SCENARIO fm_backend_agent_state on a gone pane id, status=stale-stopped (live server) / head
+agent_state=missing
+launch attempts: 0
+real lab server processes now: 1
+== teardown fm-lab-crew-83908-17468
+teardown rc=0
+lab servers left for fm-lab-crew-83908-17468: 0

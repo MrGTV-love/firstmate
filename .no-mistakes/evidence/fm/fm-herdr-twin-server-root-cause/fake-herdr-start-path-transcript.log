@@ -1,0 +1,62 @@
+=== F1 proven absence -> exactly one server starts; second call reuses it
+ensure rc=0
+servers launched: 1
+ensure rc=0
+servers launched after second ensure: 1
+
+=== F2 six concurrent ensures on an absent session -> one server
+starter 1: ensure rc=0 
+starter 2: ensure rc=0 
+starter 3: ensure rc=0 
+starter 4: ensure rc=0 
+starter 5: ensure rc=0 
+starter 6: ensure rc=0 
+servers launched: 1
+-- same race on BASE code:
+BASE servers launched: 6
+
+=== F3 stale stopped status while the fake server is live -> refuse, no new server
+error: refusing Herdr server startup: Herdr server process 75374 is still alive
+ensure rc=1
+message: refused to start the herdr server for session fm-lab-f1 to protect a live or unknown server
+servers launched: 1
+
+=== F4 launched server exits before running -> exit 3
+error: the launched Herdr server for session fm-lab-f4 exited before reporting running; releasing the start lock
+ensure rc=3
+message: the herdr server for session fm-lab-f4 was launched but did not come up
+
+=== F5 start lock cannot be prepared -> exit 4
+error: Herdr server launch failed: cannot prepare the start lock: [Errno 1] Operation not permitted: '/System/fm-lab-nope'
+ensure rc=4
+message: the server start helper failed (exit 4) for session fm-lab-f5
+
+=== F6 python3 missing -> exit 127
+python3 not on PATH
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5P71S5M3EYH9TQJR4RG4HT3/bin/backends/herdr.sh: line 1696: python3: command not found
+ensure rc=127
+message: the server start helper failed (exit 127) for session fm-lab-f6
+
+=== F7 non-UTF-8 argv in the process table
+0035100    a   b   l   e       a   n   d       f   i   l   e       r   e
+0035120    p   e   a   t   e   d   -   t   i   m   e   o   u   t       w
+head prove-absent rc=0
+error: Herdr session absence is unproven: 'utf-8' codec can't decode byte 0xe9 in position 208259: invalid continuation byte
+before prove-absent rc=1
+
+=== F8 macOS ps -E boundary: unscoped herdr server, OTHER='x HERDR_SESSION=other'
+inert pid 96588: /bin/bash /tmp/fmt.JrtT5Q/eb/herdr server
+error: Herdr session absence is unproven: Herdr server process 96588 has an unreadable session environment
+head prove-absent session=other rc=1
+error: Herdr session absence is unproven: Herdr server process 96588 has an unreadable session environment
+head prove-absent session=fm-lab-f8 rc=1
+error: Herdr session absence is unproven: 'utf-8' codec can't decode byte 0xe9 in position 205424: invalid continuation byte
+before prove-absent session=other rc=1
+error: Herdr session absence is unproven: 'utf-8' codec can't decode byte 0xe9 in position 205424: invalid continuation byte
+before prove-absent session=fm-lab-f8 rc=1
+-- control: unscoped server with no HERDR_SESSION token (owner = default)
+error: Herdr session absence is unproven: Herdr server process 99165 has an unreadable session environment
+head control prove-absent session=fm-lab-f8 rc=1
+/tmp/fmt.JrtT5Q/drive-fake.sh: line 11: 99165 Terminated: 15          env -i PATH=/usr/bin:/bin OTHER='x' "$SCR/eb/herdr" server
+/tmp/fmt.JrtT5Q/drive-fake.sh: line 10: 94802 Terminated: 15          "$PY" -c 'import time; time.sleep(40)' "$(printf 'caf\xe9.log')"
+== cleanup done

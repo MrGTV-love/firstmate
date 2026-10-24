@@ -1,0 +1,17 @@
+stray caf process alive: 0
+=== F8a unscoped stand-in, real env PATH=/usr/bin:/bin and OTHER='x HERDR_SESSION=other' (no real HERDR_SESSION entry)
+ps -E view: /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /tmp/fmt.JrtT5Q/eb/herdr server PATH=/usr/bin:/bin OTHER=x HERDR_SESSION=other
+error: Herdr session absence is unproven: Herdr server process 82816 is still alive
+before prove-absent session=other rc=1
+error: Herdr session absence is unproven: Herdr server process 82816 has an unreadable session environment
+head prove-absent session=other rc=1
+before prove-absent session=fm-lab-f8 rc=0
+error: Herdr session absence is unproven: Herdr server process 82816 has an unreadable session environment
+head prove-absent session=fm-lab-f8 rc=1
+=== F8b control: unscoped stand-in, env OTHER=x only (owner = default)
+ps -E view: /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /tmp/fmt.JrtT5Q/eb/herdr server PATH=/usr/bin:/bin OTHER=x
+head prove-absent session=fm-lab-f8 rc=0
+=== F8c unscoped stand-in whose env is withheld (platform binary /bin/bash wrapper)
+ps -E view: /bin/bash /tmp/fmt.JrtT5Q/eb2/herdr server
+error: Herdr session absence is unproven: Herdr server process 89074 has an unreadable session environment
+head prove-absent session=fm-lab-f8 rc=1

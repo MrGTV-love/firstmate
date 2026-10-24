@@ -1,0 +1,22 @@
+ok - holder processes expose their environment to the owner library
+ok - kernel environment entries retain spaces and omit unrelated line-breaking values
+ok - an empty session is started inside the launch agent
+ok - launchd and worker markers require gui-domain launchctl proof
+ok - unrelated multiline values and non-shell names leave proven Aqua owners untouched
+ok - duplicate and line-breaking relevant markers refuse all ownership evidence
+ok - embedded worker and launchd values never prove an Aqua birth
+ok - a missing kernel environment reader refuses server takeover
+ok - a python3 that resolves but cannot run refuses takeover of a worker-born server
+ok - background, inherited-XPC, SSH-born, SSH-descended, and unprovable owners are taken over
+ok - a running session with no provable owner is taken over rather than trusted
+ok - a host without lsof cannot prove an Aqua birth, so the session is taken over
+ok - a foreign server that never releases the socket leaves the guard waiting, with one notice
+ok - a server that wins the start lock during a takeover gets a fresh ownership decision
+ok - a foreign server that replaces the stopped one between stop and re-check is taken over
+ok - the guard starts as soon as the foreign server releases the socket
+ok - a failed status while the old server is alive waits and starts nothing
+ok - a stopped status starts only after the old server process is proven gone
+ok - a failed takeover stop with failing status keeps waiting and starts no second server
+ok - a failed takeover stop whose status says stopped waits for the old process, then starts one server
+ok - argument errors are refused before any herdr call
+guard exit=0
