@@ -2607,7 +2607,7 @@ This is not sustained-outage permission to execute shell commands or write files
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
-A healthy judge still screens every shell command and write; two narrow shell-only admissions apply only when the judgment failed, whether unavailable, withheld for privacy or malformed, and never to a size refusal:
+A healthy judge still screens every shell command and write except the [brief-named file deletion allowance](#brief-named-file-deletion-allowance); two narrow shell-only admissions apply only when the judgment failed, whether unavailable, withheld for privacy or malformed, and never to a size refusal:
 
 - A shell command proven read-only is admitted with branch `read_only`.
   [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns the program allowlist, the read-only git subcommands, the requirement that every pipeline segment be read-only, and the disqualifiers: redirection, substitution, expansion, quoting, sequencing, background, git options before the subcommand other than `--no-pager`, any `--output` option, and the writing or executing `find` actions.
