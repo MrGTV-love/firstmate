@@ -1,0 +1,42 @@
+$ bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=356 parallel=29 parallel_max_ms=2894605 parallel_imbalance_ms=23604 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1117958 parallel_budget_ms=1200000 serial=309 serial_shards=21 serial_unhinted=1 serial_max_ms=1163290 serial_budget_ms=1200000 serial_indivisible_ms=917727 herdr=18
+exit=0
+
+$ bin/fm-test-run.sh --list --lane portable-parallel-1
+tests/fm-pr-merge.test.sh
+tests/fm-test-run.test.sh
+tests/fm-captain-hold-reconcile.test.sh
+tests/fm-crew-state.test.sh
+tests/fm-cd-pretool-check.test.sh
+tests/fm-tmux-submit-busy.test.sh
+tests/fm-review-diff.test.sh
+tests/fm-send-strict.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-pi-primary-types.test.sh
+tests/fm-supervision-instructions.test.sh
+$ diff <(--list --lane portable-parallel-1) <(--list-scheduled --lane portable-parallel-1)
+identical (stored longest-hint-first)
+
+$ bin/fm-test-run.sh --list --lane portable-parallel-2
+tests/fm-lint.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
+tests/fm-captain-hold-cleanup.test.sh
+tests/fm-captain-hold-sweep.test.sh
+tests/fm-composer-lib.test.sh
+tests/fm-captain-hold-keyed-answers.test.sh
+tests/fm-captain-hold-archive.test.sh
+tests/fm-arm-pretool-check.test.sh
+tests/fm-backend-herdr.test.sh
+tests/fm-x-mode.test.sh
+tests/fm-herdr-lab.test.sh
+tests/fm-brief.test.sh
+tests/fm-send-popup-settle.test.sh
+tests/fm-grok-harness.test.sh
+tests/fm-spawn-batch.test.sh
+tests/fm-send-settle.test.sh
+tests/fm-ensure-agents-md.test.sh
+tests/fm-transition-lib.test.sh
+$ diff <(--list --lane portable-parallel-2) <(--list-scheduled --lane portable-parallel-2)
+identical (stored longest-hint-first)
+
+# per-lane modeled makespan via the runner own portable_parallel_lane_makespan 3

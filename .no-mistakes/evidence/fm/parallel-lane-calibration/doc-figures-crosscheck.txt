@@ -1,0 +1,18 @@
+# Base commit 1fd02681 (serial-era hints, effective jobs 2): model of the lane that ran 1231 s in run 40121241146
+$ bin/fm-test-run.sh --check-coverage   (base archive)
+FM_TEST_COVERAGE ok total=356 parallel=29 parallel_max_ms=1883057 parallel_imbalance_ms=18852 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=2 parallel_makespan_ms=941660 parallel_budget_ms=1200000 serial=309 serial_shards=21 serial_unhinted=1 serial_max_ms=1163290 serial_budget_ms=1200000 serial_indivisible_ms=917727 herdr=18
+exit=0
+
+base max-lane model vs 1231s wall: 0.235 (max lane; old lane 1 alone is below)
+1209767/1231000 0.0172
+779131/793000 0.0175
+1.2e6*1231000/1209767/60000 20.35
+margin 1.2e6/1117958 1.073
+1231000/1209767 1.018
+# Old lane 2 membership with new hints (old lane-1 hints set to 1 ms so the reported max is lane 2 alone; doc says 779131 ms)
+parallel_effective_jobs=3
+parallel_makespan_ms=779131
+
+# Base commit, old lane 1 alone (base lane-2 hints set to 1 ms), serial-era hints at 2 bins: the old model of the 1231 s lane
+parallel_makespan_ms=932928
+old model under-predicts the 1231 s wall by 24.2 percent (doc says 24)

@@ -1,0 +1,14 @@
+# Adversarial A: base-commit lane membership (fm-captain-hold-lifecycle and fm-arm-pretool-check back in lane 1) with the new measured hints
+$ diff <(git show 1fd02681:bin/fm-test-run.sh | lane lists) <(scratch lane lists)
+lane 1 membership+order == base commit
+lane 2 membership+order == base commit
+$ bin/fm-test-run.sh --check-coverage   (scratch copy)
+fm-test-run: coverage guard: portable parallel shard models a 1209767ms makespan packed into 3 bins, above the 1200000ms budget
+fm-test-run: move the heaviest member to the lighter lane, split the lane, or refresh the hints from CI measurements; a higher --jobs does not change the model: docs/fm-test-portable-shards.md
+exit=1
+
+# Adversarial C: fm-pr-merge hint grows 100000 ms (1117958 -> 1217958), current lanes
+$ bin/fm-test-run.sh --check-coverage   (scratch copy)
+fm-test-run: coverage guard: portable parallel shard models a 1217958ms makespan packed into 3 bins, above the 1200000ms budget
+fm-test-run: move the heaviest member to the lighter lane, split the lane, or refresh the hints from CI measurements; a higher --jobs does not change the model: docs/fm-test-portable-shards.md
+exit=1

@@ -1,0 +1,12 @@
+$ FM_TEST_ONLY=test_portable_shard_union_and_coverage_guard bash tests/fm-test-run.test.sh
+ok - portable shard union, disjointness, and coverage guard hold
+exit=0
+$ FM_TEST_ONLY=test_portable_parallel_lanes_stay_duration_balanced bash tests/fm-test-run.test.sh
+ok - portable parallel lanes are fully hinted and packed within 5% of each other
+exit=0
+$ FM_TEST_ONLY=test_portable_parallel_lanes_run_bounded_and_concurrently bash tests/fm-test-run.test.sh
+ok - portable parallel lanes are bounded by a modeled makespan packed into the effective bin count
+exit=0
+$ FM_TEST_ONLY=test_portable_parallel_run_order_matches_list_scheduled bash tests/fm-test-run.test.sh
+ok - portable parallel lanes start their scripts in the order the makespan model packs
+exit=0
