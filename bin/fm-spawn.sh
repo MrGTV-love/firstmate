@@ -6234,7 +6234,9 @@ BUSY_GEN=
       # doorbell were retired because they could not withhold anything, so the
       # PostToolUse and UserPromptSubmit registrations are deliberately absent:
       # a registration that the adapter ignores is a dead guard, not coverage.
-      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
+      # Every tool except Bash reaches tool coverage; Bash has no pre-call rule,
+      # so a shell call starts no guard process.
+      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(?!Bash\$).*\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
     fi
     stop_entry=
     if [ "$KIND" = secondmate ] && grep -qF '.fm-busy-stop' "$WT/bin/fm-turnend-guard.sh" 2>/dev/null; then
