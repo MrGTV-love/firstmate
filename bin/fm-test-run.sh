@@ -595,17 +595,6 @@ zellij
 orca
 standalone
 unclassified
-tests/fm-guard-audit-closure.test.sh 10258
-tests/fm-guard-lint.test.sh 4609
-tests/fm-guard-refcheck.test.sh 1329
-tests/fm-guard-telemetry.test.sh 3139
-tests/fm-model-picker-shadow-spawn.test.sh 26389
-tests/fm-model-picker-shadow.test.sh 8850
-tests/fm-retired-jev-posttool-advisory.test.sh 1182
-tests/fm-slack-intake-unchanged.test.sh 2972
-tests/fm-slack-secret-scan.test.sh 17961
-tests/fm-slack-watch.test.sh 462747
-tests/fm-spawn-model-pin.test.sh 33955
 EOF
 }
 
@@ -932,7 +921,11 @@ tests/fm-gitignore-config.test.sh 381
 tests/fm-gotmp.test.sh 2837
 tests/fm-grok-continuity-live-e2e.test.sh 390
 tests/fm-grok-stop-live-e2e.test.sh 306
+tests/fm-guard-audit-closure.test.sh 10258
+tests/fm-guard-lint.test.sh 4609
+tests/fm-guard-refcheck.test.sh 1329
 tests/fm-guard-stale-banner.test.sh 21715
+tests/fm-guard-telemetry.test.sh 3139
 tests/fm-harness-adapter-instructions-live-e2e.test.sh 456
 tests/fm-harness-adapter-references.test.sh 756
 tests/fm-harness-liveness-drift-live-e2e.test.sh 1874
@@ -967,6 +960,8 @@ tests/fm-mem-guard.test.sh 593
 tests/fm-model-freshness.test.sh 37031
 tests/fm-model-index-live-e2e.test.sh 1253
 tests/fm-model-index.test.sh 142247
+tests/fm-model-picker-shadow-spawn.test.sh 26389
+tests/fm-model-picker-shadow.test.sh 8850
 tests/fm-model-picker.test.sh 9572
 tests/fm-muse-harness.test.sh 57303
 tests/fm-muse-signals-live-e2e.test.sh 406
@@ -1034,6 +1029,7 @@ tests/fm-remote-secondmate-parent-binding.test.sh 126929
 tests/fm-remote-secondmate-relaunch.test.sh 69311
 tests/fm-remote-secondmate-trace-context.test.sh 290868
 tests/fm-remote-transport-lanes.test.sh 80130
+tests/fm-retired-jev-posttool-advisory.test.sh 1182
 tests/fm-review-agent-select.test.sh 14400
 tests/fm-rovo-harness.test.sh 19818
 tests/fm-rovo-signals-live-e2e.test.sh 425
@@ -1064,6 +1060,9 @@ tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh 522
 tests/fm-sessionstart-nudge.test.sh 88391
 tests/fm-shared-captain-inheritance.test.sh 13249
 tests/fm-skill-pick.test.sh 120549
+tests/fm-slack-intake-unchanged.test.sh 2972
+tests/fm-slack-secret-scan.test.sh 17961
+tests/fm-slack-watch.test.sh 462747
 tests/fm-spawn-acquisition-cleanup.test.sh 35483
 tests/fm-spawn-claude-api-key-guard.test.sh 86356
 tests/fm-spawn-claude-start-confirm.test.sh 58902
@@ -1071,6 +1070,7 @@ tests/fm-spawn-compact-adviser-disable-remote.test.sh 352918
 tests/fm-spawn-compact-adviser-disable.test.sh 189707
 tests/fm-spawn-dispatch-profile.test.sh 450244
 tests/fm-spawn-herdr-launch-shell.test.sh 60679
+tests/fm-spawn-model-pin.test.sh 33955
 tests/fm-spawn-orca-worktree.test.sh 3620
 tests/fm-spawn-pool-base-freshen.test.sh 97974
 tests/fm-spawn-retained-copy.test.sh 59225
