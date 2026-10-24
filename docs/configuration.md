@@ -2087,6 +2087,10 @@ Unknown selector keys, unknown judgment ids, and missing structured matches are 
 These declarations restrict routing; they do not grant an exception, new profile, or permission.
 The [example configuration](examples/crew-dispatch.json) shows the structured format.
 
+Migration to structured matches (required before typed resolution runs): a rules file written for the retired rule Choice has no `judgments` object and no rule `match`.
+Rewrite each rule's routing facts as `match.project`, `match.exclude_project`, or `match.kind`, and each remaining semantic condition as a single-judgment Noul in `judgments` referenced from `match.all`, `match.any`, or `match.none`.
+There is no compatibility layer: an old-format file with at least one rule fails closed as a malformed rules file (exit 2), so firstmate dispatches through its manual intake until the file is migrated, and bootstrap reports the same `CREW_DISPATCH: invalid` diagnostic while the key is set.
+
 - `approval` accepts only `"captain"` and means a task the rule matches is never dispatched from the tool's answer alone.
 
 `min_confidence` is a number from 0 through 1.
@@ -2139,7 +2143,7 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - When the file exists, bootstrap validates it with `jq`.
 - Valid files stay silent by default unless [model-index warnings](#fleet-model-index-configmodel-indexjson) apply; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
-- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
 - Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 
@@ -2209,9 +2213,10 @@ Section extraction and the whole-brief fallback both read the brief after any en
 Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
 
 When the sections are sent from a scout brief, the line `Brief kind: scout (report only)` comes first, taken from the scaffold's scout contract line; ship briefs and briefs sent whole get no kind line.
-The resolver's `--kind ship|scout` input is authoritative when supplied; otherwise an unfenced `# Current ship Firstmate spec` heading takes precedence over the retained scout scaffold marker, and remaining briefs are ships.
+An unfenced `# Current ship Firstmate spec` heading makes the brief a ship; otherwise the scout scaffold's contract line in the unfenced `# Setup` section makes it a scout, and remaining briefs are ships.
 Kind is resolved before task extraction, so a promoted brief sends its current ship specification rather than the obsolete scout specification.
-Project is the caller's `--project` value, never inferred from task prose; missing project does not satisfy either an exact project or an excluded-project constraint.
+Project is the caller's `--project` value, never inferred from task prose.
+When any rule declares `project` or `exclude_project` and `--project` is absent, the resolver returns `escalate` before sending anything.
 A ship brief's delivery mode is not sent.
 
 The scaffold's standard setup, rules, and definition-of-done text is the same in every brief, so leaving it out keeps its safety language from reading as a signal about the task.
@@ -2261,7 +2266,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string in the complete assembled request, including project, kind, sanitized task text, referenced judgment criteria, fixed question text and pinned model id; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string in the complete assembled request, including project, kind, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -2361,7 +2366,7 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Predicate support below the floor with no runner-up taken, or a conflicting rule-support tie. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, desktop capability request, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, desktop capability request, project-scoped rules without `--project`, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
 | `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.

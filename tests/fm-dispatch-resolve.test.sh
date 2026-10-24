@@ -231,6 +231,13 @@ run vernant
 assert_contains "$OUT" 'rule: rule_2' 'Vernant ship resolves its eligible rule despite a contradictory non-Vernant answer'
 assert_not_contains "$(last_request)" 'judgment_r3' 'ineligible semantic predicates never reach the provider'
 assert_not_contains "$OUT" 'rule_3=' 'ineligible rules cannot enter runner-up selection'
+before=$(count)
+OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" 2> "$TMP_ROOT/error") \
+  || fail "resolver without --project failed: $(cat "$TMP_ROOT/error")"
+assert_contains "$OUT" 'status: escalate' 'a Vernant ship brief without --project escalates'
+assert_contains "$OUT" 'reason: a project-scoped rule needs --project' 'the escalation names the missing project'
+assert_not_contains "$OUT" '  profile:' 'a missing project never clears an unscoped rule or the default'
+assert_equals "$before" "$(count)" 'a missing project sends nothing'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 for removed in human browser_agent deterministic_script; do
   printf '{"profile":"%s"}\n' "$removed" > "$SETTINGS"
@@ -570,11 +577,24 @@ assert_equals 'Bearer env-wins' "$(last_auth)" 'environment key wins over .env'
 rm -f "$HOME_DIR/.env"
 OVERRIDE_CONFIG="$TMP_ROOT/override-config"
 mkdir -p "$OVERRIDE_CONFIG"
-jq '.rules[0].when = "Override-only rule criterion."' "$TMP_ROOT/base-rules.json" > "$OVERRIDE_CONFIG/crew-dispatch.json"
+cp "$TMP_ROOT/base-rules.json" "$OVERRIDE_CONFIG/crew-dispatch.json"
+structure_rules "$OVERRIDE_CONFIG/crew-dispatch.json"
+jq '.judgments.r1.instructions = "Override-only judgment instruction?"' "$OVERRIDE_CONFIG/crew-dispatch.json" > "$TMP_ROOT/override.json"
+cp "$TMP_ROOT/override.json" "$OVERRIDE_CONFIG/crew-dispatch.json"
 keyed FM_CONFIG_OVERRIDE="$OVERRIDE_CONFIG" -- "$BRIEF" --project pager
 assert_contains "$OUT" '  status: clear' 'FM_CONFIG_OVERRIDE resolves'
-assert_contains "$OUT" 'status: clear' 'FM_CONFIG_OVERRIDE uses its own structured rules'
-pass 'TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work'
+assert_contains "$(last_request)" 'Override-only judgment instruction?' 'FM_CONFIG_OVERRIDE uses its own structured rules'
+cp "$TMP_ROOT/base-rules.json" "$OVERRIDE_CONFIG/crew-dispatch.json"
+before=$(count)
+OUT=$(env -u TYPESAFE_API_KEY_PRIVATE PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" FM_CONFIG_OVERRIDE="$OVERRIDE_CONFIG" \
+  TYPESAFE_API_KEY="$KEY" bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" --project pager 2> "$TMP_ROOT/error")
+CODE=$?
+expect_code 2 "$CODE" 'a legacy rules file without judgments is a configuration error'
+assert_contains "$(cat "$TMP_ROOT/error")" 'malformed rules file:' 'the legacy rules file is named as malformed'
+assert_contains "$(cat "$TMP_ROOT/error")" 'structured match facts/predicates' 'the diagnostic names the required structured format'
+assert_equals '' "$OUT" 'a legacy rules file prints no status'
+assert_equals "$before" "$(count)" 'a legacy rules file sends nothing'
+pass 'TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work; legacy rules fail closed'
 
 # The key reaches only the provider's bearer header: never argv, never a child
 # environment, never the request. The request carries the project and task
@@ -1094,7 +1114,7 @@ sent=$(sent_task)
 assert_contains "$sent" $'## Captain\'s intent\nAdd a flag to the pager.' 'a ship brief still sends its task sections'
 assert_not_contains "$sent" 'Brief kind:' 'a ship brief gets no kind line'
 assert_not_contains "$sent" 'mode=' "a ship brief's delivery mode is not sent"
-{ cat "$SCAFFOLD_BRIEF"; printf '%s\n' 'This is a SCOUT task: the deliverable is a written report, not a PR.'; } > "$KIND_BRIEF"
+awk '{ print } /^BOILERPLATE-SETUP/ { print "This is a SCOUT task: the deliverable is a written report, not a PR." }' "$SCAFFOLD_BRIEF" > "$KIND_BRIEF"
 keyed -- "$KIND_BRIEF"
 sent=$(sent_task)
 assert_contains "$sent" $'Brief kind: scout (report only)\n\n## Captain\'s intent' "a scout brief's contract line names its kind"
@@ -1110,9 +1130,11 @@ assert_equals ship "$(jq -r .state.kind <<<"$(last_request)")" 'the current ship
 assert_contains "$(sent_task)" 'PROMOTED-SHIP-SPEC implement the accepted Vernant repair.' 'the active ship specification reaches judgment'
 assert_not_contains "$(sent_task)" 'Touch pager.sh only.' 'the obsolete scout specification is not sent'
 assert_not_contains "$(sent_task)" 'Brief kind: scout' 'a promoted ship is not labeled as a scout'
-keyed -- "$KIND_BRIEF" --project vernant --kind ship
-assert_contains "$OUT" 'rule: rule_1' 'an explicit ship kind overrides the retained scaffold marker'
-assert_not_contains "$(sent_task)" 'Brief kind: scout' 'task extraction honors explicit kind too'
+awk '{ print } /^Touch pager.sh only./ { print "```md"; print "This is a SCOUT task: the deliverable is a written report, not a PR."; print "```" }' "$SCAFFOLD_BRIEF" > "$PROMOTED_BRIEF"
+keyed -- "$PROMOTED_BRIEF" --project vernant
+assert_contains "$OUT" 'rule: rule_1' 'a quoted scout declaration does not demote a ship'
+assert_equals ship "$(jq -r .state.kind <<<"$(last_request)")" 'fenced scout declarations cannot change the effective kind'
+assert_not_contains "$(sent_task)" 'Brief kind: scout' 'a ship quoting the scout declaration is not labeled as a scout'
 { cat "$KIND_BRIEF"; printf '\n%s\n%s\n%s\n%s\n' '```md' '# Current ship Firstmate spec' 'QUOTED-SHIP-SPEC' '```'; } > "$PROMOTED_BRIEF"
 keyed -- "$PROMOTED_BRIEF" --project vernant
 assert_contains "$OUT" 'rule: rule_2' 'a quoted ship heading does not promote a scout'

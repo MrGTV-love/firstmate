@@ -1163,6 +1163,23 @@ crew_dispatch_validate() {
           end);
     def malformed_profile_floors($items):
       ($items | any(has("floor") and floor_bad(.floor; false)));
+    def text: type == "string" and test("\\S");
+    def structured_bad:
+      .judgments as $j
+      | ((.rules // []) | length) > 0
+      and (($j | type) != "object"
+        or any($j | to_entries[];
+          (.key | test("\\A[a-z][a-z0-9_]*\\z") | not)
+          or (.value | type) != "object" or .value.type != "noul" or (.value.instructions | text | not)
+          or (.value.criteria | type) != "object"
+          or (.value.criteria["true"] | text | not) or (.value.criteria["false"] | text | not))
+        or any(.rules[]; (.match | type) != "object"
+          or (.match | ((keys - ["project", "exclude_project", "kind", "all", "any", "none"]) | length) > 0
+            or (has("project") and (.project | text | not))
+            or (has("exclude_project") and (.exclude_project | text | not))
+            or (has("kind") and .kind != "ship" and .kind != "scout")
+            or any(("all", "any", "none") as $k | select(has($k)) | .[$k];
+              type != "array" or length == 0 or any(.[]; . as $id | type != "string" or ($j | has($id) | not))))));
     def bad_efforts:
       configured_profiles
       | map({h: .harness, m: .model, e: .effort})
@@ -1208,6 +1225,7 @@ crew_dispatch_validate() {
         | unique) as $bad_harnesses
       | if ($bad_harnesses | length) > 0 then "unverified harness: " + ($bad_harnesses | join(", "))
         elif (bad_efforts | length) > 0 then "invalid effort: " + (bad_efforts | join(", "))
+        elif $typed and structured_bad then "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria"
         else empty
         end
     end
