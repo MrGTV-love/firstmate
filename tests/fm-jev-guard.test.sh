@@ -2,8 +2,8 @@
 # Offline guard policy, service and adapter regressions. The loopback fixture
 # supplies controlled answers/errors, not model accuracy or publisher identity.
 set -u
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY JEV_BACKEND JEV_LEVEL_CONFIG
 unset FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FRICTION_EPISODE_ID
 export FM_FRICTION_EXECUTION_KIND=test
@@ -91,9 +91,18 @@ pass "pure write boundaries and calibrated injection equality, ambiguity, invali
 
 # T2 recorded shell misfires: execute only disposable fixture paths, never the
 # production Herdr lifecycle. Its command fixture proves dispatch, not teardown.
+# Claude dispatches through the hook settings a real worker spawn writes.
 test_bash_without_judgment() {
-  local out
-  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+  local out dir
+  dir="$TMP_ROOT/claude-spawn"
+  fm_test_spawn_home "$dir/home" claude
+  fm_git_worktree "$dir/project" "$dir/wt" wt-claude-guard
+  fm_test_spawn_brief "$dir/home" t2-claude
+  out=$(fm_test_run_spawn "$dir/home" "$dir/wt" "$(make_spawn_fakebin "$dir/fake" claude)" t2-claude "$dir/project" --mode no-mistakes --yolo off) \
+    || fail "Claude worker spawn: $out"
+  CLAUDE_SETTINGS="$dir/wt/.claude/settings.local.json"
+  [ -s "$CLAUDE_SETTINGS" ] || fail "Claude worker spawn wrote no hook settings"
+  out=$(CLAUDE_SETTINGS="$CLAUDE_SETTINGS" "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -104,6 +113,11 @@ const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const root = `${process.env.TASK_DATA}/bash-acceptance`;
 const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
 const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
+const settings = JSON.parse(readFileSync(process.env.CLAUDE_SETTINGS, 'utf8'));
+// Claude runs every PreToolUse hook whose matcher matches the tool name.
+const claudePretool = tool => (settings.hooks.PreToolUse ?? [])
+  .filter(group => new RegExp(!group.matcher || group.matcher === '*' ? '.*' : group.matcher).test(tool))
+  .flatMap(group => group.hooks);
 for (const host of ['omp', 'claude']) {
   const worktree = `${root}/${host}/repo`;
   const home = `${root}/${host}/home`;
@@ -114,7 +128,7 @@ for (const host of ['omp', 'claude']) {
   const handlers = {};
   const context = { home, config: `${home}/config`, state, task: 't2', data, worktree,
     host, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
-  installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
+  if (host === 'omp') installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
   async function run(command, unreachable = false) {
     const before = requests();
     const baseUrl = process.env.FM_JEV_GUARD_BASE_URL;
@@ -127,12 +141,7 @@ for (const host of ['omp', 'claude']) {
         if (unreachable) installJevGuard({ on(name, handler) { current[name] = handler; } }, context);
         assert.equal(await current.tool_call({ toolName: 'bash', input: { command } }, { cwd: worktree }), undefined);
       } else {
-        const output = execFileSync(`${dirname(process.env.GUARD)}/fm-jev-guard-hook.sh`,
-          [home, context.config, state, 't2', worktree, data, 'firstmate', context.policy], {
-            encoding: 'utf8', input: JSON.stringify({ hook_event_name: 'PreToolUse', cwd: worktree,
-              tool_name: 'Bash', tool_input: { command } }),
-          });
-        assert.equal(output, '', 'Claude must not deny the shell call');
+        assert.deepEqual(claudePretool('Bash'), [], 'a Claude shell call must start no guard hook process');
       }
       assert.equal(requests(), before, 'T2(f): a bash pre-call must send no TypeSafe request');
       execFileSync('bash', ['-s'], { cwd: worktree, input: command, stdio: 'pipe' });
@@ -190,10 +199,20 @@ for (const host of ['omp', 'claude']) {
     assert.equal(readFileSync(`${data}/large.txt`, 'utf8'), 'x'.repeat(300000));
   });
 }
+await test('claude: Write and Edit still reach the generated jev-guard hook', () => {
+  for (const [tool, input] of [['Write', { file_path: '/etc/fm-jev-guard-outside', content: 'x' }],
+    ['Edit', { file_path: '/etc/fm-jev-guard-outside', old_string: 'x', new_string: 'y' }]]) {
+    const hooks = claudePretool(tool);
+    assert.equal(hooks.length, 1, `${tool} must reach the guard hook`);
+    const output = execFileSync('sh', ['-c', hooks[0].command], { encoding: 'utf8',
+      input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input }) });
+    assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny', `${tool} outside the worktree must still be refused`);
+  }
+});
 JS
   ) || fail "bash acceptance: $out"
   printf '%s\n' "$out"
-  pass "T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests"
+  pass "T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it"
 }
 
 test_claude_effects() {
@@ -1416,7 +1435,6 @@ JS
 }
 
 test_bash_without_judgment
-[ "${1:-}" != --bash-acceptance ] || exit 0
 test_claude_effects
 test_outages_and_scope
 test_bounded_retry

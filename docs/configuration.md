@@ -2456,12 +2456,13 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
-Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
+Claude's only remaining guard coverage is the pre-tool deny on `Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
-`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Bash|Write|Edit` only; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Write|Edit` only, so a Claude `Bash` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+A Claude worker launched before the `Bash` registration was removed keeps its old matcher until it is respawned: its shell calls still get no judgment, but a missing or crashing runtime still stops them.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
 There is no legacy exemption, automatic compatibility, receipt backfill or automatic republication.
@@ -2597,7 +2598,7 @@ Clear scores at or below 0.20 pass without an advisory.
 Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.
 Non-text results that cannot be assessed also require review rather than an unexamined pass.
 Claude receives no result notice, because its post-tool advisory is retired.
-Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool execution with a stable error type, and no post-tool notice could undo a tool's effects.
+Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool write/edit execution with a stable error type, and no post-tool notice could undo a tool's effects.
 The command wrapper publishes only successful handler stdout, normalizes active nonzero runtime exits to exit 2, and emits `RuntimeExecutionError` with the observed numeric exit status instead of raw failure output.
 Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
 

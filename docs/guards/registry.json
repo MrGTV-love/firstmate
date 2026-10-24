@@ -580,7 +580,7 @@
       "version": "1",
       "id": "jev-pretool-deny",
       "owner": "bin/fm-jev-guard-hook.sh",
-      "invariant": "a shell or write action whose required judgment fails never runs",
+      "invariant": "a write or edit action whose required judgment fails never runs",
       "layer": "runtime-block",
       "source": "Jev answers plus Level 6 thresholds, with the output retained",
       "trigger": "the Jev judgment for this action fails its threshold",
