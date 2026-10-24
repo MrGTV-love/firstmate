@@ -1,0 +1,8 @@
+ok - direct and sweep inspection skip readable unpinned foreground without lifecycle input or task mutation
+ok - direct and sweep recovery refuse missing or mismatched non-omp pins for ships, scouts and secondmates without mutation
+ok - all lifecycle verbs refuse native startup and pinned personal session switches without input or task mutation
+ok - legacy Herdr records without a launch pin keep exit and relaunch
+ok - managed versioned and legacy launches retain interrupt, exit, busy-exit and same-pane relaunch
+ok - ordinary lifecycle accepts genuine unregistered shell panes with process-table proof
+ok - ordinary managed relaunch requires matching readable replacement pin for alive confirmation
+rc=0

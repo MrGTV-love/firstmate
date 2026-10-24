@@ -1,0 +1,16 @@
+ok - omp adoption: matching workspace adopted and fake interrupt works without a launch env pin
+ok - omp adoption: workspace of another task refused, including a deeper nested worktree
+ok - omp adoption: two metas claiming one pane refused
+ok - omp adoption: ambiguous foreground refused
+ok - omp adoption: record generation mismatch refused
+ok - omp adoption: same-PID personal current session overrides stale task registration and remains refused
+ok - omp adoption: the extension's unproven mark for the live PID is not overwritten
+ok - omp adoption: non-agent foreground process refused at adoption and at the lifecycle recheck
+ok - omp adoption: unreadable launch environment stays unknown and is not promoted to managed
+ok - omp adoption: a live process pinned to another launch generation is not adopted
+ok - omp adoption: workers, the supervision branch, and a non-owning session are refused with the record unchanged
+ok - omp adoption: pane, workspace, session-file identity, aliases, and ongoing authorization boundaries
+ok - omp adoption: a record naming a live omp process is the extension's to maintain and is refused unchanged
+ok - omp adoption: a recorded PID reused by a process other than omp, another harness's agent included, does not block repair
+ok - omp adoption: matching pin proof refuses before staging and preserves the task anchor across real personal activation
+ok - omp adoption: unreadable pin proof refuses before staging and preserves the task anchor across real personal activation

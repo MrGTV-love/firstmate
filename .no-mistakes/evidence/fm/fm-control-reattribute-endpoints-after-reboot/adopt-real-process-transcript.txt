@@ -1,0 +1,136 @@
+=== S1 stuck record -> interrupt refused -> adopt -> interrupt delivered ===
+# case matching: real pid 19431; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-matching-14840/realbin.vo90d3/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-matching-14840/wt/subdirectory
+record: {"version":1,"spawn_gen":"old","pid":2000000001,"task_session_file":"/Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-matching-14840/wt/recorded-session.jsonl","current_session_file":""}
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-matching interrupt   (before adopt)
+error: task rcv-12906-bLZmqf-drive-matching cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+exit=1
+herdr send-* calls: 0
+0
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-matching adopt
+adopted: rcv-12906-bLZmqf-drive-matching
+exit=0
+record: {"version": 1, "spawn_gen": "old", "pid": 19431, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-matching-14840/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-matching-14840/wt/recorded-session.jsonl"}
+herdr send-* calls: 0
+0
+meta unchanged: yes
+record has exactly version=1, same spawn_gen, live pid, preserved task file, live current file: yes
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-matching interrupt   (after adopt)
+interrupt-delivered rcv-12906-bLZmqf-drive-matching harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+exit=0
+herdr send-* calls: 1
+RESULT: PASS
+
+$ kill real omp pid; fm-control.sh rcv-12906-bLZmqf-drive-matching interrupt (adopted record, process gone)
+error: task rcv-12906-bLZmqf-drive-matching cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+exit=1
+herdr send-* calls: 0
+0
+RESULT: PASS (gone process not controllable)
+
+=== S2 real cwd in another task's deeper nested worktree ===
+# case foreign: real pid 28151; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-foreign-13706/realbin.NUfVgj/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-foreign-13706/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-foreign adopt
+adopt refused: workspace proof needs this task to be the unique deepest match; cwd belongs to foreign
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S3 real cwd outside the task worktree ===
+# case outside: real pid 32195; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-outside-15893/realbin.z8MYIR/omp 900; kernel cwd: /private/tmp
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-outside adopt
+adopt refused: workspace proof needs the foreground cwd inside this task's recorded worktree
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S4 another meta claims the same pane ===
+# case duplicate: real pid 35293; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-duplicate-9303/realbin.BLEqAh/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-duplicate-9303/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-duplicate adopt
+adopt refused: unique-claim proof needs no other local task to claim this pane; claimed by dup
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S5 ambiguous foreground (Herdr lists two processes) ===
+# case ambiguous: real pid 37922; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-ambiguous-13094/realbin.YRs6IS/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-ambiguous-13094/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-ambiguous adopt
+adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S6 record spawn_gen differs from meta ===
+# case generation: real pid 40174; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-generation-1787/realbin.1x89ET/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-generation-1787/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-generation adopt
+adopt refused: generation proof needs the existing record spawn_gen to equal metadata spawn_gen
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S7 real process pinned to another generation (FM_SPAWN_GEN=other) ===
+# case pinned-other: real pid 43670; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-pinned-other-30439/realbin.RVIRH5/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-pinned-other-30439/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-pinned-other adopt
+adopt refused: generation proof needs the live process not to be pinned to another launch generation
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S8 real process with a matching pin (FM_SPAWN_GEN=old) is not a repair candidate ===
+# case pinned-same: real pid 47485; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-pinned-same-15131/realbin.dlO0is/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-pinned-same-15131/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-pinned-same adopt
+error: adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S9 real foreground process is not an agent (name: sleep) ===
+# case non-agent: real pid 51292; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-non-agent-8735/realbin.S0A2Dp/sleep 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-non-agent-8735/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-non-agent adopt
+adopt refused: process proof needs the resolved foreground process to be a readable agent process
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S10 recorded PID is a live real omp process ===
+# case live-omp: real pid 54297; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-live-omp-1391/realbin.330Pxn/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-live-omp-1391/wt/subdirectory
+# recorded pid 55036 is now: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-live-omp-1391/realbin.aPweKS/omp
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-live-omp adopt
+adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; 55036 is a live omp process, so the omp extension owns this record and it was not changed
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+=== S11 recorded PID reused by a live real claude-named process: repair proceeds ===
+# case reused-claude: real pid 58722; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-reused-claude-9185/realbin.A76g5Y/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-reused-claude-9185/wt/subdirectory
+# recorded pid 59408 is now: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-reused-claude-9185/realbin.iDBuNV/claude
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-reused-claude adopt
+adopted: rcv-12906-bLZmqf-drive-reused-claude
+exit=0
+record: {"version": 1, "spawn_gen": "old", "pid": 58722, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-reused-claude-9185/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-reused-claude-9185/wt/recorded-session.jsonl"}
+herdr send-* calls: 0
+0
+RESULT: PASS
+
+=== S12 caller gates: worker, supervision branch, non-lock-owner ===
+# case gates: real pid 65763; ps: /Users/charlesab /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-gates-25913/realbin.XFuwTI/omp 900; kernel cwd: /Users/charlesabrooker/tmp/fm-control-relaunch.bLZmqf/drive-gates-25913/wt/subdirectory
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-gates adopt
+error: workers cannot adopt a session record
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-gates adopt
+error: session record adoption (fm-control) refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)
+exit=6
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+$ fm-control.sh rcv-12906-bLZmqf-drive-gates adopt
+error: session record adoption requires the actual lock-owning main Firstmate
+exit=1
+RESULT: PASS (refused, named proof, meta+record bytes unchanged, no pane input)
+
+TOTAL FAILS=0
