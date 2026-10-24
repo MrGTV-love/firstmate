@@ -3237,6 +3237,109 @@ SH
   pass "bounded acquire hands ownership to the waiting caller after contention"
 }
 
+# Release the live holder only after the final refused attempt has captured it.
+# The bounded acquire must classify that refusal, not a later PID-file read.
+test_bounded_lock_deadline_holder_release() {
+  local dir state lock holder_pid i rc
+  dir=$(make_case bounded-lock-deadline-holder-release)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2" || exit 10
+    printf "ready\n" > "$3"
+    ticks=0
+    while [ ! -e "$4" ] && [ "$ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      ticks=$((ticks + 1))
+    done
+    [ -e "$4" ] || exit 11
+    fm_lock_release "$2"
+    printf "released\n" > "$5"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/holder.ready" \
+    "$dir/release-holder" "$dir/holder.released" &
+  holder_pid=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$dir/holder.ready" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  [ -s "$dir/holder.ready" ] \
+    || { kill "$holder_pid" 2>/dev/null || true; fail "deadline fixture holder never acquired its lock"; }
+
+  rc=0
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    release_holder=$3 holder_released=$4 refused_holder=$5
+    eval "_fm_test_real_$(declare -f fm_lock_try_acquire)"
+    attempts=0
+    fm_lock_try_acquire() {
+      local refusal ticks=0
+      attempts=$((attempts + 1))
+      _fm_test_real_fm_lock_try_acquire "$@" && return 0
+      refusal=$?
+      if [ "$attempts" -eq 2 ]; then
+        printf "%s\n" "$FM_LOCK_HELD_PID" > "$refused_holder"
+        : > "$release_holder"
+        while [ ! -s "$holder_released" ] && [ "$ticks" -lt 200 ]; do
+          sleep 0.05
+          ticks=$((ticks + 1))
+        done
+        [ -s "$holder_released" ] || exit 12
+      fi
+      return "$refusal"
+    }
+    rc=0
+    fm_lock_acquire_wait_bounded "$2" 1 || rc=$?
+    printf "%s %s %s\n" "$rc" "${FM_LOCK_HELD_PID:-}" "$attempts" > "$6"
+    [ "$rc" -ne 0 ] || fm_lock_release "$2"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/release-holder" \
+    "$dir/holder.released" "$dir/refused-holder" "$dir/waiter.result" \
+    > "$dir/waiter.out" 2> "$dir/waiter.err" || rc=$?
+  : > "$dir/release-holder"
+  wait "$holder_pid" || fail "deadline fixture holder did not release cleanly"
+  [ "$rc" -eq 0 ] || fail "deadline fixture waiter failed: $(cat "$dir/waiter.err")"
+  [ "$(cat "$dir/refused-holder")" = "$holder_pid" ] \
+    || fail "deadline fixture did not observe the live holder at its final refusal"
+  [ "$(cat "$dir/waiter.result")" = "124 $holder_pid 2" ] \
+    || fail "holder release changed deadline contention into an acquisition error: $(cat "$dir/waiter.result")"
+  [ ! -e "$lock" ] && [ ! -L "$lock" ] || fail "deadline fixture left its lock behind"
+  pass "bounded deadline preserves contention when the observed holder releases"
+}
+
+# An unreclaimable regular-file steal mutex is an acquisition error even when
+# the primary lock contains a dead PID and the bounded helper hits its deadline.
+test_bounded_lock_malformed_steal_reports_acquire_failure() {
+  local dir state lock dead_pid rc
+  dir=$(make_case bounded-lock-malformed-steal)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+  bash -c 'exit 0' &
+  dead_pid=$!
+  wait "$dead_pid" || fail "could not prepare a dead primary lock owner"
+  mkdir "$lock"
+  printf '%s\n' "$dead_pid" > "$lock/pid"
+  : > "$lock.steal"
+
+  rc=0
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    rc=0
+    fm_lock_acquire_wait_bounded "$2" 1 || rc=$?
+    printf "%s %s\n" "$rc" "$FM_LOCK_BUSY" > "$3"
+    [ "$rc" -ne 0 ] || fm_lock_release "$2"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/result" || rc=$?
+  [ "$rc" -eq 0 ] || fail "malformed steal fixture shell failed"
+  [ "$(cat "$dir/result")" = '1 0' ] \
+    || fail "malformed steal mutex was reported as contention: $(cat "$dir/result")"
+  [ -f "$lock.steal" ] && [ ! -L "$lock.steal" ] \
+    || fail "bounded acquire replaced the malformed steal mutex"
+  [ "$(cat "$lock/pid")" = "$dead_pid" ] \
+    || fail "bounded acquire changed the primary owner despite its malformed mutex"
+  pass "a malformed steal mutex reports acquisition error instead of contention"
+}
+
 # A live-but-stuck presentation lock must not strand the executable drain. The
 # presentation remains retriable on the next pass, while the separate queue
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
@@ -4123,6 +4226,8 @@ test_unreclaimable_dead_lock_refuses_without_waiting
 test_lock_wait_ends_when_the_lock_directory_is_gone
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
+test_bounded_lock_deadline_holder_release
+test_bounded_lock_malformed_steal_reports_acquire_failure
 test_live_presentation_holder_is_deadlined_without_weakening_ack
 test_malformed_presentation_lock_reports_acquire_failure
 test_secondmate_foreign_queue_stall_tracks_progress_and_alerts_once

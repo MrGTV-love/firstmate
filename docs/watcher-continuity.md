@@ -387,6 +387,7 @@ An ordinary presentation drain bounds both its initial queue-lock acquire and it
 | Initial queue lock | One PID-naming advisory, and the whole drain is skipped before any claim or mutation. |
 | Status-presentation lock | One such advisory after raw wake presentation, and status annotations, sections, and cursors are left retriable on the next drain. |
 
+A deadline reports the contention observed by its final acquisition attempt even if that holder releases before the advisory is printed; a malformed regular-file lock is an acquisition error, not a publishing owner.
 Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics while the lock's parent directory exists, so acknowledgement atomicity is unchanged.
 The wake drain and its bounded-lock handoff use native HUP/TERM handling, with EXIT cleanup releasing only locks still owned by the exiting process. Interrupted presentation leaves durable rows available for replay until explicit acknowledgement; a successfully transferred lock remains owned by its caller.
 
