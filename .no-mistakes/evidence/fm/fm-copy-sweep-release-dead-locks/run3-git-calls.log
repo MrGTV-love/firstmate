@@ -1,0 +1,236 @@
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused rev-parse HEAD
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused symbolic-ref --quiet --short HEAD
+python	rev-parse --show-toplevel
+python	rev-parse --path-format=absolute --git-common-dir
+python	rev-parse --show-toplevel
+python	rev-parse --show-toplevel
+python	status --porcelain=v2 -b --untracked-files=no
+python	remote get-url origin
+python	remote get-url --push --all origin
+python	rev-parse --verify -q MERGE_HEAD
+python	rev-parse --verify -q REBASE_HEAD
+python	merge-base HEAD origin/main
+python	diff --name-only
+python	diff --cached --name-only
+python	ls-files --others --exclude-standard -z
+python	submodule status --recursive
+python	ls-tree -r -z --format=%(objectmode)%x09%(objecttype)%x09%(objectname)%x09%(path) HEAD
+python	merge-base --is-ancestor 983ce50733a09670ec9c4aea6fd43bfc65701241 origin/main
+python	diff --name-status -z --find-renames --find-copies origin/main...HEAD
+python	cat-file -e origin/main:README.md
+python	--literal-pathspecs ls-tree -z origin/main -- README.md
+python	--literal-pathspecs ls-tree -z HEAD -- README.md
+python	cat-file blob 4eaf8ad0e00b1acc1c20eaed5aaa95c79c396eaf
+python	ls-tree -r -z --format=%(objectname)%x09%(path) origin/main
+python	cat-file --batch
+python	rev-parse --absolute-git-dir
+python	worktree list --porcelain
+python	ls-remote origin refs/pull/*/head
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse HEAD
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher symbolic-ref --quiet --short HEAD
+python	rev-parse --show-toplevel
+python	rev-parse --path-format=absolute --git-common-dir
+python	rev-parse --show-toplevel
+python	rev-parse --show-toplevel
+python	status --porcelain=v2 -b --untracked-files=no
+python	remote get-url origin
+python	remote get-url --push --all origin
+python	rev-parse --verify -q MERGE_HEAD
+python	rev-parse --verify -q REBASE_HEAD
+python	merge-base HEAD origin/main
+python	diff --name-only
+python	diff --cached --name-only
+python	ls-files --others --exclude-standard -z
+python	submodule status --recursive
+python	ls-tree -r -z --format=%(objectmode)%x09%(objecttype)%x09%(objectname)%x09%(path) HEAD
+python	merge-base --is-ancestor 8bb2abc324bb78ced2a353dc0d524d79b720866d origin/main
+python	diff --name-status -z --find-renames --find-copies origin/main...HEAD
+python	rev-parse --absolute-git-dir
+python	status --short --untracked-files=all
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/scripts/git-stability rev-parse --path-format=absolute --show-toplevel
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/scripts/git-stability rev-parse --path-format=absolute --git-common-dir
+python	--no-optional-locks -C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse HEAD
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse HEAD
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --absolute-git-dir
+python	rev-parse --show-toplevel
+python	rev-parse --path-format=absolute --git-common-dir
+python	rev-parse --show-toplevel
+python	rev-parse --show-toplevel
+python	status --porcelain=v2 -b --untracked-files=no
+python	remote get-url origin
+python	remote get-url --push --all origin
+python	rev-parse --verify -q MERGE_HEAD
+python	rev-parse --verify -q REBASE_HEAD
+python	merge-base HEAD origin/main
+python	diff --name-only
+python	diff --cached --name-only
+python	ls-files --others --exclude-standard -z
+python	submodule status --recursive
+python	ls-tree -r -z --format=%(objectmode)%x09%(objecttype)%x09%(objectname)%x09%(path) HEAD
+python	merge-base --is-ancestor 8bb2abc324bb78ced2a353dc0d524d79b720866d origin/main
+python	diff --name-status -z --find-renames --find-copies origin/main...HEAD
+python	rev-parse --absolute-git-dir
+python	status --short --untracked-files=all
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/scripts/git-stability rev-parse --path-format=absolute --show-toplevel
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/scripts/git-stability rev-parse --path-format=absolute --git-common-dir
+python	--no-optional-locks -C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard -z
+python	rev-parse --path-format=absolute --git-common-dir
+python	show-ref --verify --quiet refs/vernant/recovery/worktree-remove-live-launcher-9a1734bd3f73
+python	update-ref refs/vernant/recovery/worktree-remove-live-launcher-9a1734bd3f73 HEAD
+python	rev-parse --verify refs/vernant/recovery/worktree-remove-live-launcher-9a1734bd3f73
+python	rev-parse --path-format=absolute --git-dir
+python	rev-parse --show-toplevel
+python	status --porcelain=v2 -b --untracked-files=no
+python	remote get-url origin
+python	remote get-url --push --all origin
+python	rev-parse --verify -q MERGE_HEAD
+python	rev-parse --verify -q REBASE_HEAD
+python	merge-base HEAD origin/main
+python	diff --name-only
+python	diff --cached --name-only
+python	ls-files --others --exclude-standard -z
+python	submodule status --recursive
+python	rev-parse --show-toplevel
+python	status --porcelain=v2 -b --untracked-files=no
+python	remote get-url origin
+python	remote get-url --push --all origin
+python	rev-parse --verify -q MERGE_HEAD
+python	rev-parse --verify -q REBASE_HEAD
+python	merge-base HEAD origin/main
+python	diff --name-only
+python	diff --cached --name-only
+python	ls-files --others --exclude-standard -z
+python	submodule status --recursive
+python	rev-parse HEAD
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --git-common-dir
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --git-common-dir
+python	--no-optional-locks -C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher rev-parse --git-dir
+python	--no-optional-locks -C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher log -g -1 --date=unix --format=%gd HEAD
+python	--no-optional-locks -C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher status --porcelain -z
+python	--no-optional-locks -C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher ls-files --others --ignored --exclude-standard -z
+python	ls-files -z
+python	worktree list --porcelain
+python	worktree unlock /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher
+python	worktree remove /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher
+python	worktree list --porcelain
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --show-toplevel
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant rev-parse --path-format=absolute --git-common-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --verify --quiet HEAD^{commit}
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve status --porcelain --untracked-files=all --ignore-submodules=none
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse --absolute-git-dir
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve ls-files --others --ignored --exclude-standard --directory -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant worktree list --porcelain -z
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-list --count HEAD --not --remotes
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve rev-parse HEAD
+bash	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve symbolic-ref --quiet --short HEAD
+python	rev-parse --show-toplevel
+python	rev-parse --path-format=absolute --git-common-dir
+python	rev-parse --show-toplevel
+python	rev-parse --show-toplevel
+python	status --porcelain=v2 -b --untracked-files=no
+python	remote get-url origin
+python	remote get-url --push --all origin
+python	rev-parse --verify -q MERGE_HEAD
+python	rev-parse --verify -q REBASE_HEAD
+python	merge-base HEAD origin/main
+python	diff --name-only
+python	diff --cached --name-only
+python	ls-files --others --exclude-standard -z
+python	submodule status --recursive
+python	ls-tree -r -z --format=%(objectmode)%x09%(objecttype)%x09%(objectname)%x09%(path) HEAD
+python	merge-base --is-ancestor 8bb2abc324bb78ced2a353dc0d524d79b720866d origin/main
+python	diff --name-status -z --find-renames --find-copies origin/main...HEAD
+python	rev-parse --absolute-git-dir
+python	status --short --untracked-files=all
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/scripts/git-stability rev-parse --path-format=absolute --show-toplevel
+python	-C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/scripts/git-stability rev-parse --path-format=absolute --git-common-dir
+python	--no-optional-locks -C /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve ls-files --others --ignored --exclude-standard -z

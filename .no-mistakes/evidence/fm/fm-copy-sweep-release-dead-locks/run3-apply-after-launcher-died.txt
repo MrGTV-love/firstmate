@@ -1,0 +1,21 @@
+$ FM_HOME=$LAB/home FM_COPY_SWEEP_TREEHOUSE_ROOT=$LAB/th bin/fm-copy-sweep.sh --apply   # after launcher 17620 stopped
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.54 GiB	/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve	its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: {"allowed": true, "cleanup_command": ["git", "worktree", "remove", "/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-preserve"], "cleanup_timeout_seconds": 30, "coverage_mode": "exact_tree", "exact_tree_covered": true, "execute": false, "ignored_payload_disposition": "archive_then_retain_tree", "launch_cwd": {"cwd": "/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.git/vernant-launch", "launch_dir": "/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.git/vernant-launch", "previous_cwd": "/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool
+HELD-LOCKED	0.54 GiB	/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "cleanup_command": ["git", "worktree", "remove", "/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/refused"], "cleanup_timeout_seconds": 30, "coverage_mode": "blocked", "exact_tree_covered": false, "execute": false, "landed_pr_discovery": {"candidates": [], "pr": null, "reason": "no PR head on origin equals the copy's tip 983ce50733a09670ec9c4aea6fd43bfc65701241", "tree_tip_sha": "983ce50733a09670ec9c4aea6fd43bfc65701241"}, "launch_cwd": {"cwd": "/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.git/vernant-launch", "launch_dir": "/Use
+HELD-UNPUSHED	0.54 GiB	/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher	branch lab/live-launcher at 8bb2abc324bb, copy 0.54 GiB, preserved 0.00 GiB, net freed 0.54 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 17620 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool: 1.61 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant: 1.61 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=4 GiB=2.14 reaped=1 freed=0.54
+exit=0

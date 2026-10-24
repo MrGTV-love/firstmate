@@ -1,0 +1,11 @@
+worktree /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant
+worktree /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-a
+locked vernant-session-active owner=launcher:17360 launcher=17360
+worktree /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-b
+locked vernant-session-active owner=launcher:17360 launcher=17360
+worktree /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-c
+locked vernant-session-active owner=launcher:17360 launcher=17360
+worktree /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/live-launcher
+locked vernant-session-active owner=launcher:17620 launcher=17620
+worktree /Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/unpushed
+locked vernant-session-active owner=launcher:17360 launcher=17360

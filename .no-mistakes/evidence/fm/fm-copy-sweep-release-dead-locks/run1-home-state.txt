@@ -1,0 +1,11 @@
+== find home/data home/state
+$LAB/home/data
+$LAB/home/state
+$LAB/home/data/copy-sweep
+$LAB/home/data/copy-sweep.log
+$LAB/home/state/copy-sweep.sizes
+$LAB/home/state/copy-sweep.record
+$LAB/home/data/copy-sweep/retained
+== data/copy-sweep.log
+2026-10-24T02:38:21Z	removed	/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/notlanded	clone=/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant	head=6c9c99802f51f712b37cbafc9f9d99e4c7da12f2	branch=lab/notlanded	kib=562280	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 17360 is gone
+2026-10-24T02:38:32Z	removed	/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant/.claude/worktrees/landed-ignored	clone=/Users/charlesabrooker/tmp/fm-lab.sGoChh/th/vpool/1/vernant	head=8bb2abc324bb78ced2a353dc0d524d79b720866d	branch=lab/landed-ignored	kib=562288	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 17360 is gone
