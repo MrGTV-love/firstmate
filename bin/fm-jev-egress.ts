@@ -1,7 +1,7 @@
 // Deterministic worker tool coverage and outbound-call policy. No model or network
 // requests occur here. docs/configuration.md "Jev guard" owns the grant contract.
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { lstatSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 export type DestinationClass = "semantic-search" | "web" | "browser" | "provider" | "subagent" | "dynamic-code" | "remote-storage";
 type ToolPolicy = { result: "screen" | "unjudged" } & (
@@ -34,7 +34,7 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   reflect: { call: "provider", result: "unjudged" },
   retain: { call: "provider", result: "unjudged" },
   memory_edit: { call: "local", result: "unjudged" },
-  manage_skill: { call: "local", result: "unjudged" },
+  manage_skill: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   ast_edit: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   debug: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   notebook: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
@@ -108,7 +108,7 @@ export function egressGranted(state: string, task: string, destination: Destinat
   try {
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(task)) return false;
     const path = resolve(state, `${task}.meta`);
-    if (!lstatSync(path).isFile() || realpathSync(dirname(path)) !== realpathSync(state)) return false;
+    if (!lstatSync(path).isFile()) return false;
     const entries = readFileSync(path, "utf8").split("\n").filter((line) => line.startsWith("egress="));
     if (entries.length !== 1) return false;
     const grant: unknown = JSON.parse(entries[0].slice("egress=".length));

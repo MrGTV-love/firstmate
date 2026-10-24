@@ -6710,7 +6710,8 @@ preserve_relaunch_meta() {
     echo "projects=$SECONDMATE_PROJECTS"
   fi
   # Keep relaunch fields before the preserved PR block so monitoring can parse it;
-  # fm_pr_metadata_identity_parse owns the allowed fields following pr=.
+  # fm_pr_metadata_identity_parse owns the allowed fields following pr=, including
+  # a preserved egress= grant that Firstmate appended after the PR was recorded.
   if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
     echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"
   fi

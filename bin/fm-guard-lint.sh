@@ -281,10 +281,15 @@ if [ "$COUNTS" -eq 1 ]; then
   excluded_n=$(jq -r '(.excluded // []) | length' "$REGISTRY")
   unregistered_n=$(jq -r '(.unregistered_ids // []) | length' "$REGISTRY")
   beyond_n=$(jq -r '(.beyond_audit_retired // []) | length' "$REGISTRY")
-  total=$((active + retired_n - beyond_n + excluded_n + unregistered_n))
+  beyond_active_n=$(jq -r '(.beyond_audit_active // []) | length' "$REGISTRY")
+  jq -r '(.guards | map(.id)) as $ids | (.beyond_audit_active // [])[] | select(. as $b | $ids | index($b) | not)' "$REGISTRY" \
+    | while IFS= read -r bid; do
+        [ -n "$bid" ] && printf 'R1\t%s\tbeyond_audit_active names no registered guard\n' "$bid" >>"$VIOLATIONS"
+      done
+  total=$((active - beyond_active_n + retired_n - beyond_n + excluded_n + unregistered_n))
   [ "$total" -eq "$audited" ] \
-    || violation R1 "inventory" "active($active) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) + unregistered($unregistered_n) = $total, audited=$audited"
-  info inventory "active=$active retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$unregistered_n audited=$audited"
+    || violation R1 "inventory" "active($active, $beyond_active_n beyond the audit) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) + unregistered($unregistered_n) = $total, audited=$audited"
+  info inventory "active=$active retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$unregistered_n audited=$audited beyond_audit_active=$beyond_active_n"
 fi
 
 # --------------------------------------------------------------- ratchet gate

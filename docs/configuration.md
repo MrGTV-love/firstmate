@@ -2490,6 +2490,7 @@ Firstmate records the per-task grant as exactly one `egress=` line containing a 
 The recognized destination classes are `semantic-search`, `web`, `browser`, `provider`, `subagent`, `dynamic-code` and `remote-storage`.
 An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
 Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
 Each tool has at most one destination class, which must be granted; a grant never bypasses existing path, credential, shell or privacy checks.
 
@@ -2500,10 +2501,12 @@ This table classifies host tools; it does not detect network behavior inside she
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
 omp's `python`, `debug` and `run_experiment` code runners have the same effect as `eval` and use the same confinement-owned classification.
-Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
+Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), `manage_skill` writes to its managed-skills directory, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
 A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
 Claude `Monitor` and `PowerShell` run commands outside the screened `bash` path and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
+The unclassified-tool, missing-grant and `xd://report_issue` refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-report-issue-refusal`, each with its deny and pass fixture in the audit regression.
+They are not instrumented in `state/guard-events.jsonl`; each refusal and each granted outbound call writes one content-free terminal row to the owning home's `state/jev-guard.jsonl`.
 
 ### Model policy
 
