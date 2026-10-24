@@ -2197,7 +2197,7 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 **What the model receives**
 
-When on and at least one rule exists, the tool sends the project name, code-resolved brief kind, and task-specific text in one `JevClient.systemOne` call pinned to `jev-1.13.0`.
+When on and at least one rule exists, the tool sends the project name, code-resolved brief kind, and task-specific text in one `JevClient.systemOne` call using the current `jev-latest` model.
 Code eliminates rules whose project or kind facts do not match before assembling any semantic questions; an excluded rule cannot reappear in confidence fallback.
 The remaining rules contribute only their referenced individual Noul judgments, each sent once even when several rules share it.
 The request also includes the upstream ambiguity, model-tier and reasoning-effort questions, plus a desktop-access Noul with concrete true/false criteria.
@@ -2209,7 +2209,8 @@ Section extraction and the whole-brief fallback both read the brief after any en
 Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
 
 When the sections are sent from a scout brief, the line `Brief kind: scout (report only)` comes first, taken from the scaffold's scout contract line; ship briefs and briefs sent whole get no kind line.
-The resolver's `--kind ship|scout` input is authoritative when supplied; otherwise the exact scaffold scout marker determines scout kind and the remaining briefs are ships.
+The resolver's `--kind ship|scout` input is authoritative when supplied; otherwise an unfenced `# Current ship Firstmate spec` heading takes precedence over the retained scout scaffold marker, and remaining briefs are ships.
+Kind is resolved before task extraction, so a promoted brief sends its current ship specification rather than the obsolete scout specification.
 Project is the caller's `--project` value, never inferred from task prose; missing project does not satisfy either an exact project or an excluded-project constraint.
 A ship brief's delivery mode is not sent.
 
@@ -2457,7 +2458,7 @@ Current protection claim: **no protection** until the rebuild is landed and actu
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
 Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
-Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, desktop criteria, and the pinned dispatch model.
+Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, and desktop criteria.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.

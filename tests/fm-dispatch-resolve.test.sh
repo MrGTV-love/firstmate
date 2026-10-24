@@ -602,7 +602,6 @@ for runtime in "${RUNTIMES[@]}"; do
   assert_not_contains "$(last_request)" "$KEY" "$runtime: the key never rides in the request body"
 done
 body=$(last_request)
-assert_equals jev-1.13.0 "$(jq -r .model <<<"$body")" 'dispatch pins its threshold-era model'
 assert_equals pager "$(jq -r .state.repository <<<"$body")" 'the authoritative project is explicit'
 assert_contains "$(jq -r .state.task <<<"$body")" 'off-by-one in the pager' 'the task-specific state is retained'
 assert_equals ship "$(jq -r .state.kind <<<"$body")" 'kind is a code fact'
@@ -1100,6 +1099,26 @@ keyed -- "$KIND_BRIEF"
 sent=$(sent_task)
 assert_contains "$sent" $'Brief kind: scout (report only)\n\n## Captain\'s intent' "a scout brief's contract line names its kind"
 assert_not_contains "$sent" 'This is a SCOUT task' 'the scout contract line itself is not sent'
+# Promotion retains the scout body and appends the authoritative ship spec.
+PROMOTED_BRIEF="$TMP_ROOT/promoted-brief.md"
+{ cat "$KIND_BRIEF"; printf '\n%s\n%s\n' '# Current ship Firstmate spec' 'PROMOTED-SHIP-SPEC implement the accepted Vernant repair.'; } > "$PROMOTED_BRIEF"
+jq '.rules=[.rules[0],.rules[1]] | .rules[0].match={project:"vernant",kind:"ship"} | .rules[1].match={project:"vernant",kind:"scout"}' "$TMP_ROOT/base-rules.json" > "$RULES"
+settings '{"rule_probabilities":{"rule_1":1,"rule_2":1}}'
+keyed -- "$PROMOTED_BRIEF" --project vernant
+assert_contains "$OUT" 'rule: rule_1' 'a promoted Vernant ship cannot select the retained scout rule'
+assert_equals ship "$(jq -r .state.kind <<<"$(last_request)")" 'the current ship contract wins over the original scout marker'
+assert_contains "$(sent_task)" 'PROMOTED-SHIP-SPEC implement the accepted Vernant repair.' 'the active ship specification reaches judgment'
+assert_not_contains "$(sent_task)" 'Touch pager.sh only.' 'the obsolete scout specification is not sent'
+assert_not_contains "$(sent_task)" 'Brief kind: scout' 'a promoted ship is not labeled as a scout'
+keyed -- "$KIND_BRIEF" --project vernant --kind ship
+assert_contains "$OUT" 'rule: rule_1' 'an explicit ship kind overrides the retained scaffold marker'
+assert_not_contains "$(sent_task)" 'Brief kind: scout' 'task extraction honors explicit kind too'
+{ cat "$KIND_BRIEF"; printf '\n%s\n%s\n%s\n%s\n' '```md' '# Current ship Firstmate spec' 'QUOTED-SHIP-SPEC' '```'; } > "$PROMOTED_BRIEF"
+keyed -- "$PROMOTED_BRIEF" --project vernant
+assert_contains "$OUT" 'rule: rule_2' 'a quoted ship heading does not promote a scout'
+assert_equals scout "$(jq -r .state.kind <<<"$(last_request)")" 'fenced headings cannot change the effective kind'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+settings '{}'
 WHOLE_BRIEF="$TMP_ROOT/whole-brief.md"
 printf '%s\n' '# Task' 'Fix the off-by-one in the pager: root cause is the <= on line 40.' > "$WHOLE_BRIEF"
 keyed -- "$WHOLE_BRIEF"

@@ -20,10 +20,10 @@
 #   rule project/kind facts, then one JevClient.systemOne call judges referenced
 #   semantic Nouls alongside ambiguity, desktop access, model tier and effort.
 #   The state is project, kind, and the brief's task-specific text. --kind is
-#   authoritative when supplied; otherwise the exact scout scaffold marker
-#   selects scout and all other briefs are ships. Task prose cannot set project.
-#   bin/fm-dispatch-level5.ts owns question assembly, the pinned model and effort
-#   floors; bun runs it when installed, otherwise node with type stripping.
+#   authoritative when supplied; otherwise the current ship heading overrides
+#   a retained scout marker before task extraction. Task prose cannot set project.
+#   bin/fm-dispatch-level5.ts owns question assembly and effort floors; bun runs
+#   it when installed, otherwise node with type stripping.
 #   The shared client selects TypeSafe explicitly, retains the raw exchange,
 #   validates every answer, and bounds retries within five seconds.
 #   After the answer, code combines predicates and applies the support floor
@@ -442,7 +442,13 @@ never_send_check() {
 # fm_typesafe_brief_task owns marker removal and the task-section extraction
 # shared with worker skill selection.
 never_send_load
-fm_typesafe_brief_task "$BRIEF" "$NEVER_SEND_PATH" "$TASK_TEXT" \
+if [ -z "$KIND" ]; then
+  KIND=ship
+  if ! fm_brief_heading_present "$BRIEF" '# Current ship Firstmate spec' &&
+    grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$BRIEF"; then KIND=scout; fi
+fi
+case "$KIND" in ship|scout) ;; *) die "--kind must be ship or scout" ;; esac
+fm_typesafe_brief_task "$BRIEF" "$NEVER_SEND_PATH" "$TASK_TEXT" "$KIND" \
   || never_send_off "$FM_TYPESAFE_WITHHELD_REASON"
 # The TypeScript adapter runs under bun when installed, else node with type
 # stripping, exactly as bin/fm-jev-guard-hook.sh runs the vendored guard.
@@ -455,12 +461,6 @@ else
 fi
 "${LEVEL5[@]}" validate "$RULES" \
   || die_rules "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria"
-if [ -z "$KIND" ]; then
-  KIND=ship
-  if grep -qxF 'Brief kind: scout (report only)' "$TASK_TEXT" ||
-    grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$TASK_TEXT"; then KIND=scout; fi
-fi
-case "$KIND" in ship|scout) ;; *) die "--kind must be ship or scout" ;; esac
 "${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" "$KIND" > "$MODEL_CONFIG/level5-request.json" \
   || emit_error "Level 5 request preparation failed"
 REQUEST=$(cat "$MODEL_CONFIG/level5-request.json")

@@ -17,7 +17,7 @@ type Config = Record<string, unknown> & { judgments: Record<string, NoulQuestion
 type Filtered = { profile: Profile; reason: string };
 const [action, ...args] = process.argv.slice(2);
 const levels = ["low", "medium", "high", "xhigh", "max"];
-const model = "jev-1.13.0";
+const model = "jev-latest";
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
