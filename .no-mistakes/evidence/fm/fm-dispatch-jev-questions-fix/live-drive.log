@@ -1,0 +1,264 @@
+
+===== S1 T6(a): Vernant ship can never select a non-Vernant rule (adversarial: provider says every judgment is true) =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 7   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=7 quota_ms=12 local_ms=341 total_ms=360
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  Vernant ship clears on the Vernant rule (rule_1)
+PASS  non-Vernant rule_2 is absent from support
+PASS  non-Vernant-only judgment never reaches the provider
+PASS  Vernant judgment is sent
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+  rule: default (No listed rule applies to this task.)   confidence: 1
+  support: rule_1=0 default=1
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: no rule matched
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'
+  timings: api_ms=5 quota_ms=13 local_ms=305 total_ms=323
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  with Vernant judgment false and non-Vernant judgments true, result is default, never rule_2
+
+===== S1b task prose cannot set project; --project firstmate never reaches Vernant rules =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project firstmate  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_2 (Non-Vernant bounded ship.)   confidence: 1
+  support: rule_2=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max'
+  timings: api_ms=4 quota_ms=13 local_ms=293 total_ms=310
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  firstmate project selects the non-Vernant rule_2
+PASS  Vernant rules absent from support for firstmate
+PASS  request repository is the --project value, not task prose
+
+===== S2 missing --project with project-scoped rules escalates and sends nothing =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md   (exit 0)
+dispatch-resolve:
+  status: escalate
+  reason: a project-scoped rule needs --project
+PASS  status escalate naming the missing project
+PASS  no profile line
+PASS  zero provider calls
+PASS  exit 0
+
+===== S3 Q7 deleted / S5 current model, no pin / S6 no kind sent =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=4 quota_ms=12 local_ms=306 total_ms=322
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  request has no categorical rule or profile (workflow) question
+PASS  non-judgment questions are exactly ambiguity, effort, model, needs_desktop
+PASS  every judgment question is a single-judgment Noul
+PASS  request model is jev-latest (no pinned version)
+PASS  request state holds only task and repository (no kind)
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=5 quota_ms=13 local_ms=297 total_ms=315
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  obsolete workflow label 'human' cannot escalate or redirect
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=4 quota_ms=12 local_ms=289 total_ms=305
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  obsolete workflow label 'browser_agent' cannot escalate or redirect
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=5 quota_ms=12 local_ms=304 total_ms=321
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  obsolete workflow label 'deterministic_script' cannot escalate or redirect
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=4 quota_ms=13 local_ms=300 total_ms=317
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  obsolete workflow label 'fast_agent' cannot escalate or redirect
+
+===== S4 Q9 desktop question has criteria and keeps its boundary =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=4 quota_ms=13 local_ms=292 total_ms=309
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  needs_desktop is a noul with true/false criteria
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=5 quota_ms=14 local_ms=294 total_ms=313
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  needs_desktop 0.5 does not escalate
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":true,"escalate":"desktop access requires an explicit capability decision"}
+  reason: desktop access requires an explicit capability decision
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=4 quota_ms=14 local_ms=281 total_ms=299
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  needs_desktop 0.9 escalates for a capability decision
+
+===== S7 brief kind decided in code from # Setup; fenced quote does not demote a ship =====
+--- $ fm-dispatch-resolve.sh vernant-scout.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_3 (Vernant scout report.)   confidence: 1
+  support: rule_3=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'medium'
+  timings: api_ms=4 quota_ms=13 local_ms=315 total_ms=332
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  scout brief selects the Vernant scout rule_3
+PASS  scout request state still has no kind field
+--- $ fm-dispatch-resolve.sh ship-quoting-scout.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=4 quota_ms=15 local_ms=301 total_ms=320
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  ship quoting the scout line in a fence stays ship (rule_1)
+
+===== S8 never-send line matching only a judgment id withholds the request =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project firstmate  (exit 0)
+
+--- stderr:
+dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-t6-live.qsZl4I/home/config/dispatch-never-send line 1; nothing sent)
+PASS  stdout empty, exit 0
+PASS  stderr says off and nothing sent
+PASS  stderr does not echo the private value
+PASS  zero provider calls
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 0)
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+  support: rule_1=1 default=0
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  note: rule matched
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+  timings: api_ms=6 quota_ms=13 local_ms=329 total_ms=348
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  same list on Vernant (judgment not sent) still resolves
+
+===== S9 legacy unstructured rules fail closed before any network call =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project vernant  (exit 2)
+
+--- stderr:
+error: malformed rules file: /Users/charlesabrooker/tmp/fm-t6-live.qsZl4I/home/config/crew-dispatch.json - judgments must be an object of single-judgment Nouls; fix that field in /Users/charlesabrooker/tmp/fm-t6-live.qsZl4I/home/config/crew-dispatch.json resolved against /Users/charlesabrooker/tmp/fm-t6-live.qsZl4I/home/config/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>
+PASS  exit 2 config error naming judgments
+PASS  zero provider calls
+
+===== S10 exact support tie between different outcomes is ambiguous in either rule order =====
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project firstmate  (exit 0)
+dispatch-resolve:
+  status: ambiguous
+  model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+  rule: rule_1 (A)   confidence: 0.7
+  support: rule_1=0.7 rule_2=0.7 default=0.30000000000000004
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  reason: conflicting rule support tie
+  candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=5 quota_ms=16 local_ms=304 total_ms=325
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  order AB: ambiguous conflicting rule support tie
+--- $ fm-dispatch-resolve.sh vernant-ship.md --project firstmate  (exit 0)
+dispatch-resolve:
+  status: ambiguous
+  model: jev-1.13.0   latency_ms: 4   tokens: 100/20
+  rule: rule_1 (B)   confidence: 0.7
+  support: rule_1=0.7 rule_2=0.7 default=0.30000000000000004
+  routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  reason: conflicting rule support tie
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=4 quota_ms=13 local_ms=307 total_ms=324
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+PASS  order BA: ambiguous conflicting rule support tie
+
+===== S11 T6(b): live CLI replay of all 136 logged resolve structures, no Q7 escalation =====
+replayed=136 formerly_Q7_escalated=42 now_escalated=0 rule_mismatch=0
+PASS  all 136 logged resolves replayed through the CLI
+PASS  no replayed resolve escalates
+PASS  each replay selects its logged rule (or default)
+
+TOTAL pass=39 fail=0 provider_calls=152 (all to local fake endpoint)
+/Users/charlesabrooker/.no-mistakes/evidence/01M5QJQA7779PXSQ9GBVAH28EV/live-drive.sh: line 211:  7591 Terminated: 15          node "$W/provider.mjs" "$SET" "$CALLS" "$W/port" 2> /dev/null

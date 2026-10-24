@@ -1,0 +1,8 @@
+{
+  "type": "noul",
+  "instructions": "Does completing `task` require interacting with an authenticated application session or the graphical desktop?",
+  "criteria": {
+    "true": "The requested outcome requires operating a logged-in web application, a native GUI application, or the desktop itself.",
+    "false": "The task can be completed using repository files, a terminal, public web pages, or an API; mentioning a browser, app, or provider without requiring interactive session access is not enough."
+  }
+}

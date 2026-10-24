@@ -1,0 +1,10 @@
+--- base resolver, --project vernant, answers: {"rule":"rule_1","profile":"human"}
+  status: escalate
+  rule: rule_1 (Vernant ship that needs design.)   confidence: 0.95
+  reason: human requires an explicit handler or capability decision
+--- base resolver, --project vernant, answers: {"rule":"rule_2","profile":"fast_agent"}
+  status: clear
+  rule: rule_2 (Non-Vernant bounded ship.)   confidence: 0.95
+  profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max'
+--- base request: model=jev-latest questions=["ambiguity","effort","model","needs_desktop","profile","rule"]
+/Users/charlesabrooker/.no-mistakes/evidence/01M5QJQA7779PXSQ9GBVAH28EV/baseline-drive.sh: line 42: 98729 Terminated: 15          node "$W/p.mjs" "$W/s.json" "$W/calls" "$W/port"

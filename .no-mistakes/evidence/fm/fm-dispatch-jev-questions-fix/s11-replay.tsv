@@ -1,0 +1,136 @@
+1	rule_4		clear	rule_4
+2	rule_7		clear	rule_7
+3	rule_7		clear	rule_7
+4	rule_7		clear	rule_7
+5	rule_4		clear	rule_4
+6	rule_4		clear	rule_4
+7	rule_4		clear	rule_4
+8	rule_4		clear	rule_4
+9	rule_4		clear	rule_4
+10	rule_7	fast_agent requires an explicit handler or capability decision	clear	rule_7
+11	rule_7	fast_agent requires an explicit handler or capability decision	clear	rule_7
+12	rule_6		clear	rule_6
+13	rule_6		clear	rule_6
+14	rule_7		clear	rule_7
+15	rule_7		clear	rule_7
+16	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+17	rule_6		clear	rule_6
+18	rule_6		clear	rule_6
+19	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+20	rule_3	human requires an explicit handler or capability decision	clear	rule_3
+21	rule_3		clear	rule_3
+22	rule_3		clear	rule_3
+23	rule_7		clear	rule_7
+24	rule_7		clear	rule_7
+25	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+26	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+27	rule_7		clear	rule_7
+28	rule_7		clear	rule_7
+29	rule_6		clear	rule_6
+30	rule_7		clear	rule_7
+31	rule_7		clear	rule_7
+32	rule_3	human requires an explicit handler or capability decision	clear	rule_3
+33	rule_2	human requires an explicit handler or capability decision	clear	rule_2
+34	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+35	rule_6		clear	rule_6
+36	rule_2	confidence 0.46 below floor 0.6	clear	rule_2
+37	rule_6		clear	rule_6
+38	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+39	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+40	rule_6	reasoning_agent requires an explicit handler or capability decision	clear	rule_6
+41	rule_6	reasoning_agent requires an explicit handler or capability decision	clear	rule_6
+42	rule_7		clear	rule_7
+43	rule_3	human requires an explicit handler or capability decision	clear	rule_3
+44	rule_3	rule_3 pooled probability 0.51 below floor 0.6	clear	rule_3
+45	rule_7		clear	rule_7
+46	rule_7		clear	rule_7
+47	rule_7		clear	rule_7
+48	rule_7		clear	rule_7
+49	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+50	rule_7		clear	rule_7
+51	rule_7		clear	rule_7
+52	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+53	rule_6	reasoning_agent requires an explicit handler or capability decision	clear	rule_6
+54	rule_7		clear	rule_7
+55	rule_7		clear	rule_7
+56	rule_7		clear	rule_7
+57	rule_7		clear	rule_7
+58	rule_7	reasoning_agent requires an explicit handler or capability decision	clear	rule_7
+59	rule_7		clear	rule_7
+60	rule_7		clear	rule_7
+61	rule_7		clear	rule_7
+62	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+63	rule_1	high task ambiguity requires firstmate judgment	clear	rule_1
+64	rule_2	high task ambiguity requires firstmate judgment	clear	rule_2
+65	rule_3	high task ambiguity requires firstmate judgment	clear	rule_3
+66	rule_4	high task ambiguity requires firstmate judgment	clear	rule_4
+67	rule_5	high task ambiguity requires firstmate judgment	clear	rule_5
+68	rule_6	high task ambiguity requires firstmate judgment	clear	rule_6
+69	rule_7	high task ambiguity requires firstmate judgment	clear	rule_7
+70	rule_1	high task ambiguity requires firstmate judgment	clear	rule_1
+71	rule_2	high task ambiguity requires firstmate judgment	clear	rule_2
+72	rule_3	high task ambiguity requires firstmate judgment	clear	rule_3
+73	rule_4	high task ambiguity requires firstmate judgment	clear	rule_4
+74	rule_5	high task ambiguity requires firstmate judgment	clear	rule_5
+75	rule_6	high task ambiguity requires firstmate judgment	clear	rule_6
+76	rule_7	high task ambiguity requires firstmate judgment	clear	rule_7
+77	rule_7		clear	rule_7
+78	rule_7		clear	rule_7
+79	rule_7		clear	rule_7
+80	rule_7		clear	rule_7
+81	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+82	rule_7		clear	rule_7
+83	rule_3		clear	rule_3
+84	rule_7	reasoning_agent requires an explicit handler or capability decision	clear	rule_7
+85	rule_7		clear	rule_7
+86	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+87	rule_7		clear	rule_7
+88	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+89	rule_7		clear	rule_7
+90	rule_7		clear	rule_7
+91	rule_7		clear	rule_7
+92	rule_5	deterministic_script requires an explicit handler or capability decision	clear	rule_5
+93	rule_7		clear	rule_7
+94	rule_7		clear	rule_7
+95	rule_7		clear	rule_7
+96	rule_7		clear	rule_7
+97	rule_6		clear	rule_6
+98	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+99	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+100	rule_6		clear	rule_6
+101	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+102	rule_7		clear	rule_7
+103	rule_7		clear	rule_7
+104	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+105	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+106	rule_6		clear	rule_6
+107	rule_6		clear	rule_6
+108	rule_7		clear	rule_7
+109	rule_6		clear	rule_6
+110	rule_6	reasoning_agent requires an explicit handler or capability decision	clear	rule_6
+111	rule_6	reasoning_agent requires an explicit handler or capability decision	clear	rule_6
+112	rule_7		clear	rule_7
+113	rule_7		clear	rule_7
+114	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+115	rule_6		clear	rule_6
+116	rule_6		clear	rule_6
+117	rule_7		clear	rule_7
+118	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+119	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+120	rule_6		clear	rule_6
+121	rule_7		clear	rule_7
+122	rule_6	human requires an explicit handler or capability decision	clear	rule_6
+123	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+124	rule_7		clear	rule_7
+125	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+126	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+127	rule_6		clear	rule_6
+128	rule_6		clear	rule_6
+129	rule_4		clear	rule_4
+130	rule_7		clear	rule_7
+131	rule_7		clear	rule_7
+132	rule_6		clear	rule_6
+133	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+134	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+135	rule_7	human requires an explicit handler or capability decision	clear	rule_7
+136	rule_7		clear	rule_7

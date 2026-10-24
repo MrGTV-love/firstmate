@@ -1,0 +1,14 @@
+{
+  "model": "jev-latest",
+  "state_keys": [
+    "repository",
+    "task"
+  ],
+  "question_keys": [
+    "ambiguity",
+    "effort",
+    "judgment_design_judgment",
+    "model",
+    "needs_desktop"
+  ]
+}

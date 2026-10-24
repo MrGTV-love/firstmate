@@ -1,0 +1,57 @@
+ok - pool bias is removed by normalized nonadditive evidence, with explicit ties
+ok - common headroom and economic urgency are normalized before weighting
+ok - quota veto preserves required reasoning class
+ok - an unmeasured usable pool remains disclosed uncertainty without blocking ranking
+ok - the resolver runs its adapter with node when bun is absent
+ok - T6 repository/kind facts, Q7 structural replay and Q9 capability boundaries
+ok - vendored upstream Level 5 tests pass unchanged
+ok - repository facts and removal of the workflow decision hold through the public resolver
+ok - session launch policy filters the selected rule after judgment and names an emptied rule
+ok - Level 5 tier and effort map to the approved model matrix
+ok - ambiguity and unsupported handler/capability decisions escalate
+ok - privacy boundaries and provider errors preserve safe fallback
+ok - captain approval and declared floors veto before weighted selection
+ok - fixed questions, task extraction, and protected regions retain their privacy boundary
+ok - rule floor: a known shortfall falls through to default
+ok - predicate support floors retain explicit runner-up policy
+ok - proven exhaustion activates only the declared model-matrix stand-in
+ok - a powerful verdict filters declared stand-ins and every stand-in takes the route effort
+ok - task-horizon feasibility still vetoes the quota winner
+ok - absent key is off: one stderr line, exit 0, no network call or quota read
+ok - help and bare-filename startup isolate environment credentials
+ok - TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work; legacy rules and adapter failures fail closed
+ok - key handling: bearer header only, never argv or child environments; the request carries task, project, and criteria only
+ok - never-send list withholds the request on a match or a bad list, and never prints the value
+ok - opt-in marked sections protect outgoing bodies and markers never send without the exact opt-in
+ok - error diagnostics omit sensitive API bodies without blocking intake
+ok - stock Bash resolver separates API, quota, local and total timing at millisecond precision, with input-only Jev cost
+skip: no bash with EPOCHREALTIME is installed
+ok - unavailable usage is unknown and a failed quota snapshot retains API cost
+ok - quota-error model evidence accepts only safe Jev version ids
+ok - successful resolution model evidence accepts only safe Jev version ids
+ok - rules snapshots and shell quoting preserve the profile protocol
+ok - no-rule fallback, Agy, Gemini, and documented configurations resolve
+ok - ambiguous: confidence below the fixed floor hands the decision back
+ok - only the brief's task sections and scout tag reach the model, with a whole-brief fallback
+ok - rule floor: unavailable evidence, including the OMP pool, escalates rather than falling through
+ok - declared provider and profile floor evidence are applied in code
+ok - nonnumeric spendPriority evidence is never ranked
+ok - partial and missing quota evidence remain eligible but unranked
+ok - provider-wide and exact quota rows combine into one limiting candidate
+ok - default: no rule matched resolves among the default profiles
+ok - tie: equal quota evidence never breaks by array order
+ok - no rankable candidate: the tool escalates instead of guessing
+ok - schema 6: native Codex and Pi lanes bind to their own account rows; schema 5 is unchanged
+ok - task-horizon runway, OpenRouter coverage, and minimum-version guards
+ok - quota evidence comes from one quota-axi --json read, and its failure is an error outcome
+ok - API, transport, and response failures are error outcomes with exit 0
+ok - typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty
+ok - configuration errors exit 2 before any network call
+ok - typed intake resolves roles before quota ranking and detects concrete duplicates
+ok - typed intake checks the chosen id against the pinned worker account's catalog
+ok - chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks
+ok - independent support cannot pool, and private result logging retains every outcome
+ok - shadow mode: off is identical and inert; on logs both picks without changing the dispatch, even when Jev fails or the snapshot is untrusted
+# all fm-dispatch-resolve tests passed
+bash tests/fm-dispatch-resolve.test.sh  68.34s user 63.30s system 79% cpu 2:45.62 total
+exit=0
