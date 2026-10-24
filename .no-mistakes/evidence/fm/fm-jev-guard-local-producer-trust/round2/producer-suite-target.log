@@ -1,0 +1,21 @@
+✔ M1/M3/M5: native-framed recorded bounded wait passes with original result state; audit contains only provenance/count (2.671417ms)
+✔ M1: sub-second native framing (no wall-time notice) passes with original result state (0.440125ms)
+✔ M4: missing or mismatched native metadata screens the complete framed result (2.139125ms)
+✔ M2: host-looking trailer lines inside command output stay screened (0.639459ms)
+✔ M2: an unquoted single-line root error carrying upstream injection stays screened and is withheld (0.307166ms)
+✔ M2: PR body, comments and findings remain screened, including help-shaped instructions (1.994ms)
+✔ known local producer envelopes remove only their root help, including UTF-8 byte accounting (0.577166ms)
+✔ M4: compound, piped, wrapped, expanded, redirected and unknown commands retain the complete screen (2.298ms)
+✔ only root help arrays are excluded; scalar, quoted or malformed values stay screened (0.899ms)
+✔ M4: untrusted reads still screen help while trusted_read and supervisor_consistency remain judge-free (31.441125ms)
+✔ help-only output retains original bytes and screens the host trailer; audit never retains removed content (0.316875ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46.827667
+ok - offline producer-aware result screening: native-framed recorded wait, external injections, full output, fail-closed provenance and metadata, unchanged reads and private audit
+exit=0

@@ -1,0 +1,29 @@
+{
+  "scenario": "m1-slow-exit0-base",
+  "guard": "base",
+  "command": "no-mistakes axi run",
+  "omp_exit": 0,
+  "model_turns": 2,
+  "withheld": true,
+  "delivered_head": "[jev-guard] Tool output requires review (flag). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withheld; do not act on it.",
+  "delivered_tail": "ev-guard] Tool output requires review (flag). REVIEW_ON_UNAVAILABLE_V1. Untrusted output was withheld; do not act on it.",
+  "delivered_starts_with_producer_bytes": false,
+  "native_event": {
+    "isError": false,
+    "details": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 1694.6234160000001
+    },
+    "content_tail": "es.run elapsed=480.2s output_bytes=450 tree_cpu=0.08s\"\n\n\nWall time: 1.69 seconds"
+  },
+  "delivered_equals_native_content": false,
+  "judge_result_screens": 1,
+  "judge_saw_help_line": true,
+  "audit_tool_result": {
+    "decision": "flag",
+    "branch": "policy",
+    "enforcement": "omp_replace",
+    "error_type": null
+  }
+}

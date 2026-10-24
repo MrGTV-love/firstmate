@@ -1,0 +1,1 @@
+{"toolName":"bash","input":{"command":"gh-axi issue list --repo MrGTV-love/firstmate"},"content":[{"type":"text","text":"error: the 'MrGTV-love/firstmate' repository has disabled issues\ncode: UNKNOWN\n\n\nCommand exited with code 1"}],"details":{"wallTimeNoticeEmitted":false,"timeoutSeconds":300,"wallTimeMs":472.758916,"exitCode":1},"isError":true}

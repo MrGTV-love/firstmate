@@ -1,0 +1,25 @@
+count: 20
+pull_requests[20]{number,title,state,author,draft,review}:
+  235,"fix(bin): harden recorded-review evidence and recheck it at merge time",open,MrGTV-love,no,none
+  234,"test: split the watch-triage-waits and control-relaunch suites into runnable groups",open,MrGTV-love,no,none
+  232,"fix(bin): stop only work that makes no progress, not slow productive work",open,MrGTV-love,no,none
+  231,"fix(bin): let jev-guard admit deletions of brief-named tracked files",open,MrGTV-love,no,none
+  230,"fix(bin): stop Herdr status probes from starting duplicate servers",open,MrGTV-love,no,none
+  212,"fix(bin): reconcile reused remote secondmates and add remote stay",open,MrGTV-love,no,none
+  209,"test: eliminate stdin EPIPE flakes in Claude hook contracts",open,MrGTV-love,no,none
+  205,"test: make procevent lease-debounce and runner fixtures deterministic",open,MrGTV-love,no,none
+  202,"fix(bin): batch open-loop actions and keep receipts across ledger reads",open,MrGTV-love,no,none
+  201,"fix(bin): migrate watcher and daemon markers across device-only remounts instead of re-signalling every log",open,MrGTV-love,no,none
+  197,"fix(bin): add guarded fm-control adopt verb to rebuild omp session records after restart",open,MrGTV-love,no,none
+  195,"fix(bin): register ready ship PRs automatically during watcher housekeeping",open,MrGTV-love,no,none
+  193,"fix(bin): report the newest pull request URL from a task status log",open,MrGTV-love,no,none
+  190,"docs: let firstmate edit single-file doc, config or comment changes and ordered reverts directly",open,MrGTV-love,no,none
+  189,"fix(bin): warn instead of block on persistent top-level cd in cd-guard",open,MrGTV-love,no,none
+  188,"fix(bin): cap status logs and bound every status reader so a runaway append cannot fill the disk",open,MrGTV-love,no,none
+  182,"feat(bin): route DeepSeek work to a pane-hosted dsh-tui harness",open,MrGTV-love,no,none
+  181,"fix(bin): let the copy sweep release dead-launcher Vernant-locked copies through the closeout driver",open,MrGTV-love,no,none
+  180,"feat(bin): let teardown accept a verified bundle as unlanded-commit preservation",open,MrGTV-love,no,none
+  175,"feat(bin): prune a task's pool copy automatically after its PR merges",open,MrGTV-love,no,none
+help[2]:
+  Run `gh-axi pr view <number> -R MrGTV-love/firstmate` to view details
+  Run `gh-axi pr create --title "..." --body-file <path> -R MrGTV-love/firstmate` to create

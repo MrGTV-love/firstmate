@@ -1,0 +1,34 @@
+{
+  "scenario": "m1-slow-exit1-target",
+  "guard": "target",
+  "command": "no-mistakes axi run",
+  "omp_exit": 0,
+  "model_turns": 2,
+  "withheld": false,
+  "delivered_head": "measured: \"no-mistakes.run host=Mac-Studio.local p99=479920ms margin=3 samples=43 measured=1440s bound=0s\"\nrun: running\n  intent: completed\n  rebase: completed\n",
+  "delivered_tail": ": \"no-mistakes.run elapsed=480.2s output_bytes=450 tree_cpu=0.08s\"\n\n\nWall time: 1.64 seconds\n\nCommand exited with code 1",
+  "delivered_starts_with_producer_bytes": true,
+  "native_event": {
+    "isError": true,
+    "details": {
+      "wallTimeNoticeEmitted": true,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 1644.522125,
+      "exitCode": 1
+    },
+    "content_tail": "_bytes=450 tree_cpu=0.08s\"\n\n\nWall time: 1.64 seconds\n\nCommand exited with code 1"
+  },
+  "delivered_equals_native_content": true,
+  "judge_result_screens": 1,
+  "judge_saw_help_line": false,
+  "audit_tool_result": {
+    "decision": "clear",
+    "branch": "policy",
+    "enforcement": "result_pass",
+    "error_type": null,
+    "producer_fields": {
+      "producer": "no-mistakes",
+      "removed_bytes": 208
+    }
+  }
+}

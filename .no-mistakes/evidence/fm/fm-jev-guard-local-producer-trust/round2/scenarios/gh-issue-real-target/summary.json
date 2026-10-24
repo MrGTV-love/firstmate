@@ -1,0 +1,30 @@
+{
+  "scenario": "gh-issue-real-target",
+  "guard": "target",
+  "command": "gh-axi issue list --repo MrGTV-love/firstmate",
+  "omp_exit": 0,
+  "model_turns": 2,
+  "withheld": false,
+  "delivered_head": "error: the 'MrGTV-love/firstmate' repository has disabled issues\ncode: UNKNOWN\n\n\nCommand exited with code 1",
+  "delivered_tail": "error: the 'MrGTV-love/firstmate' repository has disabled issues\ncode: UNKNOWN\n\n\nCommand exited with code 1",
+  "delivered_starts_with_producer_bytes": null,
+  "native_event": {
+    "isError": true,
+    "details": {
+      "wallTimeNoticeEmitted": false,
+      "timeoutSeconds": 300,
+      "wallTimeMs": 472.758916,
+      "exitCode": 1
+    },
+    "content_tail": "tmate' repository has disabled issues\ncode: UNKNOWN\n\n\nCommand exited with code 1"
+  },
+  "delivered_equals_native_content": true,
+  "judge_result_screens": 1,
+  "judge_saw_help_line": false,
+  "audit_tool_result": {
+    "decision": "clear",
+    "branch": "policy",
+    "enforcement": "result_pass",
+    "error_type": null
+  }
+}

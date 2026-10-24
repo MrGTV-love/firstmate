@@ -1,0 +1,29 @@
+✔ result: a fully answered estimated piece keeps its amount and source (1.564792ms)
+✔ result: a fully answered reported piece keeps its amount and source (0.574ms)
+✔ result: an answered piece with an unsent planned piece stays incomplete (0.348ms)
+✔ result: every failed chunk survives settlement (0.628125ms)
+✔ result: partial cost is incomplete and unsent chunks are not egress (0.809166ms)
+✔ result: a planned payload with no request sent is not-called and not incomplete (0.292375ms)
+✔ result: complete runs retain full reported cost without failures (0.323166ms)
+✔ write: every failed chunk survives settlement (0.647708ms)
+✔ write: partial cost is incomplete and unsent chunks are not egress (0.501083ms)
+✔ write: a planned payload with no request sent is not-called and not incomplete (0.169208ms)
+✔ write: complete runs retain full reported cost without failures (0.237583ms)
+✔ result: a blank middle piece is not planned screening work (53.164959ms)
+✔ result: an unsent failed piece stays planned beside a blank piece (28.987917ms)
+✔ result: an all-blank result plans no screening and sends nothing (0.313542ms)
+✔ call: invalid tool input fails before planning and invents no piece (0.549125ms)
+✔ result: an oversize result no plan can cover fails before planning and invents no piece (124.478209ms)
+✔ result: a never-send refusal while planning invents no piece (38.603417ms)
+✔ result: an unsupported tool result fails before planning and invents no piece (0.611875ms)
+✔ real decide: a guard-retried success keeps the client result and a complete reported cost (543.603958ms)
+✔ policy verdict precedence never discards failed spend (0.24875ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 800.2085
+ok - offline guard settlement and cost completeness

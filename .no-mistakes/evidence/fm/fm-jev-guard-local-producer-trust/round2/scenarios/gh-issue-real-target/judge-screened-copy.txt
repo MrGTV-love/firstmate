@@ -1,0 +1,5 @@
+error: the 'MrGTV-love/firstmate' repository has disabled issues
+code: UNKNOWN
+
+
+Command exited with code 1
