@@ -2367,7 +2367,7 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Predicate support below the floor with no runner-up taken, or a conflicting rule-support tie. |
 | `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, desktop capability request, project-scoped rules without `--project`, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
-| `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
+| `error` | API, network, malformed response metadata, rendering, quota-axi failure, a Level 5 adapter that cannot run, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.
 

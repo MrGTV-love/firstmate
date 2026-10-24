@@ -594,7 +594,17 @@ assert_contains "$(cat "$TMP_ROOT/error")" 'malformed rules file:' 'the legacy r
 assert_contains "$(cat "$TMP_ROOT/error")" 'structured match facts/predicates' 'the diagnostic names the required structured format'
 assert_equals '' "$OUT" 'a legacy rules file prints no status'
 assert_equals "$before" "$(count)" 'a legacy rules file sends nothing'
-pass 'TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work; legacy rules fail closed'
+mkdir -p "$TMP_ROOT/brokenbun"
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$TMP_ROOT/brokenbun/bun"
+chmod +x "$TMP_ROOT/brokenbun/bun"
+before=$(count)
+keyed PATH="$TMP_ROOT/brokenbun:$FAKEBIN:$BASE_PATH" -- "$BRIEF" --project pager
+expect_code 0 "$CODE" 'an adapter runtime failure is a structured result, not a configuration error'
+assert_contains "$OUT" '  status: error' 'an adapter that cannot run reports status error'
+assert_contains "$OUT" 'reason: Level 5 rules validation could not run' 'the error names the failed validation run'
+assert_not_contains "$ERR" 'malformed rules file' 'a valid rules file is never blamed for an adapter runtime failure'
+assert_equals "$before" "$(count)" 'an adapter runtime failure sends nothing'
+pass 'TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work; legacy rules and adapter failures fail closed'
 
 # The key reaches only the provider's bearer header: never argv, never a child
 # environment, never the request. The request carries the project and task

@@ -88,8 +88,8 @@
 #                --project, every selected profile
 #                filtered out, no candidate rankable, a genuine tie, or a
 #                winner whose established runway is shorter than the task horizon
-#   error     -> API, network, response, quota-axi, or chosen-profile model-index
-#                preflight failure; decide as today
+#   error     -> API, network, response, quota-axi, Level 5 adapter runtime, or
+#                chosen-profile model-index preflight failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
 #   existing unreadable rules file, malformed rules, model-index/profile
@@ -461,8 +461,13 @@ elif command -v node >/dev/null 2>&1; then
 else
   emit_error "neither bun nor node installed"
 fi
-"${LEVEL5[@]}" validate "$RULES" \
-  || die_rules "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria"
+validate_rc=0
+"${LEVEL5[@]}" validate "$RULES" || validate_rc=$?
+case "$validate_rc" in
+  0) ;;
+  65) die_rules "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria" ;;
+  *) emit_error "Level 5 rules validation could not run" ;;
+esac
 if [ -z "$PROJECT" ] && jq -e 'any(.rules[]; .match | has("project") or has("exclude_project"))' "$RULES" >/dev/null; then
   escalate_unsent 'a project-scoped rule needs --project'
 fi

@@ -1,4 +1,5 @@
-// Firstmate dispatch policy. CLI: validate <rules>; prepare <rules> <task>
+// Firstmate dispatch policy. CLI: validate <rules> (exit 65 for a malformed
+// schema); prepare <rules> <task>
 // <project> <ship|scout>; call (request on stdin, key on fd 3); apply <rules>
 // <response> <request> <allowed-harnesses-json> <cheap-class-re> <max-effort-re>.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -82,7 +83,13 @@ function prepare(cfg: Config, task: string, project: string, kind: string): Syst
 }
 try {
   if (action === "validate") {
-    config(args[0]);
+    try {
+      config(args[0]);
+    } catch (error) {
+      if (error instanceof Error && "code" in error) throw error;
+      console.error("dispatch-level5: malformed rules schema");
+      process.exitCode = 65;
+    }
   } else if (action === "prepare") {
     const [rulesPath, taskPath, project, kind] = args;
     console.log(JSON.stringify(prepare(config(rulesPath), readFileSync(taskPath, "utf8"), project, kind)));
