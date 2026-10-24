@@ -2227,7 +2227,7 @@ Scaffolding and typed clone-path binding require `python3` and use only its stan
 The scaffold's first line is one typed header, `FIRSTMATE_DISPATCH: {"project_path":"/absolute/clone/path"}`, from its positional repository argument, not an independently editable id.
 Only that first line can bind the project; a record quoted later in task prose, fenced or otherwise, is not metadata.
 The resolver derives the registered id by requiring that path's strict realpath to equal exactly one registered clone location: `<projects>/<id>`, where `<projects>` is `FM_PROJECTS_OVERRIDE` when set and `<home>/projects` otherwise, or the home itself for `firstmate`.
-Missing or malformed metadata, a missing clone, an unrelated or ambiguous clone location, and a missing or unreadable registry return a named `escalate` result without sending anything.
+Missing or malformed metadata, a missing clone, an unrelated or ambiguous clone location, and a missing, unreadable, or invalid registry return a named `escalate` result without sending anything.
 Unregistered scaffold inputs may still be written for manual intake but cannot resolve automatically.
 No caller `--project` flag, case folding, whitespace trimming, regex matching, or task-prose project inference participates in this binding.
 The clone path is removed from whole-brief fallback text and is never sent to the provider.
