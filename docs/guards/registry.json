@@ -708,7 +708,7 @@
       "harm": "reversible",
       "remedy_verified": "fixture",
       "beyond_audit": true,
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. A refusal repeats only while the same new line stays staged or outgoing; each refusal past the budget of 1 in a row in the same worktree also prints an escalation to a human decision, and the operation stays refused"
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt; an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused"
     },
     {
       "decision": "deny",
@@ -734,7 +734,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "beyond_audit": true,
-      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. A refusal repeats only while the same new line stays staged or outgoing; each refusal past the budget of 1 in a row in the same worktree also prints an escalation to a human decision, and the operation stays refused"
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt; an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused"
     }
   ],
   "excluded": [

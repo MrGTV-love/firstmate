@@ -298,6 +298,71 @@ test_repeated_refusals_escalate_without_admitting() {
   pass "refusals past the budget escalate to a human decision, stay refused, and an allow resets the count"
 }
 
+test_abandoned_refusal_does_not_inflate_unrelated_attempts() {
+  local mode=$1 repo remote hooks base out attempt guard log
+  repo="$TMP_ROOT/abandoned-$mode"
+  remote="$TMP_ROOT/abandoned-$mode.git"
+  hooks="$TMP_ROOT/hooks-abandoned-$mode"
+  log="$TMP_ROOT/abandoned-$mode.jsonl"
+  guard="git-${mode#pre-}-credential-shapes"
+  make_repo "$repo"
+  git init -q --bare "$remote"
+  git -C "$repo" remote add origin "$remote"
+  git -C "$repo" push -q origin HEAD:refs/heads/main
+  base=$(git -C "$repo" rev-parse HEAD)
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/first.txt"
+  git -C "$repo" add first.txt
+  if [ "$mode" = pre-push ]; then
+    git -C "$repo" commit -qm 'unscanned first fixture'
+  fi
+  for attempt in 1 2 3; do
+    if [ "$attempt" -eq 3 ]; then
+      # The refused line is unchanged even though other added content changes.
+      printf 'unrelated benign content\n' >"$repo/benign.txt"
+      git -C "$repo" add benign.txt
+      if [ "$mode" = pre-push ]; then
+        git -C "$repo" commit -qm 'unrelated benign edit'
+      fi
+    fi
+    if [ "$mode" = pre-commit ]; then
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm refused 2>&1) && fail "$mode admitted the first credential"
+    else
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/main 2>&1) && fail "$mode admitted the first credential"
+    fi
+    if [ "$attempt" -eq 1 ]; then
+      assert_not_contains "$out" 'escalate:' "$mode escalated the first content refusal"
+    else
+      assert_contains "$out" 'escalate:' "$mode lost the repeated content refusal"
+    fi
+  done
+  # Abandon the refused content without an intervening allowed hook decision.
+  git -C "$repo" reset --hard -q "$base"
+  printf 'OTHER=%s\n' "$(aws_shape)" >"$repo/unrelated.txt"
+  git -C "$repo" add unrelated.txt
+  if [ "$mode" = pre-push ]; then
+    git -C "$repo" commit -qm 'unscanned unrelated fixture'
+  fi
+  for attempt in 1 2; do
+    if [ "$mode" = pre-commit ]; then
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm refused 2>&1) && fail "$mode admitted the unrelated credential"
+    else
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/main 2>&1) && fail "$mode admitted the unrelated credential"
+    fi
+    assert_contains "$out" unrelated.txt "$mode lost the unrelated refusal's filename"
+    if [ "$attempt" -eq 1 ]; then
+      assert_not_contains "$out" 'escalate:' "$mode carried an abandoned refusal into unrelated content"
+    else
+      assert_contains "$out" 'escalate:' "$mode did not escalate the same unrelated content on retry"
+    fi
+  done
+  assert_equals 'deny:1 deny:2 deny:3 deny:1 deny:2' \
+    "$(jq -rs --arg g "$guard" '[.[] | select(.guard == $g) | "\(.decision):\(.repeat)"] | join(" ")' "$log")" \
+    "$mode did not key refusal episodes to the offending line"
+  assert_equals "$base" "$(git -C "$remote" rev-parse refs/heads/main)" "$mode changed the remote with refused content"
+  pass "$mode keys repeats to refused lines; benign edits preserve the count and abandoned content cannot inflate unrelated refusals"
+}
+
 test_each_decision_emits_one_event() {
   local repo status
   repo="$TMP_ROOT/telemetry"
@@ -316,6 +381,8 @@ test_each_decision_emits_one_event() {
   pass "commit and push decisions each record guard events, including a fail-closed unreadable source"
 }
 
+test_abandoned_refusal_does_not_inflate_unrelated_attempts pre-commit
+test_abandoned_refusal_does_not_inflate_unrelated_attempts pre-push
 test_project_pre_commit_changes_are_scanned
 test_credentials_are_checked_at_commit_and_push 0
 test_credentials_are_checked_at_commit_and_push 1
