@@ -2110,4 +2110,45 @@ test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_position
 test_dod_file_line_counts_only_inside_the_task_section
 test_spawn_accepts_a_dod_file_that_passes_the_same_check
 test_project_mode_resolves_branch_prefix
+test_governed_promotion_preserves_scout_on_refusal() {
+  local rec home proj fakebin id=promote-slot-refused slot meta brief out status original_branch
+  rec=$(make_home promote-slot-refused)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  slot="$TMP_ROOT/promote-slot-refused/slot"
+  git -C "$proj" symbolic-ref HEAD refs/heads/main
+  fm_git_worktree "$proj" "$slot" scout-retained
+  mkdir -p "$proj/scripts/git-stability"
+  cat > "$proj/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import json
+import sys
+print(json.dumps({"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}))
+sys.exit(2)
+PY
+  git -C "$proj" add scripts
+  git -C "$proj" commit -qm 'fixture governed provisioner'
+  git -C "$proj" push -q origin main
+  git -C "$slot" merge --ff-only main >/dev/null
+  meta="$home/state/$id.meta"
+  brief="$home/data/$id/brief.md"
+  write_brief "$home" "$id"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$meta"
+  cp "$meta" "$meta.before"
+  cp "$brief" "$brief.before"
+  original_branch=$(git -C "$slot" branch --show-current)
+  out=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" bash "$PROMOTE" "$id" --mode local-only --yolo off 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail 'promotion admitted a refused slot'
+  assert_contains "$out" 'manifest_live_owner' 'promotion lost the actual governed refusal'
+  cmp -s "$meta" "$meta.before" || fail 'refused promotion changed scout metadata'
+  cmp -s "$brief" "$brief.before" || fail 'refused promotion changed the scout contract'
+  [ "$(git -C "$slot" branch --show-current)" = "$original_branch" ] || fail 'refused promotion changed the scout checkout'
+  assert_absent "$home/data/$id/ship-instructions.md" 'refused promotion published ship instructions'
+  assert_absent "$slot/.claude/worktrees" 'refused promotion created nested isolation'
+  pass 'governed promotion preserves scout metadata, instructions and checkout on actual refusal'
+}
+
+test_governed_promotion_preserves_scout_on_refusal
+
 echo "# all fm-task-delivery tests passed"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
-# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
-#        fm-spawn.sh <task-id> <project-dir> --scout [--fixed-family] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
+# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--owned-path <tracked-path>]... [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
+#        fm-spawn.sh <task-id> <project-dir> --scout [--fixed-family] [--base-branch <branch>] [--owned-path <tracked-path>]... [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
@@ -514,6 +514,19 @@
 #   fetching or resetting its base. An unreachable detected origin, unresolved
 #   default branch, or non-clean worktree refuses a fresh spawn rather than
 #   risking a PR based on stale history or discarding local work.
+#   A project carrying scripts/git-stability/provision_existing_slot.py additionally
+#   requires repeatable --owned-path <tracked-path> flags: explicit task scope,
+#   never inferred from the brief. bin/fm-slot-provision-lib.sh calls that actual
+#   provisioner before any harness admission, with origin/main's merge-base and
+#   task id as owner. It uses the assigned copy, never another worktree. Governed
+#   scouts start on fm/<id> so default promotion can adopt the same declaration.
+#   Relaunch reuses recorded scope and must pass the actual clean-slot contract;
+#   dirty relaunches refuse rather than bypassing attestation. Provisioner or
+#   dependency refusal retains the copy, lease, endpoint, branches and manifests,
+#   records recovery=slot-provision-refused, and prints the actual refusal/report.
+#   Existing-slot adoption is entirely the installed provisioner's decision: a
+#   create-only manifest_exists or incompatible declaration is never forced.
+#   Projects without the provisioner keep the ordinary spawn path unchanged.
 #   A slot whose only deviation is a stale submodule gitlink is refused by that
 #   same clean check, but is reported as a stale checkout naming each submodule
 #   and both pins; nothing is converged or removed, and no remedy is suggested.
@@ -964,6 +977,8 @@ fi
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-slot-provision-lib.sh
+. "$SCRIPT_DIR/fm-slot-provision-lib.sh"
 fm_backlog_directory_present "$STATE" "state directory" || {
   echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
@@ -1023,6 +1038,7 @@ DISPATCH_SWITCHED=false
 BACKEND_ARG=
 MODE=
 YOLO=
+BRANCH=
 BRANCH_PREFIX=fm/
 TRACEPARENT_ARG=
 HARNESS_SET=0
@@ -1034,6 +1050,7 @@ YOLO_SET=0
 BRANCH_PREFIX_SET=0
 BASE_BRANCH=
 BASE_BRANCH_SET=0
+SLOT_OWNED_PATHS=()
 UPSTREAM_CONSENT=
 UPSTREAM_CONSENT_SET=0
 CAPTAIN_MODEL_PIN=
@@ -1096,6 +1113,9 @@ for a in "$@"; do
     base-branch)
       BASE_BRANCH=$a
       BASE_BRANCH_SET=1
+      ;;
+    owned-path)
+      SLOT_OWNED_PATHS+=("$a")
       ;;
     upstream-consent)
       UPSTREAM_CONSENT=$a
@@ -1179,6 +1199,8 @@ for a in "$@"; do
     BASE_BRANCH=${a#--base-branch=}
     BASE_BRANCH_SET=1
     ;;
+  --owned-path) want_value="owned-path" ;;
+  --owned-path=*) SLOT_OWNED_PATHS+=("${a#--owned-path=}") ;;
   --upstream-consent) want_value="upstream-consent" ;;
   --upstream-consent=*)
     UPSTREAM_CONSENT=${a#--upstream-consent=}
@@ -1263,6 +1285,11 @@ case "$EFFORT" in
   ;;
 esac
 
+if [ "$KIND" = secondmate ] && [ "${#SLOT_OWNED_PATHS[@]}" -gt 0 ]; then
+  echo 'error: --owned-path applies only to ship and scout assigned-copy provisioning' >&2
+  exit 1
+fi
+
 # --relaunch preserves the recorded task rather than accepting fresh-spawn
 # identity overrides. The header owns the flags; docs/agent-control.md owns
 # the proven-gone endpoint replacement policy.
@@ -1293,6 +1320,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
   }
   [ "$BASE_BRANCH_SET" -eq 0 ] || {
     echo "error: --relaunch reuses the task's recorded base branch; --base-branch cannot override it" >&2
+    exit 1
+  }
+  [ "${#SLOT_OWNED_PATHS[@]}" -eq 0 ] || {
+    echo "error: --relaunch reuses recorded slot scope; --owned-path cannot override it" >&2
     exit 1
   }
   [ "$UPSTREAM_CONSENT_SET" -eq 0 ] || {
@@ -1364,7 +1395,7 @@ else
       exit 1
     }
     [ "$BRANCH_PREFIX_SET" -eq 0 ] || {
-      echo "error: --branch-prefix applies only to ship spawns; a scout makes no branch and a secondmate records no ship branch" >&2
+      echo "error: --branch-prefix applies only to ship spawns; a governed scout uses fm/<id> and a secondmate records no ship branch" >&2
       exit 1
     }
     [ "$KIND" != secondmate ] || [ "$BASE_BRANCH_SET" -eq 0 ] || {
@@ -2113,6 +2144,9 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$OMP_NO_HELPERS" -eq 0 ] || shared_args+=(--omp-no-helpers)
   [ "$FIXED_FAMILY" -eq 0 ] || shared_args+=(--fixed-family)
   [ "$BASE_BRANCH_SET" -eq 0 ] || shared_args+=(--base-branch "$BASE_BRANCH")
+  for owned_path in "${SLOT_OWNED_PATHS[@]:-}"; do
+    [ -z "$owned_path" ] || shared_args+=(--owned-path "$owned_path")
+  done
   [ "$HERDR_RESUME_LOCK_WAIT" -eq 0 ] || shared_args+=(--herdr-resume-lock-wait)
   for pair in "${POS[@]}"; do
     case "$pair" in
@@ -4431,6 +4465,7 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
         printf '\n' &&
         { if [ "$RECONCILE_ONLY" = 1 ]; then fm_brief_reconciliation_role; fi; } &&
         awk '{ sub(/\r$/, ""); print }' "$SOURCE_BRIEF" &&
+        { if [ "$FM_SLOT_PROVISIONED" = 1 ]; then fm_slot_contract "$BRANCH"; fi; } &&
         { [ -z "${1:-}" ] || cat "$1"; } &&
         if [ "$KIND" = ship ] && [ "$MODE" = no-mistakes ]; then
           fm_brief_intent_overlay "$CAPTAIN_INTENT" "$SOURCE_BRIEF"
@@ -5915,8 +5950,65 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     SPAWN_SLOT_CLAIMED=1
   fi
 fi
+# A governed provisioner refusal retains this assigned copy and its endpoint:
+# ordinary acquisition-abort cleanup must not release its lease or remove it.
+spawn_slot_refused() {
+  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}"
+  SPAWN_TREEHOUSE_ABORT_TARGET=
+  HERDR_PROJECTION_ABORT_CLEANUP=0
+  ORCA_ABORT_CLEANUP=0
+  SPAWN_SLOT_CLAIMED=0
+  fm_slot_restore_base "$WT" || echo "error: could not restore the slot's original checkout; all branches remain preserved" >&2
+  if [ "$RELAUNCH" -eq 0 ]; then
+    {
+      echo "window=$W"
+      echo "endpoint_task_id=$ID"
+      echo "backend=$BACKEND"
+      echo "worktree=$WT"
+      echo "project=$PROJ_ABS"
+      echo "harness=$HARNESS"
+      echo "kind=$KIND"
+      echo 'recovery=slot-provision-refused'
+      echo "branch=${BRANCH:-fm/$ID}"
+      [ -z "$MODE" ] || echo "mode=$MODE"
+      [ -z "$YOLO" ] || echo "yolo=$YOLO"
+      [ "$BACKEND" != orca ] || printf 'orca_worktree_id=%s\nterminal=%s\n' "$ORCA_WORKTREE_ID" "$ORCA_TERMINAL"
+      [ "$BACKEND" != herdr ] || printf 'herdr_session=%s\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_TAB_ID" "$HERDR_PANE_ID"
+      [ "$BACKEND" != zellij ] || printf 'zellij_session=%s\nzellij_tab_id=%s\nzellij_pane_id=%s\n' "$ZELLIJ_SES" "$ZELLIJ_TAB_ID" "$ZELLIJ_PANE_ID"
+      [ "$BACKEND" != cmux ] || printf 'cmux_workspace_id=%s\ncmux_surface_id=%s\n' "$CMUX_WORKSPACE_ID" "$CMUX_SURFACE_ID"
+      :
+    } >"$recovery"
+    fm_backlog_atomic_transition publish "$recovery" "$STATE/$ID.meta" "task record" "$STATE" || {
+      echo "error: could not record retained copy $WT: $FM_BACKLOG_TRANSITION_ERROR" >&2
+      rm -f -- "$recovery"
+    }
+  fi
+  printf '%s\n' "$(status_stamp_line "blocked: slot provisioning refused before admission; assigned copy and endpoint retained: $WT; see spawn output and $DATA/$ID/slot-provision-spawn.*.json")" >>"$STATE/$ID.status"
+  echo "error: assigned copy $WT and endpoint $T retained; no worker admitted" >&2
+  exit 1
+}
+SLOT_GOVERNED=0
+if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
+  SLOT_GOVERNED=1
+  if [ "$RELAUNCH" -eq 1 ]; then
+    while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$RELAUNCH_META")
+  fi
+  fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" || spawn_slot_refused
+  BRANCH=${BRANCH:-fm/$ID}
+  if [ "$RELAUNCH" -eq 0 ]; then
+    fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+  fi
+fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
-  freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" || exit 1
+  if ! freshen_spawn_worktree_base "$WT" "$BASE_BRANCH"; then
+    [ "$SLOT_GOVERNED" = 0 ] || spawn_slot_refused
+    exit 1
+  fi
+fi
+if [ "$SLOT_GOVERNED" = 1 ]; then
+  fm_slot_provision "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
+    "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
+  render_launch_brief || exit 1
 fi
 
 # Re-assert the durable task copy after either treehouse acquisition or endpoint
@@ -6751,7 +6843,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp slot_manifest slot_base_sha slot_owned_path base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -6769,6 +6861,11 @@ preserve_relaunch_meta() {
   [ -z "$YOLO" ] || echo "yolo=$YOLO"
   [ -z "${BRANCH:-}" ] || echo "branch=$BRANCH"
   echo "tasktmp=$TASK_TMP"
+  if [ "$FM_SLOT_PROVISIONED" = 1 ]; then
+    echo "slot_manifest=$FM_SLOT_MANIFEST"
+    echo "slot_base_sha=$FM_SLOT_BASE_SHA"
+    for owned_path in "${SLOT_OWNED_PATHS[@]}"; do echo "slot_owned_path=$owned_path"; done
+  fi
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
   [ -z "$UPSTREAM_CONSENT" ] || echo "upstream_consent=$UPSTREAM_CONSENT"
   echo "model=${MODEL:-default}"

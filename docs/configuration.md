@@ -499,6 +499,7 @@ For spawn-capable adapters, the runtime session-provider backend controls where 
 | `cmux` | Experimental; no dedicated real-backend CI lane | [`docs/cmux-backend.md`](cmux-backend.md) |
 
 Treehouse remains the worktree provider for tmux, herdr, zellij, and cmux, since herdr, zellij, and cmux are session providers only; Orca provides both the task worktree and terminal endpoint.
+For projects with a governed existing-slot provisioner, spawn and scout promotion attest that assigned copy before admission; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns explicit scope, branch identity, reuse, and retained-refusal behavior, and [`fm-promote.sh`](../bin/fm-promote.sh) owns the promotion flags.
 
 Every admitted Herdr runtime requires a `python3` on its runtime PATH that runs as Python 3 to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform.
 Remote launch-agent prerequisites and repair refusals are owned by [remote readiness](remote-secondmates.md#required-remote-tools).

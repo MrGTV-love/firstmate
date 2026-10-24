@@ -2698,4 +2698,59 @@ test_teamclaude_launcher_proxies_a_raw_claude_launch
 test_teamclaude_launcher_is_inherited_by_secondmates
 test_default_secondmate_launch_survives_unsafe_routing_sources
 
+test_governed_slot_refuses_before_admission_and_preserves_work() {
+  local rec id=slot-refused out status retained_head common
+  rec=$(make_spawn_case slot-refused codex "$id")
+  read_case_record "$rec"
+  mkdir -p "$PROJ_DIR/scripts/git-stability"
+  cat > "$PROJ_DIR/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import json
+import sys
+print(json.dumps({"state": "BLOCKED", "reason": "manifest_exists", "blocked_reasons": ["manifest_exists"]}))
+sys.exit(2)
+PY
+  git -C "$PROJ_DIR" add scripts
+  git -C "$PROJ_DIR" commit -qm 'fixture governed provisioner'
+  git -C "$PROJ_DIR" push -q origin main
+  printf 'retained work\n' > "$WT_DIR/retained.txt"
+  git -C "$WT_DIR" add retained.txt
+  git -C "$WT_DIR" commit -qm 'unrelated previous task work'
+  retained_head=$(git -C "$WT_DIR" rev-parse HEAD)
+  common=$(git -C "$WT_DIR" rev-parse --path-format=absolute --git-common-dir)
+  printf 'foreign manifest bytes\n' > "$common/foreign-manifest"
+
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --mode local-only --yolo off --owned-path scripts 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail 'a refused provisioner admitted the worker'
+  assert_contains "$out" 'manifest_exists' 'spawn lost the actual provisioner refusal'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a refused provisioner sent a harness launch'
+  [ "$(git -C "$WT_DIR" rev-parse refs/heads/wt-slot-refused)" = "$retained_head" ] || fail 'freshness reset moved the previous task branch'
+  [ "$(git -C "$WT_DIR" rev-parse HEAD)" = "$retained_head" ] || fail 'refused spawn did not restore the assigned checkout'
+  [ "$(cat "$common/foreign-manifest")" = 'foreign manifest bytes' ] || fail 'refused spawn changed foreign data'
+  assert_present "$WT_DIR/retained.txt" 'refused spawn lost retained work'
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'refused spawn lost retained-copy custody'
+  assert_absent "$WT_DIR/.claude/worktrees" 'refused spawn created nested isolation'
+  pass 'governed spawn refuses before admission and preserves prior branches, copy and foreign data'
+}
+
+test_governed_slot_requires_explicit_scope_before_refresh() {
+  local rec id=slot-needs-scope out status before
+  rec=$(make_spawn_case slot-needs-scope codex "$id")
+  read_case_record "$rec"
+  mkdir -p "$PROJ_DIR/scripts/git-stability"
+  printf 'raise SystemExit("must not run without explicit scope")\n' > "$PROJ_DIR/scripts/git-stability/provision_existing_slot.py"
+  before=$(git -C "$WT_DIR" rev-parse HEAD)
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --mode local-only --yolo off 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail 'a governed spawn inferred absent owned paths'
+  assert_contains "$out" '--owned-path' 'missing-scope refusal lost its remedy'
+  [ ! -s "$LAUNCH_LOG" ] || fail 'a scope-less governed slot admitted the worker'
+  [ "$(git -C "$WT_DIR" rev-parse HEAD)" = "$before" ] || fail 'missing scope changed the assigned HEAD'
+  [ "$(git -C "$WT_DIR" branch --show-current)" = wt-slot-needs-scope ] || fail 'missing scope changed the assigned branch'
+  pass 'governed spawn requires explicit scope before refreshing or admitting a worker'
+}
+
+test_governed_slot_refuses_before_admission_and_preserves_work
+test_governed_slot_requires_explicit_scope_before_refresh
+
 echo "# all fm-spawn-dispatch-profile tests passed"
