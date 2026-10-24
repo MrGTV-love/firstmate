@@ -2478,7 +2478,8 @@ Optional host tools need not be installed for the offline regression; the instal
 Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
 Other harnesses remain outside this guard integration.
 
-Native semantic `find`, web search, browser automation, subagent dispatch, provider-backed tools and opaque code execution require a task egress grant before execution.
+Native semantic `find`, web search, browser automation, subagent dispatch, provider-backed tools and telemetry uploads through `xd://report_issue` require a task egress grant before execution.
+The telemetry device is classified in the same table, not admitted by a filesystem-root or trusted-device exception.
 Remote read/search paths and outbound shell entry points, including `curl`, `wget`, `ssh`, `scp`, GitHub calls, remote git operations, package installs and endpoint arguments, are checked at the same boundary.
 The rule is deterministic and needs neither a model verdict nor a working provider credential.
 A refusal names the destination classes whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
@@ -2494,7 +2495,10 @@ Each outbound-call decision adds exactly one terminal audit row with the tool, d
 A granted shell or write call carries those labels on its existing policy row rather than adding a second row; a native paid `find` records its deterministic decision even though it has no shell/write model classification.
 Local `read` remains pre-tool unjudged, `bash` keeps shell screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
 This table detects exposed entry points, not arbitrary network behavior hidden in scripts, executable replacements, shell expansion, local configuration or tool internals.
-Opaque native evaluators and inline general-purpose code require a `dynamic-code` grant because their effects are not statically knowable; granting that class authorizes that execution capability, not a confinement guarantee.
+The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
+That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
+Claude's notebook edits, worktree changes and skill execution use the same explicit confinement-owned classification.
+Other opaque native evaluators and inline general-purpose code require a `dynamic-code` grant because their effects are not statically knowable; granting that class authorizes that execution capability, not a confinement guarantee.
 Shell detection recognizes literal executable paths, quoted/escaped command names, common wrappers and shell command strings, but does not claim to interpret every shell grammar.
 
 ### Model policy

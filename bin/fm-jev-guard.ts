@@ -8,7 +8,7 @@
 // append context, never withhold output, so it reported protection it did not
 // provide. The tool_result handler below serves omp, whose replacement withholds
 // output; do not route Claude results back through it as advisory context.
-import { callEgress, egressGranted, toolPolicy, uncoveredTools } from "./fm-jev-egress.ts";
+import { callEgress, callPolicy, egressGranted, toolPolicy, uncoveredTools } from "./fm-jev-egress.ts";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync, statSync } from "node:fs";
@@ -457,7 +457,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
 
   pi.on("tool_call", async (event, ctx) => withDecisionBudget(async () => {
     const tool = event.toolName;
-    const policy = toolPolicy(tool);
+    const policy = callPolicy(tool, event.input);
     let result: SystemOneResult | undefined;
     let trail: Trail = {};
     const terminal: GuardTerminal = { hook: "tool_call", tool, decision: "allow", enforcement: "pretool_allow",
@@ -483,6 +483,9 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
             `Missing task egress grant: request Firstmate authorization for egress=${JSON.stringify(requested)} in state/<task>.meta. No outbound call was made.`);
         }
+      }
+      if (policy.call === "confinement") {
+        return finishCall({ ...terminal, branch: "confinement", confinement_owner: policy.confinement_owner });
       }
       if (policy.call !== "shell" && policy.call !== "write" && policy.call !== "edit") {
         return egress.length > 0 ? finishCall({ ...terminal, branch: "egress" }) : undefined;

@@ -43,6 +43,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
   It checks privacy before key lookup, over the whole payload for shell calls and results and over every model-screened piece for writes, plans overlapping pieces that each fit the request ceiling, and retains strict complete-cover planning for shell calls and results (`plan`).
   Its write-only planner, coverage audit and content-free producer-field exclusion audit follow the [operator contract](../../docs/configuration.md#jev-guard).
   Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only destination classes and fixed argument-shape labels from the egress policy, never outbound arguments or destinations.
+  Confinement-owned calls record `confinement_owner: T5`; this identifies the launch-time enforcement owner and is not proof that confinement is active.
   A write checks its pieces one at a time, so a never-send value longer than about 1,000 JSON-escaped bytes can be cut across a piece boundary and reach the model only as fragments.
   It uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.

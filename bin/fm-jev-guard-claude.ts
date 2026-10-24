@@ -20,10 +20,7 @@ async function main(): Promise<void> {
   // nothing and exits 0 instead of appending advisory context to the result.
   if (payload.hook_event_name !== "PreToolUse") return;
   if (typeof payload.tool_name !== "string") throw new Error("Invalid hook input.");
-  const nativeTool = payload.tool_name.toLowerCase();
-  const aliases: Readonly<Record<string, string>> = { websearch: "web_search", agent: "task", todowrite: "todo",
-    askuserquestion: "ask", notebookedit: "notebook", enterplanmode: "goal", exitplanmode: "goal", skill: "eval" };
-  const tool = Object.hasOwn(aliases, nativeTool) ? aliases[nativeTool] : nativeTool;
+  const tool = payload.tool_name.toLowerCase();
   // GuardHost still requires all three registrations; this adapter drives only tool_call.
   type Handlers = { tool_call: GuardCallHandler; tool_result: GuardResultHandler; before_agent_start: GuardPromptHandler };
   const handlers: Partial<Handlers> = {};
