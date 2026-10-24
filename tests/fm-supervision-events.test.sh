@@ -178,7 +178,9 @@ case "$1 ${2:-}" in
     case "${FM_RECOVERY_SERVER_STATE:?}" in
       running) printf '%s\n' '{"server":{"running":true}}' ;;
       unknown) printf '%s\n' '{"server":{}}' ;;
-      stopped) printf '%s\n' '{"server":{"running":false}}' ;;
+      # An absent socket beside the log completes the stopped server's absence proof.
+      stopped) jq -cn --arg socket "${FM_RECOVERY_INSPECTION_LOG%/*}/absent.sock" \
+        '{server:{running:false,socket:$socket}}' ;;
     esac
     ;;
   *) exit 98 ;;
@@ -245,11 +247,14 @@ SH
         assert_contains "$(cat "$RECOVERY_INSPECTION_LOG")" \
           "status --json --session $RECOVERY_INSPECTION_SESSION" \
           "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must consult the recorded server's state"
-        awk -v expected="${#RECOVERY_EXPECTED_IDS[@]}" '
+        # A stopped server is read twice: once to classify it, once by its absence proof.
+        RECOVERY_STATUS_READS=1
+        [ "$RECOVERY_SERVER_STATE" != stopped ] || RECOVERY_STATUS_READS=2
+        awk -v expected="${#RECOVERY_EXPECTED_IDS[@]}" -v reads="$RECOVERY_STATUS_READS" '
           $1 == "pane" && $2 == "get" { panes++; next }
           $1 == "status" && $2 == "--json" { servers++; next }
           { bad = 1 }
-          END { exit bad || panes != expected || servers != expected }
+          END { exit bad || panes != expected || servers != expected * reads }
         ' "$RECOVERY_INSPECTION_LOG" \
           || fail "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must inspect exactly the selected records using read-only calls"
       done

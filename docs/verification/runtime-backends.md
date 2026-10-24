@@ -2942,36 +2942,45 @@ herdr status --json --session fm-lab-never-started | jq -c "{running: .server.ru
 {"running":false,"status":"not_running"}
 ```
 
-`fm_backend_herdr_agent_state` therefore settles an uninterpretable pane read with `.server.running` rather than with the `server_not_running` error code, which keeps the verdict working across the supported range: the field is present on 0.8.2 protocol 20 and 0.9.0 protocol 22 alike (measured in "Client selection" above), while the code is not.
-Only that recovery-grade read is widened; the husk classifier under it stays strict, because it licenses closing panes.
-Observed in the lab, in one run:
+The current [passive liveness contract](../herdr-backend.md#agent-liveness-probe) reads the pane first and consults status only when that pane read cannot be interpreted; it then reports a stopped session as `missing` only when the startup helper's read-only proof also finds no server process and no accepting socket; a failed probe or an unproven stop reads `unreadable`, and the endpoint recheck reads only from a running server because a saved pane may return after explicit recovery.
+The status field is present on 0.8.2 protocol 20 and 0.9.0 protocol 22 alike (measured in "Client selection" above); protocol-20 coverage remains structural rather than a current live result.
 
-```text
-live agent-free pane                 dead
-endpoint in a session with no server missing
-malformed target                     unreadable
-```
-
-The same run drove `bin/fm-spawn.sh --relaunch` against a real Herdr pane whose shell had been moved outside its recorded worktree: the shell was told once to return, ended in the recorded worktree, and the replacement was launched into the SAME pane, leaving one task tab.
-
-Herdr 0.8.x is not installed on this host, so protocol-20 coverage is structural plus the adapter fixture exercising both response shapes; it is not a live result.
-Refresh the live half, which fails naming the installed version, with:
+Measured 2026-10-23 on macOS arm64 with Herdr 0.9.5 / protocol 22 in a fresh guarded lab, with adapter CLI calls routed through `fm-herdr-lab.sh run`:
 
 ```sh
-tests/fm-control-herdr-smoke.test.sh
+fm_backend_herdr_cli "$HERDR_LAB_SESSION" status --json | jq -c '{version:.client.version,running:.server.running,socket_absolute:(.server.socket|startswith("/"))}'
+fm_backend_herdr_server_ensure "$HERDR_LAB_SESSION"  # already running
+# After the lab helper stops this session:
+fm_backend_agent_state herdr "$HERDR_LAB_SESSION:w1:p2"
+fm_backend_herdr_endpoint_absence_recheck "$HERDR_LAB_SESSION:w1:p2"
+fm_backend_herdr_capture "$HERDR_LAB_SESSION:w1:p2" 1
 ```
 
-Observed 2026-09-10:
+The running ensure reused the server without launching, both stopped-session classifiers returned `unreadable`, capture refused, and a final status read still reported stopped.
+That run predates the proven-absence rule above, under which the passive classifier reads such a session as `missing`; the rule was not re-measured live.
+Guarded teardown succeeded with the default-session tripwire unchanged.
+The two status normalizations were:
 
 ```text
-ok - real herdr 0.9.0: a gone session reads recoverable while a live pane and a malformed target do not
-ok - real herdr: a drifted agent-free shell returns to its worktree and reuses the same endpoint
+{"version":"0.9.5","running":true,"socket_absolute":true}
+{"version":"0.9.5","running":false,"socket_absolute":true}
 ```
 
-`tests/fm-backend-herdr.test.sh` pins the logic portably by driving the two signals apart - the same failed pane read yields `missing` under a stopped server and `unreadable` under a running one - and asserts that the husk classifier still refuses on that identical read.
-`tests/fm-control-herdr-smoke.test.sh` proves the Herdr-only drift recovery against a real binary in an isolated lab session.
-`tests/fm-control-relaunch.test.sh` drives a tmux stub and proves that tmux retains its prior refusal without sending `cd` or any other input to the pane.
-The Herdr refusal when a shell accepts the command but does not move is not exercised in this change.
+The portable startup regression uses a first-on-PATH Herdr executable, real Unix listeners, and real sleeping server processes, never the installed Herdr server:
+
+```sh
+python3 tests/herdr-server-start-fixture.py "$PWD"
+```
+
+It exercises failed, simulated timeout-exit, empty, and contradictory stopped status with a live listener; an unreachable live process; an unscoped server inheriting no `HERDR_SESSION` beside another session's cold start, and one inheriting that session's name; proven absence; stale and invalid socket paths; unreadable process inventory; two concurrent starters that both succeed with one launch; read-only public state and crew-state entry points, including a stopped session read as `missing` only with proven absence; starter exit with inherited fd 3; the fm-remote guard and an adapter start racing to exactly one server; the guard releasing the start lock once its server runs, and when its server fails; a missing status socket supplied by `session list`; refusal when neither status nor `session list` names a socket; failed status reads during the post-launch readiness poll; a quoted client argv, undecodable process text, or an unreadable server session during the absence proof; a flattened macOS environment whose `HERDR_SESSION=` token may belong to another variable, which refuses; an unscoped server that exits before its environment read; and distinct failure messages for a refusal, a missing `python3` (exit 127), and a launch-preparation failure (exit 4).
+The original implementation recorded unwanted `server` launches and retained the output pipe while its sleeping server remained alive; the fixed implementation refuses those launches and releases both the starter and pipe.
+This is interception evidence, not a real duplicate-Herdr experiment.
+`tests/fm-backend-herdr.test.sh` includes this regression in its normal suite.
+
+The 2026-09-10 Herdr 0.9.0 drift-recovery smoke moved an agent-free shell back into its recorded worktree and relaunched into the same pane, leaving one task tab.
+`tests/fm-control-herdr-smoke.test.sh` retains that live refresh and its issue #4091 assertion that a never-started session's endpoint reads `missing`.
+`tests/fm-control-relaunch.test.sh` retains the tmux-specific drift refusal.
+The full drift-recovery smoke was not rerun for the startup boundary change.
 
 ### Stale agent registration
 

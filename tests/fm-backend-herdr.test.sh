@@ -60,6 +60,17 @@ next=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
   for a in "$@"; do printf '\x1f%s' "$a"; done
   printf '\n'
 } >> "$LOG"
+if [ -n "${FM_HERDR_SERVER_MARKER:-}" ]; then
+  case "${1:-}" in
+    status)
+      running=false
+      [ ! -e "$FM_HERDR_SERVER_MARKER" ] || running=true
+      printf '{"client":{"version":"0.7.1","protocol":14},"server":{"running":%s,"socket":"%s","session":"%s"}}\n' \
+        "$running" "$FM_HERDR_SERVER_MARKER.sock" "$HERDR_SESSION"
+      exit 0 ;;
+    server) : > "$FM_HERDR_SERVER_MARKER"; exit 0 ;;
+  esac
+fi
 if [ "${1:-}" = status ] && [ "${2:-}" = --json ] && [ "${FM_HERDR_SCRIPT_STATUS:-0}" != 1 ]; then
   printf '{"client":{"version":"0.7.1","protocol":14},"server":{"running":true}}\n'
   exit 0
@@ -150,7 +161,7 @@ case "${1:-}" in
     if [ -e "$FM_HERDR_SERVER_MARKER" ]; then
       printf '{"server":{"running":true}}\n'
     else
-      printf '{"server":{"running":false}}\n'
+      printf '{"server":{"running":false,"socket":"%s","session":"%s"}}\n' "$FM_HERDR_SERVER_MARKER.sock" "$HERDR_SESSION"
     fi
     ;;
   server)
@@ -461,62 +472,53 @@ run_with_clients() {  # <dir> <path> <body>
     bash -c ". \"\$0/bin/backends/herdr.sh\"; $body" "$ROOT"
 }
 
-# The #4091 widening, and the boundary it is deliberately confined to.
-#
-# A recovery-grade read that cannot confirm the pane is `missing` only when the
-# session's server is POSITIVELY stopped - absence for that whole session -
-# and stays `unreadable` otherwise. The two signals are driven apart here on
-# purpose: the SAME failed pane read is settled two ways by the server state
-# alone, so the case cannot go quietly vacuous if one signal stops being read.
-#
-# The second half matters as much as the first: the widening must not reach the
-# husk classifier under it, because that one licenses CLOSING panes.
-test_recovery_grade_read_widens_only_at_its_own_boundary() {
-  local dir log resp fb gone running husk
-
-  herdr_state_with_server() {  # <dir-suffix> <server-running-json>
-    local dir="$TMP_ROOT/recovery-widen-$1" resp log fb
-    mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
-    # 1: the pane read, failing in a way this parse cannot interpret.
-    printf 'Error: socket unavailable\n' > "$resp/1.out"
-    printf '1\n' > "$resp/1.exit"
-    # 2: the server-state read that settles it.
-    printf '{"client":{"protocol":22},"server":{"running":%s}}\n' "$2" > "$resp/2.out"
-    fb=$(make_herdr_fakebin "$dir")
-    PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
-      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state fmtest:w1:p2' "$ROOT"
-  }
-
-  gone=$(herdr_state_with_server gone false)
-  running=$(herdr_state_with_server running true)
-  [ "$gone" = missing ] \
-    || fail "an uninterpretable pane read against a positively stopped server must read missing, got '$gone'"
-  [ "$running" = unreadable ] \
-    || fail "an uninterpretable pane read against a RUNNING server must stay unreadable, got '$running'"
-  [ "$gone" != "$running" ] \
-    || fail "the server-state signal is not being consulted: both verdicts are '$gone'"
-
-  # An unreadable server state is not evidence of absence either.
-  dir="$TMP_ROOT/recovery-widen-unknown"; mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
-  printf 'Error: socket unavailable\n' > "$resp/1.out"; printf '1\n' > "$resp/1.exit"
-  printf 'not json at all\n' > "$resp/2.out"; printf '1\n' > "$resp/2.exit"
+# Passive classification reads the pane first. An answering pane is classified
+# without any status read, so a failed or timed-out status cannot hide it.
+# Only an uninterpretable pane read consults status, and there a running,
+# unknown, failed, or unprovable stopped server stays unreadable. The
+# proven-absent stopped case is covered by tests/herdr-server-start-fixture.py
+# with real process and socket state.
+test_passive_read_is_pane_first_and_consults_status_only_on_fallback() {
+  local dir log resp fb state out
+  dir="$TMP_ROOT/passive-live"; mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
+  printf '{"result":{"pane":{"pane_id":"w1:p2"}}}\n' > "$resp/1.out"
+  printf '{"result":{"agent":{"agent":"pi","agent_status":"idle"}}}\n' > "$resp/2.out"
+  printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":4242,"foreground_process_group_id":4243,"foreground_processes":[{"pid":4243,"name":"node","argv0":"pi","argv":["pi"],"cmdline":"pi"}]}}}\n' > "$resp/3.out"
+  printf '124\n' > "$resp/4.exit"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state fmtest:w1:p2' "$ROOT")
-  [ "$out" = unreadable ] \
-    || fail "a server state that cannot itself be read must keep the conservative verdict, got '$out'"
+  [ "$out" = alive ] || fail "a live pane must read alive while status would time out, got '$out'"
+  assert_not_contains "$(cat "$log")" $'\x1fstatus\x1f' "a passive read of an answering pane must not call status"
 
-  # The confinement: the husk classifier sees the SAME stopped-server read and
-  # must still refuse, because it is what licenses closing a pane.
-  dir="$TMP_ROOT/recovery-widen-husk"; mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
-  printf 'Error: socket unavailable\n' > "$resp/1.out"; printf '1\n' > "$resp/1.exit"
-  printf '{"client":{"protocol":22},"server":{"running":false}}\n' > "$resp/2.out"
+  dir="$TMP_ROOT/passive-gone"; mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
+  printf '{"error":{"code":"pane_not_found"}}\n' > "$resp/1.out"
+  printf '1\n' > "$resp/2.exit"
   fb=$(make_herdr_fakebin "$dir")
-  husk=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
-    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_pane_agent_state fmtest w1:p2; printf " "; fm_backend_herdr_tab_is_husk fmtest w1:p2 && printf husk || printf refused' "$ROOT")
-  [ "$husk" = "unknown refused" ] \
-    || fail "the stopped-server rule leaked into the husk classifier, which licenses closing panes: got '$husk'"
-  pass "herdr recovery-grade read: a stopped server means missing there, and nowhere else"
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state fmtest:w1:p2' "$ROOT")
+  [ "$out" = missing ] || fail "a running server's pane_not_found must read missing, got '$out'"
+  assert_not_contains "$(cat "$log")" $'\x1fstatus\x1f' "a structurally gone pane must not call status"
+
+  for state in true false null error; do
+    dir="$TMP_ROOT/passive-fallback-$state"; mkdir -p "$dir/responses"
+    resp="$dir/responses"; log="$dir/log"; : > "$log"
+    printf 'Error: socket unavailable\n' > "$resp/1.out"
+    printf '1\n' > "$resp/1.exit"
+    if [ "$state" = error ]; then
+      printf '1\n' > "$resp/2.exit"
+    else
+      printf '{"server":{"running":%s}}\n' "$state" > "$resp/2.out"
+      printf '{"server":{"running":%s}}\n' "$state" > "$resp/3.out"
+    fi
+    fb=$(make_herdr_fakebin "$dir")
+    out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_agent_state fmtest:w1:p2' "$ROOT")
+    [ "$out" = unreadable ] || fail "an uninterpretable pane read with server status $state must stay unreadable, got '$out'"
+    assert_contains "$(cat "$log")" $'\x1fstatus\x1f' "an uninterpretable pane read must consult status"
+    assert_not_contains "$(cat "$log")" $'\x1fserver\x1f' "a passive classifier must not start a server"
+  done
+  pass "herdr passive classifier reads the pane first and consults status only for an uninterpretable pane"
 }
 
 # --- stale agent registration over a shell-only pane (issue #4115) -----------
@@ -1275,20 +1277,12 @@ test_container_ensure_refuses_an_ambiguous_home_label() {
 test_container_ensure_starts_server_and_workspace() {
   local dir log resp fb out
   dir="$TMP_ROOT/container"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
-  # 1: version_check status --json (server not running yet, irrelevant to client check)
-  printf '{"client":{"version":"0.7.1","protocol":14}}\n' > "$resp/1.out"
-  # 2: server_ensure's status --json check -> not running
-  printf '{"server":{"running":false}}\n' > "$resp/2.out"
-  # 3: `herdr server` backgrounded launch - no meaningful output
-  # 4: server_ensure poll -> now running
-  printf '{"server":{"running":true}}\n' > "$resp/4.out"
-  # 5: workspace list -> empty (no "firstmate" workspace yet)
-  printf '{"result":{"workspaces":[]}}\n' > "$resp/5.out"
-  # 6: workspace create -> w1, seeding default tab w1:t9 (real herdr returns
-  # the seeded tab/pane ids in the SAME response - verified empirically).
-  printf '{"result":{"workspace":{"workspace_id":"w1","label":"firstmate"},"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}\n' > "$resp/6.out"
+  # Stateful status names an absent socket until server launch publishes its
+  # marker. Workspace responses do not depend on status poll scheduling.
+  printf '{"result":{"workspaces":[]}}\n' > "$resp/1.out"
+  printf '{"result":{"workspace":{"workspace_id":"w1","label":"firstmate"},"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}\n' > "$resp/2.out"
   fb=$(make_herdr_fakebin "$dir")
-  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SCRIPT_STATUS=1 HERDR_SESSION=fmtest \
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" FM_HERDR_SERVER_MARKER="$dir/running" HERDR_SESSION=fmtest \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_container_ensure /tmp' "$ROOT" )
   [ "$out" = $'fmtest:w1\tw1:t9' ] || fail "container_ensure should echo '<session>:<workspace_id>\\t<seeded_default_tab_id>', got '$out'"
   assert_contains "$(cat "$log")" "HERDR_SESSION=fmtest"$'\x1f''server' "container_ensure did not start the herdr server"
@@ -6336,6 +6330,8 @@ test_wait_transition_clean_timeout_returns_1() {
 # shellcheck source=bin/fm-backend.sh
 . "$ROOT/bin/fm-backend.sh"
 
+python3 "$ROOT/tests/herdr-server-start-fixture.py" "$ROOT" || fail "Herdr server startup safety regression"
+
 test_version_check_accepts_current_protocol
 test_version_check_refuses_old_protocol
 test_version_check_refuses_missing_herdr
@@ -6347,7 +6343,7 @@ test_workspace_label_empty_marker_falls_back_to_primary
 test_workspace_label_different_secondmates_get_different_labels
 test_cli_helper_sets_env_and_appends_trailing_session_flag
 test_agent_state_bypasses_a_stale_client_shadowing_a_compatible_one
-test_recovery_grade_read_widens_only_at_its_own_boundary
+test_passive_read_is_pane_first_and_consults_status_only_on_fallback
 test_stale_registration_over_a_shell_only_pane_is_agent_free
 test_missing_registration_requires_process_evidence
 test_stale_registration_ignores_status_and_reads_the_process

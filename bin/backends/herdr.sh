@@ -1669,34 +1669,65 @@ fm_backend_herdr_projection_order_best_effort() {  # <session> <created-workspac
   return 0
 }
 
-# fm_backend_herdr_server_ensure: start the herdr server for <session>
-# headless (no TUI client) if not already running, mirroring tmux's `tmux
-# has-session || tmux new-session -d`. Verified: a bare socket CLI call does
-# NOT auto-start the server, so this must run before any workspace/tab/pane
-# call. The server outlives its launcher and passes its startup environment to
-# every later pane, so remove home, harness identity, supervision selection, and
-# per-launch compact-adviser state inherited from whichever agent happened to
-# start it. A function-hooks flag Firstmate marked as adviser-only goes too; an
-# unmarked flag is the captain's own opt-in and stays. Bounded poll for the
-# server to report running.
+# fm_backend_herdr_server_ensure: mutation-only server startup boundary.
+# A failed, empty, or malformed status is unknown, never permission to start.
+# herdr-server-start.py owns the serialized process/socket absence proof and
+# detached launch, closing all inherited descriptors rather than backgrounding
+# a shell function that keeps a copy of its caller and capture pipes alive.
+# The server passes its startup environment to every later pane, so remove
+# home, harness identity, supervision selection, and adviser-only state.
 fm_backend_herdr_server_ensure() {  # <session>
-  local session=$1 running out i
-  running=$(fm_backend_herdr_cli "$session" status --json 2>/dev/null | jq -r '.server.running // false' 2>/dev/null)
-  [ "$running" = "true" ] && return 0
-  (
+  local session=$1 running out
+  out=$(fm_backend_herdr_cli "$session" status --json 2>/dev/null) || {
+    echo "error: herdr server status for '$session' is unknown; refusing startup" >&2
+    return 1
+  }
+  running=$(printf '%s' "$out" | jq -r '.server.running | if type == "boolean" then tostring else "unknown" end' 2>/dev/null) || running=unknown
+  case "$running" in
+    true) return 0 ;;
+    false) ;;
+    *) echo "error: herdr server status for '$session' is unknown; refusing startup" >&2; return 1 ;;
+  esac
+  printf '%s' "$out" | (
     [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS
     unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE \
       CURSOR_AGENT CURSOR_INVOKED_AS CLAUDECODE PI_CODING_AGENT FM_PI_HARNESS GROK_AGENT FM_SUPERVISION_MODEL \
       COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_DISABLE FM_COMPACT_ADVISER_HOOKS
-    fm_backend_herdr_cli "$session" server </dev/null >/dev/null 2>&1 &
-  ) || return 1
-  for i in $(seq 1 20); do
-    running=$(fm_backend_herdr_cli "$session" status --json 2>/dev/null | jq -r '.server.running // false' 2>/dev/null)
-    [ "$running" = "true" ] && return 0
-    sleep 0.5
-  done
-  echo "error: herdr server for session '$session' did not report running within 10s" >&2
-  return 1
+    python3 "$FM_BACKEND_HERDR_ROOT/bin/backends/herdr-server-start.py" "$session" "$(fm_backend_herdr_session_client "$session")"
+  )
+}
+
+# fm_backend_herdr_server_ensure_failure: describe a nonzero exit status of
+# fm_backend_herdr_server_ensure for <session>. Status 1 is a refusal that
+# protects a live or unknown server and 3 is a launched server that exited
+# before reporting running (bin/backends/herdr-server-start.py owns both); any
+# other status is a failure of the start helper itself.
+fm_backend_herdr_server_ensure_failure() {  # <status> <session>
+  case "$1" in
+    1) printf 'refused to start the herdr server for session %s to protect a live or unknown server' "$2" ;;
+    3) printf 'the herdr server for session %s was launched but did not come up' "$2" ;;
+    *) printf 'the server start helper failed (exit %s) for session %s' "$1" "$2" ;;
+  esac
+}
+
+# fm_backend_herdr_session_client: the client binary fm_backend_herdr_cli uses
+# for <session>, so the startup helper recognizes that client's server process.
+fm_backend_herdr_session_client() {  # <session>
+  if [ "${FM_BACKEND_HERDR_CLIENT_SESSION:-}" = "$1" ]; then
+    fm_backend_herdr_bin
+  else
+    printf 'herdr'
+  fi
+}
+
+# fm_backend_herdr_server_absence_proven: read-only proof that <session> has no
+# server: a successful stopped status plus herdr-server-start.py's process and
+# socket absence proof. A failed status or any unproven step returns nonzero.
+fm_backend_herdr_server_absence_proven() {  # <session>
+  local session=$1 out
+  out=$(fm_backend_herdr_cli "$session" status --json 2>/dev/null) || return 1
+  printf '%s' "$out" | python3 "$FM_BACKEND_HERDR_ROOT/bin/backends/herdr-server-start.py" \
+    --prove-absent "$session" "$(fm_backend_herdr_session_client "$session")" 2>/dev/null
 }
 
 # fm_backend_herdr_workspace_find_all: EVERY workspace id inside <session>
@@ -2416,59 +2447,38 @@ fm_backend_herdr_server_running_state() {  # <session>
 # backed by a non-shell process is `alive`, and an ambiguous or failed
 # process/API read is `unreadable`.
 #
-# One exception to that last case, and it is deliberately made HERE rather than
-# in the husk classifier: a read can fail because the recorded session's server
-# is not running at all, which is authoritative absence for every pane in that
-# session rather than an ambiguous answer about one of them. Treating it as
-# `unreadable` stranded tasks with no sanctioned recovery (issue #4091), so a
-# positively stopped server reads `missing` instead.
-#
-# Only this recovery-grade read is widened. fm_backend_herdr_pane_agent_state
-# and the presence classifier under it stay strict, so husk detection, duplicate
-# prevention, rollback, and teardown - which can DESTROY things - keep refusing
-# on exactly the reads they refused on before. A server that is running, or
-# whose state cannot itself be read, still yields `unreadable` here too: absence
-# is claimed only from positive evidence of it.
+# The pane is read first, so a failed or timed-out status read never hides an
+# answering pane. Only a pane read that cannot be interpreted consults the
+# server: a session whose stopped status is backed by proven process and socket
+# absence reads `missing`, so its tasks are not stranded (issue #4091); a failed
+# status, or a stopped status with a live process or accepting socket, reads
+# `unreadable`. This read never starts a server, and `missing` from a stopped
+# server licenses no endpoint re-creation on its own: see
+# fm_backend_herdr_endpoint_absence_recheck. The husk classifier stays strict.
 fm_backend_herdr_agent_state() {  # <target>
-  local target=$1
-  fm_backend_herdr_parse_target "$target" || { printf 'unreadable'; return 0; }
+  local state
+  state=$(fm_backend_herdr_endpoint_absence_recheck "$1")
+  if [ "$state" != unreadable ] || ! fm_backend_herdr_parse_target "$1" \
+    || [ "$(fm_backend_herdr_server_running_state "$FM_BACKEND_HERDR_SESSION")" != stopped ] \
+    || ! fm_backend_herdr_server_absence_proven "$FM_BACKEND_HERDR_SESSION"; then
+    printf '%s' "$state"
+    return 0
+  fi
+  printf 'missing'
+}
+
+# fm_backend_herdr_endpoint_absence_recheck: pure read of a recorded endpoint's
+# pane. Every verdict but `unreadable` needs an answer from a running server,
+# because a stopped server may still retain the saved pane. Explicit recovery
+# owns any preceding startup.
+fm_backend_herdr_endpoint_absence_recheck() {  # <target>
+  fm_backend_herdr_parse_target "$1" || { printf 'unreadable'; return 0; }
   case "$(fm_backend_herdr_pane_agent_state "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE")" in
     dead) printf 'missing' ;;
     no-agent|stale-agent) printf 'dead' ;;
     live) printf 'alive' ;;
-    *)
-      case "$(fm_backend_herdr_server_running_state "$FM_BACKEND_HERDR_SESSION")" in
-        stopped) printf 'missing' ;;
-        *) printf 'unreadable' ;;
-      esac
-      ;;
+    *) printf 'unreadable' ;;
   esac
-}
-
-# fm_backend_herdr_endpoint_absence_recheck: re-read <target> with its own
-# session's server running, and print the resulting fm_backend_agent_state
-# verdict. For a recovery that is about to RE-CREATE an endpoint, this is the
-# read that decides whether there is anything to re-create at all.
-#
-# fm_backend_herdr_agent_state maps a positively STOPPED session server to
-# `missing` (issue #4091), which is correct for "no agent is running" but is
-# NOT evidence the endpoint was destroyed: stopping and restarting a named
-# Herdr server preserves workspace, tab, pane, and label ids (docs/herdr-backend.md
-# "Restart and liveness behavior") - only the harness processes and their
-# registrations die. So `missing` there means unreachable right now, and a
-# caller that rebound on it would abandon a pane that was about to come back.
-#
-# Only the RECORDED session's server is ensured, never a workspace or tab, so
-# this creates nothing: a merely-stopped server comes back and the recorded
-# pane classifies `dead` (adoptable), a genuinely destroyed pane still reads
-# `missing`, a returning agent reads `alive`, and a server that will not start
-# is `unreadable` - unreachable, which refuses, rather than absence.
-fm_backend_herdr_endpoint_absence_recheck() {  # <target>
-  local target=$1
-  fm_backend_herdr_parse_target "$target" || { printf 'unreadable'; return 0; }
-  fm_backend_herdr_server_ensure "$FM_BACKEND_HERDR_SESSION" >/dev/null 2>&1 \
-    || { printf 'unreadable'; return 0; }
-  fm_backend_herdr_agent_state "$target"
 }
 
 # Backward-compatible three-state view for callers that only need a yes/no
@@ -3088,7 +3098,7 @@ fm_backend_herdr_target_ready() {  # <target>
 # process's cwd instead, which is what changes when `treehouse get` enters its
 # worktree subshell - confirmed live against a real treehouse acquisition.
 fm_backend_herdr_current_path() {  # <target>
-  fm_backend_herdr_target_ready "$1" || return 0
+  fm_backend_herdr_target_observable "$1" || return 0
   fm_backend_herdr_cli "$FM_BACKEND_HERDR_SESSION" pane get "$FM_BACKEND_HERDR_PANE" 2>/dev/null \
     | jq -r '.result.pane.foreground_cwd // empty' 2>/dev/null
 }
@@ -3102,7 +3112,7 @@ fm_backend_herdr_current_path() {  # <target>
 # response shape is the one fm_backend_herdr_pane_process_state_sample parses.
 fm_backend_herdr_foreground_args() {  # <target>
   local info
-  fm_backend_herdr_target_ready "$1" || return 0
+  fm_backend_herdr_target_observable "$1" || return 0
   info=$(fm_backend_herdr_cli "$FM_BACKEND_HERDR_SESSION" pane process-info --pane "$FM_BACKEND_HERDR_PANE" 2>/dev/null) || return 0
   printf '%s' "$info" | jq -r --arg pane "$FM_BACKEND_HERDR_PANE" '
     select(.result.type == "pane_process_info" and .result.process_info.pane_id == $pane)
@@ -3177,7 +3187,7 @@ fm_backend_herdr_send_key() {  # <target> <key>
 # always request a generous fetch far above any realistic viewport height, then
 # trim to the caller's requested bound ourselves with `tail`.
 fm_backend_herdr_capture() {  # <target> <lines>
-  fm_backend_herdr_target_ready "$1" || return 1
+  fm_backend_herdr_target_observable "$1" || return 1
   local lines=${2:-200} fetch out
   case "$lines" in ''|*[!0-9]*) lines=200 ;; esac
   fetch=$lines
@@ -3843,7 +3853,7 @@ fm_backend_herdr_agent_status_raw() {  # <session> <pane_id>
 # process read; idle and unknown are never trusted as busy by any consumer.
 fm_backend_herdr_busy_state() {  # <target>
   local verdict
-  fm_backend_herdr_target_ready "$1" || { printf 'unknown'; return 0; }
+  fm_backend_herdr_target_observable "$1" || { printf 'unknown'; return 0; }
   verdict=$(fm_backend_herdr_classify_agent_status \
     "$(fm_backend_herdr_agent_status_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE")")
   if [ "$verdict" = busy ] \

@@ -422,6 +422,7 @@ run_spawn() {  # <case-dir> <args...>
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    HERDR_SESSION="${FM_FAKE_SESSION:-}" \
     HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
     FM_SPAWN_NO_GUARD=1 GROK_HOME="$dir/grokhome" \
     "$SPAWN" "$@" 2>&1
@@ -3178,7 +3179,7 @@ test_tmux_worktree_local_recovery_with_real_lsof() {
           out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_control "$dir" "$id" relaunch --reconcile-only --note "restore instruction owner"); rc=$?
           ;;
         direct)
-          out=$(cd "$wt" && HERDR_SESSION=fmlab run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
+          out=$(cd "$wt" && FM_FAKE_SESSION=fmlab run_spawn "$dir" "$id" --relaunch --harness claude); rc=$?
           ;;
       esac
       expect_code 0 "$rc" "real lsof must permit $entry from the worktree $location"$'\n'"$out"
@@ -4107,15 +4108,16 @@ test_relocation_flag_is_scoped_to_relaunch() {
 #
 # Stopping and restarting a named Herdr server preserves workspace, tab, pane
 # and label ids; only the harness processes and their registrations die
-# (docs/herdr-backend.md "Restart and liveness behavior"). The recovery-grade
-# classifier still reads a stopped server as `missing`, so a reclaim that
-# believed that verdict would abandon a pane that was about to come back and
-# open a second tab beside it.
+# (docs/herdr-backend.md "Restart and liveness behavior"). A stopped session
+# with proven process and socket absence reads missing; recovery then restores
+# the server and must adopt the preserved pane rather than open a second tab.
 #
 # Canned/stateful fake only - never a real herdr session.
 make_herdr_stub() {  # <case-dir>
-  local fb="$1/fakebin"
+  local fb="$1/fakebin" socket_dir
   mkdir -p "$fb"
+  socket_dir=$(TMPDIR=/tmp fm_test_tmproot fm-lab-recovery) || return 1
+  printf '%s/herdr.sock\n' "$socket_dir" > "$1/fake/herdr-socket-path"
   # The herdr server-ensure poll must actually wait between reads, so this case
   # keeps the real sleep rather than the tmux cases' instant stub.
   rm -f "$fb/sleep"
@@ -4128,11 +4130,14 @@ if [ -f "$D/herdr-sessions/${HERDR_SESSION:-}" ]; then
 fi
 printf '%s\n' "$*" >> "$D/herdr-log"
 if [ "${1:-}" = status ] && [ "${2:-}" = --json ]; then
+  [ ! -f "$D/herdr-status-fails" ] || exit 1
   if [ -f "$D/herdr-stopped" ]; then
-    printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":false}}\n'
+    running=false
   else
-    printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":true}}\n'
+    running=true
   fi
+  printf '{"client":{"version":"0.9.0","protocol":22},"server":{"running":%s,"socket":"%s","session":"%s"}}\n' \
+    "$running" "$(cat "$D/herdr-socket-path")" "${HERDR_SESSION:-}"
   exit 0
 fi
 if [ "${1:-}" = server ]; then
@@ -4493,6 +4498,8 @@ test_herdr_reclaim_adopts_a_pane_that_outlived_its_server() {
 
   assert_contains "$log" "server --session fmlab" \
     "the reclaim must bring the RECORDED session's server back before deciding anything"
+  [ "$(grep -c '^server --session fmlab$' <<<"$log")" = 1 ] \
+    || fail "a proven stop must launch the recorded session's server exactly once: $log"
   assert_contains "$log" "agent get %7 --session fmlab" \
     "the reclaim must re-read the recorded pane once its server is running"
   assert_not_contains "$log" "workspace create" \
@@ -4514,6 +4521,48 @@ test_herdr_reclaim_adopts_a_pane_that_outlived_its_server() {
   assert_contains "$log" "pane send-text %7 " \
     "the replacement's launch brief must be delivered into the adopted pane"
   pass "reclaim: a herdr pane that outlived its stopped server is adopted, never orphaned beside a new tab"
+}
+
+# A stopped status alone is not absence: a failed status read, or a session
+# socket that still accepts connections, must refuse every recovery entry point
+# before any server launch or endpoint creation.
+test_herdr_recovery_refuses_an_unproven_server_stop() {
+  local mode entry dir id out rc log listener
+  for mode in status-fails socket-accepts; do
+    for entry in exit spawn; do
+      recovery_case_or_skip "unproven-herdr-$mode-$entry" "rl75-$mode-$entry" || {
+        echo "skip - herdr recovery needs jq (the herdr adapter parses JSON with it)"
+        return 0
+      }
+      dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID listener=
+      if [ "$mode" = status-fails ]; then
+        : > "$dir/fake/herdr-status-fails"
+      else
+        python3 -c 'import socket, sys, time
+s = socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen(8); time.sleep(120)' \
+          "$(cat "$dir/fake/herdr-socket-path")" &
+        listener=$!
+        for _ in $(seq 1 100); do
+          [ ! -S "$(cat "$dir/fake/herdr-socket-path")" ] || break
+          /bin/sleep 0.05
+        done
+      fi
+      rc=0
+      if [ "$entry" = exit ]; then
+        out=$(run_control "$dir" "$id" exit) || rc=$?
+      else
+        out=$(run_spawn "$dir" "$id" --relaunch --harness claude) || rc=$?
+      fi
+      [ -z "$listener" ] || kill "$listener" 2>/dev/null || true
+      log=$(cat "$dir/fake/herdr-log")
+      expect_code 1 "$rc" "an unproven herdr stop ($mode) must refuse $entry"$'\n'"$out"$'\n'"$log"
+      assert_not_contains "$log" "server --session" "an unproven herdr stop ($mode) must not launch a server through $entry"
+      assert_not_contains "$log" "tab create" "an unproven herdr stop ($mode) must not mint a tab through $entry"
+      [ "$(meta_field "$dir" "$id" window)" = 'fmlab:%7' ] \
+        || fail "an unproven herdr stop ($mode) let $entry rewrite the recorded endpoint"
+    done
+  done
+  pass "herdr recovery: a failed status or an accepting socket refuses exit and relaunch without launching a server"
 }
 
 test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server() {
@@ -6864,6 +6913,7 @@ test_relocation_flag_is_scoped_to_relaunch
 test_herdr_relaunch_resumes_only_the_registered_pi_session
 test_herdr_reclaim_adopts_a_pane_that_outlived_its_server
 test_herdr_exit_reports_already_stopped_when_the_pane_outlived_its_server
+test_herdr_recovery_refuses_an_unproven_server_stop
 test_herdr_rebind_stays_in_the_recorded_session
 test_herdr_reclaim_refuses_an_agent_that_came_back
 test_herdr_reclaim_keeps_the_task_whole

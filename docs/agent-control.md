@@ -452,14 +452,16 @@ Two endpoint verdicts can permit a relaunch, subject to the backend policy below
 - `dead` - the endpoint exists and confidently holds no agent. It is **adopted**, so the task keeps its exact recorded address.
 - gone, **proven** - there is no endpoint and therefore no agent, and it cannot be adopted; when the backend policy below permits reclaim, the launch owner **creates one fresh Herdr endpoint in the recorded worktree** and the republished record rebinds the task to it.
 
-That proof is its own step, because the classifier's `missing` is not one state: it conflates *the endpoint was destroyed* with *the endpoint is unreachable from here right now*.
-An unreachable endpoint can still hold the live agent a rebind would duplicate, so absence is proven and never inferred from a failed read - and whether it is provable at all is a property of the backend:
+That proof is its own step because an unreachable endpoint can still hold the live agent a rebind would duplicate.
+Absence is proven and never inferred from a failed read; whether it is provable at all is a property of the backend:
 
-- **Herdr can prove it.** Every read goes through the adapter's `--session <session>` CLI, so the recheck starts and reads the session the *record* names, through that session's own socket.
-  It starts that server (only the server: no workspace and no tab are created) and **re-reads the recorded pane**.
-  `dead` means the pane survived the restart and is adopted after all, with no second tab; `alive` means the agent came back and refuses; only a second `missing` proves the pane itself did not survive ([`docs/herdr-backend.md`](herdr-backend.md) "Restart and liveness behavior").
-  That server start is a real side effect, and the parenthetical above does not cover it: when the recorded session's server no longer exists at all, the probe stands a fresh empty one up in order to ask, and nothing afterwards uses it.
-  So in that state `exit` - which otherwise reads as a read-only inspection - leaves an idle herdr server behind.
+- **Herdr can prove it.** The shared absence proof is the only recovery step that may ensure the recorded session, through the [safe server-start boundary](herdr-backend.md#named-server-and-session-routing); it then **re-reads the recorded pane**.
+  Server startup is a mutation owned by recovery, not by the passive endpoint recheck or crew-state inspection.
+  No workspace or tab is created by that server ensure.
+  `dead` means the pane survived the restart and can be adopted; `alive` means an agent came back and refuses replacement; `missing` from an answering running server proves the pane itself did not survive.
+  Passive classification reads a stopped session as `missing` only after proving that no server process or accepting socket remains, and never starts a server; that `missing` does not license re-creating the endpoint until the recheck reads the pane from a running server.
+  `exit` and `relaunch` reach that proof only when the recorded endpoint reads `missing`, so they start a server only when the recorded session's server is proven absent.
+  That server start is a real side effect: when the restarted pane holds no agent (`already-stopped`) or did not survive (`endpoint-gone`), `exit` leaves the restarted server running and idle.
 - **tmux proves absence for the recorded endpoint only.**
   The record names a session and window but carries no socket identity, so the proof uses what the record does name: the exact recorded session on the server this process addresses, plus the recorded worktree.
   The addressed server must answer definitively, on two reads, that the whole server or the exact session is absent, or list the session without the recorded window.
