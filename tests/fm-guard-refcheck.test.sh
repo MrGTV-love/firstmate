@@ -17,6 +17,8 @@
 #   - a retired guard referenced from tracked code fails
 #   - a retired guard named only by its changelog and its own retirement test
 #     stays clean, which is the only legal place the id may appear
+#   - a file that names the retirement test's own path (whose name holds the id)
+#     stays clean, while the bare id on that same line still fails
 #   - a missing registry is clean (the lint owns that defect, not this check)
 set -u
 # shellcheck source=tests/lib.sh
@@ -125,6 +127,22 @@ printf '#!/usr/bin/env bash\n# proves the previously blocked action now passes: 
 $GIT "$LEGAL" add -A
 $GIT "$LEGAL" -c user.email=t@example.invalid -c user.name=t commit -qm legal
 assert_clean "a retired id named only by its changelog and retirement test stays clean" "$LEGAL"
+
+# A test-runner table names the retirement test by path. That path holds the id,
+# but it names the test, not the guard.
+NAMED=$(fixture named)
+cat >"$NAMED/docs/guards/retired.json" <<'JSON'
+[{"id":"gone-guard","system":"firstmate","invariant":"a retired invariant","retired":"2026-10-22",
+  "why":"it protected a reversible action","replaced_by":"nothing","retirement_test":"tests/fm-retired-gone-guard.test.sh"}]
+JSON
+printf '#!/usr/bin/env bash\n# gone-guard retired\n' >"$NAMED/tests/fm-retired-gone-guard.test.sh"
+printf '#!/usr/bin/env bash\n# hint table\ntests/fm-retired-gone-guard.test.sh 1182\n' >"$NAMED/bin/hints.sh"
+$GIT "$NAMED" add -A
+$GIT "$NAMED" -c user.email=t@example.invalid -c user.name=t commit -qm named
+assert_clean "a file naming the retirement test's path stays clean" "$NAMED"
+printf 'tests/fm-retired-gone-guard.test.sh re-adds gone-guard\n' >>"$NAMED/bin/hints.sh"
+$GIT "$NAMED" -c user.email=t@example.invalid -c user.name=t commit -qam named-regrown
+assert_fails_with "the bare id beside the retirement test's path still fails" "$NAMED" "RESURRECTED gone-guard bin/hints.sh:4"
 
 # --- no registry ------------------------------------------------------------
 NOREG=$(fixture noreg)

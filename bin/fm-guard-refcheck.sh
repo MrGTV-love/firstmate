@@ -17,7 +17,8 @@
 #   2. registry: every owner and test path in the guard registry resolves.
 #   3. retirement: every id in the retirement changelog has zero live references
 #      outside the changelog itself and its own retirement test, and is absent
-#      from the active registry.
+#      from the active registry. A mention of the retirement test's own path is
+#      not a reference to the guard.
 #
 # A path token is anything shaped like <prefix>/<name>.<ext> where prefix is bin,
 # scripts, or a dot-directory hook tree and ext is sh, bash, py, ts, mjs, js,
@@ -143,7 +144,9 @@ fi
 
 # Retirement: zero live references. The changelog and the guard's own retirement
 # test are the two permitted places an id may appear, because that test has to
-# name the action the guard used to block.
+# name the action the guard used to block. A file that names the retirement
+# test's path (a test-runner table, for example) names that test, not the guard,
+# so the path is masked before the id is matched.
 retired_count=0
 resurrected=0
 if [ -f "$RETIRED" ]; then
@@ -155,7 +158,14 @@ if [ -f "$RETIRED" ]; then
       | grep -v '^docs/guards/retired.json:' \
       | grep -v "^$rtest:" \
       | grep -v '^data/guard-audit' \
-      | grep -v '^\.scratch/' || true)
+      | grep -v '^\.scratch/' \
+      | awk -v rid="$rid" -v rtest="$rtest" '
+          rtest == "" { print; next }
+          { rest = $0; masked = ""
+            while ((i = index(rest, rtest)) > 0) {
+              masked = masked substr(rest, 1, i - 1); rest = substr(rest, i + length(rtest))
+            }
+            if (index(masked rest, rid)) print }' || true)
     [ -n "$hits" ] || continue
     while IFS= read -r hit; do
       [ -n "$hit" ] || continue
