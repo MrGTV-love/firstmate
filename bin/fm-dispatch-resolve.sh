@@ -3,7 +3,7 @@
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
 # Usage:
-#   fm-dispatch-resolve.sh <brief-file> [--project <name>]
+#   fm-dispatch-resolve.sh <brief-file> [--project <name>] [--kind ship|scout]
 #
 # Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
 #   resolution and precedence.
@@ -16,22 +16,19 @@
 #   alerts the captain once on 402, 401, or 403 (docs/configuration.md
 #   "TypeSafe account health" owns that contract).
 #
-# What it does when on with at least one rule: one JevClient.systemOne call
-#   combines the vendored Level 5 agent and model questions with ONE rule Choice
-#   whose options are every rule's `when` plus one fixed neutral none option.
-#   The state is the project name and the brief's task-specific text.
-#   bin/fm-dispatch-level5.ts owns this adaptation, the neutral option text, and
-#   reasoning-effort floors; bun runs it when installed, otherwise node with type
-#   stripping. The shared client selects TypeSafe explicitly, retains the raw
-#   exchange, validates every answer, and bounds retries within five seconds.
-#   Everything after the answer uses local policy: the session launch policy and
-#   model-router class filter inside the selected rule, the confidence floor
-#   (0.6 on the answer confidence, or a rule's declared `min_confidence` on that
-#   rule's probability, falling to the most probable other option that clears
-#   its own floor; options that select the identical outcome pool their
-#   probabilities, because a split between them cannot be a wrong pick, and
-#   that is how the neutral `default`, which cannot declare `min_confidence`,
-#   shares a rule's support), the rule's declared `approval` and `floor`, each
+# What it does when on with at least one rule: code first filters structured
+#   rule project/kind facts, then one JevClient.systemOne call judges referenced
+#   semantic Nouls alongside ambiguity, desktop access, model tier and effort.
+#   The state is project, kind, and the brief's task-specific text. --kind is
+#   authoritative when supplied; otherwise the exact scout scaffold marker
+#   selects scout and all other briefs are ships. Task prose cannot set project.
+#   bin/fm-dispatch-level5.ts owns question assembly, the pinned model and effort
+#   floors; bun runs it when installed, otherwise node with type stripping.
+#   The shared client selects TypeSafe explicitly, retains the raw exchange,
+#   validates every answer, and bounds retries within five seconds.
+#   After the answer, code combines predicates and applies the support floor
+#   (0.6, or min_confidence on that rule), session launch policy, model class,
+#   declared approval and quota floors, each
 #   profile's declared `provider` and `floor`, and the normalized quota
 #   composite over ONE compatible quota-axi --json snapshot and one OMP pool
 #   report. Proven exhaustion of every candidate activates the selected rule's
@@ -53,7 +50,7 @@
 # Output (stdout, TOON-style block):
 #   dispatch-resolve:
 #     status: clear | ambiguous | escalate | error
-#     model/latency_ms/tokens, rule (when excerpt) and confidence, probabilities
+#     model/latency_ms/tokens, rule (when excerpt) and confidence (support), support
 #     timings: api_ms/quota_ms/local_ms/total_ms
 #     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
 #   These diagnostics accompany normal resolution and structured errors, but
@@ -74,10 +71,8 @@
 #   echoing arbitrary API text.
 #   Only numeric usage and the returned model id are observed, never request text
 #   or raw API error bodies, which may echo sensitive input.
-#     routing: <Level 5 agent and model decisions, and any escalation>
+#     routing: <ambiguity, desktop capability, model decision, and escalation>
 #     fallback: <runner-up rule or declared stand-in taken, and why>
-#     replaced: <the answer choice a pooled group replaced, with its probability and floor, and the group>
-#     pooled: <the options pooled with the pick, when pooling cleared its floor>
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. pool=..
 #       quota_score=.. parts=.. weights=.. common=.. bounds=..
@@ -85,9 +80,9 @@
 #          | eligible, unranked: <reason> | not eligible: <reason>
 #     profile: --harness <h> [--model <m>] [--effort <e>] [--dispatch-rule <r> --dispatch-route <class:effort>]     (status clear only)
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
-#   ambiguous -> confidence below the floor; decide as today from the probabilities
-#   escalate  -> approval required, unverifiable rule floor, high ambiguity, an
-#                unsupported handler or capability, every selected profile
+#   ambiguous -> support below the floor or conflicting rule tie; decide as today
+#   escalate  -> approval required, unverifiable rule floor, high ambiguity, a
+#                desktop capability request, every selected profile
 #                filtered out, no candidate rankable, a genuine tie, or a
 #                winner whose established runway is shorter than the task horizon
 #   error     -> API, network, response, quota-axi, or chosen-profile model-index
@@ -170,7 +165,6 @@ log_result() {
      choice: ($r.choice | option), rule: ($r.rule | option), selected: ($r.selected | option),
      profile: ($r.chosen.profile | profile),
      confidence: ($r.confidence | num), floor: ($r.floor | num),
-     pooled: ($r.pooled.probability | num),
      reason: ($reason | text)}' 2>/dev/null) || return 0
   mkdir -p "${RESOLVE_LOG%/*}" 2>/dev/null || return 0
   printf '%s\n' "$line" >> "$RESOLVE_LOG" 2>/dev/null || true
@@ -196,11 +190,12 @@ usage() {
   ' "$0"
 }
 
-BRIEF='' PROJECT='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
+BRIEF='' PROJECT='' KIND='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
 NEVER_SEND_PATH="$CONFIG/dispatch-never-send"
 while [ $# -gt 0 ]; do
   case "$1" in
     --project) [ $# -ge 2 ] || die "--project needs a value"; PROJECT=$2; shift 2 ;;
+    --kind) [ $# -ge 2 ] || die "--kind needs a value"; KIND=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown flag $1" ;;
     *) [ -z "$BRIEF" ] || die "one brief file only"; BRIEF=$1; shift ;;
@@ -458,10 +453,18 @@ elif command -v node >/dev/null 2>&1; then
 else
   emit_error "neither bun nor node installed"
 fi
-"${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" > "$MODEL_CONFIG/level5-request.json" \
+"${LEVEL5[@]}" validate "$RULES" \
+  || die_rules "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria"
+if [ -z "$KIND" ]; then
+  KIND=ship
+  if grep -qxF 'Brief kind: scout (report only)' "$TASK_TEXT" ||
+    grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$TASK_TEXT"; then KIND=scout; fi
+fi
+case "$KIND" in ship|scout) ;; *) die "--kind must be ship or scout" ;; esac
+"${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" "$KIND" > "$MODEL_CONFIG/level5-request.json" \
   || emit_error "Level 5 request preparation failed"
 REQUEST=$(cat "$MODEL_CONFIG/level5-request.json")
-DEFAULT_WHEN=$(jq -r '.questions.rule.criteria.default' <<<"$REQUEST")
+DEFAULT_WHEN='No listed rule applies to this task.'
 never_send_check
 # The complete upstream exchange is preserved until policy derives its view.
 api_rc=0
@@ -521,7 +524,7 @@ fi
 RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --arg route "$DISPATCH_ROUTE" --argjson pmap "$PMAP" \
   --argjson omp_pools "$OMP_POOLS" \
   --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
-  ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
+  ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.selection) as $a |
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   def prov($p; $lane): quota_row($q; $p; $lane);
   def rows($p; $lane): (prov($p; $lane) | .quotaSemantics.effectiveAvailability // []);
@@ -630,9 +633,9 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   def declared_confidence($c): rule_at($c) as $x | $x != null and ($x | has("min_confidence"));
   def confidence_floor($c): if declared_confidence($c) then rule_at($c).min_confidence else ($floor | tonumber) end;
   # The dispatch outcome one option selects: everything $sel below reads from a
-  # rule (or from the default array), minus the `when` text the model chose by.
-  # Two options with equal outcomes are one decision, so a split between them
-  # cannot be a wrong pick. Profile order never changes the ranking.
+  # rule (or from the default array), minus the human-readable `when` text.
+  # Equal-support rules with equal outcomes need no arbitrary tie decision.
+  # Profile order never changes the ranking.
   def outcome($c):
     if $c == "default" then
       {use: (profiles($cfg.default // null) | map(tojson) | sort), filtered: ($cfg.default_filtered // []),
@@ -643,48 +646,20 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       else {use: (profiles($x.use) | map(tojson) | sort), filtered: ($x.filtered // []), approval: ($x.approval // null),
             floor: ($x.floor // null), select: ($x.select // null), fallback: ($x.fallback // [])} end
     end;
-  def own_p($c): if $c == $a.choice and (declared_confidence($c) | not) then $a.confidence else $a.probabilities[$c] end;
-  def rounded: (. * 1000000000 | round) / 1000000000;
-  # A group of options that select the identical outcome is one decision. It is
-  # stood for by the answer choice when that is a member and by its most
-  # probable member otherwise, and the floor is the stand-in floor. The support
-  # the floor tests is the answer confidence (or the own probability of a choice
-  # that declares a floor) plus the probability of every other member.
-  def stands($m): if ($m | index($a.choice)) != null then $a.choice else ($m | sort_by(-($a.probabilities[.])) | first) end;
-  def group_floor($m): confidence_floor(stands($m));
-  def group_support($m): ($m | map(own_p(.)) | add) as $s | if ($m | length) > 1 then [($s | rounded), 1] | min else $s end;
-  def group_clears($m): group_support($m) >= group_floor($m);
-  # The pick is the group holding the answer choice; when that group does not
-  # reach its floor and the group with the most probability does, the pick is
-  # that group.
+  # Independent predicate supports are not mutually exclusive probabilities.
+  # Do not add them, even when two rules happen to select identical profiles.
   ($a.choice) as $asked |
-  ([$a.probabilities | keys_unsorted[] | {key: ., outcome: (outcome(.) // .)}] | group_by(.outcome)
-    | map({members: map(.key), support: (map($a.probabilities[.key]) | add | rounded)})) as $groups |
-  ($groups | max_by([.support, (.members | index($asked) != null)])) as $top |
-  ($groups | map(select(.members | index($asked) != null)) | first) as $own |
-  (if ($top.members | length) > 1 and $top.members != $own.members and group_clears($top.members) and (group_clears($own.members) | not)
-   then $top else $own end) as $won |
-  ($won.members) as $members |
-  (stands($members)) as $picked |
-  ($members | length > 1) as $pooled_group |
-  (group_floor($members)) as $picked_floor |
-  (declared_confidence($picked)) as $declared |
-  (group_support($members)) as $pooled_p |
-  (if $pooled_group then $pooled_p else $a.probabilities[$picked] end) as $shown_p |
-  (if $pooled_group then "pooled probability" else "probability" end) as $p_word |
-  # A declared floor is checked against the probability of that option whether
-  # it is the pick or a runner-up, so a runner-up never needs weaker support
-  # than it would as the pick. Only a pick that declares its own floor falls
-  # through to a runner-up, so a file with no declared floors and no equivalent
-  # options keeps the single global floor on the answer confidence exactly.
-  (if $declared | not then
-     (if $pooled_p >= $picked_floor then {below: false} else {below: true, global: true} end)
-   elif $pooled_p >= $picked_floor then {below: false}
+  ($asked) as $picked |
+  (confidence_floor($picked)) as $picked_floor |
+  ($a.support[$picked]) as $shown_p |
+  "support" as $p_word |
+  (if $shown_p >= $picked_floor then {below: false}
+   elif (declared_confidence($picked) | not) then {below: true, global: true}
    else
-     ([$a.probabilities | to_entries[] | select(.key != $picked and .value >= confidence_floor(.key))]
+     ([$a.support | to_entries[] | select(.key != $picked and .value >= confidence_floor(.key))]
        | sort_by(-.value)) as $ok |
      if ($ok | length) == 0 then {below: true, why: "no other option clears its own floor"}
-     elif ($ok | length) > 1 and $ok[1].value == $ok[0].value then {below: true, why: "runner-up tie"}
+     elif any($ok[]; .value == $ok[0].value and outcome(.key) != outcome($ok[0].key)) then {below: true, why: "runner-up tie"}
      else {below: true, to: $ok[0].key, p: $ok[0].value, to_floor: confidence_floor($ok[0].key)} end
    end) as $fb |
   (if $fb.to then $fb.to else $picked end) as $choice |
@@ -705,14 +680,6 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
      then $default_sel + {note: "rule \($choice) floor \($rule.floor.scope) below \($rule.floor.min_percent)%: fall through to default"}
    else {source: $choice, use: profiles($rule.use), filtered: ($rule.filtered // []), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
-  # Reported only when pooling is what let the group clear its floor: no member
-  # reaches its own floor alone.
-  (if ($members | index($asked)) == null
-   then {replaced: {choice: $asked, probability: group_support($own.members), floor: group_floor($own.members),
-                    options: ([$picked] + ($members | map(select(. != $picked)))), pooled_probability: $pooled_p}}
-   else {} end) as $swap |
-  (if ($fb.below | not) and $pooled_group and all($members[]; own_p(.) < confidence_floor(.))
-   then {pooled: {probability: $pooled_p, floor: $picked_floor, options: ([$picked] + ($members | map(select(. != $picked))))}} else {} end) as $pool |
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
     choice: $asked, rule: $picked, selected: $sel.source, floor: $picked_floor,
@@ -721,16 +688,16 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       elif ((rule_at($sel.source).fallback // []) | length) > 0 then $sel.source else null end),
     rule_when: when_of($picked),
     dispatch_route: $route,
-    confidence: $a.confidence, probabilities: $a.probabilities, routing: $r.route
+    confidence: $a.confidence, support: $a.support, routing: $r.route
   }
-  + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) \($p_word) \($shown_p) is below its floor \($picked_floor)"} else {} end)
-  + $pool
-  + $swap
+  + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) support \($fb.p) clears its floor \($fb.to_floor); \($picked) \($p_word) \($shown_p) is below its floor \($picked_floor)"} else {} end)
   as $ev |
   if $r.route.escalate then $ev + {status: "escalate", reason: $r.route.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
+  elif ($fb.below | not) and any($a.support | to_entries[]; .key != $picked and .value == $shown_p and outcome(.key) != outcome($picked)) then
+    $ev + {status: "ambiguous", reason: "conflicting rule support tie", candidates: ($answer_use | map(evaluate(.)))}
   elif $fb.below and $fb.global then
-    $ev + {status: "ambiguous", reason: (if $pooled_group then "\($picked) \($p_word) \($shown_p) below floor \($floor)" else "confidence \($a.confidence) below floor \($floor)" end), candidates: ($answer_use | map(evaluate(.)))}
+    $ev + {status: "ambiguous", reason: "support \($shown_p) below floor \($floor)", candidates: ($answer_use | map(evaluate(.)))}
   elif $fb.below and ($fb.to | not) then
     $ev + {status: "ambiguous", reason: "\($picked) \($p_word) \($shown_p) below its floor \($picked_floor); \($fb.why)", candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.escalate then
@@ -820,11 +787,9 @@ TEXT=$(jq -r '
   "  status: \(.status | flat)",
   "  model: \(show(.model))   latency_ms: \(show(.latency_ms))   tokens: \(show(.tokens.input_tokens))/\(show(.tokens.output_tokens))",
   "  rule: \(.rule | flat) (\(.rule_when | flat))   confidence: \(.confidence | flat)",
-  "  probabilities: \([.probabilities | to_entries[] | "\(.key | flat)=\(.value | flat)"] | join(" "))",
+  "  support: \([.support | to_entries[] | "\(.key | flat)=\(.value | flat)"] | join(" "))",
   "  routing: \(.routing | tojson | flat)",
   (if .fallback then "  fallback: \(.fallback | flat)" else empty end),
-  (if .replaced then "  replaced: answer choice \(.replaced.choice | flat) (probability \(.replaced.probability | flat), floor \(.replaced.floor | flat)) did not clear; pooled group \([.replaced.options[] | flat] | join(" ")) (probability \(.replaced.pooled_probability | flat)) stands in" else empty end),
-  (if .pooled then "  pooled: \([.pooled.options[] | flat] | join(" ")) select the same profiles, approval and floors; combined probability \(.pooled.probability | flat) clears floor \(.pooled.floor | flat)" else empty end),
   (if .reason then "  reason: \(.reason | flat)" else empty end),
   (if .note then "  note: \(.note | flat)" else empty end),
   (.candidates[]? | "  candidate: \(.profile.harness | flat):\(show(.profile.model))"
