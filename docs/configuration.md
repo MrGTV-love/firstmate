@@ -2482,6 +2482,7 @@ Native semantic `find`, web search, browser automation, subagent dispatch and pr
 `xd://report_issue` has no table row and no grant path: like every other unadmitted xd device it is refused by the [native-device rule](#model-policy), whatever the task grants.
 Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
 Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
+omp's `read`, `grep` and `ast-grep` would otherwise fetch URL paths, so the worker launch overlay [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) sets `fetch.enabled: false` and those calls fail with omp's own `URL reads are disabled by settings.` error; web access requires a `web` grant for a web-classed tool.
 The rule is deterministic and needs neither a model verdict nor a working provider credential.
 Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
 A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
@@ -2496,7 +2497,7 @@ Each tool has at most one destination class, which must be granted; a grant neve
 
 Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
 A native paid `find` records its deterministic decision even though it has no shell/write model classification.
-Local `read` remains pre-tool unjudged, `bash` keeps shell screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
+Local file `read` remains pre-tool unjudged, `bash` keeps shell screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
 This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
@@ -2508,7 +2509,8 @@ A coverage refusal names the refused host tool and states that no call was made.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
 Claude `Monitor` and `PowerShell` run commands outside the screened `bash` path and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
 The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the existing plain-path guard.
-They are not instrumented in `state/guard-events.jsonl`; each refusal and each granted outbound call writes one content-free terminal row to the owning home's `state/jev-guard.jsonl`.
+Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, task session and timing; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
+The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision emits no Firstmate event.
 
 ### Model policy
 

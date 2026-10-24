@@ -5,7 +5,8 @@
   "audited": 30,
   "beyond_audit_active": [
     "jev-tool-coverage",
-    "jev-egress-grant"
+    "jev-egress-grant",
+    "omp-worker-url-reads-off"
   ],
   "guards": [
     {
@@ -695,7 +696,7 @@
       "proxy_reason": "",
       "precheck_gap": "",
       "exemptions": [],
-      "instrumented": false,
+      "instrumented": true,
       "status": "active",
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
@@ -712,7 +713,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "not instrumented in state/guard-events.jsonl; each decision writes one content-free terminal row to state/jev-guard.jsonl with branch=coverage"
+      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, task session and elapsed time only; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",
@@ -721,7 +722,7 @@
       "proxy_reason": "",
       "precheck_gap": "",
       "exemptions": [],
-      "instrumented": false,
+      "instrumented": true,
       "status": "active",
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
@@ -738,7 +739,33 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an unreadable, malformed or symlinked grant record grants nothing; the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "not instrumented in state/guard-events.jsonl; each decision writes one content-free terminal row to state/jev-guard.jsonl with branch=egress and the single destination_class"
+      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, task session and elapsed time only; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "omp-worker-url-reads-off",
+      "owner": ".omp/fm-worker-overlay.yml",
+      "invariant": "an omp worker's read, grep or ast-grep call never fetches a URL path",
+      "layer": "impossible-by-construction",
+      "source": "omp's fetch.enabled setting, set false in .omp/fm-worker-overlay.yml, which bin/fm-spawn.sh passes to every omp ship and scout launch",
+      "trigger": "an omp worker calls read, grep or ast-grep with an http or https URL path",
+      "remedy": "use a web-classed tool under a task grant instead: Firstmate records egress=[\"web\"] in state/<task>.meta and the worker calls web_search; omp's own error reads URL reads are disabled by settings.",
+      "budget": 1,
+      "test": "tests/fm-jev-guard-omp-live-e2e.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "remedy_verified": "fixture",
+      "fail_direction_note": "bin/fm-spawn.sh refuses an omp worker launch when .omp/fm-worker-overlay.yml is missing",
+      "telemetry_note": "not instrumented: omp refuses inside its own tool, so no Firstmate code observes the decision"
     }
   ],
   "excluded": [

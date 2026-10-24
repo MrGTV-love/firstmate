@@ -391,6 +391,32 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
     assert.equal(r.request_started, false);
   } finally { rmSync(`${state}/audit.meta`); }
 });
+await test('M4: each coverage and egress decision emits one content-free central guard event', async () => {
+  delete process.env.FM_GUARD_EVENT_LOG;
+  const log = `${state}/state/guard-events.jsonl`;
+  const events = () => { try { return readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)); } catch { return []; } };
+  const decide = async (event, expected) => {
+    const before = events().length;
+    await handlers.tool_call(event, { cwd: state });
+    const added = events().slice(before);
+    assert.deepEqual(added.map(e => [e.guard, e.decision]), expected, event.toolName);
+    for (const e of added) {
+      assert.deepEqual(Object.keys(e).sort(), ['cleared_by', 'decision', 'elapsed_ms', 'guard', 'override', 'repeat', 'session', 'source_ok', 'system', 'ts', 'version']);
+      assert.equal(e.session, 'audit');
+      assert.equal(e.system, 'firstmate');
+      assert.equal(e.source_ok, true);
+      assert.ok(Number.isInteger(e.elapsed_ms));
+      assert.ok(!JSON.stringify(e).includes('private-event-canary'), 'events carry no call content');
+    }
+  };
+  await decide({ toolName: 'read', input: { path: 'private-event-canary' } }, [['jev-tool-coverage', 'allow']]);
+  await decide({ toolName: 'new-paid-host-tool', input: { q: 'private-event-canary' } }, [['jev-tool-coverage', 'deny']]);
+  await decide({ toolName: 'find', input: { query: 'private-event-canary' } }, [['jev-tool-coverage', 'allow'], ['jev-egress-grant', 'deny']]);
+  writeFileSync(`${state}/audit.meta`, 'egress=["semantic-search"]\n');
+  try {
+    await decide({ toolName: 'find', input: { query: 'private-event-canary' } }, [['jev-tool-coverage', 'allow'], ['jev-egress-grant', 'allow']]);
+  } finally { rmSync(`${state}/audit.meta`); }
+});
 await test('worker brief shell commands are never refused for a missing egress grant', async () => {
   const commands = ['gh-axi pr create --title synthetic --body synthetic', 'gh pr checks 1 --watch',
     'no-mistakes axi run --wait', 'no-mistakes axi respond --action fix --wait', 'git push -u origin HEAD',
