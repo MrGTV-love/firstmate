@@ -1941,31 +1941,4 @@ control_relaunch_test_cases+=(
   test_recovery_fixture_claims_only_owned_temp_directories
 )
 
-# Validate the complete selection before running any behavioral case.
-for requested_case in "$@"; do
-  registered_case=false
-  for test_case in "${control_relaunch_test_cases[@]}"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      registered_case=true
-      break
-    fi
-  done
-  if [ "$registered_case" = false ]; then
-    printf 'Unknown test case: %s\n' "$requested_case" >&2
-    printf 'Usage: bash tests/fm-control-relaunch-recovery.test.sh [test_function_name ...]\n' >&2
-    exit 2
-  fi
-done
-
-for test_case in "${control_relaunch_test_cases[@]}"; do
-  if [ "$#" -eq 0 ]; then
-    "$test_case"
-    continue
-  fi
-  for requested_case in "$@"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      "$test_case"
-      break
-    fi
-  done
-done
+control_relaunch_run "$@"

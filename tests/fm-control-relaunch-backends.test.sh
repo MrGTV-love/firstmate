@@ -1472,12 +1472,6 @@ SH
   pass "supervised OMP recovery enforces the typed route class and effort on stand-ins"
 }
 
-test_concrete_ask_lifecycle_boundaries() {
-  test_relaunch_never_runs_the_task_definition_of_done_check
-  test_concrete_ask_admission_completes_fresh_spawns
-  test_fresh_charter_bypasses_concrete_ask_check
-}
-
 test_quota_exhaustion_relaunches_only_a_permitted_route() {
   local dir model id meta out rc
   for model in openai-codex/gpt-6-luna openai-codex/gpt-6.1-sol; do
@@ -1625,31 +1619,4 @@ test_herdr_shell_only_ordinary_lifecycle_accepts_missing_registration
 test_managed_herdr_relaunch_refuses_unproven_replacement_env
 )
 
-# Validate the complete selection before running any behavioral case.
-for requested_case in "$@"; do
-  registered_case=false
-  for test_case in "${control_relaunch_test_cases[@]}"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      registered_case=true
-      break
-    fi
-  done
-  if [ "$registered_case" = false ]; then
-    printf 'Unknown test case: %s\n' "$requested_case" >&2
-    printf 'Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]\n' >&2
-    exit 2
-  fi
-done
-
-for test_case in "${control_relaunch_test_cases[@]}"; do
-  if [ "$#" -eq 0 ]; then
-    "$test_case"
-    continue
-  fi
-  for requested_case in "$@"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      "$test_case"
-      break
-    fi
-  done
-done
+control_relaunch_run "$@"

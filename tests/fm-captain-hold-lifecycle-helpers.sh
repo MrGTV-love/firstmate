@@ -287,7 +287,7 @@ write_origin_meta() {  # <home> <id> [kind]
 # through bd directly where possible because the npm-published tasks-axi ships
 # the markdown backend only; the hold itself needs a beads-capable tasks-axi,
 # so that family probes once and skips itself with an explicit reason on
-# markdown-only installs, mirroring tests/fm-control-relaunch.test.sh.
+# markdown-only installs, mirroring tests/fm-control-relaunch-recovery.test.sh.
 
 # Build a fixture home whose configured backend is a scratch Beads graph.
 # Echoes "<home>|<graph-beads-dir>". The graph repo dir is named "fm" because

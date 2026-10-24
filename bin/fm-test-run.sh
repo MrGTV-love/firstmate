@@ -1892,6 +1892,8 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       printf '%s\n' "__script__:fm-omp-harness.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
       printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
@@ -1944,6 +1946,8 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-spawn-dispatch-profile.test.sh"
       printf '%s\n' "__script__:fm-worker-account.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
       printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' session-bootstrap
       ;;

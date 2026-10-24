@@ -3249,7 +3249,7 @@ test_control_relaunch_groups_partition_one_inventory() {
 }
 
 # The fm-watch-triage-waits selector called 67 shared-helper cases as one list.
-# Its three group files must still call exactly those cases once each; the case
+# Its four group files must still call exactly those cases once each; the case
 # bodies live in the shared helper, so the cover is checked against the helper's
 # definitions rather than against the group file.
 test_watch_triage_waits_groups_partition_one_inventory() {

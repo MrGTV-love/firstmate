@@ -645,7 +645,7 @@ Each real model read and acknowledged unread instruction 005, wrote a factual re
 The fixture compared the retained commit, dirty file bytes, untracked file bytes, acknowledged instruction bytes, and whole backlog bytes; all were preserved.
 The named Herdr helper completed cleanup without its default-session tripwire firing.
 
-The portable public-interface regressions in `tests/fm-control-relaunch.test.sh` cover held, dependency-only, and combined restrictions, fresh blocked dispatch, inherited recovery after a genuine prerequisite completes, explicit owner-authorized clearance, both continuation/replacement lock orderings, and away-branch replacement admission.
+The portable public-interface regressions in `tests/fm-control-relaunch-recovery.test.sh` cover held, dependency-only, and combined restrictions, fresh blocked dispatch, inherited recovery after a genuine prerequisite completes, explicit owner-authorized clearance, both continuation/replacement lock orderings, and away-branch replacement admission.
 Their session-authority fixtures, stubbed backends, and 14-harness admission matrix are structural evidence, not live-harness liveness or model-compliance proof.
 The recovery-grade boundary remains tmux and Herdr; zellij, Orca, and cmux retain their existing refusal, and no native recovery surface was added for them.
 Secondmates retain their separate recovery owner rather than acquiring this ship/scout recovery option.
@@ -3144,7 +3144,7 @@ This guard does not modify remote secondmates, unrelated panes, shared worktree 
 `tests/fm-launch-proof.test.sh` covers matching and missing kernel environment pins, versioned and legacy records, foreground ancestry, shells and helpers, interpreter-based harnesses, and rejection of argv, cwd, and initial-message shortcuts.
 Its kernel-environment probes are identity-registered and remain alive until cleanup, rather than expiring while a slow host is still reading them.
 Its `test_launch_proof_pinned_personal_switch` case changes only the active session proof and verifies that a same-PID personal-session switch loses managed authority.
-`test_reboot_recovery_inspects_without_native_attribution` in `tests/fm-control-relaunch.test.sh` covers inspection without lifecycle input or task-record mutation.
+`test_reboot_recovery_inspects_without_native_attribution` in `tests/fm-control-relaunch-backends.test.sh` covers inspection without lifecycle input or task-record mutation.
 `tests/fm-omp-harness.test.sh` covers activation, cancelled and rolled-back transitions, shutdown, and child-event preservation with both minimum-runtime and newer context shapes.
 Profile and raw-shell launch regressions assert successful execution with unrelated missing or unlisted defaults and preserved shell effects; they do not require zero harness calls, because the supported-version preflight may invoke `omp --version` before launch.
 The token-free installed-runtime refresh for the production proof extension is:
