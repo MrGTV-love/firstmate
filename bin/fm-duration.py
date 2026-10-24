@@ -621,7 +621,9 @@ def communicate_progress(child, inactivity):
     """Wait for a captured source, raising TimeoutExpired only on proven inactivity.
 
     The caller owns cleanup so its existing descendant/identity discipline is
-    retained. TimeoutExpired carries accumulated output on each observation.
+    retained. TimeoutExpired carries accumulated output on each observation;
+    the raised one names the inactivity interval, not the short poll slice,
+    because callers publish str(error) as operator evidence.
     """
     observed = {}
     previous_cpu, previous_bytes = -1, -1
