@@ -12,8 +12,10 @@ HOME and DSH_HOME at STATE/ID.dsh/GENERATION, then atomically publishes
 STATE/ID.dsh-session and retires the generation that binding replaced.
 The installed package tree is reproduced inside the launch root, hard-linked
 file by file where the filesystem allows and copied otherwise, never linked as
-a directory; configuration, credentials, preferences, and session logs belong
-exclusively to this launch.
+a directory. DSH's own configuration, credentials, preferences, and session
+logs belong exclusively to this launch; every other operator-home entry
+(FM_DSH_OPERATOR_HOME, else the invoking HOME) is symlinked into the private
+HOME so the agent keeps the operator's CLI authentication and tool state.
 prepare-primary STATE ID GENERATION SOURCE_HOME MODEL EFFORT CWD CODE_ROOT
 stages the same private runtime plus CODE_ROOT/.dsh/fm-primary.mjs, the native
 session-open, watcher and passive turn-end adapter. Resume retains that role.
@@ -38,10 +40,12 @@ strictly increasing integer seq. Missing data, or data that fails one of
 those checks, prints "unknown: <the failed check>". With --since, anything
 recorded at or before POSITION is history: a turn must have started beyond
 it, or the state is unknown.
-route MODEL [PROVIDER] prints the default model-family adapter.
+route MODEL [PROVIDER] prints the default model-family adapter. DeepSeek is
+matched as omp resolves it: provider deepseek, or a deepseek/ model prefix,
+trimmed and case-insensitive.
 check HARNESS MODEL [PROVIDER] requires dsh for DeepSeek and refuses dsh
-unless the model is a concrete DeepSeek id: a deepseek/ prefix (or provider
-deepseek), then a non-empty id with no slash or whitespace.
+unless the model is a concrete DeepSeek id: a DeepSeek route, then a non-empty
+id with no slash or whitespace.
 """
 import argparse
 import json
@@ -53,8 +57,17 @@ import sys
 CHUNK = 1024 * 1024
 
 
+def deepseek_id(model, provider=""):
+    head, slash, tail = model.strip().partition("/")
+    if slash and head.strip().lower() == "deepseek":
+        return tail.strip()
+    if provider.strip().lower() == "deepseek":
+        return model.strip()
+    return None
+
+
 def route(model, provider=""):
-    if provider == "deepseek" or model.startswith("deepseek/"):
+    if deepseek_id(model, provider) is not None:
         return "dsh"
     if model.startswith("claude"):
         return "claude"
@@ -66,10 +79,10 @@ def check(harness, model, provider=""):
         if route(model, provider) == "dsh":
             raise ValueError("DeepSeek runs through dsh-tui, not " + harness + "; select --harness dsh")
         return
-    bare = model.removeprefix("deepseek/")
-    if not bare:
+    bare = deepseek_id(model, provider)
+    if not model.strip() or bare == "":
         raise ValueError("dsh requires an explicit DeepSeek model id")
-    if route(model, provider) != "dsh":
+    if bare is None:
         raise ValueError(f"dsh runs only DeepSeek models, not '{model}'")
     if "/" in bare or any(c.isspace() for c in bare):
         raise ValueError("dsh requires a concrete DeepSeek model id")
@@ -83,8 +96,8 @@ def normalize(value):
         model, provider = value.get("model", ""), value.get("provider", "")
         if "harness" in value and isinstance(model, str) and isinstance(provider, str):
             check(value["harness"], model, provider)
-            if value["harness"] == "dsh" and provider == "deepseek" and model and not model.startswith("deepseek/"):
-                value["model"] = "deepseek/" + model
+            if value["harness"] == "dsh":
+                value["model"] = "deepseek/" + deepseek_id(model, provider)
         return value
     return value
 
@@ -135,7 +148,7 @@ def prepare(args, primary_root=None):
         if not (Path(primary_root) / ".dsh" / "fm-primary.mjs").is_file():
             raise ValueError("dsh primary plugin is missing")
     check("dsh", model)
-    model = model.removeprefix("deepseek/")
+    model = deepseek_id(model)
     if effort in ("", "default"):
         effort = ""
     elif effort not in ("low", "medium", "high", "xhigh", "max"):
@@ -328,7 +341,7 @@ def resume(args, primary_root=None):
     except (OSError, ValueError):
         # No recorded session: the caller prepares a fresh launch.
         return
-    model = model.removeprefix("deepseek/")
+    model = deepseek_id(model)
     effort = "" if effort in ("", "default") else effort
     if (binding.get("model"), binding.get("effort"), binding["cwd"]) != (model, effort, str(Path(cwd).resolve())):
         return

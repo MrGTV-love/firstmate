@@ -358,6 +358,22 @@ PY
   pass "fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default"
 }
 
+test_deepseek_spelling_without_a_harness_routes_to_dsh() {
+  local id out status spelling
+  for spelling in 'DeepSeek/deepseek-v4-flash' ' DeepSeek / deepseek-v4-flash '; do
+    id="dsh-spelled-${#spelling}"
+    make_dsh_case "spelled-${#spelling}" "$id"
+    out=$(run_dsh_spawn "$id" --model "$spelling" --scout 2>&1)
+    status=$?
+    expect_code 0 "$status" "'$spelling' with no harness must launch on dsh, not be refused: $out"
+    assert_contains "$out" "spawned $id harness=dsh" "'$spelling' must report the dsh harness"
+    assert_grep "harness=dsh" "$HOME_DIR/state/$id.meta" "'$spelling' meta must record dsh, not the crew default"
+    [ "$(jq -r .model "$HOME_DIR/state/$id.dsh-session")" = deepseek-v4-flash ] \
+      || fail "'$spelling' must bind the bare DeepSeek id"
+  done
+  pass "fm-spawn: DeepSeek spellings omp would resolve to the deepseek provider route to dsh with no harness"
+}
+
 test_explicit_harness_is_not_rerouted() {
   local id=dsh-explicit out status
   make_dsh_case explicit "$id" claude
@@ -775,6 +791,7 @@ test_lock_identity_and_tmux_liveness_name_dsh
 test_tmux_agent_state_names_dsh
 test_busy_classify_follows_the_launch_session_log
 test_deepseek_model_without_a_harness_routes_to_dsh
+test_deepseek_spelling_without_a_harness_routes_to_dsh
 test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_mirrored_dsh_primary_carries_its_bound_model

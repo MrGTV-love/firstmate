@@ -35,10 +35,11 @@ The dsh template clears every foreign marker at its own boundary, and the omp te
 
 ## Routing
 
-`bin/fm-dsh.py route` maps provider `deepseek` or a `deepseek/` model prefix to dsh; `claude*` maps to claude and everything else to omp, without changing non-DeepSeek dispatch.
+`bin/fm-dsh.py route` maps provider `deepseek` or a `deepseek/` model prefix to dsh, matched as omp resolves the selector (trimmed, case-insensitive); `claude*` maps to claude and everything else to omp, without changing non-DeepSeek dispatch.
+The omp billing-route guard in `../../../bin/fm-api-key-guard-lib.sh` delegates its DeepSeek refusal to `bin/fm-dsh.py check omp`, so raw omp launches and fallback capability checks use the same rule.
 `../../../bin/fm-spawn.sh` selects dsh for an implicit DeepSeek ship or scout; contradictory explicit DeepSeek adapters refuse rather than keep omp as a parallel route.
 An omp launch omitting `--model` also checks its resolved shared Default role through this owner, so a catalog-listed DeepSeek default cannot bypass the cutover.
-`bin/fm-dsh.py check` requires dsh for DeepSeek and requires a concrete model id (a `deepseek/` prefix, or an explicit `deepseek` provider, followed by a non-empty id with no `/` or whitespace).
+`bin/fm-dsh.py check` requires dsh for DeepSeek and requires a concrete model id (a DeepSeek route, followed by a non-empty id with no `/` or whitespace); prepare and resume bind the bare id, so `DeepSeek/<id>` and `deepseek/<id>` select the same binding.
 Relaunch checks that admission before stopping the running agent; dsh secondmates load the same native primary plugin as the main session rather than returning DeepSeek to omp.
 `../../../bin/fm-dispatch-resolve.sh` normalizes provider-only models only for dsh profiles and rejects contradictory adapter/model profiles without rewriting them.
 Declared DeepSeek stand-ins are cross-harness dsh replacements, never native omp fallback-chain entries; the fallback schema and session-policy admission belong to [configuration](../../../docs/configuration.md#crew-dispatch-profiles-configcrew-dispatchjson).

@@ -2961,12 +2961,14 @@ launch_template() {
     fi
     ;;
   # dsh-tui has no model, effort, or preference flags, so the launch swaps HOME
-  # for the task's private one. GIT_CONFIG_GLOBAL and NM_HOME name the operator's
-  # real git identity file and no-mistakes home, resolved by the pane shell before
-  # HOME changes, so a commit keeps its author and the worker still reaches the
-  # shared daemon; every other HOME-relative tool state is absent on purpose.
-  # A secondmate's own spawns stage from the operator's DSH install and link
-  # the operator's real home.
+  # for the task's private one. bin/fm-dsh.py prepare symlinks every operator-home
+  # entry except .dsh and .dsh-tui into it, so every kind keeps the operator's CLI
+  # authentication and tool state. GIT_CONFIG_GLOBAL and NM_HOME name the
+  # operator's real git identity file and no-mistakes home, resolved by the pane
+  # shell before HOME changes, so a commit keeps its author and the worker still
+  # reaches the shared daemon. A secondmate's own spawns stage from the
+  # operator's DSH install and link the operator's real home, never this
+  # session's private one.
   dsh)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh '
     [ "$kind" != secondmate ] || printf '%s' 'FM_DSH_SOURCE_HOME=__DSHSOURCE__ FM_DSH_OPERATOR_HOME=__DSHOPERATOR__ '

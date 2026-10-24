@@ -4002,8 +4002,8 @@ Earlier attempts on 2026-10-22 and 2026-10-23 are not evidence; each was stopped
 
 `tests/fm-dsh-primary.test.sh` separately exercises failed-arm follow-up budgets, native `user/message` identity, consumed-but-unacknowledged rows, delegated-child exclusion, ordinary disposal and forced native SIGKILL with a TERM-resistant descendant.
 `tests/fm-timeout-lib.test.sh` proves the shared owner-bound runner has no deadline, preserves natural command exit/output and refuses a deadline-only fallback when Perl is unavailable, alongside the existing timed-runner regressions.
-`tests/fm-dsh-harness.test.sh` covers primary-only operator tool-state sharing while keeping DSH preferences private and preserving the isolated worker-HOME contract.
-Primary CLI state is linked from the operator home, not copied; the live fixture uses an empty operator home, so it does not prove authentication to external tools.
+`tests/fm-dsh-harness.test.sh` covers operator tool-state sharing for primaries, ships and scouts (a ship and a scout resolve the operator `gh` configuration through the link) while keeping DSH preferences and the DSH runtime private to each launch.
+CLI state of every launch kind is linked from the operator home, not copied; the live fixture uses an empty operator home, so it does not prove authentication to external tools.
 
 This is passive turn-end protection, not a blocking Stop hook or native pre-tool veto.
 The guard bounds synthetic failure continuations; it cannot prevent a completed DSH turn from becoming idle.

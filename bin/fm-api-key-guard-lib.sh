@@ -19,8 +19,9 @@
 # fm_omp_api_billing_route_check <model>
 # Explicit openai/* and openrouter/* routes bill APIs, regardless of catalog
 # availability or model-index membership. Never resolve or call those models.
-# DeepSeek has moved to dsh-tui; reject that route here too so raw omp model
-# arguments and fallback capability checks cannot retain the former adapter.
+# DeepSeek has moved to dsh-tui; bin/fm-dsh.py owns that match and refuses it
+# here too so raw omp model arguments and fallback capability checks cannot
+# retain the former adapter.
 fm_omp_api_billing_route_check() {
   local provider=${1%%/*}
   [ "${1#*/}" != "$1" ] || return 0
@@ -33,12 +34,12 @@ fm_omp_api_billing_route_check() {
       echo "error: omp $provider/* routes use API billing; select --model openai-codex/<gpt-model> instead" >&2
       return 1
       ;;
-    [dD][eE][eE][pP][sS][eE][eE][kK]/*)
-      echo "error: DeepSeek runs through dsh-tui, not omp; select --harness dsh --model deepseek/<model-id>" >&2
-      return 1
-      ;;
   esac
-  return 0
+  command -v python3 >/dev/null 2>&1 || {
+    echo "error: cannot check omp model '$1' against the DeepSeek route: python3 is not on PATH" >&2
+    return 1
+  }
+  python3 "$(dirname "${BASH_SOURCE[0]}")/fm-dsh.py" check omp "$1"
 }
 
 # fm_omp_api_billing_config_diagnostics

@@ -21,7 +21,10 @@ def unknown(*args, check):
     assert out.startswith('unknown: ') and check in out, f'expected unknown naming {check!r}, got {out!r}'
 for model, provider, expected in [
     ('deepseek/deepseek-v4-flash', '', 'dsh'),
+    ('DeepSeek/deepseek-v4-flash', '', 'dsh'),
+    (' DeepSeek / model ', '', 'dsh'),
     ('v4-pro', 'deepseek', 'dsh'),
+    ('v4-pro', ' DeepSeek ', 'dsh'),
     ('claude-sonnet-4', '', 'claude'),
     ('openai-codex/gpt-6', '', 'omp'),
     ('my-deepseek/model', '', 'omp'),
@@ -32,6 +35,11 @@ for model, provider in [('', ''), ('openai/gpt', '')]:
     call('check', 'dsh', model, provider, ok=False)
 call('check', 'dsh', 'deepseek/deepseek-v4-flash')
 call('check', 'dsh', 'v4', 'deepseek')
+# omp's own provider normalization decides the route, so these spellings run
+# on dsh and never on omp.
+for model in ('DeepSeek/deepseek-v4-flash', ' DeepSeek / model '):
+    call('check', 'dsh', model)
+    call('check', 'omp', model, ok=False)
 # check admits exactly the models prepare accepts, so a relaunch is refused
 # before the running agent stops rather than after.
 for model, provider in [('deepseek/a/b', ''), ('deepseek/ ', ''), ('deepseek/', ''), ('', 'deepseek'), ('a b', 'deepseek'), ('x/y', 'deepseek')]:
@@ -62,6 +70,9 @@ modelless.write_text(json.dumps({'rules':[{'use':{'harness':'dsh','provider':'de
 call('normalize', modelless, modelless, ok=False)
 profiles = tmp / 'profiles.json'
 profiles.write_text(json.dumps({'rules':[{'use':[{'harness':'dsh','provider':'deepseek','model':'v4','effort':'high'}]}]}))
+call('normalize', profiles, profiles)
+assert json.loads(profiles.read_text())['rules'][0]['use'][0]['model'] == 'deepseek/v4'
+profiles.write_text(json.dumps({'rules':[{'use':[{'harness':'dsh','model':' DeepSeek / v4 ','effort':'high'}]}]}))
 call('normalize', profiles, profiles)
 assert json.loads(profiles.read_text())['rules'][0]['use'][0]['model'] == 'deepseek/v4'
 cwd = Path(tmp).resolve()
@@ -105,6 +116,7 @@ put([start,end])
 assert call('resume',state,'task','deepseek/v4','high',cwd) == str(runtime)
 overlay = json.loads((runtime / 'launch.yml').read_text())
 assert overlay[0]['config']['sessionId'] == header['id']
+assert call('resume',state,'task',' DeepSeek / v4 ','high',cwd) == str(runtime), 'any DeepSeek spelling of the bound id must resume'
 assert call('resume',state,'task','deepseek/other','high',cwd) == '', 'a changed model must not resume'
 assert call('resume',state,'task','deepseek/v4','xhigh',cwd) == '', 'a changed effort must not resume'
 # Fallback: no binding means no recorded session id, and spawn prepares fresh.
@@ -196,6 +208,9 @@ outside.mkdir()
 (launches / 'task.dsh-session').write_text(json.dumps({'root':str(outside),'cwd':str(cwd)}))
 worker = prepare('g3')
 assert (outside / 'keep').exists(), 'prepare must not remove a root outside the task generations'
+spelled = Path(call('prepare',launches,'spelled','g1',source,'DeepSeek/v4','high',cwd))
+assert json.loads((launches / 'spelled.dsh-session').read_text())['model'] == 'v4', 'prepare must bind the bare DeepSeek id'
+assert json.loads((spelled / 'home/.dsh-tui/model.json').read_text())['model'] == 'v4'
 # Every launch retains linked operator CLI state, while DSH preferences and
 # its runtime remain private to the launch.
 operator = tmp / 'operator-home'
