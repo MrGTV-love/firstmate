@@ -74,9 +74,18 @@ fm_slot_restore_base() { # <copy>
   fi
 }
 
-fm_slot_provision() { # <project> <copy> <task-id> <branch> <report> <owned-path>...
-  local project=$1 copy=$2 id=$3 branch=$4 report=$5 base old_branch old_head branch_head rc=0
-  shift 5
+fm_slot_run_local() { # <project> <report> <provisioner> <arg>...
+  local project=$1 report=$2
+  shift 2
+  (
+    cd "$project" || exit 1
+    PATH="$project/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 python3 "$@"
+  ) >"$report" 2>&1
+}
+
+fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <owned-path>...
+  local runner=$1 project=$2 copy=$3 id=$4 branch=$5 report=$6 base old_branch old_head branch_head rc=0
+  shift 6
   FM_SLOT_PROVISIONED=0
   FM_SLOT_MANIFEST=
   FM_SLOT_BASE_SHA=
@@ -106,15 +115,12 @@ fm_slot_provision() { # <project> <copy> <task-id> <branch> <report> <owned-path
   fi
   local args=() path
   for path in "$@"; do args+=(--owned-path "$path"); done
-  # Keep the bare interpreter form used by the governed launcher, and its
-  # primary-project cwd. An absent dependency is an actual launch refusal.
-  (
-    cd "$project" || exit 1
-    PATH="$project/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 python3 \
-      "$copy/scripts/git-stability/provision_existing_slot.py" \
-      --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
-      --branch "$branch" --base-sha "$base" "${args[@]}"
-  ) >"$report" 2>&1 || rc=$?
+  # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
+  # attributable to this invocation. The provisioner still rejects unrelated
+  # live holders. Promotion's same-owner declaration uses the local runner.
+  "$runner" "$project" "$report" "$copy/scripts/git-stability/provision_existing_slot.py" \
+    --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
+    --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
   if [ "$rc" -eq 0 ]; then
     python3 - "$report" "$copy" "$id" "$branch" "$base" "$@" <<'PY' || rc=$?
 import json
