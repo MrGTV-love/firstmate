@@ -478,6 +478,7 @@ test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
       printf '%s\n' 'pr=https://github.com/example/repo/pull/90'
       printf '%s\n' 'pr_head=0123456789abcdef0123456789abcdef01234567'
       printf '%s\n' 'x_request=request-90'
+      printf '%s\n' 'egress=["web"]'
     } >> "$dir/home/state/rl90.meta"
 
     out=$(run_control "$dir" rl90 relaunch --note "keep PR monitoring alive"); rc=$?
@@ -490,6 +491,14 @@ test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
     ' _ "$ROOT" "$dir/home/state/rl90.meta")
     [ "$parsed" = "https://github.com/example/repo/pull/90" ] \
       || fail "PR monitoring must still parse the relaunched task record with tracing $tracing (got: ${parsed:-rejected})"
+    [ "$(meta_field "$dir" rl90 egress)" = '["web"]' ] \
+      || fail "relaunch must preserve the task egress grant recorded after its PR"
+    printf '%s\n' 'unrelated_field=1' >> "$dir/home/state/rl90.meta"
+    parsed=$(bash -c '
+      . "$1/bin/fm-pr-lib.sh"
+      fm_pr_metadata_identity_parse "$2" && printf "%s\n" "$FM_PR_META_URL"
+    ' _ "$ROOT" "$dir/home/state/rl90.meta")
+    [ -z "$parsed" ] || fail "an unrelated field after pr= must still invalidate PR identity"
     if [ "$tracing" = on ]; then
       [ "$(awk -F= '$1 == "traceparent" { count++ } END { print count+0 }' "$dir/home/state/rl90.meta")" = 1 ] \
         || fail "traced relaunch must publish exactly one trace carrier"
@@ -499,7 +508,7 @@ test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
       [ -z "$(meta_field "$dir" rl90 traceparent)" ] \
         || fail "untraced relaunch must remove the task's recorded carrier"
     fi
-    pass "fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing $tracing"
+    pass "fm-control relaunch: a recorded PR with a later egress grant stays parseable for PR monitoring with tracing $tracing"
   done
 }
 

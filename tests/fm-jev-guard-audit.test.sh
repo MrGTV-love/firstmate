@@ -291,7 +291,7 @@ await test('tools that move no data or run no worker code are local; unscreened 
     assert.equal(await handlers.tool_call({ toolName, input: {} }, { cwd: state }), undefined, toolName);
     assert.equal(rowCount(), before, `${toolName}: local tools add no egress or confinement row`);
   }
-  for (const toolName of ['ast_edit', 'init_experiment', 'log_experiment', 'notebook', 'lsp', 'notebookedit', 'python', 'debug', 'run_experiment']) {
+  for (const toolName of ['ast_edit', 'init_experiment', 'log_experiment', 'notebook', 'lsp', 'manage_skill', 'notebookedit', 'python', 'debug', 'run_experiment']) {
     let patch;
     const r = await fresh(async () => { patch = await handlers.tool_call({ toolName, input: {} }, { cwd: state }); });
     assert.equal(patch, undefined, toolName);
