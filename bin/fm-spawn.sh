@@ -6648,12 +6648,12 @@ else
 fi
 SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
-  awk -F= '
+  awk -F= -v relocating="$RELAUNCH_RELOCATING" '
     BEGIN {
       split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
-    !($1 in owned)
+    !($1 in owned) && !(relocating == 1 && $1 == "jev_deletions_sha256")
   ' "$RELAUNCH_META"
 }
 {
@@ -6810,6 +6810,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   SPAWN_SLOT_CLAIMED=0
   SPAWN_META_PUBLISH_STARTED=0
   SPAWN_META_TMP=
+  [ "$RELAUNCH_RELOCATING" != 1 ] || rm -f "$STATE_REAL/$ID.authorized-deletions.json"
 fi
 # A dispatch or relaunch keeps the per-task meta lock through launch delivery.
 # The backlog mutation is deliberately the final fallible commit below, so
