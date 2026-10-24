@@ -182,12 +182,13 @@
 # preserve. A proof that fails after preservation writes no receipt and discards
 # this run's preserve the same way, and only while the same copy still holds the
 # plan's lock bytes. Either way the preserve is discarded only while every
-# preserved file, symlink and directory is still in the copy with the same bytes
-# or target; when any original is missing, different or cannot be compared, or the
+# preserved file, symlink, FIFO and directory is still in the copy with the same
+# bytes or target; when any original is missing, different or cannot be compared, or the
 # copy's identity or lock changed, the preserve stays and is the copy's latest
 # preserve. Its fingerprint and the fingerprint of the copy's current preservable
 # ignored content (each the SHA-256 over the path, type and bytes or link target
-# of every file, symlink and empty directory) go to a waiting record under
+# of every file, symlink and FIFO; a socket, which preservation never copies, is
+# skipped) go to a waiting record under
 # data/copy-sweep/waiting/<sha256 of the path>, beside the receipts. The copy is
 # never held for it: each later run that finds a different content fingerprint
 # classes it WAITING and --apply records the new one, and the first run that finds
@@ -763,9 +764,10 @@ waiting_record() {  # <copy>
 }
 
 # Prints one SHA-256 over the path, type and bytes or link target of every file,
-# symlink and empty directory that `find <find-args>` lists from <root>, so a
-# copy's preservable ignored content and a preserve of it fingerprint alike.
-# Fails when any of it cannot be read or check's time runs out.
+# symlink and FIFO that `find <find-args>` lists from <root>, so a copy's
+# preservable ignored content and a preserve of it fingerprint alike. Directories
+# hold no bytes of their own, and a socket is skipped because preservation never
+# copies one. Fails when any of it cannot be read or check's time runs out.
 tree_fingerprint() {  # <root> <find-args>...
   local root=$1 rel want out=''
   shift
@@ -777,15 +779,15 @@ tree_fingerprint() {  # <root> <find-args>...
     esac
     if [ -L "$root/$rel" ]; then
       want=l$(bounded readlink "$root/$rel") || return 1
-    elif [ -d "$root/$rel" ]; then
-      want=d
+    elif [ -p "$root/$rel" ]; then
+      want=p
     elif [ -f "$root/$rel" ]; then
       want=f$(set -o pipefail; bounded cat "$root/$rel" | teardown_ignored_sha256) || return 1
     else
       return 1
     fi
     out="$out$rel"$'\t'"$want"$'\n'
-  done < <(cd "$root" && bounded find "$@" \( -type d -empty -o ! -type d \) -print0; printf '%s\0' "$?")
+  done < <(cd "$root" && bounded find "$@" ! -type d ! -type s -print0; printf '%s\0' "$?")
   printf '%s' "$out" | LC_ALL=C sort | teardown_ignored_sha256
 }
 
@@ -1387,9 +1389,10 @@ copy_still_holds() {  # <copy> <identity> <lock-sha256>
   [ "$actual" = "$3" ]
 }
 
-# True when every directory, file and symlink in preserve <dir> is still at the
-# same path in <copy>, with the same bytes or link target. An original that is
-# missing, different or cannot be compared returns 1.
+# True when every directory, file, symlink and FIFO in preserve <dir> is still at
+# the same path in <copy>, with the same bytes or link target; a socket holds no
+# bytes and is skipped. An original that is missing, different or cannot be
+# compared returns 1.
 preserve_still_in_copy() {  # <dir> <copy>
   local rel status='' want have
   while IFS= read -r -d '' rel; do
@@ -1405,7 +1408,9 @@ preserve_still_in_copy() {  # <dir> <copy>
       [ -d "$2/$rel" ] && [ ! -L "$2/$rel" ] || return 1
     elif [ -f "$1/$rel" ]; then
       [ -f "$2/$rel" ] && [ ! -L "$2/$rel" ] && cmp -s "$1/$rel" "$2/$rel" || return 1
-    else
+    elif [ -p "$1/$rel" ]; then
+      [ -p "$2/$rel" ] && [ ! -L "$2/$rel" ] || return 1
+    elif [ ! -S "$1/$rel" ]; then
       return 1
     fi
   done < <(cd "$1" && find . ! -path ./copy-path ! -path ./SHA256SUMS -print0; printf '%s\0' "$?")

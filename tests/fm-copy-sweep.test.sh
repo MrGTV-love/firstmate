@@ -562,6 +562,7 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   exit 0
 fi
 [ ! -f "$log/execute-stderr" ] || cat "$log/execute-stderr" >&2
+[ ! -f "$log/execute-hook" ] || bash "$log/execute-hook" "\$2" || exit 4
 if [ -e "$log/execute-output-\${2##*/}" ]; then
   cat "$log/execute-output-\${2##*/}"
   exit 3
@@ -1298,7 +1299,33 @@ SH
   assert_equals 2 "$(preserved_unique | grep -c .)" "the retry did not add exactly one preserve for the changed content"
   assert_equals "durable state"$'\n'"new owner state" "$(preserved_unique | while IFS= read -r kept; do cat "$kept"; done | sort)" \
     "the preserved old content or the new content is missing"
-  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; an original that changed in the copy during preservation stops the release before execute, keeps the preserve of the old content and the next run still retries the copy; the same refusal after an unlock stays held with its preserve"
+  make_locked_copy_case temporary-after-execute-write dead
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  printf 'durable state\n' > "$(copy_path locked)/unique.dat"
+  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
+  printf 'printf "new owner state\\n" > "$1/unique.dat"\n' > "$W/execute-hook"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "a temporary refusal after an execute-time write should exit 1, got $RC: $OUT"
+  line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
+    || fail "the temporary refusal after an execute-time write was not reported as FAILED: $OUT"
+  assert_contains "$line" "cleanup_lease_conflict" "the driver's temporary refusal was not reported"
+  assert_contains "$line" "plans it again" "a temporary refusal after an execute-time write was not reported retryable"
+  assert_contains "$line" "this run's preserve stays" "the report did not say the old content was kept"
+  assert_equals 1 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "the driver's execute was not reached"
+  assert_equals 'new owner state' "$(cat "$(copy_path locked)/unique.dat")" "the copy's changed ignored file was touched"
+  assert_equals 'durable state' "$(cat "$(preserved_unique)")" "a temporary refusal discarded the only saved original"
+  [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "a temporary refusal after an execute-time write left a retention receipt"
+  registered locked || fail "a copy whose original changed during execute was removed"
+  rm -f "$W/execute-hook" "$W/execute-output"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the retry after an execute-time write failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the next quiet run did not release the copy"
+  ! registered locked || fail "the copy is still registered after the retry"
+  assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the retry did not plan and execute again"
+  assert_equals "durable state"$'\n'"new owner state" "$(preserved_unique | while IFS= read -r kept; do cat "$kept"; done | sort)" \
+    "the preserved old content or the new content is missing"
+  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; an original that changed in the copy during preservation stops the release before execute, keeps the preserve of the old content and the next run still retries the copy; an original that changed during execute before the same temporary refusal keeps that preserve with no receipt and the next quiet run releases the copy; the same refusal after an unlock stays held with its preserve"
 }
 
 test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases() {
@@ -1442,6 +1469,40 @@ SH
   assert_equals "v0"$'\n'"v0,appended" "$(preserved_unique | while IFS= read -r kept; do paste -sd, - < "$kept"; done | sort)" \
     "the preserve of the old content or of the appended content is missing"
   pass "ignored content that changes after the last proof, after a preserve was built or an earlier preserve was reused, stops the release before the driver's execute, uses no release slot and keeps every preserved byte, and a later quiet run preserves the new content once and releases the copy"
+}
+
+test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves() {
+  local run kept
+  make_locked_copy_case special-entries dead
+  install_driver "$SLOT" "$W"
+  printf 'outbox/\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  mkdir -p "$(copy_path locked)/outbox"
+  printf 'log line\n' > "$(copy_path locked)/outbox/channel.log"
+  mkfifo "$(copy_path locked)/outbox/pipe"
+  (cd "$(copy_path locked)/outbox" && python3 -c 'import socket; socket.socket(socket.AF_UNIX).bind("stale.sock")')
+  [ -S "$(copy_path locked)/outbox/stale.sock" ] || fail "the fixture socket was not created"
+  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
+  for run in 1 2; do
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 1 ] || fail "run $run: a temporary refusal should exit 1, got $RC: $OUT"
+    assert_not_contains "$OUT" "could not be compared" "run $run: a FIFO or a socket made the content uncomparable"
+    assert_equals "$run" "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "run $run: the driver's execute was not reached"
+    assert_contains "$OUT" "no preserve from this run is kept" "run $run: the run's preserve was not discarded"
+    assert_equals 0 "$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -name channel.log 2>/dev/null | wc -l | tr -d ' ')" \
+      "run $run: a quiet copy accumulated a preserve"
+    [ -z "$(ls -A "$HOMED/data/copy-sweep/waiting" 2>/dev/null)" ] || fail "run $run: a quiet copy got a waiting record"
+    registered locked || fail "run $run: a refused copy was removed"
+  done
+  rm -f "$W/execute-output"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the allowed run failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the allowed run did not release the copy"
+  ! registered locked || fail "the released copy is still registered"
+  kept=$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -name channel.log -type f 2>/dev/null)
+  assert_equals 1 "$(printf '%s\n' "$kept" | grep -c .)" "the release did not leave exactly one preserve"
+  assert_equals 'log line' "$(cat "$kept")" "the preserved log changed"
+  [ -p "${kept%/*}/pipe" ] || fail "the preserve does not hold the FIFO"
+  pass "a preservable ignored directory holding a FIFO and a stale socket is compared as preservation copies it: temporary refusals discard each run's preserve with no waiting record, so preserves never accumulate, and the allowed run preserves once and releases the copy"
 }
 
 test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries() {
@@ -2928,6 +2989,7 @@ run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_dr
 run_case test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
 run_case test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
 run_case test_ignored_content_changed_after_the_last_proof_is_not_released
+run_case test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves
 run_case test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries
 run_case test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
