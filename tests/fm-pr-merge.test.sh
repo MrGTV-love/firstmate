@@ -3116,7 +3116,7 @@ test_review_record_requires_matching_local_report() {
   record_review "$case_dir" "$url" "$head" --report "$case_dir/report.md" >/dev/null || fail "matching report must record"
   review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "could not read report provenance"
   "$JQ_BIN" -e --arg digest "$digest" --arg report "$case_dir/report.md" \
-    '.review | .report == $report and .report_sha256 == $digest' "$case_dir/latest" >/dev/null \
+    ".review | .report == \$report and .report_sha256 == \$digest" "$case_dir/latest" >/dev/null \
     || fail "record must retain report path and exact whole-file sha256"
   printf 'VERDICT: FAIL head=%s\nNew reader finding.\n' "$head" > "$case_dir/report.md"
   record_review "$case_dir" "$url" "$head" --verdict FAIL --report "$case_dir/report.md" >/dev/null \
