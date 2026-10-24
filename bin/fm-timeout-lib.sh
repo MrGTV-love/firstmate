@@ -183,7 +183,7 @@ fm_run_perl_progress() {
     my $proc = $ENV{FM_PROC_ROOT_OVERRIDE} || "/proc";
     my $ticks = eval { POSIX::sysconf(POSIX::_SC_CLK_TCK()) } || 100;
     my $cpu = sub {
-      my (%children, %times);
+      my (%children, %times, $from_ps);
       # A Linux-compatible /proc (Git Bash/MSYS too, whose ps rejects these
       # -o fields) is chosen by capability. Include waited-child CPU so work
       # cannot vanish when a child is reaped between samples.
@@ -200,6 +200,7 @@ fm_run_perl_progress() {
         }
         closedir $dir;
       } else {
+        $from_ps = 1;
         local $ENV{LC_ALL} = "C";
         open my $ps, "-|", "ps", "-S", "-axo", "pid=,ppid=,time=,stat=,lstart=" or return;
         while (my $line = <$ps>) {
@@ -215,7 +216,6 @@ fm_run_perl_progress() {
         }
         close $ps or return;
       }
-      return unless exists $times{$pid};
       $active = 0;
       my @members;
       my @todo = ($pid);
@@ -232,9 +232,11 @@ fm_run_perl_progress() {
       }
       # ps may omit waited-child CPU on Darwin. A changed tree is not a
       # consecutive idle observation, even when its last CPU burst was missed.
-      my $tree = join "\\n", sort @members;
-      $active ||= defined $last_tree && $tree ne $last_tree;
-      $last_tree = $tree;
+      if ($from_ps) {
+        my $tree = join "\\n", sort @members;
+        $active ||= defined $last_tree && $tree ne $last_tree;
+        $last_tree = $tree;
+      }
       my $total = 0;
       $total += $_ for values %observed;
       return $total;

@@ -645,7 +645,7 @@ def tree_cpu(pid, observed):
                 native_cpu = darwin_cpu_reader()
             except (AttributeError, ImportError, OSError, ValueError):
                 return None, False
-    if table is None or pid not in table:
+    if table is None:
         return None, False  # Missing evidence never proves a stall.
     children = collections.defaultdict(list)
     for child, (parent, _, _, _) in table.items():
@@ -656,10 +656,9 @@ def tree_cpu(pid, observed):
         child = todo.pop()
         if child in table:
             _, seconds, identity, running = table[child]
-            if native_cpu is not None:
-                seconds = native_cpu(child)
-                if seconds is None:
-                    return None, False
+            native = None if native_cpu is None else native_cpu(child)
+            if native is not None:
+                seconds = native
             runnable = runnable or running
             observed[(child, identity)] = max(observed.get((child, identity), 0), seconds)
         todo.extend(children[child])

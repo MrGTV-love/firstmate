@@ -424,15 +424,22 @@ def unavailable_ctypes():
 case('unavailable_ctypes_preserves_productive_work_with_blind_telemetry', unavailable_ctypes)
 
 # Git Bash/MSYS: a /proc-only host whose ps cannot sample. Each fixture process
-# publishes its own stat line (fields 4, 14+15 and 22) under FM_PROC_ROOT_OVERRIDE.
+# publishes its own stat line (fields 3, 4, 14+15, 16 and 22) under FM_PROC_ROOT_OVERRIDE.
 proc_stat = ('my $d = "$ENV{FM_PROC_ROOT_OVERRIDE}/$$"; mkdir $d;'
              'sub stat_line { open my $f, ">", "$d/stat.tmp" or die; '
-             'my $state = $_[1] || "S"; '
-             'print $f "$$ (fixture) $state 1 0 0 0 0 0 0 0 0 0 $_[0] 0 0 0 20 0 1 0 777\\n"; close $f; '
+             'my $state = $_[1] || "S"; my $waited = $_[2] || 0; '
+             'print $f "$$ (fixture) $state 1 0 0 0 0 0 0 0 0 0 $_[0] 0 $waited 0 20 0 1 0 777\\n"; close $f; '
              'rename "$d/stat.tmp", "$d/stat" or die; }')
 proc_programs = {
     'still': proc_stat + 'stat_line(0); sleep 30;',
     'growing': proc_stat + 'for my $i (1..16) { stat_line($i * 10); sleep 0.25; } exit 0;',
+    # A stable one-process tree whose only growing CPU is its waited children's.
+    'reaped': proc_stat + 'for my $i (1..16) { stat_line(0, "S", $i * 10); sleep 0.25; } exit 0;',
+    # Short sleeping children keep changing tree membership without any CPU.
+    'churn': proc_stat + 'stat_line(0); while (1) { my $c = fork; die unless defined $c; '
+             'if (!$c) { my $e = "$ENV{FM_PROC_ROOT_OVERRIDE}/$$"; mkdir $e; open my $f, ">", "$e/stat" or die; '
+             'print $f "$$ (fixture) S " . getppid() . " 0 0 0 0 0 0 0 0 0 0 0 0 0 20 0 1 0 $$\\n"; close $f; '
+             'sleep 0.1; unlink "$e/stat"; rmdir $e; exit 0; } waitpid $c, 0; }',
     'blind': 'sleep 3; exit 0;',
     # Deliberately hold the exported counter below one accounting tick while
     # the real process burns CPU. Runnable state must prevent false idle proof.
@@ -471,6 +478,12 @@ def proc_sampler():
         result, _ = proc_runner('growing', runner, proc_programs['growing'])
         require(result.returncode == 0,
                 f'{runner}: a /proc-only tree with growing CPU was cut: {result.returncode} {result.stderr}')
+        result, elapsed = proc_runner('churn', runner, proc_programs['churn'])
+        require(result.returncode == 124 and elapsed < 25,
+                f'{runner}: a /proc-only tree changing only membership was not cut: {result.returncode} {elapsed:.1f}s {result.stderr}')
+        result, _ = proc_runner('reaped', runner, proc_programs['reaped'])
+        require(result.returncode == 0,
+                f'{runner}: a /proc-only tree with growing waited-child CPU was cut: {result.returncode} {result.stderr}')
         result, _ = proc_runner('rounded', runner, proc_programs['rounded'])
         require(result.returncode == 0 and result.stdout == 'completed\n',
                 f'{runner}: runnable work with rounded CPU was stopped: {result.returncode} {result.stderr}')
