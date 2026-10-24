@@ -24,6 +24,7 @@ That plane covers workers running in this home; a remotely placed secondmate is 
 A Claude worker parked on its "Background work is running" picker, with steering messages queued behind it, is released with `bin/fm-control.sh <task-id> stay` even when its task is finished; let it read and acknowledge the queued steering before `exit`, never use improvised key presses ([`docs/agent-control.md`](../../../docs/agent-control.md#exit-and-the-background-task-picker)).
 A relaunch admission refusal is not a failed launch; reconcile it through the [instruction-owner recovery policy](../../../docs/agent-control.md#recovering-an-exited-instruction-owner), not by stopping the preserved live owner or marking the task failed.
 When a worker moved the task's work into a replacement copy and the record still names the old one, re-point the record with `bin/fm-control.sh <task-id> reassociate` ([`docs/agent-control.md`](../../../docs/agent-control.md#reassociating-a-task-with-a-replacement-copy)) instead of supervising around it by run id.
+When a restored omp task's session record is stale, repair it with `bin/fm-control.sh <task-id> adopt` ([`docs/agent-control.md`](../../../docs/agent-control.md#repairing-a-restored-omp-session-record)), which sends no input and refuses with the missing proof named.
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 
