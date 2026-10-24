@@ -124,11 +124,11 @@ export interface GuardService {
   record(terminal: GuardTerminal): void;
 }
 
-export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
+export async function withDecisionBudget<T>(run: (remainingMs: () => number) => Promise<T>): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), DECISION_MS);
   try {
-    return await budgets.run({ until: performance.now() + DECISION_MS, signal: controller.signal }, run);
+    return await budgets.run({ until: performance.now() + DECISION_MS, signal: controller.signal }, run, preflightTimeout);
   } finally {
     clearTimeout(timer);
   }
