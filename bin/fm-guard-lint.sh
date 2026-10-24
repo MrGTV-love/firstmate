@@ -294,7 +294,8 @@ fi
 
 # --------------------------------------------------------------- ratchet gate
 ALLOWED_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-guard-allow.XXXXXX") || exit 2
-trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE"' EXIT
+SC=$(mktemp "${TMPDIR:-/tmp}/fm-guard-shown.XXXXXX") || exit 2
+trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE" "$SC"' EXIT
 if [ -f "$ALLOWLIST" ]; then
   jq -r '(.allowed // [])[] | [.id, .rule] | @tsv' "$ALLOWLIST" >"$ALLOWED_FILE" 2>/dev/null || : >"$ALLOWED_FILE"
 else
@@ -305,8 +306,7 @@ is_allowed() {  # <id> <rule>
   awk -F'\t' -v id="$1" -v rule="$2" '$1 == id && $2 == rule {found = 1} END {exit !found}' "$ALLOWED_FILE"
 }
 
-SC=new; en=0; st=0; shown=0
-: >"$SC"
+en=0; st=0; shown=0
 while IFS=$'\t' read -r rule id msg; do
   [ -n "$rule" ] || continue
   if is_allowed "$id" "$rule"; then
@@ -347,7 +347,7 @@ case "$MODE" in
     # Only guards added or edited since the base are in scope. A changed guard is
     # one whose canonical JSON differs between the base registry and this one.
     base_json=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base.XXXXXX") || exit 2
-    trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE" "$base_json"' EXIT
+    trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE" "$SC" "$base_json"' EXIT
     if git -C "$ROOT" rev-parse --verify "$BASE_REF" >/dev/null 2>&1 \
       && git -C "$ROOT" show "$BASE_REF:docs/guards/registry.json" >"$base_json" 2>/dev/null; then
       touched=$(jq -r --slurpfile base "$base_json" '

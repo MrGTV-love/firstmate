@@ -70,7 +70,6 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   remotetrigger: { call: "provider", result: "unjudged" },
   reportfindings: { call: "local", result: "unjudged" },
   schedulewakeup: { call: "local", result: "unjudged" },
-  sendfeedback: { call: "local", result: "unjudged" },
   sendmessage: { call: "subagent", result: "unjudged" },
   senduserfile: { call: "provider", result: "unjudged" },
   shareonboardingguide: { call: "provider", result: "unjudged" },
