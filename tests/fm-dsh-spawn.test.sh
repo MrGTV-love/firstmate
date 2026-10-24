@@ -651,9 +651,10 @@ PY
   pass "fm-spawn: a plain, same-model or same-model role dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation"
 }
 
-# A ship relaunch resumes its conversation past a delegated subagent log whose
-# header is not yet committed, and refuses, keeping the bound generation and its
-# conversation, when a log in the store opens with anything but a session header.
+# A ship relaunch resumes its conversation past a delegated subagent log, or a
+# newer log version beside it, whose header is not yet committed, and refuses,
+# keeping the bound generation and its conversation, when a log in the store
+# opens with anything but a session header.
 test_ship_relaunch_never_discards_an_unreadable_conversation() {
   local id=dsh-ship-resume binding generation log session subagent bin out status writer
   make_dsh_case ship-resume "$id"
@@ -665,6 +666,7 @@ test_ship_relaunch_never_discards_an_unreadable_conversation() {
   subagent="$generation/dsh/sessions/workspace/subagent"
   mkdir -p "$subagent"
   printf '{"type":"session","version":4,"id":"' > "$subagent/session.v4.jsonl"
+  : > "$(dirname "$log")/session.v5.jsonl"
   bin="$CASE_DIR/relaunch-shell"
   mkdir -p "$bin"
   cat > "$bin/tmux" <<SH
@@ -693,7 +695,7 @@ PY
   status=$?
   kill "$writer" 2>/dev/null
   wait "$writer" 2>/dev/null
-  expect_code 0 "$status" "a ship relaunch past an uncommitted subagent header must resume: $out"
+  expect_code 0 "$status" "a ship relaunch past uncommitted subagent and newer-version headers must resume: $out"
   assert_equals "$generation" "$(jq -r .root "$binding")" "the relaunch must resume the bound generation"
   assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "the relaunch must neither delete nor add a generation"
   assert_equals "$session" "$(jq -r '.[0].config.sessionId' "$generation/launch.yml")" \
@@ -712,7 +714,7 @@ PY
   assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "the refusal must neither delete nor add a generation"
   cmp -s "$CASE_DIR/session.before" "$log" || fail "the refusal must leave the bound conversation log untouched"
   [ ! -s "$LAUNCH_LOG" ] || fail "the refusal must not launch dsh-tui: $(cat "$LAUNCH_LOG")"
-  pass "fm-spawn: a dsh ship relaunch resumes past an uncommitted subagent header and refuses rather than discard a conversation it cannot read"
+  pass "fm-spawn: a dsh ship relaunch resumes past uncommitted subagent and newer-version headers and refuses rather than discard a conversation it cannot read"
 }
 
 test_launch_policy_admits_dsh() {

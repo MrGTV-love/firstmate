@@ -175,6 +175,10 @@ assert call('session-file',state,'task') == str(v5)
 v5.write_text(v5.read_text()+json.dumps({'type':'turn/end','seq':2,'data':{'turn':1}})+'\n')
 assert call('state',state,'task') == 'idle'
 assert json.loads(call('position',state,'task')) == [str(v5), 2]
+for torn in ('', '{"type":"session","version":5,"id":"'):
+    v5.write_text(torn)
+    assert json.loads(call('position',state,'task')) == [str(log), 2], 'an uncommitted newer header must leave the older log live'
+    assert call('state',state,'task') == 'idle', 'an uncommitted newer header must not hide the older log'
 v5.write_text(json.dumps({'type':'snapshot','version':5})+'\n')
 unknown(state,'task', check='does not open with a session header')
 call('position',state,'task',ok=False)

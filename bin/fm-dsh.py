@@ -34,11 +34,12 @@ or nothing before the launch has a log.
 state STATE ID [--since POSITION] folds only the newest depth-zero session in
 that launch's plain JSONL store, from its newest turn/start (or the last MiB,
 whichever reaches further back), however large that turn is. Each session
-directory's highest-numbered session.v*.jsonl is read whatever its number,
-and admitted by behavior: a session header, then events with a type and a
-strictly increasing integer seq. A log whose header line is not yet committed
-opens no session and is passed over; any other first line that is not a
-session header fails. Missing data, or data that fails one of
+directory's highest-numbered session.v*.jsonl whose header line is committed
+is read whatever its number, and admitted by behavior: a session header, then
+events with a type and a strictly increasing integer seq. A newer log whose
+header line is not yet committed opens no session and leaves the older one
+live; a committed first line that is not a session header fails. Missing
+data, or data that fails one of
 those checks, prints "unknown: <the failed check>". With --since, anything
 recorded at or before POSITION is history: a turn must have started beyond
 it, or the state is unknown.
@@ -223,11 +224,14 @@ def session_path(binding):
                 logs.append((int(version), path))
         if not logs:
             continue
-        path = max(logs)[1]
-        with path.open("rb") as stream:
-            line = stream.readline(65536)
-        if len(line) < 65536 and not line.endswith(b"\n"):
-            continue  # A header not yet committed opens no session.
+        for _, path in sorted(logs, reverse=True):
+            with path.open("rb") as stream:
+                line = stream.readline(65536)
+            if len(line) < 65536 and not line.endswith(b"\n"):
+                continue  # A header not yet committed opens no session.
+            break
+        else:
+            continue
         try:
             header = json.loads(line)
         except ValueError:
