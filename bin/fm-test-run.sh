@@ -902,6 +902,11 @@ tests/fm-dispatch-capacity.test.sh 4207
 tests/fm-dispatch-resolve.test.sh 196000
 tests/fm-documentation-audiences.test.sh 4120
 tests/fm-dod-lib.test.sh 4076
+tests/fm-dsh-harness.test.sh 34127
+tests/fm-dsh-live-e2e.test.sh 542
+tests/fm-dsh-primary-live-e2e.test.sh 652
+tests/fm-dsh-primary.test.sh 11641
+tests/fm-dsh-spawn.test.sh 50994
 tests/fm-duration.test.sh 121509
 tests/fm-extension-binding.test.sh 17377
 tests/fm-fleet-ledger.test.sh 33269
