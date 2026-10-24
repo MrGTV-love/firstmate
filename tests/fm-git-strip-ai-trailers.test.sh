@@ -20,6 +20,8 @@ unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
 
 STRIP="$ROOT/bin/fm-git-strip-ai-trailers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-git-strip-ai-trailers)
+# Task hooks record credential-check events; keep them out of the checkout.
+export FM_GUARD_EVENT_LOG="$TMP_ROOT/guard-events.jsonl"
 
 fm_git_identity 'Captain Tests' 'captain@example.invalid'
 

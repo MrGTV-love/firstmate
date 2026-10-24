@@ -18,6 +18,7 @@
 #   - report mode exits 0 while still printing the violation
 #   - new-or-touched mode ignores an untouched offending guard
 #   - a retired guard that is still registered fails
+#   - --counts excludes active guards named in beyond_audit_active and beyond_audit_retired points
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -175,6 +176,21 @@ out=$(run_lint "$LATER" --counts) && fail "an unregistered post-audit id balance
 mutate "$LATER" '.beyond_audit_active = ["later-guard"]'
 out=$(run_lint "$LATER" --counts) || fail "a registered post-audit guard did not balance the inventory: $out"
 pass "a guard registered after the audit balances the inventory only when it is named"
+
+# --- audited inventory ------------------------------------------------------
+COUNTS=$(fixture counts)
+mutate "$COUNTS" '.guards += [(.guards[0] | .id = "late-guard" | .invariant = "a post-audit invariant")]'
+cat >"$COUNTS/docs/guards/retired.json" <<'JSON'
+[{"id":"late-gone","system":"firstmate","invariant":"a post-audit retired invariant","retired":"2026-10-24",
+  "why":"it was never in the audit","replaced_by":"nothing","retirement_test":"tests/gguard.test.sh"}]
+JSON
+out=$(run_lint "$COUNTS" --counts) && fail "unmarked post-audit guards must break the audited inventory"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 inventory' || fail "expected the inventory violation, got: $out"
+mutate "$COUNTS" '.beyond_audit_active = [.guards[1].id] | .beyond_audit_retired = [{"point":"late-gone","evidence":"fixture","reason":"never in the audit"}]'
+out=$(run_lint "$COUNTS" --counts) || fail "marked post-audit guards must keep the audited inventory: $out"
+printf '%s\n' "$out" | grep -q 'active=2 retired=1 beyond_audit=1 excluded=0 unregistered=0 audited=1 beyond_audit_active=1' \
+  || fail "inventory did not exclude post-audit guards: $out"
+pass "post-audit active guards named in beyond_audit_active and beyond_audit_retired points stay outside the audited inventory"
 
 # --- ratchet ----------------------------------------------------------------
 ALLOW=$(fixture allowlist)

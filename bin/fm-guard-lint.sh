@@ -280,6 +280,9 @@ if [ "$COUNTS" -eq 1 ]; then
   retired_n=$(jq -r 'length' "$RETIRED" 2>/dev/null || echo 0)
   excluded_n=$(jq -r '(.excluded // []) | length' "$REGISTRY")
   unregistered_n=$(jq -r '(.unregistered_ids // []) | length' "$REGISTRY")
+  # An active guard added after the audit is named in beyond_audit_active, and
+  # a retirement beyond the audit is listed in beyond_audit_retired; both stay
+  # outside the audited population.
   beyond_n=$(jq -r '(.beyond_audit_retired // []) | length' "$REGISTRY")
   beyond_active_n=$(jq -r '(.beyond_audit_active // []) | length' "$REGISTRY")
   jq -r '(.guards | map(.id)) as $ids | (.beyond_audit_active // [])[] | select(. as $b | $ids | index($b) | not)' "$REGISTRY" \

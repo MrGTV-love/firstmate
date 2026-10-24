@@ -93,5 +93,49 @@
     "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.6 and 7.4: the result half of the size refusal withheld large outputs only because the result screen could not cover them; the pre-tool size refusal is unchanged",
     "replaced_by": "nothing; large results reach the worker unchanged",
     "retirement_test": "tests/fm-retired-jev-result-size-refusal.test.sh"
+  },
+  {
+    "id": "jev-write-secrets-kind",
+    "system": "firstmate",
+    "invariant": "a write or edit Jev classifies as a secrets file never runs",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "the write kind Choice (assessment Q3) gated on a category label and its confidence; it never chose secrets in 4,363 judged writes, and the harm it named, a credential committed or shipped, happens at commit and push rather than at write",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.2, 6.1 (Q3), 7.3 and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py",
+    "retirement_test": "tests/fm-retired-jev-write-secrets-kind.test.sh"
+  },
+  {
+    "id": "jev-write-credential-noul",
+    "system": "firstmate",
+    "invariant": "a write or edit whose content Jev scores as a real credential never runs",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "the contains_secret Noul (assessment Q4) never reached its 0.70 threshold in 4,363 judged writes (maximum 0.52), and writing a key into an ignored .env is correct behaviour; the harm is a key reaching a commit or a push",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.2, 6.1 (Q4), 7.3 and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py",
+    "retirement_test": "tests/fm-retired-jev-write-credential-noul.test.sh"
+  },
+  {
+    "id": "jev-write-remainder-shapes",
+    "system": "firstmate",
+    "invariant": "a write or edit too long for model screening never runs while its replacement text holds a known credential shape",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "the local shape check existed only to cover the unscreened remainder of the write-time size path; with no write-content model screening there is no remainder, and the same anchored shapes now run over added lines at commit and push",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.2 (D3 remainder), 7.3 and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py",
+    "retirement_test": "tests/fm-retired-jev-write-remainder-shapes.test.sh"
+  },
+  {
+    "id": "jev-write-judgment-unavailable",
+    "system": "firstmate",
+    "invariant": "a write or edit whose required content judgment cannot run never runs",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "write-content review-on-unavailable denials (request too large, provider outage, never-send withholding) refused harmless writes such as a worker report, and a write no longer has a content judgment to require",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.6 (O3, O7-O10, O14-O17), 7.6 (D9) and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py; write/edit input and audit failures keep jev-pretool-deny",
+    "retirement_test": "tests/fm-retired-jev-write-judgment-unavailable.test.sh"
   }
 ]

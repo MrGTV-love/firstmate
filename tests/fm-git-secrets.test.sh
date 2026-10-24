@@ -7,6 +7,7 @@ unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY JEV_BACKEND
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 STRIP="$ROOT/bin/fm-git-strip-ai-trailers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-git-secrets)
+export FM_GUARD_EVENT_LOG="$TMP_ROOT/guard-events.jsonl"
 fm_git_identity 'Credential Tests' 'fixture@example.invalid'
 with_hooks_env() {
   local hooks=$1
@@ -14,6 +15,9 @@ with_hooks_env() {
   GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=$hooks "$@"
 }
 make_repo() { fm_git_init_commit "$1"; }
+# Synthetic shapes assembled at runtime; never print a fixture value.
+aws_shape() { printf 'AKIA%s' ZZZZZZZZZZZZZZZZ; }
+github_shape() { printf 'ghp_%036d' 0; }
 
 test_credentials_are_checked_at_commit_and_push() {
   local repo remote hooks out before keep=${1:-0}
@@ -113,9 +117,142 @@ SH
   pass "project pre-commit staging is scanned before commit, and project-hook failure propagates"
 }
 
+test_existing_lines_are_not_rescanned_at_commit() {
+  local repo hooks out before
+  repo="$TMP_ROOT/existing-fixtures"
+  hooks="$TMP_ROOT/hooks-existing-fixtures"
+  make_repo "$repo"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  mkdir -p "$repo/tests"
+  cp "$ROOT/tests/fm-voice-relay.test.sh" "$repo/tests/fm-voice-relay.test.sh"
+  git -C "$repo" add tests/fm-voice-relay.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'add voice relay suite' 2>&1) &&
+    fail "precondition: tests/fm-voice-relay.test.sh no longer holds a credential-shaped fixture"
+  assert_contains "$out" tests/fm-voice-relay.test.sh "adding the fixture file did not name it"
+  # The fixture already exists in history; commit it as main did, without task hooks.
+  git -C "$repo" commit -qm 'existing voice relay suite'
+  awk 'NR == 2 { $0 = $0 " # unrelated edit" } { print }' "$repo/tests/fm-voice-relay.test.sh" >"$TMP_ROOT/voice-relay.edited"
+  cp "$TMP_ROOT/voice-relay.edited" "$repo/tests/fm-voice-relay.test.sh"
+  git -C "$repo" add tests/fm-voice-relay.test.sh
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'edit an unrelated line' ||
+    fail "F2: an unrelated edit beside an existing fixture was refused"
+  before=$(git -C "$repo" rev-parse HEAD)
+  printf 'NEW_KEY=%s\n' "$(aws_shape)" >>"$repo/tests/fm-voice-relay.test.sh"
+  git -C "$repo" add tests/fm-voice-relay.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'add a new AWS key shape' 2>&1) &&
+    fail "F2: a newly added AKIA-shaped line was committed"
+  assert_contains "$out" tests/fm-voice-relay.test.sh "new AKIA refusal did not name the file"
+  assert_not_contains "$out" AKIA "new AKIA refusal printed the matching value"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "refused AKIA commit moved HEAD"
+  pass "an unrelated edit beside an existing fixture commits; a newly added AKIA-shaped line refuses"
+}
+
+test_merges_scan_only_lines_new_to_every_parent() {
+  local repo remote hooks out file=tests/fm-jev-guard.test.sh
+  repo="$TMP_ROOT/merge-fixtures"
+  remote="$TMP_ROOT/merge-fixtures.git"
+  hooks="$TMP_ROOT/hooks-merge-fixtures"
+  make_repo "$repo"
+  mkdir -p "$repo/tests"
+  printf 'shared line\n' >"$repo/$file"
+  git -C "$repo" add "$file"
+  git -C "$repo" commit -qm 'base suite'
+  git -C "$repo" branch topic
+  # Main's history carries credential-shaped fixtures, as the real suite once did.
+  { printf 'shared line from main\n'; printf 'TOKEN=%s\n' "$(github_shape)"; printf 'KEY=%s\n' "$(aws_shape)"
+    printf 'URL=postgres://fixture:%s@localhost/db\n' 000000000000; } >"$repo/$file"
+  git -C "$repo" commit -qam 'main fixtures'
+  git init -q --bare "$remote"
+  git -C "$repo" remote add origin "$remote"
+  git -C "$repo" push -q origin main
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q topic
+  printf 'shared line from topic\n' >"$repo/$file"
+  git -C "$repo" add "$file"
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'topic edit' || fail "topic edit failed"
+  with_hooks_env "$hooks" git -C "$repo" merge -q main >/dev/null 2>&1 && fail "precondition: merge did not conflict"
+  { printf 'shared line merged\n'; git -C "$repo" show main:"$file" | sed 1d; printf 'NEW=%s\n' "$(aws_shape)"; } >"$repo/$file"
+  git -C "$repo" add "$file"
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'merge main with a new key' 2>&1) &&
+    fail "F2: a conflict resolution that adds a new AKIA-shaped line was committed"
+  assert_contains "$out" "$file" "merge refusal did not name the file"
+  { printf 'shared line merged\n'; git -C "$repo" show main:"$file" | sed 1d; } >"$repo/$file"
+  git -C "$repo" add "$file"
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'merge main' ||
+    fail "F2: a conflicted merge bringing main's fixture lines was refused"
+  assert_equals 2 "$(git -C "$repo" rev-list --parents -n 1 HEAD | wc -w | tr -d ' ' | awk '{print $1 - 1}')" "resolution did not create a merge commit"
+  with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic ||
+    fail "pre-push rescanned fixture lines a merge brought in from main"
+  pass "a conflicted merge bringing main's fixtures commits and pushes; a new line in its resolution refuses"
+}
+
+test_push_baseline_is_every_remote() {
+  local repo origin hooks url fresh gate target out
+  repo="$TMP_ROOT/push-baseline"
+  origin="$TMP_ROOT/push-baseline-origin.git"
+  hooks="$TMP_ROOT/hooks-push-baseline"
+  make_repo "$repo"
+  printf 'E2E_KEY=%s\n' "$(aws_shape)" >"$repo/fixture.sh"
+  git -C "$repo" add fixture.sh
+  git -C "$repo" commit -qm 'main fixture committed before the task hooks'
+  git init -q --bare "$origin"
+  git -C "$repo" remote add origin "$origin"
+  git -C "$repo" push -q origin main
+  url="$TMP_ROOT/push-baseline-url.git"
+  fresh="$TMP_ROOT/push-baseline-fresh.git"
+  gate="$TMP_ROOT/push-baseline-gate.git"
+  git init -q --bare "$url"
+  git init -q --bare "$fresh"
+  git clone -q --bare "$origin" "$gate"
+  git -C "$repo" remote add fresh "$fresh"
+  # A remote whose content exists but whose tracking refs were never fetched.
+  git -C "$repo" remote add gate "$gate"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q -b topic
+  printf 'benign topic work\n' >>"$repo/README.md"
+  git -C "$repo" add README.md
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'topic work' || fail "topic commit failed"
+  for target in "file://$url" fresh gate; do
+    with_hooks_env "$hooks" git -C "$repo" push -q "$target" HEAD:refs/heads/topic ||
+      fail "F1: push to $target rescanned history already on origin"
+  done
+  printf 'NEW_TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  git -C "$repo" commit -qm 'credential committed outside the task hooks'
+  for target in "file://$url" fresh gate; do
+    out=$(with_hooks_env "$hooks" git -C "$repo" push -q "$target" HEAD:refs/heads/topic 2>&1) &&
+      fail "F1: push to $target sent a new credential"
+    assert_contains "$out" leak.txt "push refusal to $target did not name the file"
+    assert_not_contains "$out" fixture.sh "push refusal to $target named history already on origin"
+  done
+  pass "pushes to a URL, a new remote and a remote with no tracking refs skip origin's history and refuse a new credential"
+}
+
+test_each_decision_emits_one_event() {
+  local repo status
+  repo="$TMP_ROOT/telemetry"
+  make_repo "$repo"
+  (cd "$repo" && printf 'not a ref update\n' | python3 "$ROOT/bin/fm-git-secrets.py" pre-push origin "$TMP_ROOT/none.git") >/dev/null 2>&1
+  status=$?
+  expect_code 1 "$status" "unreadable pre-push input did not refuse"
+  for guard in git-commit-credential-shapes git-push-credential-shapes; do
+    for decision in allow deny; do
+      [ "$(jq -s --arg g "$guard" --arg d "$decision" '[.[] | select(.guard == $g and .decision == $d and .source_ok == true)] | length' "$FM_GUARD_EVENT_LOG")" -ge 1 ] ||
+        fail "no readable-source $decision event for $guard"
+    done
+  done
+  [ "$(jq -s '[.[] | select(.guard == "git-push-credential-shapes" and .decision == "deny" and .source_ok == false)] | length' "$FM_GUARD_EVENT_LOG")" -eq 1 ] ||
+    fail "the failed inspection did not record one unreadable-source deny"
+  pass "commit and push decisions each record guard events, including a fail-closed unreadable source"
+}
+
 test_project_pre_commit_changes_are_scanned
 test_credentials_are_checked_at_commit_and_push 0
 test_credentials_are_checked_at_commit_and_push 1
+test_existing_lines_are_not_rescanned_at_commit
+test_merges_scan_only_lines_new_to_every_parent
+test_push_baseline_is_every_remote
+test_each_decision_emits_one_event
 
 export T3_ROOT="$ROOT" T3_TMP="$TMP_ROOT"
 node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'T3 native write acceptance'
@@ -215,7 +352,7 @@ writeFileSync(`${wt}/${filename}`, benign + '\n---.+postgres://fixture:' + '0'.r
 git('add', filename);
 const punctuation = spawnSync('git', ['-C', wt, '-c', `core.hooksPath=${hooks}`, 'commit', '-qm', 'URL after punctuation'], { encoding: 'utf8' });
 assert.equal(punctuation.status, 1, 'punctuation-led credential URL must refuse after long hyphenated prose');
-console.log('credential shapes: complete binary blobs, newline names, anchored prefixes and URL boundaries checked at commit');
+console.log('credential shapes: added binary lines, newline names, anchored prefixes and URL boundaries checked at commit');
 JS
 pass 'T3(b,d): both native write adapters admit ignored credentials and the 396924-byte report without a provider'
 

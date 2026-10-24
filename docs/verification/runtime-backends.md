@@ -40,10 +40,11 @@ The credential suite observed:
 ```text
 omp: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
 claude: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
-credential shapes: complete binary blobs, newline names, anchored prefixes and URL boundaries checked at commit
+credential shapes: added binary lines, newline names, anchored prefixes and URL boundaries checked at commit
 ```
 
 It exercises both production write adapters offline and real Git commit/push operations through installed task hooks, including project-hook staging and failure propagation, both trailer postures, intermediate outgoing commits, new branches, ref deletion and project-hook stdin preservation.
+It also covers the added-content scope: an unrelated edit beside the existing `tests/fm-voice-relay.test.sh` fixture commits, a conflicted merge bringing credential-shaped lines from main commits and pushes, pushes to a URL, a new remote and a remote with no tracking refs skip history already on origin, and each of those paths still refuses a newly added credential shape; each of those three cases failed against the previous whole-blob scanner.
 It does not launch live model sessions or prove another backend's lifecycle behavior; Linux was not exercised.
 The [operator contract](../configuration.md#jev-guard) owns current behavior and residual limits.
 

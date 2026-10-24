@@ -6,7 +6,8 @@
 # records that refusing a worker's own inbox acknowledgement (O13).
 # Pass case: those shell calls now pass on omp and on a Claude worker that still
 # carries the old Bash hook registration, and write no guard audit row.
-# Block case: a write whose judgment cannot run still denies for review.
+# Block case: a write whose terminal audit record cannot be written still
+# denies for review; write content itself has no judgment to wait for.
 # No case starts a provider: the unreachable endpoint is a closed loopback port.
 set -u
 # shellcheck source=tests/lib.sh
@@ -77,9 +78,9 @@ mkdir "$audit/state/jev-guard.jsonl"
 shell_passes "$audit" "audit unavailable" '{"command":"rm -rf build"}'
 pass "shell calls pass on omp and an old-matcher Claude worker when their judgment could not have run"
 
-# --- block case: a write whose judgment cannot run still requires review -----
-run_hook "$home" "$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"src/retired.txt",content:"plain write"},tool_use_id:"retired-write"}')"
+# --- block case: a write whose audit record cannot be written still requires review
+run_hook "$audit" "$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"src/retired.txt",content:"plain write"},tool_use_id:"retired-write"}')"
 [ "$status" -eq 0 ] || fail "write review exited $status instead of the deny path's 0"
-jq -e '.hookSpecificOutput.permissionDecision == "deny" and (.hookSpecificOutput.permissionDecisionReason | contains("CredentialUnavailableError"))' <<<"$out" >/dev/null \
-  || fail "a write without credentials no longer requires review: $out"
-pass "a write whose judgment cannot run still denies for review"
+jq -e '.hookSpecificOutput.permissionDecision == "deny" and (.hookSpecificOutput.permissionDecisionReason | contains("AuditUnavailableError"))' <<<"$out" >/dev/null \
+  || fail "a write whose audit record cannot be written no longer requires review: $out"
+pass "a write whose audit record cannot be written still denies for review"

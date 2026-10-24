@@ -48,7 +48,7 @@ const rows = () => readFileSync(ledger, 'utf8').trim().split('\n').filter(Boolea
 const write = { toolName: 'write', input: { path: 'notes.txt', content: 'ordinary worker file' } };
 for (const handler of handlers.get('tool_call') ?? []) assert.equal(await handler(write, ctx), undefined);
 writeFileSync(`${context.worktree}/notes.txt`, write.input.content);
-assert.equal(requests.length, 1);
+assert.equal(requests.length, 0, 'the admitted write receives no content judgment');
 assert.equal(rows().length, 1);
 async function deliver(event) {
   const original = structuredClone(event);
