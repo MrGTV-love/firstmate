@@ -3,11 +3,11 @@
 # fm-spawn stamps FM_SPAWN_GEN with the record's spawn_gen and records
 # launch_proof=env-v1. The live PID's pin must match that recorded incarnation.
 # For omp, a matching pin also requires current-session proof. Explicit adopt
-# repairs only a record whose PID is gone or no longer an agent and whose live
-# process has a readable environment without a usable pin; without a pin,
-# every adoption proof is rechecked before the repaired live PID and
-# session-file identity authorize
-# lifecycle, and a pin for another generation never passes that recheck.
+# repairs only a record whose PID is gone or no longer an omp process and
+# whose live process has a readable environment without a usable pin; without
+# a pin, every adoption proof is rechecked before the repaired live PID and
+# session-file identity authorize lifecycle, and a pin for another generation
+# never passes that recheck.
 # Native Herdr restore reconstructs argv, not the launch environment/settings.
 # Verdicts: managed|unmanaged|unknown. Only managed authorizes lifecycle action
 # for a proven record; a legacy record keeps its pre-proof attribution rule.
@@ -64,6 +64,18 @@ fm_launch_proof_pid_is_agent() { # <pid>
     && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) \
     && [ -n "$comm" ] && [ -n "$args" ] \
     && [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$pid")" = agent ]
+}
+
+# Succeeds only for a live process whose readable name or argv[0] is omp, the
+# anchored name the agent classifier gives it. Prints nothing.
+fm_launch_proof_pid_is_omp() { # <pid>
+  local pid=$1 comm args name
+  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
+    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || return 1
+  for name in "$comm" "${args%% *}"; do
+    [ "$(fm_harness_path_name "$name")" != omp ] || return 0
+  done
+  return 1
 }
 
 fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID

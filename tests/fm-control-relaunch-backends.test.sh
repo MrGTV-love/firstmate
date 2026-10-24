@@ -1718,53 +1718,68 @@ test_omp_adoption_proof_boundaries() {
   pass "omp adoption: pane, workspace, session-file identity, aliases, and ongoing authorization boundaries"
 }
 
+# A real process whose argv[0] is <name>, standing in for whatever now holds a
+# recorded PID; it is killed by stop_stand_in or the suite's job reaping.
+start_stand_in() { # <name> -> STAND_IN_PID
+  local tries=0
+  (exec -a "$1" /bin/sleep 60) &
+  STAND_IN_PID=$!
+  until [ "$(ps -p "$STAND_IN_PID" -o args= 2>/dev/null | cut -d' ' -f1)" = "$1" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -le 100 ] || fail "the stand-in $1 process did not start"
+    sleep 0.05
+  done
+}
+
+stop_stand_in() {
+  kill "$STAND_IN_PID" 2>/dev/null || true
+  wait "$STAND_IN_PID" 2>/dev/null || true
+}
+
 test_omp_adoption_live_recorded_pid() {
-  local shape dir id record agent_pid tries
-  for shape in other-live-agent resolved-live-process; do
+  local shape dir id record
+  for shape in other-live-omp resolved-live-process; do
     prepare_omp_adoption "live-recorded-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
-    # A record naming a live agent belongs to the omp extension running in it.
-    # A real process named omp stands in for another live recorded agent, and
+    # A record naming a live omp process belongs to the extension running in
+    # it. A real process named omp stands in for another live recorded omp, and
     # the resolved PID with an agreeing current session is a healthy record.
     case "$shape" in
-      other-live-agent)
-        (exec -a omp /bin/sleep 60) &
-        agent_pid=$!
-        tries=0
-        until [ "$(ps -p "$agent_pid" -o args= 2>/dev/null | cut -d' ' -f1)" = omp ]; do
-          tries=$((tries + 1))
-          [ "$tries" -le 100 ] || fail "the stand-in omp process did not start"
-          sleep 0.05
-        done
-        jq --argjson pid "$agent_pid" '.pid=$pid' "$record" > "$record.new" ;;
+      other-live-omp)
+        start_stand_in omp
+        jq --argjson pid "$STAND_IN_PID" '.pid=$pid' "$record" > "$record.new" ;;
       resolved-live-process)
         jq --argjson pid "$(cat "$dir/fake/recovery-pid")" '.pid=$pid | .current_session_file=.task_session_file' \
           "$record" > "$record.new" ;;
     esac
     mv "$record.new" "$record"
-    assert_adoption_refused "$dir" "$id" 'record proof needs the recorded PID to be gone or no longer an agent process'
-    if [ "$shape" = other-live-agent ]; then
-      kill "$agent_pid" 2>/dev/null || true
-      wait "$agent_pid" 2>/dev/null || true
-    fi
+    assert_adoption_refused "$dir" "$id" 'record proof needs the recorded PID to be gone or no longer an omp process'
+    [ "$shape" != other-live-omp ] || stop_stand_in
   done
-  pass "omp adoption: a record naming a live agent process is the extension's to maintain and is refused unchanged"
+  pass "omp adoption: a record naming a live omp process is the extension's to maintain and is refused unchanged"
 }
 
 test_omp_adoption_reused_recorded_pid() {
-  prepare_omp_adoption reused-recorded-pid
-  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record out
-  record="$dir/home/state/$id.omp-session.json"
-  # After a reboot the recorded PID can belong to an unrelated live process;
-  # the test shell itself is such a process and names no omp extension.
-  jq --argjson pid "$$" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
-  out=$(run_continuation_control "$dir" "$id" adopt) || fail "a recorded PID reused by a process that is not an agent blocked repair: $out"
-  assert_contains "$out" "adopted: $id" "repair over a reused PID reports its exact task"
-  jq -e --arg task "$dir/wt/recorded-session.jsonl" \
-    '. == {version:1,spawn_gen:"old",pid:2000000000,task_session_file:$task,current_session_file:$task}' \
-    "$record" >/dev/null || fail "repair over a reused PID did not publish the live process and preserved task file"
-  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "repair over a reused PID sends no lifecycle input"
-  pass "omp adoption: a recorded PID reused by a process that is not an agent does not block repair"
+  local shape dir id record out pid
+  for shape in non-agent other-agent; do
+    prepare_omp_adoption "reused-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
+    # After a reboot the recorded PID can belong to an unrelated live process:
+    # the test shell itself, or another harness's agent, names no omp extension.
+    case "$shape" in
+      non-agent) pid=$$ ;;
+      other-agent) start_stand_in claude; pid=$STAND_IN_PID ;;
+    esac
+    jq --argjson pid "$pid" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
+    out=$(run_continuation_control "$dir" "$id" adopt) || fail "a recorded PID reused by a $shape process blocked repair: $out"
+    [ "$shape" != other-agent ] || stop_stand_in
+    assert_contains "$out" "adopted: $id" "repair over a reused PID reports its exact task"
+    jq -e --arg task "$dir/wt/recorded-session.jsonl" \
+      '. == {version:1,spawn_gen:"old",pid:2000000000,task_session_file:$task,current_session_file:$task}' \
+      "$record" >/dev/null || fail "repair over a PID reused by a $shape process did not publish the live process and preserved task file"
+    assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "repair over a reused PID sends no lifecycle input"
+  done
+  pass "omp adoption: a recorded PID reused by a process other than omp, another harness's agent included, does not block repair"
 }
 
 # The real omp extension, not a model of it, runs as the live process the fake
