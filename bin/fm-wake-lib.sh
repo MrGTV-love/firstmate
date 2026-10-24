@@ -642,15 +642,18 @@ fm_lock_claim() {
 }
 
 # A failed create sets FM_LOCK_BUSY=1 when it lost to another actor: the lock
-# path already existed, or the claim found its link replaced or a steal mutex
-# in the way. Every other failure leaves it 0 (a filesystem or owner error).
+# path was a directory or link, or the claim found its link replaced or a steal
+# mutex in the way. A regular-file lock is malformed, not another actor; every
+# filesystem or owner error leaves the flag 0.
 fm_lock_try_create() {
   local lockdir=$1 allowed_steal_owner=${2:-} ownerdir
   FM_LOCK_OWNER_DIR=
   FM_LOCK_BUSY=0
   ownerdir=$(fm_lock_owner_dir "$lockdir") || return 1
   if [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
-    FM_LOCK_BUSY=1
+    if [ -d "$lockdir" ] || [ -L "$lockdir" ]; then
+      FM_LOCK_BUSY=1
+    fi
     fm_lock_discard_owner "$ownerdir"
     return 1
   fi
@@ -667,7 +670,7 @@ fm_lock_try_create() {
       rm -f "$lockdir" 2>/dev/null || true
     fi
   else
-    if [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
+    if [ -d "$lockdir" ] || [ -L "$lockdir" ]; then
       FM_LOCK_BUSY=1
     fi
     fm_lock_remove_stray_owner_link "$lockdir" "$ownerdir"
@@ -690,6 +693,9 @@ fm_lock_remove_path() {
 
 fm_lock_mid_acquire_is_fresh() {
   local lockdir=$1 pid=$2 mid_acquire_stale
+  # Only a directory can be publishing owner metadata; a fresh regular file is
+  # malformed, not an in-progress lock acquisition.
+  [ -d "$lockdir" ] || return 1
   case "$pid" in
     ''|*[!0-9]*)
       mid_acquire_stale=$FM_LOCK_STALE_AFTER
@@ -1454,8 +1460,9 @@ _fm_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
 # fm_lock_acquire_wait_bounded <lockdir> <positive-seconds>
 #
 # Bounded acquire variant. It preserves the ordinary wait/reclaim behavior
-# until fm-timeout-lib.sh's hard deadline, returns 124 when a live holder still
-# owns the lock, and leaves FM_LOCK_HELD_PID naming that holder.
+# until fm-timeout-lib.sh's hard deadline, returns 124 when the final attempt
+# observes contention, and leaves FM_LOCK_HELD_PID naming the observed holder
+# (empty when ownership was still being published).
 # Use it where a caller must refuse rather than block: wake presentation, and
 # the guarded remote link clear, whose whole contract is to return a
 # reconciliation refusal instead of wedging an unattended close.
@@ -1495,16 +1502,9 @@ fm_lock_acquire_wait_bounded() {
     return 0
   fi
   if [ "$rc" -eq 124 ]; then
-    owner_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
-    case "$owner_pid" in
-      ''|*[!0-9]*|0) ;;
-      *)
-        if [ "$owner_pid" -gt 0 ] 2>/dev/null && fm_pid_alive "$owner_pid"; then
-          FM_LOCK_HELD_PID=$owner_pid
-          return 124
-        fi
-        ;;
-    esac
+    # The final attempt captured the refusal's cause. A later PID read races
+    # release and can turn genuine contention into an acquisition error.
+    [ "$FM_LOCK_BUSY" != 1 ] || [ "$FM_LOCK_HELD_PID" = "$caller_pid" ] || return 124
     # shellcheck disable=SC2034 # Output read by callers after bounded acquisition.
     FM_LOCK_HELD_PID=
     return 1
