@@ -42,7 +42,13 @@
 # its value against the registry; bin/fm-project-mode.sh's header owns the
 # binding and bin/fm-dod-lib.sh owns what it changes for the worker, including
 # the refusal of a forge on local-only.
-# Usage: fm-promote.sh <task-id> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--upstream-consent <host>/<owner>/<repo>]
+# A governed assigned copy is attested by bin/fm-slot-provision-lib.sh before
+# ship instructions or kind=ship are published, using the spawn-recorded scope
+# or repeatable --owned-path <tracked-path> flags for a legacy scout. The installed
+# provisioner owns repeat/reuse compatibility; dirty scratch, branch/scope changes,
+# foreign active manifests, and create-only refusals stop promotion without a
+# manifest-force path. Governed scouts keep their already-provisioned task branch.
+# Usage: fm-promote.sh <task-id> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--owned-path <tracked-path>]... [--upstream-consent <host>/<owner>/<repo>]
 # --upstream-consent records the captain's one-off approval for this task to
 # publish to firstmate's own upstream repository; promotion applies the same
 # self-repository publication gate as bin/fm-spawn.sh (bin/fm-role-lib.sh), so
@@ -74,10 +80,15 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-secondmate-parent-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
+# shellcheck source=bin/fm-task-copy-lib.sh
+. "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-slot-provision-lib.sh
+. "$SCRIPT_DIR/fm-slot-provision-lib.sh"
 
 MODE=
 YOLO=
 BRANCH_PREFIX=fm/
+SLOT_OWNED_PATHS=()
 MODE_SET=0
 YOLO_SET=0
 FORGE=none
@@ -94,6 +105,7 @@ for a in "$@"; do
       mode) MODE=$a; MODE_SET=1 ;;
       yolo) YOLO=$a; YOLO_SET=1 ;;
       branch-prefix) BRANCH_PREFIX=$a ;;
+      owned-path) SLOT_OWNED_PATHS+=("$a") ;;
       upstream-consent) UPSTREAM_CONSENT=$a; UPSTREAM_CONSENT_SET=1 ;;
     esac
     want_value=
@@ -106,6 +118,8 @@ for a in "$@"; do
     --yolo=*) YOLO=${a#--yolo=}; YOLO_SET=1 ;;
     --branch-prefix) want_value="branch-prefix" ;;
     --branch-prefix=*) BRANCH_PREFIX=${a#--branch-prefix=} ;;
+    --owned-path) want_value=owned-path ;;
+    --owned-path=*) SLOT_OWNED_PATHS+=("${a#--owned-path=}") ;;
     --upstream-consent) want_value="upstream-consent" ;;
     --upstream-consent=*) UPSTREAM_CONSENT=${a#--upstream-consent=}; UPSTREAM_CONSENT_SET=1 ;;
     *) POS+=("$a") ;;
@@ -286,6 +300,19 @@ if [ -z "$(printf '%s' "$INTENT_BODY" | tr -d '[:space:]')" ]; then
   exit 1
 fi
 
+# Attest before publishing any ship instructions or changing kind=. Existing
+# scouts retain the same owner, branch, and explicit scope; any incompatible
+# declaration is the provisioner's refusal, not permission to replace a record.
+PROMOTE_WORKTREE=$(sed -n 's/^worktree=//p' "$META" | head -n 1)
+if fm_slot_required "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" || grep -q '^slot_manifest=' "$META"; then
+  if [ "${#SLOT_OWNED_PATHS[@]}" -eq 0 ]; then
+    while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
+  fi
+  fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" || exit 1
+  fm_slot_provision "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" "$ID" "$BRANCH" \
+    "$DATA/$ID/slot-provision-promote.${BASHPID:-$$}.json" "${SLOT_OWNED_PATHS[@]}" || exit 1
+fi
+
 # The promoted worker must receive the same delivery contract an ordinary ship
 # brief carries, so the mode-specific Definition of done is rendered from its
 # single owner (bin/fm-dod-lib.sh) rather than summarised into a hint line. A
@@ -306,6 +333,11 @@ If these promotion steps were already completed before a relaunch, preserve the 
 6. Treat the scout-time Firstmate spec and any unmarked legacy \`# Task\` text as investigation context, not captain intent or current ship-time instructions.
 7. Everything else in your original instructions carries over unchanged: the status protocol; the instruction inbox and its acknowledgement; the escalation rules, including ask-user; and every safety rule, except where the current delivery contract below explicitly replaces scout-only delivery rules.
 EOF
+if [ "$FM_SLOT_PROVISIONED" = 1 ]; then
+  PROMOTION_SHIP_SPEC="$(fm_slot_contract "$BRANCH")
+Inventory the existing branch's commits and scratch state before changing it; preserve unrelated work and carry forward only the intended fix.
+The original intent, current ship delivery rules, and status/inbox safety rules still apply."
+fi
 promote_delivery_contract() {
   cat <<EOF
 # Current delivery mode contract
@@ -380,12 +412,17 @@ fi
 BRIEF_REPLACEMENT=
 
 TMP="$STATE/.$ID.meta.promote.${BASHPID:-$$}"
-grep -v -e '^kind=' -e '^mode=' -e '^yolo=' -e '^branch=' -e '^upstream_consent=' -e '^fixed_family=' "$META" > "$TMP"
+grep -v -e '^kind=' -e '^mode=' -e '^yolo=' -e '^branch=' -e '^upstream_consent=' -e '^fixed_family=' -e '^slot_manifest=' -e '^slot_base_sha=' -e '^slot_owned_path=' "$META" > "$TMP"
 {
   echo "kind=ship"
   echo "mode=$MODE"
   echo "yolo=$YOLO"
   echo "branch=$BRANCH"
+  if [ "$FM_SLOT_PROVISIONED" = 1 ]; then
+    echo "slot_manifest=$FM_SLOT_MANIFEST"
+    echo "slot_base_sha=$FM_SLOT_BASE_SHA"
+    for owned_path in "${SLOT_OWNED_PATHS[@]}"; do echo "slot_owned_path=$owned_path"; done
+  fi
   [ -z "$UPSTREAM_CONSENT" ] || echo "upstream_consent=$UPSTREAM_CONSENT"
 } >> "$TMP"
 if ! fm_backlog_atomic_transition publish "$TMP" "$META" "task record" "$STATE"; then
