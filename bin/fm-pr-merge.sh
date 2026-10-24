@@ -10,6 +10,14 @@
 # change is refused outright: that adapter is read-only, and the refusal at the
 # parse below owns why.
 #
+# Every supported forge also requires a recorded independent PASS for the live
+# head before its merge command: bin/fm-review-record.py owns the append-only
+# review/captain-word format and recording CLI. A yes escalation trigger needs
+# recorded captain words at the live head, and captain words recorded at the
+# live head stand in for the PASS until a newer FAIL at that head that no later
+# independent PASS at that head clears; neither --attended-override nor away
+# authority substitutes for this evidence, and captain words waive no old guard.
+#
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.
 # On Forgejo the merge style defaults to the repository's own
@@ -143,8 +151,8 @@
 # recorded as an `answer --release` before this entrypoint is invoked.
 # A refused hold prints that exact release command with the task's own id.
 # While an away record exists (a quiet-mode record is a present captain, so its
-# merges stay attended: bin/fm-afk-contract.sh mode) any green merge may
-# proceed under away authority:
+# merges stay attended: bin/fm-afk-contract.sh mode) a green merge satisfying
+# the recorded-review preconditions may proceed under away authority:
 # the record's presence is the whole mechanical fact, and which merge the
 # captain's away words meant is the supervision session's reading
 # (bin/fm-branch-prompt.sh "Postures"). An unreadable record refuses rather
@@ -443,8 +451,8 @@ META="$STATE/$ID.meta"
 # branch reports the green PR and never merges (contract: bin/fm-lease-lib.sh;
 # no-op in homes without a branch actor). While the away-posture record exists
 # main is parked and this one action relocates to the branch, which then meets
-# exactly the same gates below as main would: green at its live head,
-# synchronous, under the record lock. This precedes
+# exactly the same gates below as main would: green at its live head with
+# the recorded review, synchronous, under the record lock. This precedes
 # reading the task record, because the wrong actor is refused for its role
 # whatever that record says.
 # shellcheck source=bin/fm-lease-lib.sh
@@ -535,6 +543,11 @@ RECORDED_HEAD=
 if [ "$PROVIDER" = gitlab ] || [ "$PROVIDER" = forgejo ]; then
   RECORDED_HEAD=$(grep '^pr_head=' "$META" | tail -1 | cut -d= -f2- || true)
 fi
+
+require_recorded_review() {
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    python3 "$SCRIPT_DIR/fm-review-record.py" verify --pr "$URL" --head "$FM_PR_MERGE_HEAD" >&2
+}
 
 # Pre-merge conditions for a GitLab merge request, read from one live view of
 # the merge request. Sets FM_PR_MERGE_HEAD to the verified head on success and
@@ -1832,6 +1845,7 @@ case "$PROVIDER" in
     fi
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
+    require_recorded_review || exit 1
     hold_away_record_for_merge || exit 1
     away_status=0
     require_current_away_authority || away_status=$?
@@ -1887,6 +1901,7 @@ case "$PROVIDER" in
     # the conditions above are what authorize the merge.
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
+    require_recorded_review || exit 1
     hold_away_record_for_merge || exit 1
     away_status=0
     require_current_away_authority || away_status=$?
@@ -1919,6 +1934,7 @@ case "$PROVIDER" in
     forgejo_verify_mergeable || exit 1
     # The away record is locked first, so this last presence and authority
     # read and the forge command below share one live-owner critical section.
+    require_recorded_review || exit 1
     hold_away_record_for_merge || exit 1
     away_status=0
     require_current_away_authority || away_status=$?
