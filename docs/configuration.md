@@ -377,11 +377,11 @@ Both choices are local to each Firstmate home and are not part of secondmate inh
 Two optional local, gitignored files control the supervision host for this home: `config/supervision-host-off` opts the home out, and `config/supervision-host` opts a home in and selects its engine.
 The host runs the supervision branch's contract on a headless engine session beside a non-Pi primary.
 [docs/supervision-host.md](supervision-host.md) defines its design, current scope, and verified engines.
-A Claude, Cursor, OpenCode, omp, Grok, or Codex primary can run the host.
+A Claude, Cursor, OpenCode, omp, DSH, Grok, or Codex primary can run the host.
 
 A present `config/supervision-host-off`, whatever it holds, opts the home out on every primary.
 Otherwise a Claude primary runs the host by default: with no `config/supervision-host` it runs exactly as with an empty one, at the Claude engine's default model.
-A Cursor, OpenCode, omp, Grok, or Codex primary runs the host only while `config/supervision-host` exists and the home is not opted out.
+A Cursor, OpenCode, omp, DSH, Grok, or Codex primary runs the host only while `config/supervision-host` exists and the home is not opted out.
 A home that does not run the host behaves exactly as it does without it, and a Pi primary keeps its in-process supervision branch whatever either file says.
 `fm_supervision_host_enabled` in `bin/fm-supervision-engine-lib.sh` implements this gate for every reader.
 
@@ -398,7 +398,7 @@ Grok's arm command is rendered at session start, so a change to its host mode ta
 - empty or `default` selects the primary harness's own engine at that engine's default model (`sonnet` for the Claude engine);
 - `<engine> [<model>]` names a verified engine, currently only `claude`, and optionally the engine's own model name or alias; `default <model>` selects the primary harness's engine with that model.
 
-Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, Grok, or Codex home names `claude` in the file.
+Only Claude has a verified engine of its own, so a Cursor, OpenCode, omp, DSH, Grok, or Codex home names `claude` in the file.
 Engine sessions follow the [session launch policy's scope](#session-launch-policy-configsession-launch-policy); engine selection follows the rules above.
 
 ### Failures, when changes apply, and inheritance
@@ -1258,7 +1258,7 @@ A local standalone-clone home cannot receive a primary-local commit through that
 
 ## Harness support
 
-claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, and omp are empirically verified for crewmate and secondmate launches; gemini is verified for crewmate and scout launches only, and [README requirements](../README.md#requirements) own the set supported for the primary session.
+claude, codex, opencode, pi, pi-signed, grok, kimi, cursor, omp, and dsh support crewmate and secondmate launches; gemini is verified for crewmate and scout launches only, and [README requirements](../README.md#requirements) own the set supported for the primary session.
 
 ### Harness restrictions and credentials
 
@@ -1278,6 +1278,8 @@ agy is likewise verified for crewmate and scout launches ONLY, refused for a sec
 devin is verified for crewmate and scout launches only; a secondmate is refused because Devin has no verified primary supervision protocol.
 
 Its private worker config disables Claude Code imports (including the captain's hooks) and, unless the home sets `config/keep-ai-trailers` (see "Commit attribution"), Devin commit attribution without editing user or project config; [`fm-devin-config.sh`](../bin/fm-devin-config.sh) owns these enforced settings and [Devin verification](verification/devin.md) owns the live evidence and observed model availability.
+
+dsh (DeepSeek Harness through `dsh-tui`) uses the native primary plugin for main and secondmate sessions and keeps worker launches separate; [its adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md) owns the launch, model, busy-state, and composer contracts, and [runtime verification](verification/runtime-backends.md#deepseek-harness-dsh-tui) owns the live evidence.
 
 ### Verification and primary supervision
 
@@ -1304,6 +1306,10 @@ When pi-signed is selected, Firstmate preserves `FM_PI_HARNESS=pi-signed` and re
 
 Plain Pi launches set `FM_PI_HARNESS=pi`, so a signed primary's environment cannot relabel a plain Pi worker.
 When it is absent or contains `default`, crewmates mirror the firstmate's own harness.
+
+DeepSeek work runs through `dsh-tui` (`harness: dsh`), not omp or another parallel adapter.
+An implicit DeepSeek ship or scout launch selects dsh; an explicit contradictory adapter refuses before launch, and a dsh secondmate loads its native primary supervision plugin rather than retain omp.
+The [dsh adapter reference](../.agents/skills/harness-adapters/references/harness/dsh.md#routing) owns model/provider matching and admission.
 
 ### Choose the secondmate harness
 
@@ -1346,8 +1352,8 @@ Dirty edits outside those owners, wrong-branch homes, and preserved divergence r
 Local recovery converges this setting, verifies the tooling, and checks the resolved replacement against the effective child policy before stopping the old endpoint or consuming a recovery attempt.
 Automatic secondmate recovery resolves the home from metadata `home`, then `worktree`, then the registered `home:` in `data/secondmates.md`; convergence and refusal fingerprinting use that same home.
 
-For worker and secondmate launches, this opt-in permits only a supported native `omp` or `tc run` launch, not a provider-name match.
-Currently only the canonical `omp` adapter satisfies it: the verified native `tc run` launcher is a prerequisite not yet implemented in this code root.
+For worker and secondmate launches, this opt-in permits supported native adapters, not provider-name matches.
+The canonical `omp` adapter remains admitted for non-DeepSeek work, and the canonical `dsh` adapter is admitted for DeepSeek work; the verified native `tc run` launcher remains a prerequisite not yet implemented in this code root.
 A TeamClaude proxy wrapper that starts `claude` directly does not satisfy the literal `tc run` requirement and must not be treated as an allowed fallback.
 Opaque raw shell launch commands are refused, even when their first word is `omp`, because their eventual session executable cannot be established from that word.
 The `openai-codex` provider inside omp remains allowed; the restriction excludes the standalone Codex CLI, not its models or provider.
@@ -1806,10 +1812,7 @@ It does not change commit-attribution preferences.
     },
     "sonnet-grade": {
       "claude": { "model": "sonnet" },
-      "omp": {
-        "model": "anthropic/claude-sonnet-5-5",
-        "stand_in": "deepseek/deepseek-v4-flash"
-      }
+      "dsh": { "model": "deepseek/deepseek-v4-flash" }
     }
   },
   "retired": ["gpt-6-sol"]
@@ -2038,10 +2041,10 @@ Native Claude's default-account quota is not a TeamClaude proxy ledger, so a Tea
 Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
 
 Each fallback profile requires `harness`, `model`, and `effort`.
-An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
+An OMP fallback uses a concrete non-DeepSeek catalog selector; a dsh fallback uses a concrete DeepSeek model and a `dsh-tui` launcher and `dsh` CLI whose version commands succeed; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 Every fallback destination must also satisfy the home's session launch policy.
 A bare `claude` executable or a shell alias is not proof of that route.
-For example, a rule may declare `"fallback": [{"harness": "omp", "model": "deepseek/deepseek-v4-flash", "effort": "high"}]`, using a concrete selector taken from `omp models --json`; these fields grant only the named stand-in, not a general downgrade.
+For example, a rule may declare `"fallback": [{"harness": "dsh", "model": "deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only that declared model stand-in, reached through dsh-tui rather than omp.
 The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
 Natural-language `why` text does not authorize an executable fallback.
 
@@ -2061,14 +2064,11 @@ OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fall
 Ships, secondmates, and raw launch commands are refused, and the guarantee ends when the scout is promoted to a ship.
 The flag does not change dispatch-time selection; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the flag mechanics, including the recorded posture, relaunch inheritance, and the notice other harnesses print.
 Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.
-The tracked session overlay `.omp/fm-session-overlay.yml` chains `openai-codex/gpt-6.1-sol` to direct `deepseek/deepseek-v4-flash:high` for every omp launch, so a Sol session moves to the stand-in on any eligible provider error, a quota-out included, and `retry.fallbackRevertPolicy: cooldown-expiry` returns it to Sol once the suppression window ends.
-A worker's per-task chain replaces that entry for its own model, and is empty when the rule names no eligible native stand-in.
-Dispatch-time selection and the overlay chain are separate mechanisms.
-Dispatch-time selection keeps the strongest-reasoning class, and a tight choice with no supported equal-class stand-in stops and is reported.
-The overlay chain is a run-time provider-error fallback inside one session, not a dispatch decision, and it is a standing exception to that rule for omp Sol sessions.
-Its destination is the direct `deepseek` provider only, never an API-billed router such as OpenRouter.
-A lane that fell back runs on a lower reasoning class until omp returns it to Sol when the suppression window ends, or until the lane is launched again.
-Narrowing the exception means editing the one chain key, `retry.fallbackChains."openai-codex/gpt-6.1-sol"`, in `.omp/fm-session-overlay.yml`.
+The tracked session overlay `.omp/fm-session-overlay.yml` empties the former Sol-to-DeepSeek native chain: DeepSeek requires a dsh-tui replacement.
+A worker's per-task chain replaces the entry for its own model and is empty when the rule names no eligible native stand-in.
+Native omp fallback cannot change a session into a dsh-tui session; a declared dsh stand-in is selected at launch on proven exhaustion or through the existing recovery path.
+Without a supported permitted replacement, the original provider error remains visible instead of silently serving DeepSeek through omp.
+The no-mistakes review-agent selector does not offer DeepSeek through omp either: dsh-tui has no verified review-agent transport, so that candidate is reported unavailable, not mapped to ACP or headless execution.
 Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
 An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Launch and successful replacement append the selected route to task status.
@@ -2106,7 +2106,7 @@ Typed resolution additively recognizes `gemini` because AGENTS.md section 4 veri
 
 | Harness | Provider declaration on the opted-in resolver path |
 | --- | --- |
-| `claude`, `codex`, `grok`, `kimi`, `cursor`, `agy`, `muse` | The resolver has an authoritative single-provider mapping. |
+| `claude`, `codex`, `grok`, `kimi`, `cursor`, `agy`, `muse`, `dsh` | The resolver has an authoritative single-provider mapping. |
 | Every other verified harness | Must declare `provider` explicitly; this includes multi-provider `pi`, `pi-signed`, `omp`, and `opencode`, and unmapped `gemini`, `rovo`, and `devin`; omission is an actionable configuration error before any request. |
 
 This single-provider table is separate from the frozen legacy mapping used by `fm-quota-choose.sh`, so additions cannot alter no-key routing.

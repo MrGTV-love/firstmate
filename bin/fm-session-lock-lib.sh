@@ -22,18 +22,20 @@ _FM_SESSION_LOCK_LIB_DIR=${BASH_SOURCE[0]%/*}
 [ "$_FM_SESSION_LOCK_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _FM_SESSION_LOCK_LIB_DIR=.
 # shellcheck source=bin/fm-cursor-lib.sh
 . "${_FM_SESSION_LOCK_LIB_DIR:-/}/fm-cursor-lib.sh"
+# shellcheck source=bin/fm-dsh-lib.sh
+. "${_FM_SESSION_LOCK_LIB_DIR:-/}/fm-dsh-lib.sh"
 unset _FM_SESSION_LOCK_LIB_DIR
 
 # Known harness command names; extend when a new adapter is verified. omp is
 # anchored exactly like pi: its process name is the bare word `omp` (verified,
 # omp 18.1.11), and a substring match would claim ompd or comp.
-FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$|^dsh$|^dsh-tui$'
 
 # The same harnesses as exact executable names. Keep in sync with
 # FM_HARNESS_RE. Used only for the stricter path evidence below, where the
 # loose regex would also match ordinary firstmate paths such as
 # bin/fm-claude-stop-autoarm.sh.
-FM_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp)
+FM_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp dsh dsh-tui)
 
 # Print the exact harness name carried by executable path $1 - its own basename
 # or any directory component - or return 1.
@@ -72,6 +74,7 @@ fm_harness_process_matches() {  # <comm> <args>
   local comm=$1 args=$2 base argv0 name
   FM_HARNESS_IS_CLAUDE=0
   base=$(basename -- "$comm")
+  fm_dsh_args_are_dsh "$args" && return 0
   if printf '%s' "$base" | grep -qE "$FM_HARNESS_RE"; then
     case "$base" in *claude*) FM_HARNESS_IS_CLAUDE=1 ;; esac
     return 0

@@ -39,6 +39,7 @@ EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"]
 HARNESS_EFFORTS = {
     "claude": ["low", "medium", "high", "xhigh", "max"],
     "omp": ["low", "medium", "high", "xhigh", "max"],
+    "dsh": ["low", "medium", "high", "xhigh", "max"],
     "pi": ["low", "medium", "high", "xhigh", "max"],
     "pi-signed": ["low", "medium", "high", "xhigh", "max"],
     "muse": ["low", "medium", "high", "xhigh", "max"],

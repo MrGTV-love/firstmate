@@ -65,7 +65,7 @@ fm_control_verb_allowed() {  # <verb>
 # section 4's verified-adapter list; an unverified adapter is refused rather
 # than guessed at, exactly as a spawn on it would be.
 fm_control_harnesses() {
-  printf '%s\n' claude codex opencode pi pi-signed grok kimi cursor gemini muse rovo omp agy devin
+  printf '%s\n' claude codex opencode pi pi-signed grok kimi cursor gemini muse rovo omp dsh agy devin
 }
 
 fm_control_harness_supported() {  # <harness>
@@ -90,6 +90,7 @@ fm_control_harness_family() {  # <recorded-harness>
     pi) printf 'pi' ;;
     pi-signed) printf 'pi-signed' ;;
     omp) printf 'omp' ;;
+    dsh|dsh-tui) printf 'dsh' ;;
     agy) printf 'agy' ;;
     devin) printf 'devin' ;;
     claude*) printf 'claude' ;;
@@ -126,12 +127,12 @@ fm_control_omp_launch_check() {
   return 1
 }
 
-# Which task kinds an adapter is verified to run. muse, gemini, rovo, agy, and devin
-# are crewmate/scout adapters only: none has a primary supervision protocol,
-# and bin/fm-spawn.sh refuses a --secondmate launch on any of them. The control
-# plane asks this BEFORE it stops anything, so an incompatible relaunch target is
-# refused while the current agent is still running rather than after it has
-# been stopped.
+# Which task kinds an adapter is verified to run. muse, gemini, rovo, agy, and
+# devin are crewmate/scout adapters only: none has a primary supervision
+# protocol, and bin/fm-spawn.sh refuses a --secondmate launch on any of them.
+# The control plane asks this BEFORE it stops anything, so an incompatible
+# relaunch target is refused while the current agent is still running rather
+# than after it has been stopped.
 fm_control_harness_supports_kind() {  # <harness> <kind>
   local harness=${1-} kind=${2-}
   fm_control_harness_supported "$harness" || return 1
@@ -153,7 +154,7 @@ fm_control_harness_supports_kind() {  # <harness> <kind>
 # owned by docs/watcher-continuity.md "omp restored-wake recovery".
 fm_control_interrupt_key() {  # <harness>
   case "${1-}" in
-    claude|codex|opencode|pi|pi-signed|omp|kimi|cursor|gemini|muse|rovo|agy|devin) printf 'Escape' ;;
+    claude|codex|opencode|pi|pi-signed|omp|dsh|kimi|cursor|gemini|muse|rovo|agy|devin) printf 'Escape' ;;
     grok) printf 'C-c' ;;
     *) return 1 ;;
   esac
@@ -164,7 +165,7 @@ fm_control_interrupt_key() {  # <harness>
 fm_control_interrupt_repeat() {  # <harness>
   case "${1-}" in
     opencode|devin) printf '2' ;;
-    claude|codex|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy) printf '1' ;;
+    claude|codex|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|muse|rovo|agy) printf '1' ;;
     *) return 1 ;;
   esac
 }
@@ -183,7 +184,7 @@ fm_control_interrupt_repeat() {  # <harness>
 fm_control_interrupt_arm_signal() {  # <harness>
   case "${1-}" in
     devin) printf '%s' 'esc again to interrupt' ;;
-    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy) ;;
+    claude|codex|opencode|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|muse|rovo|agy) ;;
     *) return 1 ;;
   esac
 }
@@ -194,7 +195,7 @@ fm_control_interrupt_arm_signal() {  # <harness>
 fm_control_interrupt_press_gap() {  # <harness>
   case "${1-}" in
     devin) printf '0.5' ;;
-    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy) printf '0.2' ;;
+    claude|codex|opencode|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|muse|rovo|agy) printf '0.2' ;;
     *) return 1 ;;
   esac
 }
@@ -207,7 +208,7 @@ fm_control_interrupt_press_gap() {  # <harness>
 fm_control_interrupt_hazard_signal() {  # <harness>
   case "${1-}" in
     devin) printf '%s' 'Revert to step:|↵ revert' ;;
-    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy) ;;
+    claude|codex|opencode|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|muse|rovo|agy) ;;
     *) return 1 ;;
   esac
 }
@@ -230,7 +231,7 @@ fm_control_interrupt_hazard_signal() {  # <harness>
 fm_control_interrupt_clear_key() {  # <harness>
   case "${1-}" in
     muse) printf 'C-u' ;;
-    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|rovo|agy|devin) ;;
+    claude|codex|opencode|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|rovo|agy|devin) ;;
     *) return 1 ;;
   esac
 }
@@ -245,7 +246,7 @@ fm_control_interrupt_ack_source() {  # <harness>
     # rovo's TUI prints "Agent cancelled" on Escape, but for parity with
     # claude/cursor this stays 'none': the ack is a rendered string, not a
     # recorded state source, and rovo has no busy wiring to confirm against.
-    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|rovo|agy|devin) printf 'none' ;;
+    claude|codex|opencode|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|rovo|agy|devin) printf 'none' ;;
     *) return 1 ;;
   esac
 }
@@ -253,7 +254,7 @@ fm_control_interrupt_ack_source() {  # <harness>
 # The command that exits the agent from its own composer.
 fm_control_exit_command() {  # <harness>
   case "${1-}" in
-    claude|opencode|grok|kimi|cursor|muse|rovo) printf '/exit' ;;
+    claude|opencode|grok|kimi|cursor|muse|rovo|dsh) printf '/exit' ;;
     codex|pi|pi-signed|omp|gemini|agy|devin) printf '/quit' ;;
     *) return 1 ;;
   esac
@@ -271,7 +272,7 @@ fm_control_exit_command() {  # <harness>
 fm_control_exit_picker_stay_key() {  # <harness>
   case "${1-}" in
     claude) printf 'Escape' ;;
-    codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy|devin) ;;
+    codex|opencode|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|muse|rovo|agy|devin) ;;
     *) return 1 ;;
   esac
 }
@@ -282,7 +283,7 @@ fm_control_exit_picker_stay_key() {  # <harness>
 fm_control_exit_picker_confirm_key() {  # <harness>
   case "${1-}" in
     claude) printf 'Enter' ;;
-    codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy|devin) ;;
+    codex|opencode|pi|pi-signed|omp|dsh|grok|kimi|cursor|gemini|muse|rovo|agy|devin) ;;
     *) return 1 ;;
   esac
 }

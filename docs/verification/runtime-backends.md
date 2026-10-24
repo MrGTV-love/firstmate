@@ -3882,6 +3882,134 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 
 `FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh` refreshes the primary evidence; the worker path above is refreshed by repeating the scout dispatch after any omp upgrade.
 
+## DeepSeek Harness (dsh-tui)
+
+Verified on 2026-10-21 on macOS arm64 (Darwin 27.0.0) through `bin/fm-herdr-lab.sh` in a named non-default lab session.
+Observed on the PATH-selected Homebrew `dsh-tui` 0.16.1 (launcher and installed profile), `dsh` CLI 0.2.1-rc.2, and Node v26.4.0; these release numbers record the measurement, not an admission requirement.
+Fixture: a disposable scratch project and its isolated linked copy, registered only in the guard's private home with local-only delivery and no push.
+Both live guards now read the model under test at run time through `bin/fm-dsh.py preferred-model`, from `.dsh-tui/model.json` in `FM_DSH_OPERATOR_HOME`, else `HOME`, and fail before any lab step when it names no `deepseek-official` model; the model ids in the observed output below record those runs, not a requirement.
+
+```sh
+FM_DSH_LIVE=1 \
+FM_DSH_EVIDENCE_DIR=<fresh evidence directory> \
+FM_DSH_LAB_PROJECT=<disposable scratch project> \
+FM_DSH_LAB_COPY=<its separate linked copy> \
+bin/fm-test-run.sh tests/fm-dsh-live-e2e.test.sh
+bin/fm-test-run.sh tests/fm-dsh-harness.test.sh
+bin/fm-test-run.sh tests/fm-dsh-spawn.test.sh
+```
+
+```text
+ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+ok - live dsh-tui scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+cleanup_exit=0
+```
+
+| Fact | Observed |
+| --- | --- |
+| Launch | `dsh-tui --patch <launch patch> -- <brief>` started the interactive TUI and submitted the brief as its opening prompt; no folder-trust or approval dialog appeared under `DSH_PERMISSION_MODE=danger-full-access` |
+| Model and effort | no launch flags exist, so the launch patch and the launch-local `~/.dsh-tui/model.json` and `effort.json` selected `deepseek-v4-flash` at `high`; `/status` and the footer both reported that route |
+| Busy state | `bin/fm-dsh.py state` folded the launch's own JSONL session log: the brief turn read `busy`, the completed steer read `idle`, and the pre-turn launch read `unknown`; no screen scrape was consulted |
+| Composer | the rounded `⌸ … ⛶` frame holding `❯` classified `empty` on an idle busy pane and `pending` with typed text, with its two status rows and `esc to interrupt` treated as furniture |
+| Steer | `bin/fm-send.sh` delivered an inbox record mid-task and the worker replied with the requested token before the next interruption |
+| Interrupt and exit | For both workers, `bin/fm-control.sh <id> interrupt` reported `interrupt-delivered ... verified=agent-alive cancel=unconfirmed`; key delivery and agent survival were proven, but cancellation completion was not independently confirmed. `exit` reported `stopped` with Herdr then reporting the pane dead |
+| Relaunch | `bin/fm-control.sh <id> relaunch` replaced the worker in the same endpoint; the replacement read its relaunch instructions and the guard observed the bound session log grow in place |
+| Resume | Available through the launch overlay's `sessionId` field. The stock profile patch reads `DSH_TUI_RESUME_SESSION`, but the launch patch replaces that row config, so `--resume` or the env alone opened a fresh session; `bin/fm-dsh.py resume` now writes the task's newest session id explicitly and DSH continues the conversation in the same session log. Verified by a secret-word probe in which the resumed session recalled a word from the earlier turn, and by the live guard's same-log growth and earlier-conversation assertions. |
+
+The live guard completed both lifecycles with the durable start-position proof and the recognized-composer launch check enabled.
+The default-session tripwire and lab cleanup succeeded.
+`tests/fm-dsh-harness.test.sh` also reported:
+
+```text
+ok - PATH-selected DSH probes accept arbitrary releases and refuse failed commands
+ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic
+```
+
+The launcher and CLI must resolve and their version commands must exit successfully; no release string is compared.
+The actual frontend must then provide a recognizable DSH composer and a new durable turn, so a changed frontend refuses with a diagnostic naming the unreadable composer rather than being accepted because of its version.
+No screen-based DSH quota parser exists: dispatch quota uses structured snapshots and the DSH busy classifier reads its durable session log.
+The launch carries the exact probed `PATH` into the pane: a lab pane that instead selected `/usr/local/bin/node` v22.17.0 returned silently from `dsh --version` with exit zero and started no session, while the same launch using the probed PATH completed both lifecycles.
+This is a search-path handoff, not a Node-version requirement.
+
+The installed profile tree is reproduced file by file inside each launch root and never linked as a directory: Node resolves real paths before DSH's profile interception, so a linked `node_modules` directory escaped the isolated profile and loaded the launcher's own incompatible packages.
+The launcher needs the `dsh` CLI on `PATH`; `bin/fm-dsh-lib.sh` probes both PATH-selected commands and the launch preserves that search path rather than selecting a particular Node installation.
+Ship and scout launches swap `HOME` for the task's private one, link unrelated operator-home entries to retain CLI authentication and tool state, and keep `.dsh` and `.dsh-tui` launch-local.
+`NM_HOME` remains an environment path resolved by the pane shell before the swap; git reads the operator's global configuration through the linked `.gitconfig` and `.config` entries, and an exported `GIT_CONFIG_GLOBAL` passes through unchanged.
+On 2026-10-24, a real dsh-tui ship with `mode=no-mistakes` ran `gh-axi pr view 182 --repo MrGTV-love/firstmate` through its Bash tool in a guarded named Herdr lab; the command exited 0 and returned the authenticated PR record.
+The launch's `.config` resolved to the operator's original directory without a credential copy, `.dsh-tui` remained private, control-plane exit stopped the ship, and guarded teardown reported `cleanup_exit=0` with the default-session tripwire intact.
+This was an authentication smoke, not a nested no-mistakes delivery run; `tests/fm-dsh-harness.test.sh` and `tests/fm-dsh-spawn.test.sh` enforce the linked `gh` configuration path for both ships and scouts without live credentials.
+On 2026-10-19, against the operator's live no-mistakes daemon, `no-mistakes daemon status` reported the same running daemon from the operator's shell and from a swapped empty `HOME` with `NM_HOME` carried, and `daemon not running` from the swapped `HOME` with `NM_HOME` unset.
+`no-mistakes axi status` from an ungated worktree gave the identical `repo not initialized` answer under both homes. From the gated task copy under the same rendered environment (`HOME` swapped to a fresh empty directory, `NM_HOME`, `GIT_CONFIG_GLOBAL`, and the nvm bin directory carried) it reported the live run `01M59ACR7C1VSYG5SEZHB7K7SW` on branch `fm/fm-dsh-tui-adoption` at head `f09cf534`, identical to the operator's shell; with `NM_HOME` unset it fell back to `repo not initialized`. The checked process was a shell started with the rendered environment, not a command run by a DSH tool call; a DSH tool call that inherits the launch environment is the remaining unrecorded link.
+DSH's default `workspace-write` posture parked a real worker on an `Awaiting approval` panel when it moved a steering record outside the session workspace; the launch therefore selects DSH's own `danger-full-access` preset, whose approval policy is `never`.
+
+### Native primary and secondmate lifecycle
+
+Verified on 2026-10-22 on macOS arm64 with the PATH-selected `dsh-tui` 0.16.1 profile and Node v26.4.0, through a named non-default Herdr lab.
+The fixture starts a real primary with `bin/fm-dsh-primary.sh`, then exercises the existing secondmate control and spawn path against that same conversation.
+Its private home is an initialized throwaway Git repository with its own identity marker, empty operator-home fixture and bounded charter; no additional shared checkout or live fleet pane is used.
+The registered LAB check runs every second through `FM_CHECK_INTERVAL=1`; production cadence and verification wait bounds are unchanged.
+
+```sh
+FM_DSH_PRIMARY_LIVE=1 FM_DSH_EVIDENCE_DIR=<fresh evidence directory> \
+  bin/fm-proc-budget.sh -- nice -n 20 bash tests/fm-dsh-primary-live-e2e.test.sh
+```
+
+Observed output:
+
+```text
+interrupt-delivered ... harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped ... harness=dsh backend=herdr ...
+relaunched ... harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr ...
+ok - forced native owner death retired private arm and watcher
+relaunched ... harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr ...
+stopped ... harness=dsh backend=herdr ...
+ok - real dsh-tui primary startup, nested detection, one watcher, delivered and acknowledged wake, passive turn-end recovery, interrupt, exit and same-conversation resume
+cleanup_exit=0
+```
+
+| Boundary | Evidence |
+| --- | --- |
+| Startup | The native Cordis plugin loaded from the private launch patch; the real session log contained the DSH-specific ordered startup digest and supervision protocol |
+| Native notification | A registered check produced a durable epoch/sequence row; native follow-up caused the model to drain and acknowledge it, and the guard required unique delivery keys; this run's queue-empty check could not fail, so the 2026-10-23 refresh below is the enforcing evidence |
+| Turn end | The shared guard recorded `2` without supervision and `0` after the native adapter restored its tracked watcher |
+| Interrupt | The real key-plane call delivered Escape and proved agent survival; cancellation completion remains unconfirmed |
+| Exit and resume | Ordinary exit disposed the native adapter; control/spawn relaunched it in the same endpoint and log, and a new assistant reply recovered the earlier conversation's secret word, which was absent from its charter |
+| Forced crash | SIGKILL of the exact native owner bypassed disposal before a second same-conversation resume and final exit; this run's check that the arm and watcher PIDs disappeared could not fail, so the 2026-10-23 refresh below is the enforcing evidence |
+| Cleanup | Guarded named-session teardown and the default-session tripwire completed successfully; final watcher stop reported none running |
+
+The complete live guard took a measured 217.94 seconds; this is an observation, not a launch or watcher deadline.
+That run injected the digest without awaiting it, so its Startup row proves the digest reached the log but not that it preceded the first provider turn.
+Primary and secondmate launches now pass the opening prompt or brief positionally, and the plugin's awaited `agent/pre-step` waterfall enters the digest ahead of it in the first step.
+A 2026-10-23 refresh of the same guard on that shape, with the `dsh-tui` 0.16.1 launcher and profile, DSH CLI 0.2.1-rc.2 and Node v26.4.0, passed in a measured 224 seconds with `cleanup_exit=0`, after the adapter began holding claims made before its first-step waterfall and after the guard's wake-drain and crash-cleanup checks were made to fail on a non-empty queue or a surviving arm or watcher; earlier runs' versions of those two checks could not fail and are not evidence for them.
+Its final checks read the real session logs: in the primary and in the fresh secondmate, the startup digest was the first user message and the positional opening prompt or charter followed it before any assistant reply.
+The primary passed wake delivery and acknowledgement, guard recovery after typed steering, an interrupt asserted to land after the model started the requested sleep tool (`verified=agent-alive cancel=unconfirmed`), exit, two same-endpoint relaunches through the secondmate spawn path that recovered the earlier conversation's secret word, and forced native SIGKILL cleanup of the private arm and watcher.
+The guard then ran a real `fm-spawn.sh --secondmate --backend herdr` into a new lab home through `prepare-primary`, with no prior conversation, while a lab-only `bash` wrapper first on that spawn's `PATH` held just that home's `fm-sessionstart-run.sh` at a FIFO barrier.
+An earlier requirement that the spawn's start proof and composer check pass while the digest is held cannot be met on this runtime: the installed DSH awaits the plugin's `agent/created` startup before it publishes the session, so no turn exists until the digest is ready.
+Asserted instead, and observed: while held, the barrier was reached, the plugin had recorded its `startup` row, the spawn had printed no `spawned` report, and the bound runtime held no durable session log (zero logs, so none with a turn or user message); after release the spawn exited 0 and printed `spawned`, which it does only after its start proof and composer check pass, the secondmate replied, a same-endpoint relaunch recovered its charter's secret word, and exit stopped it.
+Cancellation during the first step was not exercised live.
+DSH drops a cancelled or failed step's claimed batch and never restores it, so the adapter keeps the digest and the launch input until one of them is logged and hands them to the next step when a turn ends first; `tests/fm-dsh-primary.test.sh` covers an abort or a failure while DSH assembles the system prompt after claiming and before the plugin's waterfall runs, a downstream pre-step that throws on abort, an abort after the waterfall returns but before the step starts, an Escape that keeps the inbox, a non-user cancel that clears it, and a same-process session replacement, with modeled DSH steps.
+Earlier attempts on 2026-10-22 and 2026-10-23 are not evidence; each was stopped by the environment, by a guard defect fixed before the passing run, or by the model:
+
+- One stopped at the `bin/fm-herdr-lab.sh` default-session tripwire.
+- One at a pane line over the terminal's 1024-byte canonical limit, so the guard now launches from a file.
+- One launched with no opening prompt, where `dsh-tui` booted onto its first-run guide and took the typed steering.
+- One read a watcher arm that had already closed, so the guard now takes only a live arm.
+- One fresh spawn fell back to tmux because the lab's `config/runtime-backend` is not the spawn's backend setting, so the guard now passes `--backend herdr` and refuses a spawn outside the lab session; that run's stray tmux session, started by the spawn, was removed.
+- One fresh spawn met the guard's own Herdr wrapper refusing the session-less client preflight, which the wrapper now answers through the lab helper.
+- Three ended at the primary relaunch because the interrupt had cancelled a turn before the model answered, and on relaunch the model ran that unanswered request instead of the relaunch note, so the guard now interrupts only after the model has started the requested tool.
+- One put the secondmate's instruction in the parent's brief file, where a secondmate does not read it.
+- Two held the secondmate's digest indefinitely and expected the start proof to pass during the hold; the runtime does not publish the session until startup settles, so the guard now asserts that no turn starts during the hold and that the spawn passes after release.
+
+`tests/fm-dsh-primary.test.sh` separately exercises failed-arm follow-up budgets, native `user/message` identity, consumed-but-unacknowledged rows, delegated-child exclusion, ordinary disposal and forced native SIGKILL with a TERM-resistant descendant.
+`tests/fm-timeout-lib.test.sh` proves the shared owner-bound runner has no deadline, preserves natural command exit/output and refuses a deadline-only fallback when Perl is unavailable, alongside the existing timed-runner regressions.
+`tests/fm-dsh-harness.test.sh` covers operator tool-state sharing for primaries, ships and scouts (a ship and a scout resolve the operator `gh` configuration through the link) while keeping DSH preferences and the DSH runtime private to each launch.
+CLI state of every launch kind is linked from the operator home, not copied; the live fixture uses an empty operator home, so it does not prove authentication to external tools.
+
+This is passive turn-end protection, not a blocking Stop hook or native pre-tool veto.
+The guard bounds synthetic failure continuations; it cannot prevent a completed DSH turn from becoming idle.
+Native automatic in-place compaction has no separate tracked startup re-emit callback, and the live guard does not exercise plugin hot reload or an away supervision-host session.
+The [DSH protocol](../supervision-protocols/dsh.md) and [session-start contract](../sessionstart-nudge.md#dsh) own those operating boundaries.
+
 ## Busy inbox escalation
 
 Verified at `2026-10-03T19:20:07Z` on commit `23b0232908a5adc7fbf7339ef48c34a091a7a799` with Claude Code `2.1.288 (Claude Code)` on Herdr `0.9.1`, protocol `22`, in a named isolated lab session through `bin/fm-herdr-lab.sh`.

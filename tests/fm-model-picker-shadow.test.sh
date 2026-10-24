@@ -27,7 +27,7 @@ for slug in claude-sonnet-5-5-high claude-opus-5-5-high claude-haiku-5-5 \
 done
 mkdir -p "$TMP_ROOT/home"
 # The fixture rule set is the real six concrete routes, written here so CI needs no home.
-printf '%s\n' '{"rules":[{"when":"Any task in the fixture.","use":[{"harness":"claude","model":"claude-sonnet-5-5[1m]","effort":"high"},{"harness":"claude","model":"opus","effort":"high"},{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"low"},{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}],"default":[{"harness":"claude","model":"opus","effort":"high"}]}' > "$TMP_ROOT/rules-base.json"
+printf '%s\n' '{"rules":[{"when":"Any task in the fixture.","use":[{"harness":"claude","model":"claude-sonnet-5-5[1m]","effort":"high"},{"harness":"claude","model":"opus","effort":"high"},{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"low"},{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"high"}]}],"default":[{"harness":"claude","model":"opus","effort":"high"}]}' > "$TMP_ROOT/rules-base.json"
 printf '%s\n' '{"verdict":"TRUSTED","ran_at":"2026-10-17T01:09:21Z","checked":6762,"mismatches":0}' > "$DATA/verdict.json"
 printf '%s\n' '{"schemaVersion":5,"providers":[{"provider":"claude","quotaSemantics":{"status":"known","effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":80,"runway":{"status":"through_reset"},"selection":{"spendPriority":0.8}}]}}]}' > "$TMP_ROOT/quota.json"
 printf '%s\n' '{"status":"clear","chosen":{"profile":{"harness":"claude","model":"opus","effort":"high"}},"candidates":[{"profile":{"harness":"claude","model":"claude-sonnet-5-5[1m]","effort":"high"},"eligible":true,"reason":"ok","pct":80,"spendPriority":0.8,"runway":"through_reset"},{"profile":{"harness":"claude","model":"opus","effort":"high"},"eligible":true,"reason":"ok","pct":60,"spendPriority":0.8,"runway":"through_reset"},{"profile":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"eligible":true,"reason":"ok","capacity":{"status":"usable","bestAccountHeadroom":0.9}}]}' > "$TMP_ROOT/result.json"
@@ -151,7 +151,7 @@ begin "route table maps every configured route to a real projection"
 OUT=$("$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" 2>&1); RC=$?
 check '[ "$RC" -eq 0 ]' "check-routes exits 0"
 check 'grep -q "claude:opus .*claude-opus-5-5-high *yes" <<<"$OUT"' "Opus maps to its high projection"
-check 'grep -q "omp:deepseek/deepseek-v4-flash .*deepseek-v4-flash *yes" <<<"$OUT"' "DeepSeek maps to its projection"
+check 'grep -q "dsh:deepseek/deepseek-v4-flash .*deepseek-v4-flash *yes" <<<"$OUT"' "DeepSeek maps to its projection"
 mv "$DATA/projection/claude-opus-5-5-high.json" "$TMP_ROOT/opus.saved"
 OUT=$("$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" 2>&1); RC=$?
 mv "$TMP_ROOT/opus.saved" "$DATA/projection/claude-opus-5-5-high.json"
@@ -160,7 +160,7 @@ cp "$DATA/projection/deepseek-v4-flash.json" "$TMP_ROOT/deepseek.saved"
 jq '.creator = "Someone Else"' "$TMP_ROOT/deepseek.saved" > "$DATA/projection/deepseek-v4-flash.json"
 OUT=$("$BIN" --check-routes --rules "$TMP_ROOT/rules-base.json" --data-root "$DATA" 2>&1); RC=$?
 check '[ "$RC" -eq 1 ]' "a creator mismatch refuses the route table"
-check 'grep -q "omp:deepseek/deepseek-v4-flash .*REFUSED: projection creator" <<<"$OUT"' "the creator refusal names the route"
+check 'grep -q "dsh:deepseek/deepseek-v4-flash .*REFUSED: projection creator" <<<"$OUT"' "the creator refusal names the route"
 settings '{"work_type":"feature","worker":"candidate_3","validator":"candidate_6"}'
 run_observe clear
 check 'grep -q "projection creator" "$CALLS"' "observe refuses the same projection"
@@ -533,7 +533,7 @@ finish
 begin "a route outside the resolver's candidates reads only its applicable quota rows"
 cp "$TMP_ROOT/quota.json" "$TMP_ROOT/quota.saved"
 printf '%s\n' '{"schemaVersion":5,"providers":[{"provider":"claude","quotaSemantics":{"status":"known","effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":80,"runway":{"status":"through_reset"},"selection":{"spendPriority":0.8}},{"scope":"model:opus","status":"known","effectivePercentRemaining":5,"runway":{"status":"projected_exhaustion"},"selection":{"spendPriority":0.05}}]}}]}' > "$TMP_ROOT/quota.json"
-printf '%s\n' '{"rules":[{"when":"Any task.","use":[{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$TMP_ROOT/rules-quota.json"
+printf '%s\n' '{"rules":[{"when":"Any task.","use":[{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$TMP_ROOT/rules-quota.json"
 printf '%s\n' '{"status":"clear","chosen":{"profile":{"harness":"claude","model":"claude-haiku-5-5","effort":"max"}},"candidates":[]}' > "$TMP_ROOT/result-quota.json"
 settings '{"work_type":"writing","worker":"candidate_1","validator":"candidate_2","complexity_score":0}'
 RULES_FILE="$TMP_ROOT/rules-quota.json" RESULT_FILE="$TMP_ROOT/result-quota.json" run_observe clear

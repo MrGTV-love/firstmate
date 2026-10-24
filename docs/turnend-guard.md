@@ -265,6 +265,7 @@ Each enabled primary harness adapts its own turn-end mechanism to the shared gua
 | OpenCode | `session.idle` in `.opencode/plugins/fm-primary-turnend-guard.js` | Passive callback that schedules one follow-up |
 | Pi | `agent_settled` in `.pi/extensions/fm-primary-turnend-guard.ts` | Passive callback that schedules one follow-up |
 | omp | `session_stop` in `.omp/extensions/fm-primary-turnend-guard.ts` | Blocking hook that compels one continuation |
+| dsh | Durable `turn/end` callback in `.dsh/fm-primary.mjs` | Passive shared-guard check, tracked watcher repair, and one bounded native follow-up on failure |
 | Cursor | `stop` hook in `.cursor/hooks.json` | Cannot block, so it parks and returns at most one follow-up |
 | Grok | `Stop` hook in `.grok/hooks/fm-primary-turnend-guard.json` | Native blocking, or one legacy `grok --resume` fallback |
 
@@ -307,6 +308,15 @@ The registrations in detail:
   pi-code stamps it with Pi's session file under `/.pi/`, a path component a Claude transcript never carries.
   The auto-arm stand-down fails toward running, matching the guards above, so no payload, no `jq`, or no `transcript_path` still arms.
   The Claude-only [process-event tool-boundary notice](configuration.md#process-to-event-sources-stateprocevent) also stands down on Pi compatibility payloads; the other Claude-shaped hooks pi-code delivers keep running.
+
+### DSH native passive boundary
+
+The primary launch patch mounts `.dsh/fm-primary.mjs` through DSH's native Cordis composition; a bare `dsh-tui` does not automatically load it.
+Its durable `turn/end` callback invokes the same guard, and an unhealthy primary starts or attaches through the existing watcher singleton.
+A failed arm produces at most one native `agent.followup` until an external user message resets that episode's budget.
+Accepted watcher messages are not consumption evidence: the bridge waits for the delivered epoch/sequence rows to disappear through the ordinary acknowledgement before re-arming, so a pending row cannot spin duplicate turns.
+DSH cannot veto a completed turn through this event; the bounded follow-up is its strongest equivalent, not a blocking Stop hook.
+The [DSH supervision protocol](supervision-protocols/dsh.md) owns normal operation and recovery, and `tests/fm-dsh-primary-live-e2e.test.sh` exercises the actual native callbacks and terminal lifecycle.
 
 ### Claude and Codex blocking
 

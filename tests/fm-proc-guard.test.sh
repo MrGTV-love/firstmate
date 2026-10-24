@@ -93,14 +93,14 @@ pass "check classifies the count against the limit and --check exits on WARNING 
 
 # The warning must carry the rerun probe, so a reader is never left to invent it.
 # A small burst makes a WARNING reachable even on a quiet host with a tiny count.
-for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 60 & done
-warning_pids=$(jobs -p)
+warning_pids=()
+for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 60 & warning_pids+=("$!"); done
 sleep 0.2
 warning_count=$("$GUARD" check --json | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["count"])')
 warning_limit=$(python3 -I -c 'import sys; print(max(3, int(int(sys.argv[1]) / 0.75)))' "$warning_count")
 warning_json=$("$GUARD" check --json --limit "$warning_limit")
-for warning_pid in $warning_pids; do kill "$warning_pid" 2>/dev/null || true; done
-for warning_pid in $warning_pids; do wait "$warning_pid" 2>/dev/null || true; done
+for warning_pid in "${warning_pids[@]}"; do kill "$warning_pid" 2>/dev/null || true; done
+wait "${warning_pids[@]}" 2>/dev/null || true
 printf '%s\n' "$warning_json" | python3 -I -c '
 import json, sys
 j = json.load(sys.stdin)

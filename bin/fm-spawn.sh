@@ -291,7 +291,7 @@
 #   profile consultation. A --secondmate spawn is exempt and resolves the SECONDMATE
 #   harness (config/secondmate-harness -> config/crew-harness -> own), so the
 #   secondmate-vs-crewmate split is DURABLE across every respawn (recovery,
-#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy|devin)
+#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|dsh|agy|devin)
 #   overrides it for this spawn (either kind). A non-flag string containing
 #   whitespace is treated as a RAW launch command - the escape hatch for verifying
 #   new adapters. For pi and pi-signed, fm-spawn resolves the selected executable
@@ -306,6 +306,13 @@
 #   operator's trust.json. Ordinary Pi worker launches never receive --approve.
 #   A missing selected executable refuses before endpoint creation, and pi-signed
 #   never falls back to pi.
+#   DeepSeek runs through dsh-tui, not omp. An implicit route selects dsh; a
+#   contradictory explicit harness refuses. A dsh secondmate loads the native
+#   primary plugin, and a dsh harness resolved from config or mirrored from a
+#   DSH session with no model carries that session's bound model (fm-dsh.py
+#   own-model) or refuses. The dsh adapter reference
+#   (.agents/skills/harness-adapters/references/harness/dsh.md) owns the route,
+#   and launch_template's dsh case documents the private HOME it launches under.
 #   config/session-launch-policy can restrict even explicit launches; its schema
 #   and tc-run prerequisite are owned by docs/configuration.md "Session launch policy".
 #   Devin is worker-only: --permission-mode dangerous and
@@ -336,12 +343,10 @@
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
 #   policy for the one session only (--auto-approve alone owns approval,
-#   forcing tools.approvalMode: yolo for the session). It also chains the Sol
-#   model to direct DeepSeek Flash, so a Sol session whose provider fails, a
-#   usage window that is out included, moves to the stand-in at once (a worker's
-#   per-task state/<id>.omp-fallback.yml replaces that entry for its own model),
-#   and it pins omp's own return to the recorded model once the primary serves
-#   again.
+#   forcing tools.approvalMode: yolo for the session). The old Sol-to-DeepSeek
+#   native chain is empty: DeepSeek requires a dsh-tui replacement, never an
+#   in-process omp fallback. A worker's per-task state/<id>.omp-fallback.yml
+#   replaces the entry for its own model.
 #   Each session publishes the model it is serving through
 #   bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
 #   secondmate from the home's tracked extension), and bin/fm-crew-state.sh
@@ -689,7 +694,8 @@
 # a mate's completed turns stay in its own home. Codex stays unknown until a semantic
 # source exists. Grok keeps its rendered-tail fallback and is not given a parent
 # turn-end hook. Cursor's transcript binding is written for a secondmate the same way
-# as for a crewmate. Muse, gemini, agy, devin, and rovo are refused as secondmates.
+# as for a crewmate, and a dsh secondmate's busy verdict reads its bound session log the
+# same way. Muse, gemini, agy, devin, and rovo are refused as secondmates.
 # A raw launch command for a claude, pi, pi-signed, or omp secondmate is not armed
 # and retires any arm an earlier launch of that mate left, so its verdict is unknown:
 # the raw command carries no --settings or -e flag to load the wiring.
@@ -968,6 +974,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-dsh-lib.sh
+. "$SCRIPT_DIR/fm-dsh-lib.sh"
 # shellcheck source=bin/fm-control-worktree-lib.sh
 . "$SCRIPT_DIR/fm-control-worktree-lib.sh"
 # shellcheck source=bin/fm-gate-refuse-lib.sh
@@ -1392,7 +1400,7 @@ if [ "$SESSION_LAUNCH_POLICY" = 1 ]; then
   elif [ -z "$policy_harness" ]; then
     if [ "$KIND" = secondmate ]; then
       case "${POS[1]:-}" in
-      '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
+      '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | dsh | agy | devin)
         policy_harness=${POS[1]:-} ;;
       *' '*)
         if [ "${#POS[@]}" -gt 2 ] || [ -d "${POS[1]}" ]; then
@@ -2547,7 +2555,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   }
 elif [ "$KIND" = secondmate ]; then
   case "${POS[1]:-}" in
-  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy | devin)
+  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | dsh | agy | devin)
     ARG3=${POS[1]:-}
     ;;
   *' '*)
@@ -2796,6 +2804,7 @@ print role.to_s
   *:off | *:minimal | *:low | *:medium | *:high | *:xhigh | *:max | *:auto) selector=${role%:*} ;;
   esac
   case "$selector" in */*) ;; *) return 0 ;; esac
+  python3 "$SCRIPT_DIR/fm-dsh.py" check omp "$selector" || return 1
   verdict=$(omp_catalog_verdict "$(PI_CODING_AGENT_DIR="$agent_dir" omp_models_listing "$bin")" "$selector")
   case "$verdict" in
   unknown-provider)
@@ -2951,6 +2960,21 @@ launch_template() {
       printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __PIEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
     ;;
+  # dsh-tui has no model, effort, or preference flags, so the launch swaps HOME
+  # for the task's private one. bin/fm-dsh.py prepare symlinks every operator-home
+  # entry except .dsh and .dsh-tui into it, so every kind keeps the operator's CLI
+  # authentication and tool state; git finds the operator's global config
+  # through the linked .gitconfig and .config entries, and an exported
+  # GIT_CONFIG_GLOBAL passes through unchanged. NM_HOME names the operator's
+  # no-mistakes home, resolved by the pane shell before HOME changes, so the
+  # worker still reaches the shared daemon. A secondmate's own spawns stage from the
+  # operator's DSH install and link the operator's real home, never this
+  # session's private one.
+  dsh)
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh '
+    [ "$kind" != secondmate ] || printf '%s' 'FM_DSH_SOURCE_HOME=__DSHSOURCE__ FM_DSH_OPERATOR_HOME=__DSHOPERATOR__ '
+    printf '%s' 'NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+    ;;
   # omp (Oh My Pi), a Pi fork. Same one-positional-brief, --model, --thinking,
   # and -e shape as Pi, verified on omp 18.1.11. The differences are all at
   # the launch boundary and documented in the header above: foreign markers
@@ -2961,7 +2985,7 @@ launch_template() {
   # captain-level plan, prewalk, or usage dialog cannot either, and --cwd
   # pinned to the worktree because omp's extension discovery is cwd-only.
   omp)
-    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
+    printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 __OMPBIN__ --config __OMPSESSIONCFG__ --auto-approve --cwd __WORKTREE__'
     if [ "$kind" = secondmate ]; then
       printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
@@ -3207,6 +3231,16 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
+if [ "$RELAUNCH" = 1 ] && [ "$MODEL_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
+  prior_dsh=$(fm_meta_get "$RELAUNCH_META" model)
+  [ "$prior_dsh" = default ] || MODEL=$prior_dsh
+fi
+if [ "$RAW_LAUNCH" = 0 ] && [ -z "$ARG3" ] && [ "$HARNESS" = dsh ] && { [ -z "$MODEL" ] || [ "$MODEL" = default ]; }; then
+  MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" own-model) || {
+    echo "error: the dsh harness from config/crew-harness, config/secondmate-harness or this firstmate's own DSH session has no configured model, and no live DSH session record supplied one; pass --model deepseek/<id> or add a model token to config/secondmate-harness" >&2
+    exit 1
+  }
+fi
 if { [ -n "$MODEL" ] && [ "$MODEL" != default ]; } || { [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; }; then
   SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
   FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
@@ -3229,6 +3263,34 @@ if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
   if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
 else
   MODEL_INDEXED=0
+fi
+MODEL_ADMITTED="$HARNESS:$MODEL"
+# The dsh owner checks the route and canonicalizes a dsh model. A reroute or a
+# canonical spelling changes the pair the index admitted, so the canonical id is
+# admitted again against the same staged index: retirement and entry membership
+# then judge the id that launches, not the spelling that was typed.
+dsh_admit_model() {
+  python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || return 1
+  [ "$HARNESS" = dsh ] || return 0
+  MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$MODEL") || return 1
+  [ "$MODEL_ADMITTED" != "$HARNESS:$MODEL" ] || return 0
+  [ -e "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] || [ -L "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] || return 0
+  MODEL=$(FM_CONFIG_OVERRIDE="${SPAWN_ROUTING_PAIR:-$CONFIG}" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || return 1
+  MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="${SPAWN_ROUTING_PAIR:-$CONFIG}" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || return 1
+  if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+  MODEL_ADMITTED="$HARNESS:$MODEL"
+}
+if [ "$RAW_LAUNCH" = 0 ]; then
+  if [ -z "$ARG3" ] && [ "$KIND" != secondmate ] && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
+    HARNESS=dsh
+    LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
+  fi
+  dsh_admit_model || exit 1
+fi
+if [ "$RELAUNCH" = 1 ] && [ "$EFFORT_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ] \
+   && [ "$MODEL" = "$(fm_meta_get "$RELAUNCH_META" model)" ]; then
+  prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
+  [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
 fi
 
 # Do not let dispatch fallback selection turn a forbidden explicit route into
@@ -3259,9 +3321,13 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
       MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
       MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
       if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+      MODEL_ADMITTED="$HARNESS:$MODEL"
       LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
     fi
   fi
+fi
+if [ "$RAW_LAUNCH" = 0 ]; then
+  dsh_admit_model || exit 1
 fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 
@@ -3337,6 +3403,10 @@ if [ "$KIND" != secondmate ]; then
 fi
 
 case "$HARNESS" in
+dsh)
+  DSH_BIN=$(fm_dsh_executable) || exit 1
+  fm_dsh_launch_check "$DSH_BIN" "$KIND" || exit 1
+  ;;
 devin)
   DEVIN_BIN=$(command -v devin) || {
     echo "error: devin executable not found on PATH" >&2
@@ -5586,6 +5656,47 @@ agy_spawn_fail() {  # <detail>
   rovo_endpoint_cleanup
 }
 
+# dsh-tui submits the brief as its opening prompt, so its own durable session
+# log is the start proof: a turn opening (busy) or already finishing (idle)
+# both mean the brief reached the agent. A resumed launch already holds the
+# earlier conversation, so only a turn that started beyond DSH_START_POSITION,
+# the log position taken before launch, counts. No pane-scrape fallback exists
+# because the log is the same source the busy classifier trusts. Separately,
+# require the live composer shape the steering parser understands: a successful
+# version command is not proof that a changed frontend remains compatible.
+dsh_wait_for_start() {
+  local state pane parse_error i=0 max=${FM_DSH_START_POLLS:-120} interval=${FM_DSH_START_POLL_INTERVAL:-0.5}
+  # shellcheck source=bin/fm-composer-lib.sh
+  . "$SCRIPT_DIR/fm-composer-lib.sh"
+  DSH_START_ERROR=
+  while [ "$i" -lt "$max" ]; do
+    state=$(python3 "$SCRIPT_DIR/fm-dsh.py" state "$STATE_REAL" "$ID" --since "$DSH_START_POSITION" 2>/dev/null) || state=unknown
+    case "$state" in
+      busy | idle)
+        if fm_backend_visible_capture_supported "$BACKEND"; then
+          pane=$(fm_backend_visible_capture "$BACKEND" "$T" "$W" 2>/dev/null) || pane=
+        else
+          pane=$(fm_backend_capture "$BACKEND" "$T" 120 "$W" 2>/dev/null) || pane=
+        fi
+        if parse_error=$(fm_composer_dsh_screen_check "$pane" 2>&1); then
+          return 0
+        fi
+        DSH_START_ERROR=${parse_error#error: }
+        ;;
+      unknown:*) DSH_START_ERROR="dsh-tui session log: ${state#unknown: }" ;;
+    esac
+    i=$((i + 1))
+    [ "$i" -ge "$max" ] || sleep "$interval"
+  done
+  return 1
+}
+
+dsh_spawn_fail() {  # <detail>
+  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  echo "error: $1; inspect window $T" >&2
+  rovo_endpoint_cleanup
+}
+
 # The header's Claude start-confirmation section owns the polling contract.
 # Never let retained dialog text override verified progress: a relaunch can
 # inherit scrollback from an earlier dialog after the new turn already began.
@@ -6921,6 +7032,41 @@ LAUNCH=${LAUNCH//__OMPWORKERCFG__/$sq_ompcfg}
 LAUNCH=${LAUNCH//__OMPSESSIONCFG__/$sq_ompsessioncfg}
 LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
 case "$HARNESS" in
+dsh)
+  # The launch patch replaces the dsh-tui row config, so it must also carry
+  # the sessionId that the stock profile patch would otherwise take from the
+  # launcher's --resume env. `resume` rewrites it for the task's newest
+  # session and prints nothing when the binding changed or holds no session,
+  # which prepares a fresh one; a binding it cannot read refuses the launch
+  # rather than replace the conversation it holds.
+  DSH_RUNTIME=
+  if [ "$RELAUNCH" = 1 ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
+    if [ "$KIND" = secondmate ]; then
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" --primary-root "$FM_ROOT") || exit 1
+    else
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT") || exit 1
+    fi
+  fi
+  # Inside a DSH primary or secondmate DSH_HOME is that session's private
+  # runtime; FM_DSH_SOURCE_HOME keeps naming the operator's installed DSH.
+  DSH_SOURCE_HOME=${FM_DSH_SOURCE_HOME:-${DSH_HOME:-$HOME/.dsh}}
+  DSH_OPERATOR_HOME=${FM_DSH_OPERATOR_HOME:-$HOME}
+  if [ -z "$DSH_RUNTIME" ]; then
+    if [ "$KIND" = secondmate ]; then
+      DSH_RUNTIME=$(FM_DSH_OPERATOR_HOME="$DSH_OPERATOR_HOME" python3 "$SCRIPT_DIR/fm-dsh.py" prepare-primary "$STATE_REAL" "$ID" "$SPAWN_GEN" "$DSH_SOURCE_HOME" "$MODEL" "$EFFORT" "$WT" "$FM_ROOT") || exit 1
+    else
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" prepare "$STATE_REAL" "$ID" "$SPAWN_GEN" "$DSH_SOURCE_HOME" "$MODEL" "$EFFORT" "$WT") || exit 1
+    fi
+  fi
+  DSH_START_POSITION=$(python3 "$SCRIPT_DIR/fm-dsh.py" position "$STATE_REAL" "$ID") || exit 1
+  LAUNCH=${LAUNCH//__DSHHOME__/"$(shell_quote "$DSH_RUNTIME/home")"}
+  LAUNCH=${LAUNCH//__DSHCONFIG__/"$(shell_quote "$DSH_RUNTIME/dsh")"}
+  LAUNCH=${LAUNCH//__DSHSOURCE__/"$(shell_quote "$DSH_SOURCE_HOME")"}
+  LAUNCH=${LAUNCH//__DSHOPERATOR__/"$(shell_quote "$DSH_OPERATOR_HOME")"}
+  LAUNCH=${LAUNCH//__DSHPATCH__/"$(shell_quote "$DSH_RUNTIME/launch.yml")"}
+  LAUNCH=${LAUNCH//__DSHPATH__/"$(shell_quote "$PATH")"}
+  LAUNCH=${LAUNCH//__DSHBIN__/"$(shell_quote "$DSH_BIN")"}
+  ;;
 pi | pi-signed) LAUNCH=${LAUNCH//__PIBIN__/"$(shell_quote "$PI_BIN")"} ;;
 cursor) LAUNCH=${LAUNCH//__CURSORBIN__/"$(shell_quote "$CURSOR_BIN")"} ;;
 gemini) LAUNCH=${LAUNCH//__GEMINISETTINGS__/"$(shell_quote "$STATE_REAL/$ID.gemini-settings.json")"} ;;
@@ -7313,6 +7459,12 @@ if [ "$HARNESS" = agy ]; then
     else
       agy_spawn_fail "agy never showed its folder-trust dialog on an unregistered worktree in window $T, so the brief could not be confirmed to run there"
     fi
+    exit 1
+  fi
+fi
+if [ "$HARNESS" = dsh ]; then
+  if ! dsh_wait_for_start; then
+    dsh_spawn_fail "${DSH_START_ERROR:-dsh-tui never recorded a turn for the launch brief in window $T}"
     exit 1
   fi
 fi

@@ -263,7 +263,7 @@ PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=20
+PORTABLE_SERIAL_SHARDS=21
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -471,6 +471,7 @@ family_for_basename() {
     fm-codex-continuity-live-e2e.test.sh|fm-codex-hook-layer-live-e2e.test.sh|\
     fm-grok-continuity-live-e2e.test.sh|\
     fm-cursor-primary-live-e2e.test.sh|\
+    fm-dsh-live-e2e.test.sh|fm-dsh-primary-live-e2e.test.sh|\
     fm-grok-stop-live-e2e.test.sh|fm-harness-adapter-instructions-live-e2e.test.sh|\
     fm-harness-liveness-drift-live-e2e.test.sh|\
     fm-devin-signals-live-e2e.test.sh|fm-muse-signals-live-e2e.test.sh|fm-rovo-signals-live-e2e.test.sh|fm-agy-signals-live-e2e.test.sh|\
@@ -901,6 +902,11 @@ tests/fm-dispatch-capacity.test.sh 4207
 tests/fm-dispatch-resolve.test.sh 196000
 tests/fm-documentation-audiences.test.sh 4120
 tests/fm-dod-lib.test.sh 4076
+tests/fm-dsh-harness.test.sh 35536
+tests/fm-dsh-live-e2e.test.sh 619
+tests/fm-dsh-primary-live-e2e.test.sh 696
+tests/fm-dsh-primary.test.sh 12226
+tests/fm-dsh-spawn.test.sh 75500
 tests/fm-duration.test.sh 121509
 tests/fm-extension-binding.test.sh 17377
 tests/fm-fleet-ledger.test.sh 33269
@@ -921,11 +927,11 @@ tests/fm-gitignore-config.test.sh 381
 tests/fm-gotmp.test.sh 2837
 tests/fm-grok-continuity-live-e2e.test.sh 390
 tests/fm-grok-stop-live-e2e.test.sh 306
-tests/fm-guard-audit-closure.test.sh 10258
+tests/fm-guard-audit-closure.test.sh 10550
 tests/fm-guard-lint.test.sh 4609
 tests/fm-guard-refcheck.test.sh 1329
 tests/fm-guard-stale-banner.test.sh 21715
-tests/fm-guard-telemetry.test.sh 3139
+tests/fm-guard-telemetry.test.sh 3737
 tests/fm-harness-adapter-instructions-live-e2e.test.sh 456
 tests/fm-harness-adapter-references.test.sh 756
 tests/fm-harness-liveness-drift-live-e2e.test.sh 1874
@@ -960,8 +966,8 @@ tests/fm-mem-guard.test.sh 593
 tests/fm-model-freshness.test.sh 37031
 tests/fm-model-index-live-e2e.test.sh 1253
 tests/fm-model-index.test.sh 142247
-tests/fm-model-picker-shadow-spawn.test.sh 26389
-tests/fm-model-picker-shadow.test.sh 8850
+tests/fm-model-picker-shadow-spawn.test.sh 27101
+tests/fm-model-picker-shadow.test.sh 11619
 tests/fm-model-picker.test.sh 9572
 tests/fm-muse-harness.test.sh 57303
 tests/fm-muse-signals-live-e2e.test.sh 406
@@ -1029,7 +1035,7 @@ tests/fm-remote-secondmate-parent-binding.test.sh 126929
 tests/fm-remote-secondmate-relaunch.test.sh 69311
 tests/fm-remote-secondmate-trace-context.test.sh 290868
 tests/fm-remote-transport-lanes.test.sh 80130
-tests/fm-retired-jev-posttool-advisory.test.sh 1182
+tests/fm-retired-jev-posttool-advisory.test.sh 1320
 tests/fm-review-agent-select.test.sh 14400
 tests/fm-rovo-harness.test.sh 19818
 tests/fm-rovo-signals-live-e2e.test.sh 425
@@ -1060,9 +1066,9 @@ tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh 522
 tests/fm-sessionstart-nudge.test.sh 88391
 tests/fm-shared-captain-inheritance.test.sh 13249
 tests/fm-skill-pick.test.sh 120549
-tests/fm-slack-intake-unchanged.test.sh 2972
-tests/fm-slack-secret-scan.test.sh 17961
-tests/fm-slack-watch.test.sh 462747
+tests/fm-slack-intake-unchanged.test.sh 4544
+tests/fm-slack-secret-scan.test.sh 21837
+tests/fm-slack-watch.test.sh 705493
 tests/fm-spawn-acquisition-cleanup.test.sh 35483
 tests/fm-spawn-claude-api-key-guard.test.sh 86356
 tests/fm-spawn-claude-start-confirm.test.sh 58902
@@ -1070,7 +1076,7 @@ tests/fm-spawn-compact-adviser-disable-remote.test.sh 352918
 tests/fm-spawn-compact-adviser-disable.test.sh 189707
 tests/fm-spawn-dispatch-profile.test.sh 450244
 tests/fm-spawn-herdr-launch-shell.test.sh 60679
-tests/fm-spawn-model-pin.test.sh 33955
+tests/fm-spawn-model-pin.test.sh 37381
 tests/fm-spawn-orca-worktree.test.sh 3620
 tests/fm-spawn-pool-base-freshen.test.sh 97974
 tests/fm-spawn-retained-copy.test.sh 59225
@@ -1132,6 +1138,7 @@ tests/fm-watch-triage-waits-declared.test.sh 655000
 tests/fm-watch-triage-waits-pauses.test.sh 136000
 tests/fm-watchdog-check.test.sh 27679
 tests/fm-watcher-lock.test.sh 136753
+tests/fm-work-progress.test.sh 131276
 tests/fm-worker-account-live-e2e.test.sh 4428
 tests/fm-worker-account.test.sh 168745
 EOF
@@ -1963,6 +1970,13 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
       printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' session-bootstrap
+      ;;
+    .dsh/fm-primary.mjs|bin/fm-dsh-primary.sh|bin/fm-dsh.py|bin/fm-dsh-lib.sh)
+      printf '%s\n' __script__:fm-dsh-primary.test.sh
+      printf '%s\n' __script__:fm-dsh-harness.test.sh
+      printf '%s\n' __script__:fm-dsh-spawn.test.sh
+      printf '%s\n' __script__:fm-dsh-primary-live-e2e.test.sh
+      printf '%s\n' __script__:fm-dsh-live-e2e.test.sh
       ;;
     bin/fm-env-lib.sh)
       # The one .env accessor, sourced by bin/fm-x-lib.sh (Relay token) and

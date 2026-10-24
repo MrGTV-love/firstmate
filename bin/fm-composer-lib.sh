@@ -57,6 +57,15 @@
 #                writes its model name there); a titled bottom border that
 #                still starts and ends with the family's rule glyph is
 #                tolerated, including Grok 1.0.5's three-column title overhang.
+#                dsh-tui (observed on 0.16.1) draws a rounded frame whose content rows open
+#                with `⌸` and close with `⛶`, holding the `❯` prompt glyph.
+#                Its content-width geometry is not comparable to the rule
+#                borders because the glyph itself is content, so the sides,
+#                the equal-indent borders, and the equal-width top/bottom
+#                rules are the proof. Two status rows sit flush under the
+#                frame (`<used>/<window> <pct>%`, then a middle-dot row with
+#                dsh's `ctx` cell), plus `esc to interrupt` while a turn runs;
+#                all three are furniture for the staleness probe.
 #   omp-box    - omp's titled `╭── π > ...╮` header, zero or more
 #                side-bordered rows, and `╰─ <input> ─╯` input-bearing floor.
 #                Unlike ordinary boxes, the floor is content, not just a rule.
@@ -490,6 +499,7 @@ fm_busy_lines_match() {  # [harness]
       opencode) regex=$FM_DELIVERY_OPENCODE_BUSY_REGEX_DEFAULT ;;
       pi|pi-signed) regex=$FM_DELIVERY_PI_BUSY_REGEX_DEFAULT ;;
       omp) regex=$FM_DELIVERY_OMP_BUSY_REGEX_DEFAULT ;;
+      dsh) regex=$FM_DELIVERY_CODEX_BUSY_REGEX_DEFAULT ;;
       grok) regex=$FM_DELIVERY_GROK_BUSY_REGEX_DEFAULT ;;
       agy) regex=$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT ;;
       kimi) regex=$FM_DELIVERY_KIMI_BUSY_REGEX_DEFAULT ;;
@@ -942,7 +952,8 @@ _fm_composer_scan_screen() {  # <plain-screen> <cursor-or-empty> [extract-wrap]
   local probe row_glyph row_glyph_row
   local box_glyph_row=-1 box_glyph='' pi_glyph_row=-1 pi_glyph=''
   FM_COMPOSER_SCAN_BOX_OMP=0
-  local box_omp=0 pi_native_draft_risk=0
+  FM_COMPOSER_SCAN_BOX_DSH=0
+  local box_omp=0 box_dsh=0 pi_native_draft_risk=0
   local band_top=-1 band_floor=-1 band_indent='' band_continuation=0 band_gap=0
   local bare_line bare_indent literal_line literal_indent literal_row literal_rows
   local literal_last literal_gap
@@ -1202,6 +1213,7 @@ EOF
       probe=$trimmed
       case "$probe" in
         '│'*'│') probe=${probe#│}; probe=${probe%│} ;;
+        '⌸'*'⛶') probe=${probe#⌸}; probe=${probe%⛶} ;;
         '┃'*'┃') probe=${probe#┃}; probe=${probe%┃} ;;
         '║'*'║') probe=${probe#║}; probe=${probe%║} ;;
         '|'*'|') probe=${probe#|}; probe=${probe%|} ;;
@@ -1372,6 +1384,7 @@ EOF
       box_glyph_row=-1
       box_glyph=''
       box_omp=0
+      box_dsh=0
       [ "$family" != omp-band ] || box_omp=2
       geometry_ambiguous=0
       geometry_check=1
@@ -1465,6 +1478,7 @@ EOF
             FM_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
             FM_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
             FM_COMPOSER_SCAN_BOX_OMP=$box_omp
+            FM_COMPOSER_SCAN_BOX_DSH=$box_dsh
           fi
         else
           FM_COMPOSER_SCAN_BOX_TOP=$top
@@ -1473,6 +1487,7 @@ EOF
           FM_COMPOSER_SCAN_BOX_GLYPH_ROW=$box_glyph_row
           FM_COMPOSER_SCAN_BOX_GLYPH=$box_glyph
           FM_COMPOSER_SCAN_BOX_OMP=$box_omp
+          FM_COMPOSER_SCAN_BOX_DSH=$box_dsh
         fi
         FM_COMPOSER_SCAN_INCOMPLETE_BOX_FROM=-1
       else
@@ -1496,20 +1511,22 @@ EOF
       side_family=
       case "$trimmed" in
         '│'*'│') side_family=single ;;
+        '⌸'*'⛶') side_family=dsh ;;
         '┃'*'┃') side_family=heavy ;;
         '║'*'║') side_family=double ;;
         '|'*'|') side_family=ascii ;;
       esac
       case "$current_family:$side_family" in
-        rounded:single|light:single|heavy:heavy|double:double|ascii:ascii)
+        rounded:single|rounded:dsh|light:single|heavy:heavy|double:double|ascii:ascii)
           content_rows=$((content_rows + 1))
+          [ "$side_family" != dsh ] || box_dsh=1
           if [ "$box_glyph_row" -lt 0 ] && [ "$row_glyph_row" -ge 0 ]; then
             box_glyph_row=$row_glyph_row
             box_glyph=$row_glyph
           fi
           [ "$indent" = "$current_indent" ] || geometry_ambiguous=1
           [ "$indent" = "$current_indent" ] || omp_indent_ok=0
-          if [ "$geometry_check" = 1 ]; then
+          if [ "$geometry_check" = 1 ] && [ "$side_family" != dsh ]; then
             content_inner=$trimmed
             case "$side_family" in
               single) content_inner=${content_inner#│}; content_inner=${content_inner%│} ;;
@@ -1739,6 +1756,7 @@ _fm_composer_row_content() {  # <raw-row> <styled> [omp-shape] [literal] -> cont
   fi
   case "$stripped" in
     '│'*'│') stripped=${stripped#│}; stripped=${stripped%│} ;;
+    '⌸'*'⛶') stripped=${stripped#⌸}; stripped=${stripped%⛶} ;;
     '┃'*'┃') stripped=${stripped#┃}; stripped=${stripped%┃} ;;
     '║'*'║') stripped=${stripped#║}; stripped=${stripped%║} ;;
     '|'*'|') stripped=${stripped#|}; stripped=${stripped%|} ;;
@@ -1840,6 +1858,24 @@ _fm_composer_classify_bare_row() {  # <screen> <styled> <row>
 # below a bare composer and must bound its wrap region exactly as an edge does.
 _fm_composer_row_is_omp_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OMP_STATUS_RE:-$FM_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
+}
+
+# dsh-tui draws its context meter and its model/cost/context cell row directly
+# below the composer frame, with no blank separator (observed on dsh-tui
+# 0.16.1): first `<used>/<window>   <percent>%`, then a middle-dot separated row
+# carrying `ctx <percent>% (<used>/<window>)`. Both are composer furniture; a
+# typed draft never begins with the meter shape, and the model row is only
+# furniture when it carries dsh's own ctx cell.
+FM_COMPOSER_DSH_METER_RE_DEFAULT='^[0-9]+(\.[0-9]+)?[kKmMgG]?/[0-9]+(\.[0-9]+)?[kKmMgG]?[[:space:]]+[0-9]+(\.[0-9]+)?%$'
+FM_COMPOSER_DSH_STATUS_RE_DEFAULT='[[:space:]]·[[:space:]].*[[:space:]]·[[:space:]].*ctx[[:space:]]+[0-9]+(\.[0-9]+)?%[[:space:]]+\([0-9]+(\.[0-9]+)?[kKmMgG]?/[0-9]+(\.[0-9]+)?[kKmMgG]?\)$'
+
+# _fm_composer_row_is_dsh_status: 0 when the trimmed row is one of dsh's two
+# composer status rows (the constants above), which bound a dsh box's
+# staleness probe exactly as an edge does.
+_fm_composer_row_is_dsh_status() {  # <trimmed-row>
+  local row=$1
+  fm_composer_idle_matches "$row" "$FM_COMPOSER_DSH_METER_RE_DEFAULT" sensitive && return 0
+  fm_composer_idle_matches "$row" "$FM_COMPOSER_DSH_STATUS_RE_DEFAULT" sensitive
 }
 
 # omp's whole status row: the identity cell first and the context-usage cell
@@ -2399,6 +2435,24 @@ _fm_composer_select_cursorless() {
     if [ "$footer" = 1 ] && [ "$FM_COMPOSER_FOOTER_AFTER" = "$boundary" ]; then
       next=$((FM_COMPOSER_FOOTER_LAST + 1))
     fi
+    # dsh keeps its own status rows flush under the frame with no blank
+    # separator, and adds `esc to interrupt` while a turn runs. They are
+    # furniture, not the lower live shape that would make this box stale.
+    if [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_DSH" = 1 ]; then
+      while :; do
+        raw=$(_fm_composer_screen_row "$next" "$plain")
+        trimmed=$raw
+        fm_composer_normalize_trim_var trimmed
+        [ -n "$trimmed" ] || break
+        if _fm_composer_row_is_dsh_status "$trimmed" \
+           || { [ "$(type -t fm_busy_lines_match)" = function ] \
+                && printf '%s\n' "$trimmed" | fm_busy_lines_match dsh; }; then
+          next=$((next + 1))
+          continue
+        fi
+        break
+      done
+    fi
     raw=$(_fm_composer_screen_row "$next" "$plain")
     trimmed=$raw
     fm_composer_normalize_trim_var trimmed
@@ -2782,6 +2836,20 @@ EOF
         "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
       ;;
   esac
+}
+
+# Require the DSH-specific frame and a proven content verdict, not a release
+# number or a generic prompt glyph. This is a launch compatibility check; busy
+# state remains owned by the durable session log.
+fm_composer_dsh_screen_check() {  # <styled-screen>
+  local proof
+  proof=$(fm_composer_classify_screen $'styled=1\ncursor=0\nidentity=0' "$1"
+    printf '/%s/%s' "${FM_COMPOSER_SELECTED_KIND:-}" "${FM_COMPOSER_SCAN_BOX_DSH:-0}")
+  case "$proof" in
+    empty/box/1 | pending/box/1) return 0 ;;
+  esac
+  echo 'error: dsh-tui screen: could not parse the composer frame or its input content; refusing launch' >&2
+  return 1
 }
 
 # fm_composer_submit_retry_core: the ONE verify-and-retry-Enter submit loop

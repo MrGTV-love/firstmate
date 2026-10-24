@@ -237,6 +237,7 @@ jq -e . "$RULES" >/dev/null 2>&1 || die "malformed rules file: $RULES_PATH (not 
 RESOLVED_RULES=$(FM_CONFIG_OVERRIDE="$MODEL_CONFIG" "$SCRIPT_DIR/fm-model-index.sh" profiles "$RULES") \
   || die "profiles in $RULES_PATH do not resolve against $CONFIG/model-index.json; fix the harness, model, role, or effort field named above, then rerun bin/fm-dispatch-resolve.sh <brief>"
 printf '%s\n' "$RESOLVED_RULES" > "$RULES" || die "could not write resolved rules snapshot"
+python3 "$SCRIPT_DIR/fm-dsh.py" normalize "$RULES" "$RULES" || die "a profile's harness contradicts its DeepSeek model, or a dsh profile lacks a concrete DeepSeek model"
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
 
@@ -253,6 +254,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
     elif $h == "codex" then ((["low","medium","high","xhigh"] | index($e)) != null or ($e == "max" and $m == "gpt-5.6-luna"))
     elif $h == "grok" or $h == "agy" then (["low","medium","high"] | index($e)) != null
     elif $h == "pi" or $h == "pi-signed" or $h == "omp" or $h == "muse" then (["low","medium","high","xhigh","max"] | index($e)) != null
+    elif $h == "dsh" then (["low","medium","high","xhigh","max"] | index($e)) != null
     elif $h == "rovo" then (["low","medium","high","max"] | index($e)) != null
     elif $h == "opencode" or $h == "kimi" or $h == "cursor" then false
     else true end;

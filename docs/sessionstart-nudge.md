@@ -26,7 +26,7 @@ The tier is a property of the harness surface, not of the home.
 
 | Tier | What the adapter does | Used by |
 | --- | --- | --- |
-| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, Cursor |
+| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, dsh primary launcher, Cursor |
 | Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier sources routed to the nudge |
 
 Codex's interactive TUI has no tracked session-open, compaction, or re-emit channel and is not covered by either tier.
@@ -43,6 +43,7 @@ Codex's interactive TUI has no tracked session-open, compaction, or re-emit chan
 | Grok | Nudge | [Grok](#grok) |
 | Cursor | Run | [Cursor](#cursor) |
 | omp | Run | [omp](#omp) |
+| dsh primary launcher | Run | [DSH](#dsh) |
 | Cursor compaction | Uncovered | [Cursor compaction](#cursor-compaction) |
 
 ### Why the run tier exists
@@ -374,6 +375,20 @@ So the source is derived following the Cursor precedent:
 
 A later in-process `clear` re-emits only when this lock owner completed a full startup.
 `before_agent_start` message delivery was verified to reach model context on 18.1.11.
+
+### DSH
+
+`bin/fm-dsh-primary.sh` and DSH secondmate launches add the tracked `.dsh/fm-primary.mjs` Cordis plugin to a private launch patch.
+The launch passes its opening prompt or secondmate brief to `dsh-tui` positionally.
+The installed DSH (the `dsh` CLI's own agent runtime) awaits the `agent/created` callback, which invokes `bin/fm-sessionstart-run.sh --source startup` from real DSH ancestry, before it publishes the session; no turn starts, and a spawn's start proof cannot pass, until the digest is ready.
+The plugin's awaited `agent/pre-step` waterfall then enters the digest ahead of the opening prompt in the first step, and would hold that step for the digest under a runtime that did not await the callback; DSH's own checkpoint runs first in that waterfall, so an open turn is durable during such a hold.
+A failed or empty startup is recorded in `state/.dsh-primary-events.jsonl` and enters that step as the supervision-failure notice instead of the digest.
+The launch input entering that step is the adapter's own, so that notice spends the failure episode's one follow-up; only a later user-sourced message reopens it, never DSH's own runtime-context, skill-catalog, time-context or instruction messages.
+If that first step is cancelled or fails before it starts (while DSH assembles the system prompt after claiming, while held, when a downstream pre-step throws, or after the waterfall returns), DSH drops the step's claimed batch without restoring it (a non-user cancel also clears the inbox; an Escape keeps it), so the adapter records each claim through `agent/inbox/claimed` while the digest is outstanding, keeps the digest and the launch input until one of them is logged, and a turn that ends first hands them, once, to the next step's input.
+Top-level same-process session replacements use the shared `clear` source and inject the digest into the running session; delegated children never receive the primary digest or take over the watcher.
+A fresh process resuming a conversation takes the helm again through the same idempotent startup owner.
+Bare `dsh-tui` launches do not discover this plugin, and automatic in-place compaction has no separate tracked re-emit callback.
+The [DSH protocol](supervision-protocols/dsh.md) owns watcher continuity and recovery.
 
 ### Cursor compaction
 

@@ -6141,7 +6141,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$STATE/$ID.control-relaunch" "$STATE/$ID.control-relaunch.meta-prior" \
   "$STATE/$ID.control-relaunch.brief-prior" "$STATE/$ID.control-relaunch.note" \
   "$STATE/$ID.reconcile-nudged" "$STATE/$ID.gemini-settings.json" \
-  "$STATE/$ID.claude-settings.json" "$STATE/$ID.devin-config.json" \
+  "$STATE/$ID.claude-settings.json" "$STATE/$ID.devin-config.json" "$STATE/$ID.dsh-session" \
   "$STATE/.$ID.branch-outcome-index" \
   "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
   "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
@@ -6152,7 +6152,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
 # state/<id>.git-hooks is the spawn-owned commit-msg strip directory, left
 # read-only by its installer.
 chmod u+w "$STATE/$ID.git-hooks" 2>/dev/null || true
-rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID"
+rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh"
 # A presentation journal the close path left behind is orphaned once the
 # recorded pane is proven gone (the Herdr gate above) unless it still names a
 # live projected workspace - a version 2 binding of some other pane, or a

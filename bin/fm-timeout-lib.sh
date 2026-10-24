@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# fm-timeout-lib.sh - the single owner of bounded command execution.
+# fm-timeout-lib.sh - the single owner of bounded and owner-bound execution.
+#
+#   fm_exec_owned <grace-seconds> <command> [args...]
+#       Replaces the shell with an owner-bound Perl watchdog, with no deadline.
+#       TERM, INT, HUP and owner death terminate the command process group,
+#       escalating to KILL after the positive grace. FM_EXEC_TIMED_OWNER_PID
+#       selects the owner; otherwise the calling shell's parent owns it.
+#       Requires Perl: timeout/gtimeout cannot enforce owner-death cleanup.
 #
 # Sourced, never executed. Provides one hard-bound runner so no caller has to
 # re-derive the coreutils/BSD/perl selection, and so every bounded call in this
@@ -539,7 +546,7 @@ fm_timed_out() {  # <status>
 # which keeps the bound off perl's platform-dependent syscall-restart signal
 # semantics and off the drift of counting sleep intervals.
 fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
-  local seconds=${1:-} grace=${2:-} value owner
+  local seconds=${1:-} grace=${2:-} value
   for value in "$seconds" "$grace"; do
     case "$value" in
       '' | 0* | *[!0-9]*)
@@ -553,6 +560,24 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
     echo "fm_exec_timed: usage: fm_exec_timed <positive-seconds> <positive-grace-seconds> <command> [args...]" >&2
     exit 125
   fi
+  _fm_exec_watchdog "$seconds" "$grace" "$@"
+}
+
+# Continuous children need owner-death cleanup, not an invented deadline.
+# Only the Perl watchdog can enforce that contract; timeout fallbacks cannot.
+fm_exec_owned() {  # <grace-seconds> <command...>
+  local grace=${1:-}
+  case "$grace" in
+    ''|0*|*[!0-9]*) echo 'fm_exec_owned: usage: fm_exec_owned <positive-grace-seconds> <command> [args...]' >&2; exit 125 ;;
+  esac
+  shift
+  [ "$#" -gt 0 ] || { echo 'fm_exec_owned: a command is required' >&2; exit 125; }
+  _fm_exec_watchdog 0 "$grace" "$@"
+}
+
+_fm_exec_watchdog() {  # <seconds-or-zero-for-owned> <grace> <command...>
+  local seconds=$1 grace=$2 owner
+  shift 2
   owner=${FM_EXEC_TIMED_OWNER_PID:-$$}
   unset FM_EXEC_TIMED_OWNER_PID
   if command -v perl >/dev/null 2>&1; then
@@ -580,7 +605,7 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
       setpgid($child, $child);
       $pid = $child;
       kill $pending, -$pid if $pending;
-      my $deadline = time + $bound;
+      my $deadline = $bound > 0 ? time + $bound : undef;
       sub finish {
         my $status = shift;
         kill "KILL", -$pid if $kill_at;
@@ -597,7 +622,7 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
             waitpid $pid, 0;
             finish($?);
           }
-        } elsif (time >= $deadline) {
+        } elsif (defined($deadline) && time >= $deadline) {
           $timed_out = 1;
           $kill_at = time + $grace;
           kill "TERM", -$pid;
@@ -608,6 +633,9 @@ fm_exec_timed() {  # <seconds> <grace-seconds> <command...>
         select undef, undef, undef, 0.05;
       }
     ' -- "$seconds" "$grace" "$owner" "$PPID" "$@"
+  elif [ "$seconds" -eq 0 ]; then
+    echo 'fm_exec_owned: perl is required to enforce owner-death cleanup' >&2
+    exit 127
   elif command -v timeout >/dev/null 2>&1; then
     exec timeout -k "$grace" "$seconds" "$@"
   elif command -v gtimeout >/dev/null 2>&1; then
