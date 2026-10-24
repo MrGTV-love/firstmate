@@ -27,7 +27,9 @@ function profiles(value: unknown): Profile[] {
   return entries.map(p => {
     if (!object(p) || typeof p.harness !== "string" ||
       (p.model !== undefined && typeof p.model !== "string") ||
-      (p.effort !== undefined && (typeof p.effort !== "string" || (!levels.includes(p.effort) && p.effort !== "ultra")))) throw new Error("profile");
+      (p.effort !== undefined && (typeof p.effort !== "string" || (!levels.includes(p.effort) && p.effort !== "ultra")))) {
+      throw new Error("each profile needs a string harness, a string model when present, and an effort of low, medium, high, xhigh, max, or ultra when present");
+    }
     // Construct the validated consumed fields; retain untouched captain gates.
     return { ...p, harness: p.harness, ...(typeof p.model === "string" ? { model: p.model } : {}),
       ...(typeof p.effort === "string" ? { effort: p.effort } : {}) };
@@ -35,25 +37,31 @@ function profiles(value: unknown): Profile[] {
 }
 function config(path: string): Config {
   const value: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (!object(value) || !Array.isArray(value.rules) || !object(value.judgments)) throw new Error("judgments");
+  if (!object(value) || !Array.isArray(value.rules) || !object(value.judgments)) throw new Error("judgments must be an object of single-judgment Nouls");
   const judgments: Record<string, NoulQuestion> = {};
   for (const [id, q] of Object.entries(value.judgments)) {
     if (!/^[a-z][a-z0-9_]*$/.test(id) || !object(q) || q.type !== "noul" ||
       typeof q.instructions !== "string" || !q.instructions.trim() || !object(q.criteria) ||
       typeof q.criteria.true !== "string" || !q.criteria.true.trim() ||
-      typeof q.criteria.false !== "string" || !q.criteria.false.trim()) throw new Error("judgment");
+      typeof q.criteria.false !== "string" || !q.criteria.false.trim()) {
+      throw new Error("each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false");
+    }
     judgments[id] = noul(q.instructions, { true: q.criteria.true, false: q.criteria.false });
   }
   const rules = value.rules.map((r: unknown) => {
-    if (!object(r) || typeof r.when !== "string" || !object(r.match)) throw new Error("rule match");
+    if (!object(r) || typeof r.when !== "string" || !object(r.match)) throw new Error("each rule needs a match object");
     const m = r.match;
     if (Object.keys(m).some(k => !["project", "exclude_project", "kind", "all", "any", "none"].includes(k)) ||
       [m.project, m.exclude_project].some(p => p !== undefined && (typeof p !== "string" || !p.trim())) ||
-      (m.kind !== undefined && m.kind !== "ship" && m.kind !== "scout")) throw new Error("rule facts");
+      (m.kind !== undefined && m.kind !== "ship" && m.kind !== "scout")) {
+      throw new Error("match accepts only project, exclude_project, kind, all, any, and none; project and exclude_project must be non-empty strings and kind must be ship or scout");
+    }
     for (const key of ["all", "any", "none"]) {
       const ids = m[key];
       if (ids !== undefined && (!Array.isArray(ids) || ids.length === 0 ||
-        ids.some(id => typeof id !== "string" || !Object.hasOwn(judgments, id)))) throw new Error("rule judgments");
+        ids.some(id => typeof id !== "string" || !Object.hasOwn(judgments, id)))) {
+        throw new Error("match all, any, and none must be non-empty arrays of declared judgment ids");
+      }
     }
     return { ...r, when: r.when, match: m as Match, use: profiles(r.use) };
   });
@@ -86,8 +94,8 @@ try {
     try {
       config(args[0]);
     } catch (error) {
-      if (error instanceof Error && "code" in error) throw error;
-      console.error("dispatch-level5: malformed rules schema");
+      if (!(error instanceof Error) || error.name !== "Error" || "code" in error) throw error;
+      console.error(error.message);
       process.exitCode = 65;
     }
   } else if (action === "prepare") {

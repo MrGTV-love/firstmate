@@ -2334,7 +2334,7 @@ The default support is the minimum complement of all eligible rule supports, or 
 These supports are fuzzy predicate scores, not a mutually exclusive probability distribution, so they are never summed or pooled even when rules select identical profiles.
 
 Code picks the highest-supported eligible rule or default and applies its declared `min_confidence`, or 0.6 when absent.
-An exact support tie between different dispatch outcomes is `ambiguous`; identical profiles, approval, quota floor, selection mode and fallback may share the same outcome without increasing support.
+An exact highest-support tie between different dispatch outcomes is `ambiguous` before any floor or runner-up check, so rule order and `min_confidence` cannot resolve it; identical profiles, approval, quota floor, selection mode and fallback may share the same outcome without increasing support.
 If the highest-supported rule misses its explicitly declared floor, code considers the highest-supported other eligible option that clears its own floor.
 A qualifying runner-up prints a `fallback:` line; no qualifying option or a tie between different qualifying outcomes is `ambiguous`.
 Without a declared floor, a below-0.6 pick remains `ambiguous` rather than selecting around uncertainty.

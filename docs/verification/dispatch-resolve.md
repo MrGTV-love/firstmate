@@ -61,7 +61,7 @@ A fenced, non-authoritative ship heading exercises the neighboring boundary.
 These are offline policy and transport checks, not evidence of semantic accuracy from the provider model.
 
 That pass predates the review fixes and does not validate them.
-The suite now also covers a fenced scout declaration inside an ordinary ship brief, scout detection from the unfenced `# Setup` section, escalation of project-scoped rules without `--project`, an old-format rules file failing closed with exit 2, an override directory's own judgment reaching the request, and an adapter runtime failure reported as `status: error` rather than a malformed rules file.
+The suite now also covers a fenced scout declaration inside an ordinary ship brief, scout detection from the unfenced `# Setup` section, escalation of project-scoped rules without `--project`, an old-format rules file failing closed with exit 2, an override directory's own judgment reaching the request, an adapter runtime failure reported as `status: error` rather than a malformed rules file, a conflicting highest-support tie that stays `ambiguous` in either rule order despite a declared floor, and malformed-schema diagnostics that name the failing check.
 No complete run of this entry point on the current code is recorded here; the pipeline's test step owns that evidence.
 
 ## Verification boundary

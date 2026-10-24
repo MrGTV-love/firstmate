@@ -254,7 +254,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
     elif $h == "dsh" then (["low","medium","high","xhigh","max"] | index($e)) != null
     elif $h == "rovo" then (["low","medium","high","max"] | index($e)) != null
     elif $h == "opencode" or $h == "kimi" or $h == "cursor" then false
-    else true end;
+    else (["low","medium","high","xhigh","max"] | index($e)) != null end;
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   def floor_bad($f; $need_provider):
     ($f | type) != "object"
@@ -462,11 +462,11 @@ else
   emit_error "neither bun nor node installed"
 fi
 validate_rc=0
-"${LEVEL5[@]}" validate "$RULES" || validate_rc=$?
+validate_err=$("${LEVEL5[@]}" validate "$RULES" 2>&1 >/dev/null) || validate_rc=$?
 case "$validate_rc" in
   0) ;;
-  65) die_rules "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria" ;;
-  *) emit_error "Level 5 rules validation could not run" ;;
+  65) die_rules "$validate_err" ;;
+  *) [ -z "$validate_err" ] || printf '%s\n' "$validate_err" >&2; emit_error "Level 5 rules validation could not run" ;;
 esac
 if [ -z "$PROJECT" ] && jq -e 'any(.rules[]; .match | has("project") or has("exclude_project"))' "$RULES" >/dev/null; then
   escalate_unsent 'a project-scoped rule needs --project'
@@ -663,7 +663,8 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   (confidence_floor($picked)) as $picked_floor |
   ($a.support[$picked]) as $shown_p |
   "support" as $p_word |
-  (if $shown_p >= $picked_floor then {below: false}
+  any($a.support | to_entries[]; .key != $picked and .value == $shown_p and outcome(.key) != outcome($picked)) as $top_tie |
+  (if $top_tie or $shown_p >= $picked_floor then {below: false}
    elif (declared_confidence($picked) | not) then {below: true, global: true}
    else
      ([$a.support | to_entries[] | select(.key != $picked and .value >= confidence_floor(.key))]
@@ -704,7 +705,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   as $ev |
   if $r.route.escalate then $ev + {status: "escalate", reason: $r.route.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
-  elif ($fb.below | not) and any($a.support | to_entries[]; .key != $picked and .value == $shown_p and outcome(.key) != outcome($picked)) then
+  elif $top_tie then
     $ev + {status: "ambiguous", reason: "conflicting rule support tie", candidates: ($answer_use | map(evaluate(.)))}
   elif $fb.below and $fb.global then
     $ev + {status: "ambiguous", reason: "support \($shown_p) below floor \($floor)", candidates: ($answer_use | map(evaluate(.)))}
