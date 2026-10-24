@@ -38,7 +38,7 @@ Prerequisites:
 - Herdr protocol 14 or newer, installed from [herdr.dev](https://herdr.dev).
 - `jq` for JSON responses.
 - The universal harness and toolchain requirements in [`configuration.md`](configuration.md#toolchain).
-- `python3` for kernel-backed process-environment ownership proof, and for optional protocol-16 presentation-space ordering and native event subscription.
+- `python3` for kernel-backed process-environment ownership proof, for the server-start absence proof, and for optional protocol-16 presentation-space ordering and native event subscription.
 
 Herdr is dual-licensed AGPL-3.0-or-later or commercial.
 Firstmate invokes its CLI as a separate process.
@@ -592,7 +592,7 @@ A successful stopped status is necessary but not sufficient: [`herdr-server-star
 The session socket comes from the status `.server.socket`, or from `session list --json` `.socket_path` when status omits it; with neither, startup and the absence proof refuse.
 The [fm-remote guard](../bin/fm-remote-herdr-guard.sh) execs its own server only after the helper's `--hold-for-exec` mode takes the same start lock and proves absence; that helper process holds the lock until the server reports running or exits.
 A `herdr server` process without `--session` serves the session named by its inherited `HERDR_SESSION`, or `default` when that variable is absent; the helper reads that environment with `ps -E` on macOS or `/proc/<pid>/environ` on Linux.
-When that environment cannot be read, the process's session is unknown and it blocks startup.
+When that environment cannot be read from a process that is still alive, the process's session is unknown and it blocks startup; a process that exited before the read is skipped.
 A live process, accepting socket, or unreadable proof refuses rather than replacing a server.
 A competing starter waits for the start lock, then re-reads status and reuses the server the first starter brought up, so only one launch happens.
 After a launch, the starter polls status from 0.1 seconds, doubling to a 5-second cap, with no deadline; a failed status read is not fatal.
