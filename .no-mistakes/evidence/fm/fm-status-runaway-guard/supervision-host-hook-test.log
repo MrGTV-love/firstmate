@@ -1,159 +1,14 @@
-FM_TEST_BEGIN 2026-10-22T22:27:28Z tests/fm-supervision-host-hook.test.sh family=afk expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-24T01:05:02Z tests/fm-supervision-host-hook.test.sh family=afk expected_gate_skip=none
 ok - host+hook: a successor closed before exit_to_main does not suppress the branch-outcome rewake
 ok - host+hook: a successor that closes during a held engine turn does not suppress the branch-outcome rewake
-tests/fm-supervision-host-helpers.sh: line 159: 94667 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
 ok - host+hook: a refused hand-back becomes a delivered failure notice
 ok - host+hook: a refused hand-back on an announced handling marker becomes a delivered failure notice
 ok - host+hook: an attended main-only pass-through rewakes main and keeps its successor watcher
-tests/fm-supervision-host-helpers.sh: line 159: 58247 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
 ok - host+hook: a captain outcome beside a quiet record rewakes the present captain with no away note
-tests/fm-supervision-host-helpers.sh: line 159: 78643 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
 ok - host+hook: a Claude home without config/supervision-host runs the host at the default engine, and an off file restores the plain arm
 ok - host+hook: a close that turns main-only at its turn rewakes main and keeps its successor watcher
-tests/fm-supervision-host-helpers.sh: line 159:  8877 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
-tests/fm-supervision-host-helpers.sh: line 159: 38946 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
 ok - host+hook: the successor a close that turns main-only at its turn leaves for main survives the hook's process group teardown
-tests/fm-supervision-host-helpers.sh: line 187: 38946 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
+tests/fm-supervision-host-helpers.sh: line 187: 40998 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
       printf "%s\n" "$$" > "$FM_HOME/state/.lock"
       printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
       for seed in "$FM_HOME"/mirror-seed.*; do
@@ -182,7 +37,7 @@ tests/fm-supervision-host-helpers.sh: line 187: 38946 Terminated: 15          FM
         sleep 0.1
       done
     ' 2>> "$home/claude.err"
-tests/fm-supervision-host-helpers.sh: line 159: 38946 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
+tests/fm-supervision-host-helpers.sh: line 159: 40998 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
       printf "%s\n" "$$" > "$FM_HOME/state/.lock"
       printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
       for seed in "$FM_HOME"/mirror-seed.*; do
@@ -211,7 +66,7 @@ tests/fm-supervision-host-helpers.sh: line 159: 38946 Terminated: 15          FM
         sleep 0.1
       done
     ' 2>> "$home/claude.err"
-tests/fm-supervision-host-helpers.sh: line 159: 38946 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
+tests/fm-supervision-host-helpers.sh: line 159: 40998 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
       printf "%s\n" "$$" > "$FM_HOME/state/.lock"
       printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
       for seed in "$FM_HOME"/mirror-seed.*; do
@@ -242,66 +97,8 @@ tests/fm-supervision-host-helpers.sh: line 159: 38946 Terminated: 15          FM
     ' 2>> "$home/claude.err"
 ok - host+hook: failed at-turn downtime write notifies main despite a healthy successor
 ok - host+hook: a successor close that lands during main's turn is delivered at the next turn end
-tests/fm-supervision-host-helpers.sh: line 159:  3711 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
-tests/fm-supervision-host-helpers.sh: line 159: 28408 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
 ok - host+hook: the successor a pass-through leaves for main survives the hook's process group teardown
-tests/fm-supervision-host-helpers.sh: line 187: 28408 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
+tests/fm-supervision-host-helpers.sh: line 187: 65894 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
       printf "%s\n" "$$" > "$FM_HOME/state/.lock"
       printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
       for seed in "$FM_HOME"/mirror-seed.*; do
@@ -330,7 +127,7 @@ tests/fm-supervision-host-helpers.sh: line 187: 28408 Terminated: 15          FM
         sleep 0.1
       done
     ' 2>> "$home/claude.err"
-tests/fm-supervision-host-helpers.sh: line 159: 28408 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
+tests/fm-supervision-host-helpers.sh: line 159: 65894 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
       printf "%s\n" "$$" > "$FM_HOME/state/.lock"
       printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
       for seed in "$FM_HOME"/mirror-seed.*; do
@@ -359,7 +156,7 @@ tests/fm-supervision-host-helpers.sh: line 159: 28408 Terminated: 15          FM
         sleep 0.1
       done
     ' 2>> "$home/claude.err"
-tests/fm-supervision-host-helpers.sh: line 159: 28408 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
+tests/fm-supervision-host-helpers.sh: line 159: 65894 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
       printf "%s\n" "$$" > "$FM_HOME/state/.lock"
       printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
       for seed in "$FM_HOME"/mirror-seed.*; do
@@ -391,39 +188,11 @@ tests/fm-supervision-host-helpers.sh: line 159: 28408 Terminated: 15          FM
 ok - host+hook: the next park takes over the cycle a main-only pass-through left, so one arm owns it
 ok - host+hook: a park stopped mid take-over leaves the take-over to the next park
 ok - host+hook: a successor that cannot be recorded is stopped, and main's next turn end arms a fresh cycle
-tests/fm-supervision-host-helpers.sh: line 159: 31512 Terminated: 15          FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ]; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err"
-FM_TEST_END 2026-10-22T22:33:44Z tests/fm-supervision-host-hook.test.sh exit=0 duration_ms=376106 gate_skip=false
+fm-test-run: reaped after tests/fm-supervision-host-hook.test.sh: reaped pid=79178 root=/Users/charlesabrooker/tmp/fm-lab.G0qtO3 cmd=tmux -L fm-lab new-session -d -s judge -c /Users/charlesabrooker/tmp/fm-lab.G0qtO3 node /Users/charl...
+fm-test-run: reaped after tests/fm-supervision-host-hook.test.sh: reaped pid=79183 root=/Users/charlesabrooker/tmp/fm-lab.G0qtO3 cmd=node /Users/charlesabrooker/tmp/fm-lab.G0qtO3/fake-judge.mjs /Users/charlesabrooker/tmp/fm-lab.G0qtO...
+FM_TEST_END 2026-10-24T01:06:51Z tests/fm-supervision-host-hook.test.sh exit=0 duration_ms=108187 gate_skip=false
 ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JEP7JBE1M3121EZV5RJ1V3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=377049
-FM_TEST_SUMMARY_FAMILY family=afk count=1 duration_ms=376106 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-supervision-host-hook.test.sh duration_ms=376106
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=108559
+FM_TEST_SUMMARY_FAMILY family=afk count=1 duration_ms=108187 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-supervision-host-hook.test.sh duration_ms=108187
 ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5JEP7JBE1M3121EZV5RJ1V3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-exit=0

@@ -1,0 +1,15 @@
+=== C: sanctioned writer bin/fm-status-append.sh, the incident loop routed through the helper (default 32 MiB cap shrunk to 8192 for the demo)
+appended=273 refused(exit 75)=4727 final size=8190 (cap 8192)
+first refusal message: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.WKD53Y/state/c1.status is 8190 bytes and this line would pass the limit of 8192 bytes (cap 8192, reserve 1024 for decision and terminal lines)
+done: line exit=0 ; last line: done [at=1792803891]: finished at the cap; size=8232
+
+=== D: a 2 GiB sparse status log in the lab (3000 events, a hole, a repeated tail)
+size=2147483648 bytes; real blocks=1140 KiB
+wake drain exit=0 in 0.83s
+drain stderr naming the refused log:
+fm-status: huge.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+files over 1 MB beside the logs: 0
+--- watcher on the same home (no writer holds the log):
+watcher exit=0 after 4s (default 32 MiB cap); wake text: check: status-log-over-cap: file=huge.status size=2147483648 bytes (cap 33554432) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+log still 2 GiB and untouched: 2147483648
+lab removed: yes

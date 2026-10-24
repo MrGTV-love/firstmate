@@ -1,0 +1,14 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.aJGBLn cap=2048
+--- watcher run 1: exit=0 after 1s (124 means it hung until timeout); over-cap rows now in queue=1
+wake text: check: status-log-over-cap: file=lane-x.status size=983040 bytes (cap 2048) growth=624152 bytes/s writer=pid 74524 pywriter, pid 75806 sleep; stopped nothing: pid 74524 (pywriter) is not an omp process, pid 75806 (sleep) is not an omp process; nothing was deleted, truncated or rewritten
+log size now: 1376256 bytes; writer state: S   
+(acked through 3)
+--- watcher run 2: exit=0 after 1s (124 means it hung until timeout); over-cap rows now in queue=1
+wake text: check: status-log-over-cap: file=lane-x.status size=3407872 bytes (cap 2048) growth=562540 bytes/s writer=pid 74524 pywriter, pid 80932 sleep; stopped nothing: pid 74524 (pywriter) is not an omp process, pid 80932 (sleep) is not an omp process; nothing was deleted, truncated or rewritten
+log size now: 3932160 bytes; writer state: S   
+(acked through 6)
+--- watcher run 3: exit=0 after 1s (124 means it hung until timeout); over-cap rows now in queue=1
+wake text: check: status-log-over-cap: file=lane-x.status size=6553600 bytes (cap 2048) growth=576140 bytes/s writer=pid 74524 pywriter, pid 88464 sleep; stopped nothing: pid 74524 (pywriter) is not an omp process, pid 88464 (sleep) is not an omp process; nothing was deleted, truncated or rewritten
+log size now: 7012352 bytes; writer state: S   
+(acked through 9)
+lab removed: yes

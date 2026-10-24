@@ -1,0 +1,45 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.6ePyyg cap=16384
+--- watcher run 1 (t=4s) wake text:
+signal: /Users/charlesabrooker/tmp/fm-lab.6ePyyg/state/d1-intake.status
+(ack failed)
+--- watcher run 2 (t=16s) wake text:
+check: status-log-over-cap: file=d1-intake.status size=18060 bytes (cap 16384) growth=1917 bytes/s writer=pid 5650 omp; stopped pid 5650 (omp) with SIGSTOP; resume it with kill -CONT 5650; nothing was deleted, truncated or rewritten
+writer pid=5650 state=T bystander state=S
+log exists: yes; size=18060 then after 2s size=18060 (cap 16384)
+over-cap rows in .wake-queue: 1
+--- drain view of the queue:
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "278b6e08482bf613d4e75ff4","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1792803753	5	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ePyyg/state/d1-intake.status
+1792803747	3	check	status-log-over-cap-426695781	check: status-log-over-cap: file=d1-intake.status size=18060 bytes (cap 16384) growth=1917 bytes/s writer=pid 5650 omp; stopped pid 5650 (omp) with SIGSTOP; resume it with kill -CONT 5650; nothing was deleted, truncated or rewritten
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 6984.1792803741.5Dtedv
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+wake annotation: latest wake-EVENT observed at drain, not current state: d1-intake.status: text
+--- tail sample of log:
+text
+text
+text
+lab removed: yes
