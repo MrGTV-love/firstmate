@@ -1,0 +1,20 @@
+head=ff592853b bin/fm-dispatch-resolve.sh against disposable lab home (dummy TypeSafe key; refusal happens before any network call)
+
+### S-DISPATCH-OMP-DEEPSEEK (omp profile names a DeepSeek model)
+rules: {"rules":[{"when":"Typo work.","use":{"harness":"omp","model":"deepseek/deepseek-v4-flash"}}],"default":[{"harness":"claude","model":"opus"}]}
+error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+error: a profile's harness contradicts its DeepSeek model, or a dsh profile lacks a concrete DeepSeek model
+exit=2
+
+### S-DISPATCH-PROVIDER-DEEPSEEK (pi profile with provider deepseek)
+rules: {"rules":[{"when":"Typo work.","use":{"harness":"pi","provider":"deepseek","model":"deepseek-v4-flash"}}],"default":[{"harness":"claude","model":"opus"}]}
+error: DeepSeek runs through dsh-tui, not pi; select --harness dsh
+error: a profile's harness contradicts its DeepSeek model, or a dsh profile lacks a concrete DeepSeek model
+exit=2
+
+### S-DISPATCH-DSH-NONDEEPSEEK (dsh profile with a non-DeepSeek model)
+rules: {"rules":[{"when":"Typo work.","use":{"harness":"dsh","model":"gpt-5"}}],"default":[{"harness":"claude","model":"opus"}]}
+error: dsh runs only DeepSeek models, not 'gpt-5'
+error: a profile's harness contradicts its DeepSeek model, or a dsh profile lacks a concrete DeepSeek model
+exit=2
+

@@ -1,0 +1,52 @@
+warning: /private/tmp/fmtest-dsh.GW2oeD/ship-scout/home-1792870116/data/dsh-ship-71113/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fmtest-dsh.GW2oeD/ship-scout/home-1792870116/data/dsh-ship-71113/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-71113 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-71113 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-71113) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-71113: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-ship-71113 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-live-75055-7096:w1:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+observed dsh-ship-71113 busy
+first session=/private/tmp/fmtest-dsh.GW2oeD/ship-scout/home-1792870116/state/dsh-ship-71113.dsh/s1792870118.75410.27767/dsh/sessions/--private-tmp-fmtest-dsh.GW2oeD-copy--/13ef7273-05ab-43e3-8842-63c6e9f5b8ff/session.v4.jsonl
+busy composer=empty
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+steer acknowledged by dsh-ship-71113
+observed dsh-ship-71113 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-ship-71113 busy
+interrupt-delivered dsh-ship-71113 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-ship-71113 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-75055-7096:w1:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+warning: /private/tmp/fmtest-dsh.GW2oeD/ship-scout/home-1792870116/data/dsh-ship-71113/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fmtest-dsh.GW2oeD/ship-scout/home-1792870116/data/dsh-ship-71113/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-71113 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-71113 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-71113) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-71113: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-ship-71113 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-75055-7096:w1:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+resumed the earlier conversation in place
+stopped dsh-ship-71113 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-75055-7096:w1:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+skill selection for dsh-scout-71113: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-scout-71113 harness=dsh kind=scout window=fm-lab-dsh-live-75055-7096:w2:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+observed dsh-scout-71113 busy
+first session=/private/tmp/fmtest-dsh.GW2oeD/ship-scout/home-1792870116/state/dsh-scout-71113.dsh/s1792870213.97431.5553/dsh/sessions/--private-tmp-fmtest-dsh.GW2oeD-copy--/0ec6da09-66fe-4bc6-9d33-6060f35a322c/session.v4.jsonl
+busy composer=empty
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+steer acknowledged by dsh-scout-71113
+observed dsh-scout-71113 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-scout-71113 busy
+interrupt-delivered dsh-scout-71113 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-scout-71113 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-75055-7096:w2:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+skill selection for dsh-scout-71113: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-scout-71113 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-75055-7096:w2:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+resumed the earlier conversation in place
+stopped dsh-scout-71113 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-75055-7096:w2:p1 worktree=/private/tmp/fmtest-dsh.GW2oeD/copy
+ok - live dsh-tui scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+lab_project=/private/tmp/fmtest-dsh.GW2oeD/project
+lab_copy=/private/tmp/fmtest-dsh.GW2oeD/copy
+lab_home=/private/tmp/fmtest-dsh.GW2oeD/ship-scout/home-1792870116
+cleanup_exit=0

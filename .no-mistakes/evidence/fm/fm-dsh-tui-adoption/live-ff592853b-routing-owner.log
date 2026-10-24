@@ -1,0 +1,13 @@
+head=ff592853b routing owner CLI (bin/fm-dsh.py), the one owner fm-dispatch-resolve, spawn and control call
+### normalize: valid dsh (mixed spelling), claude, and non-DeepSeek omp profiles pass; dsh model canonicalized
+{"rules":[{"when":"a","use":{"harness":"dsh","model":" DeepSeek / deepseek-v4-flash "}},{"when":"b","use":{"harness":"omp","model":"openai/gpt-5"}}],"default":[{"harness":"claude","model":"opus"},{"harness":"dsh","provider":"deepseek","model":"deepseek-v4-pro"}]}
+exit=0
+{"rules": [{"when": "a", "use": {"harness": "dsh", "model": "deepseek/deepseek-v4-flash"}}, {"when": "b", "use": {"harness": "omp", "model": "openai/gpt-5"}}], "default": [{"harness": "claude", "model": "opus"}, {"harness": "dsh", "provider": "deepseek", "model": "deepseek/deepseek-v4-pro"}]}
+### route MODEL [PROVIDER]
+'deepseek/deepseek-v4-flash'     provider=none      -> dsh
+' DeepSeek/deepseek-v4-pro '     provider=none      -> dsh
+'deepseek-v4-flash'              provider=deepseek  -> dsh
+'claude-opus-4-7'                provider=none      -> claude
+'openai/gpt-5'                   provider=none      -> omp
+'deepseekish/foo'                provider=none      -> omp
+'kimi-k2'                        provider=moonshot  -> omp

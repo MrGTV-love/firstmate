@@ -1,0 +1,5 @@
+check-coverage exit=0
+fm-dsh-harness exit=0 secs=45 nok=0
+fm-dsh-spawn exit=0 secs=141 nok=0
+fm-dsh-primary exit=0 secs=20 nok=0
+fm-test-run exit=0 secs=720 nok=0

@@ -1,0 +1,26 @@
+herdr lab session: fm-lab-dsh-route-57547-18702
+crew-harness config: omp
+== routing owner CLI (bin/fm-dsh.py route)
+[deepseek/deepseek-v4-flash]   -> dsh
+[ DeepSeek/deepseek-v4-pro ]   -> dsh
+[claude-opus-4-1]              -> claude
+[claude-sonnet-4]              -> claude
+[openai/gpt-5]                 -> omp
+[moonshot/kimi-k2]             -> omp
+[deepseekish/model]            -> omp
+[v4-flash provider=deepseek]   -> dsh
+== S-ROUTE-REFUSE: explicit --harness omp with a DeepSeek model
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-route.kir2zB
+error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+rc=1
+meta still harness=omp; agent state=dead
+S-ROUTE-REFUSE pass
+== S-ROUTE-IMPLICIT: omp-recorded ship relaunched with only a DeepSeek model
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-route.kir2zB
+error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+rc=1
+DONE
+cleanup_exit=0
+credential copies left under task home after scrub: 0
+lab_home=/private/tmp/fm-dsh-route.kir2zB
+final_exit=0
