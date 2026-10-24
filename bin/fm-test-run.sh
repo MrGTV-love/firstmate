@@ -1024,6 +1024,9 @@ tests/fm-remote-secondmate-relaunch.test.sh 69311
 tests/fm-remote-secondmate-trace-context.test.sh 290868
 tests/fm-remote-transport-lanes.test.sh 80130
 tests/fm-review-agent-select.test.sh 14400
+tests/fm-retired-jev-shell-model-gate.test.sh 1853
+tests/fm-retired-jev-shell-outage-admissions.test.sh 2347
+tests/fm-retired-jev-shell-outage-deny.test.sh 2712
 tests/fm-rovo-harness.test.sh 19818
 tests/fm-rovo-signals-live-e2e.test.sh 425
 tests/fm-secondmate-harness.test.sh 256555
