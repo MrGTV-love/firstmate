@@ -7,8 +7,8 @@
 # a supervision-host home the supervision session's new and unprocessed
 # outcomes (BRANCH OUTCOMES), then assert liveness.
 # Overdue open-work rows (OVERDUE, STANDING) are presented first, and
-# acknowledgement refuses while a presented row lacks an action receipt;
-# docs/configuration.md "Open-work ledger" owns that gate.
+# acknowledgement refuses while a presented row lacks a valid action receipt;
+# docs/configuration.md "Open-work ledger" owns that gate, receipt standing, and invalidation.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
@@ -997,6 +997,12 @@ if [ -n "$ACK_THROUGH" ]; then
     consume_actor_rows_locked "$ELIGIBLE_ROWS_FILE" "$ACK_THROUGH" || exit 1
   else
     consume_actor_rows_locked "$MAIN_ROWS_FILE" "$ACK_THROUGH" || exit 1
+  fi
+  # A partial acknowledgement is still the same handling turn. Keep its receipts
+  # until every presented row is consumed, before another drain can take the lock.
+  if [ "$RECOVERY_ACK_MOVED" = false ] && [ "$PRESENTED_MAX" -le "$ACK_THROUGH" ] \
+    && { [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; }; then
+    "$SCRIPT_DIR/fm-open-loops.sh" --complete-actions || exit 1
   fi
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   DRAIN_LOCK_HELD=false

@@ -2831,8 +2831,11 @@ home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = 
 backlog.write_text(held('elsewhere'))
 _, boundary = drain()
 mentioned = act('escalated', 'tracked as elsewhere; captain notified.')
-assert mentioned.returncode == 0 and 'standing: no' in mentioned.stdout and 'captain hold' not in mentioned.stdout, mentioned
+assert mentioned.returncode == 0, mentioned
 assert 'hold' not in stored()['handling']['actions'][row['id']], 'free text in the evidence must not bind a hold'
+assert ack(boundary).returncode == 0
+result, boundary = drain('unbound-next-turn')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'unbound firstmate escalation has bounded standing'
 
 # (b) A changed row, or a hold that is answered, released, blocked on an unresolved task, or re-held, restores the requirement.
 def changed_row(record):
@@ -2861,13 +2864,15 @@ for label, text in transitions:
         # A changed row or a fresh hold lifecycle is bound again by the new escalation.
         assert 'standing: captain hold held-job' in renewed.stdout, renewed
     else:
-        # The captain is no longer holding it, so a fresh escalation answers only this turn.
-        assert 'standing: no' in renewed.stdout and 'answers only the turn' in renewed.stdout, (label, renewed.stdout)
+        # A fresh escalation after following up is bounded, not still bound to the ended hold.
+        assert 'hold' not in stored()['handling']['actions'][row['id']], label
     assert ack(boundary).returncode == 0
     if text not in (None, REHELD):
         result, boundary = drain('next-' + label)
-        assert row['id'] in result.stdout, (label, 'a receipt without a live hold must not stand')
-        assert ack(boundary).returncode == 1, label
+        assert row['id'] not in result.stdout and ack(boundary).returncode == 0, label
+        clock['now'] += 14400
+        result, boundary = drain('expired-' + label)
+        assert row['id'] in result.stdout and ack(boundary).returncode == 1, label
 # A hold the captain defers to a date is still held for the captain: the receipt keeps standing until the hold ends.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('dated')
 _, boundary = drain()
@@ -2901,7 +2906,7 @@ backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 result, boundary = drain('unreadable')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
 
-# Categories a captain decision cannot park never take a standing escalation, even when the task is held.
+# Other categories cannot bind a captain hold; firstmate ownership still permits bounded standing.
 for category, fields in (('red_check', dict(subject=PR, next_action='diagnose: code or test', limit_seconds=0)),
                          ('stalled_worker', dict(subject='held-job', owner='worker:held-job',
                                                  source=dict(kind='task', task='held-job')))):
@@ -2909,9 +2914,13 @@ for category, fields in (('red_check', dict(subject=PR, next_action='diagnose: c
                                                                                          category=category, **fields)
     _, boundary = drain()
     recorded = act('escalated', 'asked the captain about held-job')
-    assert recorded.returncode == 0 and 'standing:' not in recorded.stdout, recorded
+    assert recorded.returncode == 0 and 'hold' not in stored()['handling']['actions'][row['id']], recorded
     assert ack(boundary).returncode == 0
     result, boundary = drain('again')
+    if row['owner'] == 'firstmate':
+        assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (category, result.stdout)
+        clock['now'] += 14400
+        result, boundary = drain('bounded-receipt-expired')
     assert row['id'] in result.stdout and ack(boundary).returncode == 1, (category, result.stdout)
     refused = act('escalated', 'asked the captain', '--hold', 'held-job')
     assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, (category, refused)
@@ -2997,14 +3006,16 @@ home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = 
 _, boundary = drain()
 backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 recorded = act('escalated', 'asked the captain')
-assert recorded.returncode == 0 and 'standing: no' in recorded.stdout, recorded
-assert 'could not be verified' in recorded.stdout and 'no task held for the captain was named' not in recorded.stdout, recorded
+assert recorded.returncode == 0, recorded
 assert 'hold' not in stored()['handling']['actions'][row['id']]
 refused = act('escalated', 'asked the captain', '--hold', 'held-job')
-assert refused.returncode == 1 and 'still held for the captain' in refused.stdout, refused
+assert refused.returncode == 1, refused
 assert ack(boundary).returncode == 0
 result, boundary = drain('unverified-after')
-assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an unverified receipt answers only its own turn'
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'an unbound firstmate receipt has bounded standing'
+clock['now'] += 14400
+result, boundary = drain('unverified-expired')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'unverified holds never buy indefinite standing'
 
 # (f) Only a row owned by firstmate can be parked: a reviewer-owned open_pr stays presented under a live captain hold.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('marker')
@@ -3057,5 +3068,380 @@ assert snapshot_runs() == 1, ('an unreadable backlog was read again for each sta
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
       ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
       ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
+PY
+# Batched receipts and read-stable, bounded handling through the real CLI.
+python3 - "$ROOT" <<'PY'
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+root = Path(sys.argv[1]).resolve()
+world = Path(tempfile.mkdtemp(prefix='ledger-receipts-'))
+code = world / 'code'
+shutil.copytree(root / 'bin', code / 'bin')
+# Count the actual local snapshot reader, not a fabricated snapshot.
+shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
+snapshot = code / 'bin/fm-fleet-snapshot.sh'
+snapshot.write_text('#!/usr/bin/env bash\nprintf "snapshot\\n" >> "$FM_HOME/snapshot-runs"\nexec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"\n')
+snapshot.chmod(0o755)
+now = int(time.time())
+clock = now
+home = world / 'home'
+for directory in ('state', 'config', 'data', 'projects'):
+    (home / directory).mkdir(parents=True)
+(home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+rows = [dict(id=f'row-{i}', category='unanswered_question', subject=f'job:question-{i}',
+             owner='firstmate', next_action='obtain decision', evidence='decision pending',
+             age_seconds=7200, limit_seconds=1800, overdue=True) for i in range(50)]
+ledger = home / 'state/open-loops.json'
+loops = code / 'bin/fm-open-loops.sh'
+drain_cli = code / 'bin/fm-wake-drain.sh'
+def publish(items):
+    ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now,
+                                     home=str(home), complete=True, rows=items)))
+def environment():
+    env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home),
+               FM_OPEN_LOOPS_NOW=str(clock), FM_TEST_SEAM='1', FM_TEST_HARNESS='codex',
+               FM_SUPERVISION_ACTOR='main', FM_DURATION_FILE='off')
+    for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+        env.pop(key, None)
+    return env
+def call(binary, *args, good=True, input_text=None):
+    result = subprocess.run([str(binary), *map(str,args)], env=environment(), text=True, capture_output=True,
+                            input=input_text)
+    if good:
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+    return result
+
+def drain():
+    result = call(drain_cli)
+    match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+    assert match, result
+    return result, match.groups()
+def ack(boundary, good=True):
+    return call(drain_cli, '--ack-through', boundary[0], '--recovery-generation', boundary[1], good=good)
+def act(ident, kind='escalated', evidence='reported decision'):
+    return call(loops, 'action', ident, kind, '--evidence', evidence)
+def stored():
+    return json.loads(ledger.read_text())
+def batch(items):
+    path = home / 'actions.jsonl'
+    path.write_text(''.join(json.dumps(item) + '\n' for item in items))
+    return call(loops, 'action', '--batch', path, good=False)
+
+try:
+    publish(rows)
+    presented, boundary = drain()
+    assert 'action --batch' in presented.stdout, 'the overdue help names the batch form'
+    # Each failed batch row reports its own result without rolling back valid actions.
+    runs = home / 'snapshot-runs'
+    runs.unlink(missing_ok=True)
+    result = batch([dict(row_id=row['id'], kind='escalated', evidence='reported decision') for row in rows]
+                   + [dict(row_id='absent', kind='escalated', evidence='not a row'),
+                      dict(row_id='row-0', kind='unknown', evidence='invalid kind')])
+    assert result.returncode == 1, result
+    assert len(runs.read_text().splitlines()) == 1, 'a 50-row batch must read one snapshot'
+    assert len(stored()['handling']['actions']) == 50, result
+    assert 'absent' in result.stdout and 'unknown' in result.stdout, result
+    assert len(result.stdout.splitlines()) == 53, result.stdout
+    call(loops, '--check-actions')
+    ack(boundary)
+    print('PASS: batch validates per row, preserves valid actions and uses one real snapshot', flush=True)
+
+    # Reads and a refused ack cannot throw away another row's completed work.
+    publish([dict(rows[0], owner='worker:job'), rows[1]])
+    _, boundary = drain()
+    act('row-0')
+    prior = stored()['handling']['presented_at']['main']['row-0']
+    clock += 1
+    drain()
+    assert ack(boundary, good=False).returncode == 1
+    assert stored()['handling']['presented_at']['main']['row-0'] == prior
+    act('row-1')
+    call(loops, '--check-actions')
+    ack(boundary)
+    print('PASS: drain and refused acknowledgement preserve unchanged recorded work', flush=True)
+
+    # Malformed stdin rows do not prevent a later valid action from being recorded.
+    publish([rows[0]])
+    _, boundary = drain()
+    result = call(loops, 'action', '--batch', '-', good=False,
+                  input_text='not-json\n' + json.dumps(dict(row_id='row-0', kind='escalated', evidence='followed up')) + '\n')
+    assert result.returncode == 1 and len(result.stdout.splitlines()) == 3, result
+    assert stored()['handling']['actions']['row-0']['kind'] == 'escalated'
+    ack(boundary)
+
+    # A partial acknowledgement must not restart action requirements for the remaining queue.
+    publish([dict(rows[0], owner='worker:job')])
+    for label in ('first', 'second'):
+        call('bash', '-c', '. "$1"; fm_wake_append check "$2" "check: $2"', '_', code / 'bin/fm-wake-lib.sh', label)
+    _, boundary = drain()
+    act('row-0')
+    ack((str(int(boundary[0]) - 1), boundary[1]))
+    drain()
+    call(loops, '--check-actions')
+    ack(boundary)
+    print('PASS: stdin batch recovery and partial acknowledgements preserve completed actions', flush=True)
+
+    # All five identity fields invalidate a receipt even before another presentation.
+    for field in ('category', 'subject', 'owner', 'next_action', 'evidence'):
+        publish([rows[0]])
+        _, boundary = drain()
+        act('row-0')
+        record = stored()
+        record['rows'][0][field] += '-changed'
+        ledger.write_text(json.dumps(record))
+        assert call(loops, '--check-actions', good=False).returncode == 1, field
+        assert ack(boundary, good=False).returncode == 1, field
+    print('PASS: every obligation identity change requires new evidence', flush=True)
+
+    # Firstmate escalations and steers stand across turns, not just across reads.
+    for kind in ('escalated', 'steered'):
+        publish([rows[0]])
+        _, boundary = drain()
+        if kind == 'steered':
+            delivery = home / 'state/job.inbox/001.msg'
+            delivery.parent.mkdir(exist_ok=True)
+            delivery.write_text(f'schema=fm-task-inbox.v1\nat={dt.datetime.fromtimestamp(clock, dt.timezone.utc).isoformat()}\n--\nfollow up\n')
+        act('row-0', kind, '001.msg' if kind == 'steered' else 'reported decision')
+        ack(boundary)
+        receipt_time = clock
+        clock += 14399
+        result = call(drain_cli)
+        assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, result
+        clock = receipt_time + 14400
+        _, boundary = drain()
+        assert ack(boundary, good=False).returncode == 1, kind
+        act('row-0')
+        ack(boundary)
+    print('PASS: firstmate escalation and steer stand for four hours, then require action', flush=True)
+
+    # An action recorded since the current presentation answers it however long the handling turn lasts.
+    publish([rows[0]])
+    _, boundary = drain()
+    act('row-0')
+    clock += 5 * 3600
+    call(loops, '--check-actions')
+    ack(boundary)
+    print('PASS: a recorded action answers its own turn at any age', flush=True)
+
+    # A heartbeat that changes only a stalled worker's elapsed-time counters changes no obligation.
+    stalled = dict(rows[0], category='stalled_worker', subject='job', owner='worker:job',
+                   next_action='follow up on the recorded wait and recover the worker')
+    def heartbeat(seconds, wait='lint still producing output'):
+        record = stored()
+        record['rows'][0]['evidence'] = (f'{wait}; {seconds}s without progress; step age {seconds}s;'
+                                         f' declaration age {seconds}s')
+        ledger.write_text(json.dumps(record))
+    recheck_at = lambda seconds: dt.datetime.fromtimestamp(clock + seconds, dt.timezone.utc).isoformat()
+    for kind in ('escalated', 'steered', 'deferred'):
+        publish([stalled])
+        heartbeat(3600)
+        _, boundary = drain()
+        if kind == 'steered':
+            delivery = home / 'state/job.inbox/001.msg'
+            delivery.parent.mkdir(exist_ok=True)
+            delivery.write_text(f'schema=fm-task-inbox.v1\nat={dt.datetime.fromtimestamp(clock, dt.timezone.utc).isoformat()}\n--\nfollow up\n')
+        if kind == 'deferred':
+            call(loops, 'action', 'row-0', 'deferred', '--evidence', 'lint still producing output',
+                 '--recheck', recheck_at(3600))
+        else:
+            act('row-0', kind, '001.msg' if kind == 'steered' else 'reported decision')
+        clock += 600
+        heartbeat(4200)
+        call(loops, '--check-actions')
+        if kind == 'escalated':
+            heartbeat(4200, wait='lint failed: 3 errors')
+            assert call(loops, '--check-actions', good=False).returncode == 1, 'a changed wait is a changed obligation'
+            heartbeat(4200)
+            call(loops, '--check-actions')
+        ack(boundary)
+        if kind == 'deferred':
+            clock += 600
+            heartbeat(4800)
+            result = call(drain_cli)
+            assert 'row-0' not in result.stdout and 'WAKE_ACK_REQUIRED' not in result.stderr, result
+            call(loops, '--check-actions')
+            heartbeat(4800, wait='lint failed: 3 errors')
+            result, boundary = drain()
+            assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1
+    print('PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do', flush=True)
+
+    # A timer the worker's own pane paints, in any unit and shape, is elapsed time too.
+    def retime(timer, work='Running lint…'):
+        record = stored()
+        record['rows'][0]['evidence'] = f'{work} ({timer} · esc to interrupt); 3600s without progress'
+        ledger.write_text(json.dumps(record))
+    for kind in ('escalated', 'deferred'):
+        for first, second in (('45s', '46s'), ('3m 12s', '3m 13s'), ('1h 2m', '1h 3m'), ('59m 59s', '1h 0m 0s')):
+            publish([stalled])
+            retime(first)
+            _, boundary = drain()
+            if kind == 'deferred':
+                call(loops, 'action', 'row-0', 'deferred', '--evidence', 'lint still producing output',
+                     '--recheck', recheck_at(3600))
+            else:
+                act('row-0')
+            stamped = stored()['handling']['presented_at']['main']['row-0']
+            clock += 60
+            retime(second)
+            call(loops, '--check-actions')
+            drain()
+            assert stored()['handling']['presented_at']['main']['row-0'] == stamped, (kind, first, second)
+            call(loops, '--check-actions')
+            retime(second, work='Running tests…')
+            assert call(loops, '--check-actions', good=False).returncode == 1, (kind, first, 'a changed task is a change')
+            retime(second)
+            ack(boundary)
+    print('PASS: a pane timer in any unit changes no obligation; a different task still does', flush=True)
+
+    # A malformed or unsupported config file never blocks a presentation, a check or an acknowledgement.
+    for text in ('{"age_limits_seconds": {', json.dumps(dict(receipt_interval_seconds=120))):
+        (home / 'config/open-loops.json').write_text(text)
+        publish([rows[0]])
+        presented = call(loops, '--present-overdue')
+        assert 'row-0' in presented.stdout, presented
+        result, boundary = drain()
+        assert 'row-0' in result.stdout and 'error' not in result.stderr, result
+        assert call(loops, '--check-actions', good=False).returncode == 1
+        act('row-0')
+        call(loops, '--check-actions')
+        call(loops, '--report')
+        ack(boundary)
+    (home / 'config/open-loops.json').unlink()
+    print('PASS: an unreadable config file never blocks the receipt gate', flush=True)
+
+    # The repeated-deferral refusal cannot be covered by an earlier standing escalation.
+    publish([rows[0]])
+    _, boundary = drain()
+    recheck = dt.datetime.fromtimestamp(clock + 60, dt.timezone.utc).isoformat()
+    call(loops, 'action', 'row-0', 'deferred', '--evidence', 'short wait', '--recheck', recheck)
+    ack(boundary)
+    act('row-0')
+    refused = call(loops, 'action', 'row-0', 'deferred', '--evidence', 'another wait',
+                   '--recheck', recheck, good=False)
+    assert refused.returncode == 1
+    assert call(loops, '--check-actions', good=False).returncode == 1
+    assert ack(boundary, good=False).returncode == 1
+    act('row-0')
+    call(loops, '--check-actions')
+    print('PASS: second deferral requires new follow-up even after a standing escalation', flush=True)
+
+    publish([dict(rows[0], category='review_pass_not_merged')])
+    _, boundary = drain()
+    act('row-0')
+    # A repeated read within this turn still preserves the action.
+    drain()
+    call(loops, '--check-actions')
+    ack(boundary)
+    _, boundary = drain()
+    assert ack(boundary, good=False).returncode == 1
+    print('PASS: reviewed PRs keep their next-turn action requirement', flush=True)
+
+    # A refused batch line leaves no presentation change behind for a valid sibling to persist.
+    publish([rows[0], rows[1]])
+    _, boundary = drain()
+    prior = stored()['handling']['presented_at']['main']['row-0']
+    clock += 60
+    result = batch([dict(row_id='row-0', kind='deferred', evidence='short wait', hold='job',
+                         recheck=dt.datetime.fromtimestamp(clock + 600, dt.timezone.utc).isoformat()),
+                    dict(row_id='row-1', kind='escalated', evidence='reported decision')])
+    assert result.returncode == 1 and '"refused"' in result.stdout and '"recorded"' in result.stdout, result
+    assert stored()['handling']['presented_at']['main']['row-0'] == prior, 'a refused line must not restamp its row'
+    assert 'row-0' not in stored()['handling']['actions']
+    act('row-0')
+    ack(boundary)
+    print('PASS: a refused batch line leaks no state into its siblings', flush=True)
+
+    # A hold-bound escalation answers its own turn by sequence, even if the hold ends or the backlog breaks.
+    backlog = home / 'data/backlog.md'
+    held = ('## In flight\n- [ ] job - Recover the run (repo: firstmate) (kind: ship) (hold: exact run recovery)'
+            ' (hold-kind: captain)\n  Captain hold set: '
+            + dt.datetime.fromtimestamp(clock - 7200, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            + '\n\n## Queued\n\n## Done\n')
+    empty = backlog.read_text()
+    for label, change in (('answered', lambda: backlog.write_text(
+                               held.replace('- [ ] job', '- [x] job').replace('## In flight', '## Done', 1))),
+                          ('unreadable', lambda: (backlog.unlink(), backlog.symlink_to(home / 'missing-backlog')))):
+        backlog.write_text(held)
+        publish([rows[0]])
+        _, boundary = drain()
+        recorded = act('row-0')
+        assert 'standing: captain hold job' in recorded.stdout, (label, recorded)
+        prior = stored()['handling']['presented_at']['main']['row-0']
+        change()
+        runs.unlink(missing_ok=True)
+        clock += 60
+        result, boundary = drain()
+        assert 'row-0' not in result.stdout, (label, result.stdout)
+        call(loops, '--check-actions')
+        assert not runs.exists(), (label, 'a same-turn answer reads no backlog snapshot')
+        assert stored()['handling']['presented_at']['main']['row-0'] == prior, (label, 'no restamp')
+        ack(boundary)
+        result, boundary = drain()
+        assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1, (label, 'next turn needs action')
+        act('row-0')
+        ack(boundary)
+        backlog.unlink()
+        backlog.write_text(empty)
+    print('PASS: a hold-bound escalation answers its own turn without a backlog read', flush=True)
+
+    # A home with no ledger acknowledges its wakes without starting the ledger receipt command.
+    home = world / 'ledgerless'
+    for directory in ('state', 'config', 'data', 'projects'):
+        (home / directory).mkdir(parents=True)
+    (home / 'data/backlog.md').write_text(empty)
+    call('bash', '-c', '. "$1"; fm_wake_append check "$2" "check: $2"', '_', code / 'bin/fm-wake-lib.sh', 'plain')
+    _, boundary = drain()
+    ack(boundary)
+    assert not (home / 'state/.open-loops.lock').exists(), 'acknowledgement without a ledger must not touch it'
+    print('PASS: a home without a ledger acknowledges without the receipt command', flush=True)
+
+    # A batch waiting on a slow producer holds no ledger lock: --report can feed the very batch it is piped into.
+    home = world / 'home'
+    fifo = home / 'actions.fifo'
+    os.mkfifo(fifo)
+    for source in ('stdin', 'file'):
+        publish(rows[:3])
+        _, boundary = drain()
+        command = [str(loops), 'action', '--batch', '-' if source == 'stdin' else str(fifo)]
+        with subprocess.Popen(command, env=environment(), text=True, stdin=subprocess.PIPE if source == 'stdin'
+                              else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as batcher:
+            time.sleep(1.5)
+            try:
+                report = subprocess.run([str(loops), '--report'], env=environment(), text=True,
+                                        capture_output=True, timeout=30)
+            except subprocess.TimeoutExpired:
+                if source == 'file':
+                    open(fifo, 'w').close()
+                raise AssertionError(f'a batch waiting on {source} must not hold the ledger lock')
+            ids = re.findall(r'^  "(row-\d+)"', report.stdout, re.M)
+            assert ids == ['row-0', 'row-1', 'row-2'], report
+            lines = ''.join(json.dumps(dict(row_id=ident, kind='escalated', evidence='reported decision')) + '\n'
+                            for ident in ids[:2])
+            if source == 'stdin':
+                out, err = batcher.communicate(lines, timeout=60)
+            else:
+                with open(fifo, 'w') as sink:
+                    sink.write(lines)
+                out, err = batcher.communicate(timeout=60)
+        assert batcher.returncode == 0 and out.count('"recorded"') == 2, (source, out, err)
+        assert set(stored()['handling']['actions']) == {'row-0', 'row-1'}, source
+        missing = call(loops, '--check-actions', good=False)
+        assert missing.returncode == 1 and 'row-2' in missing.stdout, (source, 'an unactioned row stays gated')
+        assert ack(boundary, good=False).returncode == 1, source
+        act('row-2')
+        call(loops, '--check-actions')
+        ack(boundary)
+    print('PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated', flush=True)
+finally:
+    shutil.rmtree(world)
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"
