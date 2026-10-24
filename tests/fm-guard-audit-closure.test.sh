@@ -115,13 +115,18 @@ pass "G-01 one liveness owner, and the Claude repair line is a command"
 # --- G-04/G-05/G-06: Firstmate cuts are real -----------------------------
 # Read the retired ids from the changelog rather than naming one here: the
 # reference check forbids a retired id in tracked code, and this proof file is
-# tracked code, so the assertion has to be data-driven.
+# tracked code, so the assertion has to be data-driven. A line that names the
+# retirement test's own path names that test, not the guard, so the path is
+# masked before the id is matched, as the reference check does.
 retired_live=''
-for retired_id in $(jq -r '.[].id' "$ROOT/docs/guards/retired.json"); do
-  if grep -rqsF -- "$retired_id" "$ROOT/bin"; then
-    retired_live="$retired_live $retired_id"
-  fi
-done
+while IFS=$'\t' read -r retired_id retired_test; do
+  while IFS= read -r line; do
+    if [[ ${line//"$retired_test"/} == *"$retired_id"* ]]; then
+      retired_live="$retired_live $retired_id"
+      break
+    fi
+  done < <(grep -rhsF -- "$retired_id" "$ROOT/bin")
+done < <(jq -r '.[] | [.id, (.retirement_test // "")] | @tsv' "$ROOT/docs/guards/retired.json")
 [ -z "$retired_live" ] || fail "retired guard ids still appear in bin/:$retired_live"
 pass "G-04 every retired guard is absent from bin/ and the advisory cut is recorded"
 
