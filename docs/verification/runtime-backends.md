@@ -36,12 +36,13 @@ The task audit succeeds without changing seeded shared legacy history, while ano
 `bash tests/fm-jev-guard-audit.test.sh` passed 21 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
 The settle case runs the launch `fm-spawn.sh` delivers for omp and Claude with a stand-in harness: the primary-checkout write is refused, the own status append succeeds, `TMPDIR` is the task temp root and `FM_WRITE_CONFINEMENT` is `seatbelt-v1`.
 No checked-in test starts a real harness session.
-A one-time measurement on 2026-10-24 ran one real Claude Code session (`haiku` through the TeamClaude launcher) and one real omp session (`openai-codex/gpt-6-luna`) under the generated profiles.
+One-time measurements on 2026-10-24 ran real sessions of Claude Code 2.1.310 (`haiku` through the TeamClaude launcher) and omp (`openai-codex/gpt-6-luna`) under the generated profiles; the task's private record is `data/fm-jev-guard-t5-os-write-confinement/n2-measurement.md` in the owning home, beside the exact profiles and raw session outputs.
 omp's shell, read and edit tools completed with `agent/settings.json` and `agent/memories/` protected.
-Claude's Bash, Read and Edit tools completed with `shell-snapshots/` and `session-env/` protected, and its temp directory matched the builder's derived slug.
-Every Claude `SessionStart` hook failed with `EPERM` creating `session-env/<session-id>`, and the build exposed no to-do tool in print mode, so the to-do path was not exercised.
-The unified log recorded no Seatbelt denial even for a deliberate refused write, so denials were read from tool results, hook output and error strings.
-The measurement is not recorded as a passing confinement case while the `SessionStart` denial awaits a decision.
+A first Claude session without a fixed session id completed Bash, Read and Edit, but every `SessionStart` hook failed with `EPERM` creating `session-env/<session-id>`.
+A second Claude session launched with `--session-id` under the session-scoped profile ran all four `SessionStart` hooks successfully and completed Bash, Read and Edit, with `shell-snapshots/` and every other session's entries protected.
+Its transcript and temp directories used the builder's derived slug.
+Neither Claude session had a to-do tool in print mode or wrote `todos/`, so `todos/` carries no grant.
+The unified log recorded no Seatbelt denial even for a deliberate refused write, so denials were read from tool results, hook output and error strings; a denial a harness swallows silently would not be seen.
 Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
 
 ## Pool-only cleanup critical sections

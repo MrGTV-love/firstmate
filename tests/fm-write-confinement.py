@@ -3,11 +3,14 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 
 GIT_ENV = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
+# The confined Claude worker's own session, and another session in the same home.
+OWN_SESSION, OTHER_SESSION = "11111111-2222-4333-8444-555555555555", "99999999-8888-4777-8666-555555555555"
 # The gate hooks no-mistakes installs, verbatim except NM_BIN, which names a
 # model-free stand-in for the daemon client so no real daemon is contacted.
 PRE_RECEIVE = r'''#!/bin/sh
@@ -405,23 +408,28 @@ def fixture(repo, base, harness, user_home, other):
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
                "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
                "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees"}
+    slug = re.sub(r"[^A-Za-z0-9]", "-", str(worktree))
     claude_code = (".claude/CLAUDE.md", ".claude/rules/rule.md", ".claude/agents/agent.md", ".claude/commands/command.md",
                    ".claude/skills/skill/SKILL.md", ".claude/plugins/plugin.json", ".claude/hooks/hook.sh", ".claude/settings.json",
                    ".claude/settings.local.json", ".claude/.credentials.json", ".claude/projects/p/memory/MEMORY.md", ".claude/statusline.sh",
-                   ".claude/shell-snapshots/snapshot-zsh.sh", ".claude/session-env/session/hook.sh")
+                   ".claude/shell-snapshots/snapshot-zsh.sh", ".claude/session-env/session/hook.sh",
+                   f".claude/session-env/{OTHER_SESSION}/hook.sh", f".claude/file-history/{OTHER_SESSION}/backup",
+                   f".claude/todos/{OWN_SESSION}-agent-{OWN_SESSION}.json", f".claude/projects/{slug}/{OTHER_SESSION}.jsonl",
+                   ".claude/projects/p/session.jsonl")
     omp_code = (".omp/agent/config.yml", ".omp/agent/models.yml", ".omp/agent/auth.json", ".omp/agent/.env",
                 ".omp/agent/extensions/extension.ts", ".omp/agent/settings.json", ".omp/agent/managed-skills/skill.md",
                 ".omp/agent/memories/memory.md", ".omp/plugins/plugin.ts", ".omp/run/daemons/0000000000000000/broker.pid")
     for name in claude_code + omp_code + (".codex/config.toml", ".dsh/config"):
         write(user_home / name)
     protected.update({"codex-home": user_home / ".codex/config.toml", "dsh-home": user_home / ".dsh/config"})
-    protected.update({"harness" + name.replace("/", "-"): user_home / name for name in claude_code + omp_code})
+    protected.update({"harness" + name.replace(slug, "own-project").replace("/", "-"): user_home / name for name in claude_code + omp_code})
     writable_paths = {"tool-cache": user_home / ".cache/fm-test-slots/probe", "own-home-tmp": user_tmp / "fm-task-probe/file"}
     if harness == "claude":
-        writable_paths.update({"claude-transcript": user_home / ".claude/projects/p/session.jsonl",
+        writable_paths.update({"claude-transcript": user_home / f".claude/projects/{slug}/{OWN_SESSION}.jsonl",
+                               "claude-transcript-sidecar": user_home / f".claude/projects/{slug}/{OWN_SESSION}/subagents/agent.jsonl",
+                               "claude-session-env": user_home / f".claude/session-env/{OWN_SESSION}/hook.sh",
                                "claude-json": user_home / ".claude.json", "claude-json-backup": user_home / ".claude/backups/.claude.json.backup.1",
-                               "claude-todos": user_home / ".claude/todos/session-agent.json",
-                               "claude-file-history": user_home / ".claude/file-history/session/backup",
+                               "claude-file-history": user_home / f".claude/file-history/{OWN_SESSION}/backup",
                                "claude-history": user_home / ".claude/history.jsonl",
                                "claude-statsig": user_home / ".claude/statsig/cache", "claude-debug": user_home / ".claude/debug/session.txt"})
     else:
@@ -443,6 +451,8 @@ def build_profile(repo, manifest, harness, profile, env):
                "--home", str(home), "--config", str(home / "config"), "--projects", str(home / "projects"),
                "--data", str(home / "data/task"), "--state", str(home / "state"), "--task", "task", "--branch", "fm/task",
                "--harness", harness, "--protect", manifest["other_home"], "--profile", str(profile)]
+    if harness == "claude":
+        command += ["--claude-session", OWN_SESSION]
     subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"]), check=True)
 
 

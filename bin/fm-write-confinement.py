@@ -5,6 +5,7 @@ Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
        --projects DIR --data DIR --state DIR --task ID
        --harness {omp,claude} --profile FILE
        [--agent-dir DIR] [--branch NAME] [--protect DIR ...]
+       [--claude-session UUID]
 
 Writes are allowed by default; the profile denies writes to named protected
 assets: project primary checkouts, other task worktrees, other tasks' state
@@ -77,6 +78,12 @@ def task_ids(state):
     return [path.name[:-5] for path in Path(state).glob("*.meta") if re.fullmatch(TASK_ID, path.name[:-5])]
 
 
+def slugs(worktree, given):
+    # Claude names its per-project temp and transcript directories after the
+    # working directory, with every non-alphanumeric character replaced.
+    return sorted({re.sub(r"[^A-Za-z0-9]", "-", path) for path in (worktree, os.path.abspath(given))})
+
+
 def child_dirs(root, keep):
     return [canonical(path) for path in Path(root).iterdir() if path.is_dir() and canonical(path) not in keep] if Path(root).is_dir() else []
 
@@ -145,8 +152,19 @@ def build(args):
     else:
         claude = canonical(args.agent_dir or os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude")
         deny.append(claude)
+        # Session-owned runtime state is granted for this worker's own session
+        # id only, so other sessions' transcripts, edit backups and hook
+        # environments stay protected.
+        session = args.claude_session or ""
+        if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", session):
+            raise ValueError("a confined Claude worker needs its lowercase --claude-session UUID")
         runtime += [under(claude, r"\.claude\.json(\..+)?"), under(claude, r"history\.jsonl")]
-        runtime += [f"(subpath {quoted(claude + '/' + name)})" for name in ("backups", "projects", "todos", "file-history", "statsig", "debug")]
+        runtime += [f"(subpath {quoted(claude + '/' + name)})"
+                    for name in ("backups", "statsig", "debug", "session-env/" + session, "file-history/" + session)]
+        for slug in slugs(worktree, args.worktree):
+            project = claude + "/projects/" + slug
+            runtime += [f"(literal {quoted(project)})", f"(literal {quoted(project + '/' + session + '.jsonl')})",
+                        f"(subpath {quoted(project + '/' + session)})"]
         # Default Claude stores config beside, not inside, its .claude directory.
         if not (args.agent_dir or os.environ.get("CLAUDE_CONFIG_DIR")):
             runtime.append(f"(literal {quoted(home + '/.claude.json')})")
@@ -180,7 +198,7 @@ def build(args):
     # Claude's shared per-user temp root holds one directory per session
     # working directory; only this worker's own directory stays writable.
     claude_tmp = tmp + "/claude-" + str(os.getuid())
-    own_slugs = {claude_tmp + "/" + re.sub(r"[^A-Za-z0-9]", "-", path) for path in (worktree, os.path.abspath(args.worktree))}
+    own_slugs = {claude_tmp + "/" + slug for slug in slugs(worktree, args.worktree)}
     claude_children = child_dirs(claude_tmp, own_slugs)
     lines.append("(deny file-write* " + under(claude_tmp, "[^/]+/.*") + ")")
     # An entry carrying this task's id stays its own even when a shorter
@@ -224,6 +242,7 @@ def main():
     parser.add_argument("--harness", choices=("omp", "claude"), required=True)
     parser.add_argument("--agent-dir")
     parser.add_argument("--branch", default="")
+    parser.add_argument("--claude-session")
     parser.add_argument("--protect", action="append", default=[])
     args = parser.parse_args()
     try:
