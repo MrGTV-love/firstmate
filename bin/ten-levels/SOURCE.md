@@ -65,7 +65,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
-- `bin/fm-jev-deletions.ts` owns the deterministic brief-named deletion admission shared by omp and Claude, its mandatory task-local audit, and the firstmate-side publisher used by `bin/fm-jev-deletions.sh` and initial spawn.
+- `bin/fm-jev-deletions.ts` owns the deterministic brief-named deletion admission and invalid-declaration refusal shared by omp and Claude, its mandatory task-local audit, and the firstmate-side publisher used by `bin/fm-jev-deletions.sh` and initial spawn.
   The [operator contract](../../docs/configuration.md#brief-named-file-deletion-allowance) owns the literal-shell grammar, HEAD/file/path checks, live update/revocation route, digest format and same-user consistency-only limit; a worker can deliberately forge both list and digest.
   The upstream shell questions, thresholds and `bash-gate.ts` remain unchanged.
 - `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.

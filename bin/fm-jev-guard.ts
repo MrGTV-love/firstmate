@@ -415,6 +415,10 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       if (typeof input.command !== "string") throw new GuardUnavailableError("InvalidToolInputError");
       const deletion = authorizedDeletion(input.command, ctx.cwd, c);
       if (deletion) {
+        if ("invalid" in deletion) {
+          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
+            "the declared authorized-deletion list is missing, unreadable or inconsistent");
+        }
         try {
           recordDeletion(c, deletion);
         } catch {

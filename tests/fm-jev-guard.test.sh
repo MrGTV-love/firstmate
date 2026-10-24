@@ -1420,7 +1420,10 @@ const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
 const publish = () => execFileSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
   env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_DATA_OVERRIDE: `${home}/data` }, encoding: 'utf8',
 });
-for (const call of [omp, claude]) assert.equal(await call('rm -rf listed.txt'), true, 'no list keeps the existing refusal');
+for (const call of [omp, claude]) {
+  assert.equal(await call('rm -rf listed.txt'), true, 'no list keeps the existing refusal');
+  assert.equal(await call('rm -f listed.txt'), false, 'without a declaration an allow answer still passes');
+}
 // Spawn uses this exact prepare operation under its metadata transaction.
 writeFileSync(`${data}/brief.md`, brief(listed));
 const preparedDigest = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', `${bin}/fm-jev-deletions.ts`,
@@ -1437,6 +1440,18 @@ const originalList = readFileSync(listPath);
 const originalMeta = readFileSync(metaPath);
 const digest = createHash('sha256').update(originalList).digest('hex');
 for (const [host, call] of [['omp', omp], ['claude', claude]]) {
+  const locallyDenied = async reason => {
+    const before = requests();
+    // The fixture would ALLOW this spelling if it ever reached Jev.
+    assert.equal(await call('rm -f listed.txt'), true, `${host}: ${reason}`);
+    assert.equal(requests(), before, 'invalid declared authorization must deny before an allow-answer judge');
+    const row = JSON.parse(readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+    assert.equal(row.branch, 'deterministic');
+    assert.equal(row.request_started, false);
+  };
+  const beforeFallback = requests();
+  assert.equal(await call('rm -f unlisted.txt'), false, 'a valid list does not change ordinary judgment of unlisted files');
+  assert.notEqual(requests(), beforeFallback);
   for (const command of ['rm -rf -- listed.txt', "rm -rf 'plain space.txt'", `/bin/rm -rf ${worktree}/listed.txt`]) {
     restore();
     const before = requests();
@@ -1462,15 +1477,21 @@ for (const [host, call] of [['omp', omp], ['claude', claude]]) {
   assert.equal(await call('rm -rf listed.txt', `${worktree}/nested`), false, 'nested cwd resolves to the listed nested file');
   writeFileSync(listPath, originalList.toString().replace('listed.txt', 'unlisted.txt'));
   assert.equal(await call('rm -rf unlisted.txt'), true, 'list edited without matching digest is refused');
+  await locallyDenied('changed list without matching digest');
   writeFileSync(listPath, originalList);
   renameSync(listPath, `${listPath}.saved`);
-  assert.equal(await call('rm -rf listed.txt'), true, 'missing list is refused');
+  await locallyDenied('missing declared list');
   mkdirSync(listPath);
-  assert.equal(await call('rm -rf listed.txt'), true, 'unreadable list is refused');
+  await locallyDenied('unreadable declared list');
   execFileSync('rmdir', [listPath]);
   renameSync(`${listPath}.saved`, listPath);
   writeFileSync(metaPath, `worktree=${worktree}\n`);
-  assert.equal(await call('rm -rf listed.txt'), true, 'missing digest is refused');
+  await locallyDenied('snapshot without digest');
+  const malformed = '{';
+  writeFileSync(listPath, malformed);
+  writeFileSync(metaPath, `worktree=${worktree}\njev_deletions_sha256=${createHash('sha256').update(malformed).digest('hex')}\n`);
+  await locallyDenied('malformed declared list with matching digest');
+  writeFileSync(listPath, originalList);
   writeFileSync(metaPath, originalMeta);
   unlinkSync(`${worktree}/listed.txt`);
   symlinkSync(`${home}/outside.txt`, `${worktree}/listed.txt`);

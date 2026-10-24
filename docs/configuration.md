@@ -2495,7 +2495,8 @@ Both hosts reread the list and digest for each candidate deletion, so live addit
 An omp worker already using older guard code must load this implementation through an authorized relaunch before it can consume a new list; Claude's command hook loads the shared code each call.
 
 The publisher writes `state/<task>.authorized-deletions.json` and its SHA-256 as `jev_deletions_sha256` in `state/<task>.meta`, binding the snapshot to the task and canonical worktree.
-Missing, unreadable, malformed or mismatched records grant no allowance, including during the two-file publication window.
+Once either a snapshot or metadata digest declares deletion authorization, a missing, unreadable, malformed or mismatched pair blocks candidate literal `rm` calls locally, without asking Jev, including during the two-file publication window.
+Tasks with neither a snapshot nor a digest declaration retain ordinary shell screening; a valid list also leaves non-applicable commands and unlisted operands under that existing screening.
 The list and its digest are firstmate-written; a worker running as the same OS user could forge both, so this guards against mistakes, not deliberate forgery.
 It is not producer authentication, an OS permission boundary, or a filesystem/process sandbox.
 Path and `HEAD` checks happen immediately before admission, not atomically with shell execution; concurrent filesystem or Git changes can invalidate that observation.
