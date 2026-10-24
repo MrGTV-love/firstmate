@@ -312,7 +312,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         cost,
         chunks, planned_chunks: plannedChunks, answers,
         ...(terminal.producer_fields ? { producer_fields: terminal.producer_fields } : {}),
-
       };
       try {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });

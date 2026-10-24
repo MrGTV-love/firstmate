@@ -18,6 +18,7 @@
 #   - report mode exits 0 while still printing the violation
 #   - new-or-touched mode ignores an untouched offending guard
 #   - a retired guard that is still registered fails
+#   - --counts excludes active and retired guards marked beyond_audit
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -165,6 +166,22 @@ JSON
 assert_clean "a retired guard with a live retirement test is clean" "$RETIRED"
 mutate "$RETIRED" '.guards += [(.guards[0] | .id = "gone-guard" | .invariant = "a retired invariant")]'
 assert_fails_with "a retired guard that is still registered fails" "$RETIRED" R1
+
+# --- audited inventory ------------------------------------------------------
+COUNTS=$(fixture counts)
+mutate "$COUNTS" '.guards += [(.guards[0] | .id = "late-guard" | .invariant = "a post-audit invariant")]'
+cat >"$COUNTS/docs/guards/retired.json" <<'JSON'
+[{"id":"late-gone","system":"firstmate","invariant":"a post-audit retired invariant","retired":"2026-10-24",
+  "why":"it was never in the audit","replaced_by":"nothing","retirement_test":"tests/gguard.test.sh"}]
+JSON
+out=$(run_lint "$COUNTS" --counts) && fail "unmarked post-audit guards must break the audited inventory"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 inventory' || fail "expected the inventory violation, got: $out"
+mutate "$COUNTS" '.guards[1].beyond_audit = true'
+jq '.[0].beyond_audit = true' "$COUNTS/docs/guards/retired.json" >"$COUNTS/retired.tmp" && mv "$COUNTS/retired.tmp" "$COUNTS/docs/guards/retired.json"
+out=$(run_lint "$COUNTS" --counts) || fail "marked post-audit guards must keep the audited inventory: $out"
+printf '%s\n' "$out" | grep -q 'active=2 active_beyond_audit=1 retired=1 beyond_audit=1 excluded=0 unregistered=0 audited=1' \
+  || fail "inventory did not exclude post-audit guards: $out"
+pass "post-audit active and retired guards marked beyond_audit stay outside the audited inventory"
 
 # --- ratchet ----------------------------------------------------------------
 ALLOW=$(fixture allowlist)

@@ -280,11 +280,14 @@ if [ "$COUNTS" -eq 1 ]; then
   retired_n=$(jq -r 'length' "$RETIRED" 2>/dev/null || echo 0)
   excluded_n=$(jq -r '(.excluded // []) | length' "$REGISTRY")
   unregistered_n=$(jq -r '(.unregistered_ids // []) | length' "$REGISTRY")
-  beyond_n=$(jq -r '(.beyond_audit_retired // []) | length' "$REGISTRY")
-  total=$((active + retired_n - beyond_n + excluded_n + unregistered_n))
+  # A guard added or retired after the audit carries beyond_audit: true and is
+  # outside the audited population.
+  active_beyond_n=$(jq -r '[.guards[] | select(.beyond_audit == true)] | length' "$REGISTRY")
+  beyond_n=$(jq -r '[.[] | select(.beyond_audit == true)] | length' "$RETIRED" 2>/dev/null || echo 0)
+  total=$((active - active_beyond_n + retired_n - beyond_n + excluded_n + unregistered_n))
   [ "$total" -eq "$audited" ] \
-    || violation R1 "inventory" "active($active) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) + unregistered($unregistered_n) = $total, audited=$audited"
-  info inventory "active=$active retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$unregistered_n audited=$audited"
+    || violation R1 "inventory" "active($active, $active_beyond_n beyond the audit) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) + unregistered($unregistered_n) = $total, audited=$audited"
+  info inventory "active=$active active_beyond_audit=$active_beyond_n retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$unregistered_n audited=$audited"
 fi
 
 # --------------------------------------------------------------- ratchet gate
