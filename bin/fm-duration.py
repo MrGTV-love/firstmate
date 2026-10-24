@@ -599,7 +599,11 @@ def ps_table():
 
 @functools.lru_cache(maxsize=1)
 def darwin_cpu_reader():
-    """Native CPU including waited children; macOS ps -S can omit that CPU."""
+    """Native CPU including waited children; macOS ps -S can omit that CPU.
+
+    Each process total is truncated to ps's 0.01 s step, the resolution /proc
+    clock ticks also report, so idle timer wakeups are judged as on other hosts.
+    """
     import ctypes
 
     class Usage(ctypes.Structure):
@@ -617,14 +621,14 @@ def darwin_cpu_reader():
     timebase = Timebase()
     if ctypes.sizeof(Usage) != 144 or libc.mach_timebase_info(ctypes.byref(timebase)) or not timebase.denom:
         raise ValueError('cannot read Darwin CPU accounting ABI/timebase')
-    seconds_per_tick = timebase.numer / timebase.denom / 1_000_000_000
 
     def read_cpu(pid):
         usage = Usage()
         if libc.proc_pid_rusage(pid, 1, ctypes.byref(usage)):
             return None
         # ri_user_time, ri_system_time, ri_child_user_time, ri_child_system_time.
-        return sum(usage.counters[index] for index in (0, 1, 10, 11)) * seconds_per_tick
+        nanoseconds = sum(usage.counters[index] for index in (0, 1, 10, 11)) * timebase.numer // timebase.denom
+        return nanoseconds // 10_000_000 / 100
 
     return read_cpu
 

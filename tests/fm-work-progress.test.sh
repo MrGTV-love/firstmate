@@ -496,6 +496,44 @@ def proc_sampler():
                 f'{runner}: missing one loud platform warning: {result.stderr}')
 case('proc_only_sampler_cuts_still_keeps_growing_and_warns_when_blind', proc_sampler)
 
+def host_sampler_run(name, runner, sampler, program):
+    home, env = fixture(f'host-{runner}-{sampler}-{name}')
+    if sampler == 'ps':
+        env['FM_PROC_ROOT_OVERRIDE'] = str(home / 'no-proc')
+    if runner == 'python':
+        command = [sys.executable, home / 'bin/fm-duration.py', 'keep-going', '1', '--', *program]
+    else:
+        tools = home / 'no-python'
+        tools.mkdir()
+        for tool in ('bash', 'perl', 'ps', 'dirname'):
+            (tools / tool).symlink_to(shutil.which(tool))
+        env['PATH'] = str(tools)
+        command = ['bash', '-c', '. "$1"; shift; command -v python3 && exit 99; fm_run_progress 1 "$@"',
+                   '_', home / 'bin/fm-timeout-lib.sh', *program]
+    child = subprocess.Popen(list(map(str, command)), env=env, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True)
+    try:
+        stdout, stderr = child.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        child.terminate()
+        child.communicate(timeout=10)
+        raise AssertionError(f'{runner}/{sampler}: {name} was still running after 30s')
+    return child.returncode, stdout, stderr
+
+def host_samplers():
+    # Each real host sampler (/proc or native Darwin by default, ps when /proc
+    # is hidden) judges CPU at the same 0.01 s resolution.
+    poll = [sys.executable, '-c', 'import time\nwhile True: time.sleep(0.05)']
+    burst = ['bash', '-c', '"$1" -c "$2"; sleep 0.5; echo completed', '_', sys.executable, busy]
+    for runner in ('python', 'perl'):
+        for sampler in ('host', 'ps'):
+            code, _, stderr = host_sampler_run('poll', runner, sampler, poll)
+            require(code == 124, f'{runner}/{sampler}: a timed-poll idle process was not stopped: {code} {stderr}')
+            code, stdout, stderr = host_sampler_run('burst', runner, sampler, burst)
+            require(code == 0 and stdout == 'completed\n',
+                    f'{runner}/{sampler}: a reaped CPU burst was stopped: {code} {stdout} {stderr}')
+case('host_samplers_stop_timed_poll_idle_and_keep_reaped_cpu_burst', host_samplers)
+
 import select
 
 def holder_fixture(name, stale, program='while True: sum(i*i for i in range(1000))'):
