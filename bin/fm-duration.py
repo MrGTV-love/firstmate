@@ -20,10 +20,11 @@ Each nested runner keeps its own bound, so a hung inner read is stopped by its
 own owner and an outer owner sees an inner sampler's CPU only until then.
 Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
 (/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps (with libproc CPU
-on Darwin, whose ps omits waited-child time). Where a confined worker's sandbox
-refuses to execute setuid ps, the process table, the process-group check
-behind a Darwin EPERM group signal and a slot holder's start time come from
-bin/fm-proc-info.py instead. Without a complete sample,
+on Darwin, whose ps omits waited-child time). A failed native root read makes
+the sample blind; only non-root members may fall back to ps CPU. Where a
+confined worker's sandbox refuses to execute setuid ps, the process table, the
+process-group check behind a Darwin EPERM group signal and a slot holder's
+start time come from bin/fm-proc-info.py instead. Without a complete sample,
 including unavailable native imports, one cpu_telemetry_unavailable line names
 the platform and nothing is stopped for inactivity: a missing sample is neither
 progress nor a stall.
@@ -680,6 +681,8 @@ def tree_cpu(pid, observed):
         if child in table:
             _, seconds, identity, running = table[child]
             native = None if native_cpu is None else native_cpu(child)
+            if child == pid and native_cpu is not None and native is None:
+                return None, False  # ps omits the root's waited-child CPU on Darwin.
             if native is not None:
                 seconds = native
             runnable = runnable or running
