@@ -2494,7 +2494,7 @@ omp and Claude tool results reach the worker unchanged: the guard installs no re
 There is no result size budget or result-dependent read exemption.
 Launch and steering records use the existing [launch publisher](../bin/fm-operational-input.sh) and [steering-inbox owner](../bin/fm-task-inbox-lib.sh); they publish only the record bytes, with no guard receipt, and their delivery and acknowledgement contracts are unchanged.
 The steering carrier names the exact record, acknowledgement ordering and omp `:raw` hint in under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
-[`tests/fm-jev-guard-producer.test.sh`](../tests/fm-jev-guard-producer.test.sh) covers unchanged background notices, recorded bounded-wait help, launch/steering records and result-free session accounting offline.
+The removed result screen and the result-only decision points retired with it are recorded in [`docs/guards/retired.json`](guards/retired.json); their retirement test covers unchanged background notices, recorded bounded-wait help, launch/steering records and result-free session accounting offline.
 
 The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
@@ -2588,7 +2588,7 @@ A row that holds a provider answer keeps the client's own `attempts` and `ms`, w
 A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer, separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
 Its usage totals every answered piece, its attempts include every answered piece and every unanswered piece whose request started, and `ms` is the longest elapsed time because pieces run concurrently.
 The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.
-A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning, an invalid request shape) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
+A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
 When every planned piece answered, one answer carries its own reported or estimated charge, and several answers sum to a reported charge only when every one of them reported its cost, otherwise unknown.
 Once a request has started, a planned piece that did not answer, whether it failed or was never sent, makes the total unknown with `incomplete: true`.
 A payload for which no request was sent records `not_called` and is not incomplete, because nothing was billed.

@@ -485,7 +485,7 @@ assert.equal((await inactive.tool_call({ toolName: 'write', input: { path: '/etc
 const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
 const sent = () => requests().trim().split('\n').filter(Boolean).length;
 const beforeReset = sent();
-const reset = await handlers.tool_call({ toolName: 'bash', input: { command: 'deploy socket-reset' } }, ctx);
+const reset = await handlers.tool_call({ toolName: 'write', input: { path: 'src/reset.txt', content: 'socket-reset' } }, ctx);
 assert.equal(reset.block, true, 'a network failure on every try requires review');
 assert.equal(row().error_type, 'TypeError');
 assert.equal(row().request_started, true);
@@ -591,26 +591,23 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
-function install(task, host) {
+function install(task) {
   const handlers = {};
-  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task, host, worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task, worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
   return handlers;
 }
-const claude = install('deadline', 'claude');
-const omp = install('deadline-omp', 'omp');
-// Both hosts retain the 330-second pre-tool envelope above the 300-second service budget.
-async function beforeHostDeadline(handlers, name, event, limitMs) {
+const handlers = install('deadline');
+// A 330-second test limit stands in for the configured host deadline above the 300-second service budget.
+async function beforeHostDeadline(event, limitMs) {
   let timer;
   try {
-    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${limitMs} ms host deadline exceeded`)), limitMs); })]);
+    return await Promise.race([handlers.tool_call(event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${limitMs} ms host deadline exceeded`)), limitMs); })]);
   } finally { clearTimeout(timer); }
 }
 const started = performance.now();
-const [slowCall, pre, ompSlowCall, ompPre] = await Promise.all([
-  beforeHostDeadline(claude, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'late-answer' } }, 330000),
-  beforeHostDeadline(claude, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'stall-direct' } }, 330000),
-  beforeHostDeadline(omp, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'late-answer' } }, 330000),
-  beforeHostDeadline(omp, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'stall-direct' } }, 330000),
+const [slowCall, pre] = await Promise.all([
+  beforeHostDeadline({ toolName: 'write', input: { path: 'src/deadline.txt', content: 'late-answer' } }, 330000),
+  beforeHostDeadline({ toolName: 'write', input: { path: 'src/deadline.txt', content: 'stall-direct' } }, 330000),
 ]);
 assert.equal(slowCall, undefined, 'a judge answer arriving after 30 seconds must allow the call');
 assert.equal(pre.block, true);
@@ -630,17 +627,6 @@ for (const row of stalled) {
   assert.ok(row.ms >= 270000 && row.ms < 300000, `three 90-second tries and backoff stay inside the decision budget: ${row.ms}`);
 }
 assert.ok(performance.now() - started >= 270000, 'outage cannot be reported at the old latency deadline');
-
-assert.equal(ompSlowCall, undefined, 'omp pre-tool waits for a judge answer arriving after 30 seconds');
-assert.equal(ompPre.block, true);
-assert.match(ompPre.reason, /TimeoutError/);
-const ompRows = rows.filter(row => row.task === 'deadline-omp');
-const ompLate = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'policy');
-assert.equal(ompLate.error_type, null);
-assert.ok(ompLate.ms >= 30000, `omp pre-tool actually waited for the late answer: ${ompLate.ms}`);
-const ompPreRow = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'outage');
-assert.equal(ompPreRow.attempts, 3, 'omp pre-tool gives a dead judge all three full tries');
-assert.ok(ompPreRow.ms >= 270000 && ompPreRow.ms < 300000, `omp pre-tool row time ${ompPreRow.ms}`);
 console.log('deadlines-ok');
 JS
 ) || fail "handler deadlines: $out"

@@ -37,7 +37,8 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
 ## Changed copies: Level 6 policies and service
 
 - `src/levels/level06/index.ts` exports only the write policy.
-  The unchanged vendored `src/levels/level06/result-screen.ts` is unused: no import or call loads it.
+  `src/levels/level06/result-screen.ts` is unchanged by this ship and unused: no import or call loads it.
+  Its Firstmate changes from upstream remain: a frozen, calibrated injection Noul, the canonical contract error on invalid answers, no invented probability for empty output, complete-text instead of prefix-only screening, and the shared `Decide` type imported from `write-gate.ts`.
   Follow-up task `fm-jev-guard-delete-unused-result-screen` deletes it; ship T2 already removed the bash model gate.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment, names the existing secrets-file threshold and owns the shared `Decide` and `GateDecision` types without changing valid write questions or threshold behavior.
 - `tests/level06.test.ts` exercises write threshold boundaries and outside-root refusal.

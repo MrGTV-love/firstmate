@@ -707,6 +707,31 @@
       "point": "D8 Outage admissions",
       "evidence": "data/fm-jev-guard-e2e/report.md",
       "reason": "never registered: an outage exemption inside the audited jev-pretool-deny guard, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D4 Result screen",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "never registered: the omp result screen, which the 2026-10-22 audit never counted, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D5 Trusted read",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "never registered: an exemption that served only the omp result screen, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D6 Channel consistency",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "never registered: a consistency exemption that served only the omp result screen, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D7 Producer-field exclusion",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "never registered: a help-line exclusion that served only the omp result screen, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D9 Size refusal, result half",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "never registered: the result half of the size refusal, which served only the omp result screen while the pre-tool size refusal stays, so its retirement record adds to the audited population"
     }
   ]
 }
