@@ -187,8 +187,11 @@ else:
     script(home / 'bin/fm-watch-arm.sh', 'exec python3 -c ' + __import__('shlex').quote(source) + '\n')
     env.update(FM_ARM_CONFIRM_TIMEOUT='1', FM_TEST_SUCCESSOR_MODE=mode)
     try:
+        # The trailing exit keeps bash 5.1+ from exec-ing the hook in place of
+        # the fake Claude, which would remove the harness from its ancestry.
         result = subprocess.run([str(fakeclaude), '-c',
-            'printf "%s\\n" "$$" > "$FM_HOME/state/.lock"; "$FM_HOME/bin/fm-claude-stop-autoarm.sh"'],
+            'printf "%s\\n" "$$" > "$FM_HOME/state/.lock"; "$FM_HOME/bin/fm-claude-stop-autoarm.sh"; '
+            'status=$?; exit "$status"'],
             env=env, input='{"session_id":"slow-successor","stop_hook_active":false}\n',
             capture_output=True, text=True)
         detail = f'rc={result.returncode} completed={(home / "successor-completed").exists()} ' + result.stdout + result.stderr
@@ -546,10 +549,18 @@ case('contender_refuses_a_proven_stalled_holder_that_survives_term', term_surviv
 def resumed_holder():
     # Proven idle when the arm samples it, then working again before the arm's
     # child samples: the child stands down and the arm attaches, not FAILED.
+    # The holder marks that its CPU advanced, and the child's real watcher waits
+    # for that mark, so the child always samples after the holder resumed.
     program = ('import glob, os, sys, time\nstate = os.path.join(sys.argv[1], "state")\n'
                'while not glob.glob(os.path.join(state, ".watch-arm-output.*")): time.sleep(0.2)\n'
+               'start = time.process_time()\n'
+               'while time.process_time() - start < 0.1: sum(i*i for i in range(1000))\n'
+               'open(os.path.join(sys.argv[1], "holder-resumed"), "w").close()\n'
                'while True: sum(i*i for i in range(1000))')
     home, env, holder, beat = holder_fixture('resumed-holder', True, program)
+    shutil.copy2(home / 'bin/fm-watch.sh', home / 'bin/fm-watch-real.sh')
+    script(home / 'bin/fm-watch.sh', 'for _ in $(seq 250); do [ -e "$FM_HOME/holder-resumed" ] && break; sleep 0.02; done\n'
+           'exec bash "$FM_HOME/bin/fm-watch-real.sh" "$@"\n')
     arm_process = None
     try:
         progress_check(home, env, holder.pid)
