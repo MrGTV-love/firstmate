@@ -13,6 +13,7 @@
 FM_SLOT_PROVISIONED=0
 FM_SLOT_MANIFEST=
 FM_SLOT_BASE_SHA=
+FM_SLOT_PREPARED_HEAD=
 FM_SLOT_PREVIOUS_BRANCH=
 FM_SLOT_PREVIOUS_HEAD=
 
@@ -74,6 +75,30 @@ fm_slot_restore_base() { # <copy>
   fi
 }
 
+fm_slot_resume_prepared() { # <project> <copy> <task-id> <branch> <prepared-head>
+  local project=$1 copy=$2 id=$3 branch=$4 expected=$5 actual
+  case "$expected" in
+    ''|*[!0-9a-f]*) echo 'error: refused slot has an invalid prepared commit identity' >&2; return 1 ;;
+  esac
+  { [ "${#expected}" -eq 40 ] || [ "${#expected}" -eq 64 ]; } || {
+    echo 'error: refused slot has an invalid prepared commit identity' >&2
+    return 1
+  }
+  git check-ref-format --branch "$branch" >/dev/null || return 1
+  actual=$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$branch^{commit}") || actual=
+  [ "$actual" = "$expected" ] || {
+    echo "error: prepared task branch $branch changed or is missing since provisioning refusal; preserving it" >&2
+    return 1
+  }
+  fm_slot_prepare_base "$project" "$copy" "$id" || return 1
+  git -C "$copy" checkout --quiet "$branch" -- || return 1
+  if [ "$(git -C "$copy" rev-parse --verify HEAD)" != "$expected" ]; then
+    fm_slot_restore_base "$copy" || true
+    echo "error: prepared task branch $branch moved during recovery; no worker admitted" >&2
+    return 1
+  fi
+}
+
 fm_slot_run_local() { # <project> <report> <provisioner> <arg>...
   local project=$1 report=$2
   shift 2
@@ -89,6 +114,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <o
   FM_SLOT_PROVISIONED=0
   FM_SLOT_MANIFEST=
   FM_SLOT_BASE_SHA=
+  FM_SLOT_PREPARED_HEAD=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
   [ -f "$copy/scripts/git-stability/provision_existing_slot.py" ] || {
@@ -113,6 +139,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <o
       git -C "$copy" checkout --quiet -b "$branch" -- || return 1
     fi
   fi
+  FM_SLOT_PREPARED_HEAD=$old_head
   local args=() path
   for path in "$@"; do args+=(--owned-path "$path"); done
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
