@@ -276,26 +276,33 @@ PORTABLE_SERIAL_SHARDS=21
 # below) bins.
 PORTABLE_PARALLEL_JOBS=3
 
-# How many of the scripts above the runner actually runs at full speed. Three
-# are in flight, but a four-vCPU runner saturates before that: the lane that
-# summed 33.5 minutes serially took 20 minutes three abreast, an effective
-# factor near two rather than three, and its per-script wall times rose to a
-# 57.9 minute sum. The makespan model packs min(jobs, this) bins rather than the
-# raw job count, because a model that assumed perfect scaling would pass while
-# the real lane ran a third over its own budget. Raising the job count past
-# this changes neither the model nor the guard.
-# measured: value=2 date=2026-10-22 host=github-ubuntu-26.04 margin=1.0 (lane 1: 33.5 min serial, 57.9 min summed at three abreast, 20 min wall; run 39757092565)
-PORTABLE_PARALLEL_EFFECTIVE_JOBS=2
+# How many of those scripts the makespan model packs at once. It now equals the
+# job count because the parallel hints hold each script's measured wall under
+# the real three-abreast schedule, so the model must not apply a second
+# contention factor. Before 2026-10-24 the hints were serial-era samples and
+# this value was two, standing in for a four-vCPU runner that saturates: the
+# lane that summed 33.5 minutes serially ran 20 minutes three abreast and its
+# per-script wall times rose to a 57.9 minute sum. Run 40121241146 measured the
+# same effect on today's mix - lane 1's three-abreast work summed 1.85 times
+# its serial-era hints (3453612 ms against 1864205 ms; per script 1.28 to
+# 2.30) - and the two-bin model under-predicted that lane's 1231 s wall by 24
+# percent. Packing the measured wall into the real
+# slot count models the memberships that ran at 1209767 ms and 779131 ms, each
+# about 1.7 percent under its 1231 s and 793 s wall.
+# measured: value=3 date=2026-10-24 host=github-ubuntu-26.04 margin=1.02 (run 40121241146: lanes ran 1231 s and 793 s at three jobs; the model predicts 1209767 ms and 779131 ms for those memberships from their measured per-script wall)
+PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 
 # Modeled makespan budget for one portable-parallel job. The guard compares this
-# with the modeled makespan, not with wall time, and the model reads about
-# sixteen percent below what the runner measured: the lane that finished in 20
-# minutes on the 26.04 image models at 1004772 ms. So 1200000 ms bounds a real
-# lane near 24 minutes, a fifth above the measured 20 minute lane, and a new
-# member or a slow path fails the coverage guard instead of quietly stretching
-# the workflow. Like the serial target this is packing arithmetic, not an
-# execution timeout.
-# measured: value=1200000 date=2026-10-22 host=github-ubuntu-26.04 margin=1.19 (the slowest parallel lane measured 20 minutes in run 39757092565 and models at 1004772 ms at two bins)
+# with the modeled makespan, not with wall time. Since the hints became
+# measured three-abreast wall the model reads close to reality: run 40121241146
+# measured lanes of 1231 s and 793 s where the model predicts 1209767 ms and
+# 779131 ms, each about 1.7 percent under. So 1200000 ms bounds a real lane near
+# 20.4 minutes, and a new member or a slow path fails the coverage guard instead
+# of quietly stretching the workflow. The lane 1 membership that ran modeled at
+# 1209767 ms, just above this budget, so two scripts moved to lane 2; the
+# rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone. Like the
+# serial target this is packing arithmetic, not an execution timeout.
+# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
 # Conservative balance hint for a portable-serial script with no measurement.
@@ -649,40 +656,40 @@ tests/fm-x-mode.test.sh
 EOF
 }
 
-# Per-script serial CI duration hints, one "<path> <ms>" per line, used to
+# Per-script three-abreast wall hints, one "<path> <ms>" per line, used to
 # pack only the two portable parallel lanes. Measurement provenance and the
 # refresh procedure are owned by docs/fm-test-portable-shards.md.
 portable_parallel_weight_hints() {
   cat <<'EOF'
-tests/fm-arm-pretool-check.test.sh 62853
-tests/fm-backend-herdr.test.sh 63003
-tests/fm-brief.test.sh 23750
-tests/fm-captain-hold-archive.test.sh 148345
-tests/fm-captain-hold-cleanup.test.sh 270094
-tests/fm-captain-hold-keyed-answers.test.sh 185475
-tests/fm-captain-hold-lifecycle.test.sh 277909
-tests/fm-captain-hold-reconcile.test.sh 268161
-tests/fm-captain-hold-sweep.test.sh 261144
-tests/fm-cd-pretool-check.test.sh 19990
-tests/fm-composer-ghost.test.sh 3649
-tests/fm-composer-lib.test.sh 192576
-tests/fm-crew-state.test.sh 116812
-tests/fm-ensure-agents-md.test.sh 1673
-tests/fm-grok-harness.test.sh 8934
-tests/fm-herdr-lab.test.sh 27489
-tests/fm-lint.test.sh 640000
-tests/fm-pi-primary-types.test.sh 2395
-tests/fm-pr-merge.test.sh 571000
-tests/fm-review-diff.test.sh 7665
-tests/fm-send-popup-settle.test.sh 8997
-tests/fm-send-settle.test.sh 3498
-tests/fm-send-strict.test.sh 6756
-tests/fm-spawn-batch.test.sh 5826
-tests/fm-supervision-instructions.test.sh 1773
-tests/fm-test-run.test.sh 515000
-tests/fm-tmux-submit-busy.test.sh 10242
-tests/fm-transition-lib.test.sh 613
-tests/fm-x-mode.test.sh 41640
+tests/fm-arm-pretool-check.test.sh 90611
+tests/fm-backend-herdr.test.sh 85564
+tests/fm-brief.test.sh 24726
+tests/fm-captain-hold-archive.test.sh 176384
+tests/fm-captain-hold-cleanup.test.sh 366226
+tests/fm-captain-hold-keyed-answers.test.sh 237586
+tests/fm-captain-hold-lifecycle.test.sh 492000
+tests/fm-captain-hold-reconcile.test.sh 463574
+tests/fm-captain-hold-sweep.test.sh 344893
+tests/fm-cd-pretool-check.test.sh 29155
+tests/fm-composer-ghost.test.sh 6552
+tests/fm-composer-lib.test.sh 257854
+tests/fm-crew-state.test.sh 268757
+tests/fm-ensure-agents-md.test.sh 2078
+tests/fm-grok-harness.test.sh 10027
+tests/fm-herdr-lab.test.sh 29438
+tests/fm-lint.test.sh 713491
+tests/fm-pi-primary-types.test.sh 3677
+tests/fm-pr-merge.test.sh 1117958
+tests/fm-review-diff.test.sh 12861
+tests/fm-send-popup-settle.test.sh 10405
+tests/fm-send-settle.test.sh 3052
+tests/fm-send-strict.test.sh 10132
+tests/fm-spawn-batch.test.sh 6239
+tests/fm-supervision-instructions.test.sh 2276
+tests/fm-test-run.test.sh 941010
+tests/fm-tmux-submit-busy.test.sh 15049
+tests/fm-transition-lib.test.sh 726
+tests/fm-x-mode.test.sh 43305
 EOF
 }
 
@@ -707,10 +714,8 @@ list_portable_parallel_1() {
   cat <<'EOF'
 tests/fm-pr-merge.test.sh
 tests/fm-test-run.test.sh
-tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-crew-state.test.sh
-tests/fm-arm-pretool-check.test.sh
 tests/fm-cd-pretool-check.test.sh
 tests/fm-tmux-submit-busy.test.sh
 tests/fm-review-diff.test.sh
@@ -725,11 +730,13 @@ EOF
 list_portable_parallel_2() {
   cat <<'EOF'
 tests/fm-lint.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-cleanup.test.sh
 tests/fm-captain-hold-sweep.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-archive.test.sh
+tests/fm-arm-pretool-check.test.sh
 tests/fm-backend-herdr.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
