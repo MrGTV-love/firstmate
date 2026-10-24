@@ -349,7 +349,9 @@
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
-#   300-second shell and write judgment budget (docs/configuration.md "Jev guard").
+#   300-second shell and write judgment budget (docs/configuration.md "Jev guard"),
+#   and disables omp URL reads so read and grep never fetch the web; web access
+#   needs a task egress grant for a web-classed tool.
 #   Workers also enable eager native account rotation without waiting for usage
 #   resets and receive a task-owned --config overlay permitting only declared
 #   OMP model fallbacks, with an empty default chain so ambient role chains
@@ -6122,7 +6124,7 @@ BUSY_GEN=
       # doorbell were retired because they could not withhold anything, so the
       # PostToolUse and UserPromptSubmit registrations are deliberately absent:
       # a registration that the adapter ignores is a dead guard, not coverage.
-      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
+      guard_entries="\"PreToolUse\":[{\"matcher\":\".*\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
     fi
     stop_entry=
     if [ "$KIND" = secondmate ] && grep -qF '.fm-busy-stop' "$WT/bin/fm-turnend-guard.sh" 2>/dev/null; then
@@ -6710,7 +6712,8 @@ preserve_relaunch_meta() {
     echo "projects=$SECONDMATE_PROJECTS"
   fi
   # Keep relaunch fields before the preserved PR block so monitoring can parse it;
-  # fm_pr_metadata_identity_parse owns the allowed fields following pr=.
+  # fm_pr_metadata_identity_parse owns the allowed fields following pr=, including
+  # a preserved egress= grant that Firstmate appended after the PR was recorded.
   if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
     echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"
   fi

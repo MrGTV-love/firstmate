@@ -249,7 +249,7 @@ test_claude_hooks_semantic_lifecycle() {
   done
   jq -e '.hooks.Stop | length == 1 and (.[0].hooks | length == 1 and .[0].timeout == 25)' \
     "$settings" >/dev/null || fail "Stop must have one combined command with its timeout"
-  jq -e '.hooks.PreToolUse[0].matcher == "^(Bash|Write|Edit)$"
+  jq -e '.hooks.PreToolUse[0].matcher == ".*"
     and (.hooks | has("PostToolUse") | not)' "$settings" >/dev/null \
     || fail "claude hook settings must register the PreToolUse guard without PostToolUse"
   out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \

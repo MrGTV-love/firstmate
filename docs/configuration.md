@@ -2456,18 +2456,63 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
-Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
+Claude's guard runs at the pre-tool boundary for every tool, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
-`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Bash|Write|Edit` only; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse`; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
 There is no legacy exemption, automatic compatibility, receipt backfill or automatic republication.
 Pre-receipt records and receipts for an older doorbell never gain the consistency exception.
 To enable the guard for an already-running legacy task, Main must manually reissue its pending messages through the existing current publisher and normal delivery, verify acknowledgement, and only then retire the old pending identity before an authorized fresh guarded launch.
 This is an operator-only migration, not an automated retrofit; isolated verification is not production activation.
+
+### Tool coverage and outbound calls
+
+[`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls and result screening.
+An unclassified tool is refused when it is called instead of silently skipping the guard; calls to classified tools do not depend on the rest of the host registry.
+The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry without submitting a model turn, and proves that adding an unclassified tool fails coverage.
+Optional host tools need not be installed for the offline regression; the installed-host portion explicitly skips when omp is absent.
+Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
+Other harnesses remain outside this guard integration.
+
+Native semantic `find`, web search, browser automation, subagent dispatch and provider-backed tools require a task egress grant before execution.
+`xd://report_issue` has no table row and no grant path: like every other unadmitted xd device it is refused by the [native-device rule](#model-policy), whatever the task grants.
+Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
+Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
+omp's `read`, `grep` and `ast-grep` would otherwise fetch URL paths, so the worker launch overlay [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) sets `fetch.enabled: false` and those calls fail with omp's own `URL reads are disabled by settings.` error; web access requires a `web` grant for a web-classed tool.
+The rule is deterministic and needs neither a model verdict nor a working provider credential.
+Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
+A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
+
+Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
+The recognized destination classes are `semantic-search`, `web`, `browser`, `provider`, `subagent`, `dynamic-code` and `remote-storage`.
+An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
+Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
+This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
+Each tool has at most one destination class, which must be granted; a grant never bypasses existing path, credential, shell or privacy checks.
+
+Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
+A native paid `find` records its deterministic decision even though it has no shell/write model classification.
+Local file `read` remains pre-tool unjudged, `bash` keeps shell screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
+This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
+The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
+That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
+omp's `python`, `debug` and `run_experiment` code runners have the same effect as `eval` and use the same confinement-owned classification.
+Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), `manage_skill` writes to its managed-skills directory, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
+A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
+`report_issue` and Claude `SendFeedback` upload reports, so they must never receive a `TOOL_POLICY` row and are refused under every grant; every other unclassified tool gets a row classified by its real effect.
+A coverage refusal names the refused host tool and states that no call was made.
+Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
+Claude `Monitor` and `PowerShell` run commands outside the screened `bash` path and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
+The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the existing plain-path guard.
+Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, timing and a session of the task id joined to the decided tool name or destination class, so an allow of another tool or class never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
+The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision emits no Firstmate event.
+
+### Model policy
 
 Questions and numeric policy are code-owned:
 
@@ -2527,7 +2572,7 @@ The shared guard blocks every other spelling without a Jev call because omp can 
 
 Admitted devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can still send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
-`xd://report_issue` remains blocked because it can upload reports; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
+`xd://report_issue` remains blocked because it can upload reports, and no egress grant admits it; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
 Device `edit` calls remain blocked, and every path-spelling refusal tells the agent to use a plain path and report if that is not possible.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
@@ -2610,7 +2655,7 @@ The command wrapper publishes only successful handler stdout, normalizes active 
 Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
 
 Other or absent project scopes and an omp worker's `--omp-no-helpers` posture are intentionally inactive/**no protection**, not inference outages.
-They perform no guard key lookup or provider request and retain deterministic path, root, native-device and edit-schema checks.
+They perform no guard key lookup or provider request and retain deterministic tool-coverage, egress-grant, path, root, native-device and edit-schema checks.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
