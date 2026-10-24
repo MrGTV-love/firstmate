@@ -1,0 +1,71 @@
+### world: 7 merged, pushed, clean copies, each locked by a dead Vernant launcher; default cap
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo                      fdf7a75 [main]
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c1 86484be [fm/c1] locked
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c2 2367bac [fm/c2] locked
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c3 fb8e175 [fm/c3] locked
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c4 fab1c39 [fm/c4] locked
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c5 593fce2 [fm/c5] locked
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c6 1447c99 [fm/c6] locked
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c7 0998510 [fm/c7] locked
+
+### run 1: fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=2
+DEFERRED	0.00 GiB	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c1	per-run cap: 5 locked release slots used; eligible next run
+DEFERRED	0.00 GiB	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c2	per-run cap: 5 locked release slots used; eligible next run
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c7	branch fm/c7 at 09985106388d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c6	branch fm/c6 at 1447c997cb71, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c5	branch fm/c5 at 593fce25888b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c4	branch fm/c4 at fab1c392a841, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c3	branch fm/c3 at fb8e175ec913, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=2
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=7 GiB=0.00 reaped=5 freed=0.00
+rc=0
+
+### after run 1: worktree list
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo                      fdf7a75 [main]
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c1 86484be [fm/c1] locked
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c2 2367bac [fm/c2] locked
+lock c1: vernant-session-active owner=launcher:21375 launcher=21375
+lock c2: vernant-session-active owner=launcher:21375 launcher=21375
+
+### run 2: fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c2	branch fm/c2 at 2367bac966a9, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c1	branch fm/c1 at 86484bed5d5b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.00 reaped=2 freed=0.00
+rc=0
+
+### after run 2: worktree list
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo fdf7a75 [main]
+
+### data/copy-sweep.log (one line per removal)
+2026-10-24T04:52:48Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c7	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo	head=09985106388d071b3e90f10b9a7986b60dcca0e4	branch=fm/c7	kib=36	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone
+2026-10-24T04:52:54Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c6	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo	head=1447c997cb71ea8478b3c3b7634f3d31c1b9f69f	branch=fm/c6	kib=32	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone
+2026-10-24T04:53:00Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c5	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo	head=593fce25888b153cfaad117517b2cd6b36bd88bb	branch=fm/c5	kib=28	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone
+2026-10-24T04:53:06Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c4	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo	head=fab1c392a8410c7504a7fa2f6ef07a3a73ba311a	branch=fm/c4	kib=24	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone
+2026-10-24T04:53:12Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c3	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo	head=fb8e175ec913056db2585118dcd123ef1f5c4cf8	branch=fm/c3	kib=20	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone
+2026-10-24T04:53:21Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c2	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo	head=2367bac966a95b7b41fd5e85f61f9a4ed4acad09	branch=fm/c2	kib=16	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone
+2026-10-24T04:53:28Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo/.claude/worktrees/c1	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s2/th/pool1/1/repo	head=86484bed5d5bd78e3a9d780a7a93c8ba831a9770	branch=fm/c1	kib=12	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21375 is gone

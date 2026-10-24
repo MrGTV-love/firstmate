@@ -1,0 +1,40 @@
+### FM_COPY_SWEEP_CASE=test_locked_release_cap_defers_copies_until_the_next_run nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - the default cap releases five of seven locked copies and defers two unchanged until the next run; an explicit cap of two behaves the same way
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_refusals_use_no_release_slot_and_cannot_starve_later_copies nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_partial_releases_use_release_slots nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - a driver execute that reports success but leaves the copy registered, or fails after releasing its lock, uses a release slot, so a systematic partial release reaches at most five copies per run and defers the rest
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_failed_post_execute_enumeration_uses_release_slot nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - a post-execute enumeration that prints the candidate and then fails is unknown, uses a release slot, and limits seven untouched driver refusals to five executes with two deferred
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_failed_nested_registration_proof_holds_copy nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - a failed nested-registration enumeration holds a clean locked copy before any driver call
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_failed_post_removal_registration_keeps_receipt_unproved nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - a failed post-removal registration proof reports unproved, keeps the receipt, and never reports or logs REMOVED
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_execute_stderr_warning_keeps_temporary_refusal_retryable nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - missing-.env stderr warnings remain visible but do not turn either temporary stdout refusal into a permanent receipt
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_plan_stderr_warning_does_not_block_allowed_stdout nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - an exact env_loading missing-.env warning on stderr does not veto an allowed stdout plan, and the cap still limits executes
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_recycled_launcher_lock_is_held nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - a live recycled launcher pid holds its copy and unchanged lock, with age and lock mtime reported
+ok - fm-copy-sweep
+rc=0
+### FM_COPY_SWEEP_CASE=test_dead_launcher_lock_is_released_by_the_driver nice -n 20 bash tests/fm-copy-sweep.test.sh
+ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - fm-copy-sweep
+rc=0

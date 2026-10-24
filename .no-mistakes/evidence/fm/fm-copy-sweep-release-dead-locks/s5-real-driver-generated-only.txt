@@ -1,0 +1,30 @@
+### world: one merged copy, dead launcher, ignored content only __pycache__/, .pytest_cache/, node_modules/
+!! .pytest_cache/
+!! __pycache__/
+!! node_modules/
+
+### fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s5/th/pool1/1/repo/.claude/worktrees/c1	branch fm/c1 at fc489165e750, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 43824 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+rc=0
+
+### after
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s5/th/pool1/1/repo 0d491a3 [main]
+copy dir exists: no
+
+### preserved files
+
+### data/copy-sweep.log
+2026-10-24T04:54:44Z	removed	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s5/th/pool1/1/repo/.claude/worktrees/c1	clone=/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s5/th/pool1/1/repo	head=fc489165e7500dd43b5dc381dc30ac4a37cdc427	branch=fm/c1	kib=24	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 43824 is gone

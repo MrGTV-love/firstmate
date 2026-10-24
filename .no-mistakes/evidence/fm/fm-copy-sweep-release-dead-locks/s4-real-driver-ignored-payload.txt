@@ -1,0 +1,36 @@
+### world: one merged copy, dead launcher, holding ignored outbox.log and a 20 MiB ignored unique.dat
+!! outbox.log
+!! unique.dat
+8b3d957af8766c39fff5f91e1cb54801f2d01babe68da1dfa54eb6fac717b2e5  /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo/.claude/worktrees/c1/unique.dat
+34afc69a13d24a6434e227274d7237adee9ab773a67e45a69ea370c0737c8855  /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo/.claude/worktrees/c1/outbox.log
+
+### fm-copy-sweep.sh --apply
+copy-sweep: mode=apply containers=1 copies=1
+HELD-LOCKED	0.02 GiB	/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo/.claude/worktrees/c1	its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: env_loading: no .env found for /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo/scripts/git-stability/reap_core.py; tried in order: /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo/.env. Create .env at the clone root (the primary checkout) or in this worktree. {"allowed": true, "cleanup_command": ["git", "worktree", "remove", "/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo/.claude/worktrees/c1"], "cleanup_timeout_seconds": 30, "coverage_mode": "exact_tree", "exact_tree_covered": true, "execute": false, "ignored_payload_disposition": "arch
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1: 0.02 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo: 0.02 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.02 reaped=0 freed=0.00
+rc=0
+
+### after
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo                      ddaf33d [main]
+/Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/th/pool1/1/repo/.claude/worktrees/c1 31ef9f5 [fm/c1] locked
+copy dir exists: yes
+
+### preserved files
+bfs: error: /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/home/data/copy-sweep: No such file or directory.
+bfs: error: /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/home/data/copy-sweep: No such file or directory.
+
+### data/copy-sweep.log
+cat: /Users/charlesabrooker/tmp/fm-sweep-real.URWjzz/s4/home/data/copy-sweep.log: No such file or directory
