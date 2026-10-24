@@ -35,21 +35,23 @@ run_hook() {  # <home> <payload>
 }
 
 shell_passes() {  # <home> <case> <tool-input-json>
-  local home=$1 label=$2 input=$3 ompout
-  run_hook "$home" "$(jq -cn --arg cwd "$WT" --argjson input "$input" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Bash",tool_input:$input,tool_use_id:"retired-call"}')"
+  local home=$1 label=$2 input="$TMP_ROOT/input.json" ompout
+  printf '%s' "$3" > "$input"
+  run_hook "$home" "$(jq -cn --arg cwd "$WT" --slurpfile input "$input" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Bash",tool_input:$input[0],tool_use_id:"retired-call"}')"
   [ "$status" -eq 0 ] || fail "$label: Claude shell call exited $status"
   [ -z "$out" ] || fail "$label: Claude shell call was still refused: $out"
   [ ! -s "$TMP_ROOT/hook.err" ] || fail "$label: Claude shell call wrote stderr: $(cat "$TMP_ROOT/hook.err")"
-  ompout=$(GUARD="$ROOT/bin/fm-jev-guard.ts" GUARD_HOME="$home" WT="$WT" INPUT="$input" \
+  ompout=$(GUARD="$ROOT/bin/fm-jev-guard.ts" GUARD_HOME="$home" WT="$WT" INPUT_FILE="$input" \
     node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.GUARD_HOME;
 const handlers = {};
 installJevGuard({ on(name, handler) { handlers[name] = handler; } }, { home, config: `${home}/config`, state: `${home}/state`,
   task: 't1', worktree: process.env.WT, data: `${home}/data/t1`, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1', host: 'omp' });
-assert.equal(await handlers.tool_call({ toolName: 'bash', input: JSON.parse(process.env.INPUT) }, { cwd: process.env.WT }), undefined);
+assert.equal(await handlers.tool_call({ toolName: 'bash', input: JSON.parse(readFileSync(process.env.INPUT_FILE, 'utf8')) }, { cwd: process.env.WT }), undefined);
 console.log('omp-shell-ok');
 JS
   ) || fail "$label: omp shell call: $ompout"
