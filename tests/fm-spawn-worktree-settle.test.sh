@@ -305,7 +305,55 @@ SH
   pass "non-measured harness launches unchanged and explicitly reports unconfined coverage"
 }
 
+# The launch fm-spawn delivers for a measured harness runs inside the generated
+# profile: a model-free stand-in for the harness records what it could do.
+test_measured_harness_launch_runs_confined() {
+  local harness rec id out source_line probe before version
+  local FM_COMPAT_LAUNCH_LOG
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
+    return 0
+  fi
+  for harness in omp claude; do
+    id=settle-confined-$harness-z8
+    rec=$(make_settle_case "confined-$harness" "$id" 0)
+    read_settle_record "$rec"
+    printf '%s\n' "$harness" > "$HOME_DIR/config/crew-harness"
+    FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+    export FM_COMPAT_LAUNCH_LOG
+    probe="$HOME_DIR/data/$id/probe"
+    version='omp/18.12.4'
+    [ "$harness" = omp ] || version='2.1.310 (Claude Code)'
+    cat > "$FAKEBIN_DIR/$harness" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in --version) printf '%s\\n' '$version'; exit 0 ;; esac
+[ -n "\${FM_TASK_INBOX:-}" ] || exit 0
+{
+  if { printf 'replaced' >> '$PROJ_DIR/README.md'; } 2>/dev/null; then echo foreign=written; else echo foreign=refused; fi
+  if { printf 'probe-status-append\\n' >> '$HOME_DIR/state/$id.status'; } 2>/dev/null; then echo status=appended; else echo status=refused; fi
+  echo "tmpdir=\$TMPDIR"
+  echo "confinement=\$FM_WRITE_CONFINEMENT"
+} > '$probe'
+SH
+    chmod +x "$FAKEBIN_DIR/$harness"
+    before=$(cat "$PROJ_DIR/README.md")
+    out=$(run_settle_spawn "$id")
+    expect_code 0 "$?" "confined $harness spawn was refused: $out"
+    assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "confined $harness coverage absent from metadata"
+    assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver a $harness launch command"
+    source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+    PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
+    assert_present "$probe" "delivered $harness launch did not reach the harness"
+    assert_equals $'foreign=refused\nstatus=appended\ntmpdir=/tmp/fm-'"$id"$'\nconfinement=seatbelt-v1' "$(cat "$probe")" \
+      "delivered $harness launch ran outside its write profile"
+    assert_equals "$before" "$(cat "$PROJ_DIR/README.md")" "confined $harness changed the primary checkout"
+    assert_grep 'probe-status-append' "$HOME_DIR/state/$id.status" "confined $harness could not append its own status"
+  done
+  pass "measured harness launches run inside their generated write profile"
+}
+
 test_nonmeasured_harness_stays_unconfined_and_audited
+test_measured_harness_launch_runs_confined
 test_single_stale_first_read_is_not_accepted
 test_already_settled_pane_costs_one_confirm_read
 test_transient_primary_checkout_is_not_accepted

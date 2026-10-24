@@ -6124,6 +6124,16 @@ if [ "$KIND" != secondmate ]; then
   case "$confinement_os:$HARNESS" in
     Darwin:omp | Darwin:claude)
       [ -x /usr/bin/sandbox-exec ] || { confinement_refuse false "sandbox-exec is required for macOS workers"; exit 1; }
+      # A raw command's own root selectors run after the confinement exports
+      # and win, so the profile could not follow the root the harness uses.
+      if [ "$RAW_LAUNCH" = 1 ]; then
+        case "$RAW_COMMAND" in
+          *PI_CODING_AGENT_DIR* | *PI_CONFIG_DIR* | *OMP_PROFILE* | *PI_PROFILE* | *--profile* | *CLAUDE_CONFIG_DIR*)
+            confinement_refuse false "this raw $HARNESS launch command selects its own harness state root, so its write profile cannot be derived; launch with --harness $HARNESS and set the root in the environment instead"
+            exit 1
+            ;;
+        esac
+      fi
       WRITE_CONFINEMENT=seatbelt-v1
       WRITE_CONFINEMENT_PROFILE="$STATE_REAL/$ID.write-confinement.sb"
       confinement_agent=
@@ -6134,7 +6144,10 @@ if [ "$KIND" != secondmate ]; then
       confinement_args=()
       [ -z "$confinement_agent" ] || confinement_args=(--agent-dir "$confinement_agent")
       [ -z "${BRANCH:-}" ] || confinement_args+=(--branch "$BRANCH")
-      fm_local_firstmate_state_dirs "$STATE" tolerant
+      if ! fm_local_firstmate_state_dirs "$STATE"; then
+        confinement_refuse false "cannot list the local Firstmate homes to protect: $FM_LOCAL_FIRSTMATE_ERROR"
+        exit 1
+      fi
       for confinement_home_state in "${FM_LOCAL_FIRSTMATE_STATES[@]:1}"; do
         confinement_args+=(--protect "${confinement_home_state%/state}")
       done
@@ -6142,7 +6155,7 @@ if [ "$KIND" != secondmate ]; then
         --config "$CONFIG" --projects "$PROJECTS" \
         --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" \
         --harness "$HARNESS" --profile "$WRITE_CONFINEMENT_PROFILE" \
-        "${confinement_args[@]}" || { confinement_refuse false "cannot derive the protected-asset write profile"; exit 1; }
+        ${confinement_args[@]+"${confinement_args[@]}"} || { confinement_refuse false "cannot derive the protected-asset write profile"; exit 1; }
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
       ;;

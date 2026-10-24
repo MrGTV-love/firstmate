@@ -8,33 +8,34 @@ Exact task chronology, branch names, temporary homes, local paths, process ids, 
 
 ## macOS worker write confinement
 
-Verified on 2026-10-24 on macOS 27 arm64 with omp 18.12.4 and Claude Code 2.1.310.
+Verified on 2026-10-24 on macOS 27 arm64.
 The configuration owner is [Worker OS write confinement](../configuration.md#worker-os-write-confinement).
-Refresh with these token-free executable entry points:
+Refresh with these model-free executable entry points:
 
 ```sh
 bash tests/fm-write-confinement.test.sh
-bash tests/fm-write-confinement-live-e2e.test.sh
+bash tests/fm-spawn-worktree-settle.test.sh
 ```
 
-The direct fixture builds both the omp and the Claude profile over a synthetic HOME, home, project, gate store and foreign assets, then runs one unconfined control and one confined pass per profile.
-Every confined check was true for both profiles and for real SessionStart descendants under each installed harness:
+The direct fixture builds both the omp and the Claude profile over a synthetic HOME, home, project, gate store and foreign assets, then runs a plain Python process once unconfined as a control and once under each profile.
+Every confined check was true for both profiles:
 
-- cases a-e, own Git commit, inbox handling, the real busy writer, native session proof and task audit;
+- cases a-e, with B3's glob deletion against another task's directory in the shared `/private/tmp/claude-<uid>` root and B15's aged sweep against another task's `~/tmp` entry;
+- own Git commit, inbox handling, the real busy writer, native session proof and task audit;
 - a push to the task's own gate through the no-mistakes `pre-receive` and `post-receive` hooks, with `push -u`, `fetch` and `stash`;
-- a duration record appended through `bin/fm-duration.py`, and a tool-cache write under HOME;
-- one refused write per protected asset class: project and home primary checkouts, the primary index, nested and pool worktrees of other tasks, other task state and data, Main-owned `meta`, `control-relaunch` and `git-hooks` records, `config/`, `.env`, another branch, another Firstmate home and another project's gate, including a push to that gate;
-- in the direct fixture only, refused writes to Claude settings, credentials and project memory, omp agent config, plugins and a foreign daemon scope, `~/.codex` and `~/.dsh`, while the Claude transcript, `.claude.json`, omp agent database and own daemon scope stayed writable.
+- a duration record appended through `bin/fm-duration.py`, a procevent board registered and retired through `bin/fm-procevent.sh`, a fleet-ledger append through `bin/fm-fleet-ledger.sh`, and a tool-cache write under HOME;
+- one refused write per protected asset class: project and home primary checkouts, the primary index, nested and pool worktrees of other tasks, other task state, data and temp roots, the shared legacy audit, Main-owned `meta`, `control-relaunch` and `git-hooks` records, `config/`, `.env`, another branch, another Firstmate home and another project's gate, including a push to that gate;
+- refused writes to every Claude and omp file that loads code or instructions, `~/.codex` and `~/.dsh`, while the running harness's measured runtime state stayed writable;
+- refused renames of another task's data directory, a worktree's parent folder, the gate store, `state/` and another session's Claude temp directory.
 
-The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial, the symlink escape and every refused-write check, while the positive operations remained successful.
+The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial, the symlink escape and every refused check, while the positive operations remained successful.
 The gate hooks are the installed no-mistakes hooks with `NM_BIN` pointed at a model-free stand-in for the daemon client, so no real daemon run starts.
 The probes invoke the real `createGuardService.record` and `createTaskSessionProof` writers, including native proof publication and shutdown invalidation; no audit or session writer is mocked.
 The task audit succeeds without changing seeded shared legacy history, while another task's audit append fails with `AuditUnavailableError`.
 `bash tests/fm-jev-guard-audit.test.sh` passed 21 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
-The live probes use synthetic agent/config stores, EOF without a submitted model prompt and the installed runtime's existing HOME; no authentication is copied and real harness homes are never written.
-This proves inherited filesystem enforcement through real harness startup, not a model-submitted native Bash/eval invocation or authenticated provider access.
+The settle case runs the launch `fm-spawn.sh` delivers for omp and Claude with a stand-in harness: the primary-checkout write is refused, the own status append succeeds, `TMPDIR` is the task temp root and `FM_WRITE_CONFINEMENT` is `seatbelt-v1`.
+No test starts a real harness session, so the Claude runtime directories outside the measured set (for example `shell-snapshots/`, `todos/` and `session-env/`) are refused without a real-harness measurement of their effect.
 Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
-The [live guard](../../tests/fm-write-confinement-live-e2e.test.sh) reports absent harnesses explicitly and refuses a pass with no harness checked.
 
 ## Pool-only cleanup critical sections
 

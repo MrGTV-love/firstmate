@@ -359,7 +359,7 @@ SH
       else
         assert_equals complete "$(journal_field "$dir" "$id" phase)" "subscription relaunch must complete"
         assert_equals "$model" "$(meta_field "$dir" "$id" model)" "subscription selection must reach the replacement"
-        assert_contains "$(cat "$dir/fake/launch")" "--model '$model'" "subscription model must reach executable launch"
+        assert_launch_word "$dir/fake/launch" "--model " "$model" "subscription model must reach executable launch"
       fi
     done
   done
@@ -1057,8 +1057,7 @@ test_worker_account_pin_follows_the_relaunch() {
   out=$(run_control "$dir" "$id" relaunch --note "pinned account"); rc=$?
   expect_code 0 "$rc" "a relaunch under a signed-in account pin should succeed"$'\n'"$out"
   [ "$(meta_field "$dir" "$id" account)" = "$dir/work" ] || fail "the relaunched record should carry the pinned account"
-  assert_contains "$(cat "$dir/fake/literal")" "CLAUDE_CONFIG_DIR='$dir/work'" \
-    "the replacement should launch under the pinned root"
+  assert_launch_word "$dir/fake/literal" "CLAUDE_CONFIG_DIR=" "$dir/work" "the replacement should launch under the pinned root"
   rm "$dir/home/config/claude-account"
   : > "$dir/fake/literal"
   out=$(run_control "$dir" "$id" relaunch --note "pin removed"); rc=$?

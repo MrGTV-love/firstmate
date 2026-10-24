@@ -2486,17 +2486,22 @@ The profile builder is [`bin/fm-write-confinement.py`](../bin/fm-write-confineme
 It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash derivation; missing prerequisites refuse a measured-harness launch rather than silently removing confinement.
 Writes are allowed by default; the profile denies writes to these named protected assets:
 
-- the primary checkout of every project in `projects/` and of the task's own repository, except the task's own worktree;
+- the primary checkout of every project in `projects/`, of the task's own repository and of this home, except the task's own worktree;
 - every other linked worktree those repositories list, nested `.claude/worktrees/fm-*` copies and pool copies alike;
-- this home's checkout, `config/` and `.env`, and every `state/` record except the task's own worker records;
+- this home's checkout, `config/` and `.env`;
+- every other task's `state/<other>.*` records, this task's Main-owned records and the shared legacy `state/jev-guard.jsonl`; the rest of `state/`, such as `state/procevent/`, `state/friction.jsonl` and the fleet ledger, stays writable;
 - every `data/<other>/` directory; the shared `data/` files such as the duration ledger stay writable;
-- Main-owned records of this task, including `state/<task>.meta`, `state/<task>.control-relaunch` and the installed `state/<task>.git-hooks`;
+- every other task's temp roots: `/tmp/fm-<other>` and its `/tmp/fm-<other>+<token>` launch sibling, every other session directory under `/private/tmp/claude-<uid>/`, and every `~/tmp` entry whose name carries another task's id;
 - other tasks' branches, and the primary checkout's own `HEAD` and index, in the shared Git directory;
-- the harness config homes `~/.claude`, `~/.claude.json`, `~/.omp`, `~/.codex`, `~/.dsh`, `~/.pi`, `~/.grok`, `~/.kimi`, `~/.kimi-code`, `~/.cursor`, `~/.gemini`, `~/.rovo`, `~/.rovodev` and opencode's config and data directories;
-- every other local Firstmate home, the root home and each registered local secondmate home;
+- the harness config homes `~/.claude`, `~/.claude.json`, `~/.omp`, `~/.codex`, `~/.dsh`, `~/.pi`, `~/.grok`, `~/.kimi`, `~/.kimi-code`, `~/.cursor`, `~/.gemini`, `~/.rovo`, `~/.rovodev` and opencode's config and data directories, apart from the running harness's measured runtime state below;
+- every other local Firstmate home: the root home and each registered local secondmate home;
 - the no-mistakes gate repository of every other project under `$NM_HOME/repos` (default `~/.no-mistakes/repos`).
 
+Task ids come from the `state/<id>.meta` records of this home and of every other local home.
+Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
+Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch` and the installed `state/<task>.git-hooks`.
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
+The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
 The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch`, `git stash` and `git push -u` keep working.
 Native temp selectors point at the task temporary root.
 A declared nested `.claude/worktrees/fm-*` worktree is treated as the task root, not rejected by its spelling.
@@ -2505,9 +2510,11 @@ The measured harness contracts are omp and Claude.
 Each launch audit prints the actual harness identifier and confinement mode; macOS metadata records `write_confinement=unconfined-macos-<harness>` for these unmeasured harnesses.
 Their root contracts are follow-up work, not coverage supplied by this boundary.
 Secondmates are persistent homes and are not subject to this task-worker boundary.
+A raw omp or Claude launch command that names its own state root (`PI_CODING_AGENT_DIR`, `PI_CONFIG_DIR`, `OMP_PROFILE`, `PI_PROFILE`, `--profile` or `CLAUDE_CONFIG_DIR`) is refused, because its own assignment would win over the profile's root; set the root in the environment and launch with `--harness` instead.
+A home list that cannot be read, or a project whose worktrees Git cannot list, also refuses the launch instead of leaving those assets out.
 
-The running harness keeps its measured state roots writable inside its protected config home: omp's resolved agent directory and exactly its project-scoped daemon directory, or Claude's selected config directory.
-Inside those roots the agent configuration stays protected: omp's `config.yml`, `models.yml`, `auth.json` and `.env`, and Claude's `settings.json`, `settings.local.json`, `.credentials.json` and every `projects/*/memory` directory.
+Inside its protected config home the running harness keeps only its measured runtime state writable: omp's `agent.db` and `models.db` with their WAL, SHM and journal files, its `sessions/` transcripts and exactly its project-scoped daemon directory; or Claude's `.claude.json` with its temporary and backup siblings, its `backups/` directory and its `projects/` transcripts outside every `projects/*/memory` directory.
+Everything else there stays protected, including every path that loads code or instructions: Claude's `CLAUDE.md`, `rules/`, `agents/`, `commands/`, `skills/`, `plugins/`, `hooks/`, settings and credentials files and status-line scripts, and omp's `config.yml`, `models.yml`, `auth.json`, `.env`, `settings.json`, `extensions/`, `managed-skills/` and `memories/`.
 The omp daemon suffix uses omp's `Bun.hash.wyhash(path.resolve(projectDir))` derivation, not a hard-coded hash or a grant of the shared daemon parent.
 SQLite database creation requires the omp agent directory; an observed `EPERM mkdir` requires the separate daemon scope.
 Claude SessionStart requires creation of `.claude.json` and its backups in the selected config directory; the default layout also permits the single home-level `.claude.json` file.
@@ -2518,12 +2525,16 @@ Landlock is not enabled; the Linux layout is a separate prerequisite, not a reas
 
 This is inherited process-tree filesystem enforcement, not confinement of external authorities.
 Two residuals remain, and the residual review on 2026-11-07 revisits both.
-First, a precious location that is not on the protected list is unprotected: shared temp roots such as `/private/tmp/claude-<uid>` and `~/tmp`, other tasks' temp roots, the home's shared `data/` files, the shared Git directory's config and hooks, and credentials outside the listed harness homes.
-Protected lists are read at launch, so a task, home or gate created later is not covered until the worker is relaunched.
-Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker, and the harness-state roots above remain mutable.
+First, a precious location that is not on the protected list is unprotected.
+That includes any temp entry with no owner marker: a `/private/tmp/claude-<uid>/` file outside a session directory, a `~/tmp` entry whose name carries no task id, and a `/tmp/fm-*` root whose task has no `state/<id>.meta` record.
+It also includes the home's shared `data/` and `state/` files, the shared Git directory's config and hooks, and credentials outside the listed harness homes.
+Protected lists are read at launch, so a task, home, gate or session directory created later is not covered until the worker is relaunched; only the contents of a later `data/<other>/` directory or a later Claude session directory are still covered, by their name patterns.
+Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker.
 The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
-[`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) builds the omp and Claude profiles over a synthetic home and checks cross-task glob deletion, aged-file deletion, Python eval unlink, nested-root writes, status isolation, symlink escapes, real busy-state transitions, a gate push through the no-mistakes hooks, a duration record and one refused write per protected asset class.
-[`tests/fm-write-confinement-live-e2e.test.sh`](../tests/fm-write-confinement-live-e2e.test.sh) repeats the operations in token-free real harness SessionStart descendants; this is not a model-submitted native tool invocation.
+[`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) builds the omp and Claude profiles over a synthetic home and runs a plain Python process under each, after an unconfined control.
+It checks B3's glob deletion in the shared Claude temp root, B15's aged sweep under `~/tmp`, Python eval unlink, nested-root writes, status isolation, symlink escapes, real busy-state transitions, a gate push through the no-mistakes hooks, a duration record, a procevent board registered and retired, a fleet-ledger append, one refused write per protected asset class and refused renames of protected folders and their parents.
+[`tests/fm-spawn-worktree-settle.test.sh`](../tests/fm-spawn-worktree-settle.test.sh) runs the launch `fm-spawn.sh` delivers for omp and Claude with a model-free stand-in for each harness.
+No test starts a real harness session or calls a model.
 
 ### Model guard integration
 

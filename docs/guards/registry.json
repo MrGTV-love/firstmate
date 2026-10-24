@@ -43,7 +43,7 @@
       "emitters": ["bin/fm-spawn.sh"],
       "invariant": "a macOS omp or Claude task worker launches with writes to every named protected asset denied",
       "layer": "impossible-by-construction",
-      "source": "uname -s, resolved home/config/projects/data/state paths, git worktree lists of every project, local Firstmate homes from fm_local_firstmate_state_dirs, $NM_HOME/repos gate names, harness config homes and agent directory, omp project-scope hash, final launch-bound FM_WRITE_CONFINEMENT and task audit routing in bin/ten-levels/extensions/report.ts",
+      "source": "uname -s, resolved home/config/projects/data/state paths, git worktree lists of every project and of the home, local Firstmate homes from strict fm_local_firstmate_state_dirs, task ids from every local home's state/<id>.meta, /tmp/fm-<id>, /private/tmp/claude-<uid> and ~/tmp entries, $NM_HOME/repos gate names, harness config homes and measured runtime state, omp project-scope hash, the raw launch command's root selectors, final launch-bound FM_WRITE_CONFINEMENT and task audit routing in bin/ten-levels/extensions/report.ts",
       "trigger": "fm-spawn launches or relaunches an omp or claude ship/scout on Darwin",
       "decision": "deny",
       "fail_direction": "closed",

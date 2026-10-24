@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -155,6 +156,19 @@ def writable(path):
     return True
 
 
+def rename_refused(path):
+    path = Path(path)
+    moved = path.with_name(path.name + ".moved")
+    try:
+        path.rename(moved)
+    except PermissionError:
+        return path.exists()
+    except FileNotFoundError:
+        return False
+    moved.rename(path)
+    return False
+
+
 def child(manifest):
     # A worker records into its home's ledger; the suite's fixture-wide off
     # switch would hide exactly the write under test.
@@ -167,11 +181,16 @@ def child(manifest):
     pool = Path(manifest["pool"])
     nested = Path(manifest["nested"])
     own_gate, other_gate = Path(manifest["own_gate"]), Path(manifest["other_gate"])
+    other = manifest["other"]
     results = {}
-    subprocess.run(["/bin/sh", "-c", 'rm -rf "$1"/claude-501/base.*', "sh", str(pool)], capture_output=True)
-    results["a"] = (pool / "claude-501/base.other/payload").exists()
-    subprocess.run(["find", str(nested / "tmp"), "-type", "f", "-mtime", "+1", "-delete"], capture_output=True)
-    results["b"] = (nested / "tmp/old").exists()
+    # B3 and B15 in the shared temp roots, narrowed to this run's other task so
+    # the unconfined control can never touch a real session's directory.
+    claude_tmp, user_tmp = Path(manifest["claude_tmp"]), Path(manifest["user_tmp"])
+    subprocess.run(["/bin/sh", "-c", 'rm -rf "$1"/base."$2"*', "sh", str(claude_tmp), other], capture_output=True)
+    results["a"] = (claude_tmp / f"base.{other}/payload").exists()
+    subprocess.run(["find", str(user_tmp), "-mindepth", "1", "-maxdepth", "1", "-name", "fm-teardown.*", "-mtime", "+1",
+                    "-exec", "rm", "-rf", "{}", "+"], capture_output=True)
+    results["b"] = (user_tmp / f"fm-teardown.{other}/old").exists()
     try:
         eval('Path(manifest["home"]).joinpath("data/other/eval-target").unlink()')
         results["c"] = False
@@ -215,12 +234,30 @@ def child(manifest):
     with (state / "task.status").open("a") as stream:
         stream.write("working\n")
     results["e-append"] = (state / "task.status").read_text() == "working\n"
-    for name in ("other.status", "task.other.status"):
+    for name, record in (("other.status", f"{other}.status"), ("task.other.status", "task.other.status")):
         try:
-            (state / name).write_text("replaced")
+            (state / record).write_text("replaced")
             results["e-" + name] = False
         except PermissionError:
-            results["e-" + name] = (state / name).read_text() == "original"
+            results["e-" + name] = (state / record).read_text() == "original"
+    # Shared home state the worker's own procedures write stays writable.
+    procedure_env = dict(os.environ, FM_ROOT_OVERRIDE=manifest["repo"], FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+                         FM_DATA_OVERRIDE=str(data), FM_CONFIG_OVERRIDE=str(home / "config"))
+    board = data / "task/board.html"
+    board.write_text("<h1>board</h1>\n")
+    lavish = str(Path(manifest["repo"]) / "bin/fm-procevent-lavish.sh")
+    procevent = str(Path(manifest["repo"]) / "bin/fm-procevent.sh")
+    source = subprocess.run([lavish, "source-id", str(board)], env=procedure_env, capture_output=True, text=True).stdout.strip()
+    register = subprocess.run([procevent, "register-task", "lavish", source, "task", "--", lavish, "poll", str(board)],
+                              env=procedure_env, capture_output=True, text=True)
+    listed = subprocess.run([procevent, "list"], env=procedure_env, capture_output=True, text=True).stdout
+    retire = subprocess.run([procevent, "retire", source], env=procedure_env, capture_output=True, text=True)
+    results["procevent-board"] = (bool(source) and register.returncode == 0 and source in listed and retire.returncode == 0
+                                  and source not in subprocess.run([procevent, "list"], env=procedure_env, capture_output=True, text=True).stdout)
+    ledger = subprocess.run([str(Path(manifest["repo"]) / "bin/fm-fleet-ledger.sh"), "appended", str(home / "config"), str(state / "task.status")],
+                            env=procedure_env, capture_output=True, text=True)
+    results["fleet-ledger"] = (ledger.returncode == 0 and (state / "fleet-ledger.jsonl").exists()
+                               and any(json.loads(line).get("task") == "task" for line in (state / "fleet-ledger.jsonl").read_text().splitlines()))
     (state / "task.inbox/001.msg").rename(state / "task.inbox/handled/001.msg")
     results["inbox-handled"] = (state / "task.inbox/handled/001.msg").exists()
     busy = subprocess.run(["bash", str(Path(manifest["repo"]) / "bin/fm-busy-event.sh"),
@@ -235,7 +272,7 @@ import { readFileSync } from "node:fs";
 const { createTaskSessionProof } = await import(process.argv[2]);
 const { createGuardService } = await import(process.argv[5]);
 const { readGuardAudit } = await import(process.argv[6]);
-const state = process.argv[3], session = process.argv[4];
+const state = process.argv[3], session = process.argv[4], other = process.argv[7];
 const record = { hook: 'tool_result', tool: 'read', decision: 'clear', enforcement: 'result_pass', branch: 'trusted_read', error_type: null, request_started: false };
 const context = { home: state + '/..', config: state + '/../config', state, task: 'task', noHelpers: true };
 const legacy = readFileSync(state + '/jev-guard.jsonl', 'utf8');
@@ -244,7 +281,7 @@ const history = readGuardAudit(state).trim().split('\\n').map(JSON.parse);
 if (!history.some(row => row.task === 'legacy') || !history.some(row => row.task === 'task' && row.decision === 'clear' && row.request_started === false)) throw Error('audit history lost');
 if (readFileSync(state + '/jev-guard.jsonl', 'utf8') !== legacy) throw Error('legacy audit changed');
 let foreignDenied = false;
-try { createGuardService({ ...context, task: 'other' }).record(record); }
+try { createGuardService({ ...context, task: other }).record(record); }
 catch (error) { if (error.errorType !== 'AuditUnavailableError') throw error; foreignDenied = true; }
 const manager = { getSessionFile: () => session };
 const owner = { sessionManager: manager, waitForSessionTransition: async () => {} };
@@ -258,7 +295,7 @@ if (JSON.parse(readFileSync(state + "/task.omp-session.json", "utf8")).current_s
 console.log(JSON.stringify({ foreignDenied }));
 ''')
     proof_run = subprocess.run(["bun", str(proof_script), str(Path(manifest["repo"]) / ".omp/extensions/lib/fm-task-session.ts"), str(state), str(session),
-                                str(Path(manifest["repo"]) / "bin/ten-levels/extensions/report.ts"), str(Path(manifest["repo"]) / "bin/fm-jev-audit-read.mjs")],
+                                str(Path(manifest["repo"]) / "bin/ten-levels/extensions/report.ts"), str(Path(manifest["repo"]) / "bin/fm-jev-audit-read.mjs"), other],
                                env=dict(os.environ, FM_SPAWN_GEN="proof-probe", FM_WRITE_CONFINEMENT="seatbelt-v1"), capture_output=True, text=True)
     results["native-session-proof"] = proof_run.returncode == 0
     results["task-audit-written"] = proof_run.returncode == 0
@@ -275,8 +312,9 @@ console.log(JSON.stringify({ foreignDenied }));
         results["refused-" + name] = refused(path)
     for name, path in manifest["writable"].items():
         results[name] = writable(path)
-    if manifest.get("result"):
-        Path(manifest["result"]).write_text(json.dumps(results, sort_keys=True))
+    # Renaming a protected folder, or a folder above one, would move it away.
+    for name, path in manifest["renamed"].items():
+        results["refused-rename-" + name] = rename_refused(path)
     print(json.dumps(results, sort_keys=True))
     return results
 
@@ -292,14 +330,14 @@ def scope_key(worktree):
                                     str(worktree)], text=True).strip()
 
 
-def fixture(repo, base, harness, user_home):
+def fixture(repo, base, harness, user_home, other):
     """Lay out one fresh home, project, gates and foreign assets under base."""
     base.mkdir(parents=True)
     base = base.resolve()
     home, nm = base / "home", base / "nm"
     state, data = home / "state", home / "data"
     project = home / "projects/project"
-    worktree, nested, pool = project / ".claude/worktrees/fm-task", project / ".claude/worktrees/fm-other", base / "pool/other"
+    worktree, nested, pool = project / ".claude/worktrees/fm-task", project / ".claude/worktrees/fm-other", base / "pool/5/other"
     write(project / "README")
     for args in (["init", "-q", "-b", "main", str(project)], ["-C", str(project), "add", "README"],
                  ["-C", str(project), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "init"],
@@ -319,25 +357,33 @@ def fixture(repo, base, harness, user_home):
         write(own_gate / "hooks" / name, text.replace("@NM_BIN@", str(fake_client)))
         (own_gate / "hooks" / name).chmod(0o755)
     assert git("-C", str(worktree), "remote", "add", "no-mistakes", str(own_gate)).returncode == 0
-    write(pool / "claude-501/base.other/payload")
-    write(nested / "tmp/old")
-    os.utime(nested / "tmp/old", (1, 1))
+    # Another task's directories in the shared Claude temp root, its own temp
+    # root and an aged test directory under ~/tmp that carries its id.
+    claude_tmp = Path(f"/private/tmp/claude-{os.getuid()}")
+    write(claude_tmp / f"base.{other}/payload")
+    write(Path(f"/private/tmp/fm-{other}/payload"))
+    user_tmp = user_home / "tmp"
+    write(user_tmp / f"fm-teardown.{other}/old")
+    os.utime(user_tmp / f"fm-teardown.{other}/old", (1, 1))
+    os.utime(user_tmp / f"fm-teardown.{other}", (1, 1))
     write(data / "other/eval-target")
     write(data / "other/file")
     (data / "task").mkdir(parents=True)
     (worktree / "escape").symlink_to(data / "other", target_is_directory=True)
-    for name in ("other.status", "task.other.status"):
+    write(state / f"{other}.meta", f"window=fmtest:fm-{other}\nworktree={nested}\nproject=fmtest\n")
+    for name in (f"{other}.status", "task.other.status"):
         write(state / name)
-    write(state / "other.jev-guard.jsonl", json.dumps({"at": 2, "task": "other", "decision": "clear"}) + "\n")
+    write(state / f"{other}.jev-guard.jsonl", json.dumps({"at": 2, "task": other, "decision": "clear"}) + "\n")
     write(state / "jev-guard.jsonl", json.dumps({"at": 1, "task": "legacy", "decision": "clear"}) + "\n")
     write(state / "task.status", "")
-    write(state / "task.meta", "spawn_gen=proof-probe\n")
+    write(state / "task.meta", f"spawn_gen=proof-probe\nwindow=fmtest:fm-task\nworktree={worktree}\nproject=fmtest\n")
     write(state / "task.inbox/001.msg", "message")
     (state / "task.inbox/handled").mkdir()
     (state / "task.git-hooks").mkdir()
     subprocess.run(["bash", str(repo / "bin/fm-busy-event.sh"), "arm", str(state), "task"], check=True, capture_output=True)
     write(home / "README")
     write(home / "config/crew-harness")
+    write(home / "config/fleet-ledger", "")
     write(home / ".env")
     write(base / "other-home/state/x.status")
     protected = {
@@ -345,46 +391,46 @@ def fixture(repo, base, harness, user_home):
         "config": home / "config/crew-harness", "env": home / ".env",
         "other-worktree-nested": nested / "README", "other-worktree-pool": pool / "README",
         "other-data": data / "other/file", "other-home": base / "other-home/state/x.status", "other-gate": other_gate / "config",
+        "other-task-temp": Path(f"/private/tmp/fm-{other}/payload"),
+        "shared-legacy-audit": state / "jev-guard.jsonl",
         "main-meta": state / "task.meta", "main-control-relaunch": state / "task.control-relaunch",
         "main-git-hooks": state / "task.git-hooks/pre-commit",
     }
-    writable_paths = {}
-    if user_home:
-        write(user_home / ".claude/settings.json")
-        write(user_home / ".claude/.credentials.json")
-        write(user_home / ".claude/projects/p/memory/MEMORY.md")
-        write(user_home / ".omp/agent/config.yml")
-        write(user_home / ".omp/plugins/plugin.ts")
-        write(user_home / ".omp/run/daemons/0000000000000000/broker.pid")
-        write(user_home / ".codex/config.toml")
-        write(user_home / ".dsh/config")
-        protected.update({"codex-home": user_home / ".codex/config.toml", "dsh-home": user_home / ".dsh/config",
-                          "claude-settings": user_home / ".claude/settings.json", "omp-config": user_home / ".omp/agent/config.yml"})
-        writable_paths["tool-cache"] = user_home / ".cache/fm-test-slots/probe"
-        if harness == "claude":
-            protected.update({"claude-credentials": user_home / ".claude/.credentials.json",
-                              "claude-memory": user_home / ".claude/projects/p/memory/MEMORY.md"})
-            writable_paths.update({"claude-transcript": user_home / ".claude/projects/p/session.jsonl",
-                                   "claude-json": user_home / ".claude.json"})
-        else:
-            protected.update({"omp-plugins": user_home / ".omp/plugins/plugin.ts",
-                              "omp-foreign-daemon": user_home / ".omp/run/daemons/0000000000000000/broker.pid"})
-            writable_paths.update({"omp-agent-db": user_home / ".omp/agent/agent.db",
-                                   "omp-daemon-scope": user_home / ".omp/run/daemons" / scope_key(worktree) / "broker.pid"})
+    renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
+               "state": state, "claude-temp-session": claude_tmp / f"base.{other}"}
+    claude_code = (".claude/CLAUDE.md", ".claude/rules/rule.md", ".claude/agents/agent.md", ".claude/commands/command.md",
+                   ".claude/skills/skill/SKILL.md", ".claude/plugins/plugin.json", ".claude/hooks/hook.sh", ".claude/settings.json",
+                   ".claude/settings.local.json", ".claude/.credentials.json", ".claude/projects/p/memory/MEMORY.md", ".claude/statusline.sh")
+    omp_code = (".omp/agent/config.yml", ".omp/agent/models.yml", ".omp/agent/auth.json", ".omp/agent/.env",
+                ".omp/agent/extensions/extension.ts", ".omp/agent/settings.json", ".omp/agent/managed-skills/skill.md",
+                ".omp/agent/memories/memory.md", ".omp/plugins/plugin.ts", ".omp/run/daemons/0000000000000000/broker.pid")
+    for name in claude_code + omp_code + (".codex/config.toml", ".dsh/config"):
+        write(user_home / name)
+    protected.update({"codex-home": user_home / ".codex/config.toml", "dsh-home": user_home / ".dsh/config"})
+    protected.update({"harness" + name.replace("/", "-"): user_home / name for name in claude_code + omp_code})
+    writable_paths = {"tool-cache": user_home / ".cache/fm-test-slots/probe", "own-home-tmp": user_tmp / "fm-task-probe/file"}
+    if harness == "claude":
+        writable_paths.update({"claude-transcript": user_home / ".claude/projects/p/session.jsonl",
+                               "claude-json": user_home / ".claude.json", "claude-json-backup": user_home / ".claude/backups/.claude.json.backup.1"})
+    else:
+        writable_paths.update({"omp-agent-db": user_home / ".omp/agent/agent.db", "omp-agent-db-wal": user_home / ".omp/agent/agent.db-wal",
+                               "omp-models-db-shm": user_home / ".omp/agent/models.db-shm",
+                               "omp-session": user_home / ".omp/agent/sessions/session.jsonl",
+                               "omp-daemon-scope": user_home / ".omp/run/daemons" / scope_key(worktree) / "broker.pid"})
     return {"repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
-            "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"),
+            "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
+            "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp),
             "protected": {name: str(path) for name, path in protected.items()},
-            "writable": {name: str(path) for name, path in writable_paths.items()}}
+            "writable": {name: str(path) for name, path in writable_paths.items()},
+            "renamed": {name: str(path) for name, path in renamed.items()}}
 
 
-def build_profile(repo, manifest, harness, profile, env, agent=None):
+def build_profile(repo, manifest, harness, profile, env):
     home = Path(manifest["home"])
     command = [sys.executable, str(repo / "bin/fm-write-confinement.py"), "--worktree", manifest["worktree"],
                "--home", str(home), "--config", str(home / "config"), "--projects", str(home / "projects"),
                "--data", str(home / "data/task"), "--state", str(home / "state"), "--task", "task", "--branch", "fm/task",
                "--harness", harness, "--protect", manifest["other_home"], "--profile", str(profile)]
-    if agent:
-        command += ["--agent-dir", str(agent)]
     subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"]), check=True)
 
 
@@ -399,15 +445,21 @@ for harness in ("claude", "omp"):
         base = root / f"{harness}-{mode}"
         user_home = base / "user-home"
         user_home.mkdir(parents=True)
-        manifest = fixture(repo, base / "fixture", harness, user_home.resolve())
-        env = {name: value for name, value in os.environ.items() if name not in ("CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR")}
-        env.update(HOME=str(user_home.resolve()), TMPDIR=str(base / "temp"), TMP=str(base / "temp"), TEMP=str(base / "temp"))
-        (base / "temp").mkdir()
-        profile = base / "profile.sb"
-        build_profile(repo, manifest, harness, profile, env)
-        command = [sys.executable, __file__, "--child", json.dumps(manifest)]
-        invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
-        result = subprocess.run(invocation, capture_output=True, text=True, env=env)
+        other = f"wc-other-{os.getpid()}-{harness}-{mode}"
+        shared = [Path(f"/private/tmp/claude-{os.getuid()}/base.{other}"), Path(f"/private/tmp/fm-{other}")]
+        try:
+            manifest = fixture(repo, base / "fixture", harness, user_home.resolve(), other)
+            env = {name: value for name, value in os.environ.items() if name not in ("CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR")}
+            env.update(HOME=str(user_home.resolve()), TMPDIR=str(base / "temp"), TMP=str(base / "temp"), TEMP=str(base / "temp"))
+            (base / "temp").mkdir()
+            profile = base / "profile.sb"
+            build_profile(repo, manifest, harness, profile, env)
+            command = [sys.executable, __file__, "--child", json.dumps(manifest)]
+            invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
+            result = subprocess.run(invocation, capture_output=True, text=True, env=env)
+        finally:
+            for path in shared:
+                shutil.rmtree(path, ignore_errors=True)
         if not result.stdout.strip():
             raise AssertionError(f"{harness} {mode}: exit={result.returncode} stderr={result.stderr}")
         actual = json.loads(result.stdout)
@@ -418,99 +470,3 @@ for harness in ("claude", "omp"):
                     assert actual[name] is False, (harness, mode, name, actual)
         else:
             assert result.returncode == 0 and all(actual.values()), (harness, mode, result.stderr, actual)
-
-if os.environ.get("FM_WRITE_CONFINEMENT_LIVE_RUN") == "1":
-    import shlex
-    import shutil
-    import signal
-    import time
-    checked = 0
-    for harness in ("omp", "claude"):
-        executable = shutil.which(harness)
-        if executable is None:
-            print(f"skip: live: {harness} absent")
-            continue
-        checked += 1
-        home = Path.home()
-        # Keep the installed runtime's HOME, as production does. Authentication
-        # is neither copied nor used: EOF submits no prompt and the agent store
-        # is synthetic. The daemon scope is unique to this fixture project.
-        # Real harness homes are never written: their refusals run only against
-        # the synthetic home above.
-        manifest = fixture(repo, root / f"live-{harness}", harness, None)
-        worktree = Path(manifest["worktree"])
-        daemon_dir = home / ".omp/run/daemons" / scope_key(worktree)
-        agent = root / f"live-{harness}/agent"
-        agent.mkdir()
-        data = Path(manifest["home"]) / "data/task"
-        output = data / (harness + "-result.json")
-        live_manifest = dict(manifest, result=str(output))
-        env = {"PATH": os.environ["PATH"], "HOME": str(home), "TMPDIR": str(root / f"live-{harness}"),
-               "OMP_SKIP_SETUP": "1", "DISABLE_AUTOUPDATER": "1", "PI_CODING_AGENT_DIR": str(agent),
-               "CLAUDE_CONFIG_DIR": str(agent), "PI_CONFIG_DIR": ".omp"}
-        profile = data / (harness + ".sb")
-        build_profile(repo, manifest, harness, profile, env, agent)
-        child_command = [sys.executable, str(Path(__file__).resolve()), "--child", json.dumps(live_manifest)]
-        if harness == "omp":
-            extension = data / "probe.ts"
-            extension.write_text('export default function(pi) { pi.on("session_start", async () => { const p = Bun.spawn(' + json.dumps(child_command) + ', {stdout:"ignore",stderr:"ignore"}); await p.exited; }); }')
-            command = [executable, "--mode", "rpc", "--no-ui", "--no-extensions", "-e", str(extension),
-                       "--no-skills", "--no-rules", "--no-title", "--no-lsp", "--no-tools", "--session-dir", str(data / "sessions"), "--cwd", str(worktree)]
-        else:
-            settings = data / "settings.json"
-            settings.write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": shlex.join(child_command)}]}]}}))
-            command = [executable, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-                       "--no-session-persistence", "--setting-sources", "", "--settings", str(settings)]
-        version = subprocess.check_output([executable, "--version"], text=True).strip().splitlines()[0]
-        process = subprocess.Popen(["/usr/bin/sandbox-exec", "-f", str(profile)] + command,
-                                   env=env, cwd=worktree, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, start_new_session=True, text=True)
-        try:
-            stdout, stderr = process.communicate("", timeout=60)
-        finally:
-            if process.poll() is None:
-                os.killpg(process.pid, signal.SIGTERM)
-                try:
-                    process.communicate(timeout=5)
-                except subprocess.TimeoutExpired:
-                    os.killpg(process.pid, signal.SIGKILL)
-                    process.communicate()
-            # Only inspect the exact synthetic project's daemon scope, never
-            # enumerate the shared daemon namespace. Normal idle is 3 seconds.
-            for pidfile in [daemon_dir / "broker.pid"] if (daemon_dir / "broker.pid").exists() else []:
-                record = json.loads(pidfile.read_text())
-                pid = int(record["pid"])
-                for _ in range(100):
-                    try:
-                        os.kill(pid, 0)
-                    except ProcessLookupError:
-                        break
-                    time.sleep(0.1)
-                else:
-                    # A stale pidfile alone is not ownership: Darwin may reuse
-                    # the PID. Require this process to hold the native lease on
-                    # this exact private scope before any signal.
-                    def holds_lease():
-                        holder = subprocess.run(["/usr/sbin/lsof", "-t", "-a", "-p", str(pid), "--", str(pidfile)],
-                                                capture_output=True, text=True)
-                        return holder.returncode == 0 and holder.stdout.split() == [str(pid)]
-                    if holds_lease():
-                        os.kill(pid, signal.SIGTERM)
-                        for _ in range(50):
-                            if not holds_lease():
-                                break
-                            time.sleep(0.1)
-                        else:
-                            if holds_lease():
-                                os.kill(pid, signal.SIGKILL)
-                            assert not holds_lease(), "private broker lease survived cleanup"
-                    raise AssertionError(f"private {harness} broker did not idle-exit: {pid}; cleanup checked only its native lease")
-        if not output.exists():
-            import re
-            diagnostics = re.findall(r"EPERM|EACCES|EROFS|unable to open database file|Operation not permitted|permission denied", stdout + stderr)
-            fields = re.findall(r"^\s*(?:path|syscall):\s*[\"']([^\"']+)[\"']", stdout + stderr, re.MULTILINE)
-            raise AssertionError(f"{harness} {version}: startup acceptance hook not reached (exit {process.returncode}); codes={diagnostics}; paths/syscalls={fields}")
-        actual = json.loads(output.read_text())
-        assert process.returncode == 0 and all(actual.values()), (harness, version, actual)
-        print(f"live {harness} {version}: " + json.dumps(actual, sort_keys=True))
-    assert checked, "no installed harness checked"

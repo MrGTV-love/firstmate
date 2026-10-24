@@ -2054,12 +2054,17 @@ test_retiring_omp_removes_only_its_generated_configuration() {
   printf claude > "$dir/fake/becomes"
   printf 'export default () => {};\n' > "$dir/home/state/rl-config.omp-ext.ts"
   printf '{"retry":{"modelFallback":false}}\n' > "$dir/home/state/rl-config.omp-fallback.yml"
+  printf '{"current_session_file":"retired"}\n' > "$dir/home/state/rl-config.omp-session.json"
+  printf '{"at":1,"task":"rl-config","decision":"clear"}\n' > "$dir/home/state/rl-config.jev-guard.jsonl"
+  cp "$dir/home/state/rl-config.jev-guard.jsonl" "$dir/prior-audit"
   mkdir -p "$dir/wt/.omp"
   printf 'user configuration\n' > "$dir/wt/.omp/config.yml"
   out=$(run_control "$dir" rl-config relaunch --harness claude --note "replace the configured runtime explicitly"); rc=$?
   expect_code 0 "$rc" "an explicit runtime replacement must complete: $out"
   assert_absent "$dir/home/state/rl-config.omp-fallback.yml" "retired model policy must not survive replacement"
   assert_absent "$dir/home/state/rl-config.omp-ext.ts" "retired callbacks must not survive replacement"
+  assert_absent "$dir/home/state/rl-config.omp-session.json" "the retired session binding must not survive replacement"
+  cmp -s "$dir/prior-audit" "$dir/home/state/rl-config.jev-guard.jsonl" || fail "runtime replacement removed historical task audit rows"
   assert_equals 'user configuration' "$(cat "$dir/wt/.omp/config.yml")" "retirement must preserve user configuration"
   out=$(run_control "$dir" rl-config relaunch --note "continue after the explicit runtime override"); rc=$?
   expect_code 0 "$rc" "the retired rule must not block subsequent recovery: $out"
