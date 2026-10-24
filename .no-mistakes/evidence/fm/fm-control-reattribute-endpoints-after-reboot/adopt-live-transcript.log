@@ -1,0 +1,99 @@
+lab session: fm-lab-adopt-live-65023-24718 (non-default, guarded helper)
+installed omp integration to /Users/charlesabrooker/tmp/fm-adopt-fx.z4oIdK/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+task A: native omp pid=66926 pane=w1:p1 cwd=/Users/charlesabrooker/tmp/fm-adopt-fx.z4oIdK/wt-adopt-a/sub/inner
+task A: live environment FM_SPAWN_GEN present? 0
+task A: herdr registration: {"agent":"omp","agent_session":{"agent":"omp","kind":"path","source":"herdr:omp","value":"/Users/charlesabrooker/tmp/fm-adopt-fx.z4oIdK/omp-session-a.jsonl"}}
+task A stuck record (dead pid 73273, empty current): {"version":1,"spawn_gen":"gen-adopt-a","pid":73273,"task_session_file":"/Users/charlesabrooker/tmp/fm-adopt-fx.z4oIdK/omp-session-a.jsonl","current_session_file":""}
+=== S0 baseline: interrupt on the stuck restored omp is refused ===
+$ fm-control.sh adopt-a interrupt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    error: task adopt-a cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+RESULT PASS: S0 interrupt refused before adopt
+=== S7a worker refusal ===
+$ FM_TASK_ID=someworker fm-control.sh adopt-a adopt (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+error: workers cannot adopt a session record
+RESULT PASS: S7a worker adopt refused, record unchanged
+=== S7b session without the home lock ===
+$ fm-control.sh adopt-a adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    error: session record adoption requires the actual lock-owning main Firstmate
+RESULT PASS: S7b no-lock adopt refused, record unchanged
+lock acquired: harness pid 60002
+fm-lock.sh acquire exit 0; lock: held by live harness pid 60002
+=== S5 record spawn_gen differs from metadata ===
+$ fm-control.sh adopt-a adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: generation proof needs the existing record spawn_gen to equal metadata spawn_gen
+RESULT PASS: S5 generation mismatch refused, no generation fabricated
+=== S4 two metas claim one pane ===
+$ fm-control.sh adopt-a adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: unique-claim proof needs no other local task to claim this pane; claimed by adopt-dup
+RESULT PASS: S4 duplicate pane claim refused
+=== S3a another task owns a deeper worktree around the cwd ===
+$ fm-control.sh adopt-a adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: workspace proof needs this task to be the unique deepest match; cwd belongs to adopt-nested
+RESULT PASS: S3a deeper nested worktree of another task refused
+=== S3b another task records the same worktree (tie) ===
+$ fm-control.sh adopt-a adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: workspace proof needs this task to be the unique deepest match; cwd belongs to adopt-nested
+RESULT PASS: S3b same-depth worktree tie refused
+=== S6 same live PID with the extension's empty unproven mark ===
+$ fm-control.sh adopt-a adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: current-session proof for the live PID is empty or invalid, which the omp extension writes as unproven; adoption cannot overwrite it
+RESULT PASS: S6a adopt refused for live-PID empty mark, unchanged
+$ fm-control.sh adopt-a interrupt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    error: task adopt-a cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+RESULT PASS: S6b interrupt still refused on live-PID empty mark
+=== S1 happy path: adopt the stuck restored omp, then interrupt with no keystroke ===
+$ fm-control.sh adopt-a adopt   (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopted: adopt-a
+record after adopt: {"version": 1, "spawn_gen": "gen-adopt-a", "pid": 66926, "task_session_file": "/Users/charlesabrooker/tmp/fm-adopt-fx.z4oIdK/omp-session-a.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-adopt-fx.z4oIdK/omp-session-a.jsonl"}
+RESULT PASS: S1a adopt writes version=1, same spawn_gen, live pid, preserved task file, live current file
+-rw-r--r--  1 charlesabrooker  staff  452 Oct 24 14:00 adopt-a.meta
+-rw-------  1 charlesabrooker  staff  240 Oct 24 14:00 adopt-a.omp-session.json
+RESULT PASS: S1b no staged/capture leftovers
+RESULT PASS: S1c adopt did not restart or replace the agent
+$ fm-control.sh adopt-a interrupt   (exit 0)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    interrupt-delivered adopt-a harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+RESULT PASS: S1d interrupt succeeds after adopt (no human keystroke)
+RESULT PASS: S1e agent survives interrupt (same PID)
+=== S2 repeat adopt is refused and leaves the record byte-identical ===
+$ fm-control.sh adopt-a adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: record proof needs the recorded PID to be gone; 66926 is a live process, so the omp extension owns this record and it was not changed
+RESULT PASS: S2 repeat adopt refused, record byte-identical
+task E: native omp pid=96742 pinned FM_SPAWN_GEN=gen-another-launch
+=== S8 process pinned to another generation ===
+$ fm-control.sh adopt-e adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: generation proof needs the live process not to be pinned to another launch generation
+RESULT PASS: S8a pinned-elsewhere adopt refused, record unchanged
+$ fm-control.sh adopt-e interrupt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    error: task adopt-e cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+RESULT PASS: S8b interrupt still refused for pinned-elsewhere
+task D foreground: [{"pid":7580,"name":"sleep"},{"pid":7577,"name":"sleep"},{"pid":7573,"name":"bash"}]
+=== S9 ambiguous foreground ===
+$ fm-control.sh adopt-d adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane
+RESULT PASS: S9 ambiguous foreground refused
+=== S10 non-agent foreground process ===
+$ fm-control.sh adopt-f adopt   (exit 1)
+    fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuLx8y
+    adopt refused: process proof needs the resolved foreground process to be a readable agent process
+RESULT PASS: S10 non-agent foreground refused
+Herdr lab runtime: {"server":true,"session":null}
+TOTAL FAILS: 0
+guarded teardown of fm-lab-adopt-live-65023-24718 completed
+native pid 66926 exit confirmed
+native pid 96742 exit confirmed
+removed private fixture trees
