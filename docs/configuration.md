@@ -2087,13 +2087,15 @@ Account pins and saved resets are unchanged; reviewer model selection remains ow
 Top-level `task_horizon_minutes`, rule `approval`, `min_confidence`, and `floor`, and profile `provider` and `floor` are optional declarations that only [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) applies in code; without that opt-in they are inert, and firstmate's own intake reads them as ordinary hints.
 Typed resolution requires a top-level `judgments` object and a `match` object on every rule; `when` remains the human-readable description, not a question sent to the model.
 Each judgment has `type: "noul"`, one observable question in `instructions`, and concrete `criteria.true` and `criteria.false` strings.
-A rule's `match` may constrain exact `project`, exact `exclude_project`, and `kind` (`ship` or `scout`), and reference judgment ids in nonempty `all`, `any`, and `none` arrays.
+Every rule's `match.projects` is a nonempty positive list of ids registered in `data/projects.md`; config load rejects unregistered ids, missing project lists, and negative selectors.
+It may also constrain `kind` (`ship` or `scout`) and reference judgment ids in nonempty `all`, `any`, and `none` arrays.
 Unknown selector keys, unknown judgment ids, and missing structured matches are configuration errors, not a fallback to prose classification.
 These declarations restrict routing; they do not grant an exception, new profile, or permission.
 The [example configuration](examples/crew-dispatch.json) shows the structured format.
 
 Migration to structured matches (required before typed resolution runs): a rules file written for the retired rule Choice has no `judgments` object and no rule `match`.
-Rewrite each rule's routing facts as `match.project`, `match.exclude_project`, or `match.kind`, and each remaining semantic condition as a single-judgment Noul in `judgments` referenced from `match.all`, `match.any`, or `match.none`.
+List each rule's applicable registered projects in `match.projects`, retain any `match.kind` fact, and express each remaining semantic condition as a single-judgment Noul in `judgments` referenced from `match.all`, `match.any`, or `match.none`.
+The former `project` and `exclude_project` selectors have no compatibility layer; adding a project to the registry does not make any existing rule apply to it.
 There is no compatibility layer: an old-format file with at least one rule fails closed as a malformed rules file (exit 2), so firstmate dispatches through its manual intake until the file is migrated, and bootstrap reports the same `CREW_DISPATCH: invalid` diagnostic while the key is set.
 
 - `approval` accepts only `"captain"` and means a task the rule matches is never dispatched from the tool's answer alone.
@@ -2197,7 +2199,7 @@ This section is the single owner of the tool's operator contract; the script hea
 Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFIG_OVERRIDE` selects the config directory for tests and specialized setup like the other scripts.
 
 ```sh
-bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name>        # TOON block on stdout
+bin/fm-dispatch-resolve.sh data/<id>/brief.md        # TOON block on stdout
 ```
 
 **When firstmate invokes the resolver**
@@ -2221,8 +2223,14 @@ Extraction rewrites the caller's task-text file in place without relaxing its ex
 When the sections are sent from a scout brief, the line `Brief kind: scout (report only)` comes first, taken from the scaffold's scout contract line; ship briefs and briefs sent whole get no kind line.
 An unfenced `# Current ship Firstmate spec` heading makes the brief a ship; otherwise the scout scaffold's contract line in the unfenced `# Setup` section makes it a scout, and remaining briefs are ships.
 Kind is resolved before task extraction, so a promoted brief sends its current ship specification rather than the obsolete scout specification.
-Project is the caller's `--project` value, never inferred from task prose.
-When any rule declares `project` or `exclude_project` and `--project` is absent, the resolver returns `escalate` before sending anything.
+Scaffolding and typed clone-path binding require `python3` and use only its standard library.
+The scaffold's first line is one typed header, `FIRSTMATE_DISPATCH: {"project_path":"/absolute/clone/path"}`, from its positional repository argument, not an independently editable id.
+Only that first line can bind the project; a record quoted later in task prose, fenced or otherwise, is not metadata.
+The resolver derives the registered id by requiring that path's strict realpath to equal exactly one registered clone location: `<home>/projects/<id>`, or the home itself for `firstmate`.
+Missing or malformed metadata, a missing clone, an unrelated or ambiguous clone location, and a missing or unreadable registry return a named `escalate` result without sending anything.
+Unregistered scaffold inputs may still be written for manual intake but cannot resolve automatically.
+No caller `--project` flag, case folding, whitespace trimming, regex matching, or task-prose project inference participates in this binding.
+The clone path is removed from whole-brief fallback text and is never sent to the provider.
 A ship brief's delivery mode is not sent.
 
 The scaffold's standard setup, rules, and definition-of-done text is the same in every brief, so leaving it out keeps its safety language from reading as a signal about the task.
@@ -2372,7 +2380,7 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Predicate support below the floor with no runner-up taken, or a conflicting rule-support tie. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, desktop capability request, project-scoped rules without `--project`, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, desktop capability request, missing or invalid typed clone-path bindings, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
 | `error` | API, network, malformed response metadata, rendering, quota-axi failure, a Level 5 adapter that cannot run, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.

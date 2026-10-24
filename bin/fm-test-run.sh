@@ -1937,6 +1937,11 @@ families_for_changed_path() {
     bin/fm-review-agent-select.sh)
       printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       ;;
+    bin/fm-dispatch-project.py)
+      printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
+      printf '%s\n' "__script__:fm-brief.test.sh"
+      printf '%s\n' "__script__:fm-bootstrap.test.sh"
+      ;;
     bin/fm-dispatch-resolve.sh|bin/fm-dispatch-level5.ts)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       ;;

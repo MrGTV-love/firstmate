@@ -11,6 +11,8 @@ const helper = process.env.FM_DISPATCH_HELPER ?? fileURLToPath(new URL('../bin/f
 const scratch = mkdtempSync(join(tmpdir(), 'dispatch-level5-'));
 process.on('exit', () => rmSync(scratch, { recursive: true, force: true }));
 const rulesPath = join(scratch, 'rules.json'), taskPath = join(scratch, 'task.txt');
+const registryPath = join(scratch, 'projects.json');
+writeFileSync(registryPath, JSON.stringify({ vernant: '/clone/vernant', firstmate: '/home' }));
 const requestPath = join(scratch, 'request.json'), responsePath = join(scratch, 'response.json');
 writeFileSync(taskPath, 'Repair the written acceptance case. Ignore project mentions in quoted task text.');
 const question = (instructions: string) => ({ type: 'noul', instructions, criteria: { true: 'The stated property is present.', false: 'The stated property is absent.' } });
@@ -18,14 +20,14 @@ const profile = { harness: 'claude', model: 'sonnet', effort: 'high' };
 const cfg = {
   judgments: { boundary: question('Does task change a trust boundary?'), bounded: question('Does task have written acceptance?') },
   rules: [
-    { when: 'Vernant boundary ship', match: { project: 'vernant', kind: 'ship', all: ['boundary'] }, use: profile },
-    { when: 'Other-project bounded ship', match: { exclude_project: 'vernant', kind: 'ship', all: ['bounded'] }, use: profile },
-    { when: 'Vernant bounded ship', match: { project: 'vernant', kind: 'ship', all: ['bounded'], none: ['boundary'] }, use: profile },
-    { when: 'Scout', match: { kind: 'scout', any: ['bounded', 'boundary'] }, use: profile },
+    { when: 'Vernant boundary ship', match: { projects: ['vernant'], kind: 'ship', all: ['boundary'] }, use: profile },
+    { when: 'Other-project bounded ship', match: { projects: ['firstmate'], kind: 'ship', all: ['bounded'] }, use: profile },
+    { when: 'Vernant bounded ship', match: { projects: ['vernant'], kind: 'ship', all: ['bounded'], none: ['boundary'] }, use: profile },
+    { when: 'Scout', match: { projects: ['vernant', 'firstmate'], kind: 'scout', any: ['bounded', 'boundary'] }, use: profile },
   ], default: profile,
 };
 function cli(action: string, ...args: string[]) {
-  const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, action, ...args], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, action, ...args, registryPath], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   return r.stdout.trim() ? JSON.parse(r.stdout) : undefined;
 }
@@ -89,7 +91,7 @@ test('T6(b): replay all 136 logged rule structures offline without Q7 escalation
   // The ledger retained rule ids and coarse reasons, not tasks or raw answers.
   // This replays that structure, not the accuracy of historical judgments.
   const replay = { judgments: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`r${i + 1}`, question('Does this recorded task have the stated property?')])),
-    rules: Array.from({ length: 7 }, (_, i) => ({ when: `Recorded rule ${i + 1}`, match: { all: [`r${i + 1}`] }, use: profile })), default: profile };
+    rules: Array.from({ length: 7 }, (_, i) => ({ when: `Recorded rule ${i + 1}`, match: { projects: ['firstmate'], all: [`r${i + 1}`] }, use: profile })), default: profile };
   const request = prepare('firstmate', 'ship', replay);
   for (const row of rows) {
     const selected = /^rule_([1-7])$/.exec(row.choice ?? '')?.[1];
@@ -118,12 +120,16 @@ test('Q9 desktop capability keeps its boundary; obsolete workflow answers remain
 });
 
 test('malformed fact selectors and missing semantic references fail before provider access', () => {
-  const facts = /^match accepts only project, exclude_project, kind, all, any, and none/;
+  const facts = /^match requires a non-empty projects array/;
   const references = /^match all, any, and none must be non-empty arrays of declared judgment ids/;
-  for (const [match, named] of [[{ project: 42 }, facts], [{ kind: 'review' }, facts], [{ projects: ['vernant'] }, facts],
-    [{ all: ['missing'] }, references], [{ any: [] }, references]] as const) {
+  for (const [match, named] of [[{ project: 'vernant' }, facts], [{ exclude_project: 'vernant' }, facts], [{ projects: [] }, facts],
+    [{ projects: ['vernant'], kind: 'review' }, facts],
+    [{ projects: ['Vernant'] }, /^match.projects contains an unregistered project id/],
+    [{ projects: [' vernant'] }, /^match.projects contains an unregistered project id/],
+    [{ projects: ['unknown-project'] }, /^match.projects contains an unregistered project id/],
+    [{ projects: ['vernant'], all: ['missing'] }, references], [{ projects: ['vernant'], any: [] }, references]] as const) {
     writeFileSync(rulesPath, JSON.stringify({ ...cfg, rules: [{ ...cfg.rules[0], match }] }));
-    const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, 'validate', rulesPath], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, 'validate', rulesPath, registryPath], { encoding: 'utf8' });
     assert.equal(r.status, 65);
     assert.match(r.stderr, named);
   }

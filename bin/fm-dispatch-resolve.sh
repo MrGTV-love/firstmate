@@ -3,7 +3,7 @@
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
 # Usage:
-#   fm-dispatch-resolve.sh <brief-file> [--project <name>]
+#   fm-dispatch-resolve.sh <brief-file>
 #
 # Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
 #   resolution and precedence.
@@ -22,8 +22,10 @@
 #   The state is project and the brief's task-specific text; kind stays in code
 #   and is never sent. The current
 #   ship heading overrides the scout declaration under the brief's # Setup before
-#   task extraction. Task prose cannot set project; a project-scoped rules file
-#   without --project escalates before anything is sent.
+#   task extraction. fm-dispatch-project.py derives project from the brief's
+#   typed clone path and a frozen data/projects.md registry, never task prose or
+#   a caller-typed id. Missing or invalid bindings escalate before anything is
+#   sent; every rule must name positive registered projects.
 #   bin/fm-dispatch-level5.ts owns question assembly and effort floors; bun runs
 #   it when installed, otherwise node with type stripping.
 #   The shared client selects TypeSafe explicitly, retains the raw exchange,
@@ -85,8 +87,8 @@
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> support below the floor or conflicting rule tie; decide as today
 #   escalate  -> approval required, unverifiable rule floor, high ambiguity, a
-#                desktop capability request, a project-scoped rule without
-#                --project, every selected profile
+#                desktop capability request, a missing/invalid clone binding,
+#                every selected profile
 #                filtered out, no candidate rankable, a genuine tie, or a
 #                winner whose established runway is shorter than the task horizon
 #   error     -> API, network, response, quota-axi, Level 5 adapter runtime, or
@@ -198,7 +200,6 @@ BRIEF='' PROJECT='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
 NEVER_SEND_PATH="$CONFIG/dispatch-never-send"
 while [ $# -gt 0 ]; do
   case "$1" in
-    --project) [ $# -ge 2 ] || die "--project needs a value"; PROJECT=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown flag $1" ;;
     *) [ -z "$BRIEF" ] || die "one brief file only"; BRIEF=$1; shift ;;
@@ -462,17 +463,18 @@ elif command -v node >/dev/null 2>&1; then
 else
   emit_error "neither bun nor node installed"
 fi
+python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" \
+  >"$MODEL_CONFIG/projects.json" 2>"$MODEL_CONFIG/project.err" || escalate_unsent "$(cat "$MODEL_CONFIG/project.err")"
 validate_rc=0
-validate_err=$("${LEVEL5[@]}" validate "$RULES" 2>&1 >/dev/null) || validate_rc=$?
+validate_err=$("${LEVEL5[@]}" validate "$RULES" "$MODEL_CONFIG/projects.json" 2>&1 >/dev/null) || validate_rc=$?
 case "$validate_rc" in
   0) ;;
   65) die_rules "$validate_err" ;;
   *) [ -z "$validate_err" ] || printf '%s\n' "$validate_err" >&2; emit_error "Level 5 rules validation could not run" ;;
 esac
-if [ -z "$PROJECT" ] && jq -e 'any(.rules[]; .match | has("project") or has("exclude_project"))' "$RULES" >/dev/null; then
-  escalate_unsent 'a project-scoped rule needs --project'
-fi
-"${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" "$KIND" > "$MODEL_CONFIG/level5-request.json" \
+PROJECT=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" resolve "$BRIEF" "$MODEL_CONFIG/projects.json" "$TASK_TEXT" \
+  2>"$MODEL_CONFIG/project.err") || escalate_unsent "$(cat "$MODEL_CONFIG/project.err")"
+"${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" "$KIND" "$MODEL_CONFIG/projects.json" > "$MODEL_CONFIG/level5-request.json" \
   || emit_error "Level 5 request preparation failed"
 REQUEST=$(cat "$MODEL_CONFIG/level5-request.json")
 never_send_check
@@ -501,7 +503,7 @@ done < <(jq -r '[(.rules[].use | if type == "array" then .[] else . end),
 # This is a private derived snapshot, not a rewrite of the captain's policy.
 chmod 600 "$RULES"
 NORMALIZED=$("${LEVEL5[@]}" apply "$RULES" "$RESP_FILE" "$MODEL_CONFIG/level5-request.json" "$KIND" "$allowed_harnesses" \
-  "$FM_DISPATCH_CHEAP_CLASS_RE" "$FM_DISPATCH_MAX_EFFORT_RE") \
+  "$FM_DISPATCH_CHEAP_CLASS_RE" "$FM_DISPATCH_MAX_EFFORT_RE" "$MODEL_CONFIG/projects.json") \
   || emit_error "Level 5 response or mapping failed"
 DISPATCH_ROUTE=$(jq -r '.route.model | "\(.model):\(.effort)"' <<<"$NORMALIZED")
 [[ "$DISPATCH_ROUTE" =~ $FM_DISPATCH_ROUTE_RE ]] || emit_error "Level 5 route is not a typed class and effort"

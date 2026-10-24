@@ -1096,7 +1096,7 @@ model_freshness_sweep() {
 }
 
 crew_dispatch_validate() {
-  local file err verified_harnesses resolved index_notes typed_active=false
+  local file err verified_harnesses resolved index_notes projects='{}' typed_active=false
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
@@ -1121,7 +1121,10 @@ crew_dispatch_validate() {
   else
     verified_harnesses='["claude","codex","opencode","pi","pi-signed","grok","kimi","cursor","agy","muse","rovo","omp","dsh","devin"]'
   fi
-  err=$(jq -r --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
+  if $typed_active && jq -e '(.rules // []) | length > 0' <<<"$resolved" >/dev/null; then
+    projects=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" 2>/dev/null) || projects='{}'
+  fi
+  err=$(jq -r --argjson projects "$projects" --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
     def verified($h): $verified_harnesses | index($h);
     def provider_id($p): ($p | type) == "string" and ($p | test($provider_re));
     def effort_ok($h; $m; $e):
@@ -1177,11 +1180,12 @@ crew_dispatch_validate() {
         then "each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false"
         else first((.rules[] | .match |
           if type != "object" then "each rule needs a match object"
-          elif ((keys - ["project", "exclude_project", "kind", "all", "any", "none"]) | length) > 0
-            or (has("project") and (.project | text | not))
-            or (has("exclude_project") and (.exclude_project | text | not))
+          elif ((keys - ["projects", "kind", "all", "any", "none"]) | length) > 0
+            or (.projects | type != "array" or length == 0 or any(.[]; type != "string"))
             or (has("kind") and .kind != "ship" and .kind != "scout")
-          then "match accepts only project, exclude_project, kind, all, any, and none; project and exclude_project must be non-empty strings and kind must be ship or scout"
+          then "match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout"
+          elif any(.projects[]; . as $id | $projects | has($id) | not)
+          then "match.projects contains an unregistered project id"
           elif any(("all", "any", "none") as $k | select(has($k)) | .[$k];
             type != "array" or length == 0 or any(.[]; . as $id | type != "string" or ($j | has($id) | not)))
           then "match all, any, and none must be non-empty arrays of declared judgment ids"

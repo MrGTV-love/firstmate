@@ -1,8 +1,8 @@
-// Firstmate dispatch policy. CLI: validate <rules> (exit 65 for a malformed
-// schema); prepare <rules> <task>
-// <project> <ship|scout>; call (request on stdin, key on fd 3); apply <rules>
-// <response> <request> <ship|scout> <allowed-harnesses-json> <cheap-class-re>
-// <max-effort-re>. Kind filters rules in code and is never sent to the provider.
+// Firstmate dispatch policy. CLI: validate <rules> <registry> (exit 65 for a
+// malformed schema); prepare <rules> <task> <project> <ship|scout> <registry>;
+// call (request on stdin, key on fd 3); apply <rules> <response> <request>
+// <ship|scout> <allowed-harnesses-json> <cheap-class-re> <max-effort-re> <registry>.
+// The frozen registry contains ids and clone locations. Kind stays in code.
 import { readFileSync, writeFileSync } from "node:fs";
 import { JevClient, ContractError, validateResponse } from "./ten-levels/src/core/client.ts";
 import { noul } from "./ten-levels/src/core/helpers.ts";
@@ -13,7 +13,7 @@ import type { ModelRoute } from "./ten-levels/src/levels/level05/model-router.ts
 import type { NoulQuestion, Questions, SystemOneRequest } from "./ten-levels/src/core/types.ts";
 
 type Profile = Record<string, unknown> & { harness: string; model?: string; effort?: string };
-type Match = { project?: string; exclude_project?: string; kind?: "ship" | "scout"; all?: string[]; any?: string[]; none?: string[] };
+type Match = { projects: string[]; kind?: "ship" | "scout"; all?: string[]; any?: string[]; none?: string[] };
 type Rule = Record<string, unknown> & { when: string; match: Match; use: Profile[] };
 type Config = Record<string, unknown> & { judgments: Record<string, NoulQuestion>; rules: Rule[]; default: Profile[] };
 type Filtered = { profile: Profile; reason: string };
@@ -36,7 +36,9 @@ function profiles(value: unknown): Profile[] {
       ...(typeof p.effort === "string" ? { effort: p.effort } : {}) };
   });
 }
-function config(path: string): Config {
+function config(path: string, registryPath: string): Config {
+  const registry: unknown = JSON.parse(readFileSync(registryPath, "utf8"));
+  if (!object(registry) || Object.values(registry).some(p => typeof p !== "string")) throw new Error("invalid project registry snapshot");
   const value: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (!object(value) || !Array.isArray(value.rules) || !object(value.judgments)) throw new Error("judgments must be an object of single-judgment Nouls");
   const judgments: Record<string, NoulQuestion> = {};
@@ -52,11 +54,12 @@ function config(path: string): Config {
   const rules = value.rules.map((r: unknown) => {
     if (!object(r) || typeof r.when !== "string" || !object(r.match)) throw new Error("each rule needs a match object");
     const m = r.match;
-    if (Object.keys(m).some(k => !["project", "exclude_project", "kind", "all", "any", "none"].includes(k)) ||
-      [m.project, m.exclude_project].some(p => p !== undefined && (typeof p !== "string" || !p.trim())) ||
+    if (Object.keys(m).some(k => !["projects", "kind", "all", "any", "none"].includes(k)) ||
+      !Array.isArray(m.projects) || m.projects.length === 0 || m.projects.some(p => typeof p !== "string") ||
       (m.kind !== undefined && m.kind !== "ship" && m.kind !== "scout")) {
-      throw new Error("match accepts only project, exclude_project, kind, all, any, and none; project and exclude_project must be non-empty strings and kind must be ship or scout");
+      throw new Error("match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout");
     }
+    if (m.projects.some(p => !Object.hasOwn(registry, p))) throw new Error("match.projects contains an unregistered project id");
     for (const key of ["all", "any", "none"]) {
       const ids = m[key];
       if (ids !== undefined && (!Array.isArray(ids) || ids.length === 0 ||
@@ -69,9 +72,7 @@ function config(path: string): Config {
   return { ...value, judgments, rules, default: profiles(value.default) };
 }
 function eligible(match: Match, project: string, kind: unknown): boolean {
-  return (!match.project || project === match.project) &&
-    (!match.exclude_project || (!!project && project !== match.exclude_project)) &&
-    (!match.kind || kind === match.kind);
+  return match.projects.includes(project) && (!match.kind || kind === match.kind);
 }
 function prepare(cfg: Config, task: string, project: string, kind: string): SystemOneRequest {
   if (kind !== "ship" && kind !== "scout") throw new Error("kind");
@@ -93,15 +94,15 @@ function prepare(cfg: Config, task: string, project: string, kind: string): Syst
 try {
   if (action === "validate") {
     try {
-      config(args[0]);
+      config(args[0], args[1]);
     } catch (error) {
       if (!(error instanceof Error) || error.name !== "Error" || "code" in error) throw error;
       console.error(error.message);
       process.exitCode = 65;
     }
   } else if (action === "prepare") {
-    const [rulesPath, taskPath, project, kind] = args;
-    console.log(JSON.stringify(prepare(config(rulesPath), readFileSync(taskPath, "utf8"), project, kind)));
+    const [rulesPath, taskPath, project, kind, registryPath] = args;
+    console.log(JSON.stringify(prepare(config(rulesPath, registryPath), readFileSync(taskPath, "utf8"), project, kind)));
   } else if (action === "call") {
     const request: unknown = JSON.parse(readFileSync(0, "utf8"));
     validateRequest(request);
@@ -112,11 +113,11 @@ try {
         ? { baseUrl: process.env.FM_TYPESAFE_TEST_ENDPOINT } : {}) });
     console.log(JSON.stringify(await client.systemOne(request.state, request.questions, { model: request.model })));
   } else if (action === "apply") {
-    const [rulesPath, responsePath, requestPath, kind, allowedJson, cheapPattern, maxEffortPattern] = args;
+    const [rulesPath, responsePath, requestPath, kind, allowedJson, cheapPattern, maxEffortPattern, registryPath] = args;
     if (!cheapPattern || !maxEffortPattern) throw new Error("classes");
     const cheapClass = new RegExp(cheapPattern, "i");
     const maxEffort = new RegExp(maxEffortPattern, "i");
-    const cfg = config(rulesPath);
+    const cfg = config(rulesPath, registryPath);
     const request: unknown = JSON.parse(readFileSync(requestPath, "utf8"));
     validateRequest(request);
     if (!object(request.state) || typeof request.state.task !== "string" || typeof request.state.repository !== "string" ||

@@ -28,10 +28,8 @@ It exited 0 with:
 ℹ fail 0
 ```
 
-The tests invoke the actual dispatch adapter's `prepare` and `apply` CLI paths without calling a provider.
-They drive maximally positive semantic answers against incompatible repository/kind facts, exercise predicate conjunction, disjunction and negation, preserve capability and ambiguity thresholds, and reject invalid fact selectors and missing predicate references.
-The baseline adapter fails the fact-scoped selection and removed-workflow escalation cases.
-The same command was re-run on the same host on the review-fix working tree based on commit `9c97cdd7c`, after malformed schemas received their own validator exit status, and again passed 5 of 5.
+The tests invoke the actual dispatch adapter's `prepare`, `apply`, and `validate` CLI paths without calling a provider.
+They drive maximally positive semantic answers against incompatible positive project/kind facts, exercise predicate conjunction, disjunction and negation, preserve capability and ambiguity thresholds, and reject negative selectors, unregistered project ids, and missing predicate references.
 
 The fixture [`dispatch-resolve-20261024.json`](../../tests/fixtures/dispatch-resolve-20261024.json) retains only rule choices and coarse reasons from the 136 logged resolves assessed on 2026-10-24.
 Thirty-two records carry the old human-workflow escalation reason.
@@ -39,30 +37,39 @@ Every record's rule-choice structure is replayed using fixed semantic answers, a
 The ledger did not retain task text, raw answers, project or kind, so this is a structural replay, not reconstruction of historical model judgments, wrong-pick rates, or a new live clear rate.
 No paid replay was performed.
 
+## Clone-bound public resolver smoke
+
+On the same host and date, the focused public-interface command was:
+
+```sh
+FM_DISPATCH_BINDING_ONLY=1 bash tests/fm-dispatch-resolve.test.sh
+```
+
+It exited 0 with:
+
+```console
+ok - B1 removes free-text project input and rejects missing, unrelated, redirected and absent clone bindings
+```
+
+This exercises the real shell resolver, scaffold, registry binding, policy adapter, and loopback HTTP provider with synthetic text and credentials.
+It rejects the removed `--project` inputs `Vernant` and ` vernant` before sending, rejects a missing first-line metadata header even when task prose contains a valid-looking record, and rejects unrelated paths, a redirected symlink, and a registered but absent clone.
+It also rejects an unregistered project in positive rule selection before sending.
+A generated Vernant brief then selects only a Vernant-applicable rule despite maximally positive answers for a non-Vernant rule.
+The recorded clone-path header does not reach the provider.
+
 ## Public resolver regression entry point
 
 ```sh
 bash bin/fm-test-run.sh tests/fm-dispatch-resolve.test.sh
 ```
 
-On the same host on 2026-10-24, at commit `f10c20f1b` (before the review fixes), this command exited 0 with:
-
-```console
-# all fm-dispatch-resolve tests passed
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=562499
-```
-
-The optional `EPOCHREALTIME` fast-path case printed `skip: no bash with EPOCHREALTIME is installed`; stock macOS Bash timing coverage ran.
-The established suite invokes the acceptance cases above and exercises the public shell resolver through a loopback HTTP provider using synthetic text and credentials.
-It covers request batching, deterministic fact exclusion through the complete resolver, removed workflow labels, session launch restrictions, model/effort floors, approval and quota gates, credential isolation, never-send filtering, frozen rules/index snapshots, chosen-account model checks, private result logging, and the observe-only shadow picker.
-The same script exercises the Node fallback when Bun is absent and leaves the unchanged vendored Level 5 tests in place.
-Its promoted-Vernant-ship case retains the original scout marker and appends the current ship specification, then verifies ship-only routing and the current specification in the actual provider request.
-A fenced, non-authoritative ship heading exercises the neighboring boundary.
-These are offline policy and transport checks, not evidence of semantic accuracy from the provider model.
-
-That pass predates the review fixes and does not validate them.
-The suite now also covers a fenced scout declaration inside an ordinary ship brief, scout detection from the unfenced `# Setup` section, escalation of project-scoped rules without `--project`, an old-format rules file failing closed with exit 2, an override directory's own judgment reaching the request, an adapter runtime failure reported as `status: error` rather than a malformed rules file, a conflicting highest-support tie that stays `ambiguous` in either rule order despite a declared floor, malformed-schema diagnostics that name the failing check, a provider request whose state carries no brief kind, and a never-send match found only in a judgment id, which withholds the request.
-No complete run of this entry point on the current code is recorded here; the pipeline's test step owns that evidence.
+The established suite includes the acceptance and clone-binding cases above and exercises quota ranking, uncertainty and tie handling, task-horizon feasibility, request batching, removed workflow labels, session launch restrictions, model/effort floors, approval gates, credential isolation, never-send filtering, frozen rules/index snapshots, chosen-account model checks, private result logging, and the observe-only shadow picker.
+It runs the Node fallback when Bun is absent and the unchanged vendored Level 5 tests.
+Its promoted-Vernant-ship case retains the original scout marker and appends the current ship specification, then verifies ship-only routing and the current specification in the provider request.
+Fenced, non-authoritative ship and scout declarations exercise neighboring boundaries.
+On the same host and date, `bash tests/fm-dispatch-resolve.test.sh` exited 0 and ended with `# all fm-dispatch-resolve tests passed` for this clone-binding cutover.
+The optional fast-clock case reported `skip: no bash with EPOCHREALTIME is installed`; stock macOS Bash timing coverage ran.
+The scaffold and bootstrap suites also exited 0 on that host.
 
 ## Verification boundary
 

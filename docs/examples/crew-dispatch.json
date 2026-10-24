@@ -3,54 +3,121 @@
     "fresh_facts": {
       "type": "noul",
       "instructions": "Does task depend on facts that must be checked against current public sources?",
-      "criteria": {"true": "Fresh external information is necessary for the requested outcome.", "false": "Repository or supplied information is sufficient."}
+      "criteria": {
+        "true": "Fresh external information is necessary for the requested outcome.",
+        "false": "Repository or supplied information is sufficient."
+      }
     },
     "mechanical": {
       "type": "noul",
       "instructions": "Does task consist of a straightforward mechanical operation?",
-      "criteria": {"true": "A rote rename, formatting sweep, targeted typo fix, or simple file gathering suffices.", "false": "The implementation needs investigation or design judgment."}
+      "criteria": {
+        "true": "A rote rename, formatting sweep, targeted typo fix, or simple file gathering suffices.",
+        "false": "The implementation needs investigation or design judgment."
+      }
     },
     "cross_file_reasoning": {
       "type": "noul",
       "instructions": "Does task require reasoning across several interacting parts?",
-      "criteria": {"true": "Many moving parts or a large multi-file feature must be considered together.", "false": "A localized change can be reasoned about in isolation."}
+      "criteria": {
+        "true": "Many moving parts or a large multi-file feature must be considered together.",
+        "false": "A localized change can be reasoned about in isolation."
+      }
     },
     "risky_refactor": {
       "type": "noul",
       "instructions": "Does task involve refactoring with material regression risk?",
-      "criteria": {"true": "The refactor's correctness depends on preserving nonlocal behavior.", "false": "No risky refactor is needed."}
+      "criteria": {
+        "true": "The refactor's correctness depends on preserving nonlocal behavior.",
+        "false": "No risky refactor is needed."
+      }
     },
     "design_judgment": {
       "type": "noul",
       "instructions": "Does task require choosing a design not already settled in its specification?",
-      "criteria": {"true": "A design choice remains necessary to meet the stated outcome.", "false": "The design is already specified."}
+      "criteria": {
+        "true": "A design choice remains necessary to meet the stated outcome.",
+        "false": "The design is already specified."
+      }
     }
   },
   "rules": [
     {
       "when": "Work requiring fresh public facts.",
-      "match": {"all": ["fresh_facts"]},
-      "use": {"harness": "grok"},
+      "match": {
+        "all": [
+          "fresh_facts"
+        ],
+        "projects": [
+          "firstmate"
+        ]
+      },
+      "use": {
+        "harness": "grok"
+      },
       "why": "Grok is preferred when current web-connected context is central."
     },
     {
       "when": "The task is a trivial mechanical edit such as a rote rename, formatting sweep, targeted typo fix, or simple file gathering.",
-      "match": {"all": ["mechanical"], "none": ["fresh_facts"]},
-      "use": {"harness": "claude", "role": "easy", "effort": "low"},
+      "match": {
+        "all": [
+          "mechanical"
+        ],
+        "none": [
+          "fresh_facts"
+        ],
+        "projects": [
+          "firstmate"
+        ]
+      },
+      "use": {
+        "harness": "claude",
+        "role": "easy",
+        "effort": "low"
+      },
       "why": "Use the fast profile for narrow mechanical work."
     },
     {
       "when": "The task is a big or ambiguous multi-file feature, a risky refactor, or work that requires holding many moving parts in mind.",
-      "match": {"any": ["design_judgment", "cross_file_reasoning", "risky_refactor"], "none": ["fresh_facts"]},
+      "match": {
+        "any": [
+          "design_judgment",
+          "cross_file_reasoning",
+          "risky_refactor"
+        ],
+        "none": [
+          "fresh_facts"
+        ],
+        "projects": [
+          "firstmate"
+        ]
+      },
       "use": [
-        {"harness": "claude", "role": "opus-grade", "effort": "high"},
-        {"harness": "codex", "role": "opus-grade", "effort": "high"}
+        {
+          "harness": "claude",
+          "role": "opus-grade",
+          "effort": "high"
+        },
+        {
+          "harness": "codex",
+          "role": "opus-grade",
+          "effort": "high"
+        }
       ],
       "why": "Resolve equal-class alternatives through quota-array-dispatch."
     }
   ],
   "default": [
-    {"harness": "codex", "role": "sonnet-grade", "effort": "medium"},
-    {"harness": "pi", "role": "sonnet-grade", "effort": "medium", "provider": "claude"}
+    {
+      "harness": "codex",
+      "role": "sonnet-grade",
+      "effort": "medium"
+    },
+    {
+      "harness": "pi",
+      "role": "sonnet-grade",
+      "effort": "medium",
+      "provider": "claude"
+    }
   ]
 }
