@@ -543,6 +543,8 @@ for SECTION in 'WAKE QUEUE' 'SUPERVISION OPERATING INSTRUCTIONS' 'FLEET STATE' '
 done
 pass "a wedged backlog backend still leaves a complete digest: wake queue, supervision instructions, fleet state, and context all print"
 
+grep -q '^BACKLOG_RECONCILE: wedged-task-a: .*could not be moved to In flight: .*wedged-task-a.*bound' "$DIGEST" \
+  || fail "the no-progress stop must be reported for the first queued worker: $(cat "$DIGEST")"
 for ID in wedged-task-b wedged-task-c; do
   grep -q "^BACKLOG_RECONCILE: $ID: .*could not be read: .*skipped" "$DIGEST" \
     || fail "the later worker must be reported as skipped without repeating the timeout: $(cat "$DIGEST")"

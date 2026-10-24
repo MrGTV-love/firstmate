@@ -684,8 +684,9 @@ start_successor() {  # <predecessor-arm-pid>
     if [ "$(date +%s)" -ge "$deadline" ]; then
       : > "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
       if ! grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$SUCCESSOR_OUT" 2>/dev/null; then
-        grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null && rm "$SUCCESSOR_OUT.unattended" 2>/dev/null && return 1
-        return 2
+        grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null || return 2
+        rm -f "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
+        return 1
       fi
       rm -f "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
       continue

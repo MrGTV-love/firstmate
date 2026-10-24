@@ -96,7 +96,7 @@ fm_run_progress() {
   local seconds=$1 helper
   shift
   helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
-  if command -v python3 >/dev/null 2>&1; then
+  if fm_posix_python; then
     python3 "$helper" keep-going "$seconds" -- "$@"
   elif command -v perl >/dev/null 2>&1; then
     fm_run_perl_progress "$seconds" "$@"
@@ -104,6 +104,39 @@ fm_run_progress() {
     printf 'fm_run_progress: Python 3 or Perl is required to observe command progress\n' >&2
     return 127
   fi
+}
+
+# fm_posix_python: 0 when python3 is a POSIX interpreter able to run
+# fm-duration.py's process-group runners. A native Windows python3 on a Git Bash
+# PATH is not, so callers fall back instead of failing every read. The answer is
+# kept for the rest of this shell.
+fm_posix_python() {
+  if [ -z "${_FM_POSIX_PYTHON:-}" ]; then
+    _FM_POSIX_PYTHON=0
+    if command -v python3 >/dev/null 2>&1 \
+      && python3 -c 'import os, sys; sys.exit(os.name != "posix")' >/dev/null 2>&1; then
+      _FM_POSIX_PYTHON=1
+    fi
+  fi
+  [ "$_FM_POSIX_PYTHON" = 1 ]
+}
+
+# fm_progress_check <record> <pid> <no-progress-seconds> [path...]: fm-duration.py
+# progress-check, the identity-bound proof that pid's process tree and the paths
+# made no progress for the interval (124 only then). Without a POSIX python3
+# nothing can be proven, so it never returns 124 and writes one
+# cpu_telemetry_unavailable line per shell instead of failing each call.
+fm_progress_check() {
+  local helper
+  if ! fm_posix_python; then
+    if [ "${_FM_PROGRESS_CHECK_WARNED:-0}" != 1 ]; then
+      _FM_PROGRESS_CHECK_WARNED=1
+      printf 'cpu_telemetry_unavailable: no POSIX python3 can check process progress here; hung work cannot be proven, so nothing is stopped for inactivity\n' >&2
+    fi
+    return 0
+  fi
+  helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
+  python3 "$helper" progress-check "$@"
 }
 
 # Preserve the existing Python-optional shell readers. Perl core modules relay

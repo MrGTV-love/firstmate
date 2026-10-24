@@ -426,6 +426,98 @@ def proc_sampler():
                 f'{runner}: missing one loud platform warning: {result.stderr}')
 case('proc_only_sampler_cuts_still_keeps_growing_and_warns_when_blind', proc_sampler)
 
+import select
+
+def holder_fixture(name, stale):
+    home, env = fixture(name)
+    env.update(FM_GUARD_GRACE='1', FM_WATCHER_STALE_GRACE='1', FM_WATCHER_STALL_BOUND='1',
+               FM_ARM_CONFIRM_TIMEOUT='1', FM_ARM_ATTACH_POLL='0.1', FM_POLL='1',
+               FM_SIGNAL_GRACE='0', FM_CHECK_INTERVAL='999999', FM_HEARTBEAT='999999',
+               FM_WATCH_HANDLING_SUCCESSOR='1')
+    # A watcher busy in a long handling turn: identity-matched, CPU advancing.
+    holder = subprocess.Popen([sys.executable, '-c', 'while True: sum(i*i for i in range(1000))'])
+    lock = home / 'state/.watch.lock'
+    lock.mkdir()
+    identity = run(['bash', '-c', '. "$1"; fm_pid_identity "$2"', '_', home / 'bin/fm-wake-lib.sh',
+                    str(holder.pid)], env).stdout.strip()
+    require(bool(identity), 'holder identity missing')
+    for key, value in {'pid': str(holder.pid), 'pid-identity': identity, 'fm-home': str(home),
+                       'watcher-path': str(home / 'bin/fm-watch.sh')}.items():
+        (lock / key).write_text(value + '\n')
+    beat = home / 'state/.last-watcher-beat'
+    beat.touch()
+    if stale:
+        os.utime(beat, (1, 1))
+    return home, env, holder, beat
+
+def stop_process(child):
+    if child is not None and child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
+
+def contender():
+    home, env, holder, beat = holder_fixture('contender', True)
+    child = None
+    try:
+        child = subprocess.Popen([str(home / 'bin/fm-watch.sh')], env=env,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        until = time.monotonic() + 20
+        while child.poll() is None and holder.poll() is None and time.monotonic() < until:
+            time.sleep(0.05)
+        require(holder.poll() is None, 'contender terminated a productive identity-matched old-beacon holder')
+        out, err = child.communicate()
+        require(child.returncode == 0 and 'already running pid ' + str(holder.pid) in out,
+                'contender did not preserve the existing cycle: ' + out + err)
+    finally:
+        stop_process(child)
+        stop_process(holder)
+case('contender_preserves_productive_old_beacon_holder', contender)
+
+def attached(stale):
+    home, env, holder, beat = holder_fixture('attached-old' if stale else 'attached-aging', stale)
+    import threading
+    stop_beacon = threading.Event()
+    def fresh_until_attached():
+        while not stop_beacon.is_set():
+            beat.touch()
+            stop_beacon.wait(0.05)
+    publisher = None if stale else threading.Thread(target=fresh_until_attached)
+    if publisher:
+        publisher.start()
+    arm_process = None
+    try:
+        arm_process = subprocess.Popen([str(home / 'bin/fm-watch-arm.sh')], env=env,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        until = time.monotonic() + 20
+        first = ''
+        while time.monotonic() < until:
+            if select.select([arm_process.stdout], [], [], 0.1)[0]:
+                first = arm_process.stdout.readline()
+                break
+            if arm_process.poll() is not None:
+                break
+        require(first.startswith('watcher: attached pid=' + str(holder.pid)),
+                'productive holder was not followed: ' + first + ' holder-exit=' + str(holder.poll()))
+        stop_beacon.set()
+        if publisher:
+            publisher.join()
+        os.utime(beat, (1, 1))
+        time.sleep(3)
+        require(holder.poll() is None, 'attached arm terminated productive holder')
+        require(arm_process.poll() is None, 'attached arm refused productive holder solely because its beacon aged')
+    finally:
+        stop_beacon.set()
+        if publisher:
+            publisher.join()
+        stop_process(arm_process)
+        stop_process(holder)
+case('attached_arm_follows_productive_holder_after_beacon_ages', lambda: attached(False))
+case('attached_arm_admits_productive_already_old_holder', lambda: attached(True))
+
 def load_collector():
     spec = importlib.util.spec_from_file_location('progress_collector', root / 'bin/fm_open_loops.py')
     module = importlib.util.module_from_spec(spec)

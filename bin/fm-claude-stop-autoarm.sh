@@ -364,7 +364,7 @@ run_arm() {  # <output file, or empty for none>
 # or is still starting.
 SUCCESSOR_NOTE=
 start_handling_successor() {  # <closed-arm-pid>
-  local out mark pid deadline budget line monitor_was_on=0
+  local out mark pid deadline budget line queued='' monitor_was_on=0
   budget=${FM_ARM_CONFIRM_TIMEOUT:-30}
   case "$budget" in ''|*[!0-9]*) budget=30 ;; esac
   if ! out=$(mktemp "$STATE/.claude-autoarm-successor.XXXXXX"); then
@@ -385,14 +385,23 @@ start_handling_successor() {  # <closed-arm-pid>
       return 0
     fi
     grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
-    fm_pid_alive "$pid" || break
+    if ! fm_pid_alive "$pid"; then
+      if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
+        rm -f "$out" 2>/dev/null || true
+        return 0
+      fi
+      break
+    fi
     if [ "$(date +%s)" -ge "$deadline" ]; then
       : > "$mark" 2>/dev/null || true
       if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
         rm -f "$out" "$mark" 2>/dev/null || true
         return 0
       fi
-      grep -q '^watcher: FAILED' "$out" 2>/dev/null && rm "$mark" 2>/dev/null && break
+      if grep -q '^watcher: FAILED' "$out" 2>/dev/null; then
+        rm "$mark" 2>/dev/null || queued=' and was also queued as a wake'
+        break
+      fi
       rm -f "$out" 2>/dev/null || true
       SUCCESSOR_NOTE="The handling successor pid=$pid is still starting; this wake is not held for it, and it keeps running to report its own result."
       return 0
@@ -402,7 +411,7 @@ start_handling_successor() {  # <closed-arm-pid>
   line=$(grep '^watcher: FAILED' "$out" 2>/dev/null | head -n 1 || true)
   rm -f "$out" 2>/dev/null || true
   [ -z "$line" ] || line=" ($line)"
-  SUCCESSOR_NOTE="The handling successor pid=$pid did not confirm a live watcher$line; this handling turn runs uncovered until the next turn end re-arms."
+  SUCCESSOR_NOTE="The handling successor pid=$pid did not confirm a live watcher$line$queued; this handling turn runs uncovered until the next turn end re-arms."
   return 1
 }
 

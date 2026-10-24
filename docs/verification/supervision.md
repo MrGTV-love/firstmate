@@ -231,7 +231,7 @@ The nested-bound case checks that captured stdout closes promptly and the child 
 
 ### Productive-work limits
 
-Verified 2026-10-23 on macOS arm64 with Bash 3.2.57, Python 3.13.6, Perl 5.34.1 and Node 26.4.0:
+Verified 2026-10-23 on macOS arm64 with Bash 3.2.57, Python 3.13.6, Perl 5.34.1 and Node 26.4.0, against the change as first submitted (commit c5ac4d161), before its rebase and review rounds:
 
 ```sh
 bash bin/fm-test-run.sh tests/fm-work-progress.test.sh
@@ -241,13 +241,14 @@ bash bin/fm-test-run.sh tests/fm-duration.test.sh
 ```
 
 These commands ran beneath the process-budget and duration owners.
-The progress suite reported `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0` with all eleven cases passing.
+At that commit the progress suite reported `FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0` with all eleven of its then cases passing.
 It exercises slow arm/omp/Claude readiness, a productive watcher with an old beacon followed by a real inactive-holder stop, atomic summary publication, authoritative crew and fleet reads, and collection beyond the retired overall alarm.
 It also removes Python from the child's PATH and proves both CPU-only descendant work and output-only work survive, while a genuinely inactive source is stopped without leaving a live descendant.
 The backlog suite finished with `# fm-backlog-read-bound.test.sh: all assertions passed`, covering slow row/inventory/held-call reads without poisoning the sweep, plus real no-progress recovery and refusal to spend an unreadable row as absence or inventory attestation.
 The complete crew-state suite also passed its unchanged Python-free and unavailable-SQLite diagnostics, and the duration-owner suite retained real statistics-import and ownership behavior.
 Progress-only execution therefore does not acquire a SQLite dependency just to observe a command.
 These are project-owned process and API-boundary guarantees, not refreshed vendor-rendering or backend-availability claims.
+The later review rounds changed the progress runner, crew-state reads, watcher ownership and adapter readiness and added cases to these suites; this record does not cover those changes, which rest on the suites' own current results.
 The [progress owner](../../bin/fm-duration.py), [shell execution owner](../../bin/fm-timeout-lib.sh), and [backlog owner](../../bin/fm-backlog-transition-lib.sh) define the current mechanics; incident chronology and before-change counterfactuals remain in private task evidence.
 
 ## Semantic busy state

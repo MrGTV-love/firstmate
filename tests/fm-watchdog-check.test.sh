@@ -188,6 +188,26 @@ test_stale_watcher_recovers() {
   pass "a stale watcher with a live session is resumed and recovers"
 }
 
+# A live lock pid that is not this home's watcher (no recorded identity, as a
+# reused pid leaves it) is a stale lock: the check clears it through the arm's
+# home-scoped --stop and never signals that unrelated process.
+test_stale_watcher_with_live_pid_is_stopped_first() {
+  local home dir holder
+  home=$(make_home hung)
+  dir=$(dirname "$home")
+  stale_beat "$home"
+  write_ledger "$home" rewake "$(dead_pid)"
+  holder=$(start_session)
+  mkdir -p "$home/state/.watch.lock"
+  printf '%s\n' "$holder" > "$home/state/.watch.lock/pid"
+  write_stubs "$home" "$(healing_resume "$home")"
+  run_check "$home"
+  expect_code 0 "$CODE" "hung watcher exit"
+  assert_equals "--stop" "$(cat "$dir/arm.calls")" "the home-scoped stop is the only watcher action"
+  kill -0 "$holder" 2>/dev/null || fail "the check must not signal the watcher pid itself"
+  pass "a stale lock held by an unrelated live pid is cleared through the arm's home-scoped --stop only"
+}
+
 test_dead_arm_owner_is_named() {
   local home dir
   home=$(make_home deadarm)
@@ -613,6 +633,7 @@ test_idle_home_does_nothing
 test_missing_home_is_idle
 test_bound_rewake_has_finite_grace
 test_stale_watcher_recovers
+test_stale_watcher_with_live_pid_is_stopped_first
 test_dead_arm_owner_is_named
 test_live_arm_owner_is_not_dead_arm
 test_missing_session_relaunches

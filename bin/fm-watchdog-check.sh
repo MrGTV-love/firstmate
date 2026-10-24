@@ -174,7 +174,7 @@ watchdog_verdict() {
     # An old beacon is not proof of a hang. Consecutive identity-bound samples
     # must show neither tree CPU nor beacon progress for the inactivity bound.
     # A first, failed or uncertain sample preserves the running watcher.
-    python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$STATE/.watchdog-progress" \
+    fm_progress_check "$STATE/.watchdog-progress" \
       "$watcher_pid" "$STALE_SECS" "$STATE/.last-watcher-beat" >> "$LOG" 2>&1 || progress_rc=$?
     if [ "$progress_rc" -ne 124 ]; then
       return 0
@@ -254,8 +254,17 @@ stop_stale_watcher() {
   local pid
   pid=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
   fm_pid_alive "$pid" || return 0
+  # A live pid that is not this home's watcher (a reused pid) holds only a stale
+  # lock: the arm's --stop clears that lock and its downtime without signalling.
+  if ! fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$pid" "$FM_HOME"; then
+    log "clearing stale watcher lock: live pid=$pid is not this home's watcher; through $(basename "$ARM") --stop, never signalled"
+    RECOVERY_ACTION_RAN=1
+    fm_run_timed "$STEP_BOUND" env FM_WATCH_STOP_PID="$pid" FM_WATCH_STOP_IDENTITY= \
+      FM_WATCH_STOP_IDLE_SECS="$STALE_SECS" "$ARM" --stop >> "$LOG" 2>&1 \
+      || log "stale watcher lock clear reported a failure"
+    return 0
+  fi
   if [ "$pid" != "$WATCHDOG_STUCK_PID" ] \
-    || ! fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$pid" "$FM_HOME" \
     || [ "$FM_WATCHER_MATCHED_IDENTITY" != "$WATCHDOG_STUCK_IDENTITY" ]; then
     log "preserving watcher pid=$pid: no identity-matched no-progress proof"
     return 0

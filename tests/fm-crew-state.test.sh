@@ -3491,6 +3491,7 @@ SH
   assert_not_contains "$out" "state: working" "an old working declaration cannot revive a dead worker"
   assert_contains "$out" "state: unknown" "a gone worker with a cut store reads unknown"
   assert_contains "$out" "backend target gone" "the pane still decides liveness after a cut lookup"
+  assert_contains "$out" "run-store: skipped (no output or CPU progress)" "the cut lookup is disclosed"
   pass "a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker"
 }
 
@@ -4472,8 +4473,9 @@ test_capped_inventory_reader_is_time_bounded() {
   local d=$TMP_ROOT/capped-slow-reader out started elapsed
   cat > "$d/fakebin/python3" <<'SH'
 #!/usr/bin/env bash
-# Stall the inventory, not the independent progress monitor's interpreter.
-if [ "${1##*/}" = fm-duration.py ]; then
+# Stall the inventory, not the independent progress monitor's interpreter or
+# its POSIX capability check; both run the real interpreter on this PATH.
+if [ "${1##*/}" = fm-duration.py ] || [ "${1:-}" = -c ]; then
   exec "${FM_TEST_PROGRESS_PYTHON:?}" "$@"
 fi
 printf 'invoked\n' >> "${0%/*}/python3.calls"
@@ -4483,13 +4485,16 @@ SH
   FM_CREW_STATE_NM_TIMEOUT=2
   export FM_CREW_STATE_NM_TIMEOUT
   started=$SECONDS
-  out=$(FM_TEST_PROGRESS_PYTHON="$(command -v python3)" run_crew_state "$d" competing)
+  # The interpreter itself, not a version-manager shim that would put its own
+  # python3 ahead of this fixture's on PATH.
+  out=$(FM_TEST_PROGRESS_PYTHON="$(python3 -c 'import sys; print(sys.executable)')" run_crew_state "$d" competing)
   elapsed=$((SECONDS - started))
   unset FM_CREW_STATE_NM_TIMEOUT
   [ "$elapsed" -lt 10 ] || fail "the capped inventory reader ran unbounded for ${elapsed}s"
   assert_contains "$out" 'state: unknown' 'an unreachable inventory reader cannot establish a verdict'
   assert_contains "$out" 'reader unavailable' 'a killed reader reports the same unavailable reader path'
   [ -s "$d/fakebin/python3.calls" ] || fail 'the inventory reader never ran, so the bound proved nothing'
+  assert_contains "$out" 'run-store: skipped (no output or CPU progress)' 'the stopped reader is disclosed as a skipped lookup'
   pass 'the capped inventory reader is bounded by the crew read budget'
 }
 

@@ -488,8 +488,9 @@ PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
   "$WRITER" --best-effort \
   || fail "validation timeout changed the best-effort caller result"
-[ -s "$HOME_DIR/state/.home-summary-refresh.log" ] \
-  || fail "publication validation failure was not logged"
+grep -F 'refresh made no output or CPU progress for 1 seconds' \
+  "$HOME_DIR/state/.home-summary-refresh.log" >/dev/null \
+  || fail "the publication validation stall was not logged as an inactivity failure: $(cat "$HOME_DIR/state/.home-summary-refresh.log" 2>/dev/null)"
 pass "best-effort refresh bounds validation and publication"
 
 MKBIN="$TMP_ROOT/mkdir-hangbin"

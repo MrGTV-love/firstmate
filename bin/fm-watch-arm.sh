@@ -32,13 +32,14 @@
 #   watcher: FAILED - cycle ended without an actionable reason
 #                                                        - a clean cycle ended with no wake and no
 #                                                          verified healthy successor
-#   watcher: FAILED - attached watcher pid=<N> stalled (beacon <age>s at or past hard bound <bound>s)
-#                                                        - the followed holder is alive but its beacon
-#                                                          reached the stall bound
+#   watcher: FAILED - attached watcher pid=<N> stalled (no CPU or beacon progress for <bound>s; beacon <age>s)
+#                                                        - the followed holder is alive but proven to
+#                                                          make no progress for the stall bound
 # A handling successor launched with FM_WATCH_LATE_FAILURE_MARK=<path> reports a
 # startup failure that comes after its waiter stopped waiting: the waiter creates
 # that file when it delivers the wake without the successor's result, and the
-# arm that removes it appends its FAILED line to the durable wake queue. Whoever
+# arm that removes it appends its FAILED line to the durable wake queue as a
+# main-owned `check: watcher-successor-failed:` row. Whoever
 # removes the file first, this arm or its waiter, is the one that reports, so the
 # failure is delivered once. A started or attached arm removes it unreported.
 # It NEVER reports started/attached/healthy off a stale beacon or a dead/reused pid: a
@@ -49,9 +50,12 @@
 # attached, a stale beacon alone does not end the followed cycle: while that
 # holder is alive and the lock still names it under the same identity, the arm
 # keeps following it, as a started arm waits out a slow child, until the lock
-# changes or the beacon reaches fm_watcher_stall_bound (bin/fm-wake-lib.sh), the
-# age at which the watcher's own re-arm evicts it; there it fails with the
-# stalled-holder line so its owner's retry replaces the holder. A cycle
+# changes or fm_progress_check (bin/fm-timeout-lib.sh) proves the holder's
+# process tree and beacon made no progress for fm_watcher_stall_bound
+# (bin/fm-wake-lib.sh), the proof on which the watcher's own re-arm evicts it;
+# there it fails with the stalled-holder line so its owner's retry replaces the
+# holder. Re-arm admits the same way: a live, identity-matched holder with an
+# old beacon that is not proven stalled is attached to and followed. A cycle
 # that ends with no reason line and no healthy successor is resolved against the
 # watcher's identity-bound delivery record: a matching record reports that wake
 # and exits 0, and only a cycle that delivered nothing is the typed nonzero
@@ -130,6 +134,8 @@ if [ "${FM_GATE_REFUSE_BYPASS:-}" != 1 ]; then
 fi
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+command -v fm_progress_check >/dev/null 2>&1 || . "$SCRIPT_DIR/fm-timeout-lib.sh"
 
 ARM_STARTED=0
 ARM_FAILURE_LINE=
@@ -146,8 +152,8 @@ report_late_failure() {
   local mark=${FM_WATCH_LATE_FAILURE_MARK:-}
   [ -n "$mark" ] && [ "$ARM_STARTED" -eq 0 ] && [ -n "$ARM_FAILURE_LINE" ] || return 0
   rm "$mark" 2>/dev/null || return 0
-  fm_wake_append signal watcher-successor-failed \
-    "$ARM_FAILURE_LINE (handling successor arm pid=$$ was still starting when its wake went out)" || true
+  fm_wake_append check watcher-successor-failed \
+    "check: watcher-successor-failed: $ARM_FAILURE_LINE (handling successor arm pid=$$ was still starting when its wake went out)" || true
 }
 trap report_late_failure EXIT
 
@@ -169,9 +175,12 @@ CONFIRM_TIMEOUT=${FM_ARM_CONFIRM_TIMEOUT:-$ARM_CONFIRM_DEFAULT}
 START_NO_PROGRESS=${FM_ARM_CONFIRM_TIMEOUT:-$((15 * 60))}
 # Poll interval while attached to an existing healthy watcher.
 ATTACH_POLL=${FM_ARM_ATTACH_POLL:-0.5}
-# The beacon age at which the watcher's own re-arm evicts a live holder; an
-# attached arm follows a slow holder up to it (attach_and_wait).
+# The no-progress interval the watcher's own re-arm must prove before it evicts
+# a live holder; an attached arm follows a slow holder until the same proof
+# (attach_and_wait), sampling it every tenth of the interval.
 STALL_BOUND=$(fm_watcher_stall_bound)
+PROGRESS_SAMPLE_EVERY=$(( STALL_BOUND / 10 ))
+[ "$PROGRESS_SAMPLE_EVERY" -ge 1 ] || PROGRESS_SAMPLE_EVERY=1
 CYCLE_LOG="$STATE/.watch-cycle-exits.log"
 CYCLE_LOG_LOCK="$STATE/.watch-cycle-exits.lock"
 CYCLE_LOG_MAX_BYTES=${FM_WATCH_CYCLE_LOG_MAX_BYTES:-262144}
@@ -423,8 +432,18 @@ attached_holder_live() {
 # A stale beacon alone does not end the followed cycle: while the holder is alive
 # and the lock still names it under the same identity, it is a slow cycle, which
 # a started arm tolerates by waiting on its child, so this arm keeps following it.
-# Only at the stall bound, where the watcher's own re-arm evicts a live holder,
-# does it fail with the typed stalled-holder line so its owner's retry replaces it.
+# Only once the holder is proven to make no progress for the stall bound, the
+# proof on which the watcher's own re-arm evicts a live holder, does it fail with
+# the typed stalled-holder line so its owner's retry replaces it.
+ATTACH_NEXT_SAMPLE=0
+attached_holder_proven_stalled() {  # <pid>
+  local rc=0
+  [ "$SECONDS" -ge "$ATTACH_NEXT_SAMPLE" ] || return 1
+  ATTACH_NEXT_SAMPLE=$(( SECONDS + PROGRESS_SAMPLE_EVERY ))
+  fm_progress_check "$STATE/.watchdog-progress" "$1" "$STALL_BOUND" "$BEAT" || rc=$?
+  [ "$rc" -eq 124 ]
+}
+
 attach_and_wait() {
   local attached_pid=$1 age
   while :; do
@@ -440,12 +459,12 @@ attach_and_wait() {
     fi
     if attached_holder_live "$attached_pid"; then
       age=$(fm_path_age "$BEAT")
-      if [ "$age" -lt "$STALL_BOUND" ]; then
+      if ! attached_holder_proven_stalled "$attached_pid"; then
         sleep "$ATTACH_POLL"
         continue
       fi
       cycle_log_append unknown unknown attached-holder-stalled none
-      echo "watcher: FAILED - attached watcher pid=$attached_pid stalled (beacon ${age}s at or past hard bound ${STALL_BOUND}s)"
+      echo "watcher: FAILED - attached watcher pid=$attached_pid stalled (no CPU or beacon progress for ${STALL_BOUND}s; beacon ${age}s)"
       return 1
     fi
     if wait_for_healthy_successor; then
@@ -560,7 +579,7 @@ stop_home_watcher() {
         STOP_SUPERSEDED=1
         return 0
       fi
-      python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$STATE/.watchdog-progress" \
+      fm_progress_check "$STATE/.watchdog-progress" \
         "$lock_pid" "${FM_WATCH_STOP_IDLE_SECS:-0}" "$BEAT" || progress_rc=$?
       if [ "$progress_rc" -ne 124 ]; then
         STOP_SUPERSEDED=1
@@ -664,7 +683,23 @@ fi
 # one - attach to that cycle and wait until it ends so the harness notify fires
 # then, not as an immediate empty wake. (--restart skips this: it just stopped
 # this home's watcher and wants a fresh one.)
-if [ "$mode" = arm ] && healthy_watcher; then
+# A live, identity-matched holder whose beacon is old (a holder still starting
+# has none yet and is left to the child below) is a slow cycle, attached
+# to like a fresh one, unless it is proven to make no progress for the stall
+# bound; then the child below evicts it.
+progressing_stale_holder() {
+  local pid rc=0
+  [ -e "$BEAT" ] || return 1
+  pid=$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)
+  fm_pid_alive "$pid" || return 1
+  fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$pid" "$FM_HOME" || return 1
+  fm_progress_check "$STATE/.watchdog-progress" "$pid" "$STALL_BOUND" "$BEAT" || rc=$?
+  [ "$rc" -ne 124 ] || return 1
+  HEALTHY_PID=$pid
+  HEALTHY_IDENTITY=$FM_WATCHER_MATCHED_IDENTITY
+}
+
+if [ "$mode" = arm ] && { healthy_watcher || progressing_stale_holder; }; then
   cycle_mark_predecessor_successor "attached:$HEALTHY_PID"
   cycle_begin "$HEALTHY_PID" attached "$HEALTHY_IDENTITY"
   report_attached
@@ -730,7 +765,7 @@ else
 fi
 child=$!
 cycle_begin "$child" started "$(fm_pid_identity "$child" 2>/dev/null || true)"
-python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$child_out.progress" "$child" "$START_NO_PROGRESS" \
+fm_progress_check "$child_out.progress" "$child" "$START_NO_PROGRESS" \
   "$child_out" "$BEAT" || true
 child_done=0
 
@@ -797,8 +832,8 @@ while :; do
   if healthy_watcher; then
     if [ "$HEALTHY_PID" = "$child" ]; then
       if grep -q '^watcher: replaced stalled pid ' "$child_out" 2>/dev/null; then
-        # The child evicted a live holder whose beacon stalled past the hard
-        # bound (bin/fm-watch.sh evict_stalled_holder). Ledger that as its own
+        # The child evicted a live holder proven to make no progress for the
+        # stall bound (bin/fm-watch.sh evict_stalled_holder). Ledger that as its own
         # row - lock_before still names the evicted holder - then reopen this
         # cycle so its ordinary close row follows as usual.
         cycle_log_append 0 none stalled-holder-replaced "started:$child"
@@ -840,7 +875,7 @@ while :; do
   fi
   if [ "$(date +%s)" -ge "$deadline" ]; then
     progress_rc=0
-    python3 "$SCRIPT_DIR/fm-duration.py" progress-check "$child_out.progress" "$child" "$START_NO_PROGRESS" \
+    fm_progress_check "$child_out.progress" "$child" "$START_NO_PROGRESS" \
       "$child_out" "$BEAT" || progress_rc=$?
     [ "$progress_rc" -ne 124 ] || break
     deadline=$(( $(date +%s) + 1 ))
