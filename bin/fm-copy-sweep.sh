@@ -864,7 +864,7 @@ content_quiet() {  # <copy>
 # <container>. A clone under a Firstmate home other than this one is judged as
 # that home would judge it.
 classify() {  # <copy> <clone> <pool> <container>
-  local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending inner
+  local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending inner nested
   local home=$FM_HOME state=$STATE locked=0 launcher=
   CLASS=
   REASON=
@@ -1004,13 +1004,18 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 0
   fi
+  if ! nested=$(list_nested "$clone"); then
+    CLASS=HELD-DIRTY
+    REASON="its registered nested copies cannot be listed, so no inner copy is ruled out"
+    return 0
+  fi
   while IFS= read -r inner; do
     case "$inner" in "$copy"/*) ;; *) continue ;; esac
     [ -d "$inner" ] || continue
     CLASS=HELD-DIRTY
     REASON="another registered copy is inside it: $inner"
     return 0
-  done < <(list_nested "$clone")
+  done <<< "$nested"
   if ! count=$(git -C "$copy" rev-list --count HEAD --not --remotes 2>/dev/null); then
     CLASS=HELD-UNPUSHED
     REASON="its HEAD cannot be compared with the remotes"
@@ -1301,7 +1306,7 @@ driver_plan_allows() {  # <clone> <copy>
   set -m
   (
     local r=0
-    teardown_run_closeout "$1" "$2" plan || r=$?
+    teardown_run_closeout "$1" "$2" plan "$dir/verdict" || r=$?
     printf '%s' "$TEARDOWN_CLOSEOUT_OUT" > "$dir/out"
     printf '%s' "$r" > "$dir/rc"
   ) </dev/null &
@@ -1319,19 +1324,20 @@ driver_plan_allows() {  # <clone> <copy>
   wait "$pid" 2>/dev/null
   rc=$(cat "$dir/rc" 2>/dev/null) || rc=1
   TEARDOWN_CLOSEOUT_OUT=$(cat "$dir/out" 2>/dev/null) || TEARDOWN_CLOSEOUT_OUT=
-  rm -f "$dir/out" "$dir/rc"
+  TEARDOWN_CLOSEOUT_STDOUT=$(cat "$dir/verdict" 2>/dev/null) || TEARDOWN_CLOSEOUT_STDOUT=
+  rm -f "$dir/out" "$dir/rc" "$dir/verdict"
   rmdir "$dir" 2>/dev/null
   if [ "$timed_out" = 1 ]; then
     PLAN_WHY="its closeout driver did not answer within ${limit}s"
     return 1
   fi
   PLAN_WHY=$(printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | tr '\n\t' '  ')
-  PLAN_WHY="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")${PLAN_WHY:0:600}"
-  if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_OUT"; then
+  PLAN_WHY="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")${PLAN_WHY:0:600}"
+  if [ "$rc" != 0 ] || ! plan_verdict_allows "$TEARDOWN_CLOSEOUT_STDOUT"; then
     PLAN_WHY="its closeout driver would not release it (exit ${rc:-1}): ${PLAN_WHY:-no output}"
     return 1
   fi
-  if plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_OUT"; then
+  if plan_verdict_retains_tree "$TEARDOWN_CLOSEOUT_STDOUT"; then
     PLAN_WHY="its closeout driver keeps a tree with unique ignored files after archiving them (ignored_payload_disposition=archive_then_retain_tree) and never removes it automatically: $PLAN_WHY"
     return 1
   fi
@@ -1361,7 +1367,7 @@ release_still_proven() {  # <clone> <copy> <pool> <container> <HEAD> <lock-sha25
 # reason cleanup_lease_conflict or cleanup_skipped_live_or_unknown.
 execute_refusal_is_temporary() {  # <exit>
   [ "$1" = 3 ] || return 1
-  printf '%s' "$TEARDOWN_CLOSEOUT_OUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
+  printf '%s' "$TEARDOWN_CLOSEOUT_STDOUT" | jq -s -e 'length == 1 and (.[0] | type == "object" and .allowed == false and (.reason == "cleanup_lease_conflict" or .reason == "cleanup_skipped_live_or_unknown"))' >/dev/null 2>&1
 }
 
 # True when <copy> is still the same copy and still holds exactly <lock-sha256>,
@@ -1495,7 +1501,7 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   rc=0
   teardown_run_closeout "$clone" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
-    words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_OUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
+    words="$(driver_reason_prefix "$TEARDOWN_CLOSEOUT_STDOUT")$(fm_refuse_text "${TEARDOWN_CLOSEOUT_OUT:0:600}")"
     if execute_refusal_is_temporary "$rc" && copy_still_holds "$copy" "$identity" "$7"; then
       retry_after_preserve "$copy" "$identity" "$7" "$3"
       if rm -f -- "$(retained_receipt "$copy")"; then
@@ -1505,7 +1511,7 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
     fi
     record_driver_retention "$copy" "$7" "$identity" "exit $rc: $words" || true
     echo "REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words" >&2
-    if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_OUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
+    if [ "$rc" = 3 ] && [[ $TEARDOWN_CLOSEOUT_STDOUT == *cleanup_ignored_payload_archived_tree_retained* ]]; then
       return 3
     fi
     return 1
@@ -1630,7 +1636,12 @@ apply_removals() {
         continue
       fi
     fi
-    if [ -e "$copy" ] || [ -L "$copy" ] || list_nested "$clone" | grep -qxF "$copy"; then
+    if ! registered=$(list_nested "$clone"); then
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"its registration after removal could not be proved; no retention receipt was cleared"$'\n'
+      continue
+    fi
+    if [ -e "$copy" ] || [ -L "$copy" ] || grep -qxF "$copy" <<< "$registered"; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
       REMOVAL_REPORT="${REMOVAL_REPORT}FAILED"$'\t'"$copy"$'\t'"it is still present or registered after its removal"$'\n'
       continue

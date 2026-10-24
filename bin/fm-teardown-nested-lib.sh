@@ -103,6 +103,7 @@ TEARDOWN_FOREIGN_LOCK=
 TEARDOWN_FOREIGN_LOCK_FILE=
 TEARDOWN_SLOT_COPIES=()
 TEARDOWN_CLOSEOUT_OUT=
+TEARDOWN_CLOSEOUT_STDOUT=
 TEARDOWN_FOREIGN_RULE=
 TEARDOWN_FOREIGN_PID=
 TEARDOWN_REFUSED_COPIES=()
@@ -744,11 +745,14 @@ teardown_foreign_procs_retire() {
 
 # Runs Vernant's closeout driver on <copy>: it releases its own creation lock
 # and removes the copy. With "plan" it omits --execute-cleanup, so the driver
-# only says whether it would. Output lands in TEARDOWN_CLOSEOUT_OUT. Exit 0 means
-# the driver allowed and, unless planning, ran the cleanup.
-teardown_run_closeout() {  # <slot> <copy> [plan]
-  local slot=$1 copy=$2 execute=--execute-cleanup driver py rc=0
+# only says whether it would. TEARDOWN_CLOSEOUT_STDOUT is verdict input;
+# TEARDOWN_CLOSEOUT_OUT retains stdout and stderr for display and refusal records.
+# An optional capture file belongs to the caller (so a killed plan can clean it).
+# Exit 0 means the driver allowed and, unless planning, ran the cleanup.
+teardown_run_closeout() {  # <slot> <copy> [plan] [stdout-capture-file]
+  local slot=$1 copy=$2 execute=--execute-cleanup driver py rc=0 capture=${4:-} own_capture=0
   [ "${3:-}" != plan ] || execute=
+  TEARDOWN_CLOSEOUT_STDOUT=
   TEARDOWN_CLOSEOUT_OUT=
   driver=$slot/scripts/git-stability/closeout_pr.py
   py=${FM_TEARDOWN_VERNANT_PYTHON:-$slot/.venv/bin/python}
@@ -756,15 +760,27 @@ teardown_run_closeout() {  # <slot> <copy> [plan]
     TEARDOWN_CLOSEOUT_OUT="Vernant's closeout driver $driver or its interpreter $py is not available"
     return 127
   fi
-  # The sentinel keeps command substitution from stripping the driver's trailing
-  # newlines, so a refusal can save exactly the output the driver produced.
+  if [ -z "$capture" ]; then
+    capture=$(mktemp "${TMPDIR:-/tmp}/fm-closeout-stdout.XXXXXX") || {
+      TEARDOWN_CLOSEOUT_OUT="Vernant's closeout stdout could not be captured"
+      return 1
+    }
+    own_capture=1
+  fi
+  # tee sees only stdout; stderr bypasses it into the display capture. pipefail
+  # preserves a driver refusal and treats a failed capture as no permission.
+  # Sentinels preserve trailing newlines in both output contracts.
   TEARDOWN_CLOSEOUT_OUT=$(
+    set -o pipefail
     local status=0
-    ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) 2>&1 || status=$?
+    { ( cd "$slot" && "$py" "$driver" --cleanup-worktree "$copy" ${execute:+"$execute"} ) | tee "$capture"; } 2>&1 || status=$?
     printf '.'
     exit "$status"
   ) || rc=$?
   TEARDOWN_CLOSEOUT_OUT=${TEARDOWN_CLOSEOUT_OUT%.}
+  TEARDOWN_CLOSEOUT_STDOUT=$(cat "$capture" || exit 1; printf '.') || rc=1
+  TEARDOWN_CLOSEOUT_STDOUT=${TEARDOWN_CLOSEOUT_STDOUT%.}
+  [ "$own_capture" = 0 ] || rm -f -- "$capture"
   return "$rc"
 }
 

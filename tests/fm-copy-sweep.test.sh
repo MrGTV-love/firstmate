@@ -90,6 +90,15 @@ fi
 case " $* " in
   *" worktree list "*)
     [ -z "${FAKE_GIT_FAIL_LIST:-}" ] || exit 128
+    if [ -n "${FAKE_GIT_FAIL_LIST_AFTER:-}" ]; then
+      count=$(cat "$FAKE_GIT_LOG.list-count" 2>/dev/null || printf 0)
+      count=$((count + 1))
+      printf '%s\n' "$count" > "$FAKE_GIT_LOG.list-count"
+      [ "$count" -le "$FAKE_GIT_FAIL_LIST_AFTER" ] || exit 128
+    fi
+    if [ -n "${FAKE_GIT_FAIL_LIST_FILE:-}" ] && [ -f "$FAKE_GIT_FAIL_LIST_FILE" ]; then
+      exit 128
+    fi
     if [ -n "${FAKE_GIT_PARTIAL_LIST_FILE:-}" ] && [ -f "$FAKE_GIT_PARTIAL_LIST_FILE" ]; then
       copy=$(cat "$FAKE_GIT_PARTIAL_LIST_FILE")
       rm -f "$FAKE_GIT_PARTIAL_LIST_FILE"
@@ -499,6 +508,7 @@ export FAKE_DRIVER=1
 printf '%s|%s\n' "\$PWD" "\$*" >> "$log/closeout.log"
 printf '%s\n' "\$\$" >> "$log/driver.pids"
 if [ "\${3:-}" != --execute-cleanup ]; then
+  [ ! -f "$log/plan-stderr" ] || cat "$log/plan-stderr" >&2
   if [ -e "$log/plan-output" ]; then
     cat "$log/plan-output"
     exit "\$(cat "$log/plan-exit" 2>/dev/null || printf 0)"
@@ -548,6 +558,7 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   echo '{"allowed": true}'
   exit 0
 fi
+[ ! -f "$log/execute-stderr" ] || cat "$log/execute-stderr" >&2
 if [ -e "$log/execute-output-\${2##*/}" ]; then
   cat "$log/execute-output-\${2##*/}"
   exit 3
@@ -762,6 +773,96 @@ test_dead_launcher_process_inside_copy_is_held() {
 test_dead_launcher_lock_is_released_by_the_driver() {
   assert_driver_release driver-dead dead
   pass "a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported"
+}
+
+driver_env_warning() {
+  printf 'env_loading: no .env found for %s/scripts/git-stability/reap_core.py; tried in order: %s/.env. Create .env at the clone root (the primary checkout) or in this worktree.\n' "$SLOT" "$SLOT"
+}
+
+test_plan_stderr_warning_does_not_block_allowed_stdout() {
+  local n
+  make_locked_copy_case plan-stderr-warning dead
+  install_driver "$SLOT" "$W"
+  for n in 2 3; do
+    add_copy "locked$n"
+    git -C "$SLOT" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$(copy_path "locked$n")"
+  done
+  driver_env_warning > "$W/plan-stderr"
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=2 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "stderr warning blocked an allowed plan: $OUT"
+  assert_equals 2 "$(printf '%s\n' "$OUT" | grep -c $'^REMOVED\t')" "allowed stdout with stderr warning was not released under the cap"
+  assert_equals 1 "$(printf '%s\n' "$OUT" | grep -c $'^DEFERRED\t')" "stderr warning changed cap deferral"
+  assert_equals 2 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "stderr warning changed the execute count"
+  pass "an exact env_loading missing-.env warning on stderr does not veto an allowed stdout plan, and the cap still limits executes"
+}
+
+test_execute_stderr_warning_keeps_temporary_refusal_retryable() {
+  local reason admin before
+  for reason in cleanup_lease_conflict cleanup_skipped_live_or_unknown; do
+    make_locked_copy_case "execute-warning-$reason" dead
+    install_driver "$SLOT" "$W"
+    driver_env_warning > "$W/execute-stderr"
+    printf '{"allowed": false, "reason": "%s"}\n' "$reason" > "$W/execute-output"
+    admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+    before=$(shasum -a 256 "$admin/locked")
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 1 ] || fail "$reason: execute refusal should fail this run: $OUT"
+    assert_contains "$OUT" "env_loading: no .env found" "$reason: stderr warning was not retained as display text"
+    assert_contains "$OUT" "$reason" "$reason: stdout refusal reason was lost"
+    assert_contains "$OUT" "next sweep run plans it again" "$reason: stderr made a temporary refusal permanent"
+    registered locked || fail "$reason: temporary refusal unregistered the copy"
+    assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "$reason: temporary refusal changed the lock"
+    assert_equals '' "$(find "$HOMED/data/copy-sweep/retained" -type f -print 2>/dev/null)" "$reason: temporary refusal left a permanent receipt"
+    rm -f "$W/execute-output"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$reason: next run did not retry and release: $OUT"
+    assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "$reason: retried copy was not removed"
+    assert_equals 2 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "$reason: next run did not execute again"
+  done
+  pass "missing-.env stderr warnings remain visible but do not turn either temporary stdout refusal into a permanent receipt"
+}
+
+test_failed_nested_registration_proof_holds_copy() {
+  local admin before
+  make_locked_copy_case unreadable-inner-proof dead
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  FAKE_GIT_FAIL_LIST_AFTER=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep
+  assert_class locked HELD-DIRTY
+  assert_contains "$OUT" "registered nested copies cannot be listed" "unreadable inner-copy proof was not named"
+  rm -f "$W/git.log.list-count"
+  FAKE_GIT_FAIL_LIST_AFTER=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  assert_not_contains "$OUT" "REMOVED"$'\t' "failed inner-copy proof was reported removed"
+  registered locked || fail "failed inner-copy enumeration unregistered the copy"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "failed inner-copy enumeration changed the lock"
+  assert_absent "$W/closeout.log" "driver ran without a readable inner-copy proof"
+  pass "a failed nested-registration enumeration holds a clean locked copy before any driver call"
+}
+
+test_failed_post_removal_registration_keeps_receipt_unproved() {
+  make_locked_copy_case unreadable-post-removal dead
+  install_driver "$SLOT" "$W"
+  cat > "$W/vernant-python" <<SH
+#!/usr/bin/env bash
+rc=0
+bash "\$@" || rc=\$?
+if [ "\${4:-}" = --execute-cleanup ]; then
+  : > "$W/post-execute-list-fails"
+fi
+exit "\$rc"
+SH
+  chmod +x "$W/vernant-python"
+  FAKE_GIT_FAIL_LIST_FILE="$W/post-execute-list-fails" FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "unproved post-removal registration should fail: $OUT"
+  assert_contains "$OUT" "registration after removal could not be proved" "failed post-removal proof was not reported"
+  assert_not_contains "$OUT" "REMOVED"$'\t' "unknown registration was reported removed"
+  assert_absent "$HOMED/data/copy-sweep.log" "unknown registration was logged as removed"
+  assert_equals 1 "$(find "$HOMED/data/copy-sweep/retained" -type f | wc -l | tr -d ' ')" "unknown registration cleared the retention receipt"
+  [ ! -e "$(copy_path locked)" ] || fail "fixture driver did not remove the directory"
+  ! registered locked || fail "fixture driver did not unregister the copy"
+  assert_equals 1 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "unknown registration retried execute"
+  pass "a failed post-removal registration proof reports unproved, keeps the receipt, and never reports or logs REMOVED"
 }
 
 test_locked_release_cap_defers_copies_until_the_next_run() {
@@ -2732,6 +2833,10 @@ run_case test_recycled_launcher_lock_is_held
 run_case test_dead_launcher_dirty_copy_is_held
 run_case test_dead_launcher_process_inside_copy_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
+run_case test_plan_stderr_warning_does_not_block_allowed_stdout
+run_case test_execute_stderr_warning_keeps_temporary_refusal_retryable
+run_case test_failed_nested_registration_proof_holds_copy
+run_case test_failed_post_removal_registration_keeps_receipt_unproved
 run_case test_locked_release_cap_defers_copies_until_the_next_run
 run_case test_refusals_use_no_release_slot_and_cannot_starve_later_copies
 run_case test_failed_post_execute_enumeration_uses_release_slot

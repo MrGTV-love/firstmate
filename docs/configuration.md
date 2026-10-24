@@ -1967,6 +1967,7 @@ The script header owns how a budget is measured, when it is over, and when its w
 
 `FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) names the Treehouse root.
 `FM_TEARDOWN_VERNANT_PYTHON` (default `<clone>/.venv/bin/python`) names the interpreter that runs Vernant's closeout driver when `--apply` releases a locked copy, exactly as it does for teardown.
+The [closeout helper](../bin/fm-teardown-nested-lib.sh) owns the stdout-only verdict channel and the retained diagnostic-output contract.
 `FM_COPY_SWEEP_PLAN_TIMEOUT` (default `120`, in seconds) bounds the closeout driver's plan for a locked copy; a plan that does not answer in time holds the copy, and the script header owns how the plan is stopped.
 `FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT` (default `5`) caps the locked release slots used per `--apply` run: a copy uses one slot once the driver's execute has run for it, unless afterwards it is provably untouched (still present and registered, the same copy, the same creation-lock bytes); a refused plan, a failed preservation, a failed reproof and an execute refusal that left the copy provably untouched use none, and the candidates left once the slots are used are `DEFERRED` (per-run cap), eligible next run, with the script header owning the counting and invalid-value rules.
 Review the first batch's records before unattended operation.
