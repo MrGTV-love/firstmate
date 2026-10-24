@@ -1,0 +1,202 @@
+{
+  "families": [
+    {
+      "count": 3,
+      "duration_ms": 662862,
+      "failed": 0,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 2,
+      "duration_ms": 1862,
+      "failed": 0,
+      "name": "live-harness-optin"
+    },
+    {
+      "count": 1,
+      "duration_ms": 48501,
+      "failed": 0,
+      "name": "orca"
+    },
+    {
+      "count": 1,
+      "duration_ms": 457771,
+      "failed": 0,
+      "name": "pr-forge"
+    },
+    {
+      "count": 3,
+      "duration_ms": 83898,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 2,
+      "duration_ms": 136871,
+      "failed": 0,
+      "name": "standalone"
+    },
+    {
+      "count": 4,
+      "duration_ms": 45496,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-10-24T19:17:22Z",
+  "run_id": "fm-test-run-1792868003301-2459",
+  "scripts": [
+    {
+      "duration_ms": 443999,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-compact-adviser-disable-remote.test.sh"
+    },
+    {
+      "duration_ms": 457771,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-teardown-pool.test.sh"
+    },
+    {
+      "duration_ms": 201819,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-compact-adviser-disable.test.sh"
+    },
+    {
+      "duration_ms": 119189,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pi-branch-extension.test.sh"
+    },
+    {
+      "duration_ms": 77762,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-agy-harness.test.sh"
+    },
+    {
+      "duration_ms": 48501,
+      "exit": 0,
+      "expected_gate_skip": "optional-binary",
+      "family": "orca",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-backend-orca.test.sh"
+    },
+    {
+      "duration_ms": 39654,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-procevent-runner-backlog.test.sh"
+    },
+    {
+      "duration_ms": 17682,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-extension-binding.test.sh"
+    },
+    {
+      "duration_ms": 17044,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-worktree-settle.test.sh"
+    },
+    {
+      "duration_ms": 4276,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-supervision-fork-budget.test.sh"
+    },
+    {
+      "duration_ms": 981,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": true,
+      "gate_skip_reason": "native Windows Node required",
+      "path": "tests/fm-pi-windows-shell-invocation.test.sh"
+    },
+    {
+      "duration_ms": 4907,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-calm-claude-mod.test.sh"
+    },
+    {
+      "duration_ms": 1229,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-trace-context-lib.test.sh"
+    },
+    {
+      "duration_ms": 585,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-mem-guard.test.sh"
+    },
+    {
+      "duration_ms": 921,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: lavish-axi absent",
+      "path": "tests/fm-bearings-board-lavish-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 941,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_SESSIONSTART_HOOK_LIVE_E2E=1 to run",
+      "path": "tests/fm-sessionstart-hook-live-e2e.test.sh"
+    }
+  ],
+  "selection": "lane=portable-serial-19of20;fail-on-gate-skip=Pi extension typecheck prerequisite not found",
+  "started_at": "2026-10-24T18:53:23Z",
+  "summary": {
+    "duration_ms": 1439378,
+    "failed": 0,
+    "skipped_gate": 3,
+    "total": 16
+  }
+}

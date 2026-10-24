@@ -1,0 +1,184 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 107149,
+      "failed": 0,
+      "name": "afk"
+    },
+    {
+      "count": 1,
+      "duration_ms": 76634,
+      "failed": 0,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 2,
+      "duration_ms": 1680,
+      "failed": 0,
+      "name": "live-harness-optin"
+    },
+    {
+      "count": 2,
+      "duration_ms": 87094,
+      "failed": 0,
+      "name": "secondmate"
+    },
+    {
+      "count": 2,
+      "duration_ms": 170578,
+      "failed": 0,
+      "name": "standalone"
+    },
+    {
+      "count": 5,
+      "duration_ms": 83969,
+      "failed": 0,
+      "name": "unclassified"
+    },
+    {
+      "count": 1,
+      "duration_ms": 757580,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-24T16:00:05Z",
+  "run_id": "fm-test-run-1792856318614-2476",
+  "scripts": [
+    {
+      "duration_ms": 757580,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-watch-triage-waits-declared.test.sh"
+    },
+    {
+      "duration_ms": 169631,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-dispatch-resolve.test.sh"
+    },
+    {
+      "duration_ms": 107149,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "afk",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-supervision-host-hook.test.sh"
+    },
+    {
+      "duration_ms": 76634,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-teardown-endpoint-safety.test.sh"
+    },
+    {
+      "duration_ms": 52901,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-doctor.test.sh"
+    },
+    {
+      "duration_ms": 24902,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-slack-secret-scan.test.sh"
+    },
+    {
+      "duration_ms": 27448,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-test-reap-orphans.test.sh"
+    },
+    {
+      "duration_ms": 19285,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-live-lab-up-mate.test.sh"
+    },
+    {
+      "duration_ms": 34193,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-herdr-guard.test.sh"
+    },
+    {
+      "duration_ms": 8270,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-fleet-snapshot-rolling-window.test.sh"
+    },
+    {
+      "duration_ms": 4064,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-session-launch-policy-receipt.test.sh"
+    },
+    {
+      "duration_ms": 947,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-project-origin.test.sh"
+    },
+    {
+      "duration_ms": 838,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "native Pi adapter not installed (PI_CODEX_NATIVE_PACKAGE to select it)",
+      "path": "tests/fm-pi-codex-native.test.sh"
+    },
+    {
+      "duration_ms": 842,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: teamclaude absent",
+      "path": "tests/fm-teamclaude-launch-live-e2e.test.sh"
+    }
+  ],
+  "selection": "lane=portable-serial-6of20;fail-on-gate-skip=Pi extension typecheck prerequisite not found",
+  "started_at": "2026-10-24T15:38:38Z",
+  "summary": {
+    "duration_ms": 1286564,
+    "failed": 0,
+    "skipped_gate": 2,
+    "total": 14
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 115055,
+      "failed": 0,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 3,
+      "duration_ms": 2091,
+      "failed": 0,
+      "name": "live-harness-optin"
+    },
+    {
+      "count": 1,
+      "duration_ms": 87232,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 3,
+      "duration_ms": 173226,
+      "failed": 0,
+      "name": "session-bootstrap"
+    },
+    {
+      "count": 4,
+      "duration_ms": 89242,
+      "failed": 0,
+      "name": "unclassified"
+    },
+    {
+      "count": 2,
+      "duration_ms": 686183,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-24T18:52:55Z",
+  "run_id": "fm-test-run-1792866820542-2257",
+  "scripts": [
+    {
+      "duration_ms": 683036,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-watch-triage-waits-declared.test.sh"
+    },
+    {
+      "duration_ms": 158826,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "session-bootstrap",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-bootstrap.test.sh"
+    },
+    {
+      "duration_ms": 115055,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-control.test.sh"
+    },
+    {
+      "duration_ms": 87232,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-task-delivery.test.sh"
+    },
+    {
+      "duration_ms": 37434,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-nm-read-cache.test.sh"
+    },
+    {
+      "duration_ms": 24733,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-cpu-pass.test.sh"
+    },
+    {
+      "duration_ms": 19751,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-session-end-relaunch.test.sh"
+    },
+    {
+      "duration_ms": 12193,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "session-bootstrap",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-gate-refuse.test.sh"
+    },
+    {
+      "duration_ms": 7324,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-inbox.test.sh"
+    },
+    {
+      "duration_ms": 3147,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-parent-channel-scan-exclusion.test.sh"
+    },
+    {
+      "duration_ms": 2207,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "session-bootstrap",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-gotmp.test.sh"
+    },
+    {
+      "duration_ms": 697,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_OMP_REBOOT_LIVE=1 to run",
+      "path": "tests/fm-omp-reboot-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 695,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "native Pi adapter not installed (PI_CODEX_NATIVE_PACKAGE to select it)",
+      "path": "tests/fm-pi-codex-native.test.sh"
+    },
+    {
+      "duration_ms": 699,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_HARNESS_ADAPTER_INSTRUCTION_EVAL=1 to run",
+      "path": "tests/fm-harness-adapter-instructions-live-e2e.test.sh"
+    }
+  ],
+  "selection": "lane=portable-serial-6of20;fail-on-gate-skip=Pi extension typecheck prerequisite not found",
+  "started_at": "2026-10-24T18:33:40Z",
+  "summary": {
+    "duration_ms": 1154486,
+    "failed": 0,
+    "skipped_gate": 3,
+    "total": 14
+  }
+}

@@ -1,0 +1,61 @@
+=== Scenario: stuck record (dead pid, empty current_session_file) -> adopt -> interrupt
+record: {"version":1,"spawn_gen":"old","pid":2000000001,"task_session_file":"<case>/wt/recorded-session.jsonl","current_session_file":""}
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-matching interrupt
+error: task rcv-90443-TdHCJB-adoption-transcript-matching cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+[exit=1]
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-matching adopt
+adopted: rcv-90443-TdHCJB-adoption-transcript-matching
+[exit=0]
+record: {"version":1,"spawn_gen":"old","pid":2000000000,"task_session_file":"<case>/wt/recorded-session.jsonl","current_session_file":"<case>/wt/recorded-session.jsonl"}
+herdr send-* calls during adopt: 0
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-matching interrupt
+interrupt-delivered rcv-90443-TdHCJB-adoption-transcript-matching harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+[exit=0]
+
+=== Adversarial: cwd inside another task's worktree
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-foreign adopt
+adopt refused: workspace proof needs this task to be the unique deepest match; cwd belongs to foreign
+[exit=1]
+record: {"version":1,"spawn_gen":"old","pid":2000000001,"task_session_file":"<case>/wt/recorded-session.jsonl","current_session_file":""}
+
+=== Adversarial: two metas claim the pane
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-dup adopt
+adopt refused: unique-claim proof needs no other local task to claim this pane; claimed by duplicate
+[exit=1]
+
+=== Adversarial: ambiguous foreground
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-amb adopt
+adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane
+[exit=1]
+
+=== Adversarial: record spawn_gen differs from meta
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-gen adopt
+adopt refused: generation proof needs the existing record spawn_gen to equal metadata spawn_gen
+[exit=1]
+record: {"version":1,"spawn_gen":"different","pid":2000000001,"task_session_file":"<case>/wt/recorded-session.jsonl","current_session_file":""}
+
+=== Adversarial: recorded PID is a live omp process
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-liveomp adopt
+adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; 890 is a live omp process, so the omp extension owns this record and it was not changed
+[exit=1]
+
+=== Recorded PID reused by a live claude process (not omp): repair proceeds
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-claude adopt
+adopted: rcv-90443-TdHCJB-adoption-transcript-claude
+[exit=0]
+record: {"version":1,"spawn_gen":"old","pid":2000000000,"task_session_file":"<case>/wt/recorded-session.jsonl","current_session_file":"<case>/wt/recorded-session.jsonl"}
+
+=== Worker caller (FM_TASK_ID set) refused
+
+$ fm-control.sh rcv-90443-TdHCJB-adoption-transcript-worker adopt
+error: workers cannot adopt a session record
+[exit=1]

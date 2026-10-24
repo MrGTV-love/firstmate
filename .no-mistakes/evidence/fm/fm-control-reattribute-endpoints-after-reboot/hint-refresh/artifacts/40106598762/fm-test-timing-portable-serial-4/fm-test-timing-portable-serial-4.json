@@ -1,0 +1,187 @@
+{
+  "families": [
+    {
+      "count": 3,
+      "duration_ms": 153605,
+      "failed": 0,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 3,
+      "duration_ms": 1733,
+      "failed": 0,
+      "name": "live-harness-optin"
+    },
+    {
+      "count": 2,
+      "duration_ms": 690640,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 2,
+      "duration_ms": 89624,
+      "failed": 0,
+      "name": "secondmate"
+    },
+    {
+      "count": 4,
+      "duration_ms": 31632,
+      "failed": 0,
+      "name": "unclassified"
+    },
+    {
+      "count": 1,
+      "duration_ms": 59141,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-24T16:07:09Z",
+  "run_id": "fm-test-run-1792857002127-2240",
+  "scripts": [
+    {
+      "duration_ms": 686083,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-omp-harness.test.sh"
+    },
+    {
+      "duration_ms": 123809,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-trace-context-spawn.test.sh"
+    },
+    {
+      "duration_ms": 80291,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-transport-lanes.test.sh"
+    },
+    {
+      "duration_ms": 59141,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-watch-recovery-loop.test.sh"
+    },
+    {
+      "duration_ms": 2948,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-guard-telemetry.test.sh"
+    },
+    {
+      "duration_ms": 26424,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-fleet-ledger.test.sh"
+    },
+    {
+      "duration_ms": 16806,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-git-strip-ai-trailers.test.sh"
+    },
+    {
+      "duration_ms": 12990,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-worktree-settle.test.sh"
+    },
+    {
+      "duration_ms": 9333,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-shared-captain-inheritance.test.sh"
+    },
+    {
+      "duration_ms": 4557,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-dod-lib.test.sh"
+    },
+    {
+      "duration_ms": 1642,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-gemini-harness.test.sh"
+    },
+    {
+      "duration_ms": 618,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-nm-test-contract.test.sh"
+    },
+    {
+      "duration_ms": 585,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: omp absent",
+      "path": "tests/fm-omp-fallback-chain-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 584,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_HARNESS_ADAPTER_INSTRUCTION_EVAL=1 to run",
+      "path": "tests/fm-harness-adapter-instructions-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 564,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_PI_LIVE_E2E=1 to run",
+      "path": "tests/fm-pi-primary-live-e2e.test.sh"
+    }
+  ],
+  "selection": "lane=portable-serial-4of20;fail-on-gate-skip=Pi extension typecheck prerequisite not found",
+  "started_at": "2026-10-24T15:50:02Z",
+  "summary": {
+    "duration_ms": 1027625,
+    "failed": 0,
+    "skipped_gate": 3,
+    "total": 15
+  }
+}

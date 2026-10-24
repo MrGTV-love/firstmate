@@ -1,0 +1,175 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 13587,
+      "failed": 0,
+      "name": "afk"
+    },
+    {
+      "count": 4,
+      "duration_ms": 5649,
+      "failed": 0,
+      "name": "live-harness-optin"
+    },
+    {
+      "count": 1,
+      "duration_ms": 6209,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 1,
+      "duration_ms": 501675,
+      "failed": 0,
+      "name": "secondmate"
+    },
+    {
+      "count": 2,
+      "duration_ms": 134715,
+      "failed": 0,
+      "name": "standalone"
+    },
+    {
+      "count": 2,
+      "duration_ms": 27744,
+      "failed": 0,
+      "name": "unclassified"
+    },
+    {
+      "count": 2,
+      "duration_ms": 104637,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-24T18:57:13Z",
+  "run_id": "fm-test-run-1792867438038-2452",
+  "scripts": [
+    {
+      "duration_ms": 501675,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-secondmate-lifecycle-e2e.test.sh"
+    },
+    {
+      "duration_ms": 100535,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-spawn-pool-base-freshen.test.sh"
+    },
+    {
+      "duration_ms": 49589,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-wake-drain-unread-status.test.sh"
+    },
+    {
+      "duration_ms": 55048,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-turnend-guard.test.sh"
+    },
+    {
+      "duration_ms": 34180,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-procevent-when.test.sh"
+    },
+    {
+      "duration_ms": 20052,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-session-launch-policy-inherit.test.sh"
+    },
+    {
+      "duration_ms": 13587,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "afk",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-afk-contract.test.sh"
+    },
+    {
+      "duration_ms": 6209,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-harness-precedence.test.sh"
+    },
+    {
+      "duration_ms": 7692,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-fleet-snapshot-rolling-window.test.sh"
+    },
+    {
+      "duration_ms": 2920,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pi-seeded-home-trust-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 910,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_SEND_INBOX_LIVE_E2E=1 to run",
+      "path": "tests/fm-send-inbox-doorbell-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 908,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_CLAUDE_LIVE_E2E=1 to run",
+      "path": "tests/fm-claude-stop-autoarm-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 911,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": true,
+      "gate_skip_reason": "live: opt-in; set FM_AGY_SIGNALS_LIVE=1 to run",
+      "path": "tests/fm-agy-signals-live-e2e.test.sh"
+    }
+  ],
+  "selection": "lane=portable-serial-2of20;fail-on-gate-skip=Pi extension typecheck prerequisite not found",
+  "started_at": "2026-10-24T18:43:58Z",
+  "summary": {
+    "duration_ms": 795882,
+    "failed": 0,
+    "skipped_gate": 3,
+    "total": 13
+  }
+}
