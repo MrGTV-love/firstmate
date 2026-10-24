@@ -145,8 +145,8 @@ def build(args):
     else:
         claude = canonical(args.agent_dir or os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude")
         deny.append(claude)
-        runtime += [under(claude, r"\.claude\.json(\..+)?"), f"(subpath {quoted(claude + '/backups')})",
-                    f"(subpath {quoted(claude + '/projects')})"]
+        runtime += [under(claude, r"\.claude\.json(\..+)?"), under(claude, r"history\.jsonl")]
+        runtime += [f"(subpath {quoted(claude + '/' + name)})" for name in ("backups", "projects", "todos", "file-history", "statsig", "debug")]
         # Default Claude stores config beside, not inside, its .claude directory.
         if not (args.agent_dir or os.environ.get("CLAUDE_CONFIG_DIR")):
             runtime.append(f"(literal {quoted(home + '/.claude.json')})")
@@ -165,27 +165,31 @@ def build(args):
     lines.append("(deny file-write* " + under(data_root, "[^/]+/.*") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
-    for name in ("worktrees", "refs/heads", "logs/refs/heads"):
-        lines.append(f"(deny file-write* (subpath {quoted(Path(common) / name)}))")
+    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads")]
+    lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in git_shared]
     # The primary checkout's own HEAD and index live in the shared Git directory.
     for name in ("HEAD", "HEAD.lock", "index", "index.lock"):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
     # Other tasks' state records and temp roots: /tmp/fm-<id>, its launch
     # sibling /tmp/fm-<id>+<token>, and ~/tmp entries whose name carries the id.
     tmp = canonical("/tmp")
+    home_tmp = {task: "(deny file-write* " + under(home + "/tmp", "[^/]*" + re.escape(task) + "[^/]*(/.*)?") + ")" for task in others}
     for task in others:
         lines.append("(deny file-write* " + under(state, re.escape(task) + r"\..*") + ")")
         lines.append("(deny file-write* " + under(tmp, "fm-" + re.escape(task) + r"(\+[^/]*)?(/.*)?") + ")")
-        lines.append("(deny file-write* " + under(home + "/tmp", "[^/]*" + re.escape(task) + "[^/]*(/.*)?") + ")")
     # Claude's shared per-user temp root holds one directory per session
     # working directory; only this worker's own directory stays writable.
     claude_tmp = tmp + "/claude-" + str(os.getuid())
     own_slugs = {claude_tmp + "/" + re.sub(r"[^A-Za-z0-9]", "-", path) for path in (worktree, os.path.abspath(args.worktree))}
     claude_children = child_dirs(claude_tmp, own_slugs)
     lines.append("(deny file-write* " + under(claude_tmp, "[^/]+/.*") + ")")
+    # An entry carrying this task's id stays its own even when a shorter
+    # foreign id is part of that id; every other foreign entry stays protected.
+    lines += [rule for task, rule in home_tmp.items() if task in args.task]
+    lines.append("(allow file-write* " + under(home + "/tmp", "[^/]*" + re.escape(args.task) + "[^/]*(/.*)?") + ")")
+    lines += [rule for task, rule in home_tmp.items() if task not in args.task]
     for root in (worktree, gitdir, data, *sorted(own_slugs)):
         lines.append(f"(allow file-write* (subpath {quoted(root)}))")
-    lines.append("(allow file-write* " + under(home + "/tmp", "[^/]*" + re.escape(args.task) + "[^/]*(/.*)?") + ")")
     for record in WORKER_RECORDS:
         lines.append("(allow file-write* " + under(state, re.escape(args.task + ".") + record) + ")")
     # A task's declared branch and its atomic lock/reflog are separate from
@@ -204,7 +208,7 @@ def build(args):
     lines += [f"(deny file-write* {item})" for item in harness_protected]
     # A protected folder, a folder holding protected entries, and every folder
     # above them refuse rename and deletion; creating children stays allowed.
-    anchors = deny + data_children + claude_children + [data_root, state, common, str(gates), home + "/tmp", claude_tmp]
+    anchors = deny + git_shared + data_children + claude_children + [data_root, state, common, str(gates), home + "/tmp", claude_tmp]
     fixed = []
     for anchor in anchors:
         path = Path(anchor)

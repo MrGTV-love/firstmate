@@ -2491,7 +2491,7 @@ Writes are allowed by default; the profile denies writes to these named protecte
 - this home's checkout, `config/` and `.env`;
 - every other task's `state/<other>.*` records, this task's Main-owned records and the shared legacy `state/jev-guard.jsonl`; the rest of `state/`, such as `state/procevent/`, `state/friction.jsonl` and the fleet ledger, stays writable;
 - every `data/<other>/` directory; the shared `data/` files such as the duration ledger stay writable;
-- every other task's temp roots: `/tmp/fm-<other>` and its `/tmp/fm-<other>+<token>` launch sibling, every other session directory under `/private/tmp/claude-<uid>/`, and every `~/tmp` entry whose name carries another task's id;
+- every other task's temp roots: `/tmp/fm-<other>` and its `/tmp/fm-<other>+<token>` launch sibling, every other session directory under `/private/tmp/claude-<uid>/`, and every `~/tmp` entry whose name carries another task's id, unless the name also carries this task's longer id;
 - other tasks' branches, and the primary checkout's own `HEAD` and index, in the shared Git directory;
 - the harness config homes `~/.claude`, `~/.claude.json`, `~/.omp`, `~/.codex`, `~/.dsh`, `~/.pi`, `~/.grok`, `~/.kimi`, `~/.kimi-code`, `~/.cursor`, `~/.gemini`, `~/.rovo`, `~/.rovodev` and opencode's config and data directories, apart from the running harness's measured runtime state below;
 - every other local Firstmate home: the root home and each registered local secondmate home;
@@ -2513,10 +2513,11 @@ Secondmates are persistent homes and are not subject to this task-worker boundar
 A raw omp or Claude launch command that names its own state root (`PI_CODING_AGENT_DIR`, `PI_CONFIG_DIR`, `OMP_PROFILE`, `PI_PROFILE`, `--profile` or `CLAUDE_CONFIG_DIR`) is refused, because its own assignment would win over the profile's root; set the root in the environment and launch with `--harness` instead.
 A home list that cannot be read, or a project whose worktrees Git cannot list, also refuses the launch instead of leaving those assets out.
 
-Inside its protected config home the running harness keeps only its measured runtime state writable: omp's `agent.db` and `models.db` with their WAL, SHM and journal files, its `sessions/` transcripts and exactly its project-scoped daemon directory; or Claude's `.claude.json` with its temporary and backup siblings, its `backups/` directory and its `projects/` transcripts outside every `projects/*/memory` directory.
-Everything else there stays protected, including every path that loads code or instructions: Claude's `CLAUDE.md`, `rules/`, `agents/`, `commands/`, `skills/`, `plugins/`, `hooks/`, settings and credentials files and status-line scripts, and omp's `config.yml`, `models.yml`, `auth.json`, `.env`, `settings.json`, `extensions/`, `managed-skills/` and `memories/`.
+Inside its protected config home the running harness keeps only its measured runtime state writable: omp's `agent.db` and `models.db` with their WAL, SHM and journal files, its `sessions/` transcripts and exactly its project-scoped daemon directory; or Claude's `.claude.json` with its temporary and backup siblings, `history.jsonl`, its `backups/`, `todos/`, `file-history/`, `statsig/` and `debug/` directories and its `projects/` transcripts outside every `projects/*/memory` directory.
+Everything else there stays protected, including every path that loads code or instructions: Claude's `CLAUDE.md`, `rules/`, `agents/`, `commands/`, `skills/`, `plugins/`, `hooks/`, `shell-snapshots/`, `session-env/`, settings and credentials files and status-line scripts, and omp's `config.yml`, `models.yml`, `auth.json`, `.env`, `settings.json`, `extensions/`, `managed-skills/` and `memories/`.
 The omp daemon suffix uses omp's `Bun.hash.wyhash(path.resolve(projectDir))` derivation, not a hard-coded hash or a grant of the shared daemon parent.
 SQLite database creation requires the omp agent directory; an observed `EPERM mkdir` requires the separate daemon scope.
+Because `session-env/` stays protected, a confined Claude worker cannot run `SessionStart` hooks: a real Claude session under the profile reported `EPERM` creating `session-env/<session-id>` for each of them, while its Bash and Edit tools completed.
 Claude SessionStart requires creation of `.claude.json` and its backups in the selected config directory; the default layout also permits the single home-level `.claude.json` file.
 No authentication or runtime state is copied.
 
@@ -2532,7 +2533,7 @@ Protected lists are read at launch, so a task, home, gate or session directory c
 Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker.
 The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
 [`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) builds the omp and Claude profiles over a synthetic home and runs a plain Python process under each, after an unconfined control.
-It checks B3's glob deletion in the shared Claude temp root, B15's aged sweep under `~/tmp`, Python eval unlink, nested-root writes, status isolation, symlink escapes, real busy-state transitions, a gate push through the no-mistakes hooks, a duration record, a procevent board registered and retired, a fleet-ledger append, one refused write per protected asset class and refused renames of protected folders and their parents.
+It checks B3's glob deletion in the shared Claude temp root, B15's aged sweep under `~/tmp`, Python eval unlink, nested-root writes, status isolation, symlink escapes, real busy-state transitions, a gate push through the no-mistakes hooks, a duration record, a procevent board registered and retired, a fleet-ledger append, one refused write per protected asset class, refused renames of protected folders and their parents including the shared Git `refs/` and `worktrees/` folders, and `~/tmp` ownership for task ids that extend this task's id and that are part of it.
 [`tests/fm-spawn-worktree-settle.test.sh`](../tests/fm-spawn-worktree-settle.test.sh) runs the launch `fm-spawn.sh` delivers for omp and Claude with a model-free stand-in for each harness.
 No test starts a real harness session or calls a model.
 

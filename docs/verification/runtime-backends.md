@@ -26,7 +26,8 @@ Every confined check was true for both profiles:
 - a duration record appended through `bin/fm-duration.py`, a procevent board registered and retired through `bin/fm-procevent.sh`, a fleet-ledger append through `bin/fm-fleet-ledger.sh`, and a tool-cache write under HOME;
 - one refused write per protected asset class: project and home primary checkouts, the primary index, nested and pool worktrees of other tasks, other task state, data and temp roots, the shared legacy audit, Main-owned `meta`, `control-relaunch` and `git-hooks` records, `config/`, `.env`, another branch, another Firstmate home and another project's gate, including a push to that gate;
 - refused writes to every Claude and omp file that loads code or instructions, `~/.codex` and `~/.dsh`, while the running harness's measured runtime state stayed writable;
-- refused renames of another task's data directory, a worktree's parent folder, the gate store, `state/` and another session's Claude temp directory.
+- refused renames of another task's data directory, a worktree's parent folder, the gate store, `state/`, the shared Git `refs/` and `worktrees/` folders and another session's Claude temp directory;
+- a `~/tmp` entry of a task whose id extends this task's id stays protected, while this task's own entry stays writable when another task's id is part of its id.
 
 The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial, the symlink escape and every refused check, while the positive operations remained successful.
 The gate hooks are the installed no-mistakes hooks with `NM_BIN` pointed at a model-free stand-in for the daemon client, so no real daemon run starts.
@@ -34,7 +35,13 @@ The probes invoke the real `createGuardService.record` and `createTaskSessionPro
 The task audit succeeds without changing seeded shared legacy history, while another task's audit append fails with `AuditUnavailableError`.
 `bash tests/fm-jev-guard-audit.test.sh` passed 21 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
 The settle case runs the launch `fm-spawn.sh` delivers for omp and Claude with a stand-in harness: the primary-checkout write is refused, the own status append succeeds, `TMPDIR` is the task temp root and `FM_WRITE_CONFINEMENT` is `seatbelt-v1`.
-No test starts a real harness session, so the Claude runtime directories outside the measured set (for example `shell-snapshots/`, `todos/` and `session-env/`) are refused without a real-harness measurement of their effect.
+No checked-in test starts a real harness session.
+A one-time measurement on 2026-10-24 ran one real Claude Code session (`haiku` through the TeamClaude launcher) and one real omp session (`openai-codex/gpt-6-luna`) under the generated profiles.
+omp's shell, read and edit tools completed with `agent/settings.json` and `agent/memories/` protected.
+Claude's Bash, Read and Edit tools completed with `shell-snapshots/` and `session-env/` protected, and its temp directory matched the builder's derived slug.
+Every Claude `SessionStart` hook failed with `EPERM` creating `session-env/<session-id>`, and the build exposed no to-do tool in print mode, so the to-do path was not exercised.
+The unified log recorded no Seatbelt denial even for a deliberate refused write, so denials were read from tool results, hook output and error strings.
+The measurement is not recorded as a passing confinement case while the `SessionStart` denial awaits a decision.
 Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
 
 ## Pool-only cleanup critical sections

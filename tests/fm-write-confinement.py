@@ -371,6 +371,11 @@ def fixture(repo, base, harness, user_home, other):
     (data / "task").mkdir(parents=True)
     (worktree / "escape").symlink_to(data / "other", target_is_directory=True)
     write(state / f"{other}.meta", f"window=fmtest:fm-{other}\nworktree={nested}\nproject=fmtest\n")
+    # Tasks whose ids extend this task's id, and are part of it, own ~/tmp
+    # entries that carry both ids.
+    for related in ("task-2", "ask"):
+        write(state / f"{related}.meta", "project=fmtest\n")
+    write(user_tmp / "fm-teardown.task-2/old")
     for name in (f"{other}.status", "task.other.status"):
         write(state / name)
     write(state / f"{other}.jev-guard.jsonl", json.dumps({"at": 2, "task": other, "decision": "clear"}) + "\n")
@@ -392,15 +397,18 @@ def fixture(repo, base, harness, user_home, other):
         "other-worktree-nested": nested / "README", "other-worktree-pool": pool / "README",
         "other-data": data / "other/file", "other-home": base / "other-home/state/x.status", "other-gate": other_gate / "config",
         "other-task-temp": Path(f"/private/tmp/fm-{other}/payload"),
+        "extending-task-home-tmp": user_tmp / "fm-teardown.task-2/old",
         "shared-legacy-audit": state / "jev-guard.jsonl",
         "main-meta": state / "task.meta", "main-control-relaunch": state / "task.control-relaunch",
         "main-git-hooks": state / "task.git-hooks/pre-commit",
     }
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
-               "state": state, "claude-temp-session": claude_tmp / f"base.{other}"}
+               "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
+               "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees"}
     claude_code = (".claude/CLAUDE.md", ".claude/rules/rule.md", ".claude/agents/agent.md", ".claude/commands/command.md",
                    ".claude/skills/skill/SKILL.md", ".claude/plugins/plugin.json", ".claude/hooks/hook.sh", ".claude/settings.json",
-                   ".claude/settings.local.json", ".claude/.credentials.json", ".claude/projects/p/memory/MEMORY.md", ".claude/statusline.sh")
+                   ".claude/settings.local.json", ".claude/.credentials.json", ".claude/projects/p/memory/MEMORY.md", ".claude/statusline.sh",
+                   ".claude/shell-snapshots/snapshot-zsh.sh", ".claude/session-env/session/hook.sh")
     omp_code = (".omp/agent/config.yml", ".omp/agent/models.yml", ".omp/agent/auth.json", ".omp/agent/.env",
                 ".omp/agent/extensions/extension.ts", ".omp/agent/settings.json", ".omp/agent/managed-skills/skill.md",
                 ".omp/agent/memories/memory.md", ".omp/plugins/plugin.ts", ".omp/run/daemons/0000000000000000/broker.pid")
@@ -411,7 +419,11 @@ def fixture(repo, base, harness, user_home, other):
     writable_paths = {"tool-cache": user_home / ".cache/fm-test-slots/probe", "own-home-tmp": user_tmp / "fm-task-probe/file"}
     if harness == "claude":
         writable_paths.update({"claude-transcript": user_home / ".claude/projects/p/session.jsonl",
-                               "claude-json": user_home / ".claude.json", "claude-json-backup": user_home / ".claude/backups/.claude.json.backup.1"})
+                               "claude-json": user_home / ".claude.json", "claude-json-backup": user_home / ".claude/backups/.claude.json.backup.1",
+                               "claude-todos": user_home / ".claude/todos/session-agent.json",
+                               "claude-file-history": user_home / ".claude/file-history/session/backup",
+                               "claude-history": user_home / ".claude/history.jsonl",
+                               "claude-statsig": user_home / ".claude/statsig/cache", "claude-debug": user_home / ".claude/debug/session.txt"})
     else:
         writable_paths.update({"omp-agent-db": user_home / ".omp/agent/agent.db", "omp-agent-db-wal": user_home / ".omp/agent/agent.db-wal",
                                "omp-models-db-shm": user_home / ".omp/agent/models.db-shm",
