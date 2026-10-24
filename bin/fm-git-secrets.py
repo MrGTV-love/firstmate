@@ -13,13 +13,15 @@ is not inspected again. Pre-push consumes Git's ref-update records on stdin;
 the hook wrapper preserves those bytes for the repository's own hook. No file
 content or match is printed, no provider is called, and no working-tree file
 is read. Each decision appends one event through fm-guard-event.sh carrying
-the number of consecutive refusals in this worktree; past the budget of one,
-the refusal also escalates to a human decision, and the operation stays
+the highest consecutive refusal count for the same credential-shaped line,
+identified by its content hash. Different content starts at one; past the budget
+of one, the refusal also escalates to a human decision, and the operation stays
 refused. Exit 1 refuses the Git operation, including when inspection fails;
 exit 2 indicates invalid arguments.
 """
 
 import codecs
+import hashlib
 import json
 import os
 import re
@@ -127,25 +129,34 @@ def outgoing_lines():
 
 
 def refused(added):
-    return {path for path, lines in added.items()
-            if any(shape.search(b"\n".join(lines)) for shape in SHAPES)}
+    for path, lines in added.items():
+        for line in lines:
+            if any(shape.search(line) for shape in SHAPES):
+                yield path, hashlib.sha256(line).hexdigest()
 
 
-def repeat(guard, denied):
+def repeat(guard, fingerprints):
     try:
         state = git("rev-parse", "--git-path", "fm-" + guard + ".refusals").rstrip(b"\n")
-        if not denied:
+        if not fingerprints:
             if os.path.exists(state):
                 os.remove(state)
             return 1
         try:
-            with open(state, "rb") as counter:
-                count = int(counter.read() or b"0") + 1
+            with open(state, "r", encoding="utf-8") as counter:
+                previous = json.load(counter)
+            if not isinstance(previous, dict):
+                previous = {}
         except (OSError, ValueError):
-            count = 1
-        with open(state, "w") as counter:
-            counter.write(f"{count}\n")
-        return count
+            previous = {}
+        counts = {}
+        for fingerprint in fingerprints:
+            count = previous.get(fingerprint, 0)
+            counts[fingerprint] = count + 1 if type(count) is int and count >= 0 else 1
+        with open(state, "w", encoding="utf-8") as counter:
+            json.dump(counts, counter, sort_keys=True)
+            counter.write("\n")
+        return max(counts.values())
     except (OSError, subprocess.SubprocessError):
         return 1
 
@@ -174,11 +185,16 @@ def main():
         return 2
     guard, started = GUARDS[args[0]], time.monotonic()
     try:
-        paths, source_ok = sorted(set().union(*(refused(added) for added in inspections()))), "true"
+        paths, fingerprints = set(), set()
+        for added in inspections():
+            for path, fingerprint in refused(added):
+                paths.add(path)
+                fingerprints.add(fingerprint)
+        paths, source_ok = sorted(paths), "true"
     except (OSError, ValueError, subprocess.SubprocessError):
-        paths, source_ok = None, "false"
+        paths, fingerprints, source_ok = None, set(), "false"
     denied = paths is None or bool(paths)
-    count = repeat(guard, denied)
+    count = repeat(guard, fingerprints)
     record(guard, "deny" if denied else "allow", source_ok, started, count)
     if not denied:
         return 0
