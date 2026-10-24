@@ -222,9 +222,9 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };
   }
 
-  const guardEvent = (guard: string, decision: "allow" | "deny", started: number): void => {
+  const guardEvent = (guard: string, subject: string, decision: "allow" | "deny", started: number): void => {
     try {
-      execFileSync("bash", [GUARD_EVENT_WRITER, guard, decision, "--session", c.task, "--elapsed-ms", String(Math.round(performance.now() - started))], {
+      execFileSync("bash", [GUARD_EVENT_WRITER, guard, decision, "--session", `${c.task}:${subject}`, "--elapsed-ms", String(Math.round(performance.now() - started))], {
         env: { PATH: process.env.PATH ?? "/usr/bin:/bin", FM_HOME: c.home,
           ...(process.env.FM_GUARD_EVENT_LOG ? { FM_GUARD_EVENT_LOG: process.env.FM_GUARD_EVENT_LOG } : {}) },
         stdio: "ignore", timeout: 5000,
@@ -242,7 +242,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       branch: "policy", error_type: null, request_started: false,
       ...((tool === "write" || tool === "edit") && object(event.input) && typeof event.input.path === "string"
         ? { refused_path: event.input.path } : {}) };
-    guardEvent("jev-tool-coverage", policy ? "allow" : "deny", started);
+    guardEvent("jev-tool-coverage", tool, policy ? "allow" : "deny", started);
     if (!policy) {
       return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
         `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must classify it in fm-jev-egress.ts before execution. No call was made.`);
@@ -252,7 +252,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       if (destination) {
         terminal.destination_class = destination;
         const granted = egressGranted(c.state, c.task, destination);
-        guardEvent("jev-egress-grant", granted ? "allow" : "deny", started);
+        guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", started);
         if (!granted) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
             `Missing task egress grant: request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
