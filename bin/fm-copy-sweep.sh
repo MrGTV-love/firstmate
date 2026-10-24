@@ -108,6 +108,7 @@
 # release slots used per run. Once the driver's execute has run for a copy, that
 # copy uses one slot, unless afterwards the copy is provably untouched: still
 # present and registered, the same copy, holding the same creation-lock bytes.
+# Registration enumeration must succeed, even if a failed listing printed the copy.
 # So a full release uses a slot, and so does an execute that reports success but
 # leaves the copy present or registered, a failure after a partial release, an
 # archived-tree retention, or any outcome the sweep cannot prove untouched. A
@@ -1547,7 +1548,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
-  local driver_slots=0 driver_limit deferred=''
+  local driver_slots=0 driver_limit deferred='' registered enumeration_rc
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1603,9 +1604,13 @@ apply_removals() {
       release_rc=0
       identity=$(copy_identity "$copy") || identity=
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
-      if [ "$release_rc" != 2 ] \
-        && ! { copy_still_holds "$copy" "$identity" "$lock_hash" && list_nested "$clone" | grep -qxF "$copy"; }; then
-        driver_slots=$((driver_slots + 1))
+      if [ "$release_rc" != 2 ]; then
+        enumeration_rc=0
+        registered=$(list_nested "$clone") || enumeration_rc=$?
+        if ! { copy_still_holds "$copy" "$identity" "$lock_hash" \
+          && [ "$enumeration_rc" = 0 ] && grep -qxF "$copy" <<< "$registered"; }; then
+          driver_slots=$((driver_slots + 1))
+        fi
       fi
       if [ "$release_rc" = 3 ]; then
         held="$held$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'

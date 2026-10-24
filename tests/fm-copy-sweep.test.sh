@@ -90,6 +90,13 @@ fi
 case " $* " in
   *" worktree list "*)
     [ -z "${FAKE_GIT_FAIL_LIST:-}" ] || exit 128
+    if [ -n "${FAKE_GIT_PARTIAL_LIST_FILE:-}" ] && [ -f "$FAKE_GIT_PARTIAL_LIST_FILE" ]; then
+      copy=$(cat "$FAKE_GIT_PARTIAL_LIST_FILE")
+      rm -f "$FAKE_GIT_PARTIAL_LIST_FILE"
+      printf '%s\n' "$copy" >> "$FAKE_GIT_PARTIAL_LIST_FILE.log"
+      printf 'worktree %s\0' "$copy"
+      exit 128
+    fi
     ;;
   *" worktree remove "*)
     if [ -n "${FAKE_GIT_FAIL_REMOVE:-}" ]; then
@@ -907,6 +914,59 @@ SH
     fi
   done
   pass "a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two"
+}
+
+test_failed_post_execute_enumeration_uses_release_slot() {
+  local n name admin before executed=0 deferred=0
+  make_world driver-cap-partial-enumeration
+  install_driver "$SLOT" "$W"
+  for ((n = 1; n <= 7; n++)); do
+    add_copy "p$n"
+    git -C "$SLOT" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$(copy_path "p$n")"
+  done
+  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
+  # Each refused execute leaves the copy untouched but makes the next worktree
+  # enumeration print that copy and then fail. No earlier proof is affected.
+  cat > "$W/vernant-python" <<SH
+#!/usr/bin/env bash
+rc=0
+bash "\$@" || rc=\$?
+if [ "\${4:-}" = --execute-cleanup ]; then
+  printf '%s\n' "\$3" > "$W/partial-list"
+fi
+exit "\$rc"
+SH
+  chmod +x "$W/vernant-python"
+  admin=$(git -C "$(copy_path p1)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked" | awk '{ print $1 }')
+  FAKE_GIT_PARTIAL_LIST_FILE="$W/partial-list" FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=5 \
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 1 ] || fail "unknown enumeration should leave execute refusals failed, got $RC: $OUT"
+  assert_equals 5 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" \
+    "an enumeration that prints the candidate and then fails did not use a release slot"
+  assert_equals 5 "$(wc -l < "$W/partial-list.log" | tr -d ' ')" \
+    "the partial-output enumerator was not exercised after every execute"
+  assert_equals 0 "$(printf '%s\n' "$OUT" | grep -c $'^REMOVED\t')" "an unknown enumeration was reported removed"
+  for ((n = 1; n <= 7; n++)); do
+    name="p$n"
+    registered "$name" || fail "unknown enumeration: $name was unregistered"
+    admin=$(git -C "$(copy_path "$name")" rev-parse --absolute-git-dir)
+    assert_equals "$before" "$(shasum -a 256 "$admin/locked" | awk '{ print $1 }')" \
+      "unknown enumeration: $name lost its creation lock"
+    if grep -qFx "$SLOT|--cleanup-worktree $(copy_path "$name") --execute-cleanup" "$W/closeout.log"; then
+      executed=$((executed + 1))
+      assert_contains "$OUT" "FAILED"$'\t'"$(copy_path "$name")" "unknown enumeration: execute refusal was not reported"
+    else
+      deferred=$((deferred + 1))
+      assert_class "$name" DEFERRED
+      assert_no_grep "$(copy_path "$name")" "$W/closeout.log" "unknown enumeration: deferred copy reached the driver"
+    fi
+  done
+  assert_equals 5 "$executed" "unknown enumeration: wrong number of executed copies"
+  assert_equals 2 "$deferred" "unknown enumeration: wrong number of deferred copies"
+  assert_contains "$OUT" "per-run cap: 5 locked release slots used; eligible next run" \
+    "unknown enumeration: deferral did not explain its limit"
+  pass "a post-execute enumeration that prints the candidate and then fails is unknown, uses a release slot, and limits seven untouched driver refusals to five executes with two deferred"
 }
 
 test_partial_releases_use_release_slots() {
@@ -2674,6 +2734,7 @@ run_case test_dead_launcher_process_inside_copy_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_locked_release_cap_defers_copies_until_the_next_run
 run_case test_refusals_use_no_release_slot_and_cannot_starve_later_copies
+run_case test_failed_post_execute_enumeration_uses_release_slot
 run_case test_partial_releases_use_release_slots
 run_case test_uuid_owner_lock_is_released_by_the_driver
 run_case test_ppid_owner_lock_is_released_by_the_driver
