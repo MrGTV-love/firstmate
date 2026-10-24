@@ -23,7 +23,7 @@ retry:
   fallbackChains:
     default: []
     judge: []
-# The Jev guard may spend up to 300 seconds judging one shell or write call
+# The Jev guard may spend up to 300 seconds judging one write or edit call
 # (bin/ten-levels/extensions/report.ts). omp refuses a call whose tool_call
 # handler outlasts this deadline, 30 seconds by default, so the deadline stays
 # above that budget. The tool_result deadline has no setting.

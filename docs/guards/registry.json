@@ -580,7 +580,7 @@
       "version": "1",
       "id": "jev-pretool-deny",
       "owner": "bin/fm-jev-guard-hook.sh",
-      "invariant": "a shell or write action whose required judgment fails never runs",
+      "invariant": "a write or edit action whose required judgment fails never runs",
       "layer": "runtime-block",
       "source": "Jev answers plus Level 6 thresholds, with the output retained",
       "trigger": "the Jev judgment for this action fails its threshold",
@@ -690,6 +690,23 @@
       "id": "f6-prose-layer",
       "layer": "prose",
       "reason": "an instruction corpus in AGENTS.md and its skills, not a guard with a decision, source, or remedy; the audit scores it as prose and rule 3 cannot name a runtime source for it"
+    }
+  ],
+  "beyond_audit_retired": [
+    {
+      "point": "D1 Bash gate",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "a shell decision inside the audited jev-pretool-deny guard, which stays active for write and edit, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "shell outage denial",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "a shell decision inside the audited jev-pretool-deny guard, which stays active for write and edit, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D8 Outage admissions",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "never registered: an outage exemption inside the audited jev-pretool-deny guard, so its retirement record adds to the audited population"
     }
   ]
 }

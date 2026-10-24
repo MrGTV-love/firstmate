@@ -2,8 +2,8 @@
 # Offline guard policy, service and adapter regressions. The loopback fixture
 # supplies controlled answers/errors, not model accuracy or publisher identity.
 set -u
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY JEV_BACKEND JEV_LEVEL_CONFIG
 unset FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FRICTION_EPISODE_ID
 export FM_FRICTION_EXECUTION_KIND=test
@@ -36,7 +36,7 @@ const server = createServer((req, res) => {
     if (text.includes('flaky-once') && !seen.has(text)) { seen.add(text); res.statusCode = 500; res.end('{}'); return; }
     if (text.includes('stall-direct')) return;
     if (text.includes('invalid-json')) { res.end('{'); return; }
-    const risky = /rm -rf|IGNORE PREVIOUS|sk-live/.test(text);
+    const risky = /\brm\b|fm-herdr-lab\.sh.*teardown|IGNORE PREVIOUS|sk-live/.test(text);
     const probability = /probability=([0-9.]+)/.exec(text);
     const answers = {};
     for (const [id, q] of Object.entries(request.questions)) {
@@ -87,21 +87,136 @@ claude_hook() {
 denied() { jq -e '.hookSpecificOutput.hookEventName == "PreToolUse" and .hookSpecificOutput.permissionDecision == "deny"' <<<"$1" >/dev/null; }
 
 "${NODE_TS[@]}" --test "$ROOT/bin/ten-levels/tests/level06.test.ts" > "$TMP_ROOT/policy.out" 2>&1 || fail "policy tests: $(cat "$TMP_ROOT/policy.out")"
-pass "pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values"
+pass "pure write boundaries and calibrated injection equality, ambiguity, invalid and empty values"
+
+# T2 recorded shell misfires: execute only disposable fixture paths, never the
+# production Herdr lifecycle. Its command fixture proves dispatch, not teardown.
+# Claude dispatches through the hook settings a real worker spawn writes.
+test_bash_without_judgment() {
+  local out dir
+  dir="$TMP_ROOT/claude-spawn"
+  fm_test_spawn_home "$dir/home" claude
+  fm_git_worktree "$dir/project" "$dir/wt" wt-claude-guard
+  fm_test_spawn_brief "$dir/home" t2-claude
+  out=$(fm_test_run_spawn "$dir/home" "$dir/wt" "$(make_spawn_fakebin "$dir/fake" claude)" t2-claude "$dir/project" --mode no-mistakes --yolo off) \
+    || fail "Claude worker spawn: $out"
+  CLAUDE_SETTINGS="$dir/wt/.claude/settings.local.json"
+  [ -s "$CLAUDE_SETTINGS" ] || fail "Claude worker spawn wrote no hook settings"
+  out=$(CLAUDE_SETTINGS="$CLAUDE_SETTINGS" "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const root = `${process.env.TASK_DATA}/bash-acceptance`;
+const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
+const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
+const settings = JSON.parse(readFileSync(process.env.CLAUDE_SETTINGS, 'utf8'));
+// Claude runs every PreToolUse hook whose matcher matches the tool name.
+const claudePretool = tool => (settings.hooks.PreToolUse ?? [])
+  .filter(group => new RegExp(!group.matcher || group.matcher === '*' ? '.*' : group.matcher).test(tool))
+  .flatMap(group => group.hooks);
+for (const host of ['omp', 'claude']) {
+  const worktree = `${root}/${host}/repo`;
+  const home = `${root}/${host}/home`;
+  const data = `${home}/data/t2`;
+  const state = `${home}/state`;
+  for (const dir of [worktree, data, state, `${home}/config`]) mkdirSync(dir, { recursive: true });
+  writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
+  const handlers = {};
+  const context = { home, config: `${home}/config`, state, task: 't2', data, worktree,
+    host, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
+  if (host === 'omp') installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
+  async function run(command, unreachable = false) {
+    const before = requests();
+    const baseUrl = process.env.FM_JEV_GUARD_BASE_URL;
+    // The closed loopback port prevents any paid request in the outage case.
+    if (unreachable) process.env.FM_JEV_GUARD_BASE_URL = 'http://127.0.0.1:1/v1/systemone';
+    try {
+      if (host === 'omp') {
+        // A fresh installation prevents an earlier fixture client from retaining its healthy endpoint.
+        const current = unreachable ? {} : handlers;
+        if (unreachable) installJevGuard({ on(name, handler) { current[name] = handler; } }, context);
+        assert.equal(await current.tool_call({ toolName: 'bash', input: { command } }, { cwd: worktree }), undefined);
+      } else {
+        assert.deepEqual(claudePretool('Bash'), [], 'a Claude shell call must start no guard hook process');
+      }
+      assert.equal(requests(), before, 'T2(f): a bash pre-call must send no TypeSafe request');
+      execFileSync('bash', ['-s'], { cwd: worktree, input: command, stdio: 'pipe' });
+    } finally {
+      process.env.FM_JEV_GUARD_BASE_URL = baseUrl;
+    }
+  }
+  await test(`${host} T2(a), B68: remove own smoke.py`, async () => {
+    const path = `${data}/smoke.py`;
+    writeFileSync(path, '# disposable smoke\n');
+    await run(`rm ${quote(path)}`);
+    assert.equal(existsSync(path), false);
+  });
+  await test(`${host} T2(b), B69: four-file probe cleanup`, async () => {
+    // The assessment truncates three basenames; these retain its four-file shape.
+    const paths = ['host-probe.ts', 'native-probe.ts', 'device-probe.ts', 'config-probe.ts'].map(name => `${data}/${name}`);
+    for (const path of paths) writeFileSync(path, '// disposable probe\n');
+    await run(`rm ${paths.map(quote).join(' ')}`);
+    for (const path of paths) assert.equal(existsSync(path), false);
+  });
+  await test(`${host} T2(c), B57: six tracked cd-guard deletions`, async () => {
+    // The report truncates the last basename; retain its six tracked file shape.
+    const paths = ['bin/fm-cd-pretool-check.sh', 'bin/fm-cd-command-policy.mjs',
+      'tests/fm-cd-pretool-check.test.sh', 'docs/cd-guard.md', '.grok/hooks/fm-primary-cd-check.json',
+      '.opencode/plugins/fm-primary-cd-check.ts'];
+    execFileSync('git', ['init', '-q', worktree]);
+    for (const path of paths) {
+      mkdirSync(dirname(`${worktree}/${path}`), { recursive: true });
+      writeFileSync(`${worktree}/${path}`, 'disposable tracked guard\n');
+    }
+    execFileSync('git', ['add', '--', ...paths], { cwd: worktree });
+    await run(`rm ${paths.map(quote).join(' ')}`);
+    for (const path of paths) assert.equal(existsSync(`${worktree}/${path}`), false);
+    assert.equal(execFileSync('git', ['diff', '--name-only'], { cwd: worktree, encoding: 'utf8' }).trim().split('\n').length, 6);
+  });
+  await test(`${host} T2(d), B22/B48-B50: dispatch lab teardown command`, async () => {
+    const script = `${worktree}/fm-herdr-lab.sh`;
+    const marker = `${data}/teardown-args`;
+    writeFileSync(script, `#!/bin/sh\nprintf '%s' "$1" > ${quote(marker)}\n`, { mode: 0o700 });
+    await run(`${quote(script)} teardown`);
+    assert.equal(readFileSync(marker, 'utf8'), 'teardown');
+  });
+  await test(`${host} T2(e), O13: acknowledge inbox with provider unreachable`, async () => {
+    const inbox = `${state}/t2.inbox`;
+    mkdirSync(`${inbox}/handled`, { recursive: true });
+    writeFileSync(`${inbox}/002.msg`, 'disposable steering record\n');
+    await run(`mv ${quote(`${inbox}/002.msg`)} ${quote(`${inbox}/handled/`)}`, true);
+    assert.equal(existsSync(`${inbox}/002.msg`), false);
+    assert.equal(readFileSync(`${inbox}/handled/002.msg`, 'utf8'), 'disposable steering record\n');
+  });
+  await test(`${host} T2(f): shell admission does not depend on audit availability or payload size`, async () => {
+    if (existsSync(`${state}/jev-guard.jsonl`)) unlinkSync(`${state}/jev-guard.jsonl`);
+    mkdirSync(`${state}/jev-guard.jsonl`, { recursive: true });
+    await run(`printf '%s' ${quote('x'.repeat(300000))} > ${quote(`${data}/large.txt`)}`);
+    assert.equal(readFileSync(`${data}/large.txt`, 'utf8'), 'x'.repeat(300000));
+  });
+}
+await test('claude: Write and Edit still reach the generated jev-guard hook', () => {
+  for (const [tool, input] of [['Write', { file_path: '/etc/fm-jev-guard-outside', content: 'x' }],
+    ['Edit', { file_path: '/etc/fm-jev-guard-outside', old_string: 'x', new_string: 'y' }]]) {
+    const hooks = claudePretool(tool);
+    assert.equal(hooks.length, 1, `${tool} must reach the guard hook`);
+    const output = execFileSync('sh', ['-c', hooks[0].command], { encoding: 'utf8',
+      input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input }) });
+    assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny', `${tool} outside the worktree must still be refused`);
+  }
+});
+JS
+  ) || fail "bash acceptance: $out"
+  printf '%s\n' "$out"
+  pass "T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it"
+}
 
 test_claude_effects() {
   local out before payload
-  before=$(requests)
-  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
-  denied "$out" || fail "destructive shell command was not denied"
-  claude_hook "$(pre Bash '{"command":"ls -la"}')"
-  [ -z "$out" ] || fail "read-only shell command did not proceed"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "shell calls did not receive one judgment each"
-  printf 'fm-lab-home v1\n' > "$HOME_DIR/.fm-lab-home"
-  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
-  denied "$out" || fail "a healthy judge admitted a lab teardown it refused"
-  [ "$(requests)" -eq $((before + 3)) ] || fail "a lab shell command skipped a healthy judge"
-  rm "$HOME_DIR/.fm-lab-home"
   before=$(requests)
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
   denied "$out" || fail "outside-root write was not denied"
@@ -121,54 +236,29 @@ test_claude_effects() {
     denied "$out" || fail "Claude admitted an OMP device"
   done
   [ "$(requests)" -eq "$before" ] || fail "Claude device payload reached the provider"
-  pass "Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal"
+  pass "Claude pre-tool credential effects, allowed roots, removals and deterministic device refusal"
 }
 
 test_outages_and_scope() {
   local out before marker status project payload
   for marker in fail500 http402 invalid-json; do
-    claude_hook "$(pre Bash "$(jq -cn --arg m "$marker" '{command:$m}')")"
+    claude_hook "$(pre Write "$(jq -cn --arg m "$marker" '{file_path:"src/outage.txt",content:$m}')")"
     denied "$out" || fail "$marker allowed a required judgment"
   done
   mv "$HOME_DIR/.env" "$HOME_DIR/env.off"
   before=$(requests)
   printf 'synthetic-sensitive-token\n' > "$HOME_DIR/config/dispatch-never-send"
-  claude_hook "$(pre Bash '{"command":"synthetic-SENSITIVE-token"}')"
+  claude_hook "$(pre Write '{"file_path":"src/privacy.txt","content":"synthetic-SENSITIVE-token"}')"
   denied "$out" || fail "privacy refusal allowed active execution"
   jq -se '.[-1].error_type == "PrivacyWithheldError" and .[-1].request_started == false' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "privacy was not checked before missing credentials"
   rm "$HOME_DIR/config/dispatch-never-send"
-  claude_hook "$(pre Bash '{"command":"deploy"}')"
+  claude_hook "$(pre Write '{"file_path":"src/deploy.txt","content":"plain write"}')"
   denied "$out" || fail "missing credentials allowed active execution"
-  for command in 'ls -la' 'ps aux | grep firstmate' 'git status --short' 'git --no-pager log --oneline -3' 'find . -name x'; do
-    claude_hook "$(pre Bash "$(jq -cn --arg c "$command" '{command:$c}')")"
-    [ -z "$out" ] || fail "an outage refused a read-only shell command: $command"
-  done
-  jq -se '.[-1] | .branch == "read_only" and .decision == "allow" and .error_type == "CredentialUnavailableError"' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "read-only outage admission was not audited"
-  # The fixtures stay literal on purpose so the classifier sees the exact characters.
-  # shellcheck disable=SC2016
-  for command in 'sort -o x y' "find . -'delete'" 'find . "-exec" rm {} +' 'find . -de\lete' 'find . -fprint0 x' 'git branch -D main' \
-    'git reflog expire --expire=now --all' 'git --git-dir=/tmp/x/.git status' 'git diff --output=x' 'git log --out=x' \
-    'rg --pre rm x .' 'uniq a b' 'date -s now' 'ls; rm -rf build' 'ls | xargs rm' 'cat $HOME' 'find . -{delete,x}' 'rm -rf build'; do
-    claude_hook "$(pre Bash "$(jq -cn --arg c "$command" '{command:$c}')")"
-    denied "$out" || fail "an outage admitted an unproven shell command: $command"
-  done
-  printf 'fm-lab-home v1\n' > "$HOME_DIR/.fm-lab-home"
-  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
-  [ -z "$out" ] || fail "an outage refused an approved lab teardown"
-  jq -se '.[-1] | .branch == "lab" and .decision == "allow" and .error_type == "CredentialUnavailableError"' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "lab outage admission was not audited"
-  FM_STATE_OVERRIDE="$TMP_ROOT/elsewhere" claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
-  denied "$out" || fail "an outage admitted a lab teardown split by an override"
-  claude_hook "$(pre Write "$(jq -cn --arg path "$WT/src/lab.ts" '{file_path:$path,content:"plain text"}')")"
-  denied "$out" || fail "an outage admitted a lab write"
-  printf 'fm-lab-home v1-forged\n' > "$HOME_DIR/.fm-lab-home"
-  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
-  denied "$out" || fail "an outage admitted a teardown without the lab token"
-  rm "$HOME_DIR/.fm-lab-home"
   [ "$(requests)" -eq "$before" ] || fail "privacy or missing credentials sent a request"
   mv "$HOME_DIR/env.off" "$HOME_DIR/.env"
   printf 'OPENROUTER_API_KEY=fake-openrouter\n' >> "$HOME_DIR/.env"
   before=$(requests)
-  claude_hook "$(pre Bash '{"command":"fail500"}')"
+  claude_hook "$(pre Write '{"file_path":"src/retry.txt","content":"fail500"}')"
   denied "$out" || fail "TypeSafe failure did not require review"
   [ "$(requests)" -eq $((before + 3)) ] || fail "TypeSafe failure fell back or did not stop after three tries of HTTP 500"
   jq -se 'all(.[]; .path == "/v1/systemone")' "$REQUESTS" >/dev/null || fail "guard used another provider"
@@ -196,37 +286,37 @@ test_outages_and_scope() {
 test_bounded_retry() {
   local out before reason ledger
   before=$(requests)
-  claude_hook "$(pre Bash '{"command":"flaky-once ls"}')"
+  claude_hook "$(pre Write '{"file_path":"src/retry.txt","content":"flaky-once write"}')"
   [ -z "$out" ] || fail "an outage followed by success did not allow the call"
   [ "$(requests)" -eq $((before + 2)) ] || fail "outage then success did not use exactly two tries"
   before=$(requests)
-  claude_hook "$(pre Bash '{"command":"fail500 again"}')"
+  claude_hook "$(pre Write '{"file_path":"src/retry.txt","content":"fail500 again"}')"
   denied "$out" || fail "three outages allowed a required judgment"
   [ "$(requests)" -eq $((before + 3)) ] || fail "persistent outage did not stop after two retries"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   [[ "$reason" == *"could not run"* && "$reason" == *"same call once more"* ]] || fail "outage deny text lost the retry guidance: $reason"
   jq -se '.[-1] | .error_type == "Error" and .request_started == true and .attempts == 3 and (.ms | type == "number")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "failure row lost attempts and ms"
   before=$(requests)
-  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  claude_hook "$(pre Write '{"file_path":"src/retry.txt","content":"sk-live-fixture"}')"
   denied "$out" || fail "policy block was not denied"
   [ "$(requests)" -eq $((before + 1)) ] || fail "policy block was retried"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   before=$(requests)
-  claude_hook "$(pre Bash '{"command":"invalid-json"}')"
+  claude_hook "$(pre Write '{"file_path":"src/retry.txt","content":"invalid-json"}')"
   denied "$out" || fail "malformed response allowed a required judgment"
   [ "$(requests)" -eq $((before + 1)) ] || fail "contract failure was retried"
   jq -se '.[-1] | .error_type == "ContractError" and .attempts == 1' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "contract failure row lost its single try"
   ledger="$HOME_DIR/state/jev-guard.jsonl"
   mv "$ledger" "$ledger.saved"
   mkdir "$ledger"
-  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  claude_hook "$(pre Write '{"file_path":"src/retry.txt","content":"sk-live-fixture"}')"
   denied "$out" || fail "policy block was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   [[ "$reason" == *"AuditUnavailableError"* ]] || fail "failed ledger write was not named: $reason"
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
   denied "$out" || fail "deterministic refusal was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
-  claude_hook "$(pre Bash '{"command":"fail500 ledger"}')"
+  claude_hook "$(pre Write '{"file_path":"src/retry.txt","content":"fail500 ledger"}')"
   denied "$out" || fail "outage was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   rmdir "$ledger"
@@ -429,7 +519,7 @@ const unsupported = await handlers.tool_result({ toolName: 'bash', content: [{ t
 assert.equal(unsupported.isError, true);
 assert.equal(JSON.stringify(unsupported).includes('private-output-canary'), false);
 const bad = install({ state: `${home}/audit-bad` });
-assert.match((await bad.tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx)).reason, /AuditUnavailableError/);
+assert.match((await bad.tool_call({ toolName: 'write', input: { path: 'src/deploy.txt', content: 'ordinary write' } }, ctx)).reason, /AuditUnavailableError/);
 const unavailableAudit = await bad.tool_result(event('fail500'), ctx);
 assert.match(unavailableAudit.content[0].text, /AuditUnavailableError/);
 assert.match(unavailableAudit.content[0].text, /error_type=Error/);
@@ -448,7 +538,7 @@ JS
 
 test_claude_node_pretool() {
   local out
-  out=$(pre Bash '{"command":"rm -rf fixture"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1)
+  out=$(pre Write '{"file_path":"src/node.ts","content":"sk-live-fixture"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1)
   denied "$out" || fail "node type stripping did not enforce the guard"
   pass "node type stripping still enforces the Claude pre-tool deny"
 }
@@ -549,13 +639,13 @@ async function beforeHostDeadline(handlers, name, event, limitMs) {
 }
 const started = performance.now();
 const [slowCall, slowResult, pre, post, ompSlowCall, ompSlowResult, ompPre, ompPost] = await Promise.all([
-  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
+  beforeHostDeadline(claude, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'late-answer' } }, 330000),
   beforeHostDeadline(claude, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer' }] }, 330000),
-  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
+  beforeHostDeadline(claude, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'stall-direct' } }, 330000),
   beforeHostDeadline(claude, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 330000),
-  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
+  beforeHostDeadline(omp, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'late-answer' } }, 330000),
   beforeHostDeadline(omp, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer private-output-canary' }] }, 30000),
-  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
+  beforeHostDeadline(omp, 'tool_call', { toolName: 'write', input: { path: 'src/deadline.txt', content: 'stall-direct' } }, 330000),
   beforeHostDeadline(omp, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 30000),
 ]);
 assert.equal(slowCall, undefined, 'a judge answer arriving after 30 seconds must allow the call');
@@ -686,12 +776,12 @@ assert.match(withheld.content[0].text, /TimeoutError/);
 assert.ok(performance.now() - started >= 24000 && performance.now() - started < 30000);
 assert.equal(row().attempts, 2);
 let judged = sent();
-assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx), undefined, 'a safe call is judged and admitted right after an outage');
+assert.equal(await install().tool_call({ toolName: 'write', input: { path: 'src/deploy.txt', content: 'ordinary write' } }, ctx), undefined, 'a safe call is judged and admitted right after an outage');
 assert.equal(row().error_type, null);
 assert.equal(row().request_started, true);
 assert.equal(sent(), judged + 1, 'the pre-tool call reached its own judge');
 judged = sent();
-assert.equal(await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx), undefined);
+assert.equal(await install({ host: 'claude' }).tool_call({ toolName: 'write', input: { path: 'src/deploy.txt', content: 'ordinary write' } }, ctx), undefined);
 assert.equal(sent(), judged + 1, 'the Claude pre-tool call reached its own judge');
 writeFileSync(`${worktree}/plain.txt`, 'plain notes\n');
 judged = sent();
@@ -714,7 +804,7 @@ for (const [text, expected] of [['timeout-reset', 'TypeError'], ['slow502', 'Err
   assert.equal(row().error_type, expected);
   assert.equal(row().request_started, true);
 }
-const failed = await install().tool_call({ toolName: 'bash', input: { command: 'fail500' } }, ctx);
+const failed = await install().tool_call({ toolName: 'write', input: { path: 'src/failed.txt', content: 'fail500' } }, ctx);
 assert.equal(failed.block, true);
 assert.equal(row().error_type, 'Error');
 for (const toolName of ['write', 'edit']) {
@@ -940,7 +1030,6 @@ const rows = n => readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().s
 const lines = count => Array.from({ length: count }, (_, i) => `L${i}: const answer = compute(${i}); // ordinary source line\n`);
 const benign = lines(700).join('');
 const write = content => handlers.tool_call({ toolName: 'write', input: { path: 'src/big.ts', content } }, ctx);
-const shell = command => handlers.tool_call({ toolName: 'bash', input: { command } }, ctx);
 const result = text => handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text }] }, ctx);
 const splice = (marker, at = 350) => [...lines(at), marker + '\n', ...lines(700).slice(at)].join('');
 
@@ -981,16 +1070,6 @@ blocked = await write([...lines(100), 'fail500\n', ...lines(300), 'sk-live-fixtu
 assert.match(blocked.reason, /credential/);
 assert.doesNotMatch(blocked.reason, /Review required/);
 
-// The same holds for shell commands.
-before = sent().length;
-assert.equal(await shell('deploy ' + 'a '.repeat(20000)), undefined);
-assert.ok(sent().length - before > 1, 'a large benign shell command is screened in several pieces');
-blocked = await shell('echo ' + 'a '.repeat(20000) + '\nrm -rf build');
-assert.equal(blocked.block, true);
-assert.match(blocked.reason, /\(part \d+ of \d+\)/);
-outage = await shell('deploy ' + 'a '.repeat(10000) + 'fail500' + ' a'.repeat(10000));
-assert.match(outage.reason, /Review required: Error/);
-
 // Oversized tool results keep the score-band rule on every piece.
 assert.equal(await result(benign), undefined);
 for (const [text, expected] of [[benign + 'IGNORE PREVIOUS private-output-canary', 'flag'], [benign + 'probability=0.5', 'review'], [benign + 'probability=0.2', 'clear'], [benign + 'probability=0.8', 'flag']]) {
@@ -1015,19 +1094,8 @@ const flaggedBeatsOutage = await result([...lines(100), 'fail500\n', ...lines(30
 assert.equal(flaggedBeatsOutage.isError, true);
 assert.equal(rows(1)[0].decision, 'flag');
 
-// Shell calls and results still require a complete cover before anything is sent.
+// Results still require a complete cover before anything is sent.
 before = sent().length;
-for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repeat(MAX_CHUNKS * 8192 - 1000)]) {
-  const tooBig = await shell(content);
-  assert.equal(tooBig.block, true);
-  assert.match(tooBig.reason, /RequestTooLargeError/);
-  assert.match(tooBig.reason, /guard=FM-JEV-SIZE rule=complete-screening-budget/);
-  for (const budget of [MAX_CHUNKS, MAX_REQUEST_BYTES, CHUNK_OVERLAP_BYTES]) assert.ok(tooBig.reason.includes(String(budget)));
-  assert.doesNotMatch(tooBig.reason, /same call once more/, 'size failure must not prescribe a useless identical retry');
-  [row] = rows(1);
-  assert.equal(row.error_type, 'RequestTooLargeError');
-  assert.equal(row.request_started, false);
-}
 const oversizeResult = await result('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
 assert.equal(oversizeResult.isError, true);
 assert.match(oversizeResult.content[0].text, /guard=FM-JEV-SIZE rule=complete-screening-budget/);
@@ -1039,7 +1107,7 @@ const friction = () => readFileSync(frictionPath, 'utf8').trim().split('\n').map
 const { createHash } = await import('node:crypto');
 const taskDigest = 'sha256:' + createHash('sha256').update('oversize').digest('hex');
 const sizeEvents = friction().filter(r => r.guard_id === 'FM-JEV-SIZE' && r.task_id === taskDigest);
-assert.equal(sizeEvents.length, 3, 'two shell denials and one result denial produce one event each');
+assert.equal(sizeEvents.length, 1, 'one result denial produces one event');
 for (const r of sizeEvents) {
   assert.equal(r.schema, 'fm-friction.v1');
   assert.equal(r.rule_id, 'complete-screening-budget');
@@ -1053,10 +1121,10 @@ assert.equal(JSON.stringify(sizeEvents).includes(home), false, 'bridge must not 
 const { renameSync, mkdirSync } = await import('node:fs');
 renameSync(frictionPath, `${frictionPath}.saved`);
 mkdirSync(frictionPath);
-const telemetryFailure = await shell('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
-assert.equal(telemetryFailure.block, true);
-assert.match(telemetryFailure.reason, /complete-screening-budget/);
-assert.doesNotMatch(telemetryFailure.reason, /AuditUnavailableError/);
+const telemetryFailure = await result('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
+assert.equal(telemetryFailure.isError, true);
+assert.match(telemetryFailure.content[0].text, /complete-screening-budget/);
+assert.doesNotMatch(telemetryFailure.content[0].text, /AuditUnavailableError/);
 assert.equal(await write('ordinary bounded report'), undefined);
 rmSync(frictionPath, { recursive: true });
 renameSync(`${frictionPath}.saved`, frictionPath);
@@ -1122,7 +1190,7 @@ console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
   [ "${out##*$'\n'}" = oversize-ok ] || fail "oversize screening did not reach its final line: $out"
-  pass "bounded pieces preserve policy/outage decisions; uncoverable shell/results and never-send payloads send nothing, deadlines hold"
+  pass "bounded pieces preserve policy/outage decisions; uncoverable results and never-send payloads send nothing, deadlines hold"
 }
 
 test_claude_oversize() {
@@ -1233,7 +1301,7 @@ for (const host of ['omp', 'claude']) {
   assert.deepEqual(row().write_coverage, expected);
   assert.equal(row().decision, 'allow');
   assert.match(row().note, /unscreened remainder.*deterministic/);
-  // The host writes only after admission; then its ordinary commit shell call is screened too.
+  // The host writes only after admission; then its ordinary commit shell call runs without a pre-call judgment.
   writeFileSync(path, report);
   const command = 'git add report.md && git -c user.name=Fixture -c user.email=fixture@example.invalid -c commit.gpgsign=false commit --allow-empty -qm report';
   assert.equal(await handlers.tool_call({ toolName: 'bash', input: { command } }, ctx), undefined);
@@ -1366,6 +1434,7 @@ JS
   pass "396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited"
 }
 
+test_bash_without_judgment
 test_claude_effects
 test_outages_and_scope
 test_bounded_retry

@@ -109,9 +109,8 @@ const server = createServer((req, res) => {
     const answers = {};
     for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
       const keys = Object.keys(q.criteria ?? {});
-      const pick = keys.includes('irreversible') ? 'irreversible' : keys[0];
-      answers[id] = q.type === 'noul' ? { type: 'noul', noul: 0.05 }
-        : { type: 'choice', choice: pick, confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === pick ? 1 : 0])) };
+      answers[id] = q.type === 'noul' ? { type: 'noul', noul: 0.95 }
+        : { type: 'choice', choice: keys[0], confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === keys[0] ? 1 : 0])) };
     }
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({ model: 'jev-fake', answers, usage: { input_tokens: 3, output_tokens: 1 } }));
@@ -130,7 +129,7 @@ guard_decision() {
   local home=$1 out err="$TMP_ROOT/hook.err" status
   mkdir -p "$home/state" "$home/config" "$home/data/t1" "$TMP_ROOT/wt"
   : > "$TMP_ROOT/transport"
-  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf ./sandbox"}}' \
+  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"sandbox.txt","content":"fixture"}}' \
     | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE -u OPENROUTER_API_KEY FM_TEST_SEAM=1 \
         FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/jev-port")/v1/systemone" \
         "$ROOT/bin/fm-jev-guard-hook.sh" "$home" "$home/config" "$home/state" t1 "$TMP_ROOT/wt" "$home/data/t1" firstmate FIRSTMATE_JEV_GUARD_V1 2>"$err")

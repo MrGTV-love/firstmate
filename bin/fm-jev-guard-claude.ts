@@ -29,8 +29,7 @@ async function main(): Promise<void> {
   const input = object(payload.tool_input) ? payload.tool_input : {};
   const ctx = { cwd: typeof payload.cwd === "string" ? payload.cwd : worktree };
   const toolCallId = typeof payload.tool_use_id === "string" ? payload.tool_use_id : undefined;
-  const mapped = tool === "bash" ? { command: input.command }
-    : { path: input.file_path, content: input.content, new_string: input.new_string };
+  const mapped = { path: input.file_path, content: input.content, new_string: input.new_string };
   const handler = handlers.tool_call;
   if (!handler) throw new Error("Missing pre-tool handler.");
   const result = await handler({ toolName: tool, toolCallId, input: mapped }, ctx);

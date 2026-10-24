@@ -279,6 +279,8 @@ On 2026-10-15, `bin/fm-test-run.sh --check-coverage` reported `serial_shards=14 
 Before integration, the guard repair's native hints produced `serial_shards=14 serial_unhinted=0 serial_max_ms=1197356 serial_budget_ms=1200000`; that historical packing check does not describe the rebased head.
 Rebasing the repair onto `8221de43a082aef5d0368cfdfb9512810b0d71e5` preserves both sets of measured hints but invalidates prior reviewed-head continuity and downstream head evidence.
 The existing pipeline must restart validation from Review and refresh downstream checks and PR evidence for the integrated head; neither historical estimate is a new-head CI pass.
+The Jev shell-gate retirement added `tests/fm-retired-jev-shell-model-gate.test.sh`, `tests/fm-retired-jev-shell-outage-admissions.test.sh`, and `tests/fm-retired-jev-shell-outage-deny.test.sh` to the serial lane; their default weights packed serial shard 1 at 1204794 ms.
+Their hints (1853, 2347, and 2712 ms) are the successful `exit=0`, `gate_skip=false` records from the serial shards of [run 40122298914](https://github.com/MrGTV-love/firstmate/actions/runs/40122298914) on 2026-10-24.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.

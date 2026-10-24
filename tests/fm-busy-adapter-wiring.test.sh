@@ -249,10 +249,12 @@ test_claude_hooks_semantic_lifecycle() {
   done
   jq -e '.hooks.Stop | length == 1 and (.[0].hooks | length == 1 and .[0].timeout == 25)' \
     "$settings" >/dev/null || fail "Stop must have one combined command with its timeout"
-  jq -e '.hooks.PreToolUse[0].matcher == "^(Bash|Write|Edit)$"
+  jq -e '[.hooks.PreToolUse[].matcher] as $m
+    | (["Write", "Edit"] | all(. as $t | $m | any(. as $r | $t | test($r))))
+    and ($m | any(. as $r | "Bash" | test($r)) | not)
     and (.hooks | has("PostToolUse") | not)' "$settings" >/dev/null \
-    || fail "claude hook settings must register the PreToolUse guard without PostToolUse"
-  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
+    || fail "claude hook settings must register the PreToolUse guard for Write and Edit only, without PostToolUse"
+  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"src/x.txt","content":"x"}}' \
     | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE sh -c "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")" 2>&1) \
     || fail "the generated jev-guard hook must exit 0 without a key"
   [ -z "$out" ] || fail "the generated jev-guard hook must allow silently without a key: $out"

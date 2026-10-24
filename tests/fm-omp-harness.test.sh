@@ -487,7 +487,7 @@ const server = createServer((req, res) => {
     const answers = {};
     for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
       const keys = Object.keys(q.criteria ?? {});
-      const choice = keys.includes("irreversible") ? "irreversible" : keys[0];
+      const choice = keys[0];
       answers[id] = q.type === "noul" ? { type: "noul", noul: 0.95 }
         : { type: "choice", choice, confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === choice ? 1 : 0])) };
     }
@@ -504,12 +504,12 @@ try {
   (await import(pathToFileURL(process.env.EXT_PATH))).default({ registerProvider: (name, config) => providers.push({ name, ...config }), on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
   assert.deepEqual(providers.map(row => [row.name, row.baseUrl]), [["typesafe", "https://api.typesafe.ai"]]);
   const credential = () => execFileSync("/bin/sh", ["-c", providers[0].apiKey.slice(1)], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
+  const result = await handlers.tool_call({ toolName: "write", input: { path: "customer-record.txt", content: "fixture" } }, { cwd: process.env.WT });
   if (process.env.PROJECT === "firstmate") {
     assert.equal(credential(), "omp-scope-key");
     assert.equal(result?.block, true);
     assert.deepEqual(requests.map(row => row.path), ["/direct"]);
-    assert.ok(requests.every(row => row.state.command === "rm -rf customer-record"));
+    assert.ok(requests.every(row => row.state.path === "customer-record.txt"));
   } else {
     assert.throws(credential, "a non-firstmate worker must have no native judge credential");
     assert.equal(result, undefined);
