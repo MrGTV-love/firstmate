@@ -46,6 +46,8 @@ trimmed and case-insensitive.
 check HARNESS MODEL [PROVIDER] requires dsh for DeepSeek and refuses dsh
 unless the model is a concrete DeepSeek id: a DeepSeek route, then a non-empty
 id with no slash or whitespace.
+canonical MODEL [PROVIDER] applies the dsh check and prints the model's one
+identity, deepseek/<id>, which launch metadata and relaunch comparisons use.
 """
 import argparse
 import json
@@ -88,6 +90,11 @@ def check(harness, model, provider=""):
         raise ValueError("dsh requires a concrete DeepSeek model id")
 
 
+def canonical(model, provider=""):
+    check("dsh", model, provider)
+    return "deepseek/" + deepseek_id(model, provider)
+
+
 def normalize(value):
     if isinstance(value, list):
         return [normalize(item) for item in value]
@@ -97,7 +104,7 @@ def normalize(value):
         if "harness" in value and isinstance(model, str) and isinstance(provider, str):
             check(value["harness"], model, provider)
             if value["harness"] == "dsh":
-                value["model"] = "deepseek/" + deepseek_id(model, provider)
+                value["model"] = canonical(model, provider)
         return value
     return value
 
@@ -432,6 +439,9 @@ def main():
     p.add_argument("harness")
     p.add_argument("model")
     p.add_argument("provider", nargs="?", default="")
+    p = sub.add_parser("canonical")
+    p.add_argument("model")
+    p.add_argument("provider", nargs="?", default="")
     p = sub.add_parser("normalize")
     p.add_argument("file")
     p.add_argument("output")
@@ -455,6 +465,8 @@ def main():
             print(route(args.model, args.provider))
         elif args.command == "check":
             check(args.harness, args.model, args.provider)
+        elif args.command == "canonical":
+            print(canonical(args.model, args.provider))
         elif args.command == "normalize":
             atomic_json(Path(args.output), normalize(json.loads(Path(args.file).read_text())))
         elif args.command == "position":

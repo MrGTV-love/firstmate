@@ -40,6 +40,12 @@ call('check', 'dsh', 'v4', 'deepseek')
 for model in ('DeepSeek/deepseek-v4-flash', ' DeepSeek / model '):
     call('check', 'dsh', model)
     call('check', 'omp', model, ok=False)
+# Every DeepSeek spelling has one identity; the model id keeps its own case.
+for model, provider, expected in [(' DeepSeek / v4 ', '', 'deepseek/v4'), ('deepseek/v4', '', 'deepseek/v4'),
+                                  ('v4', ' DeepSeek ', 'deepseek/v4'), ('DeepSeek/V4-Pro', '', 'deepseek/V4-Pro')]:
+    assert call('canonical', model, provider) == expected
+for model in ('openai/gpt', 'deepseek/a/b', 'deepseek/', ''):
+    call('canonical', model, ok=False)
 # check admits exactly the models prepare accepts, so a relaunch is refused
 # before the running agent stops rather than after.
 for model, provider in [('deepseek/a/b', ''), ('deepseek/ ', ''), ('deepseek/', ''), ('', 'deepseek'), ('a b', 'deepseek'), ('x/y', 'deepseek')]:

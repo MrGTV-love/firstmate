@@ -239,6 +239,19 @@ SH
   expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
   assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "the explicit model is the replacement model"
   assert_equals max "$(journal_field "$dir" smd to_effort)" "an explicit bound model without --effort keeps the recorded effort"
+  # Another DeepSeek spelling of the bound model is the same model.
+  rm -f "$home/state/smd.control-relaunch"
+  printf 'dsh DeepSeek/recorded-model max\n' > "$home/config/secondmate-harness"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_contains "$out" "composer visibly holds pending text" "a config spelling of the bound model must pass every pre-stop admission"
+  assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "a config spelling of the bound model keeps it"
+  rm -f "$home/state/smd.control-relaunch"
+  printf 'dsh deepseek/other-model high\n' > "$home/config/secondmate-harness"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch --model ' DeepSeek / recorded-model '); rc=$?
+  expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
+  assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "an explicit spelling of the bound model is the canonical replacement model"
+  assert_equals max "$(journal_field "$dir" smd to_effort)" "an explicit spelling of the bound model without --effort keeps the recorded effort"
   # Role tokens compare by the model they resolve to, never by their name.
   printf '%s\n' '{"version":1,"roles":{"bound":{"dsh":{"model":"deepseek/recorded-model"}}},"retired":[]}' > "$home/config/model-index.json"
   rm -f "$home/state/smd.control-relaunch"

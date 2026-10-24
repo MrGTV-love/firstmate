@@ -368,6 +368,8 @@ test_deepseek_spelling_without_a_harness_routes_to_dsh() {
     expect_code 0 "$status" "'$spelling' with no harness must launch on dsh, not be refused: $out"
     assert_contains "$out" "spawned $id harness=dsh" "'$spelling' must report the dsh harness"
     assert_grep "harness=dsh" "$HOME_DIR/state/$id.meta" "'$spelling' meta must record dsh, not the crew default"
+    assert_equals "$DSH_MODEL" "$(sed -n 's/^model=//p' "$HOME_DIR/state/$id.meta")" \
+      "'$spelling' meta must record the canonical DeepSeek model"
     [ "$(jq -r .model "$HOME_DIR/state/$id.dsh-session")" = deepseek-v4-flash ] \
       || fail "'$spelling' must bind the bare DeepSeek id"
   done
@@ -563,11 +565,12 @@ esac
 exec "$FAKEBIN_DIR/tmux" "\$@"
 SH
   chmod +x "$bin/tmux"
-  # A plain relaunch, an explicit bound model without --effort, and the exact
-  # profile bin/fm-control.sh hands over each resume the same conversation.
+  # A plain relaunch, an explicit bound model in any DeepSeek spelling without
+  # --effort, and the exact profile bin/fm-control.sh hands over each resume the
+  # same conversation.
   printf '{"version":1,"roles":{"bound":{"dsh":{"model":"%s"}}},"retired":[]}\n' "$DSH_MODEL" > "$HOME_DIR/config/model-index.json"
   seq=2
-  for args in '' "--model $DSH_MODEL" "--model role:bound" "--harness dsh --model $DSH_MODEL --effort high"; do
+  for args in '' "--model $DSH_MODEL" "--model DeepSeek/${DSH_MODEL#deepseek/}" "--model role:bound" "--harness dsh --model $DSH_MODEL --effort high"; do
     : > "$LAUNCH_LOG"
     python3 - "$generation/dsh/sessions/workspace/session/session.v4.jsonl" "$LAUNCH_LOG" "$seq" <<'PY' &
 import json, os, sys, time

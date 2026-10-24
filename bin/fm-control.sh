@@ -2243,6 +2243,7 @@ resolve_relaunch_profile() {
     if [ "$TARGET_HARNESS" = dsh ] && [ "$PRIOR_HARNESS" = dsh ] && [ "$NEW_MODEL" != default ]; then
       relaunch_pair_stage || return 1
       dsh_model=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" "$SCRIPT_DIR/fm-model-index.sh" model dsh "$NEW_MODEL") || return 1
+      dsh_model=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$dsh_model") || return 1
       if [ "$dsh_model" = "$PRIOR_MODEL" ]; then
         dsh_prior_kept=1
       fi
@@ -2255,6 +2256,7 @@ resolve_relaunch_profile() {
       if [ "$TARGET_MODEL" != default ]; then
         relaunch_pair_stage || return 1
         dsh_model=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" "$SCRIPT_DIR/fm-model-index.sh" model dsh "$TARGET_MODEL") || return 1
+        dsh_model=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$dsh_model") || return 1
       fi
       if [ "$EFFORT_SET" = 0 ] && { [ "$dsh_model" != "$PRIOR_MODEL" ] \
          || [ "${CONFIG_EFFORT:-$PRIOR_EFFORT}" != "$PRIOR_EFFORT" ]; }; then
@@ -2331,6 +2333,7 @@ resolve_relaunch_profile() {
   local dsh_route_model=$TARGET_MODEL
   [ "$dsh_route_model" != default ] || dsh_route_model=
   python3 "$SCRIPT_DIR/fm-dsh.py" check "$TARGET_HARNESS" "$dsh_route_model" || return 1
+  [ "$TARGET_HARNESS" != dsh ] || TARGET_MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$TARGET_MODEL") || return 1
   case "$(fm_meta_get "$META" omp_no_helpers)" in
     '') ;;
     on)

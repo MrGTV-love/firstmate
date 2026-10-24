@@ -3263,18 +3263,18 @@ if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
 else
   MODEL_INDEXED=0
 fi
-if [ "$RELAUNCH" = 1 ] && [ "$EFFORT_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ] \
-   && [ "$MODEL" = "$(fm_meta_get "$RELAUNCH_META" model)" ]; then
-  prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
-  [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
-fi
-
 if [ "$RAW_LAUNCH" = 0 ]; then
   if [ -z "$ARG3" ] && [ "$KIND" != secondmate ] && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
     HARNESS=dsh
     LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
   fi
   python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || exit 1
+  [ "$HARNESS" != dsh ] || MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$MODEL") || exit 1
+fi
+if [ "$RELAUNCH" = 1 ] && [ "$EFFORT_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ] \
+   && [ "$MODEL" = "$(fm_meta_get "$RELAUNCH_META" model)" ]; then
+  prior_dsh=$(fm_meta_get "$RELAUNCH_META" effort)
+  [ "$prior_dsh" = default ] || EFFORT=$prior_dsh
 fi
 
 # Do not let dispatch fallback selection turn a forbidden explicit route into
@@ -3311,6 +3311,7 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
 fi
 if [ "$RAW_LAUNCH" = 0 ]; then
   python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || exit 1
+  [ "$HARNESS" != dsh ] || MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$MODEL") || exit 1
 fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 
