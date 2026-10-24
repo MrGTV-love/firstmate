@@ -64,7 +64,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Bash pre-calls return without judging effects or destructive intent, planning provider requests, inspecting lab markers or classifying read-only commands; only an omp brief-named deletion record writes audit rows.
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The [operator contract](../../docs/configuration.md#jev-guard) owns enforcement and outage behavior.
-- `bin/fm-jev-deletions.ts` owns the deterministic brief-named deletion record for omp `bash` calls, its mandatory task-local audit, and the firstmate-side publisher used by `bin/fm-jev-deletions.sh` and initial spawn.
+- `bin/fm-jev-deletions.ts` owns the deterministic brief-named deletion record and invalid-declaration refusal for omp `bash` calls, its mandatory task-local audit, and the firstmate-side publisher used by `bin/fm-jev-deletions.sh` and initial spawn.
   The [operator contract](../../docs/configuration.md#brief-named-file-deletion-allowance) owns the literal-shell grammar, HEAD/file/path checks, live update/revocation route, digest format and same-user consistency-only limit; a worker can deliberately forge both list and digest.
   It adds no model judgment, shell question or threshold.
 - `bin/fm-jev-guard-claude.ts` normalizes native tool names, forwards actual input and call identity and maps pre-tool refusal to Claude denial; non-pre-tool events return without output.

@@ -2,7 +2,7 @@
 // The CLI is called under the task metadata lock by fm-jev-deletions.sh or spawn.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, lstatSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -96,24 +96,35 @@ function operands(command: string): string[] | undefined {
   return paths.length > 0 ? paths : undefined;
 }
 
-/** No exception on an absent, changed or unreadable consistency record. */
-export function authorizedDeletion(command: string, cwd: string, c: Context): Admission | undefined {
+/** Invalid declared authorization denies locally; non-applicable calls retain Jev screening. */
+export function authorizedDeletion(command: string, cwd: string, c: Context): Admission | { invalid: true } | undefined {
+  const targets = operands(command);
+  if (!targets) return;
+  let declared = false;
+  let root: string, digest: string, list: DeletionList;
   try {
     taskValid(c.task);
-    const targets = operands(command);
-    if (!targets || targets.some((target) => target.split("/").includes(".."))) return;
-    const root = rootPath(c.worktree);
+    declared = existsSync(listPath(c));
+    const meta = readFileSync(resolve(c.state, `${c.task}.meta`), "utf8");
+    declared ||= meta.split("\n").some((line) => line.startsWith(`${digestKey}=`));
+    // Tasks without either a snapshot or a declaration keep their existing policy.
+    if (!declared) return;
+    root = rootPath(c.worktree);
+    if (realpathSync(metaValue(meta, "worktree")) !== root) return { invalid: true };
+    const bytes = readFileSync(listPath(c));
+    digest = hash(bytes);
+    if (metaValue(meta, digestKey) !== digest) return { invalid: true };
+    list = JSON.parse(bytes.toString("utf8"));
+    if (list.schema !== "fm-authorized-deletions.v1" || list.task !== c.task || list.worktree !== root
+      || !Array.isArray(list.paths) || !list.paths.every((path) => typeof path === "string" && relativePath(path))) return { invalid: true };
+  } catch {
+    return declared ? { invalid: true } : undefined;
+  }
+  try {
+    if (targets.some((target) => target.split("/").includes(".."))) return;
     const working = realpathSync(cwd);
     const workingRelative = relative(root, working);
     if (isAbsolute(workingRelative) || workingRelative === ".." || workingRelative.startsWith(`..${sep}`)) return;
-    const meta = readFileSync(resolve(c.state, `${c.task}.meta`), "utf8");
-    if (realpathSync(metaValue(meta, "worktree")) !== root) return;
-    const bytes = readFileSync(listPath(c));
-    const digest = hash(bytes);
-    if (metaValue(meta, digestKey) !== digest) return;
-    const list: DeletionList = JSON.parse(bytes.toString("utf8"));
-    if (list.schema !== "fm-authorized-deletions.v1" || list.task !== c.task || list.worktree !== root
-      || !Array.isArray(list.paths) || !list.paths.every((path) => typeof path === "string" && relativePath(path))) return;
     const paths = [...new Set(targets.map((target) => relative(root, resolve(working, target)).split(sep).join("/")))];
     if (!paths.every((path) => relativePath(path) && list.paths.includes(path)) || !trackedFiles(root, paths)) return;
     return { paths, list_sha256: digest };
