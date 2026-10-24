@@ -83,6 +83,37 @@ SH
   pass "T3(a-c): staged credential refuses by filename, ignored .env commits nothing, placeholders commit and push; outgoing history is checked"
 }
 
+test_project_pre_commit_changes_are_scanned() {
+  local repo hooks before out status
+  repo="$TMP_ROOT/project-stages-secret"
+  hooks="$TMP_ROOT/hooks-project-stages-secret"
+  make_repo "$repo"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  before=$(git -C "$repo" rev-parse HEAD)
+  cat >"$repo/.git/hooks/pre-commit" <<'SH'
+#!/usr/bin/env bash
+printf 'ghp_%036d\n' 0 >hook-staged.txt
+git add hook-staged.txt
+SH
+  chmod +x "$repo/.git/hooks/pre-commit"
+  printf 'benign initial change\n' >>"$repo/README.md"
+  git -C "$repo" add README.md
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'project hook stages credential' 2>&1) &&
+    fail "a chained project pre-commit hook staged a credential after inspection"
+  assert_contains "$out" hook-staged.txt "post-project-hook credential refusal did not name the file"
+  assert_not_contains "$out" "ghp_" "post-project-hook refusal printed matching bytes"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "project hook credential reached a commit"
+  git -C "$repo" ls-files --error-unmatch hook-staged.txt >/dev/null || fail "project hook never staged its credential"
+  # A project-hook refusal must propagate before the scanner runs, even while
+  # the index still contains the synthetic credential from the first case.
+  printf '#!/usr/bin/env bash\nexit 17\n' >"$repo/.git/hooks/pre-commit"
+  (cd "$repo" && with_hooks_env "$hooks" "$hooks/pre-commit") >/dev/null 2>&1
+  status=$?
+  expect_code 17 "$status" "task wrapper lost the project hook failure status"
+  pass "project pre-commit staging is scanned before commit, and project-hook failure propagates"
+}
+
+test_project_pre_commit_changes_are_scanned
 test_credentials_are_checked_at_commit_and_push 0
 test_credentials_are_checked_at_commit_and_push 1
 

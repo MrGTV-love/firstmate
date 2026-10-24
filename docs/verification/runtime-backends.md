@@ -43,7 +43,7 @@ claude: ignored .env write stages nothing; wrote and committed 396924-byte repor
 credential shapes: complete binary blobs, newline names, anchored prefixes and URL boundaries checked at commit
 ```
 
-It exercises both production write adapters offline and real Git commit/push operations through installed task hooks, including both trailer postures, intermediate outgoing commits, new branches, ref deletion and project-hook stdin preservation.
+It exercises both production write adapters offline and real Git commit/push operations through installed task hooks, including project-hook staging and failure propagation, both trailer postures, intermediate outgoing commits, new branches, ref deletion and project-hook stdin preservation.
 It does not launch live model sessions or prove another backend's lifecycle behavior; Linux was not exercised.
 The [operator contract](../configuration.md#jev-guard) owns current behavior and residual limits.
 
