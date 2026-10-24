@@ -1,0 +1,17 @@
+### test_captain_fail_triggered_pass_refuses on base b26779019 code
+ok - fm-pr-merge reads a plan-gated 403 on branch rules as no merge queue, not unreadable
+ok - away merge proceeds on a plan-gated 403 because that repository cannot have a merge queue
+not ok - captain-word, FAIL, PASS with loosens-deny-allow-list=yes must refuse: expected exit 1, got 0
+exit=1
+### test_late_fail_before_away_hold_refuses on base b26779019 code
+ok - fm-pr-merge reads a plan-gated 403 on branch rules as no merge queue, not unreadable
+ok - away merge proceeds on a plan-gated 403 because that repository cannot have a merge queue
+not ok - github must refuse FAIL appended after earlier verification: expected exit 1, got 0
+exit=1
+### test_attended_override_without_review_refuses on base b26779019 code
+ok - fm-pr-merge reads a plan-gated 403 on branch rules as no merge queue, not unreadable
+ok - away merge proceeds on a plan-gated 403 because that repository cannot have a merge queue
+ok - github attended override cannot merge without recorded review evidence
+ok - gitlab attended override cannot merge without recorded review evidence
+ok - forgejo attended override cannot merge without recorded review evidence
+exit=0
