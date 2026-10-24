@@ -90,6 +90,20 @@ await test('M1/M3/M5: native-framed recorded bounded wait passes with original r
     assert.equal(JSON.stringify(row()).includes('bounded hold'), false);
   }
 });
+await test('M1: sub-second native framing (no wall-time notice) passes with original result state', async () => {
+  // omp 18.12.4 framing captured live for `no-mistakes axi status` (35 ms): no wall-time line, and only the exit-code line when nonzero.
+  for (const exitCode of [undefined, 1]) {
+    const exit = exitCode === undefined ? '' : `\n\nCommand exited with code ${exitCode}`;
+    const text = boundedWait + exit;
+    const details = { wallTimeNoticeEmitted: false, timeoutSeconds: 300, wallTimeMs: 35.9, ...(exitCode === undefined ? {} : { exitCode }) };
+    const { patch, delivered, event } = await result('no-mistakes axi status', text, { details, isError: exitCode !== undefined });
+    assert.equal(patch, undefined, 'fast local command help must not withhold output');
+    assert.deepEqual(delivered, [{ type: 'text', text }]);
+    assert.equal(event.isError, exitCode !== undefined);
+    assert.deepEqual(screened, [boundedWait.replace(helpLine, '') + exit], 'every exit-code trailer byte stays screened');
+    assert.deepEqual(row().producer_fields, { producer: 'no-mistakes', removed_bytes: Buffer.byteLength(helpLine) });
+  }
+});
 await test('M4: missing or mismatched native metadata screens the complete framed result', async () => {
   const framed = boundedWait + wall;
   const failed = framed + '\n\nCommand exited with code 1';
@@ -107,6 +121,12 @@ await test('M4: missing or mismatched native metadata screens the complete frame
     [boundedWait.trimEnd() + '\nWall time: 2.34 seconds', { wallTimeMs: 2338.7 }],
     [framed + '\nTimeout clamped to 300s.', { wallTimeMs: 2338.7 }],
     [framed + '\n\n[Command timed out after 300 seconds]', { wallTimeMs: 2338.7, timedOut: true }],
+    [boundedWait, { wallTimeNoticeEmitted: false }],
+    [boundedWait, { wallTimeNoticeEmitted: false, wallTimeMs: 35.9, exitCode: 1 }],
+    [boundedWait + '\n\nCommand exited with code 1', { wallTimeNoticeEmitted: false, wallTimeMs: 35.9 }],
+    [boundedWait + '\n\nCommand exited with code 1', { wallTimeNoticeEmitted: false, wallTimeMs: 35.9, exitCode: 2 }],
+    [framed, { wallTimeNoticeEmitted: false, wallTimeMs: 2338.7 }],
+    [boundedWait, { wallTimeNoticeEmitted: true, wallTimeMs: 2338.7 }],
   ]) {
     const { patch } = await result('no-mistakes axi run', text, { details, isError: true });
     assert.equal(patch?.isError, true, JSON.stringify(details));

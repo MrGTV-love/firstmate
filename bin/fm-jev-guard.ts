@@ -352,12 +352,13 @@ function primitiveCells(value: string): number | undefined {
 /** Command output before the completed BashTool trailer its own details confirm exactly. */
 function nativeBashOutput(text: string, details: unknown): string | undefined {
   if (!object(details) || typeof details.wallTimeMs !== "number" || !Number.isFinite(details.wallTimeMs)) return;
-  let trailer = `\n\nWall time: ${(details.wallTimeMs / 1000).toFixed(2)} seconds`;
+  // omp omits the wall-time line for sub-second commands and records that as wallTimeNoticeEmitted: false.
+  let trailer = details.wallTimeNoticeEmitted === false ? "" : `\n\nWall time: ${(details.wallTimeMs / 1000).toFixed(2)} seconds`;
   if (details.exitCode !== undefined) {
     if (typeof details.exitCode !== "number") return;
     trailer += `\n\nCommand exited with code ${details.exitCode}`;
   }
-  return text.endsWith(trailer) ? text.slice(0, -trailer.length) : undefined;
+  return text.endsWith(trailer) ? text.slice(0, text.length - trailer.length) : undefined;
 }
 
 function producerScreen(text: string): { text: string; removed_bytes: number } {

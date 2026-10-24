@@ -2473,6 +2473,7 @@ Before omp result planning, a literal single invocation of a known local AXI com
 The command/mode registry and structural rule have one owner in [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts); quoted or expanded shell arguments, executable paths, wrappers, pipelines, chains, redirections, unknown producers and raw-output modes receive ordinary complete screening.
 The supported envelopes cover no-mistakes AXI drive/status/respond, gh-axi PR/issue views and lists, tasks-axi detail/list, Lavish home/playbook, browser eval and quota home output; other modes remain screened unchanged rather than being guessed safe.
 The exclusion applies only when the result ends with the completed omp BashTool trailer that its own `wallTimeMs` and `exitCode` details reproduce exactly; missing or mismatched metadata receives complete screening.
+For a command under 1 second, omp records `wallTimeNoticeEmitted: false` and omits the wall-time line, so the expected trailer is only the exit-code line for a nonzero exit, or nothing.
 The structure is parsed on the command output before that trailer, and every trailer byte stays in the screened copy.
 Only root `help[N]` arrays with exactly the declared primitive entries are excluded.
 PR bodies, comments, findings, file content, every scalar field including `error`, and other indented subtrees stay screened, including help-shaped or host-trailer-shaped text inside them; ambiguous or malformed framing is screened unchanged.
