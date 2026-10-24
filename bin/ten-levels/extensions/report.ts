@@ -107,6 +107,8 @@ export interface GuardTerminal {
   refused_path?: string;
   /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */
   write_coverage?: { model_screened_bytes: number; local_only_bytes: number };
+  /** Producer-owned structural fields excluded from result screening, never their text. */
+  producer_fields?: { producer: string; removed_bytes: number };
   error_type: GuardFailureType | null;
   request_started: boolean;
   result?: SystemOneResult;
@@ -366,6 +368,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         usage: answered.length > 0 ? { input_tokens: sum(answered.map((r) => r.usage.input_tokens)), output_tokens: sum(answered.map((r) => r.usage.output_tokens)) } : null,
         cost,
         chunks, planned_chunks: plannedChunks, answers,
+        ...(terminal.producer_fields ? { producer_fields: terminal.producer_fields } : {}),
         ...(terminal.write_coverage ? { write_coverage: terminal.write_coverage,
           ...(terminal.write_coverage.local_only_bytes > 0 ? { note: "unscreened remainder: deterministic local rules only" } : {}) } : {}),
       };

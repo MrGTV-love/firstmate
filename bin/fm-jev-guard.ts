@@ -313,6 +313,92 @@ function readOnlyShell(command: string): boolean {
   return true;
 }
 
+// Literal argv only: quoted/expanded arguments and absolute or relative executable
+// paths are deliberately not inferred. Raw-output modes (API, diff, snapshot,
+// wrappers, etc.) are not producer-owned envelopes, even when the CLI is local.
+const AXI_PRODUCERS: Readonly<Record<string, RegExp>> = {
+  "no-mistakes": /^axi (?:run|status|respond)(?: |$)/,
+  "gh-axi": /^(?:pr|issue) (?:view|list)(?: |$)/,
+  "tasks-axi": /^(?:show|view|list)(?: |$)/,
+  "lavish-axi": /^(?:playbook(?: |$)|$)/,
+  "chrome-devtools-axi": /^eval(?: |$)/,
+  "quota-axi": /^$/,
+};
+
+function axiProducer(event: GuardResultEvent): string | undefined {
+  if (event.toolName !== "bash" || !object(event.input) || typeof event.input.command !== "string") return;
+  const command = event.input.command;
+  // No shell grammar beyond literal words separated by ASCII spaces/tabs. This
+  // excludes operators, redirections, substitutions, comments and wrappers.
+  if (!/^[ \t]*[A-Za-z0-9_./:@%+,=-]+(?:[ \t]+[A-Za-z0-9_./:@%+,=-]+)*[ \t]*$/.test(command)) return;
+  const [program, ...args] = command.trim().split(/[ \t]+/);
+  return Object.hasOwn(AXI_PRODUCERS, program) && AXI_PRODUCERS[program].test(args.join(" ")) ? program : undefined;
+}
+
+/** Count TOON primitive cells without treating a quoted comma as a separator. */
+function primitiveCells(value: string): number | undefined {
+  let quoted = false;
+  let count = 1;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    if (quoted && char === "\\") {
+      if (!/[\\"nrt]/.test(value[++i] ?? "")) return;
+    } else if (char === '"') quoted = !quoted;
+    else if (!quoted && char === ",") count++;
+  }
+  return quoted ? undefined : count;
+}
+
+/** Command output before the completed BashTool trailer its own details confirm exactly. */
+function nativeBashOutput(text: string, details: unknown): string | undefined {
+  if (!object(details) || typeof details.wallTimeMs !== "number" || !Number.isFinite(details.wallTimeMs)) return;
+  // omp omits the wall-time line for sub-second commands and records that as wallTimeNoticeEmitted: false.
+  let trailer = details.wallTimeNoticeEmitted === false ? "" : `\n\nWall time: ${(details.wallTimeMs / 1000).toFixed(2)} seconds`;
+  if (details.exitCode !== undefined) {
+    if (typeof details.exitCode !== "number") return;
+    trailer += `\n\nCommand exited with code ${details.exitCode}`;
+  }
+  return text.endsWith(trailer) ? text.slice(0, text.length - trailer.length) : undefined;
+}
+
+function producerScreen(text: string): { text: string; removed_bytes: number } {
+  const unchanged = { text, removed_bytes: 0 };
+  const lines = text.split(/(?<=\n)/);
+  const fields: { start: number; key: string; count?: number; value: string; end: number }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\n$/, "");
+    if (!line) continue;
+    // TOON strings escape newlines; raw block scalars, unclosed quotes and raw
+    // non-field root lines make provenance ambiguous, so screen everything.
+    if (/[\r\t\x00-\x08\x0b-\x1f]/.test(line) || primitiveCells(line) === undefined || /: [|>][+-]?$/.test(line)) return unchanged;
+    if (line.startsWith("  ")) {
+      if (fields.length === 0) return unchanged;
+      continue;
+    }
+    const field = /^([A-Za-z_][A-Za-z0-9_.-]*)(?:\[([0-9]+)\](?:\{[^{}]+\})?)?:(?: (.*))?$/.exec(line);
+    if (!field) return unchanged;
+    if (fields.length) fields[fields.length - 1].end = i;
+    fields.push({ start: i, end: lines.length, key: field[1], count: field[2] === undefined ? undefined : Number(field[2]), value: field[3] ?? "" });
+  }
+  // Structural rule: only root help arrays with exactly N primitive entries
+  // belong to the producer. All other fields, including scalars such as error,
+  // and their entire indented subtrees are opaque task data; never search
+  // inside PR bodies, comments, findings or quoted values for help.
+  const removed = new Set<number>();
+  for (const field of fields) {
+    if (field.key !== "help" || field.count === undefined || !Number.isSafeInteger(field.count)) continue;
+    const children = lines.slice(field.start + 1, field.end).filter(line => line.trim() !== "");
+    const owned = field.value !== ""
+      ? children.length === 0 && primitiveCells(field.value) === field.count
+      : children.length === field.count && children.every(line => /^  (?:- )?\S/.test(line)
+        && !/^  (?:- )?[A-Za-z_][A-Za-z0-9_.-]*:/.test(line));
+    if (owned) for (let i = field.start; i < field.end; i++) removed.add(i);
+  }
+  if (removed.size === 0) return unchanged;
+  const content = lines.filter((_, i) => !removed.has(i)).join("");
+  return { text: content, removed_bytes: Buffer.byteLength(text, "utf8") - Buffer.byteLength(content, "utf8") };
+}
+
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
@@ -454,6 +540,15 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         if (!object(part) || part.type !== "text" || typeof part.text !== "string") throw new GuardUnavailableError("UnsupportedToolResultError");
         text += separator + part.text;
         separator = "\n";
+      }
+      const producer = axiProducer(event);
+      const output = producer ? nativeBashOutput(text, event.details) : undefined;
+      if (producer && output !== undefined) {
+        const screened = producerScreen(output);
+        if (screened.removed_bytes > 0) {
+          terminal.producer_fields = { producer, removed_bytes: screened.removed_bytes };
+          text = screened.text + text.slice(output.length);
+        }
       }
       const pieces = service.plan({ tool, source_role: "tool_result", content: text }, "content", SCREEN_QUESTIONS);
       const settled = settle(await screenParts(pieces, (piece, judge) => screenToolResult(tool, piece, judge), service),
