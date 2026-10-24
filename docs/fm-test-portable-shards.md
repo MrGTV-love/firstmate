@@ -199,7 +199,9 @@ The waits hints (351000, 712000, 148000, and 76000 ms) scale the four local Ubun
 The control hints (238000, 538000, and 447000 ms) are apportioned from the measured prefixes that did not hit a container-only node and harness gap.
 All seven were then set so the unchanged twenty shards pass `--check-coverage` at `serial_max_ms` 1198995.
 Each family's hints sum to about 0.90 of the combined suite's last CI measurement (1287000 against 1433371 ms for waits, 1223000 against 1358153 ms for control); they sit deliberately below it to leave the twenty-shard cover inside the 1200000 ms target.
-They are apportioned estimates, not CI measurements; the first `fm-test-timing-portable-serial-*` artifacts for the new files replace them, as the refresh procedure above requires.
+The first measured artifacts for the new files come from [run 40063531528](https://github.com/MrGTV-love/firstmate/actions/runs/40063531528): waits 364946, 655026, 136392, and 62759 ms; control 236454, 389108, and 481058 ms.
+Those replace the apportioned estimates, and the unchanged twenty shards still pass `--check-coverage` at a modeled `serial_max_ms` of 1189726.
+That run's observed worst serial shard was 1488349 ms (shard 13), above the target; the cause is stale hints on suites the split does not touch (`fm-pr-merge` measured 987295 against a 461903 hint, `fm-test-run` 889567 against 444553, `fm-lint` 1105233 against 758806), which is the routine refresh's work rather than this split's.
 
 ## Portable serial remainder
 

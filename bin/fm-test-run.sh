@@ -885,9 +885,9 @@ tests/fm-composer-native-idle-hint.test.sh 4023
 tests/fm-contributions-read-saved.test.sh 2078
 tests/fm-contributions.test.sh 248058
 tests/fm-control-reassociate.test.sh 347235
-tests/fm-control-relaunch-backends.test.sh 447000
-tests/fm-control-relaunch-recovery.test.sh 538000
-tests/fm-control-relaunch.test.sh 238000
+tests/fm-control-relaunch-backends.test.sh 481000
+tests/fm-control-relaunch-recovery.test.sh 389000
+tests/fm-control-relaunch.test.sh 236000
 tests/fm-control.test.sh 120383
 tests/fm-copy-sweep.test.sh 207702
 tests/fm-cpu-pass.test.sh 26909
@@ -1115,10 +1115,10 @@ tests/fm-watch-open-loops.test.sh 322294
 tests/fm-watch-typesafe-health.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59837
 tests/fm-watch-triage.test.sh 539000
-tests/fm-watch-triage-waits.test.sh 351000
-tests/fm-watch-triage-waits-away.test.sh 76000
-tests/fm-watch-triage-waits-declared.test.sh 712000
-tests/fm-watch-triage-waits-pauses.test.sh 148000
+tests/fm-watch-triage-waits.test.sh 365000
+tests/fm-watch-triage-waits-away.test.sh 63000
+tests/fm-watch-triage-waits-declared.test.sh 655000
+tests/fm-watch-triage-waits-pauses.test.sh 136000
 tests/fm-watchdog-check.test.sh 27679
 tests/fm-watcher-lock.test.sh 136753
 tests/fm-worker-account-live-e2e.test.sh 4428
