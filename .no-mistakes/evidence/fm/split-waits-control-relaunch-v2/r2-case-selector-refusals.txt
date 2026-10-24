@@ -1,0 +1,32 @@
+# Case selector refusals, HEAD af023a08
+$ bash tests/fm-control-relaunch.test.sh test_concurrent_relaunch_is_refused
+Unknown test case: test_concurrent_relaunch_is_refused
+Usage: bash tests/fm-control-relaunch.test.sh [test_function_name ...]
+exit=2 elapsed_s=3
+
+$ bash tests/fm-control-relaunch-backends.test.sh test_pinned_personal_session_refuses_lifecycle_boundaries
+Unknown test case: test_pinned_personal_session_refuses_lifecycle_boundaries
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2 elapsed_s=4
+
+$ bash tests/fm-control-relaunch-backends.test.sh test_proven_task_lifecycle_remains_available
+Unknown test case: test_proven_task_lifecycle_remains_available
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2 elapsed_s=3
+
+$ bash tests/fm-control-relaunch-backends.test.sh test_concrete_ask_lifecycle_boundaries
+Unknown test case: test_concrete_ask_lifecycle_boundaries
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2 elapsed_s=4
+
+# mixed valid + unknown: whole selection must be refused before any case runs
+$ bash tests/fm-control-relaunch-backends.test.sh test_concurrent_relaunch_is_refused test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2 elapsed_s=4
+
+$ bash tests/fm-control-relaunch-recovery.test.sh test_spawn_relaunch_refuses_contradicting_flags
+Unknown test case: test_spawn_relaunch_refuses_contradicting_flags
+Usage: bash tests/fm-control-relaunch-recovery.test.sh [test_function_name ...]
+exit=2 elapsed_s=3
+

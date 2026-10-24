@@ -1,0 +1,9 @@
+$ FM_TEST_ONLY=test_split_suites_stay_selectable_in_their_families bash tests/fm-test-run.test.sh
+not ok - unknown test: test_split_suites_stay_selectable_in_their_families
+exit=0
+$ FM_TEST_ONLY=test_control_relaunch_groups_partition_one_inventory bash tests/fm-test-run.test.sh
+not ok - unknown test: test_control_relaunch_groups_partition_one_inventory
+exit=0
+$ FM_TEST_ONLY=test_watch_triage_waits_groups_partition_one_inventory bash tests/fm-test-run.test.sh
+not ok - unknown test: test_watch_triage_waits_groups_partition_one_inventory
+exit=0

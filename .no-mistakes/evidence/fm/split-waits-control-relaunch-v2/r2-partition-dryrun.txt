@@ -1,0 +1,18 @@
+# Dispatch dry-run (tracer: case-dryrun.sh). base=c05aa92b new=af023a08
+base fm-control-relaunch: 154 dispatches, 154 unique; repeated: []
+  new fm-control-relaunch: 74 dispatches; repeated: []
+  new fm-control-relaunch-recovery: 43 dispatches; repeated: []
+  new fm-control-relaunch-backends: 37 dispatches; repeated: []
+  union: 154 dispatches, 154 unique; in more than one dispatch: []
+  unique names lost by split: []
+  unique names new in groups: []
+
+base fm-watch-triage-waits: 67 dispatches, 67 unique; repeated: []
+  new fm-watch-triage-waits: 36 dispatches; repeated: []
+  new fm-watch-triage-waits-declared: 17 dispatches; repeated: []
+  new fm-watch-triage-waits-pauses: 8 dispatches; repeated: []
+  new fm-watch-triage-waits-away: 6 dispatches; repeated: []
+  union: 67 dispatches, 67 unique; in more than one dispatch: []
+  unique names lost by split: []
+  unique names new in groups: []
+

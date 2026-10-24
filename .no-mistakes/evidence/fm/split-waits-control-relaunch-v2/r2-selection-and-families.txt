@@ -1,0 +1,40 @@
+# --changed selection on a throwaway copy of HEAD af023a08: one-line edit per path, then 'fm-test-run.sh --list --changed --base HEAD'
+== changed: bin/fm-model-index.sh
+tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh
+== changed: bin/fm-dispatch-capacity.sh
+tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh
+== changed: tests/fm-control-relaunch-helpers.sh
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch.test.sh
+== changed: tests/fm-watch-triage-helpers.sh
+tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits.test.sh
+tests/fm-watch-triage.test.sh
+== changed: tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-backends.test.sh
+== changed: tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-away.test.sh
+
+$ bash bin/fm-test-isolation-proof.sh --list-exclusions | grep waits
+fm-watch-triage-waits.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-declared.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-pauses.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-away.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+
+# primary family of each group (--list --family)
+family watcher-wake-lock:
+tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits.test.sh
+family backend-dispatch:
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch.test.sh

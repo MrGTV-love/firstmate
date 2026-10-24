@@ -1,0 +1,20 @@
+# Serial shard placement of the seven split groups (20 shards), HEAD af023a08
+portable-serial-2of20: tests/fm-watch-triage-waits-away.test.sh 
+portable-serial-6of20: tests/fm-watch-triage-waits-declared.test.sh 
+portable-serial-10of20: tests/fm-control-relaunch.test.sh 
+portable-serial-11of20: tests/fm-watch-triage-waits-pauses.test.sh 
+portable-serial-12of20: tests/fm-control-relaunch-backends.test.sh 
+portable-serial-16of20: tests/fm-control-relaunch-recovery.test.sh 
+portable-serial-17of20: tests/fm-watch-triage-waits.test.sh 
+
+# Every script appears in exactly one serial shard:
+split groups placed: 7
+
+$ bash bin/fm-test-run.sh --list --lane portable-serial | grep split groups
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch.test.sh
+tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits.test.sh
