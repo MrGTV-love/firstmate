@@ -1456,6 +1456,62 @@ time.sleep(120)
                         pass
     print('PASS: no-progress source failure owns resistant descendant cleanup', flush=True)
 
+interval_home = world / 'interval-home'
+for name in ('state', 'data', 'config', 'projects'):
+    (interval_home / name).mkdir(parents=True)
+(interval_home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=2)))
+script(world / 'inactive-source.py', r'''#!/usr/bin/env python3
+import os, subprocess, sys, time
+from pathlib import Path
+home = Path(os.environ['FM_HOME'])
+identity = subprocess.check_output(['ps', '-p', str(os.getpid()), '-o', 'lstart='], text=True).strip()
+(home / 'source-identity').write_text(identity)
+(home / 'source-pid').write_text(str(os.getpid()))
+body = "import os,signal,subprocess,time;from pathlib import Path;signal.signal(signal.SIGTERM,signal.SIG_IGN);home=Path(os.environ['FM_HOME']);identity=subprocess.check_output(['ps','-p',str(os.getpid()),'-o','lstart='],text=True).strip();home.joinpath('descendant-identity').write_text(identity);home.joinpath('descendant-pid').write_text(str(os.getpid()));time.sleep(120)"
+subprocess.Popen([sys.executable, '-c', body], start_new_session=True)
+until = time.monotonic() + 20
+while not (home / 'descendant-pid').exists() and time.monotonic() < until:
+    time.sleep(0.01)
+print('source-started', flush=True)
+print('source-diagnostic', file=sys.stderr, flush=True)
+time.sleep(120)
+''')
+probe = r'''
+import json, runpy, subprocess, sys, time
+collector = runpy.run_path(sys.argv[1], run_name='fm_open_loops_probe')['Collector'](sys.argv[2], int(time.time()))
+text = lambda value: value.decode() if isinstance(value, bytes) else (value or '')
+try:
+    collector.run([sys.executable, sys.argv[3]])
+except subprocess.TimeoutExpired as error:
+    print(json.dumps(dict(timeout=error.timeout, stdout=text(error.output), stderr=text(error.stderr))))
+else:
+    print(json.dumps(None))
+'''
+try:
+    expired = json.loads(out([sys.executable, '-I', '-c', probe, code / 'bin/fm_open_loops.py', interval_home,
+                              world / 'inactive-source.py'], env=dict(env, FM_HOME=str(interval_home)), timeout=60))
+    assert expired is not None, 'inactive source must expire'
+    assert expired['timeout'] == 2, expired
+    assert 'source-started' in expired['stdout'] and 'source-diagnostic' in expired['stderr'], expired
+    pids = [(int((interval_home / (role + '-pid')).read_text()),
+             (interval_home / (role + '-identity')).read_text().strip())
+            for role in ('source', 'descendant')]
+    until = time.monotonic() + 2
+    while any(process_alive(pid, identity) for pid, identity in pids) and time.monotonic() < until:
+        time.sleep(0.01)
+    assert not any(process_alive(pid, identity) for pid, identity in pids), pids
+finally:
+    for role in ('source', 'descendant'):
+        pid_path, identity_path = (interval_home / (role + suffix) for suffix in ('-pid', '-identity'))
+        if pid_path.exists() and identity_path.exists():
+            pid, identity = int(pid_path.read_text()), identity_path.read_text().strip()
+            if process_alive(pid, identity):
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+print('PASS: no-progress expiry reports the configured interval and keeps captured output', flush=True)
+
 # Conditional reads and the quota floor: a repeated run over unchanged forge data is answered with 304s, and a run
 # that finds the recorded quota below the floor publishes the last rows marked stale with the reset time.
 double.pop('pulls_by_repo', None)

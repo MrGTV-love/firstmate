@@ -644,6 +644,7 @@ def communicate_progress(child, inactivity):
                 continue
             previous_cpu = max(previous_cpu, cpu)
             if now - last_progress >= inactivity:
+                error.timeout = inactivity
                 raise
 
 
