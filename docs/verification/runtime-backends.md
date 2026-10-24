@@ -2518,6 +2518,8 @@ ok - real Herdr lab validation completed on Herdr 0.7.4 with the default-session
 ```
 
 The suite also covers lost or failed move responses, restart husks, missing and duplicate tokens, manual renames, concurrent cleanup, and exact focus restoration.
+Its concurrent-order oracle compares the serialized create/place transaction order, not task-name order or process-start order.
+The wrapper appends each complete command record with one `O_APPEND` write so concurrent read-only probes cannot corrupt that oracle, and ordering failures print both expected and actual sequences.
 
 The mandatory projection suite ran again on 2026-07-24 against Herdr 0.7.5 protocol 16:
 
