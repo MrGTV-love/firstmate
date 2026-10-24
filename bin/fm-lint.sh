@@ -1296,7 +1296,10 @@ tests/fm-contributions-read-saved.test.sh	768
 tests/fm-contributions.test.sh	2221
 tests/fm-control-herdr-smoke.test.sh	1069
 tests/fm-control-reassociate.test.sh	3073
-tests/fm-control-relaunch.test.sh	9888
+tests/fm-control-relaunch-backends.test.sh	2274
+tests/fm-control-relaunch-helpers.sh	1825
+tests/fm-control-relaunch-recovery.test.sh	2724
+tests/fm-control-relaunch.test.sh	2922
 tests/fm-control.test.sh	9788
 tests/fm-cpu-pass.test.sh	1370
 tests/fm-crew-state.test.sh	6482

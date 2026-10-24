@@ -308,9 +308,10 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # target when that shard's own sum is also above its own largest script, so the
 # excess is packing. A shard holding one indivisible suite alone may exceed it;
 # another shard never borrows that suite's size. The guard reports the largest
-# single script as serial_indivisible_ms. Splitting
-# tests/fm-watch-triage-waits.test.sh is the way back under this target without
-# that exception (docs/fm-test-portable-shards.md).
+# single script as serial_indivisible_ms. The former indivisible members,
+# tests/fm-watch-triage-waits.test.sh and tests/fm-control-relaunch.test.sh, are
+# now split into separately packed groups (docs/fm-test-portable-shards.md,
+# "Split watch-triage-waits and control-relaunch").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -421,7 +422,10 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|\
+    fm-watch-triage-waits-declared.test.sh|fm-watch-triage-waits-pauses.test.sh|\
+    fm-watch-triage-waits-away.test.sh|\
+    fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -498,7 +502,9 @@ family_for_basename() {
       ;;
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
     fm-tmux-agent-liveness.test.sh|\
-    fm-control.test.sh|fm-control-relaunch.test.sh|fm-control-reassociate.test.sh|\
+    fm-control.test.sh|fm-control-relaunch.test.sh|\
+    fm-control-relaunch-recovery.test.sh|fm-control-relaunch-backends.test.sh|\
+    fm-control-reassociate.test.sh|\
     fm-launch-proof.test.sh|\
     fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
@@ -879,7 +885,9 @@ tests/fm-composer-native-idle-hint.test.sh 4023
 tests/fm-contributions-read-saved.test.sh 2078
 tests/fm-contributions.test.sh 248058
 tests/fm-control-reassociate.test.sh 347235
-tests/fm-control-relaunch.test.sh 1358153
+tests/fm-control-relaunch-backends.test.sh 481000
+tests/fm-control-relaunch-recovery.test.sh 389000
+tests/fm-control-relaunch.test.sh 236000
 tests/fm-control.test.sh 120383
 tests/fm-copy-sweep.test.sh 207702
 tests/fm-cpu-pass.test.sh 26909
@@ -1107,7 +1115,10 @@ tests/fm-watch-open-loops.test.sh 322294
 tests/fm-watch-typesafe-health.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59837
 tests/fm-watch-triage.test.sh 539000
-tests/fm-watch-triage-waits.test.sh 1433371
+tests/fm-watch-triage-waits.test.sh 365000
+tests/fm-watch-triage-waits-away.test.sh 63000
+tests/fm-watch-triage-waits-declared.test.sh 655000
+tests/fm-watch-triage-waits-pauses.test.sh 136000
 tests/fm-watchdog-check.test.sh 27679
 tests/fm-watcher-lock.test.sh 136753
 tests/fm-worker-account-live-e2e.test.sh 4428
@@ -1883,6 +1894,8 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       printf '%s\n' "__script__:fm-omp-harness.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
       printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
     bin/fm-quota-axi-lib.sh)
@@ -1934,6 +1947,8 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-spawn-dispatch-profile.test.sh"
       printf '%s\n' "__script__:fm-worker-account.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-recovery.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
       printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' session-bootstrap
       ;;

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Declared waits, paused records, restated waits, resurface throttles, wedge
+# threshold deferral, and the bounded recheck of a declared time.
+# The stale/wedge/write-deferral cases live in
+# tests/fm-watch-triage-waits.test.sh; the captain-call and secondmate pause
+# cases live in tests/fm-watch-triage-waits-pauses.test.sh; the away/quiet
+# cases live in tests/fm-watch-triage-waits-away.test.sh.
+set -u
+
+# shellcheck source=tests/fm-watch-triage-helpers.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fm-watch-triage-helpers.sh"
+
+test_own_work_wait_keeps_first_alert_then_long_cadence
+test_absorbed_replacement_wait_does_not_inherit_the_old_throttle
+test_live_declared_wait_churn_honors_the_resurface_throttle
+test_live_keyed_wait_restatement_is_not_a_new_wait
+test_restated_wait_recheck_uses_last_surface_time
+test_restated_wait_preserves_fired_deadline_phase
+test_live_paused_until_controls_recheck_time
+test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
+test_wedge_threshold_keeps_a_wait_past_a_default_key_answer
+test_wedge_threshold_recheck_names_the_captain_for_a_held_lane
+test_wedge_threshold_defers_to_a_parked_gate_awaiting_a_human
+test_wedge_threshold_parked_gate_needs_an_unanswered_decision
+test_wedge_threshold_parked_gate_is_off_until_armed
+test_wedge_defer_refuses_a_half_filled_wait_record
+test_paused_until_near_future_is_quiet_before_the_cadence
+test_paused_until_wrong_year_is_bounded_by_the_cadence
+test_paused_until_that_passed_is_rechecked_before_the_cadence

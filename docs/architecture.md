@@ -108,7 +108,7 @@ Restating a keyed wait within that episode therefore neither reopens a first-sig
 After an actual surface or recheck, repeats age from that surface's throttle marker, not from later status appends.
 A future declared `until` defers even an inconclusive initial stale wake only until the deadline or `FM_PAUSE_RESURFACE_SECS` cadence permits a recheck, whichever comes first.
 An elapsed `until` expedites the episode's first deadline recheck; once that phase has fired, omitting or repeating the deadline in a same-episode restatement does not reopen it, including after periodic rechecks.
-Both stable and changing pane hashes honor these bounds; [`tests/fm-watch-triage-waits.test.sh`](../tests/fm-watch-triage-waits.test.sh) covers episode restatement, last-surface timing, and deadline-phase retention.
+Both stable and changing pane hashes honor these bounds; [`tests/fm-watch-triage-waits-declared.test.sh`](../tests/fm-watch-triage-waits-declared.test.sh) covers episode restatement, last-surface timing, and deadline-phase retention.
 The pause path still never reads a secondmate's endpoint liveness - dead-or-missing recovery belongs to the dedicated liveness tick above - and a mate is admitted to that same cadence only to serve a status-declared wait's bounded re-surface, so a forgotten `paused:` declaration, or an attended `captain-held` declaration, cannot rot invisibly.
 Its initial normal-mode status signal still surfaces through the no-verb path, while a daemon-backed away posture self-handles that routine signal and owns later external-wait rechecks.
 Fresh stale panes use the same current-state read before trusting the status log, so an active run or a proven busy worker outranks an old captain-relevant status-log line left behind before validation.

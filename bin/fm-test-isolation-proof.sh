@@ -121,7 +121,9 @@ exclusion_reason() {
     fm-daemon.test.sh|fm-guard-stale-banner.test.sh|fm-pi-watch-extension.test.sh|\
     fm-supervision-events.test.sh|fm-turnend-guard.test.sh|fm-wake-daemon-lifecycle-e2e.test.sh|\
     fm-wake-queue.test.sh|fm-watch-checkpoint.test.sh|fm-watch-triage.test.sh|\
-    fm-watch-triage-waits.test.sh|fm-watcher-lock.test.sh)
+    fm-watch-triage-waits.test.sh|fm-watch-triage-waits-declared.test.sh|\
+    fm-watch-triage-waits-pauses.test.sh|fm-watch-triage-waits-away.test.sh|\
+    fm-watcher-lock.test.sh)
       printf '%s\n' 'watcher/wake/lock family; intentional process locks and daemon races'
       ;;
     fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|fm-afk-inject-herdr-e2e.test.sh|\
@@ -214,6 +216,9 @@ fm-teardown-pool.test.sh
 fm-teardown-cleanup.test.sh
 fm-watcher-lock.test.sh
 fm-watch-triage-waits.test.sh
+fm-watch-triage-waits-declared.test.sh
+fm-watch-triage-waits-pauses.test.sh
+fm-watch-triage-waits-away.test.sh
 fm-wake-queue.test.sh
 fm-afk-inject-e2e.test.sh
 fm-backend-herdr-smoke.test.sh

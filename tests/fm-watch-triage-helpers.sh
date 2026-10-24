@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Shared definitions and fixture setup for the independently runnable
-# fm-watch-triage and fm-watch-triage-waits suites: wake triage built into
+# fm-watch-triage suite and the four waits groups (fm-watch-triage-waits,
+# fm-watch-triage-waits-declared, fm-watch-triage-waits-pauses, and
+# fm-watch-triage-waits-away): wake triage built into
 # bin/fm-watch.sh and the shared classifier (bin/fm-classify-lib.sh). The watcher
 # now absorbs the benign majority of wakes in bash and exits ONLY on an actionable
 # wake, so firstmate's LLM re-arms once per actionable event instead of once per

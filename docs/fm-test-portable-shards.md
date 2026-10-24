@@ -22,8 +22,8 @@ The corpus grows from fifteen to eighteen serial shards, which packs the slowest
 The per-shard packing check below then refused eighteen and nineteen shards, because one shard packed 1282762 ms and 1202486 ms of several scripts behind a 898093 ms largest suite, so the corpus moves to twenty serial shards, the fewest that pass.
 The packing target stays at 1200000 ms, and the 60-minute job timeout is unchanged.
 The guard checks each shard on its own: it refuses a shard whose packed sum is above the target and above that shard's own largest script.
-So a shard that holds `tests/fm-watch-triage-waits.test.sh` alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
-If every shard must return under 1200000 ms without that exception, splitting `tests/fm-watch-triage-waits.test.sh` is the agreed follow-up, the same way the former combined watch-triage suite was split below.
+So a shard that holds one indivisible script alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
+`tests/fm-watch-triage-waits.test.sh` and `tests/fm-control-relaunch.test.sh` were the two remaining indivisible members and are now four and three independently runnable groups, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) describes.
 The two parallel lanes now pass `--jobs 3`, the `PORTABLE_PARALLEL_JOBS` count, because their membership is exactly the proven-isolated set.
 The recorded four-way proof of that set in [fm-test-isolation-proof.md](fm-test-isolation-proof.md) ran on a macOS host, where `tests/fm-pi-primary-types.test.sh` gate-skipped and `tests/fm-pr-merge.test.sh` failed, so those two members are not yet proven to pass concurrently.
 The first three-wide run on the 26.04 image is [run 39757092565](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565) of PR #198 at head `2f5fd300`: all 30 jobs passed, the workflow finished in 23 minutes, and the two parallel jobs took 20 and 13 minutes against 33 and 28 minutes when they ran serially in [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843) at head `12a9cef0`, before either job passed `--jobs`; both members the macOS proof missed exited zero there (`fm-pr-merge` in 907277 ms, `fm-pi-primary-types` in 4187 ms, no gate skip), which is one sample beside a proof rather than a replacement for it.
@@ -168,12 +168,40 @@ The 2026-10-23 caller-CWD landed-proof fix added `test_landed_proof_ignores_unre
 The group hints are the groups' own measured times in the `fm-test-timing-portable-serial-*` artifacts of [run 39881107550](https://github.com/MrGTV-love/firstmate/actions/runs/39881107550): `fm-teardown` 307312 ms, `fm-teardown-pool` 333924 ms, and `fm-teardown-cleanup` 917727 ms, summing to 1558963 ms against the former combined 1587660 ms.
 That run replaced the first apportioned estimates (272355, 439235, and 876070 ms), which had divided the combined CI measurement by local container times.
 `tests/fm-teardown-*` packed into three shards instead of one indivisible member: shard 17 summed 1181211 ms, shard 4 1199945 ms, and shard 15 860782 ms, and every packed shard stayed inside the 1200000 ms target at the unchanged twenty shards.
-The worst pool then moved to `fm-watch-triage-waits`, which holds serial shard 1 alone at a 1433371 ms hint and measured 1410975 ms of script time; that job finished in 23 minutes 55 seconds, against the 26 minutes 49 seconds the old teardown shard took in run 39838628417.
+The worst pool then moved to `fm-watch-triage-waits`, which held serial shard 1 alone at a 1433371 ms hint and measured 1410975 ms of script time; that job finished in 23 minutes 55 seconds, against the 26 minutes 49 seconds the old teardown shard took in run 39838628417.
 The workflow finished in 31 minutes 39 seconds, down from that earlier run's 35 minutes 40 seconds; serial shards 1, 2, and 4 started seven to eight minutes late in the queued run, so the pool bound is the waits job and the workflow's extra minutes are runner queueing rather than work.
 
 The hint table also carries the run 39838628417 measurements that grew by more than 30 seconds - `fm-pr-check-security` (342666 to 420272 ms), `fm-control-relaunch` (1318470 to 1358153 ms), and `fm-spawn-compact-adviser-disable-remote` (294998 to 352918 ms) - plus four measured but previously unhinted serial members: `fm-api-key-guard-lib` (3850), `fm-copy-sweep` (207702), `fm-friction-ledger` (2020), and `fm-jev-guard-audit` (1281 ms).
 Both sets are successful per-script `duration_ms` records from that run's `fm-test-timing-portable-serial-*` artifacts.
-The serial lane still passes `--check-coverage` at the unchanged twenty shards, and the largest remaining single script is `fm-watch-triage-waits` at 1433371 ms, so splitting that suite is the way to a packed shard below it.
+The serial lane still passes `--check-coverage` at the unchanged twenty shards. The two members that then held the floor are split in [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch).
+
+## Split watch-triage-waits and control-relaunch
+
+The former `tests/fm-watch-triage-waits.test.sh` (67 case calls over the shared `tests/fm-watch-triage-helpers.sh`) and `tests/fm-control-relaunch.test.sh` (155 cases that also own their bodies) each held a serial shard alone.
+They are now four and three files that are independently selectable by name.
+
+`tests/fm-watch-triage-waits.test.sh` keeps the stale, wedge, busy-turn, and write-deferral cases (36); `tests/fm-watch-triage-waits-declared.test.sh` holds the declared-wait, restated-wait, wedge-threshold, and bounded-recheck cases (17); `tests/fm-watch-triage-waits-pauses.test.sh` holds the captain-call churn and secondmate pause cases (8); `tests/fm-watch-triage-waits-away.test.sh` holds the away-record and quiet-record cases (6).
+The cases keep living in `tests/fm-watch-triage-helpers.sh`, so the split is a partition of the call list and no body moves.
+
+`tests/fm-control-relaunch-helpers.sh` owns the former suite's setup, fixtures, and helpers, a byte-for-byte move apart from its header comment, plus the one `control_relaunch_run` selector every group calls.
+`tests/fm-control-relaunch.test.sh` keeps the same-harness contract, harness switches, profiles and model routing, the progress-note cases, and the pre-stop and post-stop failure cases (74); it also keeps the `--jev-guard` entry point.
+`tests/fm-control-relaunch-recovery.test.sh` holds the gone-endpoint, relocation, Herdr reclaim, and held/dependency/continuation cases (44, including the 14 that require a compatible `tasks-axi`).
+`tests/fm-control-relaunch-backends.test.sh` holds secondmate child-work, lifecycle-lock participation, TeamClaude, Herdr lifecycle admission, reboot recovery, and the quota routes (37); `fm-spawn --relaunch`'s own refusals stay in `tests/fm-control-relaunch.test.sh`.
+Each group registers its cases in order and hands its arguments to `control_relaunch_run`, which accepts `[test_function_name ...]`, so a single case is selectable from the file that defines it; this positional selector replaced the former `FM_TEST_ONLY` hook.
+
+The split preserves the combined suite's per-case shell state: control-relaunch never enabled `errexit` at file scope, and each group still sources the shared setup with `set -u` and its own temporary root, fixture-process registry, and `EXIT` cleanup.
+Every helper and case body was compared definition by definition against the pre-split file and is byte-identical, except that three unregistered wrappers are gone: `test_pinned_personal_session_refuses_lifecycle_boundaries`, `test_proven_task_lifecycle_remains_available`, and `test_concrete_ask_lifecycle_boundaries` were reachable only through the removed `FM_TEST_ONLY` hook, and the positional selector runs only registered cases; the union of the registered lists is the same 155 cases with nothing duplicated or dropped.
+
+`tests/fm-test-run.test.sh` holds the partition: `test_control_relaunch_groups_partition_one_inventory` requires the three registered lists to be a duplicate-free 155-case cover with every case registered by the file that defines it, `test_watch_triage_waits_groups_partition_one_inventory` requires the four call lists to be a duplicate-free 67-case cover against the shared helper, and `test_split_suites_stay_selectable_in_their_families` requires each group to stay independently selectable and to keep its family.
+
+The `watcher-wake-lock` and `backend-dispatch` family memberships are otherwise unchanged; `backend-dispatch` is not an admitted `--jobs` family, so the control groups add no concurrency admission, and the waits groups join the already-admitted `watcher-wake-lock` family.
+The first waits hints (351000, 712000, 148000, and 76000 ms) scaled the four local Ubuntu 26.04 container measurements (230 s, 465 s, 97 s, and 50 s) by about 1530 ms per measured second.
+The first control hints (238000, 538000, and 447000 ms) were apportioned from the measured prefixes that did not hit a container-only node and harness gap.
+All seven were then set so the unchanged twenty shards pass `--check-coverage` at `serial_max_ms` 1198995.
+Each family's first hints summed to about 0.90 of the combined suite's last CI measurement (1287000 against 1433371 ms for waits, 1223000 against 1358153 ms for control); they sat deliberately below it to leave the twenty-shard cover inside the 1200000 ms target.
+The first measured artifacts for the new files come from [run 40063531528](https://github.com/MrGTV-love/firstmate/actions/runs/40063531528): waits 364946, 655026, 136392, and 62759 ms; control 236454, 389108, and 481058 ms.
+Those replace the apportioned estimates, and the unchanged twenty shards still pass `--check-coverage` at a modeled `serial_max_ms` of 1191981.
+That run's observed worst serial shard was 1488349 ms (shard 13), above the target; the cause is stale hints on suites the split does not touch (`fm-pr-merge` measured 987295 against a 461903 hint, `fm-test-run` 889567 against 444553, `fm-lint` 1105233 against 758806), which is the routine refresh's work rather than this split's.
 
 ## Portable serial remainder
 
@@ -215,7 +243,7 @@ Its header and `--help` own the modeled-budget check and output fields; read the
 The boundary, inventory-growth, generation-failure, and duplicate-refusal fixtures share tiny serial timing inputs independent of production hint growth; the boundary cases raise the seeded script, plus three more scripts to 700000 ms in the packed-shard refusal fixture, and every other member stays at its tiny fixture hint. The separate real-repository coverage check continues to validate the actual timing table and packing budget.
 The family-admission regression executes fixture members through the real runner and checks execution, the proven worker cap and external-path refusal, rather than nesting watcher lifecycle suites and their independent startup deadlines. Those real suites retain their own complete lane membership.
 The former combined `tests/fm-watch-triage.test.sh` measured 1355995-1429810 ms in the latest three main runs, so no shard count could fit it within the unchanged 1200000 ms packing target.
-Its 159 existing cases now run exactly once across `tests/fm-watch-triage.test.sh` (93 classifier, signal, delivery, and heartbeat cases) and `tests/fm-watch-triage-waits.test.sh` (66 stale, wait, escalation, and away-mode cases).
+Its 159 existing cases now run exactly once across `tests/fm-watch-triage.test.sh` (93 classifier, signal, delivery, and heartbeat cases) and `tests/fm-watch-triage-waits.test.sh` (66 stale, wait, escalation, and away-mode cases); that waits half is now four groups, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) describes.
 Both source the unchanged definitions and fixture setup in `tests/fm-watch-triage-helpers.sh`; each invocation has its own temporary root and registered watcher cleanup.
 The stock macOS `FM_TEST_ONLY` regression remains selectable through the original script.
 No sleeps, production deadlines, test assertions, or case bodies were shortened or removed.
@@ -280,6 +308,7 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 Its `fm_lint_partition_weight_hints` table contains the slowest successful per-root duration from the two partitions' `partition-N.roots.tsv` sidecars in the same three main runs used by the latest serial refresh.
 The seven captain-hold roots have no lint measurement of their own yet: their rows divide the former combined file's 12745 ms in proportion to each file's bytes, so refresh them from the next three main runs' sidecars.
 The four teardown rows (`tests/fm-teardown-cleanup.test.sh` 4219, `tests/fm-teardown-helpers.sh` 2194, `tests/fm-teardown-pool.test.sh` 2043, and `tests/fm-teardown.test.sh` 1830) divide the former combined file's measured 10286 ms by each file's line share; they are not measurements, so replace them from the lint sidecars of the next three Ubuntu main runs.
+The four control-relaunch rows (`tests/fm-control-relaunch.test.sh` 2922, `tests/fm-control-relaunch-recovery.test.sh` 2724, `tests/fm-control-relaunch-backends.test.sh` 2274, and `tests/fm-control-relaunch-helpers.sh` 1825) divide the former combined file's measured 9888 ms roughly by each file's line share; they are not measurements, so replace them from the lint sidecars of the next three Ubuntu main runs.
 The telemetry records ShellCheck 0.11.0 on Linux x86_64, Ubuntu 24, image `20261004.327.1`.
 Longest-processing-time packing uses those durations, not direct file bytes: equal byte totals previously carried 1240 and 1781 seconds of measured lint work in run 38312847224.
 The script header owns missing-root fallback and partition syntax; local worker balancing and its telemetry weight fields still use direct bytes.
