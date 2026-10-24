@@ -2696,6 +2696,7 @@ Write/edit screening remains mandatory during a provider outage.
 While active, required write/edit judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
 The former shell effect and destructive-intent questions, shell outage denial, read-only shell classifier and `.fm-lab-home` outage admission are retired.
 Shell pre-calls bypass this policy rather than receiving an exception or an allow-list match; write/edit model coverage follows the bounded-write rule above.
+The [brief-named file deletion allowance](#brief-named-file-deletion-allowance) makes no judgment either: its refusals come from its own declared-list and audit checks, not this policy.
 Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop every pre-tool call the guard receives, not only write/edit, with a stable error type, and no post-tool notice could undo a tool's effects.
 The command wrapper publishes only successful handler stdout, normalizes active nonzero runtime exits to exit 2, and emits `RuntimeExecutionError` with the observed numeric exit status instead of raw failure output.
 Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
