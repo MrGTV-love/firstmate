@@ -283,9 +283,10 @@ PORTABLE_PARALLEL_JOBS=3
 # this value was two, standing in for a four-vCPU runner that saturates: the
 # lane that summed 33.5 minutes serially ran 20 minutes three abreast and its
 # per-script wall times rose to a 57.9 minute sum. Run 40121241146 measured the
-# same effect on today's mix - each script's three-abreast wall ran 1.83 times
-# its serial-era hint on lane 1 - and the two-bin model under-predicted that
-# lane's 1231 s wall by 24 percent. Packing the measured wall into the real
+# same effect on today's mix - lane 1's three-abreast work summed 1.85 times
+# its serial-era hints (3453612 ms against 1864205 ms; per script 1.28 to
+# 2.30) - and the two-bin model under-predicted that lane's 1231 s wall by 24
+# percent. Packing the measured wall into the real
 # slot count models the memberships that ran at 1209767 ms and 779131 ms, each
 # about 1.7 percent under its 1231 s and 793 s wall.
 # measured: value=3 date=2026-10-24 host=github-ubuntu-26.04 margin=1.02 (run 40121241146: lanes ran 1231 s and 793 s at three jobs; the model predicts 1209767 ms and 779131 ms for those memberships from their measured per-script wall)
