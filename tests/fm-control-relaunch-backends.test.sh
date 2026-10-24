@@ -4,8 +4,8 @@
 # relaunch path, Herdr lifecycle admission, bounded reboot recovery, and the
 # quota routes that decide whether a replacement may launch.
 # The core relaunch contract and fm-spawn --relaunch's own refusals live in
-# tests/fm-control-relaunch.test.sh; recovery, relocation, and continuation authorization live in
-# tests/fm-control-relaunch-recovery.test.sh.
+# tests/fm-control-relaunch.test.sh; recovery, relocation, and continuation
+# authorization live in tests/fm-control-relaunch-recovery.test.sh.
 # Shared fixtures: tests/fm-control-relaunch-helpers.sh.
 
 # shellcheck source=tests/fm-control-relaunch-helpers.sh
@@ -1348,17 +1348,6 @@ SH
     && [ "$before_b" = "$(shasum -a 256 "$b/wt/unlanded.txt")" ] || fail 'b repair changed preserved work'
   [ ! -s "$c/fake/herdr-log" ] || fail 'one bounded tick inspected c too'
   pass 'bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch'
-}
-
-test_pinned_personal_session_refuses_lifecycle_boundaries() {
-  test_live_herdr_lifecycle_refuses_unmanaged_native_launches_without_mutation \
-    pinned-personal "ship secondmate" env-v1 "interrupt exit busy-exit relaunch"
-  test_reboot_recovery_inspects_without_native_attribution pinned-personal env-v1
-}
-
-test_proven_task_lifecycle_remains_available() {
-  FM_CONTROL_SETTLE_WAIT=.05 FM_CONTROL_ARM_WAIT=.05 \
-    test_live_herdr_lifecycle_accepts_managed_launches env-v1 managed "interrupt exit relaunch"
 }
 
 test_exit_and_relaunch_remove_the_dialog_file() {

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Classifier, status-signal, delivery, and heartbeat wake-triage regressions.
-# The stale/wait and escalation cases run separately in fm-watch-triage-waits.
+# The stale/wait and escalation cases run separately in fm-watch-triage-waits,
+# fm-watch-triage-waits-declared, fm-watch-triage-waits-pauses, and
+# fm-watch-triage-waits-away.
 set -u
 
 # shellcheck source=tests/fm-watch-triage-helpers.sh

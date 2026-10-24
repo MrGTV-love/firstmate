@@ -1,22 +1,9 @@
 #!/usr/bin/env bash
-# fm-control.sh relaunch: the transactional replace-the-agent verb.
-#
-# Relaunch and continuation authorization change durable records, so these
-# tests pin their transactions hermetically (stubbed session provider, no
-# real agent):
-#   1. A same-harness relaunch keeps every identity axis and reuses the SAME
-#      endpoint and worktree - it replaces an agent, it never forks a task.
-#   2. A harness switch is one ordinary relaunch: the record follows, the
-#      previous harness's per-task wiring is cleared, and profile axes chosen
-#      for the old harness do not silently carry to the new one.
-#   3. The progress note is required where the replacement needs it, lands in
-#      the instructions the replacement reads, and never rewrites a charter.
-#   4. A refusal before the agent is stopped changes nothing.
-#   5. A launch failure after the agent is stopped keeps the prior record,
-#      reports the concrete state, and preserves the work.
-#   6. fm-spawn --relaunch refuses on its own: a live agent, a contradicting
-#      flag, an extra positional, or a backend that cannot prove the previous
-#      agent exited.
+# Shared setup and fixtures for the three control-relaunch groups:
+# tests/fm-control-relaunch.test.sh, tests/fm-control-relaunch-recovery.test.sh,
+# and tests/fm-control-relaunch-backends.test.sh. Each group sources this file,
+# registers control_relaunch_test_cases, and calls control_relaunch_run. The
+# fixtures are hermetic: a stubbed session provider and no real agent.
 set -u
 unset FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE FM_ROOT_OVERRIDE
 
