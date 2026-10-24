@@ -1116,6 +1116,7 @@ reassociate_stage() {  # <record-index> <timestamp>
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         worktree=*) printf 'worktree=%s\n' "$new_wt" || exit 1 ;;
+        jev_deletions_sha256=*) continue ;;
         branch=*)
           if [ "$set_branch" = 1 ]; then
             printf 'branch=%s\n' "$new_branch" || exit 1
@@ -1301,7 +1302,7 @@ do_reassociate() {
   REASSOCIATE_OWNER_PATHS=()
   REASSOCIATE_OWNER_BACKUPS=()
   for ((m=0; m<${#RA_IDS[@]}; m++)); do
-    rm -f -- "${RA_BRIEF_BACKUPS[m]}" "${RA_META_BACKUPS[m]}"
+    rm -f -- "${RA_BRIEF_BACKUPS[m]}" "${RA_META_BACKUPS[m]}" "$STATE/${RA_IDS[m]}.authorized-deletions.json"
     RA_BRIEF_BACKUPS[m]=
     RA_META_BACKUPS[m]=
   done
