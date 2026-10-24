@@ -19,7 +19,8 @@
 # What it does when on with at least one rule: code first filters structured
 #   rule project/kind facts, then one JevClient.systemOne call judges referenced
 #   semantic Nouls alongside ambiguity, desktop access, model tier and effort.
-#   The state is project, kind, and the brief's task-specific text. The current
+#   The state is project and the brief's task-specific text; kind stays in code
+#   and is never sent. The current
 #   ship heading overrides the scout declaration under the brief's # Setup before
 #   task extraction. Task prose cannot set project; a project-scoped rules file
 #   without --project escalates before anything is sent.
@@ -472,7 +473,6 @@ fi
 "${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" "$KIND" > "$MODEL_CONFIG/level5-request.json" \
   || emit_error "Level 5 request preparation failed"
 REQUEST=$(cat "$MODEL_CONFIG/level5-request.json")
-DEFAULT_WHEN='No listed rule applies to this task.'
 never_send_check
 # The complete upstream exchange is preserved until policy derives its view.
 api_rc=0
@@ -498,7 +498,7 @@ done < <(jq -r '[(.rules[].use | if type == "array" then .[] else . end),
 # apply consumes the same frozen rule set and validated questions as prepare.
 # This is a private derived snapshot, not a rewrite of the captain's policy.
 chmod 600 "$RULES"
-NORMALIZED=$("${LEVEL5[@]}" apply "$RULES" "$RESP_FILE" "$MODEL_CONFIG/level5-request.json" "$allowed_harnesses" \
+NORMALIZED=$("${LEVEL5[@]}" apply "$RULES" "$RESP_FILE" "$MODEL_CONFIG/level5-request.json" "$KIND" "$allowed_harnesses" \
   "$FM_DISPATCH_CHEAP_CLASS_RE" "$FM_DISPATCH_MAX_EFFORT_RE") \
   || emit_error "Level 5 response or mapping failed"
 DISPATCH_ROUTE=$(jq -r '.route.model | "\(.model):\(.effort)"' <<<"$NORMALIZED")
@@ -529,7 +529,7 @@ if [ -n "$omp_models" ]; then
 fi
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
-RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --arg route "$DISPATCH_ROUTE" --argjson pmap "$PMAP" \
+RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg route "$DISPATCH_ROUTE" --argjson pmap "$PMAP" \
   --argjson omp_pools "$OMP_POOLS" \
   --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.selection) as $a |
@@ -656,11 +656,9 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     end;
   # Independent predicate supports are not mutually exclusive probabilities.
   # Do not add them, even when two rules happen to select identical profiles.
-  ($a.choice) as $asked |
-  ($asked) as $picked |
+  ($a.choice) as $picked |
   (confidence_floor($picked)) as $picked_floor |
   ($a.support[$picked]) as $shown_p |
-  "support" as $p_word |
   any($a.support | to_entries[]; .key != $picked and .value == $shown_p and outcome(.key) != outcome($picked)) as $top_tie |
   (if $top_tie or $shown_p >= $picked_floor then {below: false}
    elif (declared_confidence($picked) | not) then {below: true, global: true}
@@ -676,22 +674,20 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   (if $rule == null then "none"
    elif $rule.floor.provider == "codex" and any(profiles($rule.use)[]; .harness == "omp" and (.model // "" | startswith("openai-codex/")))
    then "unknown" else floor_state($rule.floor; $rule.floor.provider; "") end) as $rule_floor_state |
-  (if $choice != "default" and $rule == null then []
-   elif $rule == null then profiles($cfg.default // null)
+  (if $rule == null then profiles($cfg.default // null)
    else profiles($rule.use)
    end) as $answer_use |
   {source: "default", use: profiles($cfg.default // null), filtered: ($cfg.default_filtered // [])} as $default_sel |
-  (if $choice != "default" and $rule == null then {invalid: "rule \($choice) is not in the rules file"}
-   elif $rule == null then $default_sel + {note: "no rule matched"}
+  (if $rule == null then $default_sel + {note: "no rule matched"}
    elif ($rule.approval // "") == "captain" then {source: $choice, escalate: "rule requires the captain'"'"'s explicit approval before dispatch"}
    elif $rule_floor_state == "unknown" then {source: $choice, escalate: "rule \($choice) floor \($rule.floor.provider)/\($rule.floor.scope) is unverifiable"}
    elif $rule_floor_state == "below"
      then $default_sel + {note: "rule \($choice) floor \($rule.floor.scope) below \($rule.floor.min_percent)%: fall through to default"}
    else {source: $choice, use: profiles($rule.use), filtered: ($rule.filtered // []), note: "rule matched"} end) as $sel |
-  def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
+  def when_of($c): (if rule_at($c) == null then "No listed rule applies to this task." else rule_at($c).when end | .[0:60]);
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
-    choice: $asked, rule: $picked, selected: $sel.source, floor: $picked_floor,
+    choice: $picked, rule: $picked, selected: $sel.source, floor: $picked_floor,
     dispatch_rule: (if $sel.source == null then null
       elif $sel.source == "default" then (if (($cfg.default_fallback // []) | length) > 0 then "default" else null end)
       elif ((rule_at($sel.source).fallback // []) | length) > 0 then $sel.source else null end),
@@ -699,16 +695,15 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     dispatch_route: $route,
     confidence: $a.confidence, support: $a.support, routing: $r.route
   }
-  + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) support \($fb.p) clears its floor \($fb.to_floor); \($picked) \($p_word) \($shown_p) is below its floor \($picked_floor)"} else {} end)
+  + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) support \($fb.p) clears its floor \($fb.to_floor); \($picked) support \($shown_p) is below its floor \($picked_floor)"} else {} end)
   as $ev |
   if $r.route.escalate then $ev + {status: "escalate", reason: $r.route.escalate, candidates: ($answer_use | map(evaluate(.)))}
-  elif $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
   elif $top_tie then
     $ev + {status: "ambiguous", reason: "conflicting rule support tie", candidates: ($answer_use | map(evaluate(.)))}
   elif $fb.below and $fb.global then
     $ev + {status: "ambiguous", reason: "support \($shown_p) below floor \($floor)", candidates: ($answer_use | map(evaluate(.)))}
   elif $fb.below and ($fb.to | not) then
-    $ev + {status: "ambiguous", reason: "\($picked) \($p_word) \($shown_p) below its floor \($picked_floor); \($fb.why)", candidates: ($answer_use | map(evaluate(.)))}
+    $ev + {status: "ambiguous", reason: "\($picked) support \($shown_p) below its floor \($picked_floor); \($fb.why)", candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.escalate then
     $ev + {status: "escalate", reason: $sel.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif ($sel.use | length) == 0 and ($sel.filtered | length) > 0 then

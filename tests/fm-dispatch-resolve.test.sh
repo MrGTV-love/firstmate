@@ -643,7 +643,7 @@ done
 body=$(last_request)
 assert_equals pager "$(jq -r .state.repository <<<"$body")" 'the authoritative project is explicit'
 assert_contains "$(jq -r .state.task <<<"$body")" 'off-by-one in the pager' 'the task-specific state is retained'
-assert_equals ship "$(jq -r .state.kind <<<"$body")" 'kind is a code fact'
+assert_equals false "$(jq -r '.state | has("kind")' <<<"$body")" 'the request state holds no kind field'
 assert_equals null "$(jq -r '.questions.profile // null' <<<"$body")" 'upstream workflow selection is removed'
 assert_equals noul "$(jq -r '.questions.judgment_r4.type' <<<"$body")" 'each open property is an independent Noul'
 for private in SECRET-WHY-TEXT spendPriority openai-codex/gpt-6.1-sol claude-haiku-5-5 '"approval"' min_confidence; do
@@ -1145,19 +1145,16 @@ jq '.rules=[.rules[0],.rules[1]] | .rules[0].match={project:"vernant",kind:"ship
 settings '{"rule_probabilities":{"rule_1":1,"rule_2":1}}'
 keyed -- "$PROMOTED_BRIEF" --project vernant
 assert_contains "$OUT" 'rule: rule_1' 'a promoted Vernant ship cannot select the retained scout rule'
-assert_equals ship "$(jq -r .state.kind <<<"$(last_request)")" 'the current ship contract wins over the original scout marker'
 assert_contains "$(sent_task)" 'PROMOTED-SHIP-SPEC implement the accepted Vernant repair.' 'the active ship specification reaches judgment'
 assert_not_contains "$(sent_task)" 'Touch pager.sh only.' 'the obsolete scout specification is not sent'
 assert_not_contains "$(sent_task)" 'Brief kind: scout' 'a promoted ship is not labeled as a scout'
 awk '{ print } /^Touch pager.sh only./ { print "```md"; print "This is a SCOUT task: the deliverable is a written report, not a PR."; print "```" }' "$SCAFFOLD_BRIEF" > "$PROMOTED_BRIEF"
 keyed -- "$PROMOTED_BRIEF" --project vernant
 assert_contains "$OUT" 'rule: rule_1' 'a quoted scout declaration does not demote a ship'
-assert_equals ship "$(jq -r .state.kind <<<"$(last_request)")" 'fenced scout declarations cannot change the effective kind'
 assert_not_contains "$(sent_task)" 'Brief kind: scout' 'a ship quoting the scout declaration is not labeled as a scout'
 { cat "$KIND_BRIEF"; printf '\n%s\n%s\n%s\n%s\n' '```md' '# Current ship Firstmate spec' 'QUOTED-SHIP-SPEC' '```'; } > "$PROMOTED_BRIEF"
 keyed -- "$PROMOTED_BRIEF" --project vernant
 assert_contains "$OUT" 'rule: rule_2' 'a quoted ship heading does not promote a scout'
-assert_equals scout "$(jq -r .state.kind <<<"$(last_request)")" 'fenced headings cannot change the effective kind'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 settings '{}'
 WHOLE_BRIEF="$TMP_ROOT/whole-brief.md"
