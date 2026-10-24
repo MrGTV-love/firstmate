@@ -263,7 +263,7 @@ PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=20
+PORTABLE_SERIAL_SHARDS=21
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -422,7 +422,8 @@ family_for_basename() {
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
     fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
-    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
+    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|\
+    fm-status-runaway-guard.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     fm-afk-inject-herdr-e2e.test.sh|fm-afk-launch.test.sh|fm-backend-autodetect-smoke.test.sh|\
@@ -1059,6 +1060,7 @@ tests/fm-spawn-worktree-settle.test.sh 15808
 tests/fm-startup-growth-check.test.sh 9459
 tests/fm-startup-memory-budget.test.sh 12398
 tests/fm-startup-network.test.sh 101306
+tests/fm-status-runaway-guard.test.sh 199417
 tests/fm-stat-shadowing.test.sh 797
 tests/fm-stow-cascade.test.sh 4694
 tests/fm-supervision-events.test.sh 23314
@@ -1803,7 +1805,8 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-status-record-lib.sh|bin/fm-status-decision-lib.sh|\
-    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-utc-lib.sh)
+    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-utc-lib.sh|\
+    bin/fm-status-cap-lib.sh|bin/fm-status-cap-guard.sh|bin/fm-status-append.sh)
       printf '%s\n' pure-contract-unit
       printf '%s\n' standalone
       printf '%s\n' secondmate

@@ -1253,9 +1253,19 @@ function invoke(registration, home, context, payload) {
   });
   if (context === 'legacy') env.GROK_AGENT = '1';
   if (context === 'session-metadata') env.GROK_SESSION_ID = 'native-session-metadata';
-  const result = spawnSync('/bin/bash', ['-c', registration.command], {
-    cwd: home, env, input: JSON.stringify(payload), encoding: 'utf8', timeout: 15000,
-  });
+  // Inert hooks exit without reading stdin, and a pipe write to an exited child fails with EPIPE
+  // on a loaded host, so the payload is a file the child may leave unread.
+  const stdinPath = path.join(home, 'pane-home', 'hook-input.json');
+  fs.writeFileSync(stdinPath, JSON.stringify(payload));
+  const stdinFd = fs.openSync(stdinPath, 'r');
+  let result;
+  try {
+    result = spawnSync('/bin/bash', ['-c', registration.command], {
+      cwd: home, env, stdio: [stdinFd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,
+    });
+  } finally {
+    fs.closeSync(stdinFd);
+  }
   assert.ifError(result.error);
   assert.equal(result.signal, null, `${registration.target} did not settle`);
   return result;

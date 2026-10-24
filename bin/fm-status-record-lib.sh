@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Shared emission-time metadata and retry identity for status records.
 # Sourcing this library only defines functions; it does not initialize globals.
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-cap-lib.sh"
 
 # Match a status line against a regex one byte at a time, leaving the captures
 # in BASH_REMATCH. A line can hold a byte run that is not valid in the caller's
@@ -148,12 +150,21 @@ _fm_status_unstamped() {  # <status-line> <out-var> -> line with its stamp remov
 # its cursor) appends nothing. A caller that owns evidence of a new episode
 # decides that itself, as bin/fm-pending-reply-lib.sh's escalation does.
 status_event_recorded() {  # <status-file> <new-status-line>
-  local wanted line untimed
+  local wanted line untimed size
   [ -f "$1" ] || return 1
   _fm_status_untimed "$2" wanted
+  # The whole log is read, exactly, up to the read limit (bin/fm-status-cap-lib.sh): a
+  # match stays recorded for the life of the file, so no earlier part may be skipped.
+  # A log past the limit is refused and named, and the event then reads as not
+  # recorded; the capped writer decides whether it can be appended. Only the byte
+  # limit applies: the loop is short per line, and the answer must not depend on how
+  # many lines the log has.
+  size=$(LC_ALL=C wc -c < "$1" 2>/dev/null) || return 1
+  size=${size//[[:space:]]/}
+  case "$size" in ''|*[!0-9]*) return 1 ;; esac
   while IFS= read -r line || [ -n "$line" ]; do
     _fm_status_untimed "$line" untimed
     [ "$untimed" != "$wanted" ] || return 0
-  done < "$1"
+  done < <(fm_status_read_exact "$1" 0 "$size" 0)
   return 1
 }

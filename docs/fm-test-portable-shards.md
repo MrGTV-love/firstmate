@@ -174,6 +174,10 @@ The hint table also carries the run 39838628417 measurements that grew by more t
 Both sets are successful per-script `duration_ms` records from that run's `fm-test-timing-portable-serial-*` artifacts.
 The serial lane still passes `--check-coverage` at the unchanged twenty shards, and the largest remaining single script is `fm-watch-triage-waits` at 1433371 ms, so splitting that suite is the way to a packed shard below it.
 
+On 2026-10-23 the new serial member `tests/fm-status-runaway-guard.test.sh` (199417 ms, one local run of `bin/fm-test-run.sh`, not a CI measurement) made `--check-coverage` refuse twenty shards: shard 3 packed 1203868 ms of several scripts behind its 917727 ms largest suite.
+The corpus moves to twenty-one serial shards, the fewest that pass; every packed shard now models between 1140193 ms and 1140402 ms, and shards 1 and 2 each hold one indivisible suite.
+The packing target stays at 1200000 ms, and the 60-minute job timeout is unchanged.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
@@ -315,7 +319,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses twenty-six long-lived Linux jobs (twenty serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses twenty-seven long-lived Linux jobs (twenty-one serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 

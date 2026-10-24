@@ -1750,7 +1750,7 @@ test_branch_default_on_heartbeat_afk_and_fallback() {
   install_pi_branch_extension_fixture "$repo"
   cp "$ROOT/bin/fm-branch-outcome.sh" "$ROOT/bin/fm-classify-lib.sh" "$ROOT/bin/fm-status-record-lib.sh" \
     "$ROOT/bin/fm-status-decision-lib.sh" "$ROOT/bin/fm-status-event-lib.sh" \
-    "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-utc-lib.sh" \
+    "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-status-cap-lib.sh" "$ROOT/bin/fm-utc-lib.sh" \
     "$ROOT/bin/fm-lease.sh" "$ROOT/bin/fm-lease-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" \
     "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-path-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$ROOT/bin/fm-wake-grant.sh" "$broken/bin/"
   cat > "$broken/bin/fm-branch-prompt.sh" <<'SH'
@@ -4901,6 +4901,72 @@ EOF
   pass "scopeForUnreadWake excludes every main-only class without vetoing eligible task-local rows, and writes the eligible snapshot"
 }
 
+# A stale row asks the dispatch library whether its task owns an open decision, which reads
+# the task's whole status log. A log past the status read limit (bin/fm-status-cap-lib.sh:
+# cap plus reserve, from FM_STATUS_CAP_BYTES and FM_STATUS_CAP_RESERVE_BYTES) is never read:
+# the scope is unsafe, so the wake stays with main. A log inside the limit is read once.
+test_branch_dispatch_refuses_a_status_log_past_the_read_limit() {
+  local repo home out status
+  repo="$TMP_ROOT/dispatch-limit-root"
+  home="$TMP_ROOT/dispatch-limit-home"
+  mkdir -p "$repo/.pi/extensions/lib" "$home/state" "$home/projects/approved"
+  cp "$ROOT/.pi/extensions/lib/fm-branch-dispatch.ts" "$repo/.pi/extensions/lib/fm-branch-dispatch.ts"
+  cp "$ROOT/.pi/extensions/lib/fm-native-contract.ts" "$repo/.pi/extensions/lib/fm-native-contract.ts"
+  cp "$ROOT/.pi/extensions/lib/fm-async-exec.ts" "$repo/.pi/extensions/lib/fm-async-exec.ts"
+  cp "$ROOT/.pi/extensions/lib/fm-branch-model-picker.ts" "$repo/.pi/extensions/lib/fm-branch-model-picker.ts"
+  printf 'project=%s/projects/approved\nwindow=fm-window\n' "$home" > "$home/state/task-a.meta"
+  LIB="$repo/.pi/extensions/lib/fm-branch-dispatch.ts" FM_HOME="$home" \
+    node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { syncBuiltinESMExports } from "node:module";
+import fs, { writeFileSync } from "node:fs";
+
+const originalReadFileSync = fs.readFileSync;
+let countedStatusPath = "";
+let countedStatusReads = 0;
+fs.readFileSync = function(path, ...args) {
+  if (String(path) === countedStatusPath) countedStatusReads += 1;
+  return originalReadFileSync.call(this, path, ...args);
+};
+syncBuiltinESMExports();
+
+const { scopeForUnreadWake } = await import(pathToFileURL(process.env.LIB).href);
+const state = `${process.env.FM_HOME}/state`;
+const statusPath = `${state}/task-a.status`;
+countedStatusPath = statusPath;
+process.env.FM_STATUS_CAP_BYTES = "1000";
+process.env.FM_STATUS_CAP_RESERVE_BYTES = "500";
+writeFileSync(`${state}/.wake-queue`, "1\t1\tstale\tfm-window\tstale: fm-window (awaiting the captain)");
+
+writeFileSync(statusPath, "captain-held [key=route]: awaiting the captain\n");
+const inside = scopeForUnreadWake(state, false);
+if (inside.corrupted || countedStatusReads !== 1 || inside.needsDecisionKeys.join(",") !== "fm-window") {
+  throw new Error(`a log inside the read limit was not read once and classified: reads=${countedStatusReads} ${JSON.stringify(inside)}`);
+}
+
+countedStatusReads = 0;
+writeFileSync(statusPath, `captain-held [key=route]: awaiting the captain\n${"working: padding\n".repeat(120)}`);
+if (fs.statSync(statusPath).size <= 1500) throw new Error("the fixture log is not past the read limit");
+const past = scopeForUnreadWake(state, false);
+if (past.status !== "unsafe" || !past.corrupted || past.eligible || past.eligibleSeqs.length !== 0) {
+  throw new Error(`a log past the read limit was not an unsafe scope: ${JSON.stringify(past)}`);
+}
+if (countedStatusReads !== 0) throw new Error(`a log past the read limit was read ${countedStatusReads} time(s)`);
+
+// The limit is the cap plus the reserve: the same log is read again once the cap allows it.
+process.env.FM_STATUS_CAP_BYTES = "100000";
+const allowed = scopeForUnreadWake(state, false);
+if (allowed.corrupted || countedStatusReads !== 1) {
+  throw new Error(`a log inside a raised limit was still refused: reads=${countedStatusReads} ${JSON.stringify(allowed)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a status log past the read limit must make the stale scope unsafe without being read: $out"
+  pass "scopeForUnreadWake refuses to read a status log past the status read limit and reads one inside it once"
+}
+
 # A second mate's status log is one shared channel for many independently keyed
 # decisions, so its signal rows are judged by the span presented since the last
 # drain (bounded by bin/fm-classify-lib.sh's own presentation-cursor writer),
@@ -5965,6 +6031,7 @@ test_abbreviated_processing_request_points_to_full_outcome
 test_large_unprocessed_backlog_replays_in_batches
 test_undated_unprocessed_outcome_surfaces_and_stays_unprocessed
 test_branch_dispatch_classifies_main_only_rows_and_writes_the_eligible_snapshot
+test_branch_dispatch_refuses_a_status_log_past_the_read_limit
 test_branch_dispatch_routes_secondmate_signal_by_new_span
 test_branch_cache_key_is_per_home_stable
 test_branch_default_on_heartbeat_afk_and_fallback

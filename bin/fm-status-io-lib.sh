@@ -22,6 +22,13 @@ case $- in *u*) _fm_classify_nounset=on ;; *) _fm_classify_nounset=off ;; esac
 [ "$_fm_classify_nounset" = on ] || set +u
 unset _fm_classify_nounset
 
+# The read limit and the tail window (bin/fm-status-cap-lib.sh owns both bounds and
+# their reasons) are applied once, here, so every caller that takes bytes from a
+# status log inherits them.
+# shellcheck source=bin/fm-status-cap-lib.sh
+# shellcheck disable=SC1091
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-cap-lib.sh"
+
 # Parameter expansion rather than dirname and basename: every presentation scan
 # asks for the cursor path of every task, and two child processes per call were
 # the largest process count in a wake drain.
@@ -166,9 +173,13 @@ _fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
 # unchanged. Consumers distinguish a missing manifest from a failed read of an
 # existing receipt, which must never become an empty or partial successful read.
 _fm_read_file_into() {  # <file> <out-var>
-  local __fm_rf_data='' __fm_rf_size LC_ALL=C
+  local __fm_rf_data='' __fm_rf_size __fm_rf_window LC_ALL=C
   _fm_status_stat_raw "$1" '' __fm_rf_size '' || return 1
   case "$__fm_rf_size" in ''|*[!0-9]*) return 1 ;; esac
+  # The presentation manifest is one small row per task; one past the tail
+  # window is abnormal and is refused, not read.
+  fm_status_window_bytes __fm_rf_window
+  [ "$__fm_rf_size" -le "$__fm_rf_window" ] || return 1
   { [ "$__fm_rf_size" -eq 0 ] || IFS= read -r -d '' -n "$__fm_rf_size" __fm_rf_data; } 2>/dev/null < "$1" || return 1
   [ "${#__fm_rf_data}" -eq "$__fm_rf_size" ] || return 1
   printf -v "$2" '%s' "$__fm_rf_data"
@@ -190,25 +201,66 @@ _fm_status_span_scratch() {  # <status-file>
   printf '%s.span.%s' "$__fm_ss_cursor" "$$"
 }
 
-_fm_status_read_span() {  # <status-file> <start-offset> <byte-length>
-  local f=$1 start=$2 length=$3
+# Take exactly <byte-length> bytes of a status log from <start-offset>
+# (fm_status_read_exact, bin/fm-status-cap-lib.sh), or refuse: a span past the read
+# limit is refused, one line on stderr names the file, nothing is printed, and the
+# status is 1. The reader never prints a clipped copy, so a caller that turns the bytes
+# into a position (an endpoint, a line number, a cursor) always measures it against the
+# span it asked for, and a caller that fails on a read error leaves its saved position
+# where it was. The optional fourth argument is the line limit: the default refuses a
+# span with more lines than a shell loop should walk, and 0 asks for the byte limit
+# alone, for a caller that filters without a shell loop or needs an exact position.
+_fm_status_read_span() {  # <status-file> <start-offset> <byte-length> [<max-lines>]
   if [ -n "${FM_STATUS_SPAN_READER:-}" ]; then
-    "$FM_STATUS_SPAN_READER" "$f" "$start" "$length"
+    "$FM_STATUS_SPAN_READER" "$1" "$2" "$3"
     return
   fi
-  perl -MFcntl=:DEFAULT -e '
-    my ($path, $start, $length) = @ARGV;
-    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;
-    sysseek($file, $start, 0) == $start or exit 1;
-    while ($length > 0) {
-      my $want = $length > 65536 ? 65536 : $length;
-      my $read = sysread($file, my $chunk, $want);
-      defined($read) && $read > 0 or exit 1;
-      print $chunk or exit 1;
-      $length -= $read;
-    }
-  ' "$f" "$start" "$length"
+  fm_status_read_exact "$1" "$2" "$3" "${4-}"
 }
+
+# Whole-file readers use this instead of redirecting a status log: it prints the log
+# exactly when it is within the read limits and refuses it, loudly, when it is not.
+# <max-lines> works as for _fm_status_read_span. Callers loop over it with process
+# substitution.
+fm_status_cat() {  # <status-file> [<max-lines>]
+  local f=$1 __fm_wc_size
+  _fm_status_file_size "$f" __fm_wc_size || return 1
+  __fm_wc_size=${__fm_wc_size//[[:space:]]/}
+  case "$__fm_wc_size" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$__fm_wc_size" -gt 0 ] || return 0
+  fm_status_read_exact "$f" 0 "$__fm_wc_size" "${2-}"
+}
+
+# 0 when a status sidecar (a fold cursor, the home-appends ledger) is small enough
+# to read whole: no larger than one tail window. A sidecar past that is abnormal, and
+# the readers answer it in two ways. The fold checkpoint parse
+# (_fm_open_decisions_checkpoint_parse) and the home-appends ranges read treat it as
+# absent and rebuild it from the log. status_open_decisions_cursor_offset fails closed
+# (status 1), as does _fm_read_file_into for a presentation manifest past the same
+# window, so the drain's presentation cursor reads fail until the sidecar is replaced.
+# The watcher guard (bin/fm-status-cap-guard.sh) raises the alarm for a sidecar once it
+# passes the cap.
+_fm_status_sidecar_fits() {  # <file>
+  local __fm_sf_size __fm_sf_window
+  _fm_status_file_size "$1" __fm_sf_size 2>/dev/null || return 1
+  __fm_sf_size=${__fm_sf_size//[[:space:]]/}
+  case "$__fm_sf_size" in ''|*[!0-9]*) return 1 ;; esac
+  fm_status_window_bytes __fm_sf_window
+  [ "$__fm_sf_size" -le "$__fm_sf_window" ]
+}
+
+# The last <lines> lines of a status log, read from at most its last tail window of
+# bytes: tail -n alone scans backwards for newlines, so a log that holds one
+# newline-free run of gigabytes would still be read whole. This is a tail read for a
+# caller that needs only the latest events; it never stands for the log's history.
+# A partial first line of a clamped read is the caller's tolerance, exactly as with
+# tail -n.
+fm_status_tail_lines() {  # <status-file> <lines>
+  local window
+  fm_status_window_bytes window
+  tail -c "$window" "$1" 2>/dev/null | head -c "$window" | tail -n "$2"
+}
+
 FM_STATUS_SNAPSHOT_EVENT_LINE=
 FM_STATUS_SNAPSHOT_EVENT_MTIME=
 FM_STATUS_SNAPSHOT_EVENT_ENDPOINT=
@@ -243,7 +295,7 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
   fi
   length=$((endpoint - start))
   scratch="$(_fm_status_span_scratch "$f").latest"
-  _fm_status_read_span "$f" "$start" "$length" > "$scratch" 2>/dev/null \
+  _fm_status_read_span "$f" "$start" "$length" 0 > "$scratch" 2>/dev/null \
     || { rm -f "$scratch"; return 1; }
   if record=$(LC_ALL=C perl -e '
     my ($path, $start, $skip_first) = @ARGV;

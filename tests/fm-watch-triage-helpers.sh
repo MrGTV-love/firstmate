@@ -643,26 +643,24 @@ test_status_declared_wait_identity() {
 }
 
 test_wait_identity_concurrent_append_uses_one_snapshot() {
-  local dir f one two countfile i
-  dir=$(make_case wait-identity-concurrent); f="$dir/t.status"; countfile="$dir/tail-count"
+  local dir f one two i
+  dir=$(make_case wait-identity-concurrent); f="$dir/t.status"
   for i in $(seq 1 298); do printf 'Continuation prose.\n'; done > "$f"
   printf 'working: resumed\npaused [key=k]: original wait\n' >> "$f"
   one=$(status_declared_wait_identity "$f")
   [ "${one##*:}" = 300 ] || fail "initial wait identity had the wrong line position: $one"
-  printf '0\n' > "$countfile"
-  # shellcheck disable=SC2329 # Invoked indirectly by status_declared_wait_identity.
-  tail() {
-    local calls
-    calls=$(cat "$countfile")
-    printf '%s\n' "$((calls + 1))" > "$countfile"
-    if [ "$calls" -eq 1 ]; then
-      printf 'paused [key=k]: restated during the read\n' >> "$f"
-    fi
-    command tail "$@"
+  # The append lands once the endpoint is captured and the span is read, through the
+  # span-reader seam; the fixture never counts or matches the reader's internal calls.
+  # shellcheck disable=SC2329 # Invoked indirectly through FM_STATUS_SPAN_READER.
+  append_after_span_read() {  # <status-file> <start-offset> <byte-length>
+    tail -c "+$(($2 + 1))" "$1" | head -c "$3"
+    printf 'paused [key=k]: restated during the read\n' >> "$1"
   }
+  FM_STATUS_SPAN_READER=append_after_span_read
   two=$(status_declared_wait_identity "$f")
-  unset -f tail
-  [ "$(command tail -n 1 "$f")" = 'paused [key=k]: restated during the read' ] \
+  unset FM_STATUS_SPAN_READER
+  unset -f append_after_span_read
+  [ "$(tail -n 1 "$f")" = 'paused [key=k]: restated during the read' ] \
     || fail "the concurrent append fixture did not append during the read"
   [ "$one" = "$two" ] || fail "a concurrent restatement changed the episode position: $one vs $two"
   [ "$(status_declared_wait_identity "$f")" = "$one" ] \
@@ -2663,7 +2661,9 @@ fi
 exec "$real_bin" "$@"
 SH
     chmod 0700 "$fakebin/$hook"
-    # The grace is 7s, a value no other watcher sleep uses.
+    # The grace is 7s, a value no other watcher sleep uses. The poll is 7s too, because the
+    # watcher sleeps the grace in slices of one poll (signal_grace_linger): with the poll
+    # at the grace the linger is the one `sleep 7` this fake sleep looks for.
     grace_log="$dir/grace-sleeps"
     real_sleep=$(type -P sleep)
     printf '#!/usr/bin/env bash\nreal_sleep=%q\ngrace_log=%q\n' "$real_sleep" "$grace_log" > "$fakebin/sleep"
@@ -2679,7 +2679,7 @@ exec "$real_sleep" "$@"
 SH
     chmod 0700 "$fakebin/sleep"
     watch_bg "$state" "$fakebin" "$out" env FM_HOME="$dir" FM_CONFIG_OVERRIDE="$dir/config" \
-      FM_WATCH_HANDLING_SUCCESSOR=1 FM_SIGNAL_GRACE=7
+      FM_WATCH_HANDLING_SUCCESSOR=1 FM_SIGNAL_GRACE=7 FM_POLL=7
     pid=$!
     wait_for_exit "$pid" 600 || { reap "$pid"; fail "$shape process-event wake never exited"; }
     [ -e "$state/late-signal-injected" ] || fail "$shape status line was never appended"

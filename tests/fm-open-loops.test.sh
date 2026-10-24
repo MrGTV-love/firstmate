@@ -1516,10 +1516,14 @@ time.sleep(0.7)
 print('source command failure', file=sys.stderr)
 sys.exit(1)
 '''
-    for command in (('git', 'gh', 'cat') if reader == 'questions' else ('git', 'gh')):
+    for command in ('git', 'gh'):
         script(deadline_bin / command, driver)
     deadline_env = dict(env, FM_HOME=str(deadline_home), DEADLINE_READER=reader,
                         PATH=f'{deadline_bin}:{env["PATH"]}')
+    if reader == 'questions':
+        # The bounded status reader takes a log's size through this seam before it reads a byte.
+        script(deadline_bin / 'size-reader', driver)
+        deadline_env['FM_STATUS_SIZE_READER'] = str(deadline_bin / 'size-reader')
     deadline_report = json.loads(out([deadline_code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'],
                                     env=deadline_env, timeout=120))
     assert not deadline_report['complete'] and len(rows(deadline_report, 'coverage')) == 1, deadline_report
@@ -1531,7 +1535,7 @@ sys.exit(1)
         'pr-checks': [['gh', 'api', '-i',
                        'repos/test/project/commits/' + 'a' * 40 + '/check-runs?per_page=100']],
         'pr-state': [['gh', 'api', '-i', 'repos/test/project/pulls/' + str(i)] for i in range(24)],
-        'questions': [['cat', str(deadline_home / 'state' / (str(i) + '.status'))] for i in range(24)],
+        'questions': [['size-reader', str(deadline_home / 'state' / (str(i) + '.status'))] for i in range(24)],
     }
     assert len(attempts) == 2 and all(request in expected_requests[reader] for request in attempts), (reader, attempts)
     assert json.loads((deadline_home / 'deadline-trigger').read_text()) == attempts[-1], (reader, attempts)

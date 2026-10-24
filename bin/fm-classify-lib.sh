@@ -87,9 +87,12 @@ status_paused_until() {  # <status-line> -> epoch on stdout
 # fold's most recently opened record supplies it; a standing declared wait, then
 # the latest recognized event, stands when nothing is open.
 # Actual run/pane evidence is still reconciled by fm-crew-state.sh.
+# A log the read limits refuse (bin/fm-status-cap-lib.sh) has no current line that
+# can be trusted: nothing is printed and the status is 2, which a caller reads as
+# unknown, never as a log with no open decision.
 status_current_line() {  # <status-file> <kind>
   local open key verb note current=''
-  open=$(status_open_decisions "$1" "$2")
+  open=$(status_open_decisions "$1" "$2") || return 2
   while IFS=$'\t' read -r key verb note; do
     case "$verb" in ?*) ;; *) continue ;; esac
     current="$verb [key=$key]: $note"
@@ -166,9 +169,9 @@ status_key_closing_verb() {  # <status-file> <key>
   kind=$(_fm_status_kind "$f")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  candidates=$(grep -a -E \
-    "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]" \
-    "$f") || [ "$?" -eq 1 ] || candidates=$(cat "$f")
+  candidates=$(fm_status_cat "$f" 0 2>/dev/null | grep -a -E \
+    "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]") \
+    || [ "$?" -eq 1 ] || candidates=$(fm_status_cat "$f" 0 2>/dev/null)
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" event
     case "$event:$kind" in
@@ -292,7 +295,7 @@ EOF
 
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
-  local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
+  local version='' size actual_size cur_ident resolve held chunk chunk_size line cursor_dirty=0
   local target_cursor kind fold_version boundary_rc verb
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" '' kind
@@ -343,15 +346,13 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   fi
 
   if [ "$offset" -lt "$size" ]; then
-    chunk_file="$cf.read.$$"
-    _fm_status_read_span "$f" "$offset" "$((size - offset))" > "$chunk_file" 2>/dev/null \
-      || { rm -f "$chunk_file"; printf '%s' "$trusted_open"; return 0; }
-    chunk_size=$(LC_ALL=C wc -c < "$chunk_file" 2>/dev/null) \
-      || { rm -f "$chunk_file"; printf '%s' "$trusted_open"; return 0; }
-    chunk_size=${chunk_size//[[:space:]]/}
-    case "$chunk_size" in
-      ''|*[!0-9]*) rm -f "$chunk_file"; printf '%s' "$trusted_open"; return 0 ;;
-    esac
+    # In memory rather than a scratch file beside the cursor, so a drain killed
+    # mid-fold leaves nothing behind; the trailing sentinel keeps the exact byte
+    # count that a command substitution would otherwise trim.
+    chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null && printf x) \
+      || { printf '%s' "$trusted_open"; return 0; }
+    chunk=${chunk%x}
+    chunk_size=$(LC_ALL=C; printf '%s' "${#chunk}")
     # Test-only observability seam (off by default, no production behavior
     # change): when set, records exactly how many bytes THIS call folded, so a
     # test can assert the incremental path stays bounded by new appends rather
@@ -367,8 +368,9 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
           _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open
           ;;
       esac
-    done < "$chunk_file"
-    rm -f "$chunk_file"
+    done <<STATUS_FOLD_CHUNK
+$chunk
+STATUS_FOLD_CHUNK
     offset=$size
     cursor_dirty=1
   fi
@@ -600,7 +602,14 @@ $fully_presented
 " in *$'\n'"$task"$'\n'*) safe=true ;; esac
     f="$state/$task.status"
     status_presentation_cursor_offset "$f" offset || return 1
-    status_new_lines_since_cursor "$f" "$endpoint" lines || return 1
+    status_new_lines_since_cursor "$f" "$endpoint" lines || {
+      [ "$?" -eq 2 ] || return 1
+      # A span the read limits refuse is this task's alone: its cursor stays where
+      # it was, the log is named, and every other task is still presented.
+      echo "fm-status: $task.status has unread status past the read limits; its presentation cursor stays at byte $offset and the drain cannot show it" >&2
+      __fm_ack_rows+="$task"$'\t'"$offset"$'\t'"$ident"$'\n'
+      continue
+    }
     # Classify the captured span once for both presentation and acknowledgement.
     # Routine-only spans stay pending for delayed signal annotations.
     while IFS= read -r line || [ -n "$line" ]; do
@@ -706,7 +715,11 @@ scan_unread_surface_lines() {  # <state>
     [ -e "$f" ] || continue
     [ "$f" = "$exclude" ] && continue
     task=${f##*/}; task="${task%.status}"
-    status_new_lines_since_cursor "$f" "" lines || return 1
+    status_new_lines_since_cursor "$f" "" lines || {
+      [ "$?" -eq 2 ] || return 1
+      echo "fm-status: $task.status has unread status past the read limits; it is skipped" >&2
+      continue
+    }
     [ -n "$lines" ] || continue
     while IFS= read -r line; do
       [ -n "$line" ] || continue
@@ -724,7 +737,11 @@ scan_unread_surface_snapshot() {  # <state> <task-and-endpoint-snapshot>
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     f="$state/$task.status"
-    status_new_lines_since_cursor "$f" "$endpoint" lines || return 1
+    status_new_lines_since_cursor "$f" "$endpoint" lines || {
+      [ "$?" -eq 2 ] || return 1
+      echo "fm-status: $task.status has unread status past the read limits; it is skipped" >&2
+      continue
+    }
     [ -n "$lines" ] || continue
     while IFS= read -r line; do
       [ -n "$line" ] || continue
@@ -797,13 +814,16 @@ _fm_status_open_activities_stream() {
 }
 
 status_open_activities() {  # <status-file-or-dash>
-  local f=$1
+  local f=$1 text rc
   if [ "$f" = - ]; then
     _fm_status_open_activities_stream
     return 0
   fi
   [ -f "$f" ] || return 0
-  _fm_status_open_activities_stream < "$f"
+  text=$(fm_status_cat "$f") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
+  _fm_status_open_activities_stream <<EOF
+$text
+EOF
 }
 
 # task id from a recorded window target, falling back to the tmux-shaped

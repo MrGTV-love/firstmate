@@ -10,7 +10,8 @@
 #
 # Producers:
 #   bin/fm-brief.sh              appended (in every worker's status command,
-#                                right after its unchanged plain append)
+#                                right after its capped append,
+#                                bin/fm-status-append.sh)
 #   bin/fm-spawn.sh              dispatched (fresh spawns only, never relaunch)
 #   bin/fm-watch.sh              capture, once per poll cycle
 #   bin/fm-pr-check.sh           pr_ready (a PR registered for review, not the
@@ -43,9 +44,13 @@
 # line added to a state/<task>.status log since that task's byte offset in
 # state/.<task>.fleet-ledger-offset. An absent offset reads from byte 0, and a
 # log shorter than its offset is re-read from byte 0. A partial last line waits
-# for a later capture. Records are appended before the offset is saved, so an
-# interrupted capture repeats records rather than losing them. Without any
-# grown log, capture returns after one size listing and sources nothing.
+# for a later capture. A log that grew by more than one tail window or more than
+# CAPTURE_MAX_LINES lines since the offset is captured from its last whole lines,
+# and a task.status.skipped record counts the bytes left out (docs/fleet-ledger.md;
+# docs/configuration.md "Status log size bounds" owns the bounds). Records are
+# appended before the offset is saved, so an interrupted capture repeats records
+# rather than losing them. Without any grown log, capture returns after one size
+# listing and sources nothing.
 # appended captures only that task, so a worker's status line is recorded as
 # soon as the worker writes it; the byte offset keeps the per-poll capture from
 # recording it again. Its arguments name the home, because a worker has no
@@ -76,6 +81,8 @@ set -u
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
@@ -213,8 +220,15 @@ append_status() { # <task> <status-line>
     --arg state "$verb" --arg key "$key" --arg text "$text"
 }
 
+# The most status lines one capture turns into ledger events. Each line costs a jq run,
+# 27 ms measured on 2026-10-18, so a burst of tens of thousands would hold the
+# watcher's poll loop for minutes; 256 lines is about seven seconds. A log that grew
+# by more than this since the last capture is captured from its last lines and the
+# ledger records how much it skipped.
+CAPTURE_MAX_LINES=256
+
 capture_task() { # <task>; caller holds the lock
-  local task=$1 log offset data complete tail line saved
+  local task=$1 log offset data size complete tail line saved window window_lines skipped clamped=0 head lines drop
   log="$STATE/$task.status"
   saved=$(offset_path "$task")
   [ -f "$log" ] && [ ! -L "$log" ] || return 0
@@ -223,12 +237,47 @@ capture_task() { # <task>; caller holds the lock
   data=${data//[[:space:]]/}
   [ "$data" -ge "$offset" ] || offset=0
   [ "$data" -gt "$offset" ] || return 0
-  # The trailing x keeps a final newline that command substitution would strip.
-  data=$(tail -c "+$((offset + 1))" "$log"; printf x) || return 1
+  size=$data
+  # Bounded: a log that grew by more than one tail window (bin/fm-status-cap-lib.sh)
+  # or more than CAPTURE_MAX_LINES lines since the saved offset is captured from its
+  # last whole lines, and the ledger records a task.status.skipped event saying how
+  # much it skipped, so a runaway writer cannot make this read the whole log into
+  # memory or start thousands of jq processes. The saved offset advances to the end
+  # of what was read.
+  fm_status_window_bytes window
+  window_lines=$CAPTURE_MAX_LINES
+  skipped=0
+  if [ $((data - offset)) -gt "$window" ]; then
+    skipped=$((data - window - offset))
+    offset=$((data - window))
+    clamped=1
+  fi
+  # Exactly the counted bytes, so a log that is still growing cannot make the read chase
+  # its writer. The trailing x keeps a final newline that command substitution would strip.
+  data=$(tail -c "+$((offset + 1))" "$log" | head -c "$((size - offset))"; printf x) || return 1
   data=${data%x}
+  if [ "$clamped" = 1 ]; then
+    # The window starts mid-line unless the byte before it ended one: drop the partial line.
+    case "$data" in
+      *$'\n'*) head=${data%%$'\n'*}; data=${data#*$'\n'}; skipped=$((skipped + ${#head} + 1)); offset=$((offset + ${#head} + 1)) ;;
+      *) skipped=$((skipped + ${#data})); offset=$((offset + ${#data})); data='' ;;
+    esac
+  fi
   tail=${data##*$'\n'}
   complete=${data%"$tail"}
   [ -n "$complete" ] || return 0
+  lines=$(printf '%s' "$complete" | grep -c '')
+  if [ "$lines" -gt "$window_lines" ]; then
+    head=$(printf '%s' "$complete" | head -n $((lines - window_lines)))
+    drop=$(( ${#head} + 1 ))
+    complete=${complete:$drop}
+    skipped=$((skipped + drop))
+    offset=$((offset + drop))
+  fi
+  if [ "$skipped" -gt 0 ]; then
+    # shellcheck disable=SC2016 # $bytes is a jq variable, not a shell one.
+    append task.status.skipped "$task" '{bytes: ($bytes | tonumber)}' --arg bytes "$skipped" || return 1
+  fi
   while IFS= read -r line; do
     [ -n "${line//[[:space:]]/}" ] || continue
     append_status "$task" "$line" || return 1

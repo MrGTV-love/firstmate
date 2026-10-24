@@ -3046,6 +3046,27 @@ test_no_run_idle_pane_uses_log() {
   pass "no run + idle pane uses the status-log verb"
 }
 
+# A status log the read limits refuse (bin/fm-status-cap-lib.sh) cannot be read, which is
+# not the same as having no events: the lane reads unknown and names the log, instead of
+# taking whatever the pane alone says (here an idle pane, which would read as ordinary).
+test_status_log_past_the_read_limits_reads_unknown() {
+  reset_fakes
+  local d out; d=$(new_case refused-log)
+  make_repo_on_branch "$d/wt" fm/feat-big
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-big.meta" "window=fm:fm-feat-big" "worktree=$d/wt" "kind=ship" "harness=claude"
+  { printf 'needs-decision [key=q1]: which database?\n'; perl -e 'print "text\n" x 40000'; } > "$d/state/feat-big.status"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_BUSY=0
+  arm_idle_record "$d/state" feat-big
+  out=$(run_crew_state "$d" feat-big)
+  assert_contains "$out" "state: unknown" "an unreadable status log reads unknown"
+  assert_contains "$out" "source: status-log" "the unknown names the status log as its source"
+  assert_contains "$out" "feat-big.status is past the status read limits" "the unknown does not name the refused log"
+  assert_not_contains "$out" "state: parked" "a refused log was read as its stale decision"
+  pass "a status log past the read limits reads unknown and names the log"
+}
+
 test_no_run_idle_pane_uses_keyed_log() {
   reset_fakes
   local d; d=$(new_case keyed-idle)
@@ -6048,6 +6069,7 @@ test_no_run_herdr_husk_dead_still_reads_gone
 test_no_run_herdr_idle_agent_status_outranked_by_record
 test_no_run_herdr_idle_agent_status_and_idle_record_stays_idle
 test_no_run_idle_pane_uses_log
+test_status_log_past_the_read_limits_reads_unknown
 test_no_run_idle_pane_uses_keyed_log
 test_no_run_idle_pane_paused
 test_no_run_idle_pane_custom_paused_verb

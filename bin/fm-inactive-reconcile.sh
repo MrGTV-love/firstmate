@@ -374,7 +374,9 @@ child_terminal_ledger_line() { # <status>
   [ -f "$status" ] && [ ! -L "$status" ] && [ -s "$status" ] || return 1
   last=$(last_status_line "$status")
   case "$(status_line_verb "$last")" in done|failed) ;; *) return 1 ;; esac
-  snapshot=$(cat "$status"; printf '%s' "$marker") || return 1
+  # Only the final line matters here, so a bounded tail stands for the log: a runaway
+  # log must not be read whole into memory (bin/fm-status-cap-lib.sh).
+  snapshot=$(tail -c 65536 "$status" | head -c 65536; printf '%s' "$marker") || return 1
   case "$snapshot" in
     *$'\n'"$marker") ;;
     "$last$marker"|*$'\n'"$last$marker") return 2 ;;

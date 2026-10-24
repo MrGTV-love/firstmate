@@ -2292,6 +2292,9 @@ reconcile_close() {
 # The status-stream line number of the line that opened <key>'s current call,
 # found with the fold's own readers; empty when the key is not open. Status
 # logs are append-only, so the number names one opening for the life of the log.
+# The log is read whole and exactly (bin/fm-status-cap-lib.sh read limit), never a
+# clipped copy, so the number is the same whatever the log's size; a log past the
+# read limit is refused on stderr and the result is empty, which every caller fails on.
 key_opening_line() {  # <status-file> <key>
   local f=$1 key=$2 line verb open='' kind resolve held n=0 row tab=$'\t'
   _fm_status_kind "$f" '' kind
@@ -2305,7 +2308,7 @@ key_opening_line() {  # <status-file> <key>
         _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open "$n"
         ;;
     esac
-  done < "$f"
+  done < <(fm_status_cat "$f" 0)
   while IFS= read -r row; do
     case "$row" in
       "$key$tab"*) row=${row#*"$tab"}; printf '%s' "${row#*"$tab"}"; return 0 ;;
@@ -2406,7 +2409,8 @@ reconcile_close_key() {
       *) fail "cannot establish whether key $key belongs to captain-held task $id; nothing was closed" ;;
     esac
   done
-  open=$(status_open_decisions "$file")
+  open=$(status_open_decisions "$file") \
+    || fail "cannot read $owner's status log, which is past the status read limits, so its open decisions are unknown; nothing was closed"
   if status_event_recorded "$file" "$line"; then
     ! _fm_open_set_has "$open" "$key" \
       || fail "key $key was reopened; old evidence cannot resolve a new call"
@@ -2421,7 +2425,8 @@ reconcile_close_key() {
   record_key_evidence "$owner" "$key" "$opening"
   fm_wake_status_append_self_announced "$STATE" "$file" "$line" || append_rc=$?
   [ "$append_rc" -ne 2 ] || fail "could not append the reconciliation for $owner key $key; retry with the same evidence"
-  open=$(status_open_decisions "$file")
+  open=$(status_open_decisions "$file") \
+    || fail "the close of key $key was appended, but $owner's status log is past the status read limits, so whether it closed cannot be verified"
   ! _fm_open_set_has "$open" "$key" \
     || fail "key $key remains open in $owner; it may have reopened concurrently"
   printf 'reconciled-key: %s %s\nevidence: %s\n' "$owner" "$key" "$KEY_EVIDENCE_PATH"
@@ -2538,7 +2543,8 @@ EOF
   fi
 
   status_file="$STATE/$origin.status"
-  open=$(status_open_decisions "$status_file")
+  open=$(status_open_decisions "$status_file") \
+    || fail "cannot read origin $origin's status stream, which is past the status read limits, so its open captain decisions are unknown"
   if [ -n "$open" ] && [ -z "$keys" ]; then
     fail "origin $origin still has open captain decisions in its status stream; hold a captain task for what remains, or answer them, before attesting --none"
   fi
@@ -2594,7 +2600,8 @@ command_verify() {
 $(printf '%s\n' "$keys" | tr ',' '\n')
 EOF
   fi
-  open=$(status_open_decisions "$STATE/$origin.status")
+  open=$(status_open_decisions "$STATE/$origin.status") \
+    || fail "cannot read origin $origin's status stream, which is past the status read limits, so its open captain decisions are unknown"
   while IFS=$'\t' read -r key _verb _summary; do
     [ -n "$key" ] || continue
     fail "open captain decision $origin/$key is not transferred to the captain-held inventory; re-run complete"
@@ -2661,9 +2668,10 @@ open_task_ids() {
 
 # Every key token stated anywhere in a status log. A cheap candidate scan: it
 # over-includes tokens that are only prose, and status_key_closing_verb below is
-# what actually decides what the stream says about a key.
+# what actually decides what the stream says about a key. The log is read through the
+# byte read limit (bin/fm-status-cap-lib.sh), so a log past it yields no tokens.
 status_log_key_tokens() {  # <status-file>
-  grep -o '\[key=[A-Za-z0-9._-]*\]' "$1" 2>/dev/null |
+  fm_status_cat "$1" 0 2>/dev/null | grep -o '\[key=[A-Za-z0-9._-]*\]' |
     sed 's/^\[key=//; s/\]$//' | LC_ALL=C sort -u
 }
 

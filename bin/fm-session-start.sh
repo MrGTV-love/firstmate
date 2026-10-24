@@ -568,7 +568,7 @@ print_status_tail() {
   # and the full log path above reaches the rest.
   while IFS= read -r line || [ -n "$line" ]; do
     fm_cap_line "$line"
-  done < <(tail -n "$STATUS_TAIL" "$status")
+  done < <(tail -c 262144 "$status" 2>/dev/null | head -c 262144 | tail -n "$STATUS_TAIL")
 }
 
 # fm_session_start_endpoint_read <backend> <target> [expected-label]: ONE

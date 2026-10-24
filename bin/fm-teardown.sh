@@ -654,6 +654,7 @@ for _teardown_source in \
   fm-status-event-lib.sh \
   fm-status-wake-lib.sh \
   fm-status-io-lib.sh \
+  fm-status-cap-lib.sh \
   fm-utc-lib.sh \
   fm-gate-refuse-lib.sh \
   fm-pr-lib.sh \
@@ -4022,7 +4023,7 @@ require_shared_task_worktree_slot() {
           echo "Several other root records name this slot; select the live one whose work stays in it as <remaining-task>. Each candidate's last recorded status:" >&2
           for ((i=0; i < ${#sharers[@]}; i++)); do
             last=
-            [ ! -f "${sharer_metas[$i]%.meta}.status" ] || last=$(tail -1 "${sharer_metas[$i]%.meta}.status" 2>/dev/null)
+            [ ! -f "${sharer_metas[$i]%.meta}.status" ] || last=$(tail -c 65536 "${sharer_metas[$i]%.meta}.status" 2>/dev/null | head -c 65536 | tail -1)
             echo "  ${sharers[$i]}: ${last:-(no status recorded)}" >&2
           done
         fi

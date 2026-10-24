@@ -130,7 +130,11 @@ fm_idle_reap_classify() {
     fi
     return 0
   fi
-  open=$(status_open_decisions "$status" "$IDLE_REAP_KIND")
+  if ! open=$(status_open_decisions "$status" "$IDLE_REAP_KIND"); then
+    IDLE_REAP_CLASS=parked
+    IDLE_REAP_DETAIL="status log unreadable past the read limits; cleanup ineligible"
+    return 0
+  fi
   if [ -n "$open" ]; then
     IDLE_REAP_CLASS=parked
     IDLE_REAP_DETAIL="open decision: ${open%%$'\n'*}"

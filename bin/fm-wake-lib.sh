@@ -2840,7 +2840,7 @@ fm_wake_status_append_self_announced() {  # <state> <status-file> <line>...
     pre_size=$(_fm_status_file_size "$file") || pre_size=''
     pre_ident=$(_fm_open_decisions_file_ident "$file") || pre_ident=''
   fi
-  printf '%s\n' "${stamped[@]}" >> "$file" || return 2
+  fm_status_append_lines "$file" "${stamped[@]}" || return 2
   case "$pre_size" in ''|*[!0-9]*) return 1 ;; esac
   post_size=$(_fm_status_file_size "$file") || return 1
   post_ident=$(_fm_open_decisions_file_ident "$file") || return 1
@@ -2935,38 +2935,28 @@ fm_wake_status_cursor_offset() {  # <validated-status-path> -> already-presented
 # O_NOFOLLOW read of every still-unread status byte. min-offset is the
 # already-presented cursor from classify-lib. Lines whose bytes begin before
 # that offset are not replayed. Prints nothing and returns 1 when no unread
-# non-blank line exists.
+# non-blank line exists. The span goes through the status read limits
+# (bin/fm-status-cap-lib.sh): a span past them is refused, one line on stderr
+# names the log, and nothing is read, so a runaway log never reaches the
+# annotation loop below.
 fm_wake_unread_events() {  # <validated-status-path> <unused-tail-byte-cap> <min-offset> [<end-offset>]
-  local path=$1 min_offset=$3 end_offset=${4:-} result size chunk chunk_start
+  local path=$1 min_offset=$3 end_offset=${4:-} size chunk chunk_start
   local LC_ALL=C
   FM_WAKE_EVENT_LINE=
   FM_WAKE_UNREAD_LINES=
   case "$min_offset" in ''|*[!0-9]*) min_offset=0 ;; esac
-  result=$(perl -MFcntl=:DEFAULT -e '
-    my ($path, $start, $end) = @ARGV;
-    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;
-    my @stat = stat $file or exit 1;
-    exit 1 unless -f _;
-    my $size = $stat[7];
-    exit 1 unless $size =~ /\A\d+\z/ && $start =~ /\A\d+\z/ && $start <= $size;
-    $end = $size unless length $end;
-    exit 1 unless $end =~ /\A\d+\z/ && $start <= $end && $end <= $size;
-    seek($file, $start, 0) or exit 1;
-    printf "%s\t", $end or exit 1;
-    my $remaining = $end - $start;
-    while ($remaining > 0) {
-      my $read = read($file, my $buffer, $remaining);
-      exit 1 unless defined $read;
-      last unless $read;
-      print $buffer or exit 1;
-      $remaining -= $read;
-    }
-  ' "$path" "$min_offset" "$end_offset" 2>/dev/null) || return 1
-  size=${result%%$'\t'*}
-  chunk=${result#*$'\t'}
+  min_offset=$((10#$min_offset))
+  if [ -n "$end_offset" ]; then
+    size=$end_offset
+  else
+    _fm_status_file_size "$path" size || return 1
+    size=${size//[[:space:]]/}
+  fi
   case "$size" in ''|*[!0-9]*) return 1 ;; esac
-  [ -n "$chunk" ] || return 1
+  size=$((10#$size))
   [ "$min_offset" -lt "$size" ] || return 1
+  chunk=$(_fm_status_read_span "$path" "$min_offset" "$((size - min_offset))") || return 1
+  [ -n "$chunk" ] || return 1
   chunk_start=$min_offset
   FM_WAKE_UNREAD_LINES=$(printf '%s' "$chunk" | LC_ALL=C awk -v start="$chunk_start" -v min="$min_offset" '
     BEGIN { pos = start + 0 }

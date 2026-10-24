@@ -466,11 +466,14 @@ shell_quote() {
 }
 
 STATUS_FILE=$(shell_quote "$STATE/$ID.status")
-# The worker's status command: the plain append always carries the line, then
-# the opt-in fleet ledger (docs/fleet-ledger.md) records it at once, costing one
-# file test when the flag is absent. A host without that flag, such as a remote
-# second mate's, runs only the append; the watcher capture is the backstop.
-STATUS_APPEND="echo \"{state} [at=<epoch>]: {one short line}\" >> $STATUS_FILE && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$FM_ROOT/bin/fm-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
+# The worker's status command: the sanctioned capped append always carries the
+# line (bin/fm-status-append.sh owns the size bound, and
+# docs/configuration.md "Status log size bounds" the reason), then the opt-in fleet
+# ledger (docs/fleet-ledger.md) records it at once, costing one file test when the
+# flag is absent. A host without that flag, such as a remote second mate's, runs only
+# the append; the watcher capture is the backstop. A refused append (exit 75) skips
+# the ledger and says why on stderr.
+STATUS_APPEND="$(shell_quote "$FM_ROOT/bin/fm-status-append.sh") $STATUS_FILE \"{state} [at=<epoch>]: {one short line}\" && { [ ! -e $(shell_quote "$CONFIG/fleet-ledger") ] || $(shell_quote "$FM_ROOT/bin/fm-fleet-ledger.sh") appended $(shell_quote "$CONFIG") $STATUS_FILE >/dev/null 2>&1 || true; }"
 INBOX_DIR=$(shell_quote "$STATE/$ID.inbox")
 
 # The receive-and-ack half of the steering-inbox contract, included in every
@@ -574,7 +577,7 @@ A request relayed to you by the main firstmate is tagged with a leading \`$FM_FR
 When a message carries that marker, do the work, then respond via the STATUS/ESCALATION path below, never only in this chat: the main firstmate does not read your chat, so a chat-only reply is lost.
 Marked requests also carry a privacy-safe \`corr=<id>\` token after the marker; include that exact token in your parent status reply (or in the status pointer to a detailed doc) so the parent can correlate the answer.
 Optional helper: \`bin/fm-secondmate-report.sh <verb> <corr_id> <note>\` appends that correlated line to the parent channel itself - do not pass a status path, and do not write a hand path under this home.
-A plain \`echo\` that includes the same \`corr=<id>\` on this parent channel is equally valid; do not depend on the helper being present.
+If the helper is missing, append the same correlated line with \`$FM_ROOT/bin/fm-status-append.sh\`; never hand-write a \`printf\` or a loop into a status file, because an unbounded append can fill the disk.
 For a terse result, a status line is the whole answer.
 For a detailed answer (an investigation, a plan, an audit), write it to a doc under your home's \`data/\` and append a status line that points to that doc - the scout-report pattern - so the main firstmate is woken and can read it.
 Before treating an investigation or visual review as complete, load \`captain-hold-lifecycle\` from this home's \`.agents/skills/\` and pass its shared completion gate.

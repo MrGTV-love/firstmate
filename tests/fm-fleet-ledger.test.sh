@@ -172,7 +172,7 @@ worker_status_command() {  # <state> <note> [<state-dir> [<config-dir>]]
     "$ROOT/bin/fm-brief.sh" "$TASK" sample --mode no-mistakes >/dev/null) \
     || fail "brief scaffold failed"
   # shellcheck disable=SC2016 # Match literal backticks in the generated brief.
-  cmd=$(sed -n '/`echo "{state}/s/.*`\(echo .*\)`.*/\1/p' "$HOME_DIR/data/$TASK/brief.md" | head -1)
+  cmd=$(sed -n '/`[^`]*fm-status-append\.sh[^`]*{state}/s/.*`\([^`]*fm-status-append\.sh[^`]*\)`.*/\1/p' "$HOME_DIR/data/$TASK/brief.md" | head -1)
   [ -n "$cmd" ] || fail "the brief carries no status command"
   cmd=${cmd//\{state\}/$1}
   cmd=${cmd//<epoch>/1790000000}
@@ -264,6 +264,57 @@ test_worker_status_line_with_the_flag_absent() {
   leftovers=$(cd "$HOME_DIR/state" && find . -name '*fleet-ledger*')
   assert_equals "" "$leftovers" "ledger files with the flag absent"
   pass "flag off: the worker's status command is a plain append and leaves no ledger file, offset, or lock"
+}
+
+test_a_burst_is_captured_from_its_last_lines_and_the_skip_is_recorded() {
+  local out events skipped first last
+  make_case burst on
+  : > "$HOME_DIR/state/$TASK.status"
+  perl -e 'print "working [at=1790000000]: burst line $_\n" for 1 .. 600' >> "$HOME_DIR/state/$TASK.status"
+  out=$(in_home "$ROOT/bin/fm-fleet-ledger.sh" capture 2>&1) || fail "the ledger capture failed: $out"
+  events=$(jq -c 'select(.event == "task.status")' "$HOME_DIR/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')
+  [ "$events" -eq 256 ] || fail "a 600 line burst became $events status events, not the 256 line bound"
+  skipped=$(jq -c 'select(.event == "task.status.skipped") | .bytes' "$HOME_DIR/state/fleet-ledger.jsonl")
+  [ -n "$skipped" ] && [ "$skipped" -gt 0 ] || fail "the skipped lines were not recorded: '$skipped'"
+  first=$(jq -r 'select(.event == "task.status") | .text' "$HOME_DIR/state/fleet-ledger.jsonl" | head -1)
+  last=$(jq -r 'select(.event == "task.status") | .text' "$HOME_DIR/state/fleet-ledger.jsonl" | tail -1)
+  [ "$first" = " burst line 345" ] && [ "$last" = " burst line 600" ] \
+    || fail "the capture is not the last 256 lines: first '$first', last '$last'"
+  pass "a burst past 256 lines is captured from its last 256 lines and the ledger records how many bytes it skipped"
+}
+
+# A capture reads exactly the bytes it counted. A writer that appends between the count
+# and the read (a runaway one never stops) must not make the read chase it: the late lines
+# wait for the next capture, and the saved offset names where this one ended.
+test_a_capture_reads_only_the_bytes_it_counted() {
+  local real_wc rows
+  make_case exact-read on
+  perl -e 'print "working [at=1790000000]: counted line $_\n" for 1 .. 10' > "$HOME_DIR/state/$TASK.status"
+  real_wc=$(command -v wc)
+  cat > "$FAKEBIN/wc" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -c ] && [ ! -e "$HOME_DIR/late.done" ]; then
+  out=\$("$real_wc" "\$@")
+  : > "$HOME_DIR/late.done"
+  perl -e 'print "working [at=1790000000]: late line \$_\n" for 1 .. 5' >> "$HOME_DIR/state/$TASK.status"
+  printf '%s\n' "\$out"
+  exit 0
+fi
+exec "$real_wc" "\$@"
+SH
+  chmod +x "$FAKEBIN/wc"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" appended "$HOME_DIR/config" "$HOME_DIR/state/$TASK.status" \
+    || fail "the capture failed"
+  [ -e "$HOME_DIR/late.done" ] || fail "the fixture never appended between the count and the read"
+  rows=$(jq -r 'select(.event == "task.status") | .text' "$HOME_DIR/state/fleet-ledger.jsonl")
+  [ "$(printf '%s\n' "$rows" | grep -c 'counted line')" -eq 10 ] || fail "the capture lost counted lines: $rows"
+  [ "$(printf '%s\n' "$rows" | grep -c 'late line')" -eq 0 ] || fail "the capture read past the bytes it counted: $rows"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" appended "$HOME_DIR/config" "$HOME_DIR/state/$TASK.status" \
+    || fail "the next capture failed"
+  rows=$(jq -r 'select(.event == "task.status") | .text' "$HOME_DIR/state/fleet-ledger.jsonl")
+  [ "$(printf '%s\n' "$rows" | grep -c 'late line')" -eq 5 ] || fail "the late lines were not captured by the next capture: $rows"
+  [ "$(printf '%s\n' "$rows" | grep -c 'counted line')" -eq 10 ] || fail "the next capture repeated a counted line: $rows"
+  pass "a capture reads exactly the bytes it counted and leaves a late append for the next capture"
 }
 
 test_flag_off_writes_nothing() {
@@ -437,6 +488,8 @@ test_worker_status_line_is_recorded_under_a_relative_config_override
 test_worker_status_command_fails_when_the_append_fails
 test_worker_status_line_lands_when_the_ledger_fails
 test_worker_status_line_with_the_flag_absent
+test_a_burst_is_captured_from_its_last_lines_and_the_skip_is_recorded
+test_a_capture_reads_only_the_bytes_it_counted
 test_flag_off_writes_nothing
 test_lifecycle_records_carry_exactly_their_fields
 test_closed_is_recorded_once_per_task_evidence_and_pr

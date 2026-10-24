@@ -614,8 +614,8 @@ _fm_pending_reply_corr_candidates() {  # <status-file> <corr_id>
   local status_file=$1 corr=$2
   case "$corr" in
     '') return 0 ;;
-    *[!A-Za-z0-9_]*) LC_ALL=C grep -na '' -- "$status_file" 2>/dev/null ;;
-    *) LC_ALL=C grep -naF -- "${FM_PENDING_REPLY_CORR_PREFIX}${corr}" "$status_file" 2>/dev/null ;;
+    *[!A-Za-z0-9_]*) fm_status_cat "$status_file" 0 2>/dev/null | LC_ALL=C grep -na '' ;;
+    *) fm_status_cat "$status_file" 0 2>/dev/null | LC_ALL=C grep -naF -- "${FM_PENDING_REPLY_CORR_PREFIX}${corr}" ;;
   esac
   return 0
 }
@@ -973,7 +973,7 @@ fm_pending_reply_recovery_message() {  # <record-path>
 fm_pending_reply_send_recovery() {  # <state-dir> <corr_id>
   local state=$1 corr=$2
   local rec phase completed delivered attempted grace now age task_id msg parent_home send_status=0
-  local sender_pid sender_identity status_file lock
+  local sender_pid sender_identity status_file lock own_open
   local STATE FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK
   rec=$(fm_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
@@ -1002,7 +1002,8 @@ fm_pending_reply_send_recovery() {  # <state-dir> <corr_id>
   # config/wait-no-turns: a mate waiting on its own open decision or blocker
   # is never poked. The recovery stays unattempted until the answer lands.
   if [ -e "${FM_CONFIG_OVERRIDE:-${FM_HOME:-}/config}/wait-no-turns" ]; then
-    [ -z "$(status_own_open_decisions "$state/$task_id.status")" ] || return 1
+    own_open=$(status_own_open_decisions "$state/$task_id.status") || return 1
+    [ -z "$own_open" ] || return 1
   fi
   status_file=$(fm_pending_reply_get "$rec" parent_status)
   parent_home=$(fm_pending_reply_get "$rec" parent_home)
@@ -1172,11 +1173,14 @@ fm_pending_reply_escalation_payload() {  # <record-path> <kind>
 # unkeyed escalation is matched and closed under the shared default key while
 # that exact escalation remains open. If an unrelated decision has since taken
 # over that key, the close is withheld so the unrelated decision is not cleared.
+# A log the read limits refuse (bin/fm-status-cap-lib.sh) prints nothing and returns 2:
+# the escalation is unknown, which is not the same as absent.
 fm_pending_reply_escalation_line() {  # <status-file> <record-path> <corr_id>
-  local status_file=$1 rec=$2 corr=$3 line found='' kind payload own_key untimed
+  local status_file=$1 rec=$2 corr=$3 line found='' kind payload own_key untimed text rc
   [ -f "$status_file" ] || return 0
   [ "$(fm_pending_reply_get "$rec" corr_id)" = "$corr" ] || return 0
   own_key=$(fm_pending_reply_escalation_key "$corr")
+  text=$(fm_status_cat "$status_file") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
   while IFS= read -r line || [ -n "$line" ]; do
     [ "$(status_line_verb "$line")" = blocked ] || continue
     _fm_status_untimed "$line" untimed
@@ -1187,7 +1191,9 @@ fm_pending_reply_escalation_line() {  # <status-file> <record-path> <corr_id>
         "blocked [key=$own_key]: $payload "*|"blocked: $payload "*) found=$line; break ;;
       esac
     done
-  done < "$status_file"
+  done <<EOF
+$text
+EOF
   printf '%s' "$found"
 }
 
@@ -1216,7 +1222,7 @@ fm_pending_reply_close_escalation() {  # <state-dir> <corr_id>
 
 _fm_pending_reply_close_escalation_locked() {  # <state-dir> <corr_id>
   local state=$1 corr=$2 rec escalated closed parent_status escalation key note
-  local open_line open_key open_note now close_line close_rc _task _via
+  local open_line open_key open_note now close_line close_rc _task _via parent_open
   rec=$(fm_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
   [ "$(fm_pending_reply_get "$rec" phase)" = resolved ] || return 0
@@ -1226,10 +1232,11 @@ _fm_pending_reply_close_escalation_locked() {  # <state-dir> <corr_id>
   [ -z "$closed" ] || return 0
   parent_status=$(fm_pending_reply_get "$rec" parent_status)
   [ -n "$parent_status" ] || return 1
-  escalation=$(fm_pending_reply_escalation_line "$parent_status" "$rec" "$corr")
+  escalation=$(fm_pending_reply_escalation_line "$parent_status" "$rec" "$corr") || return 1
   if [ -n "$escalation" ]; then
     key=$(_fm_decision_key "$escalation") || key=''
     note=$(status_line_note "$escalation")
+    parent_open=$(status_open_decisions "$parent_status") || return 1
     while IFS= read -r open_line; do
       [ -n "$open_line" ] || continue
       open_key=${open_line%%$'\t'*}
@@ -1251,7 +1258,7 @@ _fm_pending_reply_close_escalation_locked() {  # <state-dir> <corr_id>
       [ "$close_rc" -ne 2 ] || return 1
       break
     done <<EOF
-$(status_open_decisions "$parent_status")
+$parent_open
 EOF
   fi
   now=$(fm_pending_reply_now)
@@ -1282,7 +1289,7 @@ fm_pending_reply_maybe_escalate() {  # <state-dir> <corr_id>
 _fm_pending_reply_maybe_escalate_locked() {  # <state-dir> <corr_id>
   local state=$1 corr=$2
   local rec phase completed now payload parent_status line kind first display
-  local delivered task_id meta sm_home remote_host grace age key new_episode
+  local delivered task_id meta sm_home remote_host grace age key new_episode parent_open
   rec=$(fm_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
   phase=$(fm_pending_reply_get "$rec" phase)
@@ -1350,13 +1357,14 @@ _fm_pending_reply_maybe_escalate_locked() {  # <state-dir> <corr_id>
   # loss is a new one. While the decision is open the identical line is a retry.
   new_episode=1
   if [ -n "$(fm_pending_reply_get "$rec" escalated_epoch)" ]; then
-    case $'\n'"$(status_open_decisions "$parent_status")" in
+    parent_open=$(status_open_decisions "$parent_status") || return 1
+    case $'\n'"$parent_open" in
       *$'\n'"$key"$'\t'*) ;;
       *) new_episode=0 ;;
     esac
   fi
   if [ "$new_episode" -eq 0 ] || ! status_event_recorded "$parent_status" "$line"; then
-    printf '%s\n' "$(status_stamp_line "$line")" >> "$parent_status" 2>/dev/null || return 1
+    fm_status_append_line "$parent_status" "$(status_stamp_line "$line")" || return 1
   fi
   now=$(fm_pending_reply_now)
   fm_pending_reply_set "$rec" escalated_epoch "$now" || return 1

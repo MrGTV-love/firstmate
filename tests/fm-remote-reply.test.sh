@@ -657,6 +657,48 @@ assert_grep 'report=data/remote-secondmates/ios/data/reply/writefail.md' "$PAREN
 mirrored_cursor_is_current "the recovered delta did not advance the cursor"
 pass "a failed mirror write never drops status content or advances the cursor"
 
+# A mirror append the size cap refuses stops the ingest the same way: the delta stays
+# uncommitted and re-readable, nothing is dropped, the log never passes its limit, and
+# one keyed blocker names the log. Once the log can take the line again, the same
+# captured delta applies in full.
+GEN=$((GEN + 1))
+stop_reply_listener || fail "the reply listener did not stop before the capped-stream capture"
+printf 'working [key=cap-refusal]: probe line the capped stream must refuse\n' \
+  >> "$REMOTE/state/parent-replies.status"
+cap_cursor_before=$(cat "$PARENT/state/remote-replies/ios.cursor")
+cap_size_before=$(wc -c < "$PARENT/state/ios.status" | tr -d ' ')
+cp "$PARENT/state/ios.status" "$TMP_ROOT/ios-status-before-cap"
+FM_STATUS_CAP_BYTES=$cap_size_before FM_STATUS_CAP_RESERVE_BYTES=1024 \
+  remote_env "$ROOT/bin/fm-procevent.sh" start "$SID" >/dev/null 2>&1 || true
+RESULT_CAPPED="$PARENT/state/procevent-inbox/$SID.$GEN.result"
+assert_present "$RESULT_CAPPED" "the capped-stream delta was not captured"
+assert_absent "$PARENT/state/procevent-inbox/$SID.$GEN.handled" \
+  "a capture whose mirror append the cap refused was acknowledged anyway"
+cap_rc=0
+FM_STATUS_CAP_BYTES=$cap_size_before FM_STATUS_CAP_RESERVE_BYTES=1024 \
+  remote_env "$ADAPTER" handle ios "$GEN" "$RESULT_CAPPED" > "$TMP_ROOT/cap-refused.out" 2>&1 || cap_rc=$?
+[ "$cap_rc" -ne 0 ] || fail "a mirror append the cap refused reported success"
+assert_grep 'size limit' "$TMP_ROOT/cap-refused.out" "the refused mirror append did not say why it stopped"
+[ "$(cat "$PARENT/state/remote-replies/ios.cursor")" = "$cap_cursor_before" ] \
+  || fail "a refused mirror append advanced the cursor past status nobody received"
+assert_no_grep 'probe line the capped stream must refuse' "$PARENT/state/ios.status" \
+  "the refused line reached the parent stream anyway"
+[ "$(grep -F 'blocked [key=remote-reply-continuity-ios-capped]' "$PARENT/state/ios.status" | grep -cF 'remote reply mirror stopped for ios')" -eq 1 ] \
+  || fail "the refusal did not raise exactly one named blocker"
+[ "$(wc -c < "$PARENT/state/ios.status" | tr -d ' ')" -le $((cap_size_before + 1024)) ] \
+  || fail "the parent stream grew past cap plus reserve"
+FM_STATUS_CAP_BYTES=$cap_size_before FM_STATUS_CAP_RESERVE_BYTES=1024 \
+  remote_env "$ADAPTER" handle ios "$GEN" "$RESULT_CAPPED" >/dev/null 2>&1 || true
+[ "$(grep -F 'blocked [key=remote-reply-continuity-ios-capped]' "$PARENT/state/ios.status" | grep -cF 'remote reply mirror stopped for ios')" -eq 1 ] \
+  || fail "a retried refusal raised the named blocker again"
+remote_env "$ADAPTER" handle ios "$GEN" "$RESULT_CAPPED" >/dev/null \
+  || fail "the captured delta did not apply once the cap allowed the line"
+assert_grep 'probe line the capped stream must refuse' "$PARENT/state/ios.status" \
+  "the re-read delta did not mirror its line"
+mirrored_cursor_is_current "the recovered capped-stream delta did not advance the cursor"
+printf 'resolved [key=remote-reply-continuity-ios-capped]: capped-stream probe settled\n' >> "$PARENT/state/ios.status"
+pass "a mirror append the cap refuses stops the ingest with the cursor unchanged, names the log once, and the delta applies in full later"
+
 # The whole-log recapture re-fetches every document the log offers, one remote
 # job at a time, so it needs far more than one await_reply_result budget on a
 # loaded runner. Each attempt is a full wait that re-checks ownership of the
