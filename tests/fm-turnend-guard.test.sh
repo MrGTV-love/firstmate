@@ -1256,7 +1256,10 @@ function invoke(registration, home, context, payload) {
   const result = spawnSync('/bin/bash', ['-c', registration.command], {
     cwd: home, env, input: JSON.stringify(payload), encoding: 'utf8', timeout: 15000,
   });
-  assert.ifError(result.error);
+  // A hook may exit without reading its payload (the Grok exclusion does).
+  // On a loaded host the payload write then races the exit and fails with
+  // EPIPE; status, signal, and output are still complete and asserted below.
+  if (result.error?.code !== 'EPIPE') assert.ifError(result.error);
   assert.equal(result.signal, null, `${registration.target} did not settle`);
   return result;
 }
