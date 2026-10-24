@@ -1996,9 +1996,13 @@ This section is the single owner of the canonical schema and its per-field seman
 
 ```json
 {
+  "judgments": {
+    "<judgment_id>": { "type": "noul", "instructions": "<one observable question about task>", "criteria": { "true": "<when true>", "false": "<when false>" } }
+  },
   "rules": [
     {
       "when": "<natural-language condition describing a kind of task>",
+      "match": { "project": "<optional exact project>", "kind": "<ship|scout, optional>", "all": ["<judgment_id>"] },
       "approval": "captain",
       "min_confidence": 0.85,
       "floor": { "scope": "<quota-axi scope>", "min_percent": 20, "provider": "<quota-axi provider>" },
@@ -2021,6 +2025,7 @@ This section is the single owner of the canonical schema and its per-field seman
 | --- | --- |
 | `rules` | May be absent or empty for a default-only configuration. |
 | Rule `when` and `use` | Required for each rule. |
+| Top-level `judgments` and rule `match` | Required only by typed resolution, as "Fields applied only by typed resolution" below defines. |
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
 | Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
