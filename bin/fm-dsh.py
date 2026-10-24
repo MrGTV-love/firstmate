@@ -148,15 +148,14 @@ def prepare(args, primary_root=None):
     dsh = root / "dsh"
     prefs = home / ".dsh-tui"
     prefs.mkdir(parents=True, mode=0o700)
-    if primary_root is not None:
-        # A primary must retain the operator's CLI authentication and tool
-        # state. Link unrelated home entries, not copies of credentials;
-        # DSH's own two roots remain exclusively launch-local.
-        operator_home = Path(os.environ.get("FM_DSH_OPERATOR_HOME", str(Path.home()))).resolve()
-        for entry in operator_home.iterdir():
-            if entry.name not in (".dsh", ".dsh-tui"):
-                (home / entry.name).symlink_to(entry, target_is_directory=entry.is_dir())
-        (home / ".dsh").symlink_to(dsh, target_is_directory=True)
+    # Every agent needs the operator's CLI authentication and tool state.
+    # Link unrelated home entries, not copies of credentials; DSH's own two
+    # roots remain exclusively launch-local.
+    operator_home = Path(os.environ.get("FM_DSH_OPERATOR_HOME", str(Path.home()))).resolve()
+    for entry in operator_home.iterdir():
+        if entry.name not in (".dsh", ".dsh-tui"):
+            (home / entry.name).symlink_to(entry, target_is_directory=entry.is_dir())
+    (home / ".dsh").symlink_to(dsh, target_is_directory=True)
     profile = dsh / "profiles" / "dsh-tui"
     profile.mkdir(parents=True, mode=0o700)
     # Do not link the profile itself: DSH rewrites cordis.yml at boot.

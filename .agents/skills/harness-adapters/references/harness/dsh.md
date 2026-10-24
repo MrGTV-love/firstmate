@@ -46,8 +46,8 @@ Declared DeepSeek stand-ins are cross-harness dsh replacements, never native omp
 ## Launch posture
 
 The launch swaps `HOME` for the task's private one, because `dsh-tui` keeps its model and effort preferences under `~/.dsh-tui` and has no flag for them.
-Other HOME-relative tool state is therefore absent from ships and scouts on purpose: ssh keys, `gh` configuration and tokens, `~/.npmrc`, toolchain and package caches, and the XDG git configuration are neither copied nor linked.
-Primary and secondmate preparation instead links unrelated operator-home entries into the private HOME, retaining existing CLI authentication and tool state without copying it; `.dsh` and `.dsh-tui` remain exclusively launch-local.
+Ships, scouts, primaries and secondmates link unrelated operator-home entries into the private HOME, retaining existing CLI authentication (including `gh` and `gh-axi` configuration) and tool state without copying those entries or credentials.
+`.dsh` and `.dsh-tui` remain exclusively launch-local.
 `FM_DSH_OPERATOR_HOME` selects that operator home when explicitly supplied, otherwise preparation uses the launching shell's HOME; the primary launcher and every DSH secondmate launch carry the value they were prepared from, so a secondmate spawned inside a DSH session links the operator's real entries, never that session's private HOME.
 Exactly two paths are carried as environment variables resolved by the pane shell before `HOME` changes, so they name the operator's real files and nothing is copied: `GIT_CONFIG_GLOBAL` (the exported value, else `~/.gitconfig`) keeps the configured commit author and works beside the `GIT_CONFIG_*` `core.hooksPath` entry, and `NM_HOME` (the exported value, else `~/.no-mistakes`) lets `no-mistakes` reach the shared daemon, which it otherwise looks for under `$HOME/.no-mistakes`.
 Run from a swapped `HOME`, `no-mistakes daemon status` reported the same running daemon as the operator's shell with `NM_HOME` carried and `daemon not running` without it; [runtime verification](../../../docs/verification/runtime-backends.md#deepseek-harness-dsh-tui) records the run.

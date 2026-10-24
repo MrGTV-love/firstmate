@@ -307,6 +307,8 @@ make_dsh_case() {  # <name> <id> [crew-harness]
   printf '{}\n' > "$installed/profiles/dsh-tui/package.json"
   printf '{"version":"99.1.0"}\n' > "$installed/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/package.json"
   printf 'secret\n' > "$installed/.credentials.yaml"
+  mkdir -p "$HOME_DIR/user-home/.config/gh"
+  printf 'github.com:\n    user: fixture-operator\n' > "$HOME_DIR/user-home/.config/gh/hosts.yml"
 }
 
 # Spawn on the current case with the session writer running; echoes the output.
@@ -341,6 +343,17 @@ test_deepseek_model_without_a_harness_routes_to_dsh() {
     assert_grep "model=$DSH_MODEL" "$HOME_DIR/state/$id.meta" "the $kind meta must record the DeepSeek model"
     assert_present "$HOME_DIR/state/$id.dsh-session" "the $kind spawn must bind its launch store"
     assert_contains "$(cat "$LAUNCH_LOG")" "FM_DSH_HARNESS=dsh" "the $kind launch must be the dsh template"
+    python3 - "$HOME_DIR/state/$id.dsh-session" "$HOME_DIR/user-home" "$kind" <<'PY' || fail "$kind cannot use the linked operator gh configuration"
+import json
+from pathlib import Path
+import sys
+binding, operator, kind = map(Path, sys.argv[1:])
+home = Path(json.loads(binding.read_text())['root']) / 'home'
+gh_config = home / '.config/gh/hosts.yml'
+assert gh_config.resolve() == (operator / '.config/gh/hosts.yml').resolve(), f'{kind} must link the operator gh configuration'
+assert gh_config.read_text() == 'github.com:\n    user: fixture-operator\n', f'{kind} must read the operator gh configuration'
+assert not (home / '.dsh-tui').is_symlink(), f'{kind} DSH preferences must remain launch-local'
+PY
   done
   pass "fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default"
 }

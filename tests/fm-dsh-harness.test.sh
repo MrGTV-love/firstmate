@@ -196,8 +196,8 @@ outside.mkdir()
 (launches / 'task.dsh-session').write_text(json.dumps({'root':str(outside),'cwd':str(cwd)}))
 worker = prepare('g3')
 assert (outside / 'keep').exists(), 'prepare must not remove a root outside the task generations'
-# Primaries retain operator CLI state, while DSH preferences and credentials
-# remain private. Worker HOME must not gain that primary-only access.
+# Every launch retains linked operator CLI state, while DSH preferences and
+# its runtime remain private to the launch.
 operator = tmp / 'operator-home'
 (operator / '.config').mkdir(parents=True)
 (operator / '.config/token').write_text('operator-token')
@@ -212,7 +212,15 @@ assert (operator / '.config/token').read_text() == 'refreshed-token', 'primary C
 (primary / 'home/.dsh-tui/model.json').write_text('private-model')
 assert (operator / '.dsh-tui/model.json').read_text() == 'operator-model', 'DSH preferences must never reach the operator home'
 assert (primary / 'home/.dsh').resolve() == primary / 'dsh'
-assert not (worker / 'home/.config').exists(), 'workers must retain their isolated HOME contract'
+(operator / '.config/gh').mkdir()
+(operator / '.config/gh/hosts.yml').write_text('github.com:\n    user: fixture-operator\n')
+for kind in ('ship', 'scout'):
+    launch = Path(call('prepare', launches, kind, 'g1', source, 'deepseek/v4', 'high', cwd, env=primary_env))
+    gh_config = launch / 'home/.config/gh/hosts.yml'
+    assert gh_config.resolve() == (operator / '.config/gh/hosts.yml').resolve(), f'{kind} must resolve the operator gh configuration without copying it'
+    assert gh_config.read_text() == 'github.com:\n    user: fixture-operator\n'
+    assert not (launch / 'home/.dsh-tui').is_symlink(), f'{kind} DSH preferences must stay private'
+    assert (launch / 'home/.dsh').resolve() == launch / 'dsh', f'{kind} DSH runtime must stay private'
 primary_log = primary / 'dsh/sessions/2026-01-01' / header['id'] / 'session.v1.jsonl'
 primary_log.parent.mkdir(parents=True)
 primary_log.write_text(json.dumps(header) + '\n' + json.dumps(start) + '\n' + json.dumps(end) + '\n')
