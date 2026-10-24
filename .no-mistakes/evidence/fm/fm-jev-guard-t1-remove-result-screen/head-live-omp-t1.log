@@ -1,0 +1,128 @@
+== head/a-background-notice
+omp exit=0
+-- delivered to worker:
+Backgrounded as job bg_1 (killed once it has run 300s in total; `timeout: 0` disables the deadline); its output is injected into the conversation as a follow-up the moment it finishes. Do NOT poll for it (no `sleep`, `ps`, `pgrep`, `top`, `pidwait`, log tailing): every poll is a wasted turn. Do other work, or end your reply and wait to be woken.
+-- jev requests:
+[
+ {
+  "state_keys": [
+   "command",
+   "cwd"
+  ],
+  "source_role": null,
+  "tool": null
+ }
+]
+-- audit:
+{"hook":"tool_call","tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+== head/b-bounded-wait
+omp exit=0
+-- delivered to worker:
+measured: "no-mistakes.run host=Mac-Studio.local p99=479920ms margin=3 samples=43 measured=1440s bound=0s"
+run: running
+  intent: completed
+  rebase: completed
+  review: completed
+  test: completed
+  document: completed
+  lint: completed
+  push: completed
+  pr: completed
+  ci: running
+progress: "no-mistakes.run elapsed=0.7s output_bytes=179 tree_cpu=0.05s"
+progress: "no-mistakes.run elapsed=91.7s output_bytes=179 tree_cpu=0.06s"
+progress: "no-mistakes.run elapsed=242.2s output_bytes=179 tree_cpu=0.07s"
+  ci: fixing
+progress: "no-mistakes.run elapsed=376.5s output_bytes=192 tree_cpu=0.08s"
+error: wait of 8m0s elapsed while driving the run
+help[3]: This bounded hold ended; it is not a pipeline failure and does not mean the daemon is dead.,Run `no-mistakes axi status` to inspect progress,Re-run `no-mistakes axi run` to reattach for another 8m0s
+progress: "no-mistakes.run elapsed=480.2s output_bytes=450 tree_cpu=0.08s"
+
+-- jev requests:
+[
+ {
+  "state_keys": [
+   "command",
+   "cwd"
+  ],
+  "source_role": null,
+  "tool": null
+ }
+]
+-- audit:
+{"hook":"tool_call","tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+== head/b-bounded-wait-exit1
+omp exit=0
+-- delivered to worker:
+measured: "no-mistakes.run host=Mac-Studio.local p99=479920ms margin=3 samples=43 measured=1440s bound=0s"
+run: running
+  intent: completed
+  rebase: completed
+  review: completed
+  test: completed
+  document: completed
+  lint: completed
+  push: completed
+  pr: completed
+  ci: running
+progress: "no-mistakes.run elapsed=0.7s output_bytes=179 tree_cpu=0.05s"
+progress: "no-mistakes.run elapsed=91.7s output_bytes=179 tree_cpu=0.06s"
+progress: "no-mistakes.run elapsed=242.2s output_bytes=179 tree_cpu=0.07s"
+  ci: fixing
+progress: "no-mistakes.run elapsed=376.5s output_bytes=192 tree_cpu=0.08s"
+error: wait of 8m0s elapsed while driving the run
+help[3]: This bounded hold ended; it is not a pipeline failure and does not mean the daemon is dead.,Run `no-mistakes axi status` to inspect progress,Re-run `no-mistakes axi run` to reattach for another 8m0s
+progress: "no-mistakes.run elapsed=480.2s output_bytes=450 tree_cpu=0.08s"
+
+
+Command exited with code 1
+-- jev requests:
+[
+ {
+  "state_keys": [
+   "command",
+   "cwd"
+  ],
+  "source_role": null,
+  "tool": null
+ }
+]
+-- audit:
+{"hook":"tool_call","tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+== head/large-result
+omp exit=0
+-- delivered to worker:
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…
+
+[Some lines truncated to 768 bytes]
+-- jev requests:
+[
+ {
+  "state_keys": [
+   "command",
+   "cwd"
+  ],
+  "source_role": null,
+  "tool": null
+ }
+]
+-- audit:
+{"hook":"tool_call","tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+== head/pretool-deny
+omp exit=0
+-- delivered to worker:
+[jev-guard] irreversible (1.00): nothing would restore what this removes or overwrites REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+-- jev requests:
+[
+ {
+  "state_keys": [
+   "command",
+   "cwd"
+  ],
+  "source_role": null,
+  "tool": null
+ }
+]
+-- audit:
+{"hook":"tool_call","tool":"bash","decision":"block","enforcement":"pretool_deny","branch":"policy","error_type":null}
+pretool marker exists: no

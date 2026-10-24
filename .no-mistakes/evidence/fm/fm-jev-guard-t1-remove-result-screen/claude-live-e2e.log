@@ -1,0 +1,21 @@
+ok - claude (2.1.310 (Claude Code)): claude: normal/launch: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: normal/inbox: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: normal/copy: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: normal/changed: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: privacy/launch: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: privacy/inbox: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: privacy/copy: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: privacy/changed: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: credentials/launch: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: credentials/inbox: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: credentials/copy: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: credentials/changed: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: provider/launch: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: provider/inbox: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: provider/copy: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: provider/changed: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: audit/launch: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: audit/inbox: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: audit/copy: unchanged native read in next model context; no result request or audit row
+ok - claude (2.1.310 (Claude Code)): claude: audit/changed: unchanged native read in next model context; no result request or audit row
+exit=0

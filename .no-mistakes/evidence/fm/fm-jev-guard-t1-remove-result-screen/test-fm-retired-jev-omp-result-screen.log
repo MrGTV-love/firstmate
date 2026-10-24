@@ -1,0 +1,13 @@
+✔ T1(a): the recorded omp background-job notice reaches the worker verbatim (0.4155ms)
+✔ T1(b): the recorded nm-drive-45.log bounded wait retains help[3] and error state (0.164ms)
+✔ T1(c): actual launch and steering publisher records reach the worker verbatim (121.253167ms)
+✔ T1(d): a worker session records only pre-tool work and sends no result to TypeSafe (0.548ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 124.940375
+ok - T1(a-d): unchanged background notice, bounded wait, launch/steering and session audit; no omp_replace row and no result provider calls

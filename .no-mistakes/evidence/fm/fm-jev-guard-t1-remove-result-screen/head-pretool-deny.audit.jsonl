@@ -1,0 +1,1 @@
+{"hook":"tool_call","tool":"bash","decision":"block","enforcement":"pretool_deny","branch":"policy","error_type":null}

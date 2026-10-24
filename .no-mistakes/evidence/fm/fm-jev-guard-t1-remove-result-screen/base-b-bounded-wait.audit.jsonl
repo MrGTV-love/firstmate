@@ -1,0 +1,2 @@
+{"hook":"tool_call","tool":"bash","decision":"allow","enforcement":"pretool_allow","branch":"policy","error_type":null}
+{"hook":"tool_result","tool":"bash","decision":"flag","enforcement":"omp_replace","branch":"policy","error_type":null}

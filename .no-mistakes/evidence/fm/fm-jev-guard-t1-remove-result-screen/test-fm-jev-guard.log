@@ -1,0 +1,27 @@
+ok - pure shell/write boundaries
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - pre-tool complete credential tails, audit failure, inactive independence, network TypeError retry and refused write/edit path
+ok - node type stripping still enforces the Claude pre-tool deny
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - actual stalled requests produce typed pre-tool denial before each documented host deadline
+ok - bounded pieces preserve policy/outage decisions; uncoverable shell and never-send payloads send nothing
+ok - Claude hooks retain JSON/exit contracts and admit budget-limited benign writes
+hyphenated-scan-ok bytes=1048576 offline_loopback_ms=941
+omp: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=592
+omp: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
+omp: never-send file present; 396924-byte report admitted in 3893 ms
+omp: never-send file present; 1048576-byte write admitted in 3858 ms
+claude: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=782
+claude: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
+claude: never-send file present; 396924-byte report admitted in 3854 ms
+claude: never-send file present; 1048576-byte write admitted in 3978 ms
+punctuation-led URL credentials: both hosts refuse write/edit locally with zero provider requests
+large-write-budget-ok
+ok - 396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions

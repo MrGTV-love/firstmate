@@ -1,0 +1,6 @@
+launch doorbell: : Firstmate operational input waiting: read '/private<lab>/state/operational-inbox/1792868514-0b9024dcede652ca.msg' and handle its contents as Firstmate operational input.
+steering record: /state/t1pub.inbox/001.msg
+doorbell line: : Firstmate instruction waiting: 't1pub.inbox/001.msg' in "$FM_TASK_INBOX" - after earlier acks read only it, omp :raw - act, mv handled/.
+files in state:
+./operational-inbox/1792868514-0b9024dcede652ca.msg
+./t1pub.inbox/001.msg
