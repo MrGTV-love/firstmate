@@ -252,6 +252,17 @@ SH
   expect_code 1 "$rc" "the fixture must stop at the pending composer: $out"
   assert_equals deepseek/recorded-model "$(journal_field "$dir" smd to_model)" "an explicit spelling of the bound model is the canonical replacement model"
   assert_equals max "$(journal_field "$dir" smd to_effort)" "an explicit spelling of the bound model without --effort keeps the recorded effort"
+  # The index judges the canonical id that launches, not the padded spelling.
+  printf '%s\n' '{"version":1,"roles":{},"retired":["retired-model"]}' > "$home/config/model-index.json"
+  rm -f "$home/state/smd.control-relaunch"
+  out=$(DSH_HOME="$primary/dsh" run_control "$dir" smd relaunch --model ' DeepSeek / retired-model '); rc=$?
+  expect_code 1 "$rc" "a padded spelling of a retired DeepSeek id must refuse a relaunch: $out"
+  assert_contains "$out" "retired model: deepseek/retired-model" "the refusal must name the retired canonical id"
+  assert_not_contains "$out" "composer visibly holds pending text" "a retired canonical id must refuse before the exit step"
+  assert_absent "$home/state/smd.control-relaunch" "a retired canonical id must refuse before the relaunch transaction"
+  cmp -s "$dir/dsh.meta" "$home/state/smd.meta" || fail "a retired canonical id refusal changed task metadata"
+  [ "$(cat "$dir/fake/command")" = dsh ] || fail "a retired canonical id refusal stopped the running dsh agent"
+  [ -s "$home/state/smd.dsh/g1/dsh/sessions/w/s/session.v4.jsonl" ] || fail "a retired canonical id refusal lost the bound conversation"
   # Role tokens compare by the model they resolve to, never by their name.
   printf '%s\n' '{"version":1,"roles":{"bound":{"dsh":{"model":"deepseek/recorded-model"}}},"retired":[]}' > "$home/config/model-index.json"
   rm -f "$home/state/smd.control-relaunch"
