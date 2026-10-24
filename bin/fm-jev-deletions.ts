@@ -135,10 +135,11 @@ function atomicWrite(path: string, bytes: string): void {
   renameSync(temp, path);
 }
 
-function prepare(c: Context, brief: string): string {
+function writeList(c: Context, suppliedPaths: string[]): string {
   taskValid(c.task);
   const root = rootPath(c.worktree);
-  const paths = briefPaths(readFileSync(brief, "utf8"));
+  if (!suppliedPaths.every(relativePath)) throw new Error("Authorized deletions must be worktree-relative literal paths");
+  const paths = [...new Set(suppliedPaths)];
   if (paths.length && !trackedFiles(root, paths)) throw new Error("Every listed path must be a regular HEAD-tracked file without symlink aliases");
   const bytes = JSON.stringify({ schema: "fm-authorized-deletions.v1", task: c.task, worktree: root, paths }) + "\n";
   atomicWrite(listPath(c), bytes);
@@ -150,12 +151,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const [operation, state, task, ...args] = process.argv.slice(2);
     taskValid(task ?? "");
     if (operation === "prepare" && args.length === 2) {
-      console.log(prepare({ state, task, worktree: args[0] }, args[1]));
-    } else if (operation === "publish" && args.length === 1) {
+      console.log(writeList({ state, task, worktree: args[0] }, briefPaths(readFileSync(args[1], "utf8"))));
+    } else if (operation === "publish" && args[0] === "--replace") {
       const metaPath = resolve(state, `${task}.meta`);
       const meta = readFileSync(metaPath, "utf8");
       const worktree = metaValue(meta, "worktree");
-      const digest = prepare({ state, task, worktree }, args[0]);
+      const digest = writeList({ state, task, worktree }, args.slice(1));
       const lines = meta.split("\n").filter((line) => line && !line.startsWith(`${digestKey}=`));
       // Keep extension fields before pr=, whose suffix has its own grammar.
       const index = lines.findIndex((line) => line.startsWith("pr="));

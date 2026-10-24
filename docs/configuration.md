@@ -2587,8 +2587,9 @@ Firstmate declares the complete replacement list in one exact `## Authorized del
 ````
 
 Fresh guarded launches snapshot that section before the worker starts; relaunches retain the existing snapshot rather than rereading a potentially worker-edited brief.
-For a task already running, Firstmate edits that section and runs [`bin/fm-jev-deletions.sh`](../bin/fm-jev-deletions.sh) from the supervising home; its `--help` owns the exact invocation and override paths.
-The command validates the files and replaces the entire list under the task metadata lock; publishing a brief without the section revokes all allowances.
+For a task already running, Firstmate supplies the complete replacement paths directly as arguments to [`bin/fm-jev-deletions.sh`](../bin/fm-jev-deletions.sh) from the supervising home; its `--help` owns the exact invocation and override paths.
+This live route never reads `data/<task>/brief.md` or another worker-writable input file: editing a brief cannot add a path to a later publication.
+The command validates the explicit paths and replaces the entire list under the task metadata lock; an explicit empty replacement revokes all allowances.
 The omp guard rereads the list and digest for each candidate deletion, so live additions and revocations require no worker restart once that worker has loaded this implementation.
 An omp worker already using older guard code must load this implementation through an authorized relaunch before it can consume a new list.
 
@@ -2598,6 +2599,7 @@ Once either a snapshot or metadata digest declares deletion authorization, a mis
 Tasks with neither a snapshot nor a digest declaration keep the unjudged bash path; a valid list also leaves non-applicable commands and unlisted operands on that path.
 The list and its digest are firstmate-written; a worker running as the same OS user could forge both, so this guards against mistakes, not deliberate forgery.
 It is not producer authentication, an OS permission boundary, or a filesystem/process sandbox.
+The allow path trusts that `rm` resolves to the real `rm`; a function, alias or shell environment change established by an earlier call can change that resolution, and that earlier call is itself an unjudged bash call.
 Path and `HEAD` checks happen immediately before admission, not atomically with shell execution; concurrent filesystem or Git changes can invalidate that observation.
 Every admitted candidate first appends a task-local line to `state/<task>.authorized-deletions.jsonl` with `task`, canonical worktree-relative `paths`, `list_sha256` and ISO-8601 `time`, then a `branch=deterministic` row to `state/jev-guard.jsonl`.
 That line records permission before execution, not proof the shell succeeded; either an allowance-audit failure or the ordinary guard-audit failure refuses the call.
