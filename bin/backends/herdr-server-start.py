@@ -12,8 +12,11 @@ the lock it prints `running` for a server already up, or proves absence and
 prints `go`, then keeps holding the lock in this process until that session
 reports running or <pid> is gone.
 After a launch, readiness polls back off from 0.1s to 5s with no deadline; a
-failed status read is not fatal, but a launched server that exits before
-reporting running exits 3, distinct from a refusal's exit 1.
+failed status read is not fatal.
+Exit status: 0 when the session is running or absence is proven; 1 when the
+start or absence proof is refused (unknown status, live process or socket, or
+an unreadable proof); 3 when a launched server exits before reporting running;
+4 when preparing the start lock or launching the server fails.
 The socket comes from status `.server.socket`, else from `session list --json`
 `.socket_path`, the adapter's own socket lookup.
 Unknown status, process inventory, socket identity, or socket errors refuse.
@@ -166,6 +169,8 @@ def prove_process_absence(session, client):
         if selected is None:
             selected = environment_session(pid, command)
             if selected is None:
+                if not process_alive(pid):
+                    continue
                 raise ValueError(f"Herdr server process {pid} has an unreadable session environment")
         if selected == session:
             raise ValueError(f"Herdr server process {pid} is still alive")
@@ -200,6 +205,10 @@ def process_alive(pid):
     state = subprocess.run(["ps", "-o", "stat=", "-p", pid], stdout=subprocess.PIPE,
                            stderr=subprocess.DEVNULL, text=True, timeout=STARTUP_SECONDS).stdout.strip()
     return bool(state) and not state.startswith("Z")
+
+
+class LaunchError(Exception):
+    pass
 
 
 def wait_until_running(client, session, alive):
@@ -244,8 +253,12 @@ def main(mode, session, client, pid=None):
         prove_process_absence(session, client)
         prove_socket_absence(path)
         return
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with open(path + ".firstmate-start.lock", "a", encoding="utf-8") as lock:
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        lock = open(path + ".firstmate-start.lock", "a", encoding="utf-8")
+    except OSError as error:
+        raise LaunchError(f"cannot prepare the start lock: {error}") from error
+    with lock:
         if mode == "--hold-for-exec":
             lock_with_notice(session, lock)
         else:
@@ -268,10 +281,13 @@ def main(mode, session, client, pid=None):
                 os.dup2(null.fileno(), sys.stdout.fileno())
             wait_until_running(client, session, lambda: process_alive(pid))
             return
-        with open(os.devnull, "r+b") as null:
-            server = subprocess.Popen([client, "server", "--session", session],
-                                      stdin=null, stdout=null, stderr=null, close_fds=True,
-                                      start_new_session=True, env=dict(os.environ, HERDR_SESSION=session))
+        try:
+            with open(os.devnull, "r+b") as null:
+                server = subprocess.Popen([client, "server", "--session", session],
+                                          stdin=null, stdout=null, stderr=null, close_fds=True,
+                                          start_new_session=True, env=dict(os.environ, HERDR_SESSION=session))
+        except OSError as error:
+            raise LaunchError(f"cannot launch the Herdr server: {error}") from error
         wait_until_running(client, session, lambda: server.poll() is None)
 
 
@@ -279,6 +295,9 @@ if __name__ == "__main__":
     mode = sys.argv[1] if sys.argv[1:2] in (["--prove-absent"], ["--hold-for-exec"]) else None
     try:
         main(mode, *sys.argv[1 + (mode is not None):])
+    except LaunchError as error:
+        print(f"error: Herdr server launch failed: {error}", file=sys.stderr)
+        sys.exit(4)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         action = "Herdr session absence is unproven" if mode == "--prove-absent" else "refusing Herdr server startup"
         print(f"error: {action}: {error}", file=sys.stderr)

@@ -77,8 +77,9 @@ OPTIONAL_TOOLS=(tmux no-mistakes gh)
 LAUNCH_AGENT_LABEL=dev.firstmate.herdr.fm-remote
 # The dedicated remote-secondmate session. The user's interactive Herdr work
 # remains in the separate default session, which this readiness check never
-# requires or changes.
-HERDR_SESSION_NAME=fm-remote
+# requires or changes. FM_REMOTE_DOCTOR_HERDR_SESSION overrides the name only so
+# tests can run beside a real fm-remote server; unset, it is fm-remote.
+HERDR_SESSION_NAME=${FM_REMOTE_DOCTOR_HERDR_SESSION:-fm-remote}
 LAUNCH_AGENT_DIR="${HOME:-}/Library/LaunchAgents"
 LAUNCH_AGENT_PLIST="$LAUNCH_AGENT_DIR/$LAUNCH_AGENT_LABEL.plist"
 LAUNCH_AGENT_LOG_DIR="${HOME:-}/Library/Logs"
@@ -868,8 +869,6 @@ wait_for_herdr_server() {
   return 1
 }
 
-# The ensure exits 3 when a server it launched exited before reporting running;
-# every other failure is a refusal that protects a live or unknown server.
 start_herdr_server() {
   local err rc=0
   if ! herdr_adapter_load; then
@@ -882,11 +881,7 @@ start_herdr_server() {
     fix_report herdr-server applied "started the herdr server for session $HERDR_SESSION_NAME"
     return 0
   fi
-  if [ "$rc" -eq 3 ]; then
-    fix_report herdr-server failed "the herdr server for session $HERDR_SESSION_NAME was launched but did not come up: $err"
-  else
-    fix_report herdr-server failed "refused to start the herdr server for session $HERDR_SESSION_NAME to protect a live or unknown server: $err"
-  fi
+  fix_report herdr-server failed "$(fm_backend_herdr_server_ensure_failure "$rc" "$HERDR_SESSION_NAME"): $err"
   return 1
 }
 

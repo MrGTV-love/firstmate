@@ -38,7 +38,8 @@ trap cleanup_holders EXIT
 GUARD="$ROOT/bin/fm-remote-herdr-guard.sh"
 JQ=$(command -v jq)
 PYTHON=$(command -v python3)
-SESSION=fm-remote
+# A per-run name keeps the real absence proof clear of a host's own fm-remote server.
+SESSION=fm-remote-t$$
 
 # The guard must see only the fixture and the system tools it really needs,
 # so a case can also present a host with NO lsof.

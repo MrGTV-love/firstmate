@@ -1697,6 +1697,19 @@ fm_backend_herdr_server_ensure() {  # <session>
   )
 }
 
+# fm_backend_herdr_server_ensure_failure: describe a nonzero exit status of
+# fm_backend_herdr_server_ensure for <session>. Status 1 is a refusal that
+# protects a live or unknown server and 3 is a launched server that exited
+# before reporting running (bin/backends/herdr-server-start.py owns both); any
+# other status is a failure of the start helper itself.
+fm_backend_herdr_server_ensure_failure() {  # <status> <session>
+  case "$1" in
+    1) printf 'refused to start the herdr server for session %s to protect a live or unknown server' "$2" ;;
+    3) printf 'the herdr server for session %s was launched but did not come up' "$2" ;;
+    *) printf 'the server start helper failed (exit %s) for session %s' "$1" "$2" ;;
+  esac
+}
+
 # fm_backend_herdr_session_client: the client binary fm_backend_herdr_cli uses
 # for <session>, so the startup helper recognizes that client's server process.
 fm_backend_herdr_session_client() {  # <session>

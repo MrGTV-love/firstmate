@@ -39,7 +39,7 @@ if cmd == "status":
             sys.exit(1)
     server = {"running": (root / "pid").exists(), "session": root.name}
     if not os.environ.get("START_NO_STATUS_SOCKET"):
-        server["socket"] = str(root / "herdr.sock")
+        server["socket"] = os.environ.get("START_SOCKET", str(root / "herdr.sock"))
     print(json.dumps({"server": server}))
 elif cmd == "session":
     entry = {"name": root.name, "running": False}
@@ -341,6 +341,60 @@ class StartupSafety(unittest.TestCase):
         self.assertEqual(self.ensure()[0], 3)
         self.assertEqual(self.servers(), [])
         self.assertTrue(self.lock_is_free())
+
+    def failure(self, extra=""):
+        rc, out = self.invoke(f'{extra}. "$1/bin/backends/herdr.sh"; fm_backend_herdr_server_ensure "$2"; '
+                              'rc=$?; fm_backend_herdr_server_ensure_failure "$rc" "$2"')
+        return out
+
+    def test_start_failures_name_their_cause(self):
+        self.listen()
+        refused = self.failure()
+        self.listener.close()
+        self.listener = None
+        tools = self.dir / "no-python"
+        tools.mkdir()
+        for tool in ("jq", "ps", "cat", "head", "sed", "awk", "grep", "tr", "dirname", "basename",
+                     "mkdir", "rm", "env", "sh", "date", "printf", "sort", "cut", "wc", "uname", "id"):
+            found = shutil.which(tool)
+            if found:
+                (tools / tool).symlink_to(found)
+        no_python = self.failure(f'PATH="{self.bin}:{tools}"; ')
+        locked = self.dir / "locked"
+        locked.mkdir()
+        locked.chmod(0o500)
+        self.env["START_SOCKET"] = str(locked / "herdr.sock")
+        try:
+            launch = self.failure()
+        finally:
+            locked.chmod(0o700)
+        session = self.dir.name
+        self.assertEqual(refused, f"refused to start the herdr server for session {session} "
+                                  "to protect a live or unknown server")
+        self.assertEqual(no_python, f"the server start helper failed (exit 127) for session {session}")
+        self.assertEqual(launch, f"the server start helper failed (exit 4) for session {session}")
+        self.assertEqual(self.servers(), [])
+
+    def test_unscoped_server_gone_before_its_environment_read_does_not_block(self):
+        binary = self.sleeper("vanishing")
+        pid = subprocess.run(["sh", "-c", f'"{binary}" server >/dev/null 2>&1 & echo $!'], env=self.env,
+                             stdout=subprocess.PIPE, text=True, check=True).stdout.strip()
+        (self.dir / "vanishing-pid").write_text(pid)
+        self.wait_for(lambda: "vanishing/herdr server" in subprocess.run(
+            ["ps", "-p", pid, "-o", "command="], stdout=subprocess.PIPE, text=True).stdout)
+        (self.bin / "ps").write_text(f"""#!/bin/sh
+out=$(/bin/ps "$@") || exit $?
+case "$*" in
+  *comm=*)
+    pid=$(cat "{self.dir}/vanishing-pid")
+    kill "$pid" 2>/dev/null
+    while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done ;;
+esac
+printf '%s\n' "$out"
+""")
+        (self.bin / "ps").chmod(0o755)
+        self.assertEqual(self.ensure()[0], 0)
+        self.assertEqual(len(self.servers()), 1)
 
     def test_quoted_client_argv_does_not_block_cold_start(self):
         words = ["pane", "send-text", "w1:p2", "don't", "stop", "--session", self.dir.name]
