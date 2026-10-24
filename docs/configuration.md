@@ -2558,8 +2558,10 @@ Existing and moved lines are not scanned again; only new lines are: within one d
 A merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
 At push time it scans the lines each outgoing commit adds relative to all of its parents, with the same per-commit move cancellation, including intermediate commits that a later commit cleans up.
 A commit is outgoing unless an advertised old tip or any remote-tracking ref, of any remote, already reaches it, so pushing to a URL or a new remote does not rescan history already on another remote.
-Each commit and push decision appends one `git-commit-credential-shapes` or `git-push-credential-shapes` event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh), whose `repeat` is the highest consecutive refusal count for the same credential-shaped line, identified by its content hash; different refused content starts at one even if an earlier attempt was abandoned, and an allowed decision clears the counts.
-Past the budget of one refusal in a row, the refusal also prints an `escalate:` line telling the worker to stop retrying and report to Firstmate for a human decision; the commit or push stays refused while the new credential-shaped line remains.
+Each commit and push decision appends one `git-commit-credential-shapes` or `git-push-credential-shapes` event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh), whose `repeat` is the highest consecutive refusal count for the same credential-shaped line, identified by its content hash; different refused content starts at one even if an earlier attempt was abandoned.
+A failed inspection is a separate episode: it counts under a reserved `inspection-failed` key, reaches the same escalation on retry, and keeps the per-line counts.
+Only an allowed decision clears the counts.
+Past the budget of one refusal in a row, the refusal also prints an `escalate:` line telling the worker to stop retrying and report to Firstmate for a human decision; the commit or push stays refused while the new credential-shaped line remains or inspection keeps failing.
 Ref deletions transfer no content and need no scan; project hooks still run and receive the original pre-push ref-update input.
 The scanner retains the existing anchored shapes: private-key headers, GitHub tokens, AWS access key IDs, Slack tokens and connection URLs with embedded passwords.
 It reports affected file names only, never matching values, and refuses when inspection fails.

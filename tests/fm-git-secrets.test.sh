@@ -363,6 +363,53 @@ test_abandoned_refusal_does_not_inflate_unrelated_attempts() {
   pass "$mode keys repeats to refused lines; benign edits preserve the count and abandoned content cannot inflate unrelated refusals"
 }
 
+test_inspection_failures_escalate_and_keep_line_counts() {
+  local mode=$1 repo log guard out head zero
+  repo="$TMP_ROOT/inspection-failed-$mode"
+  log="$TMP_ROOT/inspection-failed-$mode.jsonl"
+  guard="git-${mode#pre-}-credential-shapes"
+  zero=0000000000000000000000000000000000000000
+  make_repo "$repo"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  if [ "$mode" = pre-push ]; then
+    git -C "$repo" commit -qm 'unscanned leak fixture'
+  fi
+  head=$(git -C "$repo" rev-parse HEAD)
+  scan() {
+    if [ "$mode" = pre-commit ]; then
+      (cd "$repo" && FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" pre-commit 2>&1)
+    else
+      (cd "$repo" && printf '%s\n' "$1" | FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" pre-push origin "$TMP_ROOT/none.git" 2>&1)
+    fi
+  }
+  readable() {
+    rm -f "$repo/.git/MERGE_HEAD"
+    scan "refs/heads/main $head refs/heads/main $zero"
+  }
+  unreadable() {
+    if [ "$mode" = pre-commit ]; then
+      printf 'not-a-commit\n' >"$repo/.git/MERGE_HEAD"
+    fi
+    scan 'not a ref update'
+  }
+  out=$(readable) && fail "$mode admitted the credential"
+  assert_not_contains "$out" 'escalate:' "$mode escalated the first content refusal"
+  out=$(unreadable) && fail "$mode admitted an unreadable inspection"
+  assert_contains "$out" 'credential inspection failed' "$mode did not report the failed inspection"
+  assert_not_contains "$out" 'escalate:' "$mode escalated the first inspection failure"
+  out=$(unreadable) && fail "$mode admitted a repeated unreadable inspection"
+  assert_contains "$out" 'escalate:' "$mode did not escalate repeated inspection failures"
+  out=$(readable) && fail "$mode admitted the credential after inspection failures"
+  assert_contains "$out" leak.txt "$mode lost the refused file name"
+  assert_contains "$out" 'escalate:' "$mode erased the refused line's count on an inspection failure"
+  assert_not_contains "$out" 'ghp_' "$mode printed the credential value"
+  assert_equals 'deny:1:true deny:1:false deny:2:false deny:2:true' \
+    "$(jq -rs --arg g "$guard" '[.[] | select(.guard == $g) | "\(.decision):\(.repeat):\(.source_ok)"] | join(" ")' "$log")" \
+    "$mode did not count inspection failures apart from the refused line"
+  pass "$mode escalates repeated inspection failures and keeps the refused line's count across them"
+}
+
 test_each_decision_emits_one_event() {
   local repo status
   repo="$TMP_ROOT/telemetry"
@@ -391,6 +438,8 @@ test_merges_scan_only_lines_new_to_every_parent
 test_push_baseline_is_every_remote
 test_moved_lines_are_not_rescanned
 test_repeated_refusals_escalate_without_admitting
+test_inspection_failures_escalate_and_keep_line_counts pre-commit
+test_inspection_failures_escalate_and_keep_line_counts pre-push
 test_each_decision_emits_one_event
 
 export T3_ROOT="$ROOT" T3_TMP="$TMP_ROOT"

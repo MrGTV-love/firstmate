@@ -349,7 +349,7 @@
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
-#   300-second shell and write judgment budget (docs/configuration.md "Jev guard").
+#   300-second shell judgment budget (docs/configuration.md "Jev guard").
 #   Workers also enable eager native account rotation without waiting for usage
 #   resets and receive a task-owned --config overlay permitting only declared
 #   OMP model fallbacks, with an empty default chain so ambient role chains
