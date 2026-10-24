@@ -2073,10 +2073,16 @@ ensure_commit_object() {
   git -C "$dir" cat-file -e "$commit^{commit}" 2>/dev/null
 }
 
+# A git command that reads only stdin still resolves a working tree from the
+# caller's CWD. A caller sitting in a task copy whose git directory this
+# environment cannot resolve (for example a linked worktree mounted without the
+# repository that owns it) then made patch-id fail, so every landed patch looked
+# unproven and teardown falsely refused the copy. Anchor the whole pipeline at
+# the directory the diff is read from, so the proof depends only on that copy.
 patch_id_for_commit() {
-  local commit=$1
-  git -C "${TEARDOWN_LANDED_DIR:-$WT}" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
-    | git patch-id --stable 2>/dev/null \
+  local commit=$1 dir=${TEARDOWN_LANDED_DIR:-$WT}
+  git -C "$dir" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
+    | git -C "$dir" patch-id --stable 2>/dev/null \
     | awk 'NR == 1 { print $1 }'
 }
 

@@ -796,6 +796,39 @@ test_squash_merged_pr_allows_replayed_unpushed_patch() {
   pass "squash-merged PR accepts replayed unpushed local patches contained in the PR head"
 }
 
+# A worker can run the suite from a task copy whose git directory is not
+# reachable from where the copy is mounted: ROOT/.git then names a gitdir this
+# environment cannot resolve, and any stdin-only git command inheriting the
+# caller's directory fails. The landed-patch proof must depend only on the copy
+# it reads, or it reports landed work as unproven.
+test_landed_proof_ignores_unresolvable_git_directory_in_cwd() {
+  local case_dir rc parent_head pr_head dangling
+  case_dir=$(make_case landed-proof-dangling-cwd)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" local-parent.txt parent "local parent"
+  parent_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/wt" push -q origin "$parent_head:refs/heads/fm/task-x1"
+  git -C "$case_dir/project" fetch -q origin fm/task-x1
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  append_pr_meta_url "$case_dir"
+  pr_head=$(land_equivalent_patch_on_origin_branch "$case_dir" pr-head feature.txt hello "add feature")
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  dangling="$case_dir/unresolvable-git-cwd"
+  mkdir "$dangling"
+  printf 'gitdir: %s\n' "$case_dir/no-such-git-directory" > "$dangling/.git"
+  ( cd "$dangling" && git rev-parse --show-toplevel >/dev/null 2>&1 ) \
+    && fail "landed-proof-cwd: the fixture working directory still resolves a git worktree"
+
+  set +e
+  ( cd "$dangling" && run_teardown "$case_dir" ) > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "landed-proof-cwd: teardown should succeed when the caller's working directory names an unresolvable git directory: $(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "landed-proof-cwd: teardown printed a REFUSED line"
+  pass "the landed-patch proof ignores an unresolvable git directory in the caller's working directory"
+}
+
 test_merged_pr_with_later_local_commit_refuses() {
   local case_dir rc pr_head
   case_dir=$(make_case stale-pr-head)
@@ -2566,6 +2599,7 @@ test_task_archives_keep_refs_when_forge_is_unreachable
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows
 test_squash_merged_pr_allows_replayed_unpushed_patch
+test_landed_proof_ignores_unresolvable_git_directory_in_cwd
 test_merged_pr_with_later_local_commit_refuses
 test_squash_merged_rebased_branch_allows
 test_squash_merged_forgejo_pr_allows_when_main_moved_on
