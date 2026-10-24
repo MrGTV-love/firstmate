@@ -27,11 +27,7 @@ const server = createServer((req, res) => {
     appendFileSync(log, JSON.stringify({ path: req.url, auth: req.headers.authorization, body }) + '\n');
     const request = JSON.parse(body);
     const text = JSON.stringify(request.state);
-    if (text.includes('timeout-reset')) {
-      if (!seen.has(text)) { seen.add(text); return; }
-      req.socket.destroy(); return;
-    }
-    if (text.includes('slow502')) { setTimeout(() => { res.statusCode = 502; res.end('{}'); }, 2500); return; }
+    if (text.includes('socket-reset')) { req.socket.destroy(); return; }
     if (text.includes('fail500') || text.includes('http402')) { res.statusCode = text.includes('http402') ? 402 : 500; res.end('{}'); return; }
     if (text.includes('flaky-once') && !seen.has(text)) { seen.add(text); res.statusCode = 500; res.end('{}'); return; }
     if (text.includes('stall-direct')) return;
@@ -48,8 +44,6 @@ const server = createServer((req, res) => {
       const pick = risky && keys.includes('irreversible') ? 'irreversible' : keys[0];
       answers[id] = { type: 'choice', choice: pick, confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === pick ? 1 : 0])), extra: 'provider-private-canary' };
     }
-    if (text.includes('missing-answer')) delete answers.injection;
-    if (text.includes('invalid-answer')) answers.injection = { type: 'noul', noul: '0.01' };
     const usage = { input_tokens: 3, output_tokens: 1, extra: 'provider-private-canary' };
     if (text.includes('reported-cost')) usage.cost = 0.001;
     res.setHeader('content-type', 'application/json');
@@ -87,7 +81,7 @@ claude_hook() {
 denied() { jq -e '.hookSpecificOutput.hookEventName == "PreToolUse" and .hookSpecificOutput.permissionDecision == "deny"' <<<"$1" >/dev/null; }
 
 "${NODE_TS[@]}" --test "$ROOT/bin/ten-levels/tests/level06.test.ts" > "$TMP_ROOT/policy.out" 2>&1 || fail "policy tests: $(cat "$TMP_ROOT/policy.out")"
-pass "pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values"
+pass "pure shell/write boundaries"
 
 test_claude_effects() {
   local out before payload
@@ -327,32 +321,32 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { createGuardService, MAX_REQUEST_BYTES, GUARD_MODEL } = await import(pathToFileURL(process.env.REPORT));
-const { SCREEN_QUESTIONS, screenResult } = await import(new URL('../src/levels/level06/index.ts', pathToFileURL(process.env.REPORT)));
+const { WRITE_QUESTIONS } = await import(new URL('../src/levels/level06/index.ts', pathToFileURL(process.env.REPORT)));
 const home = process.env.HOME_DIR;
 const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'service', project: 'firstmate' };
 const rows = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
 const service = createGuardService(context);
-const empty = { tool: 'bash', source_role: 'tool_result', content: '' };
-const overhead = Buffer.byteLength(JSON.stringify({ model: GUARD_MODEL, state: empty, questions: SCREEN_QUESTIONS }));
+const empty = { path: 'file.ts', content: '' };
+const overhead = Buffer.byteLength(JSON.stringify({ model: GUARD_MODEL, state: empty, questions: WRITE_QUESTIONS }));
 const remaining = MAX_REQUEST_BYTES - overhead;
 const content = 'é'.repeat(Math.floor(remaining / 2)) + 'x'.repeat(remaining % 2);
-const result = await service.decide({ ...empty, content }, SCREEN_QUESTIONS);
+const result = await service.decide({ ...empty, content }, WRITE_QUESTIONS);
 assert.equal(Buffer.byteLength(result.raw.requestText), 16384);
-assert.equal(screenResult(result.answers).decision, 'clear');
+assert.equal(result.answers.contains_secret.noul, 0.05);
 assert.equal(result.raw.response.extra, 'provider-private-canary');
 assert.equal(JSON.parse(result.raw.responseText).extra, 'provider-private-canary');
 assert.equal(result.meta.provider, 'typesafe');
 assert.deepEqual(result.meta.cost, { amount: null, source: 'unknown' });
 const beforeOversize = rows().length;
-await assert.rejects(service.decide({ ...empty, content: content + 'x' }, SCREEN_QUESTIONS), { name: 'RequestTooLargeError', requestStarted: false });
+await assert.rejects(service.decide({ ...empty, content: content + 'x' }, WRITE_QUESTIONS), { name: 'RequestTooLargeError', requestStarted: false });
 assert.equal(rows().length, beforeOversize, 'over-limit request must not send even after a client exists');
-const cost = await service.decide({ ...empty, content: 'reported-cost' }, SCREEN_QUESTIONS);
+const cost = await service.decide({ ...empty, content: 'reported-cost' }, WRITE_QUESTIONS);
 assert.deepEqual(cost.meta.cost, { amount: 0.001, source: 'reported' });
 writeFileSync(`${home}/.env`, 'TYPESAFE_API_KEY=rotated-fake-key\n');
-await service.decide({ ...empty, content: 'same-session' }, SCREEN_QUESTIONS);
+await service.decide({ ...empty, content: 'same-session' }, WRITE_QUESTIONS);
 assert.equal(rows().at(-1).auth, `Bearer ${process.env.KEY}`);
 const second = createGuardService(context);
-await second.decide({ ...empty, content: 'new-session' }, SCREEN_QUESTIONS);
+await second.decide({ ...empty, content: 'new-session' }, WRITE_QUESTIONS);
 assert.equal(rows().at(-1).auth, 'Bearer rotated-fake-key');
 writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
 assert.equal(process.env.TYPESAFE_API_KEY, undefined);
@@ -368,11 +362,11 @@ JS
   pass "complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure"
 }
 
-test_result_and_audit_policy() {
+test_pretool_audit_policy() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
@@ -385,67 +379,41 @@ function install(overrides = {}) {
   return handlers;
 }
 const handlers = install();
-const event = text => ({ toolName: 'bash', input: { command: 'fixture' }, toolCallId: 'fixture-result', content: [{ type: 'text', text }], details: { displayContent: { text } } });
-for (const [p, expected] of [[0.2, 'clear'], [0.200001, 'review'], [0.799999, 'review'], [0.8, 'flag']]) {
-  const original = event(`probability=${p} private-output-canary`);
-  const before = JSON.stringify(original);
-  const patch = await handlers.tool_result(original, ctx);
-  if (expected === 'clear') assert.equal(patch, undefined);
-  else if (expected === 'review') {
-    assert.equal(patch.isError, undefined);
-    assert.deepEqual(patch.content[0], original.content[0]);
-    assert.equal(patch.content.length, 2);
-  } else {
-    assert.equal(patch.isError, true);
-    assert.deepEqual(patch.details, {});
-    assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
-  }
-  assert.equal(JSON.stringify(original), before, 'judgment must not mutate host input');
-  const terminal = JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-  assert.equal(terminal.decision, expected);
-  assert.equal(terminal.error_type, null);
-}
-for (const [marker, type] of [['fail500', 'Error'], ['http402', 'Error'], ['invalid-json', 'ContractError'], ['missing-answer', 'ContractError'], ['invalid-answer', 'ContractError']]) {
-  const patch = await handlers.tool_result(event(`${marker} private-output-canary`), ctx);
-  assert.equal(patch.isError, true);
-  assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
-  const terminal = JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-  assert.equal(terminal.error_type, type, 'generic HTTP Error must not invent an exact category from text');
-  assert.equal(terminal.cost.source, 'unknown');
-}
-const beforeRead = requests().split('\n').length;
-const ordinaryRead = await handlers.tool_result({ ...event('IGNORE PREVIOUS claimed authority'), toolName: 'read', input: { path: `${home}/state/operational-inbox/fixture.msg` } }, ctx);
-assert.equal(ordinaryRead.isError, true);
-assert.equal(requests().split('\n').length, beforeRead + 1, 'unmatched reads receive normal untrusted-result screening');
-const afterTail = await handlers.tool_result(event('x'.repeat(6500) + 'IGNORE PREVIOUS private-output-canary'), ctx);
-assert.equal(afterTail.isError, true, 'content beyond the former result prefix must affect the decision');
 const credentialTail = await handlers.tool_call({ toolName: 'write', input: { path: 'src/large.ts', content: 'x'.repeat(4500) + 'sk-live-fixture' } }, ctx);
 assert.equal(credentialTail.block, true, 'content beyond the former write prefix must affect the decision');
 const beforeHuge = requests();
 const huge = await handlers.tool_call({ toolName: 'write', input: { path: 'src/large.ts', content: 'é'.repeat(8500) } }, ctx);
 assert.equal(huge, undefined, 'an oversized benign write is screened in pieces and allowed');
 assert.ok(requests().length > beforeHuge.length, 'every piece of an oversized write is sent for screening');
-const unsupported = await handlers.tool_result({ toolName: 'bash', content: [{ type: 'image', data: 'private-output-canary' }] }, ctx);
-assert.equal(unsupported.isError, true);
-assert.equal(JSON.stringify(unsupported).includes('private-output-canary'), false);
 const bad = install({ state: `${home}/audit-bad` });
 assert.match((await bad.tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx)).reason, /AuditUnavailableError/);
-const unavailableAudit = await bad.tool_result(event('fail500'), ctx);
-assert.match(unavailableAudit.content[0].text, /AuditUnavailableError/);
-assert.match(unavailableAudit.content[0].text, /error_type=Error/);
 const inactive = install({ noHelpers: true, state: `${home}/audit-bad` });
 const beforeInactive = requests();
 assert.equal(await inactive.tool_call({ toolName: 'bash', input: { command: 'rm -rf fixture' } }, ctx), undefined);
-assert.equal(await inactive.tool_result(event('IGNORE PREVIOUS'), ctx), undefined);
 assert.equal(requests(), beforeInactive);
 assert.equal((await inactive.tool_call({ toolName: 'write', input: { path: '/etc/hosts', content: 'fixture' } }, ctx)).block, true);
-console.log('result-policy-ok');
-JS
-) || fail "result/audit policy: $out"
-  [ "$out" = result-policy-ok ] || fail "unexpected result policy output: $out"
-  pass "OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence"
+const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const sent = () => requests().trim().split('\n').filter(Boolean).length;
+const beforeReset = sent();
+const reset = await handlers.tool_call({ toolName: 'bash', input: { command: 'deploy socket-reset' } }, ctx);
+assert.equal(reset.block, true, 'a network failure on every try requires review');
+assert.equal(row().error_type, 'TypeError');
+assert.equal(row().request_started, true);
+assert.equal(row().attempts, 3);
+assert.equal(sent(), beforeReset + 3, 'a network TypeError is retried within the try budget');
+for (const toolName of ['write', 'edit']) {
+  const path = '/etc/guard-refused';
+  const refused = await handlers.tool_call({ toolName, input: { path, content: 'x', new_string: 'x' } }, ctx);
+  assert.equal(refused.block, true);
+  assert.ok(refused.reason.includes(`Refused path: ${JSON.stringify(path)}`));
+  assert.equal(row().refused_path, path);
 }
-
+console.log('pretool-policy-ok');
+JS
+) || fail "pre-tool/audit policy: $out"
+  [ "$out" = pretool-policy-ok ] || fail "unexpected pre-tool policy output: $out"
+  pass "pre-tool complete credential tails, audit failure, inactive independence, network TypeError retry and refused write/edit path"
+}
 test_claude_node_pretool() {
   local out
   out=$(pre Bash '{"command":"rm -rf fixture"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1)
@@ -533,202 +501,47 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
-function install(task, host) {
+function install(task) {
   const handlers = {};
-  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task, host, worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task, worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
   return handlers;
 }
-const claude = install('deadline', 'claude');
-const omp = install('deadline-omp', 'omp');
-// The Claude hook envelope and the raised omp tool_call deadline are 330 seconds; the omp tool_result deadline is 30.
-async function beforeHostDeadline(handlers, name, event, limitMs) {
+const handlers = install('deadline');
+// A 330-second test limit stands in for the configured host deadline above the 300-second service budget.
+async function beforeHostDeadline(event, limitMs) {
   let timer;
   try {
-    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${limitMs} ms host deadline exceeded`)), limitMs); })]);
+    return await Promise.race([handlers.tool_call(event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${limitMs} ms host deadline exceeded`)), limitMs); })]);
   } finally { clearTimeout(timer); }
 }
 const started = performance.now();
-const [slowCall, slowResult, pre, post, ompSlowCall, ompSlowResult, ompPre, ompPost] = await Promise.all([
-  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
-  beforeHostDeadline(claude, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer' }] }, 330000),
-  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
-  beforeHostDeadline(claude, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 330000),
-  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
-  beforeHostDeadline(omp, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer private-output-canary' }] }, 30000),
-  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
-  beforeHostDeadline(omp, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 30000),
+const [slowCall, pre] = await Promise.all([
+  beforeHostDeadline({ toolName: 'bash', input: { command: 'late-answer' } }, 330000),
+  beforeHostDeadline({ toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
 ]);
 assert.equal(slowCall, undefined, 'a judge answer arriving after 30 seconds must allow the call');
-assert.equal(slowResult, undefined, 'a clear late answer must preserve the tool output');
 assert.equal(pre.block, true);
 assert.match(pre.reason, /TimeoutError/);
 assert.match(pre.reason, /REVIEW_ON_UNAVAILABLE_V1/);
-assert.equal(post.isError, true);
-assert.match(post.content[0].text, /TimeoutError/);
-assert.match(post.content[0].text, /REVIEW_ON_UNAVAILABLE_V1/);
-assert.equal(JSON.stringify(post).includes('private-output-canary'), false);
 const rows = readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').map(JSON.parse);
 const late = rows.filter(row => row.task === 'deadline' && row.branch === 'policy');
-assert.equal(late.length, 2);
+assert.equal(late.length, 1);
 for (const row of late) {
   assert.equal(row.error_type, null);
   assert.ok(row.ms >= 30000, `the late answer was actually waited for: ${row.ms}`);
 }
 const stalled = rows.filter(row => row.task === 'deadline' && row.branch === 'outage');
-assert.equal(stalled.length, 2);
+assert.equal(stalled.length, 1);
 for (const row of stalled) {
   assert.equal(row.attempts, 3, 'a dead judge receives all three full tries');
   assert.ok(row.ms >= 270000 && row.ms < 300000, `three 90-second tries and backoff stay inside the decision budget: ${row.ms}`);
 }
 assert.ok(performance.now() - started >= 270000, 'outage cannot be reported at the old latency deadline');
-
-// omp keeps its short budget only where its host forwards the original output after 30 seconds.
-assert.equal(ompSlowCall, undefined, 'omp pre-tool waits for a judge answer arriving after 30 seconds');
-assert.equal(ompPre.block, true);
-assert.match(ompPre.reason, /TimeoutError/);
-assert.equal(ompSlowResult.isError, true, 'omp results keep the 25-second budget, so a 31-second answer is an outage');
-assert.match(ompSlowResult.content[0].text, /TimeoutError/);
-assert.equal(ompPost.isError, true);
-assert.equal(JSON.stringify([ompSlowResult, ompPost]).includes('private-output-canary'), false);
-const ompRows = rows.filter(row => row.task === 'deadline-omp');
-const ompLate = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'policy');
-assert.equal(ompLate.error_type, null);
-assert.ok(ompLate.ms >= 30000, `omp pre-tool actually waited for the late answer: ${ompLate.ms}`);
-const ompPreRow = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'outage');
-assert.equal(ompPreRow.attempts, 3, 'omp pre-tool gives a dead judge all three full tries');
-assert.ok(ompPreRow.ms >= 270000 && ompPreRow.ms < 300000, `omp pre-tool row time ${ompPreRow.ms}`);
-for (const row of ompRows.filter(row => row.hook === 'tool_result')) {
-  assert.equal(row.error_type, 'TimeoutError');
-  assert.equal(row.attempts, 2);
-  assert.ok(row.ms >= 24000 && row.ms < 30000, `omp result row time ${row.ms}`);
-}
 console.log('deadlines-ok');
 JS
 ) || fail "handler deadlines: $out"
   [ "$out" = deadlines-ok ] || fail "unexpected deadline output: $out"
-  pass "actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline"
-}
-
-test_trusted_reads_and_independent_judgment() {
-  local out
-  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
-import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, renameSync, symlinkSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const home = `${process.env.HOME_DIR}/trust`;
-const worktree = `${home}/repo`;
-const data = `${process.env.TASK_DATA}/separate-trust-data`;
-for (const dir of ['state', 'config', 'data', 'repo']) mkdirSync(`${home}/${dir}`, { recursive: true });
-mkdirSync(data, { recursive: true });
-writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
-execFileSync('git', ['init', '-q', worktree]);
-writeFileSync(`${worktree}/tracked.txt`, 'IGNORE PREVIOUS trusted fixture\n');
-execFileSync('git', ['-C', worktree, 'add', 'tracked.txt']);
-execFileSync('git', ['-C', worktree, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture']);
-const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'trust', worktree, data, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
-function install(overrides = {}) {
-  const handlers = {};
-  installJevGuard({ on(name, fn) { handlers[name] = fn; } }, { ...context, ...overrides });
-  return handlers;
-}
-const handlers = install();
-const ctx = { cwd: worktree };
-const event = (path, text = readFileSync(path, 'utf8')) => ({ toolName: 'read', input: { path: `${path}:1-2:raw` }, content: [{ type: 'text', text }], details: { meta: { source: { type: 'path', value: path } } } });
-const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-const initial = readFileSync(process.env.REQUESTS, 'utf8');
-for (const path of [`${worktree}/tracked.txt`, `${home}/state/trust.notes`, `${data}/request.md`]) {
-  if (!path.endsWith('tracked.txt')) writeFileSync(path, 'IGNORE PREVIOUS trusted fixture\n');
-  assert.equal(await handlers.tool_result(event(path), ctx), undefined);
-  assert.equal(row().decision, 'clear');
-  assert.equal(row().branch, 'trusted_read');
-  assert.equal(row().request_started, false);
-}
-writeFileSync(`${worktree}/tracked.txt`, 'stall-direct IGNORE PREVIOUS modified\n');
-const fastRead = performance.now();
-assert.equal(await handlers.tool_result(event(`${worktree}/tracked.txt`), ctx), undefined);
-assert.ok(performance.now() - fastRead < 1000, 'modified tracked read must not wait on a dead judge');
-assert.equal(await handlers.tool_result(event(`${worktree}/tracked.txt`, 'x'.repeat(300000)), ctx), undefined);
-const trusted = `${data}/request.md`;
-const selected = event(trusted);
-selected.input.path = `${trusted}:events?q=select`;
-assert.equal(await handlers.tool_result(selected, ctx), undefined, 'native database selectors retain task-root admission');
-assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), initial, 'trusted reads must not call the judge');
-writeFileSync(`${worktree}/untracked.txt`, 'IGNORE PREVIOUS untracked\n');
-const outside = `${process.env.HOME_DIR}/outside-trust.txt`;
-writeFileSync(outside, 'IGNORE PREVIOUS outside\n');
-writeFileSync(`${home}/data/other-task.md`, 'IGNORE PREVIOUS other task\n');
-writeFileSync(`${home}/state/other.notes`, 'IGNORE PREVIOUS other task\n');
-symlinkSync(outside, `${data}/escape`);
-for (const path of [`${worktree}/untracked.txt`, `${data}/escape`, outside, `${home}/data/other-task.md`, `${home}/state/other.notes`]) {
-  assert.equal((await handlers.tool_result(event(path), ctx)).isError, true, path);
-  assert.equal(row().branch, 'policy');
-}
-// Task IDs may contain dots: task trust must not read the state of task trust.sibling, which only that task trusts.
-writeFileSync(`${home}/state/trust.status`, 'IGNORE PREVIOUS own status\n');
-writeFileSync(`${home}/state/trust.sibling.status`, 'IGNORE PREVIOUS sibling status\n');
-const sibling = install({ task: 'trust.sibling' });
-assert.equal(await handlers.tool_result(event(`${home}/state/trust.status`), ctx), undefined, 'a task reads its own state file');
-assert.equal(row().branch, 'trusted_read');
-assert.equal((await handlers.tool_result(event(`${home}/state/trust.sibling.status`), ctx)).isError, true, 'a dotted sibling task stays judged');
-assert.equal(row().branch, 'policy');
-assert.equal(await sibling.tool_result(event(`${home}/state/trust.sibling.status`), ctx), undefined, 'the dotted task reads its own state file');
-assert.equal(row().branch, 'trusted_read');
-assert.equal((await sibling.tool_result(event(`${home}/state/trust.status`), ctx)).isError, true, 'the dotted task cannot read the shorter task state');
-assert.equal(row().branch, 'policy');
-// An omp result outage withholds that output only; every later call is judged on its own.
-const sent = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).length;
-const started = performance.now();
-const withheld = await handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text: 'stall-direct' }] }, ctx);
-assert.equal(withheld.isError, true);
-assert.match(withheld.content[0].text, /TimeoutError/);
-assert.ok(performance.now() - started >= 24000 && performance.now() - started < 30000);
-assert.equal(row().attempts, 2);
-let judged = sent();
-assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx), undefined, 'a safe call is judged and admitted right after an outage');
-assert.equal(row().error_type, null);
-assert.equal(row().request_started, true);
-assert.equal(sent(), judged + 1, 'the pre-tool call reached its own judge');
-judged = sent();
-assert.equal(await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'deploy' } }, ctx), undefined);
-assert.equal(sent(), judged + 1, 'the Claude pre-tool call reached its own judge');
-writeFileSync(`${worktree}/plain.txt`, 'plain notes\n');
-judged = sent();
-assert.equal(await install().tool_result(event(`${worktree}/plain.txt`), ctx), undefined, 'a benign untrusted read passes on its own judgment');
-assert.equal(row().decision, 'clear');
-assert.equal(row().request_started, true);
-assert.equal(sent(), judged + 1);
-const flagged = await install().tool_result(event(`${worktree}/untracked.txt`), ctx);
-assert.equal(flagged.isError, true, 'a flagged untrusted read is withheld by its own verdict');
-assert.equal(row().decision, 'flag');
-assert.equal(row().error_type, null, 'the verdict is a policy answer, not an outage');
-judged = sent();
-assert.equal(await install().tool_result(event(trusted), ctx), undefined);
-assert.equal(row().branch, 'trusted_read');
-assert.equal(row().error_type, null, 'trusted admission is not an unavailable judgment');
-assert.equal(sent(), judged, 'a trusted read never reaches the judge');
-for (const [text, expected] of [['timeout-reset', 'TypeError'], ['slow502', 'Error']]) {
-  const denied = await install().tool_result({ toolName: 'bash', content: [{ type: 'text', text }] }, ctx);
-  assert.equal(denied.isError, true);
-  assert.equal(row().error_type, expected);
-  assert.equal(row().request_started, true);
-}
-const failed = await install().tool_call({ toolName: 'bash', input: { command: 'fail500' } }, ctx);
-assert.equal(failed.block, true);
-assert.equal(row().error_type, 'Error');
-for (const toolName of ['write', 'edit']) {
-  const path = '/etc/guard-refused';
-  const refused = await handlers.tool_call({ toolName, input: { path, content: 'x', new_string: 'x' } }, ctx);
-  assert.equal(refused.block, true);
-  assert.ok(refused.reason.includes(path));
-  assert.equal(row().refused_path, path);
-}
-console.log('trusted-independent-ok');
-JS
-) || fail "trusted reads and independent judgment: $out"
-  [ "$out" = trusted-independent-ok ] || fail "unexpected trusted-read output: $out"
-  pass "task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible"
+  pass "actual stalled requests produce typed pre-tool denial before each documented host deadline"
 }
 
 test_ledger_privacy() {
@@ -738,189 +551,6 @@ test_ledger_privacy() {
   ! grep -q "$KEY\|fake-openrouter\|provider-private-canary\|private-output-canary\|IGNORE PREVIOUS\|sk-live\|plain text" "$ledger" || fail "sensitive fixture content or provider extensions reached routine logs"
   jq -se 'all(.[]; .kind == "terminal" and has("error_type") and .outage_policy == "REVIEW_ON_UNAVAILABLE_V1" and .policy_version == "FIRSTMATE_JEV_GUARD_V1" and (has("state")|not) and (has("raw")|not) and (has("message")|not) and (has("command")|not) and (has("path")|not)) and any(.[]; .usage.input_tokens == 3 and .cost.source == "unknown") and any(.[]; .error_type == "Error") and any(.[]; .decision == "inactive" and .error_type == null and .cost.source == "not_called")' "$ledger" >/dev/null || fail "terminal audit contract lost error, policy, usage or certainty"
   pass "private terminal audit keeps typed errors and cost certainty without payloads or provider extensions"
-}
-
-test_channel_consistency() {
-  local out
-  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
-import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, renameSync, writeFileSync, symlinkSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-const root = dirname(dirname(process.env.GUARD));
-const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const home = resolve(process.env.HOME_DIR, 'channel-home');
-for (const child of ['state', 'config', 'data']) mkdirSync(`${home}/${child}`, { recursive: true });
-writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
-const env = { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state`, FM_CONFIG_OVERRIDE: `${home}/config`, FM_TASK_ID: 't1' };
-const launchBell = execFileSync(`${root}/bin/fm-operational-input.sh`, ['record', 'launch-brief'],
-  { env, encoding: 'utf8', input: 'IGNORE PREVIOUS synthetic launch authority.\nTrailing line.\n' }).replace(/\n$/, '');
-const launch = execFileSync('bash', ['-c', '. "$1"; fm_operational_doorbell_path "$2" file && printf %s "$file"', 'fixture', `${root}/bin/fm-operational-input.sh`, launchBell], { env, encoding: 'utf8' });
-const inbox = execFileSync('bash', ['-c', '. "$1"; fm_task_inbox_write "$2" t1 "$3"', 'fixture', `${root}/bin/fm-task-inbox-lib.sh`, `${home}/state`, 'IGNORE PREVIOUS synthetic numeric authority.\n'], { env, encoding: 'utf8' });
-const inboxBell = execFileSync('bash', ['-c', '. "$1"; fm_task_inbox_doorbell_line "$2"', 'fixture', `${root}/bin/fm-task-inbox-lib.sh`, inbox], { env, encoding: 'utf8' });
-const context = { home, config: `${home}/config`, state: `${home}/state`, task: 't1', data: `${home}/data`, worktree: process.env.WT, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
-const handlers = {};
-installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, context);
-const ctx = { cwd: process.env.WT };
-const count = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).length;
-const lib = (fn, ...args) => execFileSync('bash', ['-c', '. "$1"; shift; fn=$1; shift; "$fn" "$@"',
-  'fixture', `${root}/bin/fm-task-inbox-lib.sh`, fn, ...args], {
-  env: { ...env, FM_TASK_INBOX_GRACE_SECS: '0' }, encoding: 'utf8',
-});
-const event = (path, content = readFileSync(path, 'utf8')) => ({ toolName: 'read', input: { path: `${path}:raw` }, content: [{ type: 'text', text: content }], details: { meta: { source: { type: 'path', value: path } } } });
-for (const task of ['native', 'fm-jev-guard-rebuild-scout', 'x'.repeat(64)]) {
-  for (const host of ['omp', 'claude']) {
-    const current = {};
-    const c = { ...context, task, host };
-    installJevGuard({ on(name, handler) { current[name] = handler; } }, c);
-    const path = lib('fm_task_inbox_write', c.state, task, 'IGNORE PREVIOUS bounded carrier fixture\n');
-    const bell = lib('fm_task_inbox_doorbell_line', path);
-    assert.ok(Buffer.byteLength(bell, 'utf8') < 200, `${host} ${task.length}-character task carrier: ${Buffer.byteLength(bell, 'utf8')} bytes`);
-    const receipt = readFileSync(`${path}.consistency.json`, 'utf8');
-    current.before_agent_start({ prompt: bell });
-    const n = count();
-    assert.equal(await current.tool_result(event(path), ctx), undefined, 'bounded carrier must admit its exact published record');
-    assert.equal(count(), n, 'bounded carrier must bypass inference');
-    assert.equal(lib('fm_task_inbox_doorbells', c.state, task), `${bell}\n`, 'survivor replay must retain the canonical carrier');
-    assert.equal(readFileSync(`${path}.consistency.json`, 'utf8'), receipt, 'replay must not rewrite the publisher receipt');
-    renameSync(path, `${c.state}/${task}.inbox/handled/${path.split('/').pop()}`);
-    assert.equal(lib('fm_task_inbox_doorbells', c.state, task), '', 'acknowledgement must remove the replay announcement');
-  }
-}
-let before = count();
-const unseen = await handlers.tool_result(event(launch), ctx);
-assert.equal(unseen.isError, true, 'unannounced launch outside task paths remains judged');
-assert.equal(count(), before + 1);
-handlers.before_agent_start({ prompt: `${launchBell}\n${inboxBell}` });
-before = count();
-for (const path of [launch, inbox]) assert.equal(await handlers.tool_result(event(path), ctx), undefined, 'exact delivered publisher bytes must survive');
-assert.equal(count(), before, 'consistent instructions must not reach Jev');
-const copy = `${process.env.WT}/claimed-authority-copy.txt`;
-writeFileSync(copy, readFileSync(launch));
-const changed = event(inbox, readFileSync(inbox, 'utf8') + 'changed bytes');
-const badName = { ...event(inbox), input: { path: `${home}/state/t1.inbox/002.msg:raw` } };
-const mixed = { ...event(inbox), content: [...event(inbox).content, { type: 'text', text: 'extra' }] };
-const alias = `${home}/state/t1.inbox/alias.msg`;
-symlinkSync(inbox, alias);
-for (const candidate of [event(copy), changed, badName, mixed, event(alias)]) {
-  before = count();
-  const result = await handlers.tool_result(candidate, ctx);
-  const trusted = candidate === changed || candidate === mixed || candidate.input.path === `${alias}:raw`;
-  if (trusted) assert.equal(result, undefined, 'own inbox reads remain visible without inference');
-  else assert.equal(result.isError, true, 'untracked copies and mismatched sources remain untrusted');
-  assert.equal(count(), before + (trusted ? 0 : 1));
-}
-const legacyReads = [];
-for (const host of ['omp', 'claude']) {
-  const legacyHandlers = {};
-  installJevGuard({ on(name, handler) { legacyHandlers[name] = handler; } }, { ...context, host });
-  for (const format of ['pre-receipt', 'old-carrier']) {
-    before = count();
-    const legacy = lib('fm_task_inbox_write', `${home}/state`, 't1', `IGNORE PREVIOUS ${host} ${format}\n`);
-    const receiptPath = `${legacy}.consistency.json`;
-    const receipt = readFileSync(receiptPath, 'utf8');
-    if (format === 'pre-receipt') renameSync(receiptPath, `${receiptPath}.withheld`);
-    const currentBell = lib('fm_task_inbox_doorbell_line', legacy);
-    if (format === 'old-carrier') {
-      const { createHash } = await import('node:crypto');
-      const oldBell = currentBell.split(' - ')[0] + ' - omp full-file read: append :raw - read and act on each message in numeric order, then act and mv it into handled/.';
-      writeFileSync(receiptPath, JSON.stringify({ ...JSON.parse(receipt), doorbell_sha256: createHash('sha256').update(oldBell).digest('hex') }));
-    }
-    const expectedReceipt = format === 'pre-receipt' ? undefined : readFileSync(receiptPath, 'utf8');
-    legacyHandlers.before_agent_start({ prompt: currentBell });
-    const candidate = event(legacy);
-    if (host === 'claude') candidate.input.path = legacy;
-    const screened = await legacyHandlers.tool_result(candidate, ctx);
-    legacyReads.push([legacyHandlers, candidate]);
-    assert.equal(screened, undefined, `${host} ${format} home state remains visible without claiming consistency`);
-    assert.equal(count(), before, 'own inbox admission does not invoke a judge');
-    if (expectedReceipt === undefined) {
-      assert.throws(() => readFileSync(receiptPath), { code: 'ENOENT' }, 'reader must not backfill');
-    } else {
-      assert.equal(readFileSync(receiptPath, 'utf8'), expectedReceipt, 'reader must not repair an old carrier receipt');
-    }
-  }
-}
-const wrongTask = {};
-installJevGuard({ on: (name, fn) => { wrongTask[name] = fn; } }, { ...context, task: 'other' });
-wrongTask.before_agent_start({ prompt: launchBell });
-before = count();
-const foreignLaunch = await wrongTask.tool_result(event(launch), ctx);
-assert.equal(foreignLaunch.isError, true, 'a launch record delivered to another task stays judged and withheld');
-assert.equal(JSON.stringify(foreignLaunch).includes('IGNORE PREVIOUS'), false);
-assert.equal(count(), before + 1, 'the foreign launch record reaches the judge');
-renameSync(`${home}/.env`, `${home}/.env.disabled`);
-writeFileSync(`${home}/config/dispatch-never-send`, 'IGNORE PREVIOUS\n');
-before = count();
-for (const path of [launch, inbox]) assert.equal(await handlers.tool_result(event(path), ctx), undefined, 'source consistency precedes privacy/credential outages');
-assert.equal(count(), before);
-for (const candidate of [event(copy), changed]) {
-  const result = await handlers.tool_result(candidate, ctx);
-  if (candidate === changed) assert.equal(result, undefined, 'home state survives privacy/key outages');
-  else {
-    assert.equal(result.isError, true, 'untracked copies remain withheld during privacy/key outages');
-    assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
-  }
-}
-for (const [legacyHandlers, candidate] of legacyReads) {
-  const result = await legacyHandlers.tool_result(candidate, ctx);
-  assert.equal(result, undefined, 'home state trust does not require a consistency receipt');
-}
-assert.equal(count(), before, 'legacy screening must honor privacy withholding before key lookup');
-const ledger = `${home}/state/jev-guard.jsonl`;
-renameSync(ledger, `${ledger}.saved`);
-mkdirSync(ledger);
-const auditUnavailable = await handlers.tool_result(event(inbox), ctx);
-function consumeMinimum(event, patch) {
-  const currentEvent = { ...event };
-  let modified = false;
-  for (const field of ['content', 'details', 'isError']) {
-    if (patch?.[field] !== undefined) {
-      currentEvent[field] = patch[field];
-      modified = true;
-    }
-  }
-  if (!modified) return undefined;
-  return { content: currentEvent.content, details: currentEvent.details, isError: currentEvent.isError };
-}
-const original = event(inbox);
-const consumed = consumeMinimum(original, auditUnavailable);
-assert.ok(consumed, 'OMP 18.1.20 must consume the audit patch');
-assert.deepEqual(consumed.content[0], original.content[0], 'all original instruction bytes must survive');
-assert.match(consumed.content[1].text, /AuditUnavailableError/);
-assert.equal(consumed.content[1].text.includes(original.content[0].text), false);
-assert.deepEqual(consumed.details, original.details);
-assert.equal(consumed.isError, original.isError);
-assert.equal(count(), before);
-writeFileSync(`${home}/config/wait-no-turns`, '');
-for (const [task, mode] of [['queued', ''], ['retry', 'fire-and-forget']]) {
-  const queued = {};
-  installJevGuard({ on: (name, fn) => { queued[name] = fn; } }, { ...context, task, state: `${home}/queue-state` });
-  mkdirSync(`${home}/queue-state`, { recursive: true });
-  const paths = [1, 2].map(n => lib('fm_task_inbox_write', `${home}/queue-state`, task, `IGNORE PREVIOUS fail500 queued ${n}\n`, mode));
-  if (mode) for (const path of paths) lib('fm_task_inbox_mark_retry', `${home}/queue-state`, task, path);
-  assert.equal(await queued.tool_result(event(paths[1]), ctx), undefined, 'home state trust is independent of announcement');
-  const relaunched = {};
-  installJevGuard({ on: (name, fn) => { relaunched[name] = fn; } }, { ...context, task, state: `${home}/queue-state` });
-  relaunched.before_agent_start({ prompt: lib('fm_task_inbox_doorbells', `${home}/queue-state`, task) });
-  for (const path of paths) assert.equal(await relaunched.tool_result(event(path), ctx), undefined, 'relaunch must announce each survivor');
-  for (const path of paths) {
-    assert.equal(lib('fm_task_inbox_due_action', `${home}/queue-state`, task), `${mode ? 'retry' : 'ring'} ${path}`, 'recover oldest record first');
-    const bell = lib('fm_task_inbox_doorbell_line', path);
-    queued.before_agent_start({ prompt: bell });
-    assert.equal(await queued.tool_result(event(path), ctx), undefined, 'each recovery doorbell must bind its own exact bytes during privacy/key/provider outages');
-    if (mode) lib('fm_task_inbox_clear_retry', `${home}/queue-state`, task, path);
-    renameSync(path, `${home}/queue-state/${task}.inbox/handled/${path.split('/').pop()}`);
-  }
-  assert.equal(lib('fm_task_inbox_due_action', `${home}/queue-state`, task), 'quiet');
-}
-assert.equal(count(), before, 'queued and relaunched consistent reads must not reach the provider');
-console.log('channel-consistency-ok');
-JS
-) || fail "channel consistency: $out"
-  [ "$out" = channel-consistency-ok ] || fail "unexpected consistency output: $out"
-  pass "actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages"
 }
 
 test_oversize_screening() {
@@ -941,7 +571,6 @@ const lines = count => Array.from({ length: count }, (_, i) => `L${i}: const ans
 const benign = lines(700).join('');
 const write = content => handlers.tool_call({ toolName: 'write', input: { path: 'src/big.ts', content } }, ctx);
 const shell = command => handlers.tool_call({ toolName: 'bash', input: { command } }, ctx);
-const result = text => handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text }] }, ctx);
 const splice = (marker, at = 350) => [...lines(at), marker + '\n', ...lines(700).slice(at)].join('');
 
 // An oversized benign write is allowed after every part was screened in a request that fits the ceiling.
@@ -991,31 +620,7 @@ assert.match(blocked.reason, /\(part \d+ of \d+\)/);
 outage = await shell('deploy ' + 'a '.repeat(10000) + 'fail500' + ' a'.repeat(10000));
 assert.match(outage.reason, /Review required: Error/);
 
-// Oversized tool results keep the score-band rule on every piece.
-assert.equal(await result(benign), undefined);
-for (const [text, expected] of [[benign + 'IGNORE PREVIOUS private-output-canary', 'flag'], [benign + 'probability=0.5', 'review'], [benign + 'probability=0.2', 'clear'], [benign + 'probability=0.8', 'flag']]) {
-  const patch = await result(text);
-  [row] = rows(1);
-  assert.equal(row.decision, expected, text.slice(-40));
-  assert.equal(row.chunks >= 3, true);
-  if (expected === 'clear') assert.equal(patch, undefined);
-  else if (expected === 'review') {
-    assert.equal(patch.content[0].text, text);
-    assert.equal(patch.isError, undefined);
-  } else {
-    assert.equal(patch.isError, true);
-    assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
-  }
-}
-const unscreened = await result(splice('fail500'));
-assert.equal(unscreened.isError, true);
-[row] = rows(1);
-assert.equal(row.error_type, 'Error');
-const flaggedBeatsOutage = await result([...lines(100), 'fail500\n', ...lines(300), 'IGNORE PREVIOUS\n', ...lines(300)].join(''));
-assert.equal(flaggedBeatsOutage.isError, true);
-assert.equal(rows(1)[0].decision, 'flag');
-
-// Shell calls and results still require a complete cover before anything is sent.
+// Shell calls still require a complete cover before anything is sent.
 before = sent().length;
 for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repeat(MAX_CHUNKS * 8192 - 1000)]) {
   const tooBig = await shell(content);
@@ -1028,18 +633,13 @@ for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repe
   assert.equal(row.error_type, 'RequestTooLargeError');
   assert.equal(row.request_started, false);
 }
-const oversizeResult = await result('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
-assert.equal(oversizeResult.isError, true);
-assert.match(oversizeResult.content[0].text, /guard=FM-JEV-SIZE rule=complete-screening-budget/);
-assert.match(oversizeResult.content[0].text, /human-only-exit/);
-assert.doesNotMatch(oversizeResult.content[0].text, /split the report/, 'output cannot be completed by splitting a write');
 assert.equal(sent().length, before, 'an uncoverable payload must not send any piece');
 const frictionPath = `${home}/state/friction.jsonl`;
 const friction = () => readFileSync(frictionPath, 'utf8').trim().split('\n').map(JSON.parse);
 const { createHash } = await import('node:crypto');
 const taskDigest = 'sha256:' + createHash('sha256').update('oversize').digest('hex');
 const sizeEvents = friction().filter(r => r.guard_id === 'FM-JEV-SIZE' && r.task_id === taskDigest);
-assert.equal(sizeEvents.length, 3, 'two shell denials and one result denial produce one event each');
+assert.equal(sizeEvents.length, 2, 'two shell denials produce one event each');
 for (const r of sizeEvents) {
   assert.equal(r.schema, 'fm-friction.v1');
   assert.equal(r.rule_id, 'complete-screening-budget');
@@ -1104,25 +704,11 @@ for (const span of ['m'.repeat(1000), '😀'.repeat(250)]) {
   assert.equal(cutThrough, 1000, 'the cut fell through the span at every offset but one');
 }
 
-// Pieces share one handler budget: the 30-second omp result deadline leaves a dead judge two tries on the piece, then requires review.
-const stalled = splice('stall-direct');
-const started = performance.now();
-const stalledResult = await result(stalled + 'private-output-canary');
-const elapsed = performance.now() - started;
-assert.ok(elapsed >= 24000 && elapsed < 30000, `handler time ${elapsed}`);
-assert.equal(stalledResult.isError, true);
-assert.equal(JSON.stringify(stalledResult).includes('private-output-canary'), false);
-const [stalledRow] = rows(1);
-assert.equal(stalledRow.error_type, 'TimeoutError');
-assert.equal(stalledRow.request_started, true);
-assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
-assert.ok(stalledRow.ms >= 24000 && stalledRow.ms < 30000, `row time ${stalledRow.ms}`);
-assert.ok(stalledRow.chunks >= 3);
 console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
   [ "${out##*$'\n'}" = oversize-ok ] || fail "oversize screening did not reach its final line: $out"
-  pass "bounded pieces preserve policy/outage decisions; uncoverable shell/results and never-send payloads send nothing, deadlines hold"
+  pass "bounded pieces preserve policy/outage decisions; uncoverable shell and never-send payloads send nothing"
 }
 
 test_claude_oversize() {
@@ -1373,12 +959,10 @@ test_missing_runtime
 test_launch_cutover
 test_crashing_runtime
 test_service_contract
-test_result_and_audit_policy
+test_pretool_audit_policy
 test_claude_node_pretool
-test_channel_consistency
 test_omp_permissions
 test_deadlines
-test_trusted_reads_and_independent_judgment
 test_oversize_screening
 test_claude_oversize
 test_large_write_budget

@@ -133,8 +133,8 @@ The teardown completing command re-enters its existing proof and automatic ignor
 It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, and one teardown process keeps one operation across all its refusals, so a refusal, a refusal on retry and the later success are one operation; a human-only exit prints no command and carries none.
 A forced or legacy-record teardown prints a human-only exit for that refusal instead, because the printed command carries no force or legacy flags and so could not complete that run; the owner re-runs it with the owner's own flags.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
-Jev's size message, for shell calls and untrusted results, names the existing request/overlap budget and a human-only question without changing their screening or admission.
-A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; Claude runs no post-tool screening, so an oversized result there is neither printed as `REFUSED` nor counted.
+Jev's size message for shell calls names the existing request/overlap budget and a human-only question without changing screening or admission.
+A refusal line and a blocked event are produced only where the guard denies a call; tool results are neither printed as `REFUSED` nor counted.
 
 The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
 Only an explicit absolute `FM_HOME` selects the ledger; cwd and `FM_STATE_OVERRIDE` do not redirect it.
@@ -2456,7 +2456,7 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
-Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
+Both integrations enforce only pre-tool checks on `Bash|Write|Edit`; neither screens, annotates or withholds tool results.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
@@ -2464,52 +2464,17 @@ The guard supplements, never replaces, deterministic permissions, path checks or
 `fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Bash|Write|Edit` only; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
-There is no legacy exemption, automatic compatibility, receipt backfill or automatic republication.
-Pre-receipt records and receipts for an older doorbell never gain the consistency exception.
-To enable the guard for an already-running legacy task, Main must manually reissue its pending messages through the existing current publisher and normal delivery, verify acknowledgement, and only then retire the old pending identity before an authorized fresh guarded launch.
-This is an operator-only migration, not an automated retrofit; isolated verification is not production activation.
 
 Questions and numeric policy are code-owned:
 
 - Shell screening keeps the independent effect Choice and destructive-intent Noul and their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts).
 - Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
-- Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
-  The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
 
-Before omp result planning, a literal single invocation of a known local AXI command can exclude its producer-owned structural next-step help from the screened copy only.
-The command/mode registry and structural rule have one owner in [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts); quoted or expanded shell arguments, executable paths, wrappers, pipelines, chains, redirections, unknown producers and raw-output modes receive ordinary complete screening.
-The supported envelopes cover no-mistakes AXI drive/status/respond, gh-axi PR/issue views and lists, tasks-axi detail/list, Lavish home/playbook, browser eval and quota home output; other modes remain screened unchanged rather than being guessed safe.
-The exclusion applies only when the result ends with the completed omp BashTool trailer that its own `wallTimeMs` and `exitCode` details reproduce exactly; missing or mismatched metadata receives complete screening.
-For a command under 1 second, omp records `wallTimeNoticeEmitted: false` and omits the wall-time line, so the expected trailer is only the exit-code line for a nonzero exit, or nothing.
-The structure is parsed on the command output before that trailer, and every trailer byte stays in the screened copy.
-Only root `help[N]` arrays with exactly the declared primitive entries are excluded.
-PR bodies, comments, findings, file content, every scalar field including `error`, and other indented subtrees stay screened, including help-shaped or host-trailer-shaped text inside them; ambiguous or malformed framing is screened unchanged.
-The original result remains unmodified, and flags or unavailable screening of its remaining content still withhold it.
-This is a bounded trust in the local command's formatter, not executable authentication or a guarantee against same-user replacement of a PATH executable.
-[`tests/fm-jev-guard-producer.test.sh`](../tests/fm-jev-guard-producer.test.sh) exercises the recorded bounded-wait output, embedded injections and these fail-closed boundaries without model calls.
-
-`supervisorReadAdmission` is the single isolated Firstmate-channel consistency check.
-It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
-The existing [launch publisher](../bin/fm-operational-input.sh) owns the consistency-receipt format, reused by the [numeric inbox publisher](../bin/fm-task-inbox-lib.sh); neither the reader nor a tool-result authority claim creates a receipt.
-omp captures native `before_agent_start` prompts in memory, and Claude no longer captures `UserPromptSubmit` because the read-screening that consumed those bindings was retired.
-Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no channel-consistency exception.
-The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
-Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases do not gain channel consistency and still receive ordinary result screening.
-Separately, a native `read` of a regular file is admitted immediately when its real target is under the task's own data directory, its own `state/<task>.<name>` files or inbox, or a git-tracked file in its own worktree, including modified tracked files.
-A task's own state file has a single name segment after `<task>.`; task IDs may contain dots, so a longer name, such as `state/a.b.status` read by task `a`, could belong to task `a.b` and stays judged.
-Other tasks' data and state, untracked worktree files, and symlink targets outside those roots remain judged.
-Native omp source metadata must agree with the actual read argument, including numeric and database selectors; paths claimed inside result text grant nothing.
-Trusted reads bypass the judge entirely, including for oversized content, and record decision `clear`, branch `trusted_read`, result-pass enforcement, no request started and null error type.
-They do not exempt `bash` results or reads of other paths and do not authenticate the producer.
-An audit failure adds a notice beside the original trusted read rather than erasing it.
-Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice rather than erasing them.
-On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
-Claude receives no result notice at all: its post-tool advisory was retired and the adapter ignores `PostToolUse`.
-The [steering-inbox owner](../bin/fm-task-inbox-lib.sh) defines record-specific delivery, ordered survivor announcements, checkpoint handling and publication-clock retry scheduling.
-Its shared carrier keeps the inbox reference independent of home depth and carries the exact record, acknowledgement ordering and omp `:raw` hint under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
-Native launch prompts carry the survivor doorbells separately from the record-backed launch carrier, so omp sees each binding without reading that carrier first; announcement never repairs a legacy receipt.
-This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
-Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
+omp and Claude tool results reach the worker unchanged: the guard installs no result handler, makes no TypeSafe request for results, and writes no `tool_result` audit rows.
+There is no result size budget or result-dependent read exemption.
+Launch and steering records use the existing [launch publisher](../bin/fm-operational-input.sh) and [steering-inbox owner](../bin/fm-task-inbox-lib.sh); they publish only the record bytes, with no guard receipt, and their delivery and acknowledgement contracts are unchanged.
+The steering carrier names the exact record, acknowledgement ordering and omp `:raw` hint in under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
+The removed result screen and the result-only decision points retired with it are recorded in [`docs/guards/retired.json`](guards/retired.json); their retirement test covers unchanged background notices, recorded bounded-wait help, launch/steering records and result-free session accounting offline.
 
 The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
@@ -2545,12 +2510,12 @@ The captain data-egress decision 2026-10-08 authorizes Jev guard requests only f
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
 The shared [guard service](../bin/ten-levels/extensions/report.ts) checks scope and the complete serialized request before resolving a credential or calling the provider.
 The same project decision governs omp's native model routes; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that separate launch contract.
-For authorized screening, shell state contains the command and working directory, write state contains the path and replacement-content pieces, and result state contains the tool name, `source_role: tool_result` and text output after the bounded producer-field exclusion above.
+For authorized screening, shell state contains the command and working directory, and write state contains the path and replacement-content pieces.
 These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling.
 Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
-Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent, and the never-send policy still checks their whole payload before the first piece leaves; their complete-cover screening is unchanged.
+Shell calls that would need more than 16 pieces still require review before anything is sent, and the never-send policy checks their whole payload before the first piece leaves.
 Write/edit content is not refused because it exceeds that model-screening budget: the guard screens at most 16 pieces and admits the remainder under deterministic local rules only.
 The existing root check applies to the whole operation.
 A budget-limited write/edit is also checked over its whole replacement text, before any model request, for exactly these shapes: a private-key header, a GitHub token (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` or `github_pat_` prefix), an AWS access key ID (`AKIA` or `ASIA` prefix), a Slack token (`xox` prefix) and a connection URL with an embedded password.
@@ -2563,8 +2528,8 @@ These checks can reject placeholders that resemble the listed shapes and miss un
 Every admitted write records unique UTF-8 content bytes as `write_coverage.model_screened_bytes` and `write_coverage.local_only_bytes`, excluding framing and repeated overlap; a nonzero local-only count adds an explicit unscreened-remainder note to the audit row.
 The never-send policy checks every model-screened piece of a write/edit before the first piece leaves; the remainder is never sent to a model, so that policy does not check it.
 A write/edit piece is checked alone, so a never-send value longer than about 1,000 JSON-escaped bytes as written, including the whitespace between its words, can be cut across a piece boundary, and then only fragments reach the model.
-The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while omp result handling retains the advisory-band and trusted-read exceptions above.
-A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
+The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes.
+A piece that blocks a shell command or write blocks the call and names its part, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
 
@@ -2573,15 +2538,12 @@ It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolut
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
 The client retains its existing internal retry behavior; service budgets include those retries and response bodies.
 Claude, and omp's pre-tool shell and write judgments, allow up to three 90-second service tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget.
-omp's result screening allows up to two 12-second service tries with 500 ms backoff inside a shared 25-second decision budget.
 Retries follow only a plain provider `Error`, `TimeoutError` or network `TypeError`.
-The 300-second budget reserves a complete further try and backoff before retrying; omp's result second try uses only the time remaining in its strict 25-second handler budget after backoff and local preflight.
-The service never retries a flagged, ambiguous or policy-blocked answer, malformed response (`ContractError`), privacy, credential or oversize refusal, or handler cancellation.
+The 300-second budget reserves a complete further try and backoff before retrying.
+The service never retries a policy-blocked answer, malformed response (`ContractError`), privacy, credential or oversize refusal, or handler cancellation.
 The 90-second per-try limit protects only against a judge that never answers; it is not derived from answered-call latency, which was far lower (the tracked 99th percentile of 535 ms over 15,640 answered calls under Unreachable threshold in [TypeSafe account health](#typesafe-account-health)), and answered-call measurements are censored by the previous timeout and do not establish the latency of unanswered calls.
 Claude's host hook envelope uses `fm-duration.py limit` with a 330-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
-Installed omp 18.12.0 has a separate nonconfigurable 30-second result-handler deadline that forwards original output if an extension times out.
-Its 25-second result budget must therefore remain below that native deadline; extending `extensionHandlers.toolCallTimeoutMs` cannot protect results.
-That setting is the pre-tool deadline, 30 seconds by default, and omp refuses the call when a `tool_call` handler outlasts it (measured on 18.12.0: the host logged `handler timed out after 30000ms` and returned an extension timeout instead of running the tool).
+omp refuses a call when a `tool_call` handler outlasts `extensionHandlers.toolCallTimeoutMs`, which defaults to 30 seconds.
 [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) raises it to 330 seconds, above the 300-second pre-tool budget, for worker launches through the existing per-launch `--config` overlay; no global or user omp setting is changed.
 A raw launch that omits the overlay keeps the 30-second default, so a pre-tool judgment slower than that is refused by the host rather than reviewed; that failure stays closed.
 Each call obtains its own bounded judgment; no outcome of one call is carried to another, so a slow or failed judgment never refuses a later call by itself.
@@ -2600,11 +2562,6 @@ A healthy judge still screens every shell command and write; two narrow shell-on
 
 Both admissions keep the failed judgment's error type in their audit row.
 Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
-On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude runs no result screening at all because its post-tool advisory is retired.
-Clear scores at or below 0.20 pass without an advisory.
-Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.
-Non-text results that cannot be assessed also require review rather than an unexamined pass.
-Claude receives no result notice, because its post-tool advisory is retired.
 Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool execution with a stable error type, and no post-tool notice could undo a tool's effects.
 The command wrapper publishes only successful handler stdout, normalizes active nonzero runtime exits to exit 2, and emits `RuntimeExecutionError` with the observed numeric exit status instead of raw failure output.
 Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
@@ -2615,14 +2572,13 @@ They perform no guard key lookup or provider request and retain deterministic pa
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
 The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
-When producer-field exclusion applies, `producer_fields` records only the fixed producer name and `removed_bytes`, the removed UTF-8 byte count, never the excluded text.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
-A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer (a blank tool-result piece needs none and is not counted), separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
+A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer, separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
 Its usage totals every answered piece, its attempts include every answered piece and every unanswered piece whose request started, and `ms` is the longest elapsed time because pieces run concurrently.
 The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.
-A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning, an unsupported result shape) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
+A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
 When every planned piece answered, one answer carries its own reported or estimated charge, and several answers sum to a reported charge only when every one of them reported its cost, otherwise unknown.
 Once a request has started, a planned piece that did not answer, whether it failed or was never sent, makes the total unknown with `incomplete: true`.
 A payload for which no request was sent records `not_called` and is not incomplete, because nothing was billed.
@@ -2633,9 +2589,8 @@ Reported, estimated, unknown and not-called costs are distinct; unknown charges 
 Commands, state, questions, raw exchanges, provider extension fields and exception messages are excluded; paths are excluded except for the refused write/edit target in `refused_path`.
 The guard no longer adds raw session report entries.
 An active durable-record failure requires review with `AuditUnavailableError`; if judgment also failed, its stable error type remains visible in the notice.
-The explicit trusted-read and channel-consistency exceptions retain original read content beside that notice.
 Intentionally inactive scope does not become active merely because its optional record cannot be written.
-[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, calibration limitations and deployed acceptance.
+[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, controlled decision fixtures and deployed acceptance.
 
 ## Jev belay Stop hook
 

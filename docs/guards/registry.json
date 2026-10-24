@@ -691,5 +691,13 @@
       "layer": "prose",
       "reason": "an instruction corpus in AGENTS.md and its skills, not a guard with a decision, source, or remedy; the audit scores it as prose and rule 3 cannot name a runtime source for it"
     }
+  ],
+  "beyond_audit_note": "Retired decision points the 2026-10-22 audit never counted, each matched by assessment_point to its docs/guards/retired.json entry. Ids stay out of this file because bin/fm-guard-refcheck.sh treats any other mention as a live reference.",
+  "beyond_audit_retired": [
+    { "assessment_point": "D4", "assessment": "data/fm-jev-guard-e2e/report.md" },
+    { "assessment_point": "D5", "assessment": "data/fm-jev-guard-e2e/report.md" },
+    { "assessment_point": "D6", "assessment": "data/fm-jev-guard-e2e/report.md" },
+    { "assessment_point": "D7", "assessment": "data/fm-jev-guard-e2e/report.md" },
+    { "assessment_point": "D9", "assessment": "data/fm-jev-guard-e2e/report.md" }
   ]
 }

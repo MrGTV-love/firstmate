@@ -402,7 +402,7 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
 }
 
 test_relaunch_announces_surviving_inbox_records() {
-  local harness dir id first second out meta
+  local harness dir id first second first_bell second_bell out meta
   for harness in claude omp; do
     id="survivors-$harness"
     dir=$(new_case "$id" "$id")
@@ -422,27 +422,21 @@ test_relaunch_announces_surviving_inbox_records() {
     cp "$dir/fakebin/claude" "$dir/fakebin/omp"
     fm_eval_launch "$(cat "$dir/fake/launch")" "$dir/wt" "$dir/fakebin" \
       HOME="$dir/user-home" FM_FAKE_CLAUDE_ENV_LOG="$dir/argv" || fail "$harness launch execution failed"
-    out=$(GUARD="$ROOT/bin/fm-jev-guard.ts" CASE_DIR="$dir" TASK="$id" HOST="$harness" FIRST="$first" SECOND="$second" \
-      node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
+    first_bell=$(bash -c '. "$1"; fm_task_inbox_doorbell_line "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$first") ||
+      fail "$harness first survivor doorbell unavailable"
+    second_bell=$(bash -c '. "$1"; fm_task_inbox_doorbell_line "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$second") ||
+      fail "$harness second survivor doorbell unavailable"
+    out=$(CASE_DIR="$dir" FIRST_BELL="$first_bell" SECOND_BELL="$second_bell" \
+      node --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const dir = process.env.CASE_DIR;
-const args = readFileSync(`${dir}/argv.args`, 'utf8').split('\0').filter(Boolean);
-const handlers = {};
-installJevGuard({ on(name, fn) { handlers[name] = fn; } }, {
-  home: `${dir}/home`, state: `${dir}/home/state`, config: `${dir}/home/config`,
-  data: `${dir}/home/data/${process.env.TASK}`, worktree: `${dir}/wt`,
-  task: process.env.TASK, project: 'firstmate', host: process.env.HOST, policy: 'FIRSTMATE_JEV_GUARD_V1',
-});
-handlers.before_agent_start({ prompt: args.at(-1) });
-for (const path of [process.env.FIRST, process.env.SECOND]) {
-  const result = await handlers.tool_result({ toolName: 'read', input: { path: `${path}:raw` },
-    content: [{ type: 'text', text: readFileSync(path, 'utf8') }],
-    details: { meta: { source: { type: 'path', value: path } } } }, { cwd: `${dir}/wt` });
-  assert.equal(result, undefined, 'each survivor must be natively announced, even without a provider key');
-}
+const args = readFileSync(`${process.env.CASE_DIR}/argv.args`, 'utf8').split('\0').filter(Boolean);
+const prompt = args.at(-1);
+const first = prompt.indexOf(process.env.FIRST_BELL);
+const second = prompt.indexOf(process.env.SECOND_BELL);
+assert.ok(first >= 0, 'the launch prompt must announce the first surviving record');
+assert.ok(second >= 0, 'the launch prompt must announce the second surviving record');
+assert.ok(first < second, 'surviving records must be announced in numeric order');
 JS
     ) || fail "$harness survivor delivery failed: $out"
   done

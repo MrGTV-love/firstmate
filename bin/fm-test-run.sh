@@ -211,7 +211,8 @@
 # Deleted test assets still select remaining suites that reference them; an
 # unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
 # select the jev-guard behavior suite, and outside the core client and Level 5
-# routers also the offline audit and producer suites. The core client and Level 5 routers
+# routers also the offline audit suite and every retirement test in
+# docs/guards/retired.json that names bin/ten-levels/. The core client and Level 5 routers
 # select the typed dispatch resolver suite, their only dispatch consumer.
 set -eu
 
@@ -1691,6 +1692,22 @@ scripts_for_test_reference() {
   [ "$found" -eq 1 ]
 }
 
+# Retirement tests listed in docs/guards/retired.json that name <needle>,
+# selected per script. Reading the changelog keeps retired guard ids out of
+# this file, where bin/fm-guard-refcheck.sh would count them as resurrected.
+retirement_tests_for_reference() {
+  local needle=$1 t
+  local found=0
+  [ -f docs/guards/retired.json ] || return 1
+  while IFS= read -r t; do
+    if [ -f "$t" ] && grep -Fq "$needle" "$t"; then
+      printf '__script__:%s\n' "$(basename "$t")"
+      found=1
+    fi
+  done < <(sed -nE 's/.*"retirement_test": *"([^"]+)".*/\1/p' docs/guards/retired.json | LC_ALL=C sort -u)
+  [ "$found" -eq 1 ]
+}
+
 # bin/ scripts other than <needle> itself that name <needle>.
 bin_consumers_of() {
   local needle=$1 b
@@ -1759,11 +1776,13 @@ families_for_changed_path() {
       ;;
     bin/ten-levels/*)
       # Vendored upstream jev-guard (see SOURCE.md there) and its Firstmate
-      # report.ts are exercised through the jev-guard behavior suite; the
-      # offline audit and producer suites assert its minimized audit rows.
+      # report.ts are exercised through the jev-guard behavior suite; report.ts
+      # also owns the audit row, which only the offline audit suite asserts.
+      # Retirement tests that drive the installed guard through these files
+      # prove its retired decision points stay gone.
       printf '%s\n' "__script__:fm-jev-guard.test.sh"
       printf '%s\n' "__script__:fm-jev-guard-audit.test.sh"
-      printf '%s\n' "__script__:fm-jev-guard-producer.test.sh"
+      retirement_tests_for_reference 'bin/ten-levels/' || true
       ;;
     tests/fm-pi-watch-loader-live.test.mjs)
       printf '%s\n' __script__:fm-pi-watch-loader-live.test.sh
