@@ -3237,6 +3237,70 @@ SH
   pass "bounded acquire hands ownership to the waiting caller after contention"
 }
 
+# A holder that releases between the bounded waiter's final refused attempt and
+# its classification is still contention at the deadline, not an acquisition
+# error. The wrapper forces exactly that interleaving on the final attempt.
+test_bounded_lock_deadline_keeps_contention_when_holder_releases() {
+  local dir state lock holder_pid i rc
+  dir=$(make_case bounded-lock-deadline-release-race)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2" || exit 10
+    printf "ready\n" > "$3"
+    stub_ticks=0
+    while [ ! -e "$4" ] && [ "$stub_ticks" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
+      sleep 0.05
+      stub_ticks=$((stub_ticks + 1))
+    done
+    fm_lock_release "$2"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/holder.ready" "$dir/release-holder" &
+  holder_pid=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$dir/holder.ready" ]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  [ -s "$dir/holder.ready" ] \
+    || { kill "$holder_pid" 2>/dev/null || true; fail "release-race fixture holder never acquired its lock"; }
+
+  rc=0
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fixture_lock=$2 release_holder=$3
+    eval "_fm_test_real_$(declare -f fm_lock_try_acquire)"
+    attempts=0
+    fm_lock_try_acquire() {
+      local refusal ticks=0
+      attempts=$((attempts + 1))
+      _fm_test_real_fm_lock_try_acquire "$@" && return 0
+      refusal=$?
+      if [ "$attempts" -eq 2 ]; then
+        : > "$release_holder"
+        while { [ -e "$fixture_lock" ] || [ -L "$fixture_lock" ]; } && [ "$ticks" -lt 200 ]; do
+          sleep 0.05
+          ticks=$((ticks + 1))
+        done
+      fi
+      return "$refusal"
+    }
+    rc=0
+    fm_lock_acquire_wait_bounded "$fixture_lock" 1 || rc=$?
+    printf "%s %s %s\n" "$rc" "${FM_LOCK_HELD_PID:-}" "$attempts" > "$4"
+    [ "$rc" -ne 0 ] || fm_lock_release "$fixture_lock"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$dir/release-holder" "$dir/waiter.result" \
+    > "$dir/waiter.out" 2> "$dir/waiter.err" || rc=$?
+  : > "$dir/release-holder"
+  wait "$holder_pid" || fail "release-race fixture holder did not release cleanly"
+  [ "$rc" -eq 0 ] || fail "release-race waiter shell failed (rc=$rc): $(cat "$dir/waiter.err")"
+  [ "$(cat "$dir/waiter.result" 2>/dev/null || true)" = "124 $holder_pid 2" ] \
+    || fail "a holder released after the final refusal turned deadline contention into an error: $(cat "$dir/waiter.result" 2>/dev/null || true)"
+  [ ! -e "$lock" ] && [ ! -L "$lock" ] || fail "release-race fixture left its lock behind"
+  pass "a bounded deadline stays contention when the holder releases after the final refusal"
+}
+
 # A live-but-stuck presentation lock must not strand the executable drain. The
 # presentation remains retriable on the next pass, while the separate queue
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
@@ -4123,6 +4187,7 @@ test_unreclaimable_dead_lock_refuses_without_waiting
 test_lock_wait_ends_when_the_lock_directory_is_gone
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
+test_bounded_lock_deadline_keeps_contention_when_holder_releases
 test_live_presentation_holder_is_deadlined_without_weakening_ack
 test_malformed_presentation_lock_reports_acquire_failure
 test_secondmate_foreign_queue_stall_tracks_progress_and_alerts_once
