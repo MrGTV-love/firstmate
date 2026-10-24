@@ -8,5 +8,35 @@
     "why": "it cannot withhold on Claude, so it reported itself as protection it did not provide; the note it appended was advisory only",
     "replaced_by": "nothing; the same invariant is carried by the human review of tool output and by jev-pretool-deny for actions, not reads",
     "retirement_test": "tests/fm-retired-jev-posttool-advisory.test.sh"
+  },
+  {
+    "id": "jev-shell-model-gate",
+    "system": "firstmate",
+    "invariant": "a shell command that Jev judges irreversible or destructive never runs",
+    "retired": "2026-10-24",
+    "why": "its effect and destructive-intent questions ask for the decision itself, so a worker's own cleanup reads as destructive: 63 of its 69 refusals were false positives, and eval or python -c bypassed it",
+    "replaced_by": "nothing yet; OS-level write confinement of each worker process tree, with the delegated-write residual named, is the planned replacement",
+    "evidence": "data/fm-jev-guard-e2e/report.md",
+    "retirement_test": "tests/fm-retired-jev-shell-model-gate.test.sh"
+  },
+  {
+    "id": "jev-shell-outage-deny",
+    "system": "firstmate",
+    "invariant": "a shell command whose required Jev judgment could not run never runs",
+    "retired": "2026-10-24",
+    "why": "it only failed the retired shell model gate closed; it turned provider failures into refusals of harmless commands, including a worker's own inbox acknowledgement (O13)",
+    "replaced_by": "nothing; a shell call now needs no judgment, so there is no judgment to wait for",
+    "evidence": "data/fm-jev-guard-e2e/report.md",
+    "retirement_test": "tests/fm-retired-jev-shell-outage-deny.test.sh"
+  },
+  {
+    "id": "jev-shell-outage-admissions",
+    "system": "firstmate",
+    "invariant": "during a failed shell judgment only a proven read-only command or a lab-home command runs",
+    "retired": "2026-10-24",
+    "why": "the read-only classifier and the lab-home marker existed only to stop the retired shell outage denial from refusing legitimate work, and no ledger row ever used either branch",
+    "replaced_by": "nothing; with no shell judgment and no shell outage denial there is nothing left to admit",
+    "evidence": "data/fm-jev-guard-e2e/report.md",
+    "retirement_test": "tests/fm-retired-jev-shell-outage-admissions.test.sh"
   }
 ]

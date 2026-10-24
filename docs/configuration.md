@@ -133,7 +133,7 @@ The teardown completing command re-enters its existing proof and automatic ignor
 It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, and one teardown process keeps one operation across all its refusals, so a refusal, a refusal on retry and the later success are one operation; a human-only exit prints no command and carries none.
 A forced or legacy-record teardown prints a human-only exit for that refusal instead, because the printed command carries no force or legacy flags and so could not complete that run; the owner re-runs it with the owner's own flags.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
-Jev's size message, for shell calls and untrusted results, names the existing request/overlap budget and a human-only question without changing their screening or admission.
+Jev's size message, for write/edit pre-calls that cannot be planned and for untrusted results, names the existing request/overlap budget and a human-only question without changing their screening or admission.
 A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; Claude runs no post-tool screening, so an oversized result there is neither printed as `REFUSED` nor counted.
 
 The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
