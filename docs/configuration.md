@@ -1752,13 +1752,13 @@ Report raw counts and outcomes, not estimated savings from a single synthetic sm
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
 With the flag absent, every Claude launch's inline `--settings` JSON carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, every Devin worker config sets `"attribution": false`, and every fleet launch receives a pane-scoped `GIT_CONFIG` `core.hooksPath` pointing at `state/<id>.git-hooks`, where git's `commit-msg` hook strips known AI trailers even when a runtime injects them after the typed message.
-When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and fleet launches do not install or select the strip hooks.
+When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and the task Git hooks omit only the commit-message strip.
 Fresh launches and supported same-task relaunches apply the current attribution choice without retaining that task's obsolete hook selection, including when `config/launch-env-allowlist` is enabled.
 Unrelated Git environment entries and explicit operator settings remain in the persistent pane; their inheritance by the worker is subject to the [launch environment filter](#worker-launch-environment-configlaunch-env-allowlist).
-When keeping trailers, Git uses the repository's configured hooks unless the worker receives an explicit operator override.
-`bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs when stripping is enabled.
+Every fleet launch selects the task Git hooks for the [commit and push credential check](#jev-guard), independently of the attribution choice.
+`bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs in either attribution posture.
 A repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
-When stripping is enabled, the hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the strip; install a project's hooks from outside the pane, where the wrappers chain them.
+The task hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the task hooks, which hold the credential checks and, unless trailers are kept, the strip; install a project's hooks from outside the pane, where the wrappers chain them.
 The flag is a home-wide attribution choice, independently owned by each home and not inherited into secondmate homes; the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract leaves each home's presence or absence unchanged.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Firstmate, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh).
@@ -2472,7 +2472,7 @@ This is an operator-only migration, not an automated retrofit; isolated verifica
 Questions and numeric policy are code-owned:
 
 - Shell screening keeps the independent effect Choice and destructive-intent Noul and their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts).
-- Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
+- Write/edit handling retains deterministic root and input checks only; file-kind and credential model questions are removed, and write contents are never sent for model screening.
 - Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
   The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
 
@@ -2530,9 +2530,9 @@ This is bounded trusted local-tool access, not a confinement claim: an LSP serve
 `xd://report_issue` remains blocked because it can upload reports; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
 Device `edit` calls remain blocked, and every path-spelling refusal tells the agent to use a plain path and report if that is not possible.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
-The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
-An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
-A policy block (shell and write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
+The guard validates the replacement-input schema but does not judge or scan write/edit content.
+An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unsupported edit.
+A policy block (shell gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.
@@ -2545,26 +2545,32 @@ The captain data-egress decision 2026-10-08 authorizes Jev guard requests only f
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
 The shared [guard service](../bin/ten-levels/extensions/report.ts) checks scope and the complete serialized request before resolving a credential or calling the provider.
 The same project decision governs omp's native model routes; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that separate launch contract.
-For authorized screening, shell state contains the command and working directory, write state contains the path and replacement-content pieces, and result state contains the tool name, `source_role: tool_result` and text output after the bounded producer-field exclusion above.
+For authorized screening, shell state contains the command and working directory, and result state contains the tool name, `source_role: tool_result` and text output after the bounded producer-field exclusion above.
 These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling.
 Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
 Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent, and the never-send policy still checks their whole payload before the first piece leaves; their complete-cover screening is unchanged.
-Write/edit content is not refused because it exceeds that model-screening budget: the guard screens at most 16 pieces and admits the remainder under deterministic local rules only.
-The existing root check applies to the whole operation.
-A budget-limited write/edit is also checked over its whole replacement text, before any model request, for exactly these shapes: a private-key header, a GitHub token (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` or `github_pat_` prefix), an AWS access key ID (`AKIA` or `ASIA` prefix), a Slack token (`xox` prefix) and a connection URL with an embedded password.
-A prefix shape counts only when no letter, digit, underscore or hyphen comes right before it.
-The user name of a connection URL may be empty, and its password needs at least 8 characters before the `@`.
-Whitespace, `/`, `?`, `#`, quotes, backticks, angle brackets, parentheses, square and curly brackets, backslashes, commas, semicolons and pipes end that match.
-These are intentionally conservative report boundaries, so compact JSON, CSV and markdown that put a `host:port` value before an address are not read as a password.
-Other credential shapes in the remainder, including `sk-` keys, Bearer tokens and key or password assignments, are not checked beyond the model-screened pieces.
-These checks can reject placeholders that resemble the listed shapes and miss unfamiliar or encoded values; the remainder receives no model credential or file-kind assessment.
-Every admitted write records unique UTF-8 content bytes as `write_coverage.model_screened_bytes` and `write_coverage.local_only_bytes`, excluding framing and repeated overlap; a nonzero local-only count adds an explicit unscreened-remainder note to the audit row.
-The never-send policy checks every model-screened piece of a write/edit before the first piece leaves; the remainder is never sent to a model, so that policy does not check it.
-A write/edit piece is checked alone, so a never-send value longer than about 1,000 JSON-escaped bytes as written, including the whitespace between its words, can be cut across a piece boundary, and then only fragments reach the model.
+Write/edit content has no model-screening size limit and no model coverage audit.
+Credential checks run locally in the per-task `pre-commit` and `pre-push` hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope.
+[`bin/fm-git-secrets.py`](../bin/fm-git-secrets.py) scans only added content: the lines the staged index adds against `HEAD`, after the repository's pre-commit hook succeeds, including changes that hook stages, not their working-copy counterparts.
+Existing and moved lines are not scanned again; only new lines are: within one diff, each removed copy of a line cancels one added copy of the same text in any file, so renaming, moving or splitting a file adds nothing new.
+A merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
+At push time it scans the lines each outgoing commit adds relative to all of its parents, with the same per-commit move cancellation, including intermediate commits that a later commit cleans up.
+A commit is outgoing unless an advertised old tip or any remote-tracking ref, of any remote, already reaches it, so pushing to a URL or a new remote does not rescan history already on another remote.
+Each commit and push decision appends one `git-commit-credential-shapes` or `git-push-credential-shapes` event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh), whose `repeat` is the highest consecutive refusal count for the same credential-shaped line, identified by its content hash; different refused content starts at one even if an earlier attempt was abandoned.
+A failed inspection is a separate episode: it counts under a reserved `inspection-failed` key, reaches the same escalation on retry, and keeps the per-line counts.
+Only an allowed decision clears the counts.
+Past the budget of one refusal in a row, the refusal also prints an `escalate:` line telling the worker to stop retrying and report to Firstmate for a human decision; the commit or push stays refused while the new credential-shaped line remains or inspection keeps failing.
+Ref deletions transfer no content and need no scan; project hooks still run and receive the original pre-push ref-update input.
+The scanner retains the existing anchored shapes: private-key headers, GitHub tokens, AWS access key IDs, Slack tokens and connection URLs with embedded passwords.
+It reports affected file names only, never matching values, and refuses when inspection fails.
+Writing a credential to an ignored `.env` is allowed and stages nothing; force-adding that file still subjects it to the commit check.
+Placeholders such as `replace-me` pass, but an added placeholder shaped like one of the listed credentials can fail; unfamiliar or encoded credentials can be missed.
+This is a client-side check, not a security boundary against hook bypass, alternate Git object writers, or pushes made outside the task launch environment.
+[`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, renamed and split files, conflicted merges, repeated and abandoned refusals, outgoing history, URL and new-remote pushes and complete 396,924-byte report writes through both write adapters without provider calls.
 The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while omp result handling retains the advisory-band and trusted-read exceptions above.
-A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
+A piece that blocks a shell command blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
 
@@ -2572,7 +2578,7 @@ The service uses the canonical shared Jev client, pinned to the calibrated model
 It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
 The client retains its existing internal retry behavior; service budgets include those retries and response bodies.
-Claude, and omp's pre-tool shell and write judgments, allow up to three 90-second service tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget.
+Claude and omp pre-tool shell judgments allow up to three 90-second service tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget.
 omp's result screening allows up to two 12-second service tries with 500 ms backoff inside a shared 25-second decision budget.
 Retries follow only a plain provider `Error`, `TimeoutError` or network `TypeError`.
 The 300-second budget reserves a complete further try and backoff before retrying; omp's result second try uses only the time remaining in its strict 25-second handler budget after backoff and local preflight.
@@ -2589,17 +2595,17 @@ This is not sustained-outage permission to execute shell commands or write files
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
-A healthy judge still screens every shell command and write; two narrow shell-only admissions apply only when the judgment failed, whether unavailable, withheld for privacy or malformed, and never to a size refusal:
+A healthy judge still screens every shell command; two narrow shell-only admissions apply only when the judgment failed, whether unavailable, withheld for privacy or malformed, and never to a size refusal:
 
 - A shell command proven read-only is admitted with branch `read_only`.
   [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns the program allowlist, the read-only git subcommands, the requirement that every pipeline segment be read-only, and the disqualifiers: redirection, substitution, expansion, quoting, sequencing, background, git options before the subcommand other than `--no-pager`, any `--output` option, and the writing or executing `find` actions.
   Outside the lab admission below, anything not proven read-only is refused on an outage as before.
 - A shell command in a home carrying the `.fm-lab-home` token written by [`bin/fm-lab-home.sh`](../bin/fm-lab-home.sh) is admitted with branch `lab` when every `FM_*_OVERRIDE` is empty, the same rule as `fm_gate_lab_permitted` in [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh), so an approved lab teardown is not refused by an unavailable judge.
-  Writes and edits in a lab home are screened and refused exactly as in a real home.
+  Writes and edits in a lab home retain the same deterministic checks as in a real home.
   The guard reads only the marker's first-line token, so the marker is deliberately spoofable under the confused-agent threat model that [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh) already accepts: a forged marker in a real home admits shell commands there only when their judgment failed as above, and grants nothing while the judge is healthy.
 
 Both admissions keep the failed judgment's error type in their audit row.
-Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
+Shell calls too large to cover within the request bound also deny execution; writes and edits have no model-screening size budget.
 On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude runs no result screening at all because its post-tool advisory is retired.
 Clear scores at or below 0.20 pass without an advisory.
 Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.

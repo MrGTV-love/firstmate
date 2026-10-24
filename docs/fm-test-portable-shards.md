@@ -21,6 +21,7 @@ A stale table is what makes the packing guard pass while a real shard overruns, 
 The corpus grows from fifteen to eighteen serial shards, which packs the slowest shard at 23.9 minutes.
 The per-shard packing check below then refused eighteen and nineteen shards, because one shard packed 1282762 ms and 1202486 ms of several scripts behind a 898093 ms largest suite, so the corpus moves to twenty serial shards, the fewest that pass.
 The packing target stays at 1200000 ms, and the 60-minute job timeout is unchanged.
+On 2026-10-24 the four unhinted `tests/fm-retired-jev-write-*.test.sh` retirement suites, packed at the 45000 ms default weight because `bin/fm-guard-refcheck.sh` forbids their retired ids in the hint table, pushed serial shard 1 to 1205262 ms, so the corpus moved to twenty-one serial shards (`serial_shards=21 serial_max_ms=1148122`); the packing target and job timeout are unchanged.
 The guard checks each shard on its own: it refuses a shard whose packed sum is above the target and above that shard's own largest script.
 So a shard that holds one indivisible script alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
 `tests/fm-watch-triage-waits.test.sh` and `tests/fm-control-relaunch.test.sh` were the two remaining indivisible members and are now four and three independently runnable groups, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) describes.
@@ -352,7 +353,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses twenty-six long-lived Linux jobs (twenty serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses twenty-seven long-lived Linux jobs (twenty-one serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 

@@ -21,21 +21,18 @@ let next;
 let realPlan = false;
 const answer = (noul = 0.05) => ({ model: 'fixture', answers: {
   injection: { type: 'noul', noul },
-  kind: { type: 'choice', choice: 'code', confidence: 1 }, contains_secret: { type: 'noul', noul },
 }, usage: { input_tokens: 3, output_tokens: 1 }, meta: { provider: 'typesafe', attempts: 1, elapsedMs: 7, cost: { amount: 0.001, source: 'reported' } } });
 mock.module(reportUrl, { namedExports: { ...report, createGuardService: () => ({ ...service,
   plan: (...args) => realPlan ? service.plan(...args) : parts.map((_, i) => String(i)),
-  planWrite: state => ({ pieces: parts.map((_, i) => String(i)), model_screened_bytes: Buffer.byteLength(state.content), local_only_bytes: 0 }),
   decide: async () => { const part = parts[next++]; if (part instanceof Error) throw part; return part; },
 }) } });
 const { installJevGuard } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-guard.ts`));
 const handlers = {};
 installJevGuard({ on(name, fn) { handlers[name] = fn; } }, context);
 const row = () => JSON.parse(readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-async function run(values, tool = 'result') {
+async function run(values) {
   parts = values; next = 0;
-  if (tool === 'write') await handlers.tool_call({ toolName: 'write', input: { path: 'file.ts', content: 'fixture' } }, { cwd: state });
-  else await handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text: 'fixture' }] }, { cwd: state });
+  await handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text: 'fixture' }] }, { cwd: state });
   return row();
 }
 const failed = (attempts, ms) => new report.GuardUnavailableError('TimeoutError', true, undefined, { attempts, elapsedMs: ms });
@@ -63,37 +60,36 @@ await test('result: an answered piece with an unsent planned piece stays incompl
   assert.equal(r.cost.incomplete, true);
   assert.equal(r.cost.reported_amount, 0.001, 'the partial reported charge stays visible');
 });
-for (const tool of ['result', 'write']) {
-  await test(`${tool}: every failed chunk survives settlement`, async () => {
-  const r = await run([answer(), failed(2, 40), failed(3, 90)], tool);
+  await test(`result: every failed chunk survives settlement`, async () => {
+  const r = await run([answer(), failed(2, 40), failed(3, 90)]);
   assert.equal(r.attempts, 6, 'every failed chunk contributes its attempts');
   assert.equal(r.ms, 90, 'parallel elapsed time includes the slowest failure, not only the first');
   assert.deepEqual(r.failures.map(f => [f.chunk, f.attempts, f.ms]), [[2, 2, 40], [3, 3, 90]], 'each failed chunk keeps its own timing');
   assert.equal(r.chunks, 3);
   });
-  await test(`${tool}: partial cost is incomplete and unsent chunks are not egress`, async () => {
-  let r = await run([answer(), failed(2, 40), failed(3, 90)], tool);
+  await test(`result: partial cost is incomplete and unsent chunks are not egress`, async () => {
+  let r = await run([answer(), failed(2, 40), failed(3, 90)]);
   assert.equal(r.cost.source, 'unknown', 'an answered piece cannot certify unanswered charges');
   assert.equal(r.cost.amount, null);
   assert.equal(r.cost.incomplete, true);
   assert.equal(r.cost.reported_amount, 0.001, 'the known partial reported charge is retained');
 
-  r = await run([new report.GuardUnavailableError('PrivacyWithheldError'), failed(2, 50)], tool);
+  r = await run([new report.GuardUnavailableError('PrivacyWithheldError'), failed(2, 50)]);
   assert.equal(r.request_started, true, 'an unsent first failure cannot hide later egress');
   assert.equal(r.attempts, 2);
   assert.equal(r.chunks, 1, 'planned but unsent pieces are not provider egress');
   assert.equal(r.planned_chunks, 2);
   assert.equal(r.cost.incomplete, true);
 
-  r = await run([answer(), new report.GuardUnavailableError('CredentialUnavailableError')], tool);
+  r = await run([answer(), new report.GuardUnavailableError('CredentialUnavailableError')]);
   assert.equal(r.chunks, 1);
   assert.equal(r.planned_chunks, 2);
   assert.equal(r.cost.incomplete, true);
   assert.equal(r.cost.reported_amount, 0.001);
 
   });
-  await test(`${tool}: a planned payload with no request sent is not-called and not incomplete`, async () => {
-  const r = await run([new report.GuardUnavailableError('CredentialUnavailableError')], tool);
+  await test(`result: a planned payload with no request sent is not-called and not incomplete`, async () => {
+  const r = await run([new report.GuardUnavailableError('CredentialUnavailableError')]);
   assert.equal(r.request_started, false);
   assert.equal(r.planned_chunks, 1);
   assert.equal(r.chunks, 0);
@@ -102,15 +98,14 @@ for (const tool of ['result', 'write']) {
   assert.equal(r.cost.incomplete, false);
   assert.equal(r.cost.reported_amount, 0);
   });
-  await test(`${tool}: complete runs retain full reported cost without failures`, async () => {
-  const r = await run([answer(), answer()], tool);
+  await test(`result: complete runs retain full reported cost without failures`, async () => {
+  const r = await run([answer(), answer()]);
   assert.equal(r.attempts, 2);
   assert.deepEqual(r.failures, [], 'a complete run invents no failed attempts');
   assert.equal(r.cost.amount, 0.002);
   assert.equal(r.cost.source, 'reported');
   assert.equal(r.cost.incomplete, false, 'a fully reported complete run is complete');
   });
-}
 // A blank piece of an oversized result is cleared locally: it sends nothing, so it is not work the provider had to answer.
 const { SCREEN_QUESTIONS } = await import(new URL('../src/levels/level06/index.ts', reportUrl));
 async function runText(text, values) {

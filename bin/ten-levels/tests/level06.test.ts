@@ -20,23 +20,10 @@ test("shell: irreversible equality and destructive equality deny independently",
   assert.equal(l6.gateBash({ effect: choiceA("reversible", 0.5), destructive_intent: noulA(0.85) }).block, true);
 });
 
-test("write: outside-root denial precedes any model call", async () => {
-  let called = false;
-  const decision = await l6.gateWriteCall("/tmp/notes.txt", "hello", "/repo", async () => { called = true; return { answers: {} }; });
-  assert.equal(decision.block, true);
-  assert.equal(called, false);
+test("write: lexical roots reject escapes and the root itself", () => {
   assert.equal(l6.insideRepo("docs/x.md", "/repo"), true);
   assert.equal(l6.insideRepo("../x.md", "/repo"), false);
   assert.equal(l6.insideRepo("/repo", "/repo"), false);
-});
-
-test("write: credential and secrets-file equality preserve independent thresholds", () => {
-  for (const [kind, confidence, secret, block] of [
-    ["config", 0.8, 0.6999, false], ["config", 0.8, 0.7, true],
-    ["secrets", 0.7999, 0.1, false], ["secrets", 0.8, 0.1, true],
-  ] as const) {
-    assert.equal(l6.gateWrite({ kind: choiceA(kind, confidence, l6.WRITE_QUESTIONS.kind.criteria), contains_secret: noulA(secret) }).block, block);
-  }
 });
 
 for (const [probability, expected] of [

@@ -40,6 +40,9 @@ Registry-only fields carry what the audit scores: `tier`, `harm`,
 `emitters`. `emitters` lists host files that take the guard's decision and emit
 its event when the invariant is defined in a library the host calls; the writer
 call is then proven in the emitter rather than in the owner.
+An active or retired guard added after the audit carries `beyond_audit: true`,
+which keeps it outside the audited inventory that `fm-guard-lint.sh --counts`
+balances against `audited`.
 
 `remedy` is rendered text, not a pointer. Every remedy contains at least one
 executable token: a repository path that exists, a `bin/` invocation, or a shell

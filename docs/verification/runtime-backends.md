@@ -27,6 +27,33 @@ The [architecture](../architecture.md) owns the shared allocation/publication bo
 
 ## Launch-scoped Git hook selection
 
+Credential-boundary and relaunch verification on 2026-10-24 used Darwin arm64, Node v26.4.0, Python 3.13.6 and Apple Git 2.54.0:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-git-secrets.test.sh
+bash bin/fm-test-run.sh tests/fm-git-strip-ai-trailers.test.sh
+```
+
+Both suites exited 0 with no gate skip; the private Bash/ksh tmux relaunch fixture preserved operator configuration and kept the credential hooks selected with either trailer posture.
+The credential suite observed:
+
+```text
+omp: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+claude: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+credential shapes: added binary lines, newline names, anchored prefixes and URL boundaries checked at commit
+```
+
+It exercises both production write adapters offline and real Git commit/push operations through installed task hooks, including project-hook staging and failure propagation, both trailer postures, intermediate outgoing commits, new branches, ref deletion and project-hook stdin preservation.
+It also covers the added-content scope: an unrelated edit beside the existing `tests/fm-voice-relay.test.sh` fixture commits, a conflicted merge bringing credential-shaped lines from main commits and pushes, pushes to a URL, a new remote and a remote with no tracking refs skip history already on origin, and each of those paths still refuses a newly added credential shape; each of those three cases failed against the previous whole-blob scanner.
+Renaming and splitting a file that holds an existing fixture commit and push while a new AKIA-shaped line inside the moved file still refuses, and repeated refusals record their `repeat` count and escalate past the budget without admitting the commit; both cases failed against the previous added-line scanner.
+The abandoned-attempt regression exercises both installed hooks without an intervening allowed decision and observes `deny:1 deny:2 deny:3 deny:1 deny:2`: unchanged credential-shaped lines retain their count through benign edits, but unrelated refused content starts a fresh episode; this regression failed against the worktree-only counter.
+The inspection-failure regression drives both scanners directly with an invalid merge parent or pre-push record and observes `deny:1:true deny:1:false deny:2:false deny:2:true` as `decision:repeat:source_ok`: repeated failed inspections escalate, and the refused line keeps its count across them; it failed against the scanner that cleared the counts on every failed inspection.
+It does not launch live model sessions or prove another backend's lifecycle behavior; Linux was not exercised.
+The [operator contract](../configuration.md#jev-guard) owns current behavior and residual limits.
+
+### Attribution-only selection evidence (historical)
+
+The records below predate the always-installed credential hooks and do not establish the current strip-to-keep routing.
 Verified on 2026-10-05 on macOS arm64 with tmux 3.5a, Apple Git 2.50.1, and stock Bash 3.2.57:
 
 ```sh
