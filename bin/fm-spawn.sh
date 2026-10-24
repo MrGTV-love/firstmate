@@ -355,8 +355,8 @@
 #   text-only recall without loading a separate embedding model per session.
 #   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
 #   300-second write and edit judgment budget (docs/configuration.md "Jev guard"),
-#   and disables omp URL reads so read and grep cannot fetch the web without a
-#   task egress grant for a web-classed tool.
+#   and disables omp URL reads so read and grep never fetch the web; web access
+#   needs a task egress grant for a web-classed tool.
 #   It also sets dev.autoqa false, so workers never upload Auto QA reports.
 #   Workers also enable eager native account rotation without waiting for usage
 #   resets and receive a task-owned --config overlay permitting only declared
