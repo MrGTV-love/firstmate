@@ -1,0 +1,105 @@
+
+=== S1 / T3(a): commit a file holding a 40-char ghp_ token ===
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "config.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+exit=1
+no credential bytes in output
+HEAD unchanged
+
+=== S6: retry the same refused commit (budget 1 -> escalate) ===
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "config.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+escalate: this check refused 2 times in a row, past its budget of 1; stop retrying and report the refusal to Firstmate for a human decision. The commit or push stays refused until inspection succeeds and finds no new credential-shaped line.
+exit=1
+HEAD unchanged after escalation
+
+=== S2 / T3(b): Claude Write of the token to an ignored .env ===
+gitignore committed (allowed decision)
+hook exit=0 stdout=[] (empty stdout + exit 0 = write allowed)
+staged after 'git add -A': []
+commit exit=1 :: On branch main
+HEAD unchanged; .env never committed
+.env absent from all history
+
+=== S3 / T3(c): placeholder commits and pushes ===
+placeholder commit OK
+placeholder push OK; remote main=fcd0f9e local=fcd0f9e
+
+=== S4 / T3(d): 396,924-byte report written via Claude hook, then committed ===
+payload bytes=396924
+hook exit=0 stdout=[]
+report commit OK; committed blob bytes=396924
+report push OK
+
+=== S5: credential committed with --no-verify (hooks skipped) is caught at push ===
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "leak.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+error: failed to push some refs to '/Users/charlesabrooker/tmp/fm-t3-walk.NX1jfJ/remote.git'
+push exit=1
+no credential bytes in output
+remote unchanged
+new-branch push exit=1 :: error: credential-shaped content in lines that staged or outgoing commits add
+
+=== S7: existing fixture line in history is not re-scanned; moved file OK; new line still refused ===
+fixture placed on remote (hooks bypassed, as historic content)
+unrelated edit beside fixture: commit OK
+unrelated edit: push OK
+git mv of fixture file: commit OK
+rename: push OK
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "renamed-fixture.test.sh"
+new AKIA line exit=1
+no credential bytes in output
+
+=== S8: fail closed when inspection input is invalid (bad MERGE_HEAD) ===
+error: credential inspection failed; commit or push refused
+help: Restore readable Git objects and an available python3 runtime, then retry.
+pre-commit exit=1
+escalate: this check refused 2 times in a row, past its budget of 1; stop retrying and report the refusal to Firstmate for a human decision. The commit or push stays refused until inspection succeeds and finds no new credential-shaped line.
+retry pre-commit exit=1
+after restoring input: benign commit OK (allow clears counts)
+
+=== S9: keep-ai-trailers=1 install keeps credential checks and keeps trailers ===
+keep-trailers credential commit exit=1 :: error: credential-shaped content in lines that staged or outgoing commits add
+trailer kept: 1
+default install trailer count: 0
+
+=== S10: project pre-commit hook: its failure propagates; credential it stages is caught ===
+project hook exit-17 -> commit exit=1 :: project-hook-ran
+wrapper status=17
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "generated.txt"
+project-staged credential exit=1
+
+=== Guard events (one JSON line per decision) ===
+{'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 2}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-push-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-push-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-push-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-push-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 2}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-push-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-push-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': False, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': False, 'repeat': 2}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+{'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+events: 23
+
+=== Jev guard ledger rows for the two Claude writes ===
+{'tool': 'write', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'request_started': False, 'error_type': None}
+{'tool': 'write', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'request_started': False, 'error_type': None}

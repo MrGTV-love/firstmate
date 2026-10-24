@@ -1,0 +1,73 @@
+FM_TEST_BEGIN 2026-10-24T20:22:21Z tests/fm-git-secrets.test.sh family=unclassified expected_gate_skip=none
+ok - pre-commit keys repeats to refused lines; benign edits preserve the count and abandoned content cannot inflate unrelated refusals
+ok - pre-push keys repeats to refused lines; benign edits preserve the count and abandoned content cannot inflate unrelated refusals
+ok - project pre-commit staging is scanned before commit, and project-hook failure propagates
+ok - T3(a-c): staged credential refuses by filename, ignored .env commits nothing, placeholders commit and push; outgoing history is checked
+ok - T3(a-c): staged credential refuses by filename, ignored .env commits nothing, placeholders commit and push; outgoing history is checked
+ok - an unrelated edit beside an existing fixture commits; a newly added AKIA-shaped line refuses
+ok - a conflicted merge bringing main's fixtures commits and pushes; a new line in its resolution refuses
+ok - pushes to a URL, a new remote and a remote with no tracking refs skip origin's history and refuse a new credential
+ok - renamed and split files with existing fixtures commit and push; a new AKIA line inside a moved file refuses
+ok - refusals past the budget escalate to a human decision, stay refused, and an allow resets the count
+ok - pre-commit escalates repeated inspection failures and keeps the refused line's count across them
+ok - pre-push escalates repeated inspection failures and keeps the refused line's count across them
+ok - commit and push decisions each record guard events, including a fail-closed unreadable source
+omp: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+claude: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+credential shapes: added binary lines, newline names, anchored prefixes and URL boundaries checked at commit
+ok - T3(b,d): both native write adapters admit ignored credentials and the 396924-byte report without a provider
+FM_TEST_END 2026-10-24T20:22:48Z tests/fm-git-secrets.test.sh exit=0 duration_ms=27137 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QQTEDAJX4PDAXAJGVRJNSG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T20:22:48Z tests/fm-git-strip-ai-trailers.test.sh family=backend-dispatch expected_gate_skip=none
+ok - a Cursor --trailer commit object has no AI co-author and keeps the captain identity
+ok - a human Co-authored-by trailer survives next to a stripped Cursor trailer
+ok - a human co-author at a vendor domain survives; only the exact bot address is stripped
+ok - a hook manager resolving the pane hooks dir fails instead of displacing the strip
+ok - a relaunch reinstall replaces the read-only strip dir and still strips
+ok - install chains the previous commit-msg hook after stripping
+ok - a relative project core.hooksPath resolves against the worktree and still runs
+ok - an inherited GIT_CONFIG hooksPath does not become the chained previous hooks
+ok - a project hook that appears after install still runs for the rest of the task
+ok - a pane GIT_CONFIG hooksPath still chains the repository git is actually in
+ok - an empty project core.hooksPath runs no repository hook and still strips the trailer
+ok - an unresolvable project core.hooksPath still refuses the commit
+ok - a valueless project core.hooksPath still refuses the commit
+ok - the repository's pre-push runs and can refuse under every hooksPath override channel
+ok - a git -c hooksPath override still strips the trailer and chains the project's hooks
+ok - commit-msg file mode strips the trailer and keeps the subject
+ok - supported same-task bash tmux relaunch reconciles generated hooks and preserves operator configuration
+ok - supported same-task ksh tmux relaunch reconciles generated hooks and preserves operator configuration
+# all fm-git-strip-ai-trailers tests passed
+FM_TEST_END 2026-10-24T20:23:43Z tests/fm-git-strip-ai-trailers.test.sh exit=0 duration_ms=54083 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QQTEDAJX4PDAXAJGVRJNSG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T20:23:43Z tests/fm-retired-jev-write-credential-noul.test.sh family=unclassified expected_gate_skip=none
+ok - a credential write the Noul would score 0.99 is admitted with no judgment and stages nothing
+ok - a force-added credential still refuses at commit, and the shell judge is unchanged
+FM_TEST_END 2026-10-24T20:23:54Z tests/fm-retired-jev-write-credential-noul.test.sh exit=0 duration_ms=11213 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QQTEDAJX4PDAXAJGVRJNSG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T20:23:54Z tests/fm-retired-jev-write-judgment-unavailable.test.sh family=unclassified expected_gate_skip=none
+ok - report writes are admitted with no judgment during an outage and under never-send text
+ok - a shell command whose judgment cannot run is still denied for review
+FM_TEST_END 2026-10-24T20:24:13Z tests/fm-retired-jev-write-judgment-unavailable.test.sh exit=0 duration_ms=18287 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QQTEDAJX4PDAXAJGVRJNSG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T20:24:13Z tests/fm-retired-jev-write-remainder-shapes.test.sh family=unclassified expected_gate_skip=none
+ok - a long write whose remainder holds a credential shape is admitted with no judgment
+ok - the same shapes refuse the added lines at commit, and the shell judge is unchanged
+FM_TEST_END 2026-10-24T20:24:23Z tests/fm-retired-jev-write-remainder-shapes.test.sh exit=0 duration_ms=10611 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QQTEDAJX4PDAXAJGVRJNSG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T20:24:24Z tests/fm-retired-jev-write-secrets-kind.test.sh family=unclassified expected_gate_skip=none
+ok - a write the kind judge would label secrets is admitted with no judgment and its placeholders commit
+ok - the commit check still refuses a credential shape, and the shell judge is unchanged
+FM_TEST_END 2026-10-24T20:24:34Z tests/fm-retired-jev-write-secrets-kind.test.sh exit=0 duration_ms=10088 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QQTEDAJX4PDAXAJGVRJNSG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=6 failed=0 skipped_gate=0 duration_ms=133131
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=54083 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=5 duration_ms=77336 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-git-strip-ai-trailers.test.sh duration_ms=54083
+FM_TEST_SLOWEST rank=2 script=tests/fm-git-secrets.test.sh duration_ms=27137
+FM_TEST_SLOWEST rank=3 script=tests/fm-retired-jev-write-judgment-unavailable.test.sh duration_ms=18287
+FM_TEST_SLOWEST rank=4 script=tests/fm-retired-jev-write-credential-noul.test.sh duration_ms=11213
+FM_TEST_SLOWEST rank=5 script=tests/fm-retired-jev-write-remainder-shapes.test.sh duration_ms=10611
+FM_TEST_SLOWEST rank=6 script=tests/fm-retired-jev-write-secrets-kind.test.sh duration_ms=10088
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QQTEDAJX4PDAXAJGVRJNSG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0
