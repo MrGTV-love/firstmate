@@ -1,0 +1,1050 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-24T01:05:28Z tests/fm-crew-state.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - captured AXI replacement status replays through crew-state
+ok - captured AXI parked status replays through crew-state
+ok - captured AXI failed status replays through crew-state
+ok - captured capped inventory replays selection, ambiguity, and unavailable lookup
+ok - captured status formats reject a synthetic authority transition
+ok - captured completed status yields to synthetic subsequent development
+ok - captured cancelled run leaves fleet inventory unverified without a failure contradiction
+ok - failed-outcome/github/open: terminal delivery uses current disposition
+ok - failed-outcome/github/merged: terminal delivery uses current disposition
+ok - failed-outcome/github/closed: terminal delivery uses current disposition
+ok - failed-outcome/github/unreadable: terminal delivery uses current disposition
+ok - failed-outcome/github/skipped: terminal delivery uses current disposition
+ok - failed-outcome/github/no-identity: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/open: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/merged: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/closed: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/unreadable: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/skipped: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/no-identity: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/open: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/merged: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/closed: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/unreadable: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/skipped: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/no-identity: terminal delivery uses current disposition
+ok - failed-status/github/open: terminal delivery uses current disposition
+ok - failed-status/github/merged: terminal delivery uses current disposition
+ok - failed-status/github/closed: terminal delivery uses current disposition
+ok - failed-status/github/unreadable: terminal delivery uses current disposition
+ok - failed-status/github/skipped: terminal delivery uses current disposition
+ok - failed-status/github/no-identity: terminal delivery uses current disposition
+ok - failed-status/gitlab/open: terminal delivery uses current disposition
+ok - failed-status/gitlab/merged: terminal delivery uses current disposition
+ok - failed-status/gitlab/closed: terminal delivery uses current disposition
+ok - failed-status/gitlab/unreadable: terminal delivery uses current disposition
+ok - failed-status/gitlab/skipped: terminal delivery uses current disposition
+ok - failed-status/gitlab/no-identity: terminal delivery uses current disposition
+ok - failed-status/gerrit/open: terminal delivery uses current disposition
+ok - failed-status/gerrit/merged: terminal delivery uses current disposition
+ok - failed-status/gerrit/closed: terminal delivery uses current disposition
+ok - failed-status/gerrit/unreadable: terminal delivery uses current disposition
+ok - failed-status/gerrit/skipped: terminal delivery uses current disposition
+ok - failed-status/gerrit/no-identity: terminal delivery uses current disposition
+ok - cancelled-outcome/github/open: terminal delivery uses current disposition
+ok - cancelled-outcome/github/merged: terminal delivery uses current disposition
+ok - cancelled-outcome/github/closed: terminal delivery uses current disposition
+ok - cancelled-outcome/github/unreadable: terminal delivery uses current disposition
+ok - cancelled-outcome/github/skipped: terminal delivery uses current disposition
+ok - cancelled-outcome/github/no-identity: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/open: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/merged: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/closed: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/unreadable: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/skipped: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/no-identity: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/open: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/merged: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/closed: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/unreadable: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/skipped: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/no-identity: terminal delivery uses current disposition
+ok - cancelled-status/github/open: terminal delivery uses current disposition
+ok - cancelled-status/github/merged: terminal delivery uses current disposition
+ok - cancelled-status/github/closed: terminal delivery uses current disposition
+ok - cancelled-status/github/unreadable: terminal delivery uses current disposition
+ok - cancelled-status/github/skipped: terminal delivery uses current disposition
+ok - cancelled-status/github/no-identity: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/open: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/merged: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/closed: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/unreadable: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/skipped: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/no-identity: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/open: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/merged: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/closed: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/unreadable: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/skipped: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/no-identity: terminal delivery uses current disposition
+ok - outcome: cancellation without delivery carries no verdict
+ok - status: cancellation without delivery carries no verdict
+ok - selected: cancellation without delivery carries no verdict
+ok - coarse: cancellation without delivery carries no verdict
+ok - no-ci-log: cancellation without delivery carries no verdict
+ok - red-ci: cancellation without delivery carries no verdict
+ok - cancelled-test: cancellation without delivery carries no verdict
+ok - skipped-test: cancellation without delivery carries no verdict
+ok - synthetic cancelled run leaves fleet inventory unverified without a failure contradiction
+ok - cancelled-outcome: terminal delivery reports only observed evidence
+ok - cancelled-status: terminal delivery reports only observed evidence
+ok - skipped-rebase: terminal delivery reports only observed evidence
+ok - cancelled-skipped-rebase: terminal delivery reports only observed evidence
+ok - passed: terminal delivery reports only observed evidence
+ok - active run-step is authoritative
+ok - stale needs-decision over active run is superseded
+ok - stale blocked over active run is superseded
+ok - daemon/timeout blocked claim over a live fixing run reads as run alive
+ok - socket refusal or missing socket over a stale fixing run reports blocked
+ok - socket refusal over a terminal attributed run reports blocked
+ok - socket-down evidence outranks a live run only while it is the log's latest event
+ok - broken-pipe blocker over a live run keeps the plain superseded reading
+ok - genuine daemon-down blocked line still reports blocked
+ok - a busy secondmate keeps its open blocker until that exact key closes
+ok - the most recently opened decision supplies the reported state and detail
+ok - ship and scout terminal declarations supersede stale decisions
+ok - a model-matrix fallback notice never changes the worker's declared state
+ok - latest status retains legacy completion events and shared captain matching
+ok - latest status subprocess work stays bounded and still reads past a long prose tail
+ok - genuine parked run is not flagged superseded
+ok - the parked human-decision component is derived from the findings table's action column
+ok - scalar gate parked run is not flagged superseded
+ok - gate block parked run is not flagged superseded
+ok - ci-ready status log beats monitoring run
+ok - ci-monitoring run with checks already green surfaces done
+ok - top-level ci status uses ci log green marker
+ok - terminal no-checks ci-monitor marker surfaces done
+ok - base-advance re-arm after green stays checks green
+ok - a green marker before the ci log tail still surfaces done
+ok - pending no-checks ci-monitor marker stays working
+ok - ci-monitoring run with checks not yet green stays working
+ok - a fresh issue after an earlier green reading is not masked
+ok - stale checks-green status log does not mask CI relapse
+ok - ci fixing is not overridden by an earlier green marker
+ok - top-level fixing is not overridden by a stale ci running row
+ok - top-level fixing is not overridden by a stale done log
+ok - terminal passed run is authoritative
+ok - terminal passed-with-override run reads done like a clean pass
+ok - terminal passed-with-skips run reads done with the skip kept visible
+ok - terminal passed run uses matching retirement receipt without forge
+ok - terminal passed no-forge mode preserves local receipt evidence
+ok - terminal passed run with open PR does not claim merged
+ok - terminal passed run PR overrides stale task metadata
+ok - terminal passed run without readable PR identity reports unknown
+ok - terminal passed run reads open GitLab MR state
+ok - terminal passed run reads Forgejo pull request state through tea api
+ok - terminal passed run reads merged GitLab MR state
+ok - terminal passed run handles failed GitLab read
+ok - terminal passed run reads open Gerrit change state
+ok - terminal passed run reads merged and abandoned Gerrit change state
+ok - terminal passed run handles an unreadable or mismatched Gerrit read
+ok - terminal failed run is authoritative
+ok - orphaned ci monitor after green reads as held-for-merge done
+ok - status-only failed orphaned ci monitor after green reads done
+ok - genuinely failing CI keeps the failed verdict
+ok - a second failed step disqualifies the orphaned-monitor reclassification
+ok - outcome/merged: ci_monitor_interrupted with every step completed reads done
+ok - outcome/open: ci_monitor_interrupted with every step completed reads done
+ok - status-only/merged: ci_monitor_interrupted with every step completed reads done
+ok - status-only/open: ci_monitor_interrupted with every step completed reads done
+ok - inventory/merged: ci_monitor_interrupted with every step completed reads done
+ok - inventory/open: ci_monitor_interrupted with every step completed reads done
+ok - outcome/closed: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/unreadable: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/no-identity: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/skipped: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/closed: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/unreadable: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/no-identity: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/skipped: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/closed: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/unreadable: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/no-identity: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/skipped: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/lint-pending: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/lint-failed: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/lint-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/intent-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/rebase-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/lint-pending: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/lint-failed: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/lint-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/intent-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/rebase-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/lint-pending: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/lint-failed: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/lint-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/intent-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/rebase-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome: ci_monitor_interrupted with no recorded PR does not read done
+ok - status-only: ci_monitor_interrupted with no recorded PR does not read done
+ok - inventory: ci_monitor_interrupted with no recorded PR does not read done
+ok - ci_monitor_interrupted outranks stale and newer worker declarations
+ok - cross-branch run is attributed via the real runs list
+ok - socket refusal over a coarse active run reports blocked
+ok - failed ledger record reads unknown only when the daemon is provably down
+ok - cross-branch attribution picks the branch's most recent row
+ok - a newer failure is not hidden by a live sibling
+ok - runs-list selection keeps the newer failure over an older live row
+ok - an older unfetched live sibling does not hide a newer failure
+ok - two terminal rows keep the existing newest-first precedence
+ok - an unclassifiable status row keeps the ledger's newest-first precedence
+ok - a terminal run with no live sibling is unchanged
+ok - coarse run does not probe another branch's ci log
+ok - another branch's run is ignored, falls back
+ok - unpushed ship done: is current-state blocked
+ok - recorded merged PR reads done under the fleet snapshot's captured meta
+ok - no-mistakes pre-validation done: stays current-state done
+ok - moved remote branch without the named head is current-state blocked
+ok - no run + a busy semantic record reads working, attributed to its source
+ok - a launch parked on a recognized interactive prompt never reads working, closing the absorb path a stale watcher poll depends on
+ok - a converted adapter never reads working from rendered footer text
+ok - grok still reads working through its isolated rendered-tail fallback
+ok - herdr's native busy verdict reads working with no record present
+ok - a herdr CLI that fails to answer reads unknown/unreachable, never gone
+ok - an alive endpoint whose scrollback read failed stays working
+ok - a husk pane (agent gone) still reads gone for reclaim
+ok - a mid-tool-call crew stays working because its record outranks herdr's generation state
+ok - an idle record with idle agent_status stays not-busy (no regression for a human-blocked agent)
+ok - no run + idle pane uses the status-log verb
+ok - no run + idle pane parses keyed status syntax
+ok - no run + idle pane on a paused: status reports state: paused with its reason
+ok - no run + idle pane honors the configured paused verb
+ok - a trailing resolved: event does not corrupt state render (idle stays idle)
+ok - dead window ignores stale status log
+ok - a tmux that fails to answer reads unknown/unreachable, never gone
+ok - closed pane still reports a terminal run-step
+ok - closed pane still reports an active run-step
+ok - a wedged daemon costs one read and leaves the pane to answer
+ok - a healthy daemon read makes no daemon status probe
+ok - a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker
+ok - responsive lookups each keep their own allowance
+ok - scout skips the run lookup
+ok - torn-down worktree is handled gracefully
+ok - fm-crew-state remote: alive endpoint falls through to the routed status log
+ok - fm-crew-state remote: an idle alive endpoint reads alive, never gone or dead
+ok - fm-crew-state remote: an unreachable host reads unknown-remote, never gone or dead
+ok - fm-crew-state remote: the remote host's own dead verdict is reported truthfully
+ok - missing meta is handled gracefully
+ok - crew_is_provably_working absorbs a validating crew found only via the runs-list fallback
+ok - crew_is_provably_working still surfaces a genuinely stopped crew (safety property preserved)
+ok - usage error exits 2
+ok - historical same-branch rewritten head is not attributed as current
+ok - active run with valid descendant fix head remains current
+ok - local work advanced past run head invalidates attribution
+ok - pipeline-owned active run binds without head equality and beats the failed row
+ok - a genuinely failed run with no later run is not hidden
+ok - coarse scan anchors the unresolvable active row instead of falling to an older one
+ok - coarse scan with a mismatched anchor stays unknown and lets the pane answer
+ok - coarse terminal row at a foreign head is not attributed
+ok - an executing run binds regardless of branch_sync state
+ok - a parked run keeps the strict head rule without pipeline_owned
+ok - run_parked_scalar_gate_running keeps the strict head rule despite its live status word
+ok - run_parked_in_gate_block keeps the strict head rule despite its live status word
+ok - the exemption never applies to a terminal run
+ok - missing run head falls back instead of matching by branch
+ok - active fix round with an unfetched pipeline head reads working
+ok - unanchored unverifiable active row is attributed because it is live
+ok - unresolvable terminal row never reads as current
+ok - runs-list continuation attribution works when axi answers another branch
+ok - herdr stale registration over a shell-only pane reads agent gone, not alive
+ok - herdr stale working record never reports a shell-only pane busy
+ok - capped overview retains both competing same-branch run ids
+ok - same-branch identity survives both runs falling outside the overview
+ok - a capped overview with zero same-branch rows reports absent, not unreadable
+ok - no run for this branch beside a live run elsewhere reads absent, not unreadable
+ok - the capped inventory reader is bounded by the crew read budget
+ok - a repo spelling the inventory does not record reads unreadable
+ok - a linked worktree green PR in merge monitoring reads held for merge
+ok - complete inventory preserves the replacement gate without writes
+ok - missing complete-inventory failure reports unknown
+ok - corrupt complete-inventory failure reports unknown
+ok - schema complete-inventory failure reports unknown
+ok - repo complete-inventory failure reports unknown
+ok - count complete-inventory failure reports unknown
+ok - norepo complete-inventory failure reports unknown
+ok - R6 complete selection ignores unrelated branch semantics
+ok - R6 requested branches use exact identity without a whitelist
+ok - R6 capped inventory ignores unrelated semantics and names both ids
+ok - R6 complete identity lookup precedes partial-row semantic rejection
+ok - R6 capped inventory preserves quoted requested-branch identity
+ok - R6 structural completeness and requested-run validation remain enforced
+ok - R5 complete inventory without Python keeps the replacement gate
+ok - R5 complete ambiguity without Python names both ids
+ok - R5 capped lookup without Python preserves available ids
+ok - R5 capped lookup without SQLite support preserves available ids
+ok - R1 both directions of inventory liveness disagreement read unknown
+ok - R2 uninitialized busy workers retain pane reporting
+ok - R2 uninitialized idle workers retain status reporting
+ok - R3 historical inventory yields to the current busy pane
+ok - R3 historical inventory yields to current worker status
+ok - superseded cancelled run preserves the replacement review gate
+ok - a live rebased run beats an older failed run at the local head
+ok - pending run with a rebased head reads working
+ok - running run with a rebased head reads working
+ok - legacy live rebased run is authoritative over an older failed row
+ok - legacy surface binds a fixing run at a rebased head
+ok - legacy surface binds a ci run at a rebased head
+ok - an unproven record at a diverged head does not answer for the crew
+ok - an unproven record with a dead daemon never overrides a busy pane
+ok - an ordinary blocked tip over a coarse live row keeps the superseded reading
+ok - a socket-refused blocker survives the dead-daemon verdict
+ok - an ordinary blocked tip survives the dead-daemon verdict
+ok - a parked gate survives a dead daemon with its findings intact
+ok - an unproven record at a diverged head does not answer on the selected route
+ok - a live record at a diverged head binds while the daemon answers
+ok - the anchored continuation binds while the daemon answers
+ok - a head-tied coarse record keeps its working reading and its original note
+ok - a coarse failed record with a dead daemon reads unknown
+ok - the selected-run anchored continuation reports the dead daemon, not an identity failure
+ok - the selected-run anchored continuation binds while the daemon answers
+ok - the selected route keeps an anchored parked run's gate with a dead daemon
+ok - an open decision survives the dead-daemon verdict on the selected route
+ok - a coarse pending ledger word reads unknown
+ok - an unanswered probe never turns a failed coarse record into a gate
+ok - the selected-route dead-daemon verdict names the run once
+ok - a head-tied row reads working when axi names the self run
+ok - a head-tied row reads working when axi names the other run
+ok - a head-tied coarse row is exempt even when the record head diverged
+ok - an unrecognised ledger word keeps the ordinary supersede note
+ok - an unanswered daemon probe leaves a live rebased run bound
+ok - a head-tied coarse live row is exempt from the dead-daemon verdict
+ok - a coarse live row over an open decision keeps the original supersede note
+ok - a coarse live row at a rebased head is not attributed
+ok - a terminal run at a diverged head keeps the strict head rule
+ok - competing live runs report unknown with both run ids
+ok - newer failed run remains failed beside an older live run
+ok - missing run selection reports unknown with candidate ids
+ok - wrong-id run selection reports unknown with candidate ids
+ok - wrong-branch run selection reports unknown with candidate ids
+ok - wrong-head run selection reports unknown with candidate ids
+ok - missing-status run selection reports unknown with candidate ids
+ok - malformed-table run selection reports unknown with candidate ids
+ok - inventory-error run selection reports unknown with candidate ids
+ok - selected-error run selection reports unknown with candidate ids
+ok - legacy conflicting run records report unknown
+ok - omp live-model record adds model-drift and run-error only on positive evidence
+all fm-crew-state tests passed
+FM_TEST_END 2026-10-24T01:09:16Z tests/fm-crew-state.test.sh exit=0 duration_ms=228427 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:09:16Z tests/fm-watch-open-loops.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-24T01:09:16Z tests/fm-watch-arm.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-24T01:09:16Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-24T01:09:16Z tests/fm-pi-watch-extension.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - watch instance rebinds release predecessor chains while preserving home ownership
+ok - Pi shutdown and failed-successor retirement each log one expiry; readiness has no wall-clock cutoff
+ok - Pi extension reports external healthy watcher output
+ok - Pi missing successors log one expiry without reviving retired delivery; live successors arm once
+ok - Pi factory replacement transfers pending wakes and refuses superseded arm continuations
+ok - Pi owner publication failures retain diagnostics and allow every successor recovery path
+ok - Pi custom tool exposes repair-only metadata and returns automatic-continuation guidance
+ok - Pi redundant tool call returns ownership guidance and spawns no second child
+ok - Pi scheduled retry remains extension-owned after another tool call
+ok - Pi actionable close starts one successor before wake delivery settles
+ok - Pi actionable output waits for predecessor close before successor restoration
+ok - Pi dispatcher branch offer owns accepted wakes and falls back to main
+ok - Pi dispatcher flags a fleet-wide heartbeat offer as branch-eligible
+ok - a co-present check row neither vetoes nor rides a heartbeat into main
+ok - every main-only check class still reaches main, never the supervision branch
+ok - a captain-held signal trigger reaches main with routine rows present
+ok - an unread pending-reply escalation keeps later stale aliases on main
+ok - a mixed batch of two distinct files - one routine, one needs-decision - routes wholly to main
+ok - a co-present needs-decision row neither vetoes nor rides a heartbeat into main
+ok - heartbeat restoration failure stays on main
+ok - watcher-failure repair stays with main even with a live, accepting branch listener
+ok - under the away-posture record every actionable row is offered to the branch while broken-queue wakes and watcher-failure alarms still reach main
+ok - Pi refused handling handshake is classified and not swallowed
+ok - Pi confirm failure retires the named arm with distinct watcher pid
+ok - Pi confirm failure for a stale successor spares the newer arm
+ok - Pi superseded handling delivery carries no rejection appendix and is logged
+ok - Pi superseded handling delivery is offered to the branch like a confirmed one
+ok - Pi extension diagnostic log stays off unless opted in
+ok - Pi repair starts a fresh arm instead of no-opping on a dead child
+ok - Pi scheduled retry starts a fresh arm instead of stalling on a dead child
+ok - Pi deferred close starts a fresh arm instead of stalling on a dead child
+ok - Pi hung successor falls back to one typed actionable wake
+ok - Pi unretired successor falls back without an overlapping retry
+ok - Pi late unretired closes resume classified supervision
+ok - Pi slow successor does not hold the wake and is never retired
+ok - Pi late successor failure is surfaced after the still-starting wake
+ok - Pi clean empty close triggers a bounded continuity retry
+ok - Pi established clean closes stop at the configured retry limit
+ok - Pi close handler verifies session-lock ownership before successor launch
+ok - Pi watcher arm distinguishes all session lock ownership states
+ok - Pi session transitions auto-arm through a generation owner across /new /resume /fork/reload, stale callbacks, and quit
+ok - Pi session replacement auto-arms and carries its in-flight actionable close
+ok - Pi replacement replays a streaming follow-up before consumption
+ok - Pi streaming-time wake delivery keeps the successor chain and replays only unconsumed wakes
+ok - Pi retries a verified successor that failed during wake delivery once that delivery settles
+ok - Pi replacement receives actionable closes after retirement timeout
+ok - Pi replacement handoff tokens stay unique across fresh modules
+ok - Pi replacement persistence failure keeps its predecessor until a successor commits
+ok - Pi process-exit cleanup listener remains singular across session replacement
+ok - Pi process-exit cleanup stops the attached arm child
+ok - OpenCode plugins have an explicit ESM boundary even under a typeless parent package
+ok - OpenCode watcher plugin uses the effective FM_HOME state
+ok - OpenCode watcher plugin sources the effective config
+ok - OpenCode watcher plugin requires session lock ownership
+ok - OpenCode watcher coordinator respects primary scope
+ok - OpenCode watcher plugin starts one successor before wake prompt delivery settles
+ok - OpenCode watcher plugin runs the supervision host on an opted-in home and relays every host line (away record)
+ok - OpenCode watcher plugin runs the supervision host on an opted-in home and relays every host line (quiet record)
+ok - OpenCode pre-ready actionable close preserves its successor
+ok - OpenCode hung successor falls back to one typed actionable wake
+ok - OpenCode unretired successor falls back without an overlapping retry
+ok - OpenCode late unretired closes resume classified supervision
+ok - OpenCode slow successor does not hold the wake and is never retired
+ok - OpenCode late successor failure is surfaced after the still-starting wake
+ok - OpenCode clean empty close triggers a bounded continuity retry
+ok - OpenCode established clean closes stop at the configured retry limit
+ok - OpenCode close handler verifies session-lock ownership before successor launch
+ok - OpenCode watcher plugin coordinates with the turn-end guard
+ok - OpenCode healthy arm output does not suppress the turn-end guard
+FM_TEST_END 2026-10-24T01:10:57Z tests/fm-pi-watch-extension.test.sh exit=0 duration_ms=100196 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:10:57Z tests/fm-watchdog-check.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - fresh state reads healthy and acts on nothing
+ok - a home with no work reads idle even with a stale beacon
+ok - a missing home reads idle and is not created
+ok - a bound rewake is healthy at 1000 seconds and stale at 3700 seconds
+ok - a stale watcher with a live session is resumed and recovers
+ok - a stale lock held by an unrelated live pid is cleared through the arm's home-scoped --stop only
+ok - an arming ledger with a dead owner reads dead-arm-owner and recovers
+ok - an arming ledger with a live owner is not called a dead arm owner
+ok - a dead session lock is resumed through the configured command
+ok - an absent session lock reads session-missing
+ok - a failing recovery alarms after the threshold and then rate limits
+ok - an absent resume command is recorded without changing the unhealthy exit
+ok - no-op and real failed recoveries are distinct without changing alarm timing
+ok - a no-op attempt names the live watcher it preserved
+ok - a watcher stop that does not restore health is a real failed recovery
+ok - an empty resume command is a no-op that keeps the alarm schedule
+ok - watchdog alarm has its own title while away-mode keeps its original title
+ok - a healthy verdict after failures clears the episode
+ok - reused and unbound watchdog pids are reclaimed for both lock layouts
+ok - a reused elected reaper pid cannot block watchdog recovery
+ok - a live identity-bound watchdog excludes contenders and releases normally
+ok - install renders the plist for the home and bootstraps it
+ok - installer resolves relative roots before rendering and identity generation
+ok - uninstall boots the agent out and deletes its plist
+FM_TEST_END 2026-10-24T01:11:52Z tests/fm-watchdog-check.test.sh exit=0 duration_ms=55393 gate_skip=false
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - wait deadline diagnoses and reaps a stopped test child without hanging
+ok - simultaneous watcher starts leave exactly one live process
+ok - fm_pid_identity real ps fallback is locale-invariant
+ok - fm_pid_identity is locale-invariant across LC_ALL/LC_TIME
+ok - fm_pid_identity ps fallback is terminal-width-invariant
+ok - /proc process identity ignores simulated btime changes
+ok - /proc process identity detects pid reuse
+ok - MSYS /proc process identity regression skipped on non-Windows host
+ok - killed watcher stale lock is reclaimed
+tests/fm-watcher-lock.test.sh: line 1695: 24498 Killed: 9               FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_remove_path() {
+      if [ "$1" = "$STATE/.watch.lock" ]; then
+        kill -KILL "${BASHPID:-$$}"
+      fi
+      return 1
+    }
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" > /dev/null 2>&1
+ok - stale watcher reclaim publishes durable recovery evidence before clear
+ok - live watcher lock with stale heartbeat is actionable
+ok - slow bounded check stays fresh; stopped live poll goes stale and resumes
+ok - decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers
+ok - live watcher lock proven stalled for the hard bound is replaced; an unproven old beacon is kept
+ok - guard banner leads when down with pending wakes (repair-after-drain) and stays silent when live and fresh
+ok - concurrent fm_lock_try_acquire yields exactly one winner
+ok - dead-pid stale lock is reclaimed by a single acquirer
+ok - concurrent stale-lock steal yields exactly one winner
+ok - dead steal owner is reclaimed once without a nested steal marker
+ok - dead nested steal chain from an interrupted reclaim is recovered
+ok - a competing reaper cannot remove the successor's steal mutex
+ok - a steal mutex abandoned by this process does not block its own reclaim
+ok - a steal reap interrupted in this process is resumed from its own tombstone
+ok - live steal mutex is not reclaimed
+ok - live-held lock is not stolen
+ok - empty mid-acquire lock keeps a minimum grace
+ok - late original claimant cannot claim a recreated lock
+ok - paused mid-acquire claimant backs off to active stealer
+ok - watch restart preserves recovery without signaling a reused pid
+ok - watch restart attaches to a verified healthy peer and later surfaces a successor gap
+ok - watcher self-evicts when the lock pid no longer names it
+ok - arm turns clean self-eviction without a successor into a typed failure
+ok - arm attaches to a live fresh watcher and fails loudly when that cycle has no successor
+ok - attached arm signals record a classified lifecycle entry
+ok - arm starts cleanly and resurfaces recovery after a dead-pid lock
+ok - arm cleans child watcher and temp output on HUP
+ok - arm defers TERM until startup watcher can run its lock cleanup
+ok - arm TERM stops a startup watcher that never becomes cleanup-ready
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 72311.1792804280.7OZK8I
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - arm propagates an immediate watcher wake before confirmation
+ok - arm attaches to a peer watcher after child stands down and surfaces a missing successor
+watcher: lock held by live pid 99436 but heartbeat is stale for 846097893s (>300s); inspect or stop that watcher before re-arming.
+ok - arm reports FAILED and exits non-zero when no fresh watcher can be confirmed
+ok - cycle-exit ledger links a verified successor and remains size-capped
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-24T01:11:56Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=158980 gate_skip=false
+ok - watch-arm: an attached arm reports the wake its cycle delivered instead of a false failure
+ok - watch-arm: a delivered wake consumed by the handling turn still closes the attached arm cleanly
+ok - watch-arm: an unusable launch confirm window refuses to arm by name
+ok - watch-arm: a disposable validation checkout refuses to arm
+ok - watch-arm: a watcher exits when its state directory is removed
+ok - watch-arm: a watcher exits when its home is removed
+ok - watch-arm: the test reaper stops a watcher armed for a tracked temporary home
+ok - watch-arm: a cycle that delivered no wake of its own still fails loudly
+ok - watch-arm: an attached arm keeps following a slow live holder and reports its wake
+no_progress: "pid=8742 no CPU or watched-file progress for 12.9s"
+ok - watch-arm: an attached arm hands a holder proven stalled for the bound to its owner's replacement
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-watch-arm.sh: line 858: 51711 Killed: 9               "$WATCH" > "$child_out"
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 54226.1792804219.rbc881
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - watch-arm: re-arm surfaces every queued wake and an open remote decision after downtime
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-watch-arm.sh: line 858: 78261 Killed: 9               "$WATCH" > "$child_out"
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 79811.1792804231.M2a0KI
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - watch-arm: a re-arm whose recovery cycle runs slowly still surfaces it
+watcher: recovery state could not be persisted; retaining stale lock evidence
+ok - watch-arm: marker publication failure retains stale-lock recovery evidence
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 15073.1792804252.yw5Mat
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 23527.1792804255.S4jfuN
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - watch-arm: a wake queued after handling drain is recovered once at successor arm
+ok - watch-arm: interrupted handling leaves its wake durable for successor re-drain
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 55765.1792804271.iu7vZQ
+ok - watch-arm: malformed recovery state is quarantined without a successor loop
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 64831.1792804275.gGcmEf
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - watch-arm: publication after recovery handoff is surfaced
+ok - watch-arm: restart publishes recovery before clearing a reused-pid watcher lock
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 73807.1792804280.NfndDG
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - watch-arm: markerless legacy queues are adopted and recovered
+ok - watch-arm: an idle Lavish source stays quiet and its real result wakes promptly
+ok - watch-arm: appending work reopens an announced empty recovery
+ok - watch-arm: a watcher close during handling keeps the printed acknowledgement valid
+ok - watch-arm: a moved recovery generation consumes handled rows and names its remedy
+ok - watch-arm: downtime marker publication does not follow symlinks
+ok - watch-arm: --stop ends only this home's watcher, publishes downtime, and reports when none runs
+ok - watch-arm: an already-acknowledged handling confirmation succeeds as a no-op
+ok - watch-arm: a churned generation's handling confirmation reports a mismatch and an arm check keeps it
+ok - watch-arm: --take-over attaches to a cycle the named arm does not own and leaves it running
+ok - watch-arm: --take-over owns a fresh cycle without a recovery wake and still surfaces queued work
+watcher: secondmate liveness check failed
+ok - watch-arm: takeover preserves self-exit downtime and surfaces a recovery wake
+ok - watch-arm: the OpenCode arm plugin decides with the shared supervision predicate
+FM_TEST_END 2026-10-24T01:12:21Z tests/fm-watch-arm.test.sh exit=0 duration_ms=184278 gate_skip=false
+ok - an overdue ledger row wakes firstmate and leaves a durable queue row
+ok - an unchanged overdue set stays quiet and a new overdue row wakes again
+watcher fixture: owned child 28273 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-clean/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-clean/watch.out.err
+ok - a ledger with no overdue rows is silent
+ok - the watcher runs the reconciler detached and a partly blind ledger still wakes
+watcher fixture: owned child 51116 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-large-interval/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-large-interval/watch.out.err
+ok - a missing ledger collects with a large interval and its fresh publication stays throttled
+ok - a ledger the reconciler stopped publishing is its own wake
+watcher fixture: owned child 61189 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-wake-lib.sh: line 2337: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 73617 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-queue/watch.out.err
+watcher fixture: owned child 79862 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-wake-lib.sh: line 2334: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 90937 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-sequence/watch.out.err
+watcher fixture: owned child 97958 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-recovery/watch.out.err
+watcher: recovery state could not be persisted; retaining stale lock evidence
+watcher fixture: owned child 11532 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-overdue-recovery/watch.out.err
+watcher fixture: owned child 18241 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-wake-lib.sh: line 2337: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 28805 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-queue/watch.out.err
+watcher fixture: owned child 33621 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-wake-lib.sh: line 2334: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 41450 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-sequence/watch.out.err
+watcher fixture: owned child 45866 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-recovery/watch.out.err
+watcher: recovery state could not be persisted; retaining stale lock evidence
+watcher fixture: owned child 57102 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-stale-recovery/watch.out.err
+watcher fixture: owned child 60576 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-wake-lib.sh: line 2337: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 72354 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-queue/watch.out.err
+watcher fixture: owned child 78163 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N8HA2DQE4RJ87KDB9VAJ6E/bin/fm-wake-lib.sh: line 2334: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 87823 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-sequence/watch.out.err
+watcher fixture: owned child 94763 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-recovery/watch.out.err
+watcher: recovery state could not be persisted; retaining stale lock evidence
+watcher fixture: owned child 2420 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-retry-missing-recovery/watch.out.err
+ok - queue, sequence, and recovery publication failures retry identical overdue and stale ledgers without losing cooldown
+ok - overdue and stale publication wait for their queue lock before committing cooldown
+ok - a retained collector survives watcher exit, rejects overlapping restart scans, and publishes without starvation
+tests/fm-watch-open-loops.test.sh: line 44: 30784 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 30784 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-0100/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-0100/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 36745 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 36745 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 42738 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 42738 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 49620 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 49620 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 54945 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 54945 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-interval-invalid/watch.out.err
+ok - leading-zero intervals use decimal refresh/stale thresholds and all zero spellings fall back
+tests/fm-watch-open-loops.test.sh: line 44: 79668 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 79668 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 90534 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 90534 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 97696 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 97696 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44:  8089 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 8089 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-overdue-invalid/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 39129 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 39129 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 48978 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 48978 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 60263 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 60263 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 71803 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 71803 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-resurface-stale-invalid/watch.out.err
+ok - both stale and overdue cooldowns use decimal resurface seconds and all zero spellings fall back
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804327
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846119527,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804334
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846119534,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+watcher fixture: owned child 93016 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-aged/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-aged/watch.out.err
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804338
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846119538,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804344
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846119544,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+watcher fixture: owned child 7502 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-missing/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-recovery-missing/watch.out.err
+ok - real publication between stopped watchers rearms aged/missing stale incidents without resetting overdue cooldown
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804347
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846119547,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804352
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846119552,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804357
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846119557,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+bin: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792804362
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846119562,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+ok - fresh observation rearms aged/missing outages after real recovery races a blocked stale append
+watcher fixture: owned child 39038 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-1/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-1/watch.out.err
+watcher fixture: owned child 53840 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-2/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-2/watch.out.err
+watcher fixture: owned child 67479 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-3/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-3/watch.out.err
+watcher fixture: owned child 81767 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-4/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-4/watch.out.err
+watcher fixture: owned child 96193 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-5/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-5/watch.out.err
+watcher fixture: owned child 13575 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-6/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-6/watch.out.err
+watcher fixture: owned child 29976 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-7/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-7/watch.out.err
+watcher fixture: owned child 41028 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-8/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-8/watch.out.err
+watcher fixture: owned child 51483 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-9/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-9/watch.out.err
+watcher fixture: owned child 64712 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-10/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-10/watch.out.err
+watcher fixture: owned child 75239 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-11/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-11/watch.out.err
+watcher fixture: owned child 87572 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-12/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-test-run.SAiPvc/w2/tmp/fm-watch-open-loops-tests.3Uw5eD/ledger-corrupt-recovery-12/watch.out.err
+ok - fresh corrupt ledgers preserve continuous-outage and overdue cooldowns while valid degraded reports rearm stale incidents
+FM_TEST_END 2026-10-24T01:14:58Z tests/fm-watch-open-loops.test.sh exit=0 duration_ms=341462 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:14:58Z tests/fm-omp-harness.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement
+ok - fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch
+ok - default fallback overlay matches pre-change bytes
+ok - fixed-family empties native chains, survives relaunch, and is dropped on promotion
+ok - fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op
+ok - omp explicit shutdown logs its retirement expiry; readiness has no wall-clock cutoff
+ok - fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry
+ok - session lock and tmux liveness: omp is anchored, decoys stay out
+ok - fm-spawn refuses omp openai and openrouter routes before any worker launches
+ok - raw omp model flags refuse API billing and preserve subscription and non-model arguments
+ok - fallback admission excludes API-billed destinations from selection and native chains
+ok - fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension
+ok - no-helper posture rejects other runtimes and supervisor sessions before publishing or launching
+ok - no-helper launch, emptied fallback, record, relaunch inheritance and invalid-record refusal hold
+ok - no-helper omp launch refuses ultra effort before publishing or launching
+ok - every canonical omp ship and scout launch and relaunch disables titles and routes smol and tiny to the worker's own model with scalar roles only
+ok - omp ship and scout launches select replace edit mode only in the worker process
+ok - real omp spawns give firstmate alone, without no-helpers, native find, a judge credential and guard egress
+ok - launch preserves healthy pooled accounts and uses only the selected rule's stand-in
+ok - native chains preserve fallback order and shared launch policy
+ok - retired fallback refusal covers launch-time selection and runtime chains
+ok - typed route class and effort constrain launch stand-ins while manual routes are unchanged
+ok - stale unrelated dispatch rules do not block a launch
+ok - strongest-model exhaustion neither spends saved resets nor weakens or discards the task
+ok - fm-spawn: omp model validation is scoped to providers the listing can prove
+ok - fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy
+ok - fm-spawn: global role inspection is read-only, unlayered, and honors PI_CODING_AGENT_DIR
+ok - fm-spawn: raw omp launches validate the default only without an effective model override
+ok - fm-spawn: raw role and catalog inspection honor the actual launch directory and uncertain evidence passes through
+ok - fm-spawn: omp profile flags, assignments, and invoking environment pass through without default-role catalog probes
+ok - fm-spawn: any expanded raw token passes through unchanged without evaluating it or probing the default-role catalog
+ok - fm-spawn: unquoted, single-quoted, and double-quoted literal evidence still refuses invalid defaults
+ok - fm-spawn: a real omp secondmate launch loads only the busy -e and auto-discovers its primary extensions
+ok - fm-spawn: the config/secondmate-harness model pin is validated against the omp catalog before launch
+ok - omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification, jev-guard tool hooks installed
+ok - control, composer, and supervision-model tables carry omp's verified values
+ok - fm-wake-lib: the omp ownership proof is keyed on its own extensions and gates the hand-off tolerance
+ok - .omp turn-end guard: digest delivery, seatbelt block, one compelled continuation, flagged stop stands down
+ok - .omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up
+ok - .omp watch extension: decision, merge and multiline payloads come from the queue; unqueued closes inject nothing
+ok - .omp watch extension: an opted-in home runs the supervision host and relays every host line (away record)
+ok - .omp watch extension: an opted-in home runs the supervision host and relays every host line (quiet record)
+ok - .omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm
+ok - .omp watch extension: an unqueued host hand-back is delivered once (outcome)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (away-return)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (busy)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (stuck)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (rejected)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (unrestored)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (refused)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (stuck-refused)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (boundary)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (note)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (archived)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (diagnostic)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (restore-boundary)
+ok - .omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline (restore-diagnostic)
+ok - .omp watch extension: a redelivered merged wake keeps every host line (rows)
+ok - .omp watch extension: a redelivered merged wake keeps every host line (empty)
+ok - .omp watch extension: a handoff host mark follows the empty-queue rule (diagnostic)
+ok - .omp watch extension: a handoff host mark follows the empty-queue rule (boundary)
+ok - .omp watch extension: a host close split across stream chunks reaches main as one whole follow-up
+ok - .omp watch extension: legacy operational handoffs load and watcher records collapse into a queue-read mark
+ok - .omp watch extension: one idle queue-read boundary covers partial acknowledgements, recovery, replacement, token release, failures and slow queries
+ok - .omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher
+ok - .omp extensions: a descendant omp neither rebinds nor clears its local secondmate's task-session proof
+ok - .omp extensions: a local secondmate publishes its task-session proof with the lock missing, its own, or naming an unrelated live pid
+ok - .omp turn-end guard: the loaded marker follows the lock owner at turn boundaries instead of only at load
+ok - .omp watch extension: a generation stopped without a successor heals once; a real successor or arm call never double-arms
+ok - .omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool
+ok - .omp watch extension: publication failure retains the wake and permits tool, command, and factory repair
+FM_TEST_END 2026-10-24T01:29:01Z tests/fm-omp-harness.test.sh exit=0 duration_ms=842765 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:29:01Z tests/fm-open-loops.test.sh family=pr-forge expected_gate_skip=none
+PASS: ordinary categories, PR proof, ages and configuration
+PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion
+PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
+PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
+PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
+PASS: interrupted teardown records bound to the current task record
+PASS: correction coverage and landed/drop exclusions
+PASS: recorded task-only PR classification, fork landing, and correction coverage
+PASS: patch-equivalent delivery
+PASS: approved local landing and qualified defaults
+PASS: independent failed delivery and worker liveness axes
+PASS: unknown current state degrades independently of live verdict
+PASS: future pipeline stamps do not mask older valid progress
+PASS: future status commit and reflog cannot hide unknown-age stalls
+PASS: absolute relative empty and default pipeline stores preserve task-scoped progress
+PASS: collection leaves Git index and object inventory unchanged
+PASS: last-error JSON and human representations
+PASS: local-path origins are disclosed without degrading the ledger
+PASS: exact GitHub host admission and PR projection
+PASS: unreadable shared state inventory cannot publish complete empty coverage
+PASS: PR ownership matches the head repository and branch or an exact recorded URL; unowned checks are not fetched
+PASS: standing pauses survive unrelated answers; resumption and authoritative current states override them
+PASS: generation-invalidated snapshots retain coverage failures despite live stop events
+PASS: only dispatched ready work is overdue
+PASS: ordinary recovery adapters and source degradation
+PASS: publication suppression reset success/failure/skip
+PASS: held-gate singleflight and child cleanup
+PASS: unset and empty address overrides share shell defaults before collection
+PASS: no-progress source failure owns resistant descendant cleanup
+PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
+PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
+PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
+PASS: live and aged captain holds share unresolved-question coverage with status decisions
+PASS: unreadable tmux degrades coverage without fabricating missing worker
+PASS: current-state timeout retains independent observation failure
+PASS: real snapshot unreadable metadata/status inventory stays degraded
+PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory
+PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
+PASS: a steer on a row with a non-object source falls back to its owner inbox
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers
+PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup
+PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger; a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not
+ok - open-work reconciliation reports owned obligations from live records
+FM_TEST_END 2026-10-24T01:37:32Z tests/fm-open-loops.test.sh exit=0 duration_ms=510558 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:37:32Z tests/fm-home-summary-refresh.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+ok - watcher-carried status append publishes the real home summary
+ok - large backlog snapshots and home-summary publication stay within exec limits
+ok - fleet snapshot transport does not require or mutate operational state
+ok - parent snapshot consumes large child ledgers without argument transport
+ok - live watcher cadence bounds publication staleness without signals
+ok - fleet snapshot consumes the published local ledger by default
+ok - writer kill and replacement preserve an atomic JSON ledger
+ok - best-effort publication logs and continues
+no_progress: "operational-read made no output or CPU progress for 1s; stopping"
+Terminated: 15
+ok - best-effort refresh bounds validation and publication
+ok - best-effort refresh bounds state initialization
+ok - detached foreground returns before stalled bounded state initialization
+ok - best-effort refresh logs worker termination
+ok - best-effort refresh bounds failure reporting fallback
+ok - valid publication ignores an unavailable failure record
+ok - directory ledger destinations fail without false publication and count acquired attempts
+ok - publication completes on a home carrying accumulated status history
+ok - producer skips remote per-task state probes
+ok - a stalled publication does not delay the watcher liveness beacon
+ok - publication remains single-flight across watcher restart
+ok - bootstrap scopes retained failures to the current publication
+ok - failure records preserve refresh attempt ordering
+ok - repeated publication failure is reported at session start until it clears
+ok - a detached trigger returns at once and records no failure while a refresh is in flight
+ok - a detached trigger on an idle home publishes and clears its marker
+ok - triggers during a refresh coalesce into exactly one follow-up refresh
+ok - successful pending refreshes drain beyond four attempts
+no_progress: "operational-read made no output or CPU progress for 1s; stopping"
+Terminated: 15
+ok - timeout wake accounting finishes before a newer success publishes and resets the streak
+ok - three consecutive publication failures raise one wake that names the reason and duration, and no more
+ok - a changed failure reason raises a new wake and a repeated one does not
+ok - a successful publication ends the streak so a later streak wakes again
+ok - publication on a large history reads only what was appended and retains decisions from before and after the checkpoint
+FM_TEST_END 2026-10-24T01:41:16Z tests/fm-home-summary-refresh.test.sh exit=0 duration_ms=223825 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:41:16Z tests/fm-backlog-read-bound.test.sh family=unclassified expected_gate_skip=none
+ok - productive slow backlog rows and captain-held calls finish without latching later reads
+ok - a hanging tasks-axi show returns within the per-item bound instead of running unbounded
+ok - a timed-out row read reports one error naming the item that timed out
+ok - after the first bound hit the sweep continues and names every remaining item without paying the bound again
+ok - under an outer progress owner the per-item bound fires and the latch spares later items
+ok - a bound hit stops a captain hold without creating a task
+ok - the teardown verify gate stops at a bound hit without attesting the inventory
+ok - the reconcile-requests intake stops at a bound hit without classifying or recording the row
+ok - a bound hit in the migrated-prefix scan stops verify without attesting the inventory
+ok - a wedged backlog backend still leaves a complete digest: wake queue, supervision instructions, fleet state, and context all print
+ok - a full-body restart timeout latches the recovery sweep, naming every worker without another backend read
+# fm-backlog-read-bound.test.sh: all assertions passed
+FM_TEST_END 2026-10-24T01:42:45Z tests/fm-backlog-read-bound.test.sh exit=0 duration_ms=89174 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:42:45Z tests/fm-nm-read-cache.test.sh family=unclassified expected_gate_skip=none
+ok - the per-lane no-progress bound cuts only the hung lane, after 12s
+ok - case_finished_run_is_kept_until_the_id_changes: a finished run is cached until a newer run replaces it
+ok - case_finished_run_needs_the_database: an unverifiable finished run is read again, never guessed
+ok - case_live_run_is_read_fresh_every_time: a live run gets a fresh read on every call
+ok - case_ci_logs_follow_live_and_terminal_state: caller-path live CI logs stay fresh and the final terminal log is cached
+ok - case_failure_is_read_fresh_every_time: a failed or timed-out call is read fresh on every call and never replayed
+ok - case_unknown_inventory_is_read_fresh_every_time: an unknown inventory verdict is never kept
+ok - the daemon probe is read fresh on every call
+ok - a hit prints exactly the bytes of the fresh read, and a failure is never stored
+ok - answers are classified by what they say, and only a settled finished run is kept
+ok - cold, warm and uncached reads classify every run shape the same
+ok - mutation caught: finished-always-valid fails case_finished_run_is_kept_until_the_id_changes
+ok - mutation caught: finished-needs-no-database fails case_finished_run_needs_the_database
+ok - mutation caught: live-run-kept fails case_live_run_is_read_fresh_every_time
+ok - mutation caught: failure-kept fails case_failure_is_read_fresh_every_time
+ok - mutation caught: live-ci-log-kept fails case_ci_logs_follow_live_and_terminal_state
+ok - mutation caught: terminal-ci-log-not-kept fails case_ci_logs_follow_live_and_terminal_state
+FM_TEST_END 2026-10-24T01:43:35Z tests/fm-nm-read-cache.test.sh exit=0 duration_ms=48996 gate_skip=false
+FM_TEST_BEGIN 2026-10-24T01:43:35Z tests/fm-supervision-host.test.sh family=afk expected_gate_skip=none
+ok - host: parked child-exit sampling uses ordinary half-second sleeps
+ok - report surface: only the branch actor's current turn may report, and only on the tasks its wake names
+ok - report surface: visible late outcomes queue a relay, while silent outcomes remain stored without a wake or note
+ok - dispatch entry: the host reads branch eligibility, the offer rule, and the wake prompt from the Pi branch's own owner
+ok - drain: BRANCH OUTCOMES runs on a Claude home by default and on another primary with the file, never with off, and never on Pi
+ok - drain: captain outcomes come first, and routine overflow collapses into a count one drain clears
+ok - drain: repeated captain outcomes collapse per task, and the byte cap presents only the run its acknowledgement covers
+ok - drain: a long away window costs one short drain, captain outcomes collapsed per task and routine overflow counted, and nothing from it is shown again
+ok - drain: the BRANCH OUTCOMES budgets count bytes, cutting multibyte summaries by whole characters in any locale
+ok - drain: branch outcomes stay unread when a projection of the store fails
+ok - drain: branch outcomes stay unread and the drain fails when jq is missing
+ok - drain: branch outcomes stay unread when the drain cannot print them
+ok - drain: a legacy backlog is presented with each outcome's age and a check-first instruction, never adopted
+ok - drain: a keyed decision survives acknowledgement through a newer outcome for its task
+ok - drain: an outcome carried across a switch off Pi comes back with its age, never adopted
+ok - drain: an outcome nothing has shown is presented until acknowledged, and a repeated acknowledgement changes nothing
+ok - drain: an outcome the host drain presented but main never acknowledged stays unprocessed across a switch to Pi
+ok - drain: an outcome the host drain presented but main never acknowledged survives an outcome index repair
+ok - host: an attended wake the branch may take is handled on the engine, and its routine outcome never wakes main
+ok - host: an attended captain outcome wakes main once and stays in its drain until main acknowledges it
+ok - host: a captain outcome recorded after the captain left waits for the return, then reaches main's drain
+ok - host: a quiet record without its daemon is a present captain, so outcomes and decisions reach main
+ok - host: an attended decision close stays main's exactly as the plain arm delivers it
+ok - host: an off written while the host is parked sends the next attended close to main, naming the opt-out
+ok - host: a main-only pass-through leaves the successor watcher running and the close undelivered for main
+ok - host: a successor slower than the readiness notice window does not hold the close and is left running
+ok - host: a successor that reports failure ends the readiness wait at once
+ok - host: a successor that fails after its still-starting close delivers its failure through the wake queue
+ok - host: an attended close whose main session cannot be identified reaches main and runs no engine turn
+ok - host: a decision close accepted away whose turn starts attended still reaches main unchanged
+ok - host: an attended close whose task turns main-only before its turn still reaches main unchanged
+ok - host: a primary with no verified dialog mirror keeps every attended close on main, and its away posture still runs
+ok - host: each wake carries the captain's dialog since the last wake, without operational input
+ok - host: the dialog mirror, its feed, and the wake file are owner-only
+ok - host: dialog a turn never completed with its report (a park boundary, a stopped turn, no report) reaches the next turn
+ok - host: an attended wake whose mirror is missing, cannot be read (at the feed or at the prompt), or holds a malformed entry reaches main before any engine turn, and the cursor stays put
+ok - host: an away wake is handled on the engine through the branch contract and never reaches main
+ok - host: an engine turn that records no outcome hands its durable wake to main
+ok - host: a captain return during an engine turn hands that turn's outcomes to main
+ok - host: silent outcomes are excluded from both captain-return handoff paths
+ok - host: an early visible outcome survives more than 1,000 same-turn receipts
+ok - host: an outcome lookup failure forces a visible main handoff
+ok - host: an outcome recorded after the return reaches main even when its host dies at the turn's end
+ok - host: a killed predecessor's engine is reaped and the next host removes its turn files
+ok - host: a turn that reports but leaves its granted rows queued hands the wake to main
+ok - host: a captain return during a failed engine turn still hands that turn's outcomes to main
+ok - host: an engine turn whose result is incomplete hands its wake to main
+ok - host: two engine errors latch the session, main keeps every away wake in the cooldown, a failed probe doubles it up to its cap, and a report recovers it silently
+ok - host: an attended close in a latched session reaches main as the arm printed it and leaves the latch as it was, and a home that opted out with off never reads it
+ok - host: attended, two engine errors latch the session, main keeps every close unchanged in the cooldown, a failed probe doubles it up to its cap, and a routine probe's recovery stays in the ledger, off main
+ok - host: an engine turn is bounded, and tool processes outside its process group are reaped
+ok - host: a restarted host stops, by recorded identity, the cycle a killed predecessor left running
+ok - host: the park ends itself with a boundary wake and a stopped watcher
+ok - host: waiting closes cannot carry the park past its boundary
+ok - host: a close whose margin runs out while the successor starts reaches main at the boundary without a turn
+ok - host: the park's test clock is inert without the test marker
+ok - host: a park at or beyond the Stop-hook registration falls back to the default boundary
+ok - host: an owner's later park limit lets a turn outlive the boundary, and no other limit does
+ok - host: the first cycle's status streams once, --restart replaces a stale watcher, and an owner predecessor makes a handling successor
+ok - host: an unchanged held outcome reaches the captain once across cadences, and a later decision on the task still does
+ok - host: a home naming an unverified engine hands every away wake to main with the reason
+ok - host: a host outside the session-lock owner stands down without arming
+tests/fm-supervision-host-helpers.sh: line 159:  3861 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
+tests/fm-supervision-host-helpers.sh: line 159:  3861 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
+ok - host: a host under a superseded auto-arm generation stands down without touching the owner
+FM_TEST_END 2026-10-24T01:51:13Z tests/fm-supervision-host.test.sh exit=0 duration_ms=458485 gate_skip=false
+FM_TEST_SUMMARY total=12 failed=0 skipped_gate=0 duration_ms=2746497
+FM_TEST_SUMMARY_FAMILY family=afk count=1 duration_ms=458485 failed=0
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=510558 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=1071192 failed=0
+FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=1 duration_ms=223825 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=138170 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=5 duration_ms=840309 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-omp-harness.test.sh duration_ms=842765
+FM_TEST_SLOWEST rank=2 script=tests/fm-open-loops.test.sh duration_ms=510558
+FM_TEST_SLOWEST rank=3 script=tests/fm-supervision-host.test.sh duration_ms=458485
+FM_TEST_SLOWEST rank=4 script=tests/fm-watch-open-loops.test.sh duration_ms=341462
+FM_TEST_SLOWEST rank=5 script=tests/fm-crew-state.test.sh duration_ms=228427
+FM_TEST_SLOWEST rank=6 script=tests/fm-home-summary-refresh.test.sh duration_ms=223825
+FM_TEST_SLOWEST rank=7 script=tests/fm-watch-arm.test.sh duration_ms=184278
+FM_TEST_SLOWEST rank=8 script=tests/fm-watcher-lock.test.sh duration_ms=158980
+FM_TEST_SLOWEST rank=9 script=tests/fm-pi-watch-extension.test.sh duration_ms=100196
+FM_TEST_SLOWEST rank=10 script=tests/fm-backlog-read-bound.test.sh duration_ms=89174
+FM_TEST_SLOWEST rank=11 script=tests/fm-watchdog-check.test.sh duration_ms=55393
+FM_TEST_SLOWEST rank=12 script=tests/fm-nm-read-cache.test.sh duration_ms=48996
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M5N8HA2DQE4RJ87KDB9VAJ6E/affected-tests.json
+rc=0

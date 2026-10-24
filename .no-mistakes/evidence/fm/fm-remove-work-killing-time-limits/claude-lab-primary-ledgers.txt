@@ -1,0 +1,31 @@
+# Live Claude lab primary (claude 2.1.310) in disposable clone /Users/charlesabrooker/tmp/fm-clone.w6PKcn/firstmate at 2de608bf09aa5763f5478f5fd465b876e7cb6f77, FM_HOME=/Users/charlesabrooker/tmp/fm-lab.dEdSN3 (marked lab), private tmux socket fm-lab, config/supervision-host-off
+## state/.watch-cycle-exits.log
+arm_pid=92715	watcher_pid=92828	origin=started	started_at=1792805205	ended_at=1792805221	exit_code=0	signal=none	reason=actionable-check	beacon_age=0	lock_before=pid:92828|identity:Fri Oct 23 20:26:45 2026     bash /Users/charlesabrooker/tmp/fm-clone.w6PKcn/firstmate/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=started:10052
+## state/.watch-deliveries.log
+92828	Fri Oct 23 20:26:45 2026     bash /Users/charlesabrooker/tmp/fm-clone.w6PKcn/firstmate/bin/fm-watch.sh	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+## state/.claude-autoarm-epoch
+epoch=2 owner_pid=72487 outcome=arming updated_at=1792805278
+Fri Oct 23 20:27:58 2026     bash /Users/charlesabrooker/tmp/fm-clone.w6PKcn/firstmate/bin/fm-claude-stop-autoarm.sh
+
+## next Stop's foreground arm output (state/.claude-autoarm-output.*)
+watcher: attached pid=10052 (beacon 10s)
+## live handling-successor watcher
+  PID ELAPSED ARGS
+10052   01:45 bash /Users/charlesabrooker/tmp/fm-clone.w6PKcn/firstmate/bin/fm-watch.sh
+## startup-network timings
+v1	phase	gh-auth	460	356	
+v1	phase	secondmate-liveness	838	15	
+v1	phase	secondmate-sync	868	55	
+v1	phase	handoff-delivery	936	7	
+v1	phase	fleet-sync	835	1019	
+v1	stage	network-checks	63	1909	probe_sweeps
+## Stop hook rewake banner delivered to Claude (from the lab session transcript)
+<task-notification>
+<summary>Stop hook feedback</summary>
+</task-notification>
+<system-reminder>
+Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now.
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+
+</system-reminder>

@@ -1,0 +1,3 @@
+# default-bound contrast, base = 467a15132a1b, 2026-10-24T01:29:42Z, 20:29  up 3 days, 6 hrs, 8 users, load averages: 11.70 13.36 12.56
+[base] FAIL summary_65s_producer_publishes :: 60.2s rc=124 published=False stderr='Terminated: 15\nfm-home-summary-refresh: refresh exceeded its 60-second deadline'
+[base] FAIL fleet_45s_task_read_is_included :: 40.2s rc=0 observation-included=False endpoints='""' stderr=''

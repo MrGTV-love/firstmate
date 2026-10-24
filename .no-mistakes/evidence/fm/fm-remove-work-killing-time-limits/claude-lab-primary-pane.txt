@@ -1,0 +1,41 @@
+
+❯ Disposable lab smoke test of watcher auto-arm. For this first turn, do not act on any startup digest next steps and run no tools. Reply with only the word READY.
+
+⏺ READY
+
+✻ Worked for 7s · done 8:26 PM
+
+⏺ Stop hook feedback
+
+  Read 1 file, ran 4 shell commands
+
+⏺ Captain, I handled the wake. Now I check that the queue is clear.
+
+  Ran 2 shell commands
+
+⏺ Captain, the wake test worked, but the lab scout it flagged is gone.
+
+  What I did:
+  1. The monitor woke me with one alert: one overdue item.
+  2. I read the alert. The lab scout ("Lab smoke") has stopped. Its isolated copy is gone. It wrote no report.
+  3. I marked the item as "escalated to captain".
+  4. I cleared the alert. The queue now has no alerts.
+
+  Did it work?
+  - The monitor re-armed by itself and woke me. That part of the test passed.
+  - The lab scout did not finish. Nothing is left to recover.
+  - Then I made one extra clear-alert call that I did not need. It refused, because the overdue item still shows. This is not harmful. I did not retry it.
+
+  What you do now: pick one.
+  1. Clean up (recommended). Remove the dead lab scout item. It is a throwaway test, so nothing is lost.
+  2. Relaunch. Start the lab scout again, if you want to test it again.
+
+  The overdue item stays in the list until you pick.
+
+✻ Sautéed for 56s · done 8:27 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ clean up the lab scout
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 6% 63k/1.0M firstmate:7e73ec2f
+  ⏵⏵ auto mode on (shift+tab to cycle)
