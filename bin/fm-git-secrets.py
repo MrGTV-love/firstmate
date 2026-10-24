@@ -14,8 +14,10 @@ the hook wrapper preserves those bytes for the repository's own hook. No file
 content or match is printed, no provider is called, and no working-tree file
 is read. Each decision appends one event through fm-guard-event.sh carrying
 the highest consecutive refusal count for the same credential-shaped line,
-identified by its content hash. Different content starts at one; past the budget
-of one, the refusal also escalates to a human decision, and the operation stays
+identified by its content hash. Different content starts at one. A failed
+inspection is counted under the reserved inspection-failed key and keeps the
+per-line counts; only an allowed decision clears them. Past the budget of one,
+the refusal also escalates to a human decision, and the operation stays
 refused. Exit 1 refuses the Git operation, including when inspection fails;
 exit 2 indicates invalid arguments.
 """
@@ -41,6 +43,7 @@ OID = re.compile(rb"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 GUARDS = {"pre-commit": "git-commit-credential-shapes", "pre-push": "git-push-credential-shapes"}
 EVENT_WRITER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fm-guard-event.sh")
 BUDGET = 1
+INSPECTION_FAILED = "inspection-failed"
 # Whole-line patches with fixed prefixes, independent of user diff settings.
 DIFF = ("-p", "--text", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames",
         "--submodule=short", "--src-prefix=a/", "--dst-prefix=b/")
@@ -138,7 +141,7 @@ def refused(added):
 def repeat(guard, fingerprints):
     try:
         state = git("rev-parse", "--git-path", "fm-" + guard + ".refusals").rstrip(b"\n")
-        if not fingerprints:
+        if fingerprints is not None and not fingerprints:
             if os.path.exists(state):
                 os.remove(state)
             return 1
@@ -149,14 +152,17 @@ def repeat(guard, fingerprints):
                 previous = {}
         except (OSError, ValueError):
             previous = {}
-        counts = {}
+        if fingerprints is None:
+            counts, fingerprints = dict(previous), {INSPECTION_FAILED}
+        else:
+            counts = {}
         for fingerprint in fingerprints:
             count = previous.get(fingerprint, 0)
             counts[fingerprint] = count + 1 if type(count) is int and count >= 0 else 1
         with open(state, "w", encoding="utf-8") as counter:
             json.dump(counts, counter, sort_keys=True)
             counter.write("\n")
-        return max(counts.values())
+        return max(counts[fingerprint] for fingerprint in fingerprints)
     except (OSError, subprocess.SubprocessError):
         return 1
 
@@ -192,7 +198,7 @@ def main():
                 fingerprints.add(fingerprint)
         paths, source_ok = sorted(paths), "true"
     except (OSError, ValueError, subprocess.SubprocessError):
-        paths, fingerprints, source_ok = None, set(), "false"
+        paths, fingerprints, source_ok = None, None, "false"
     denied = paths is None or bool(paths)
     count = repeat(guard, fingerprints)
     record(guard, "deny" if denied else "allow", source_ok, started, count)
@@ -208,7 +214,7 @@ def main():
     if count > BUDGET:
         print(f"escalate: this check refused {count} times in a row, past its budget of {BUDGET}; "
               "stop retrying and report the refusal to Firstmate for a human decision. "
-              "The commit or push stays refused while the added content remains.")
+              "The commit or push stays refused until inspection succeeds and finds no new credential-shaped line.")
     return 1
 
 

@@ -356,8 +356,8 @@
 #   reports a differing model or an unrecovered run error beside the state.
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
-#   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
-#   300-second write and edit judgment budget (docs/configuration.md "Jev guard"),
+#   The same overlay raises omp's pre-tool handler deadline above the Jev guard
+#   service's 300-second decision budget (docs/configuration.md "Jev guard"),
 #   and disables omp URL reads so read and grep never fetch the web; web access
 #   needs a task egress grant for a web-classed tool.
 #   It also sets dev.autoqa false, so workers never upload Auto QA reports.
