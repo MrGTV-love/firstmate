@@ -349,6 +349,17 @@ function primitiveCells(value: string): number | undefined {
   return quoted ? undefined : count;
 }
 
+/** Command output before the completed BashTool trailer its own details confirm exactly. */
+function nativeBashOutput(text: string, details: unknown): string | undefined {
+  if (!object(details) || typeof details.wallTimeMs !== "number" || !Number.isFinite(details.wallTimeMs)) return;
+  let trailer = `\n\nWall time: ${(details.wallTimeMs / 1000).toFixed(2)} seconds`;
+  if (details.exitCode !== undefined) {
+    if (typeof details.exitCode !== "number") return;
+    trailer += `\n\nCommand exited with code ${details.exitCode}`;
+  }
+  return text.endsWith(trailer) ? text.slice(0, -trailer.length) : undefined;
+}
+
 function producerScreen(text: string): { text: string; removed_bytes: number } {
   const unchanged = { text, removed_bytes: 0 };
   const lines = text.split(/(?<=\n)/);
@@ -368,21 +379,18 @@ function producerScreen(text: string): { text: string; removed_bytes: number } {
     if (fields.length) fields[fields.length - 1].end = i;
     fields.push({ start: i, end: lines.length, key: field[1], count: field[2] === undefined ? undefined : Number(field[2]), value: field[3] ?? "" });
   }
-  // Structural rule: only root control scalars without children or quotes, and
-  // root help arrays with exactly N primitive entries, belong to the producer.
-  // All other fields and their entire indented subtrees are opaque task data;
-  // never search inside PR bodies, comments, findings or quoted values for help.
+  // Structural rule: only root help arrays with exactly N primitive entries
+  // belong to the producer. All other fields, including scalars such as error,
+  // and their entire indented subtrees are opaque task data; never search
+  // inside PR bodies, comments, findings or quoted values for help.
   const removed = new Set<number>();
   for (const field of fields) {
+    if (field.key !== "help" || field.count === undefined || !Number.isSafeInteger(field.count)) continue;
     const children = lines.slice(field.start + 1, field.end).filter(line => line.trim() !== "");
-    let owned = false;
-    if (field.key === "help" && field.count !== undefined && Number.isSafeInteger(field.count)) {
-      if (field.value !== "") owned = children.length === 0 && primitiveCells(field.value) === field.count;
-      else owned = children.length === field.count && children.every(line => /^  (?:- )?\S/.test(line)
+    const owned = field.value !== ""
+      ? children.length === 0 && primitiveCells(field.value) === field.count
+      : children.length === field.count && children.every(line => /^  (?:- )?\S/.test(line)
         && !/^  (?:- )?[A-Za-z_][A-Za-z0-9_.-]*:/.test(line));
-    } else if (["next_action", "progress", "error"].includes(field.key)) {
-      owned = field.count === undefined && children.length === 0 && field.value !== "" && !field.value.includes('"');
-    }
     if (owned) for (let i = field.start; i < field.end; i++) removed.add(i);
   }
   if (removed.size === 0) return unchanged;
@@ -533,11 +541,12 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         separator = "\n";
       }
       const producer = axiProducer(event);
-      if (producer) {
-        const screened = producerScreen(text);
+      const output = producer ? nativeBashOutput(text, event.details) : undefined;
+      if (producer && output !== undefined) {
+        const screened = producerScreen(output);
         if (screened.removed_bytes > 0) {
           terminal.producer_fields = { producer, removed_bytes: screened.removed_bytes };
-          text = screened.text;
+          text = screened.text + text.slice(output.length);
         }
       }
       const pieces = service.plan({ tool, source_role: "tool_result", content: text }, "content", SCREEN_QUESTIONS);

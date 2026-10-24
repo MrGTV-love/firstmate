@@ -2469,11 +2469,13 @@ Questions and numeric policy are code-owned:
 - Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
   The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
 
-Before omp result planning, a literal single invocation of a known local AXI command can exclude its producer-owned structural next-step fields from the screened copy only.
+Before omp result planning, a literal single invocation of a known local AXI command can exclude its producer-owned structural next-step help from the screened copy only.
 The command/mode registry and structural rule have one owner in [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts); quoted or expanded shell arguments, executable paths, wrappers, pipelines, chains, redirections, unknown producers and raw-output modes receive ordinary complete screening.
 The supported envelopes cover no-mistakes AXI drive/status/respond, gh-axi PR/issue views and lists, tasks-axi detail/list, Lavish home/playbook, browser eval and quota home output; other modes remain screened unchanged rather than being guessed safe.
-Only root `help[N]` arrays with exactly the declared primitive entries and unquoted, childless root `next_action`, `progress` and `error` scalars are excluded.
-PR bodies, comments, findings, file content, quoted scalar values and other indented subtrees stay screened, including help-shaped text inside them; ambiguous or malformed framing is screened unchanged.
+The exclusion applies only when the result ends with the completed omp BashTool trailer that its own `wallTimeMs` and `exitCode` details reproduce exactly; missing or mismatched metadata receives complete screening.
+The structure is parsed on the command output before that trailer, and every trailer byte stays in the screened copy.
+Only root `help[N]` arrays with exactly the declared primitive entries are excluded.
+PR bodies, comments, findings, file content, every scalar field including `error`, and other indented subtrees stay screened, including help-shaped or host-trailer-shaped text inside them; ambiguous or malformed framing is screened unchanged.
 The original result remains unmodified, and flags or unavailable screening of its remaining content still withhold it.
 This is a bounded trust in the local command's formatter, not executable authentication or a guarantee against same-user replacement of a PATH executable.
 [`tests/fm-jev-guard-producer.test.sh`](../tests/fm-jev-guard-producer.test.sh) exercises the recorded bounded-wait output, embedded injections and these fail-closed boundaries without model calls.
