@@ -1,0 +1,60 @@
+LAB=/Users/charlesabrooker/tmp/fm-lab.d7w3a1
+=== run 1 (default cap)
+copy-sweep: mode=apply containers=1 copies=2
+DEFERRED	0.12 GiB	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c1	per-run cap: 5 locked release slots used; eligible next run
+DEFERRED	0.12 GiB	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c2	per-run cap: 5 locked release slots used; eligible next run
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c7	branch fm/c7 at 8d7b5f00214d, copy 0.12 GiB, preserved 0.00 GiB, net freed 0.12 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 806 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c6	branch fm/c6 at cab869c0a0c6, copy 0.12 GiB, preserved 0.00 GiB, net freed 0.12 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 306 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c5	branch fm/c5 at 8f04c131b881, copy 0.12 GiB, preserved 0.00 GiB, net freed 0.12 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 99930 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c4	branch fm/c4 at 76e5b7c2351c, copy 0.12 GiB, preserved 0.00 GiB, net freed 0.12 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 99618 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c3	branch fm/c3 at e1e5849b9dd5, copy 0.12 GiB, preserved 0.00 GiB, net freed 0.12 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 99336 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=2
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1: 0.23 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo: 0.23 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=7 GiB=0.82 reaped=5 freed=0.59
+rc=0
+--- driver calls run 1: plans=5 executes=5
+c1 registered=yes
+c2 registered=yes
+c3 registered=no
+c4 registered=no
+c5 registered=no
+c6 registered=no
+c7 registered=no
+=== run 2
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c2	branch fm/c2 at dc0a2a9d6090, copy 0.12 GiB, preserved 0.00 GiB, net freed 0.12 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 99105 is gone)
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.d7w3a1/th/pool1/1/repo/.claude/worktrees/c1	branch fm/c1 at 39823523b9ff, copy 0.12 GiB, preserved 0.00 GiB, net freed 0.12 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 98824 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.23 reaped=2 freed=0.23
+rc=0
+--- driver calls total: plans=7 executes=7
+c1 registered=no
+c2 registered=no
+c3 registered=no
+c4 registered=no
+c5 registered=no
+c6 registered=no
+c7 registered=no
+--- copy-sweep.log lines: 7
+lab removed

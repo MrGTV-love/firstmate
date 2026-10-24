@@ -1,0 +1,65 @@
+LAB=/Users/charlesabrooker/tmp/fm-lab.lZaOXZ
+=== run 1 (driver: owner writes unique.dat, then cleanup_skipped_live_or_unknown)
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo/.claude/worktrees/w	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 79284 is gone
+FAILED	/Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo/.claude/worktrees/w	the copy was left: REFUSED: Vernant's closeout driver did not release /Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo/.claude/worktrees/w (exit 3): cleanup_skipped_live_or_unknown: {"allowed": false, "reason": "cleanup_skipped_live_or_unknown"}?; the driver names this refusal temporary and released nothing, so this run's preserve stays, because not every preserved original is still unchanged in the copy; later runs wait while the copy's content keeps changing and preserve again only content that differs from it; the next sweep run plans it again.
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+rc=1
+--- preserves after run 1:
+data/copy-sweep/20261024T004844Z.79754-6ec19007ff3cd419b7c7597147773a2bd93daa76/nested-copy-preserved/01351b456343221508b02013c25f39ecbc0bc8684648eb8a35addfff8cf851bb/unique.dat: v0 original
+--- waiting records: 1  receipts: 0
+=== run 2 (content back to v0)
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.00 GiB	/Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo/.claude/worktrees/w	content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool /Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container /Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+rc=0
+--- driver calls so far: 2
+=== run 3 (content unchanged since run 2)
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	/Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo/.claude/worktrees/w	branch fm/w at 6ec19007ff3c, copy 0.00 GiB, preserved - GiB (preserved in an earlier run), net freed - GiB, unmeasured (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 79284 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 1 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+rc=0
+--- driver calls total: 4
+--- preserves after run 3 (must still be one):
+data/copy-sweep/20261024T004844Z.79754-6ec19007ff3cd419b7c7597147773a2bd93daa76/nested-copy-preserved/01351b456343221508b02013c25f39ecbc0bc8684648eb8a35addfff8cf851bb/unique.dat: v0 original
+--- registered: no
+--- copy-sweep.log:
+2026-10-24T00:48:51Z	removed	/Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo/.claude/worktrees/w	clone=/Users/charlesabrooker/tmp/fm-lab.lZaOXZ/th/pool1/1/repo	head=6ec19007ff3cd419b7c7597147773a2bd93daa76	branch=fm/w	kib=16	preserved_kib=-	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 79284 is gone
+lab removed
