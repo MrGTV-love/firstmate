@@ -6,7 +6,12 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { jev } from "../../core/client.ts";
 import { choice, noul } from "../../core/helpers.ts";
 import type { ChoiceAnswer, NoulAnswer, Questions, State } from "../../core/types.ts";
-import type { Decide, GateDecision } from "./bash-gate.ts";
+
+export type Decide = (state: State, questions: Questions) => Promise<{ answers: Record<string, unknown> }>;
+export interface GateDecision {
+  block: boolean;
+  reason: string;
+}
 
 export const WRITE_QUESTIONS = {
   kind: choice("What kind of file is `path`, given `content`?", {

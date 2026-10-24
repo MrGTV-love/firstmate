@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { ContractError, JevClient, type SystemOneResult } from "../src/core/client.ts";
 import { QuestionValidationError, validateRequest, type Questions, type State } from "../src/core/types.ts";
-import { BASH_THRESHOLDS, SCREEN_THRESHOLDS, WRITE_THRESHOLDS } from "../src/levels/level06/index.ts";
+import { SCREEN_THRESHOLDS, WRITE_THRESHOLDS } from "../src/levels/level06/index.ts";
 
 export const GUARD_POLICY_VERSION = "FIRSTMATE_JEV_GUARD_V1";
 export const OUTAGE_POLICY = "REVIEW_ON_UNAVAILABLE_V1";
@@ -22,7 +22,7 @@ export const CHUNK_OVERLAP_BYTES = 1_024;
 const SIZE_REFUSAL_HEAD = `REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within ${MAX_CHUNKS} requests of ${MAX_REQUEST_BYTES} UTF-8 bytes each, including model, questions and JSON framing, with ${CHUNK_OVERLAP_BYTES} JSON-escaped bytes of overlap. `
   + `The ${MAX_CHUNKS * MAX_REQUEST_BYTES}-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. `;
 export const SIZE_REFUSAL_NOTICE = SIZE_REFUSAL_HEAD
-  + "For a shell call or unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
+  + "For an unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
 /** A result cannot be split by the worker; the withheld output is the thing to shrink. */
 export const SIZE_RESULT_NOTICE = SIZE_REFUSAL_HEAD
   + "human-only-exit: what authorized smaller read or command output gives the intended information within this budget?";
@@ -102,7 +102,7 @@ export interface GuardTerminal {
   decision: "allow" | "block" | "clear" | "flag" | "review" | "inactive";
   enforcement: "pretool_allow" | "pretool_deny" | "result_pass" | "omp_replace"
     | "claude_advisory_only" | "inactive_no_protection";
-  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read" | "read_only" | "lab";
+  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read";
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
   /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */
@@ -188,7 +188,7 @@ function escapedPointBytes(point: number): number {
   return point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
 }
 
-/** Bounded write-only prefix; shell and result plans still require a complete cover. */
+/** Bounded write-only prefix; result plans still require a complete cover. */
 function writePieces(text: string, room: number): { pieces: string[]; covered: number } {
   if (room < 2 * CHUNK_OVERLAP_BYTES + 64) throw new GuardUnavailableError("RequestTooLargeError");
   const pieces: string[] = [];
@@ -347,7 +347,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       // Question IDs and answer fields are allowlisted; provider extensions can contain input text.
       const answers: Record<string, { type: "noul"; noul: number } | { type: "choice"; choice: string; confidence: number }> = {};
       if (result) {
-        for (const key of ["effect", "destructive_intent", "kind", "contains_secret", "injection"]) {
+        for (const key of ["kind", "contains_secret", "injection"]) {
           const answer = result.answers[key];
           if (answer?.type === "noul") answers[key] = { type: "noul", noul: answer.noul };
           else if (answer?.type === "choice") answers[key] = { type: "choice", choice: answer.choice, confidence: answer.confidence };
@@ -355,7 +355,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       }
       const row = {
         kind: "terminal", at: Date.now(), task: context.task, policy_version: GUARD_POLICY_VERSION, outage_policy: OUTAGE_POLICY,
-        thresholds: { bash: BASH_THRESHOLDS, write: WRITE_THRESHOLDS, injection: SCREEN_THRESHOLDS },
+        thresholds: { write: WRITE_THRESHOLDS, injection: SCREEN_THRESHOLDS },
         hook: terminal.hook, tool: terminal.tool, decision: terminal.decision, enforcement: terminal.enforcement, branch: terminal.branch,
         error_type: terminal.error_type, request_started: requestStarted,
         ...((terminal.tool === "write" || terminal.tool === "edit") && terminal.enforcement === "pretool_deny"

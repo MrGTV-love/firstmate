@@ -721,7 +721,8 @@ The same handler waiting 65 seconds under a `--config` overlay setting `extensio
 With the real guard extension and a synthetic judge that answered a benign shell command after 31 seconds, the repository's `.omp/fm-worker-overlay.yml` made the pre-tool decision the judge's answer: `allow`, null `error_type`, one try, 31,012 ms, and the command ran.
 The same guard without that overlay was cut off by the host at 30 seconds, wrote no guard row and did not run the command.
 Each case is one run with scripted local providers, so they establish the host mechanism and the overlay's effect, not judge latency or production activation.
-`tests/fm-jev-guard-omp-live-e2e.test.sh` repeats the 31-second overlay case through `fm_jev_native_omp_pretool`.
+The shell-judgment observations above are historical: bash pre-calls no longer receive a model judgment.
+`tests/fm-jev-guard-omp-live-e2e.test.sh` now exercises the retained write judgment's 31-second overlay case through `fm_jev_native_omp_pretool`.
 
 Two additional native omp sessions consumed an answered 0.50 band result and a 0.99 flag on a real home-data read.
 The band case retained the original text plus an advisory, with a `review` / `policy` / `result_pass` audit row; the trusted case retained the original text with `clear` / `trusted_read` / `result_pass` and the original null error type.
@@ -731,6 +732,18 @@ All providers and credentials in these native measurements were synthetic and lo
 The [operator contract](../configuration.md#jev-guard) owns the distinct host budgets, advisory band, trusted-read boundary and pre-tool outage denial.
 These observations establish actual host delivery of controlled judgments, not live-model accuracy or production activation.
 Both maintained native entrypoints also passed their 20-case matrices on these installed versions, covering exact channel consistency, untracked copy withholding/advisory, newly trusted changed home-state reads, privacy, missing credentials, provider outage and audit outage.
+
+### 2026-10-24 retained write pre-tool verification
+
+On macOS arm64 with omp 18.12.4, `bash tests/fm-jev-guard-omp-live-e2e.test.sh` passed its 20 native read cases and its retained write-deadline case using only private scripted loopback providers.
+The final output was:
+
+```text
+ok - omp (omp/18.12.4): pre-tool write judgment answered after 31 seconds decides the call under the worker overlay
+```
+
+The former shell judgment is no longer exercised because bash pre-calls have no model gate.
+This is installed-host delivery evidence for the retained write policy, not live-provider accuracy or production activation.
 
 ### Offline policy verification before trusted-read handling
 

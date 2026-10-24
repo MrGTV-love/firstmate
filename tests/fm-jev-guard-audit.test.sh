@@ -170,7 +170,6 @@ function assertNoPiece(r, errorType) {
 }
 await test('call: invalid tool input fails before planning and invents no piece', async () => {
   parts = []; next = 0;
-  assertNoPiece(await fresh(() => handlers.tool_call({ toolName: 'bash', input: { command: 42 } }, { cwd: state })), 'InvalidToolInputError');
   assertNoPiece(await fresh(() => handlers.tool_call({ toolName: 'write', input: { path: 'file.ts', content: 42 } }, { cwd: state })), 'InvalidToolInputError');
 });
 await test('result: an oversize result no plan can cover fails before planning and invents no piece', async () => {
