@@ -1984,8 +1984,8 @@ spawn_abort_cleanup() {
   fi
   [ -z "$SPAWN_ROUTING_PAIR" ] || rm -rf -- "$SPAWN_ROUTING_PAIR"
   # The per-id spawn lock is retaken so a concurrent spawn of the same id, which
-  # reinstalls this strip dir, is never undone. A launched agent whose endpoint
-  # was not closed may still be committing, so it keeps its strip.
+  # reinstalls this task hooks dir, is never undone. A launched agent whose
+  # endpoint was not closed may still be committing, so it keeps its hooks.
   if [ "$status" -ne 0 ] && [ -n "$GIT_HOOKS_DIR" ] &&
     { [ "$SPAWN_LAUNCH_SENT" = 0 ] || [ "$SPAWN_ENDPOINT_CLOSED" = 1 ]; } &&
     fm_lock_try_acquire "$SPAWN_TASK_LOCK"; then
@@ -6563,12 +6563,12 @@ EOF
 # Per-task git hooksPath for local credential checks and AI trailer stripping.
 # Installed for every kind, including secondmate; keeping trailers disables
 # only the commit-msg strip, not the credential checks. Cursor and other non-Claude runtimes inject the trailer
-# after the typed message, so the typed message is not the object. When
-# installed, the pane receives this directory via GIT_CONFIG_* below, which
+# after the typed message, so the typed message is not the object. The pane
+# always receives this directory via GIT_CONFIG_* below, which
 # overrides a project's husky core.hooksPath without rewriting it; the installer
 # chains the previous hooks so they still run. Real secondmate
 # homes are firstmate clones; a launch whose worktree is not git fails closed
-# rather than shipping a runtime that cannot strip.
+# rather than shipping a runtime that cannot check credentials or strip.
 GIT_HOOKS_DIR="$STATE_REAL/$ID.git-hooks"
 "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" install "$GIT_HOOKS_DIR" "$WT" "$KEEP_AI_TRAILERS" || {
   echo "error: could not install the task Git hooks for $ID" >&2
