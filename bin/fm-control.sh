@@ -54,9 +54,11 @@
 # releasing the task's claim and recording it as released_worktree=), and
 # writing the note in the brief. A ship whose recorded copy is gone refuses,
 # because relocation through relaunch --worktree is that copy's only recovery
-# route. It stops, starts,
-# deletes, resets, and returns nothing: the old copy's bytes, the endpoint, and
-# any pipeline run are untouched. A recorded GitHub PR is retained only when
+# route. It stops, starts, resets, and returns nothing: the old copy's bytes,
+# the endpoint, and any pipeline run are untouched. It deletes only the task's
+# brief-named deletion snapshot and its metadata digest, which are bound to the
+# old copy (docs/configuration.md "Brief-named file deletion allowance").
+# A recorded GitHub PR is retained only when
 # the replacement's HEAD equals or descends from its recorded head and the
 # current forge head when readable. Missing or contradictory proof refuses.
 # For duplicate slot-root records, first retire the finished records with
@@ -634,7 +636,8 @@ fi
 
 # --- reassociate: re-point the record at a replacement copy -----------------
 #
-# Nothing here stops, starts, deletes, resets, or returns anything.
+# Nothing here stops, starts, resets, or returns anything; the only deletion is
+# each re-pointed task's old-copy deletion snapshot, after records publish.
 #
 # One call re-points the command's task or, with --also, several tasks whose
 # records leave one shared slot root, each at its own replacement copy, under
