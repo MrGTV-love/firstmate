@@ -1,0 +1,70 @@
+== herdr herdr 0.9.5 lab session fm-lab-twinproof-76059-10738 (Fri Oct 23 19:20:48 CDT 2026)
+lab server pid(s): 76260  socket: /Users/charlesabrooker/.config/herdr/sessions/fm-lab-twinproof-76059-10738/herdr.sock target: fm-lab-twinproof-76059-10738:w1:p1
+PASS - provisioned lab has exactly one server
+
+== Phase A: live server, broken status - nothing may start a second server
+[fail] ensure: error: herdr server status for 'fm-lab-twinproof-76059-10738' is unknown; refusing startup rc=1
+PASS - [fail] server_ensure refuses (nonzero) while the real server is alive
+[fail] agent_state(real agent-free pane) = dead
+PASS - [fail] still exactly the original server (76260 ) after ensure + agent_state
+[timeout] ensure: error: herdr server status for 'fm-lab-twinproof-76059-10738' is unknown; refusing startup rc=1
+PASS - [timeout] server_ensure refuses (nonzero) while the real server is alive
+[timeout] agent_state(real agent-free pane) = dead
+PASS - [timeout] still exactly the original server (76260 ) after ensure + agent_state
+[empty] ensure: error: herdr server status for 'fm-lab-twinproof-76059-10738' is unknown; refusing startup rc=1
+PASS - [empty] server_ensure refuses (nonzero) while the real server is alive
+[empty] agent_state(real agent-free pane) = dead
+PASS - [empty] still exactly the original server (76260 ) after ensure + agent_state
+[garbage] ensure: error: herdr server status for 'fm-lab-twinproof-76059-10738' is unknown; refusing startup rc=1
+PASS - [garbage] server_ensure refuses (nonzero) while the real server is alive
+[garbage] agent_state(real agent-free pane) = dead
+PASS - [garbage] still exactly the original server (76260 ) after ensure + agent_state
+[lie] ensure: error: refusing Herdr server startup: Herdr server process 76260 is still alive rc=1
+PASS - [lie] server_ensure refuses (nonzero) while the real server is alive
+[lie] agent_state(real agent-free pane) = dead
+PASS - [lie] still exactly the original server (76260 ) after ensure + agent_state
+[overload] agent_state with pane/agent reads failing too = unreadable
+PASS - [overload] passive state reads unreadable, never missing/start
+PASS - [overload] still exactly the original server (76260 )
+[lieoverload] agent_state with pane/agent reads failing too = unreadable
+PASS - [lieoverload] passive state reads unreadable, never missing/start
+PASS - [lieoverload] still exactly the original server (76260 )
+[overload] fm-crew-state.sh twinproof: state: unknown · source: none · backend unreachable (herdr endpoint state: unreadable) rc=0 
+PASS - [overload] fm-crew-state left exactly the original server (76260 )
+[lieoverload] fm-crew-state.sh twinproof: state: unknown · source: none · backend unreachable (herdr endpoint state: unreadable) rc=0 
+PASS - [lieoverload] fm-crew-state left exactly the original server (76260 )
+[fail] fm-crew-state.sh twinproof: state: unknown · source: none · backend target gone: fm-lab-twinproof-76059-10738:w1:p1 (agent gone, pane shell remains) rc=0 
+PASS - [fail] fm-crew-state left exactly the original server (76260 )
+[guard fail] log: fm-remote-herdr-guard: session fm-lab-twinproof-76059-10738: herdr status failed; waiting and re-checking rather than starting a second server 
+PASS - [guard fail] guard waited and started nothing; still original server (76260 )
+
+== Phase B: proven absence (server stopped via helper)
+helper stop rc=0
+PASS - stopped lab has no server process
+[stopped] agent_state = missing ; servers now: 0
+PASS - [stopped] passive state reads missing and starts nothing
+[unscoped twin-shaped process] ensure: error: refusing Herdr server startup: Herdr server process 89737 is still alive rc=1
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: command substitution: line 131: syntax error near unexpected token `newline'
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: command substitution: line 131: `case "$out" in *rc=0*'
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: line 19: [:  echo 1;; *) [ 0 = 0 ]; echo 1;; esac): integer expression expected
+FAIL - [unscoped process inheriting fm-lab-twinproof-76059-10738] ensure refuses and starts nothing
+PASS - [unscoped process inheriting fm-lab-twinproof-76059-10738] passive state is unreadable, not missing (unreadable)
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: line 140: 89737 Terminated: 15          HERDR_SESSION="$LAB" "$WT/bin/fm-proc-budget.sh" -- "$T/fake/herdr" server
+[6 concurrent ensures] exit codes:    6 rc=0  ; servers: 91100 Fri Oct 23 19:21:02 2026     /Users/charlesabrooker/.local/bin/herdr server --session fm-lab-twinproof-76059-10738 
+PASS - [6 concurrent ensures] all succeed
+PASS - [6 concurrent ensures] exactly ONE real herdr server
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: command substitution: line 147: syntax error near unexpected token `newline'
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: command substitution: line 147: `case "$out" in *rc=0*'
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: line 19: [:  [ 91100: integer expression expected
+FAIL - [re-ensure] reuses the running server (91100 )
+[restarted] agent_state(saved agent-free pane) = dead
+helper stop rc=0
+[guard cold start] log: fm-remote-herdr-guard: no server owns session fm-lab-twinproof-76059-10738 fm-remote-herdr-guard: starting the herdr server for session fm-lab-twinproof-76059-10738 inside this launch agent (pid 92301) herdr server running; you can use any herdr CLI command in another terminal. api socket: /Users/charlesabrooker/.config/herdr/sessions/fm-lab-twinproof-76059-10738/herdr.sock client socket: /Users/charlesabrooker/.config/herdr/sessions/fm-lab-twinproof-76059-10738/herdr-client.sock logs: /Users/charlesabrooker/.config/herdr/sessions/fm-lab-twinproof-76059-10738/herdr-server.log did you mean to open the Herdr TUI? run `herdr`; you do not need `herdr server`.  ; servers: 92301 Fri Oct 23 19:21:03 2026     /Users/charlesabrooker/.local/bin/herdr server --session fm-lab-twinproof-76059-10738  ; adapter ensure after: rc=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: command substitution: line 159: syntax error near unexpected token `newline'
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: command substitution: line 159: `[ "$(server_pids)" = "$GUARD " ] && case "$out" in *rc=0*'
+/Users/charlesabrooker/.no-mistakes/evidence/01M5N7HMQP9FSENDXAMYNE8050/live-twin-proof.sh: line 19: [:  true;; *) false;; esac; echo 1): integer expression expected
+FAIL - [guard cold start] guard exec'd exactly one server as itself (pid 92301) and an adapter ensure reused it
+== teardown via helper
+teardown rc=0
+== default session still running: {"name":"default","running":true}
+== RESULT: 3 failing checks

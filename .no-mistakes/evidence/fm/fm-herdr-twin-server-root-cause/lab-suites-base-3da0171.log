@@ -1,0 +1,16 @@
+== BASE tests/fm-control-herdr-smoke.test.sh
+ok - real herdr: exit on a pane with no registered agent is idempotent success
+ok - real herdr 0.9.5: a gone session reads recoverable while a live pane and a malformed target do not
+warning: /Users/charlesabrooker/tmp/fm-control-herdr.NUa8iX/home/data/hsmoke/launch-brief.md records no ship branch; defaulting to legacy branch fm/hsmoke
+warning: /Users/charlesabrooker/tmp/fm-control-herdr.NUa8iX/home/data/hsmoke/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: spawn refused for hsmoke: cannot determine whether /Users/charlesabrooker/tmp/fm-control-herdr.NUa8iX/proj shares firstmate's history (the code root /Users/charlesabrooker/tmp/fm-base.rP8JfR/wt has no readable history, or a shallow clone shares no root commit); fetch full history (git fetch --unshallow) before dispatching publishing work
+error: to let this home publish to that repository, write 'maintainer <host>/<owner>/<repo>' into /Users/charlesabrooker/tmp/fm-control-herdr.NUa8iX/home/config/firstmate-role (docs/configuration.md "Firstmate role"), or pass --upstream-consent <host>/<owner>/<repo> for this one task with the captain's explicit approval
+not ok - a drifted, agent-free Herdr pane should be re-homed and relaunched: 
+== rc=1
+== BASE tests/fm-backend-herdr-respawn-idem-e2e.test.sh
+ok - repro setup: two real fm-<id> task tabs exist (crewmate-shaped and secondmate-shaped), neither with a registered agent
+ok - repro confirmed: after a real session restart, both task panes survive alive but with no registered agent - the restored-layout husk
+error: herdr tab 'fm-respawn-crew1' already exists in workspace w1 (session fm-lab-respawn-idem-e2e-95069)
+not ok - REGRESSION: create_task refused to respawn into the crewmate-shaped husk instead of closing-and-replacing it - this is the exact 2026-07-03 incident (manual pane close required)
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-respawn-idem-e2e-95069'; refusing destructive calls
+== rc=1

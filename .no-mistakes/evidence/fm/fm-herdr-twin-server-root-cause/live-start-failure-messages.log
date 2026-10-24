@@ -1,0 +1,20 @@
+lab fm-lab-msgproof-67356-9881 server: 67466 herdr server --session fm-lab-msgproof-67356-9881
+[live server, failed status] error: herdr server status for 'fm-lab-msgproof-67356-9881' is unknown; refusing startup
+fm-afk-launch: refused to start the herdr server for session fm-lab-msgproof-67356-9881 to protect a live or unknown server
+rc=1
+PASS - refusal is named as protecting a live or unknown server
+PASS - still one lab server
+[stopped status, python3 absent from PATH] /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5N7HMQP9FSENDXAMYNE8050/bin/backends/herdr.sh: line 1696: python3: command not found
+fm-afk-launch: the server start helper failed (exit 127) for session fm-lab-msgproof-67356-9881
+rc=1
+PASS - missing python3 is named as start helper failure exit 127
+PASS - still one lab server
+helper stop rc=0
+[proven-absent session, unwritable start-lock dir] error: Herdr server launch failed: cannot prepare the start lock: [Errno 13] Permission denied: '/Users/charlesabrooker/tmp/fm-msg.3vSZTi/locked/herdr.sock.firstmate-start.lock'
+fm-afk-launch: the server start helper failed (exit 4) for session fm-lab-msgproof-67356-9881
+rc=1
+PASS - lock preparation failure is named as start helper failure exit 4
+PASS - no server was launched
+teardown rc=0
+== default session: {"name":"default","running":true}
+== RESULT: 0 failing checks

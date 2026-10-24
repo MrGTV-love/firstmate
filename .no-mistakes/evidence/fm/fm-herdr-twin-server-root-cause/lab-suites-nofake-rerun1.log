@@ -1,0 +1,11 @@
+== tests/fm-control-herdr-smoke.test.sh (no fake)
+ok - real herdr: exit on a pane with no registered agent is idempotent success
+not ok - a real, present, agent-free pane reads 'unreadable' rather than 'dead'; every relaunch would be refused [herdr 0.9.5]
+== rc=1
+== tests/fm-backend-herdr-respawn-idem-e2e.test.sh (no fake)
+ok - repro setup: two real fm-<id> task tabs exist (crewmate-shaped and secondmate-shaped), neither with a registered agent
+ok - repro confirmed: after a real session restart, both task panes survive alive but with no registered agent - the restored-layout husk
+error: herdr tab 'fm-respawn-crew1' already exists in workspace w1 (session fm-lab-respawn-idem-e2e-71544)
+not ok - REGRESSION: create_task refused to respawn into the crewmate-shaped husk instead of closing-and-replacing it - this is the exact 2026-07-03 incident (manual pane close required)
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-respawn-idem-e2e-71544'; refusing destructive calls
+== rc=1
