@@ -463,7 +463,7 @@ elif command -v node >/dev/null 2>&1; then
 else
   emit_error "neither bun nor node installed"
 fi
-python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" \
+python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" \
   >"$MODEL_CONFIG/projects.json" 2>"$MODEL_CONFIG/project.err" || escalate_unsent "$(cat "$MODEL_CONFIG/project.err")"
 validate_rc=0
 validate_err=$("${LEVEL5[@]}" validate "$RULES" "$MODEL_CONFIG/projects.json" 2>&1 >/dev/null) || validate_rc=$?

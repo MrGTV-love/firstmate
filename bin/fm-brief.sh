@@ -620,7 +620,7 @@ fi
 REPO=${POS[1]}
 # Store one location fact, never a second caller-supplied project id. The
 # resolver validates this location against the registry before routing.
-DISPATCH_PROJECT=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" scaffold "$FM_HOME" "$REPO") || exit 1
+DISPATCH_PROJECT=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" scaffold "$FM_HOME" "${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}" "$REPO") || exit 1
 
 if [ "$HERDR_LAB" -eq 1 ]; then
 HERDR_LAB_HELPER=$(shell_quote "$FM_ROOT/bin/fm-herdr-lab.sh")

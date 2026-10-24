@@ -1122,7 +1122,10 @@ crew_dispatch_validate() {
     verified_harnesses='["claude","codex","opencode","pi","pi-signed","grok","kimi","cursor","agy","muse","rovo","omp","dsh","devin"]'
   fi
   if $typed_active && jq -e '(.rules // []) | length > 0' <<<"$resolved" >/dev/null; then
-    projects=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" 2>/dev/null) || projects='{}'
+    if ! projects=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "$PROJECTS" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" 2>&1); then
+      echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $projects"
+      return 0
+    fi
   fi
   err=$(jq -r --argjson projects "$projects" --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
     def verified($h): $verified_harnesses | index($h);

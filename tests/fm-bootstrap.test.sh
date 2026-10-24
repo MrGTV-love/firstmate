@@ -1411,6 +1411,12 @@ ROWS
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
   [ -z "$out" ] || fail "typed resolution should add verified Gemini crewmate routing, got: $out"
+  mv "$case_dir/home/data/projects.md" "$case_dir/projects.md.saved"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - project registry data/projects.md is missing or unreadable' ] \
+    || fail "typed bootstrap must name an unreadable project registry, got: $out"
+  mv "$case_dir/projects.md.saved" "$case_dir/home/data/projects.md"
 
   rm -f "$case_dir/home/.env"
   : > "$case_dir/child-env.log"

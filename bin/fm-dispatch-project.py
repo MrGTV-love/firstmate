@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Dispatch project identity, without interpreting task prose or caller ids.
 
-scaffold <home> <repo>: emit one FIRSTMATE_DISPATCH JSON record containing
-only the clone's absolute project_path. Unregistered scaffold inputs can still
-be written for manual intake; resolution never accepts them.
-snapshot <home> <projects.md>: freeze registry ids and their clone locations.
+scaffold <home> <projects> <repo>: emit one FIRSTMATE_DISPATCH JSON record
+containing only the clone's absolute project_path. Unregistered scaffold inputs
+can still be written for manual intake; resolution never accepts them.
+snapshot <home> <projects> <projects.md>: freeze registry ids and their clone
+locations. <projects> is the home's projects directory.
 resolve <brief> <snapshot.json>: derive the id by strict realpath equality with
 exactly one registered clone. No text normalization or negative selectors.
 """
@@ -16,7 +17,7 @@ import sys
 PREFIX = "FIRSTMATE_DISPATCH: "
 
 
-def registry(home, source):
+def registry(home, projects, source):
     try:
         lines = Path(source).read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -28,7 +29,7 @@ def registry(home, source):
         name = line[2:].split(" [", 1)[0].split(" - ", 1)[0]
         if not name or name in (".", "..") or "/" in name or name in entries:
             raise ValueError("project registry has an invalid or duplicate project id")
-        entries[name] = str(home if name == "firstmate" else home / "projects" / name)
+        entries[name] = str(home if name == "firstmate" else projects / name)
     if not entries:
         raise ValueError("project registry has no project ids")
     return entries
@@ -69,10 +70,10 @@ def main():
     action, *args = sys.argv[1:]
     if action == "scaffold":
         home = Path(args[0]).absolute()
-        location = home if args[1] == "firstmate" else home / "projects" / args[1]
+        location = home if args[2] == "firstmate" else Path(args[1]).absolute() / args[2]
         print(PREFIX + json.dumps({"project_path": str(location)}, ensure_ascii=False))
     elif action == "snapshot":
-        print(json.dumps(registry(Path(args[0]).absolute(), args[1]), ensure_ascii=False))
+        print(json.dumps(registry(Path(args[0]).absolute(), Path(args[1]).absolute(), args[2]), ensure_ascii=False))
     elif action == "resolve":
         project = resolve(args[0], json.loads(Path(args[1]).read_text(encoding="utf-8")))
         if len(args) == 3:

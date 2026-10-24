@@ -2005,7 +2005,7 @@ This section is the single owner of the canonical schema and its per-field seman
   "rules": [
     {
       "when": "<natural-language condition describing a kind of task>",
-      "match": { "project": "<optional exact project>", "kind": "<ship|scout, optional>", "all": ["<judgment_id>"] },
+      "match": { "projects": ["<registered project id>"], "kind": "<ship|scout, optional>", "all": ["<judgment_id>"], "any": ["<judgment_id>"], "none": ["<judgment_id>"] },
       "approval": "captain",
       "min_confidence": 0.85,
       "floor": { "scope": "<quota-axi scope>", "min_percent": 20, "provider": "<quota-axi provider>" },
@@ -2150,7 +2150,7 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - When the file exists, bootstrap validates it with `jq`.
 - Valid files stay silent by default unless [model-index warnings](#fleet-model-index-configmodel-indexjson) apply; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
-- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; a missing, unreadable, or invalid `data/projects.md` registry is reported there with the registry's own error; without the key those inert declarations preserve the pre-existing bootstrap behavior.
 - Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 
@@ -2226,7 +2226,7 @@ Kind is resolved before task extraction, so a promoted brief sends its current s
 Scaffolding and typed clone-path binding require `python3` and use only its standard library.
 The scaffold's first line is one typed header, `FIRSTMATE_DISPATCH: {"project_path":"/absolute/clone/path"}`, from its positional repository argument, not an independently editable id.
 Only that first line can bind the project; a record quoted later in task prose, fenced or otherwise, is not metadata.
-The resolver derives the registered id by requiring that path's strict realpath to equal exactly one registered clone location: `<home>/projects/<id>`, or the home itself for `firstmate`.
+The resolver derives the registered id by requiring that path's strict realpath to equal exactly one registered clone location: `<projects>/<id>`, where `<projects>` is `FM_PROJECTS_OVERRIDE` when set and `<home>/projects` otherwise, or the home itself for `firstmate`.
 Missing or malformed metadata, a missing clone, an unrelated or ambiguous clone location, and a missing or unreadable registry return a named `escalate` result without sending anything.
 Unregistered scaffold inputs may still be written for manual intake but cannot resolve automatically.
 No caller `--project` flag, case folding, whitespace trimming, regex matching, or task-prose project inference participates in this binding.

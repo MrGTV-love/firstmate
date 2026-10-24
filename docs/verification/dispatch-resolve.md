@@ -39,13 +39,13 @@ No paid replay was performed.
 
 ## Clone-bound public resolver smoke
 
-On the same host and date, the focused public-interface command was:
+On the same host and date, the clone-binding cases ran inside the full public-interface suite:
 
 ```sh
-FM_DISPATCH_BINDING_ONLY=1 bash tests/fm-dispatch-resolve.test.sh
+bash tests/fm-dispatch-resolve.test.sh
 ```
 
-It exited 0 with:
+It exited 0, ended with `# all fm-dispatch-resolve tests passed`, and printed:
 
 ```console
 ok - B1 removes free-text project input and rejects missing, unrelated, redirected and absent clone bindings
@@ -56,6 +56,7 @@ It rejects the removed `--project` inputs `Vernant` and ` vernant` before sendin
 It also rejects an unregistered project in positive rule selection before sending.
 A generated Vernant brief then selects only a Vernant-applicable rule despite maximally positive answers for a non-Vernant rule.
 The recorded clone-path header does not reach the provider.
+With `FM_PROJECTS_OVERRIDE` set, the scaffold records the clone under that directory and the same brief binds to Vernant, while a resolve without the override rejects that clone as unregistered.
 
 ## Public resolver regression entry point
 

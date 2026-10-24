@@ -140,9 +140,8 @@ count() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; fi
 
 # B1 / reviewer D and E: there is no caller-typed project input to misspell.
 # A recorded location must identify exactly one registered clone.
-BINDING_RESOLVER=${FM_DISPATCH_RESOLVER_UNDER_TEST:-$ROOT/bin/fm-dispatch-resolve.sh}
 binding_resolve() {
-  OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash "$BINDING_RESOLVER" "$1" "${@:2}" 2> "$TMP_ROOT/error")
+  OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash "$ROOT/bin/fm-dispatch-resolve.sh" "$1" "${@:2}" 2> "$TMP_ROOT/error")
   CODE=$?
 }
 cp "$TMP_ROOT/base-rules.json" "$RULES"
@@ -159,7 +158,7 @@ binding_resolve "$BRIEF"
 assert_contains "$OUT" 'reason: brief is missing FIRSTMATE_DISPATCH project_path' 'a missing typed field fails closed'
 assert_equals "$before" "$(count)" 'a missing field sends nothing'
 for fence in '```json' ''; do
-  { cat "$BRIEF"; printf '\n%s\n' "$fence"; python3 "$ROOT/bin/fm-dispatch-project.py" scaffold "$HOME_DIR" vernant; printf '%s\n' "$fence"; } > "$TMP_ROOT/quoted-binding.md"
+  { cat "$BRIEF"; printf '\n%s\n' "$fence"; python3 "$ROOT/bin/fm-dispatch-project.py" scaffold "$HOME_DIR" "$HOME_DIR/projects" vernant; printf '%s\n' "$fence"; } > "$TMP_ROOT/quoted-binding.md"
   binding_resolve "$TMP_ROOT/quoted-binding.md"
   assert_contains "$OUT" 'reason: brief is missing FIRSTMATE_DISPATCH project_path' 'a task example cannot substitute for the metadata header'
   assert_not_contains "$OUT" '  profile:' 'task prose cannot establish project identity'
@@ -198,8 +197,18 @@ assert_contains "$OUT" 'rule: rule_2' 'a scaffolded Vernant clone reaches only p
 assert_not_contains "$OUT" 'rule_3=' 'a Vernant clone cannot reach the non-Vernant runner-up'
 assert_not_contains "$(cat "$CALLS")" 'project_path' 'the clone binding never reaches the provider'
 assert_not_contains "$(cat "$CALLS")" "$HOME_DIR" 'the absolute clone path never reaches the provider'
+mkdir -p "$TMP_ROOT/override-projects/vernant"
+FM_HOME="$HOME_DIR" FM_PROJECTS_OVERRIDE="$TMP_ROOT/override-projects" bash "$ROOT/bin/fm-brief.sh" override-bound vernant --mode direct-PR > "$TMP_ROOT/scaffold.out" \
+  || fail 'Vernant scaffold did not record its overridden clone location'
+assert_equals "FIRSTMATE_DISPATCH: {\"project_path\": \"$TMP_ROOT/override-projects/vernant\"}" "$(head -n 1 "$HOME_DIR/data/override-bound/brief.md")" 'the scaffold records the overridden projects directory'
+OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_PROJECTS_OVERRIDE="$TMP_ROOT/override-projects" TYPESAFE_API_KEY=synthetic-key \
+  bash "$ROOT/bin/fm-dispatch-resolve.sh" "$HOME_DIR/data/override-bound/brief.md" 2> "$TMP_ROOT/error") || fail "resolver failed: $(cat "$TMP_ROOT/error")"
+assert_contains "$OUT" 'rule: rule_2' 'an overridden Vernant clone binds to its registered project'
+before=$(count)
+binding_resolve "$HOME_DIR/data/override-bound/brief.md"
+assert_contains "$OUT" 'reason: brief project_path must resolve to exactly one registered project clone' 'a clone outside the active projects directory is not registered'
+assert_equals "$before" "$(count)" 'a clone outside the active projects directory sends nothing'
 pass 'B1 removes free-text project input and rejects missing, unrelated, redirected and absent clone bindings'
-[ "${FM_DISPATCH_BINDING_ONLY:-0}" != 1 ] || exit 0
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 printf '%s\n' '{}' > "$SETTINGS"
 

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import type { SystemOneRequest } from '../bin/ten-levels/src/core/types.ts';
 
-const helper = process.env.FM_DISPATCH_HELPER ?? fileURLToPath(new URL('../bin/fm-dispatch-level5.ts', import.meta.url));
+const helper = fileURLToPath(new URL('../bin/fm-dispatch-level5.ts', import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), 'dispatch-level5-'));
 process.on('exit', () => rmSync(scratch, { recursive: true, force: true }));
 const rulesPath = join(scratch, 'rules.json'), taskPath = join(scratch, 'task.txt');
