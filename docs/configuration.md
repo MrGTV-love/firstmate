@@ -2503,9 +2503,11 @@ That ownership record does not prove confinement is active: the separately deliv
 omp's `python`, `debug` and `run_experiment` code runners have the same effect as `eval` and use the same confinement-owned classification.
 Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), `manage_skill` writes to its managed-skills directory, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
 A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
+Claude `SendFeedback` drafts a bug report for upload, so like `report_issue` it has no row and is refused under every grant.
+A coverage refusal names the refused host tool and states that no call was made.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
 Claude `Monitor` and `PowerShell` run commands outside the screened `bash` path and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
-The unclassified-tool, missing-grant and `xd://report_issue` refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-report-issue-refusal`, each with its deny and pass fixture in the audit regression.
+The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the existing plain-path guard.
 They are not instrumented in `state/guard-events.jsonl`; each refusal and each granted outbound call writes one content-free terminal row to the owning home's `state/jev-guard.jsonl`.
 
 ### Model policy

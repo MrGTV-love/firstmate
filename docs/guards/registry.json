@@ -5,8 +5,7 @@
   "audited": 30,
   "beyond_audit_active": [
     "jev-tool-coverage",
-    "jev-egress-grant",
-    "jev-report-issue-refusal"
+    "jev-egress-grant"
   ],
   "guards": [
     {
@@ -740,32 +739,6 @@
       "remedy_verified": "fixture",
       "fail_direction_note": "an unreadable, malformed or symlinked grant record grants nothing; the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
       "telemetry_note": "not instrumented in state/guard-events.jsonl; each decision writes one content-free terminal row to state/jev-guard.jsonl with branch=egress and the single destination_class"
-    },
-    {
-      "decision": "deny",
-      "fail_direction": "closed",
-      "proxy": false,
-      "proxy_reason": "",
-      "precheck_gap": "",
-      "exemptions": [],
-      "instrumented": false,
-      "status": "active",
-      "telemetry": "state/guard-events.jsonl",
-      "version": "1",
-      "id": "jev-report-issue-refusal",
-      "owner": "bin/fm-jev-guard.ts",
-      "invariant": "an omp report_issue upload never leaves a guarded worker",
-      "layer": "runtime-block",
-      "source": "the plain-path rule in bin/fm-jev-guard.ts for write xd://report_issue, and the absence of a report_issue row in TOOL_POLICY in bin/fm-jev-egress.ts",
-      "trigger": "a write whose path is xd://report_issue, or a native report_issue tool call, under any task egress grant",
-      "remedy": "no grant clears it; report the problem to Firstmate instead by appending a note: line to state/<task>.status",
-      "budget": 1,
-      "test": "tests/fm-jev-guard-audit.test.sh",
-      "tier": "C",
-      "harm": "irreversible",
-      "remedy_verified": "fixture",
-      "fail_direction_note": "the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "not instrumented in state/guard-events.jsonl; each decision writes one content-free terminal row to state/jev-guard.jsonl with branch=deterministic for the device write or branch=coverage for the native tool"
     }
   ],
   "excluded": [

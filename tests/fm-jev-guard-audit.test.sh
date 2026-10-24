@@ -231,13 +231,14 @@ assert.equal(blocked.decision, 'flag');
 assert.equal(blocked.attempts, 6);
 assert.equal(blocked.cost.incomplete, true);
 });
-await test('T4(a): xd://report_issue is refused by the device rule under every grant and never logs the report body', async () => {
+await test('T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body', async () => {
   const all = '["semantic-search","web","browser","provider","subagent","dynamic-code","remote-storage"]';
   for (const meta of [undefined, `egress=${all}\n`]) {
     if (meta) writeFileSync(`${state}/audit.meta`, meta);
     try {
       for (const event of [{ toolName: 'write', input: { path: 'xd://report_issue', content: 'private-report-canary' } },
-        { toolName: 'report_issue', input: { body: 'private-report-canary' } }]) {
+        { toolName: 'report_issue', input: { body: 'private-report-canary' } },
+        { toolName: 'sendfeedback', input: { description: 'private-report-canary' } }]) {
         let patch;
         const r = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
         assert.equal(patch?.block, true, `${event.toolName}: report upload must not execute (grant: ${meta ?? 'none'})`);
@@ -291,6 +292,8 @@ await test('T4(d): an installed tool absent from the policy table is rejected, n
   const r = await fresh(async () => { patch = await handlers.tool_call({ toolName: 'new-paid-host-tool', input: {} }, { cwd: state }); });
   assert.equal(patch?.block, true);
   assert.equal(r.branch, 'coverage');
+  assert.ok(patch.reason.includes('Unclassified host tool "new-paid-host-tool"'), patch.reason);
+  assert.ok(patch.reason.includes('No call was made.'), patch.reason);
 });
 await test('T4(d): Claude built-in inventory is classified and an added tool fails coverage', async () => {
   // Every tool in the public host tool reference, retrieved 2026-10-24:
@@ -299,14 +302,14 @@ await test('T4(d): Claude built-in inventory is classified and an added tool fai
     'Edit', 'EndConversation', 'EnterPlanMode', 'EnterWorktree', 'ExitPlanMode', 'ExitWorktree',
     'Glob', 'Grep', 'ListAgents', 'ListMcpResourcesTool', 'LSP', 'Monitor', 'NotebookEdit', 'PowerShell',
     'PushNotification', 'Read', 'ReadMcpResourceTool', 'RemoteTrigger', 'ReportFindings', 'ScheduleWakeup',
-    'SendFeedback', 'SendMessage', 'SendUserFile', 'ShareOnboardingGuide', 'Skill', 'SubagentHandback',
+    'SendMessage', 'SendUserFile', 'ShareOnboardingGuide', 'Skill', 'SubagentHandback',
     'TaskCreate', 'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop', 'TaskUpdate', 'TodoWrite', 'ToolSearch',
     'WaitForMcpServers', 'WebFetch', 'WebSearch', 'Workflow', 'Write'];
   const { uncoveredTools } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
   assert.deepEqual(uncoveredTools(native.map(name => name.toLowerCase())), []);
-  assert.deepEqual(uncoveredTools([...native, 'NewHostTool', 'MultiEdit'].map(name => name.toLowerCase())), ['multiedit', 'newhosttool']);
+  assert.deepEqual(uncoveredTools([...native, 'NewHostTool', 'MultiEdit', 'SendFeedback'].map(name => name.toLowerCase())), ['multiedit', 'newhosttool', 'sendfeedback']);
   const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
-  for (const tool_name of ['NewHostTool', 'MultiEdit']) {
+  for (const tool_name of ['NewHostTool', 'MultiEdit', 'SendFeedback']) {
     const output = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', adapter,
       state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION],
       { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input: {}, cwd: state }), encoding: 'utf8' });

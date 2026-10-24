@@ -465,7 +465,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         ? { refused_path: event.input.path } : {}) };
     if (!policy) {
       return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
-        "Unclassified host tool: Firstmate must classify it in fm-jev-egress.ts before execution.");
+        `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must classify it in fm-jev-egress.ts before execution. No call was made.`);
     }
     try {
       const destination = egressClass(tool);
