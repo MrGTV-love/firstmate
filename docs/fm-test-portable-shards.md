@@ -203,7 +203,9 @@ The first measured artifacts for the new files come from [run 40063531528](https
 Those replace the apportioned estimates, and the unchanged twenty shards still pass `--check-coverage` at a modeled `serial_max_ms` of 1191981.
 That run's observed worst serial shard was 1488349 ms (shard 13), above the target, because the shard held `tests/fm-slack-watch.test.sh` with no measured hint: the packer modeled it at the 45000 ms default while it took 462747 ms, and the shard also carried several other newly measured logs-only scripts that had no hint.
 This refresh adds the measured hint for `fm-slack-watch` and for the other serial-lane scripts the run measured for the first time (`fm-spawn-model-pin` 33955, `fm-model-picker-shadow-spawn` 26389, `fm-slack-secret-scan` 17961, `fm-guard-audit-closure` 10258, `fm-model-picker-shadow` 8850, `fm-guard-lint` 4609, `fm-guard-telemetry` 3139, `fm-slack-intake-unchanged` 2972, `fm-guard-refcheck` 1329, and `tests/fm-retired-jev-posttool-advisory.test.sh` 1182 ms), and the twenty shards model at `serial_max_ms` 1198148.
-The parallel lane's own stale hints - `fm-pr-merge` measured 987295 against 461903, `fm-test-run` 889567 against 444553, and `fm-lint` 1105233 against 758806 - are left unchanged: raising them pushes the modeled parallel makespan above its 1200000 ms budget at the current two effective jobs, which is a parallel-admission question rather than a hint refresh.
+The parallel lane carried the same class of staleness - `fm-pr-merge` measured 987295 against 461903, `fm-test-run` 889567 against 444553, and `fm-lint` 1105233 against 758806 - and those hints are corrected in the same change.
+Correcting them exposed the parallel model's effective bin count rather than a lane that no longer fits: in run 40063531528 lane 1 summed 3151026 ms and ran 1129 s, and lane 2 summed 2862231 ms and ran 1120 s, so the lanes clear between 2.5 and 2.8 times their serial work.
+The model therefore packs three bins instead of two, which predicts 1105233 ms against that 1129 s lane where two bins predicted 1428620 ms; the 1200000 ms parallel budget is unchanged.
 
 ## Portable serial remainder
 
