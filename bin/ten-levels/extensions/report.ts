@@ -98,8 +98,8 @@ export interface GuardTerminal {
   branch: "policy" | "deterministic" | "device" | "outage" | "inactive" | "egress" | "coverage" | "confinement";
   /** Policy owner only; not proof that launch-time OS confinement is active. */
   confinement_owner?: "T5";
-  /** Fixed destination classes and argument categories only; no outbound text or addresses. */
-  egress?: { destination_class: string; argv_shape: string }[];
+  /** The tool's fixed egress class only; no outbound text or addresses. */
+  destination_class?: string;
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
   /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */
@@ -309,7 +309,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         usage: answered.length > 0 ? { input_tokens: sum(answered.map((r) => r.usage.input_tokens)), output_tokens: sum(answered.map((r) => r.usage.output_tokens)) } : null,
         cost,
         chunks, planned_chunks: plannedChunks, answers,
-        ...(terminal.egress ? { egress: terminal.egress } : {}),
+        ...(terminal.destination_class ? { destination_class: terminal.destination_class } : {}),
         ...(terminal.confinement_owner ? { confinement_owner: terminal.confinement_owner } : {}),
         ...(terminal.write_coverage ? { write_coverage: terminal.write_coverage,
           ...(terminal.write_coverage.local_only_bytes > 0 ? { note: "unscreened remainder: deterministic local rules only" } : {}) } : {}),

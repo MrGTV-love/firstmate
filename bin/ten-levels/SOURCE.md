@@ -45,7 +45,7 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
 - `tests/level06.test.ts` exercises write threshold boundaries and outside-root refusal.
 - `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.
   The [operator contract](../../docs/configuration.md#jev-guard) owns its privacy checks, bounded write planner, coverage accounting, failure normalization and cancellation budgets.
-  Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only destination classes and fixed argument-shape labels from the egress policy, never outbound arguments or destinations.
+  Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only the tool's single destination class from the egress policy, never outbound arguments or destinations.
   Confinement-owned calls record `confinement_owner: T5`; this identifies the launch-time enforcement owner and is not proof that confinement is active.
   The canonical client, write questions and thresholds are unchanged.
   There is no result policy, result request budget or result audit path.

@@ -4,7 +4,6 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 export type DestinationClass = "semantic-search" | "web" | "browser" | "provider" | "subagent" | "dynamic-code" | "remote-storage";
-export interface EgressShape { destination_class: DestinationClass; argv_shape: string }
 type ToolPolicy = { result: "screen" | "unjudged" } & (
   { call: "confinement"; confinement_owner: "T5" }
   | { call: "shell" | "write" | "edit" | "local" | "paths" | DestinationClass; confinement_owner?: never }
@@ -36,12 +35,12 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   retain: { call: "provider", result: "unjudged" },
   memory_edit: { call: "local", result: "unjudged" },
   manage_skill: { call: "local", result: "unjudged" },
-  ast_edit: { call: "local", result: "unjudged" },
+  ast_edit: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   debug: { call: "dynamic-code", result: "unjudged" },
   notebook: { call: "local", result: "unjudged" },
   lsp: { call: "local", result: "unjudged" },
-  init_experiment: { call: "local", result: "unjudged" },
-  log_experiment: { call: "local", result: "unjudged" },
+  init_experiment: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  log_experiment: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   run_experiment: { call: "dynamic-code", result: "unjudged" },
   update_notes: { call: "local", result: "unjudged" },
   goal: { call: "local", result: "unjudged" },
@@ -61,7 +60,7 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   exitplanmode: { call: "local", result: "unjudged" },
   enterworktree: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   exitworktree: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
-  listagents: { call: "remote-storage", result: "unjudged" },
+  listagents: { call: "local", result: "unjudged" },
   listmcpresourcestool: { call: "remote-storage", result: "unjudged" },
   monitor: { call: "dynamic-code", result: "unjudged" },
   multiedit: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
@@ -76,8 +75,8 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   sendmessage: { call: "subagent", result: "unjudged" },
   senduserfile: { call: "provider", result: "unjudged" },
   shareonboardingguide: { call: "provider", result: "unjudged" },
-  skill: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
-  subagenthandback: { call: "subagent", result: "unjudged" },
+  skill: { call: "local", result: "unjudged" },
+  subagenthandback: { call: "local", result: "unjudged" },
   taskcreate: { call: "local", result: "unjudged" },
   taskget: { call: "local", result: "unjudged" },
   tasklist: { call: "local", result: "unjudged" },
@@ -86,7 +85,7 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   taskupdate: { call: "local", result: "unjudged" },
   todowrite: { call: "local", result: "unjudged" },
   toolsearch: { call: "local", result: "unjudged" },
-  waitformcpservers: { call: "remote-storage", result: "unjudged" },
+  waitformcpservers: { call: "local", result: "unjudged" },
   workflow: { call: "subagent", result: "unjudged" },
   websearch: { call: "web", result: "unjudged" },
 });
@@ -106,7 +105,7 @@ function destinationClass(value: string): value is DestinationClass {
 }
 
 /** Missing grants deny; malformed, duplicate, unreadable or symlinked records never grant. */
-export function egressGranted(state: string, task: string, shapes: readonly EgressShape[]): boolean {
+export function egressGranted(state: string, task: string, destination: DestinationClass): boolean {
   try {
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(task)) return false;
     const path = resolve(state, `${task}.meta`);
@@ -115,11 +114,11 @@ export function egressGranted(state: string, task: string, shapes: readonly Egre
     if (entries.length !== 1) return false;
     const grant: unknown = JSON.parse(entries[0].slice("egress=".length));
     if (!Array.isArray(grant) || !grant.every((entry: unknown) => typeof entry === "string" && destinationClass(entry))) return false;
-    return shapes.every((shape) => grant.includes(shape.destination_class));
+    return grant.includes(destination);
   } catch { return false; }
 }
 
-export function callEgress(tool: string): EgressShape[] {
+export function egressClass(tool: string): DestinationClass | undefined {
   const policy = toolPolicy(tool);
-  return policy && destinationClass(policy.call) ? [{ destination_class: policy.call, argv_shape: "native" }] : [];
+  return policy && destinationClass(policy.call) ? policy.call : undefined;
 }

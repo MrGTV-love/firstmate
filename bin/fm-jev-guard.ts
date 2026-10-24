@@ -4,7 +4,7 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
-import { callEgress, egressGranted, toolPolicy } from "./fm-jev-egress.ts";
+import { egressClass, egressGranted, toolPolicy } from "./fm-jev-egress.ts";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -231,20 +231,19 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         "Unclassified host tool: Firstmate must classify it in fm-jev-egress.ts before execution.");
     }
     try {
-      const egress = callEgress(tool);
-      if (egress.length > 0) {
-        terminal.egress = egress;
-        if (!egressGranted(c.state, c.task, egress)) {
-          const requested = [...new Set(egress.map((shape) => shape.destination_class))];
+      const destination = egressClass(tool);
+      if (destination) {
+        terminal.destination_class = destination;
+        if (!egressGranted(c.state, c.task, destination)) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
-            `Missing task egress grant: request Firstmate authorization for egress=${JSON.stringify(requested)} in state/<task>.meta. No outbound call was made.`);
+            `Missing task egress grant: request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
         }
       }
       if (policy.call === "confinement") {
         return finishCall({ ...terminal, branch: "confinement", confinement_owner: policy.confinement_owner });
       }
       if (policy.call !== "write" && policy.call !== "edit") {
-        return egress.length > 0 ? finishCall({ ...terminal, branch: "egress" }) : undefined;
+        return destination ? finishCall({ ...terminal, branch: "egress" }) : undefined;
       }
       const input = object(event.input) ? event.input : {};
       if (tool === "edit" && (typeof input.path !== "string" || typeof input.new_string !== "string")) {

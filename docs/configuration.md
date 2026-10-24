@@ -2501,6 +2501,7 @@ Native semantic `find`, web search, browser automation, subagent dispatch and pr
 Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
 Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
 The rule is deterministic and needs neither a model verdict nor a working provider credential.
+Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
 A refusal names the destination classes whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
 Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
@@ -2508,15 +2509,16 @@ The recognized destination classes are `semantic-search`, `web`, `browser`, `pro
 An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
 Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
-Every required class must be granted, and a grant never bypasses existing path, credential, shell or privacy checks.
+Each tool has at most one destination class, which must be granted; a grant never bypasses existing path, credential, shell or privacy checks.
 
-Each outbound-call decision adds exactly one terminal audit row with the tool, destination class and fixed argument-shape labels, never raw arguments, query text or destination addresses.
+Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
 A native paid `find` records its deterministic decision even though it has no model classification.
 Local `read` remains pre-tool unjudged, `bash` receives no model screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
 This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
-Claude's notebook edits, worktree changes and skill execution use the same explicit confinement-owned classification.
+Claude's multi-file and notebook edits and worktree changes, and omp's structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification.
+Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
 Other opaque native evaluator tools require a `dynamic-code` grant because their effects are not statically knowable; granting that class authorizes that execution capability, not a confinement guarantee.
 
 ### Model policy
@@ -2631,7 +2633,7 @@ The command wrapper publishes only successful handler stdout, normalizes active 
 Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
 
 Other or absent project scopes and an omp worker's `--omp-no-helpers` posture are intentionally inactive/**no protection**, not inference outages.
-They perform no guard key lookup or provider request and retain deterministic path, root, native-device and edit-schema checks.
+They perform no guard key lookup or provider request and retain deterministic tool-coverage, egress-grant, path, root, native-device and edit-schema checks.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.

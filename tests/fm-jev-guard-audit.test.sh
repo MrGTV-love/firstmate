@@ -180,7 +180,7 @@ await test('T4(a): xd://report_issue is refused by the device rule under every g
         const r = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
         assert.equal(patch?.block, true, `${event.toolName}: report upload must not execute (grant: ${meta ?? 'none'})`);
         assert.equal(r.branch, event.toolName === 'write' ? 'device' : 'coverage');
-        assert.equal(r.egress, undefined, 'no egress class can admit a report upload');
+        assert.equal(r.destination_class, undefined, 'no egress class can admit a report upload');
         assert.equal(r.request_started, false);
         assert.ok(!JSON.stringify(r).includes('private-report-canary'));
       }
@@ -188,10 +188,10 @@ await test('T4(a): xd://report_issue is refused by the device rule under every g
   }
 });
 await test('T4(c): eval explicitly records T5 as the write-boundary owner, not an egress permission', async () => {
-  const { toolPolicy, callEgress } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
+  const { toolPolicy, egressClass } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
   assert.equal(toolPolicy('eval')?.call, 'confinement');
   assert.equal(toolPolicy('eval')?.confinement_owner, 'T5');
-  assert.deepEqual(callEgress('eval'), []);
+  assert.equal(egressClass('eval'), undefined);
   const r = await fresh(async () => {
     assert.equal(await handlers.tool_call({ toolName: 'eval', input: { language: 'py', code: 'print("private-eval-canary")' } }, { cwd: state }), undefined);
   });
@@ -208,14 +208,14 @@ await test('T4(b): paid find requires a task grant and records exactly one conte
   assert.equal(patch?.block, true, 'ungranted paid find must not execute');
   assert.equal(r.decision, 'block');
   assert.equal(r.branch, 'egress');
-  assert.deepEqual(r.egress, [{ destination_class: 'semantic-search', argv_shape: 'native' }]);
+  assert.equal(r.destination_class, 'semantic-search');
   assert.equal(r.request_started, false, 'egress policy itself makes no provider request');
   writeFileSync(`${state}/audit.meta`, 'egress=["semantic-search"]\n');
   try {
     r = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
     assert.equal(patch, undefined, 'the same find is admitted under its task grant');
     assert.equal(r.decision, 'allow');
-    assert.equal(r.egress[0].destination_class, 'semantic-search');
+    assert.equal(r.destination_class, 'semantic-search');
     assert.equal(r.request_started, false);
     assert.ok(!JSON.stringify(r).includes('private-query-canary'));
     assert.ok(!JSON.stringify(r).includes('paid-provider.invalid'));
@@ -265,7 +265,7 @@ await test('Claude native WebSearch retains its outbound character at the CLI bo
   try {
     const r = await fresh(async () => { assert.equal(call('WebSearch', { query: 'synthetic-query' }), ''); });
     assert.equal(r.decision, 'allow');
-    assert.equal(r.egress[0].destination_class, 'web');
+    assert.equal(r.destination_class, 'web');
     assert.equal(r.request_started, false);
   } finally { rmSync(`${state}/audit.meta`); }
   writeFileSync(`${state}/copied.meta`, 'egress=["semantic-search"]\n');
@@ -273,6 +273,29 @@ await test('Claude native WebSearch retains its outbound character at the CLI bo
   try {
     assert.equal((await handlers.tool_call({ toolName: 'find', input: {} }, { cwd: state }))?.block, true, 'a copied grant behind a symlink is not this task record');
   } finally { rmSync(`${state}/audit.meta`); rmSync(`${state}/copied.meta`); }
+});
+await test('coverage and egress refusals hold in an inactive project scope', async () => {
+  const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
+  const args = ['--experimental-strip-types', '--no-warnings', adapter, state, `${state}/config`, state, 'audit', state, state, 'other-project', report.GUARD_POLICY_VERSION];
+  const call = (tool_name, tool_input) => execFileSync(process.execPath, args, { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input, cwd: state }), encoding: 'utf8' });
+  for (const [tool, input] of [['WebSearch', { query: 'synthetic-query' }], ['Agent', { prompt: 'synthetic' }], ['mcp__synthetic__tool', {}]]) {
+    assert.equal(JSON.parse(call(tool, input)).hookSpecificOutput.permissionDecision, 'deny', tool);
+  }
+  assert.equal(call('TaskStop', { task_id: 'synthetic' }), '');
+});
+await test('tools that move no data or run no worker code are local; unscreened writers name T5', async () => {
+  for (const toolName of ['skill', 'listagents', 'waitformcpservers', 'subagenthandback', 'taskstop']) {
+    const before = rowCount();
+    assert.equal(await handlers.tool_call({ toolName, input: {} }, { cwd: state }), undefined, toolName);
+    assert.equal(rowCount(), before, `${toolName}: local tools add no egress or confinement row`);
+  }
+  for (const toolName of ['ast_edit', 'init_experiment', 'log_experiment', 'multiedit', 'notebookedit']) {
+    let patch;
+    const r = await fresh(async () => { patch = await handlers.tool_call({ toolName, input: {} }, { cwd: state }); });
+    assert.equal(patch, undefined, toolName);
+    assert.equal(r.branch, 'confinement', toolName);
+    assert.equal(r.confinement_owner, 'T5', toolName);
+  }
 });
 await test('S2 egress classes are permissions, never a bypass of existing write checks', async () => {
   const cases = [
@@ -286,7 +309,7 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
     const r = await fresh(async () => { patch = await handlers.tool_call({ toolName, input }, { cwd: state }); });
     assert.equal(patch?.block, true, `${toolName}: ungranted outbound call`);
     assert.equal(r.branch, 'egress');
-    assert.ok(r.egress.some(s => s.destination_class === destination), JSON.stringify(r.egress));
+    assert.equal(r.destination_class, destination);
     assert.equal(r.request_started, false);
   }
   for (const meta of ['egress=true\n', 'egress=["web"]\negress=["semantic-search"]\n', 'egress=["unknown-class"]\n']) {
