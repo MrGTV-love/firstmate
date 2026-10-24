@@ -407,6 +407,22 @@ def reaped_between_samples():
         child.wait()
 case('reaped_child_cpu_between_observations_prevents_false_idle_then_true_idle_is_detected', reaped_between_samples)
 
+def unavailable_ctypes():
+    home, env = fixture('unavailable-ctypes')
+    modules = home / 'modules'
+    modules.mkdir()
+    (modules / 'ctypes.py').write_text('raise ImportError("fixture: ctypes unavailable")\n')
+    # Exercise the Darwin-only import boundary portably, before any native call.
+    (modules / 'sitecustomize.py').write_text('import sys\nsys.platform = "darwin"\n')
+    env.update(PYTHONPATH=str(modules), FM_PROC_ROOT_OVERRIDE=str(home / 'no-proc'))
+    result = run([sys.executable, home / 'bin/fm-duration.py', 'keep-going', '1', '--',
+                  sys.executable, '-c', busy + 'print("productive source completed")'], env)
+    require(result.returncode == 0 and result.stdout == 'productive source completed\n',
+            f'missing ctypes killed productive work: {result.returncode} {result.stdout} {result.stderr}')
+    require(result.stderr.count('cpu_telemetry_unavailable:') == 1,
+            'missing ctypes did not enter the one-warning blind-telemetry path: ' + result.stderr)
+case('unavailable_ctypes_preserves_productive_work_with_blind_telemetry', unavailable_ctypes)
+
 # Git Bash/MSYS: a /proc-only host whose ps cannot sample. Each fixture process
 # publishes its own stat line (fields 4, 14+15 and 22) under FM_PROC_ROOT_OVERRIDE.
 proc_stat = ('my $d = "$ENV{FM_PROC_ROOT_OVERRIDE}/$$"; mkdir $d;'

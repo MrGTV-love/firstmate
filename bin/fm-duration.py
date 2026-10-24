@@ -21,8 +21,9 @@ own owner and an outer owner sees an inner sampler's CPU only until then.
 Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
 (/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps (with libproc CPU
 on Darwin, whose ps omits waited-child time). Without a complete sample,
-one cpu_telemetry_unavailable line names the platform and nothing is
-stopped for inactivity: a missing sample is neither progress nor a stall.
+including unavailable native imports, one cpu_telemetry_unavailable line names
+the platform and nothing is stopped for inactivity: a missing sample is neither
+progress nor a stall.
 Samples include waited-child CPU so reaping cannot erase work between polls.
 Runnable descendants also prevent an idle verdict: a rounded CPU counter is
 not proof that a process awaiting or using a CPU made no progress.
@@ -642,7 +643,7 @@ def tree_cpu(pid, observed):
         if sys.platform == 'darwin':
             try:
                 native_cpu = darwin_cpu_reader()
-            except (AttributeError, OSError, ValueError):
+            except (AttributeError, ImportError, OSError, ValueError):
                 return None, False
     if table is None or pid not in table:
         return None, False  # Missing evidence never proves a stall.
