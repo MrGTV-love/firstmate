@@ -221,7 +221,7 @@ That is exactly what a long-poll home (`FM_POLL=300`) hit against the Claude Sto
 Two readers derive their default grace from the configured poll instead of a bare constant:
 
 - That hook.
-- `bin/fm-watch.sh`'s own pre-acquisition staleness check (the "lock held by live pid but heartbeat is stale" refusal, now kept for a holder that does not prove the lock's recorded identity).
+- `bin/fm-watch.sh`'s own pre-acquisition staleness check (the "lock held by live pid but heartbeat is stale" refusal for a holder that does not prove the lock's recorded identity).
 
 Both use `max(300, FM_POLL + 60)`.
 The default never drops below the historical 300-second floor for the common short-poll case, but grows with the poll cadence once that cadence would otherwise outrun it.
