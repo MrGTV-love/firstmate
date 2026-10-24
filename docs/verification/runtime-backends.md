@@ -721,6 +721,7 @@ ok - omp (omp/18.12.4): pre-tool write judgment answered after 31 seconds decide
 ```
 
 The former shell judgment is no longer exercised because bash pre-calls have no model gate.
+That run used the ship T2 source, which still screened results, so its read cases are not evidence for the unchanged delivery recorded above.
 This is installed-host delivery evidence for the retained write policy, not live-provider accuracy or production activation.
 
 ### Pre-tool deadline verification (2026-10-17)
