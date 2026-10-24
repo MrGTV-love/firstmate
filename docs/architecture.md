@@ -341,12 +341,12 @@ The refusal library's header owns the gate detection, lab-home exception, test-h
 ## Two task shapes
 
 Ship tasks change projects and ship by project mode (`no-mistakes`, `direct-PR`, or `local-only`); scout tasks leave standalone investigation reports at `data/<id>/report.md` and never push.
-The intake and authority contract in `AGENTS.md` owns when separate scout research is warranted.
+The [`crew-brief-authoring` skill](../.agents/skills/crew-brief-authoring/SKILL.md) owns when separate scout research is warranted.
 
 ## Dispatch profiles
 
 Crewmate and scout dispatch can stay on the static crewmate harness resolved by `config/crew-harness`, or it can use local dispatch profiles in `config/crew-dispatch.json`.
-Without typed dispatch resolution, firstmate follows the manual intake boundary in `AGENTS.md` section 4 and the `quota-array-dispatch` selection procedure, passing the selected profile to `fm-spawn.sh` under the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson).
+Without typed dispatch resolution, firstmate follows the manual intake boundary in [`dispatch-profile-intake`](../.agents/skills/dispatch-profile-intake/SKILL.md) and the `quota-array-dispatch` selection procedure, passing the selected profile to `fm-spawn.sh` under the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson).
 Bootstrap and spawn validate configuration and verified harness/effort combinations; the optional [typed resolver](configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns its documented rule-matching and deterministic profile-selection boundary.
 The [dispatch configuration owner](configuration.md#crew-dispatch-profiles-configcrew-dispatchjson) documents bootstrap validation and diagnostics.
 When the file exists, `fm-spawn.sh` refuses crewmate and scout launches without an explicit harness, so `config/crew-harness` is only automatic when no dispatch profile file is active.
@@ -503,7 +503,7 @@ For manual project initialization, [`bin/fm-ensure-agents-md.sh`](../bin/fm-ensu
 ## Operational memory routing
 
 `/stow` sweeps the current session for durable knowledge that only exists in conversation and routes each finding to the most specific disk home.
-The destination for each kind of knowledge, including project-intrinsic knowledge, is owned by [`AGENTS.md` section 6](../AGENTS.md#6-project-and-knowledge-management).
+The destination for each kind of knowledge, including project-intrinsic knowledge, is owned by the [`knowledge-routing` skill](../.agents/skills/knowledge-routing/SKILL.md).
 Memory writes use inspect-then-update rather than blind append; the internal [`stow` skill](../.agents/skills/stow/SKILL.md) owns tier markers, decay, cold archival, and offload.
 The same pass also persists open-work record state the session is holding - filing a thread that was never recorded and correcting one the session knows went stale - bounded to the open work that session is actually holding.
 It is deliberately not a reconciliation of durable records against repository or PR reality: its input is the volatile context, so it can only preserve what the session still knows.
