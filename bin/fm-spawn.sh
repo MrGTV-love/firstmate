@@ -754,20 +754,20 @@
 # ~/.cursor/cli-config.json attribution-off is not durable (it does not travel
 # with this repo, defaults back to on when unset, and only feeds the CLI's
 # request to the server, so it suppresses the trailer rather than preventing
-# it). Unless config/keep-ai-trailers is present, every spawn installs
-# state/<id>.git-hooks as a GIT_CONFIG core.hooksPath for the pane, so git
-# commit-msg strips known AI trailers at the commit object for every launched
-# runtime, Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh
+# it). Every spawn installs state/<id>.git-hooks as a GIT_CONFIG core.hooksPath
+# for the pane: pre-commit and pre-push inspect credentials locally, while
+# commit-msg strips known AI trailers unless config/keep-ai-trailers is present,
+# for every launched runtime, Claude included as defense in depth. bin/fm-git-strip-ai-trailers.sh
 # owns the identities, the hook install, and chaining the repository git is
 # actually running in so a project husky hook still runs. Author identity is
 # not rewritten. Every launch reconciles numbered GIT_CONFIG entries in the
 # persistent destination shell before any config/launch-env-allowlist filter,
 # without changing shell selection. It removes only core.hooksPath entries equal
 # to this task's generated directory, compacts survivors in order, and appends
-# this task's override only when stripping is selected. Unrelated entries and
+# this task's override on every launch. Unrelated entries and
 # operator hooksPath overrides remain in the pane; the allowlist governs which
 # reach the worker. Reconciliation repeats inside the filtered launch shell so
-# stripping still selects the generated hooks after env -i.
+# credential checks still select the generated hooks after env -i.
 # Publishing the record and moving this home's backlog item to In flight are one
 # step, not two: bin/fm-backlog-transition-lib.sh owns that invariant, and this
 # script performs the transition under the task's own meta lock before it reports
@@ -6560,9 +6560,9 @@ EOF
     ;;
   esac
 
-# Per-task git hooksPath that strips AI commit trailers at the commit object.
-# Installed for every kind, including secondmate, unless the home opts in to
-# keeping trailers. Cursor and other non-Claude runtimes inject the trailer
+# Per-task git hooksPath for local credential checks and AI trailer stripping.
+# Installed for every kind, including secondmate; keeping trailers disables
+# only the commit-msg strip, not the credential checks. Cursor and other non-Claude runtimes inject the trailer
 # after the typed message, so the typed message is not the object. When
 # installed, the pane receives this directory via GIT_CONFIG_* below, which
 # overrides a project's husky core.hooksPath without rewriting it; the installer
@@ -6570,12 +6570,10 @@ EOF
 # homes are firstmate clones; a launch whose worktree is not git fails closed
 # rather than shipping a runtime that cannot strip.
 GIT_HOOKS_DIR="$STATE_REAL/$ID.git-hooks"
-if [ "$KEEP_AI_TRAILERS" = 0 ]; then
-  "$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" install "$GIT_HOOKS_DIR" "$WT" || {
-    echo "error: could not install the AI-trailer strip hooks for $ID" >&2
-    exit 1
-  }
-fi
+"$FM_ROOT/bin/fm-git-strip-ai-trailers.sh" install "$GIT_HOOKS_DIR" "$WT" "$KEEP_AI_TRAILERS" || {
+  echo "error: could not install the task Git hooks for $ID" >&2
+  exit 1
+}
 
 # Delivery posture recorded in meta so fm-teardown's safety check and the
 # validate/merge stages can branch on it. A ship task carries the explicit
@@ -7038,12 +7036,12 @@ if [ "$KIND" = secondmate ]; then
 fi
 # Reconcile before the allowlist boundary: a child cannot unset stale exports
 # in the persistent destination shell. Repeat inside the filtered child so
-# stripping survives env -i; the header owns the reconciliation contract.
+# credential checks survive env -i; the header owns the reconciliation contract.
 # Use assignments rather than local declarations: destination shells include ksh.
 # shellcheck disable=SC2016 # The destination shell expands this function.
 IFS= read -r -d '' GIT_HOOKS_LAUNCH_PREFIX <<'SH' || true
 fm_launch_git_hooks() {
-  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_hooks=$1 fm_count=${GIT_CONFIG_COUNT-0}
   fm_i=0 fm_out=0 fm_key= fm_value=
   case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac
   while [ "$fm_i" -lt "$fm_count" ]; do
@@ -7061,19 +7059,13 @@ fm_launch_git_hooks() {
     unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
     fm_i=$((fm_i + 1))
   done
-  if [ "$fm_keep" = 0 ]; then
-    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
-    fm_out=$((fm_out + 1))
-  fi
-  if [ "$fm_out" -eq 0 ]; then
-    unset GIT_CONFIG_COUNT
-  else
-    export GIT_CONFIG_COUNT=$fm_out
-  fi
+  export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+  fm_out=$((fm_out + 1))
+  export GIT_CONFIG_COUNT=$fm_out
 }
 SH
 GIT_HOOKS_LAUNCH_PREFIX="$GIT_HOOKS_LAUNCH_PREFIX
-fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR") $KEEP_AI_TRAILERS; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks;"
+fm_launch_git_hooks $(shell_quote "$GIT_HOOKS_DIR"); unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks;"
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi

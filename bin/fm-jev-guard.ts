@@ -17,7 +17,7 @@ import { ContractError, type SystemOneResult } from "./ten-levels/src/core/clien
 import type { Questions, State } from "./ten-levels/src/core/types.ts";
 import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, SIZE_REFUSAL_NOTICE, SIZE_RESULT_NOTICE, withDecisionBudget,
   type GuardService, type GuardServiceContext, type GuardTerminal } from "./ten-levels/extensions/report.ts";
-import { BASH_QUESTIONS, gateBash, gateWrite, insideRepo, SCREEN_QUESTIONS, screenToolResult, WRITE_QUESTIONS,
+import { BASH_QUESTIONS, gateBash, insideRepo, SCREEN_QUESTIONS, screenToolResult,
   type GateDecision, type ScreenDecision } from "./ten-levels/src/levels/level06/index.ts";
 
 export interface JevGuardContext extends GuardServiceContext {
@@ -242,14 +242,6 @@ function settle<D>(parts: Part<D>[], stops: (decision: D) => boolean, risk: (dec
 /** A multi-piece block names its piece, so the worker can find the part that was refused. */
 function whereBlocked(settled: { part: number; of: number }, reason: string): string {
   return settled.of > 1 ? `${reason} (part ${settled.part + 1} of ${settled.of})` : reason;
-}
-
-/** Anchored, low false-positive shapes only, not semantic secret detection; scan the whole budget-limited write before egress. */
-function credentialShaped(content: string): boolean {
-  return /-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY(?: BLOCK)?-----/.test(content)
-    || /(?<![A-Za-z0-9_-])(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|(?:AKIA|ASIA)[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{16,})/.test(content)
-    // Consume each complete scheme-character run, including punctuation-led runs, without restarting at hyphens.
-    || /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s/:@?#"'`<>()\[\]{}\\,;|]*:[^\s/@?#"'`<>()\[\]{}\\,;|]{8,}@/i.test(content);
 }
 
 // A disposable lab home is not a production fleet. Its marker is written by
@@ -480,21 +472,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
         const content = tool === "edit" ? input.new_string : input.content;
         if (typeof content !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-        const { pieces, ...coverage } = service.planWrite({ path, content }, WRITE_QUESTIONS);
-        if (coverage.local_only_bytes > 0 && credentialShaped(content)) {
-          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
-            "contains a credential-shaped value: the whole write was checked locally; no content was sent for model screening");
-        }
-        const settled = settle(await screenParts(pieces, async (piece, judge) => {
-          const { kind, contains_secret } = (await judge({ path, content: piece }, WRITE_QUESTIONS)).answers;
-          if (kind?.type !== "choice" || contains_secret?.type !== "noul") throw new ContractError("Invalid write answers.");
-          return { ...gateWrite({ kind, contains_secret }), risk: contains_secret.noul };
-        }, service), (decision: Gated) => decision.block, (decision) => decision.risk);
-        ({ result, trail } = settled);
-        if ("failure" in settled) throw settled.failure;
-        return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
-          ...(!settled.decision.block ? { write_coverage: coverage } : {}),
-          enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
+        return finishCall({ ...terminal, branch: "deterministic" });
       }
       if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
       if (typeof input.command !== "string") throw new GuardUnavailableError("InvalidToolInputError");
