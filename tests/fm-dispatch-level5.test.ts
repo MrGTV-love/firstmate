@@ -115,9 +115,13 @@ test('Q9 desktop capability keeps its boundary; obsolete workflow answers remain
 });
 
 test('malformed fact selectors and missing semantic references fail before provider access', () => {
-  for (const match of [{ project: 42 }, { kind: 'review' }, { projects: ['vernant'] }, { all: ['missing'] }, { any: [] }]) {
+  const facts = /^match accepts only project, exclude_project, kind, all, any, and none/;
+  const references = /^match all, any, and none must be non-empty arrays of declared judgment ids/;
+  for (const [match, named] of [[{ project: 42 }, facts], [{ kind: 'review' }, facts], [{ projects: ['vernant'] }, facts],
+    [{ all: ['missing'] }, references], [{ any: [] }, references]] as const) {
     writeFileSync(rulesPath, JSON.stringify({ ...cfg, rules: [{ ...cfg.rules[0], match }] }));
     const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, 'validate', rulesPath], { encoding: 'utf8' });
     assert.equal(r.status, 65);
+    assert.match(r.stderr, named);
   }
 });

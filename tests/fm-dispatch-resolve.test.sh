@@ -426,6 +426,15 @@ cp "$TMP_ROOT/base-rules.json" "$RULES"
 printf '%s\n' '{"rule_probabilities":{"rule_1":0,"rule_2":0.9,"rule_3":0,"rule_4":0.9}}' > "$SETTINGS"
 run
 assert_contains "$OUT" 'conflicting rule support tie' 'distinct equally supported outcomes remain ambiguous'
+printf '%s\n' '{"rule_probabilities":{"rule_1":0.7,"rule_2":0.7,"rule_3":0,"rule_4":0}}' > "$SETTINGS"
+for order in '.' '.rules=[.rules[1],.rules[0],.rules[2],.rules[3]]'; do
+  jq ".rules[0].min_confidence=0.8 | $order" "$TMP_ROOT/base-rules.json" > "$RULES"
+  run
+  assert_contains "$OUT" 'status: ambiguous' "a conflicting top-support tie stays ambiguous whatever the rule order: $order"
+  assert_contains "$OUT" 'conflicting rule support tie' "a missed floor cannot hand a conflicting tie to the runner-up: $order"
+  assert_not_contains "$OUT" 'fallback:' "no runner-up is taken around a conflicting tie: $order"
+  assert_not_contains "$OUT" '  profile:' "a conflicting tie emits no profile: $order"
+done
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 pass 'predicate support floors retain explicit runner-up policy'
 printf '%s\n' '{}' > "$SETTINGS"
@@ -591,7 +600,7 @@ OUT=$(env -u TYPESAFE_API_KEY_PRIVATE PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_
 CODE=$?
 expect_code 2 "$CODE" 'a legacy rules file without judgments is a configuration error'
 assert_contains "$(cat "$TMP_ROOT/error")" 'malformed rules file:' 'the legacy rules file is named as malformed'
-assert_contains "$(cat "$TMP_ROOT/error")" 'structured match facts/predicates' 'the diagnostic names the required structured format'
+assert_contains "$(cat "$TMP_ROOT/error")" 'judgments must be an object of single-judgment Nouls' 'the diagnostic names the missing judgments object'
 assert_equals '' "$OUT" 'a legacy rules file prints no status'
 assert_equals "$before" "$(count)" 'a legacy rules file sends nothing'
 mkdir -p "$TMP_ROOT/brokenbun"
@@ -1667,6 +1676,10 @@ for bad in \
   '{"rules":[{"when":"x","use":{"harness":"codex"}}],"default":[{"harness":"claude","model":"opus"},{"harness":"claude","model":"opus"}]}|default must not contain duplicate harness, model, and effort profiles' \
   '{"rules":[{"when":"x","use":{"harness":"spaceship"}}]}|each use profile must name a verified harness' \
   '{"rules":[{"when":"x","use":{"harness":"grok","effort":"max"}}]}|each use profile effort must be supported by its harness and model' \
+  '{"rules":[{"when":"x","use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google","effort":"minimal"}}]}|each use profile effort must be supported by its harness and model' \
+  '{"judgments":{"q":{"type":"noul","instructions":"Q?"}},"rules":[{"when":"x","match":{"all":["q"]},"use":{"harness":"claude"}}]}|each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false' \
+  '{"judgments":{},"rules":[{"when":"x","match":{"kind":"review"},"use":{"harness":"claude"}}]}|match accepts only project, exclude_project, kind, all, any, and none; project and exclude_project must be non-empty strings and kind must be ship or scout' \
+  '{"judgments":{},"rules":[{"when":"x","match":{"any":["q"]},"use":{"harness":"claude"}}]}|match all, any, and none must be non-empty arrays of declared judgment ids' \
   '{"rules":[{"when":"x","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5"}}]}|use profiles whose harness lacks one authoritative provider family require provider: opencode' \
   '{"rules":[{"when":"x","use":{"harness":"rovo"}}]}|use profiles whose harness lacks one authoritative provider family require provider: rovo' \
   '{"rules":[{"when":"x","use":{"harness":"codex"}}],"default":{"harness":"pi","model":"anthropic/claude-sonnet-5"}}|default profiles whose harness lacks one authoritative provider family require provider: pi'; do

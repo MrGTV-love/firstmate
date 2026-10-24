@@ -1136,6 +1136,7 @@ crew_dispatch_validate() {
       elif $h == "muse" then (["low","medium","high","xhigh","max"] | index($e))
       elif $h == "rovo" then (["low","medium","high","max"] | index($e))
       elif $h == "opencode" or $h == "kimi" or $h == "cursor" then false
+      elif $typed then (["low","medium","high","xhigh","max"] | index($e))
       else true
       end;
     def profiles($value):
@@ -1164,22 +1165,28 @@ crew_dispatch_validate() {
     def malformed_profile_floors($items):
       ($items | any(has("floor") and floor_bad(.floor; false)));
     def text: type == "string" and test("\\S");
-    def structured_bad:
+    def structured_err:
       .judgments as $j
-      | ((.rules // []) | length) > 0
-      and (($j | type) != "object"
-        or any($j | to_entries[];
+      | if ((.rules // []) | length) == 0 then null
+        elif ($j | type) != "object" then "judgments must be an object of single-judgment Nouls"
+        elif any($j | to_entries[];
           (.key | test("\\A[a-z][a-z0-9_]*\\z") | not)
           or (.value | type) != "object" or .value.type != "noul" or (.value.instructions | text | not)
           or (.value.criteria | type) != "object"
           or (.value.criteria["true"] | text | not) or (.value.criteria["false"] | text | not))
-        or any(.rules[]; (.match | type) != "object"
-          or (.match | ((keys - ["project", "exclude_project", "kind", "all", "any", "none"]) | length) > 0
+        then "each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false"
+        else first((.rules[] | .match |
+          if type != "object" then "each rule needs a match object"
+          elif ((keys - ["project", "exclude_project", "kind", "all", "any", "none"]) | length) > 0
             or (has("project") and (.project | text | not))
             or (has("exclude_project") and (.exclude_project | text | not))
             or (has("kind") and .kind != "ship" and .kind != "scout")
-            or any(("all", "any", "none") as $k | select(has($k)) | .[$k];
-              type != "array" or length == 0 or any(.[]; . as $id | type != "string" or ($j | has($id) | not))))));
+          then "match accepts only project, exclude_project, kind, all, any, and none; project and exclude_project must be non-empty strings and kind must be ship or scout"
+          elif any(("all", "any", "none") as $k | select(has($k)) | .[$k];
+            type != "array" or length == 0 or any(.[]; . as $id | type != "string" or ($j | has($id) | not)))
+          then "match all, any, and none must be non-empty arrays of declared judgment ids"
+          else empty end), null)
+        end;
     def bad_efforts:
       configured_profiles
       | map({h: .harness, m: .model, e: .effort})
@@ -1225,7 +1232,7 @@ crew_dispatch_validate() {
         | unique) as $bad_harnesses
       | if ($bad_harnesses | length) > 0 then "unverified harness: " + ($bad_harnesses | join(", "))
         elif (bad_efforts | length) > 0 then "invalid effort: " + (bad_efforts | join(", "))
-        elif $typed and structured_bad then "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria"
+        elif $typed and structured_err != null then structured_err
         else empty
         end
     end
