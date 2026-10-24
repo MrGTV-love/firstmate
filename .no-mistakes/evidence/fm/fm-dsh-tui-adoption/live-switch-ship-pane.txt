@@ -1,4 +1,20 @@
-          ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀              Tip: /settings customizes the status bar: TPS, trajectory, context bars · …
+
+
+                                            ✦ dsh-TUI  v0.16.1
+                                            ██▀▀▄▄ ██▀▀▀▀ ██▀▀▀▀ ██▀▀▄▄ ██▀▀▀▀ ██▀▀▀▀ ██▀▀▀▀ ██  ██
+                                            █   █  █      █      █   █  ██     █      █      █  ██
+                                            █   █  █ ▀▀▀  █ ▀▀▀  █ ▄▄▀▀  ▀▀▀▀▄ █ ▀▀▀  █ ▀▀▀  █ █
+                        ▄▀▄       ▄         █   █  █      █      █          █  █      █      █  ██
+                        ▀▀▀▀▄  ▄▄▀▀▀        ██▄▄▀▀ ██▄▄▄▄ ██▄▄▄▄ ██     ██▄▄▄▀ ██▄▄▄▄ ██▄▄▄▄ ██  ██
+        ▄▄▄▄▄▄▄▄▄       ▀▀▀▀▀▀▀▀▀▀▀▀
+      ▄▀▀▀▀▀▀▀▀▀▀▀▀▄▄     ▀▀▀▀▀▀▀▀▀         ██  ██   ▄▀▀▄   ██▀▀▄▄  ██  ██  ██▀▀▀▀  ██▀▀▀▀  ██▀▀▀▀
+    ▄▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▄  ▄▀▀▀▀▀            █   █   ██  ██  █   █   █ █ █   █       ██      ██
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀            █ ▀▀█   █ ▀▀█   █ ▄▄▀▀  █  ██   █ ▀▀▀    ▀▀▀▀▄   ▀▀▀▀▄
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀             █   █   █   █   █  ██   █   █   █           █       █
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀              ██  ██  ██  ██  ██  ██  ██  ██  ██▄▄▄▄  ██▄▄▄▀  ██▄▄▄▀
+     ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀               deepseek-v4-flash · High effort
+       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▄              /private/tmp/fmlab-dsh.Vmj0Km/copy
+          ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀              Tip: Fold the question panel with Ctrl+K or its header; when pending, Esc/…
 
           Explore the uncharted!
 
@@ -8,7 +24,7 @@
     any conflicting role identity in those instructions.
     Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
     identity, delegate the task, run fleet supervision, or address the captain.
-    Your steering inbox is `/private/tmp/fm-dsh-reroute.TyB9Bz/state/dsh-reroute-46864.inbox`; this exact path
+    Your steering inbox is `/private/tmp/fm-dsh-reroute.m6t1gO/state/dsh-reroute-74913.inbox`; this exact path
     belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so
     read and acknowledge its messages as individually announced by native launch or inbox doorbells and do not
     reject it as another home's state.
@@ -20,10 +36,10 @@
     Project instructions still govern the work wherever they do not conflict with this worker identity, including
     `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
     If the `firstmate-coding-guidelines` skill name does not resolve in this session, read
-    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5NVYT0PSTJNKPN9N8WMQZQ6/.agents/skills/firstmat
+    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5P6CVQGQ910WB76XD4XBACG/.agents/skills/firstmat
     e-coding-guidelines/SKILL.md` instead.
     When assigned an independent review, apply the shared review rubric below, rendered from
-    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5NVYT0PSTJNKPN9N8WMQZQ6/docs/review-rubric.md`,
+    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5P6CVQGQ910WB76XD4XBACG/docs/review-rubric.md`,
      against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate
     if it was not supplied.
 
@@ -62,8 +78,8 @@
     Prove a read-only GitHub request from this DeepSeek ship.
     ## Firstmate spec
     Use your shell tool to run exactly this read-only command, saving stdout and stderr and its exit status:
-    gh-axi pr view 182 --repo MrGTV-love/firstmate > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt' 2>&1;
-    result=$?; printf '%s\n' "$result" > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit'
+    gh-axi pr view 182 --repo MrGTV-love/firstmate > '/private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.txt' 2>&1;
+    result=$?; printf '%s\n' "$result" > '/private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.exit'
     Then reply FMDSHGHREADCOMPLETE. Do not inspect credentials or print tokens. Do not edit project files,
     publish, start no-mistakes, or run fleet commands.
 
@@ -75,46 +91,30 @@
 
   ⚓ Thinking (ctrl+o to expand)
 
-  • Bash(mkdir -p '/private/tmp/fmlab-dsh.r9AqPp/reroute' && gh-axi pr view 182 --repo MrGTV-love/firstmate >  · 0s
-        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt' 2>&1; result=$?; printf '%s\n' "$result" >
-        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit')
+  • Bash(mkdir -p '/private/tmp/fmlab-dsh.Vmj0Km/switch'                                                           ·
+        gh-axi pr view 182 --repo MrGTV-love/firstmate > '/private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.txt' 2>&1;   0s
+        result=$?; printf '%s\n' "$result" > '/private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.exit')
    ⎿ (no output)
 
   ⚓ Thinking (ctrl+o to expand)
 
-  • Bash(printf 'exit='; cat '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit'; printf 'bytes='; wc -c <  · 0s
-        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt'; printf 'head:\n'; head -n 5
-        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt')
-   ⎿ exit=0
-     bytes=     905
-     head:
-     … +5 lines (ctrl+o to expand)
+  • Bash(cat '/private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.exit'; echo '---'; head -20  · 0s
+        '/private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.txt')
+   ⎿ 0
+     ---
+     pull_request:
+     … +10 lines (ctrl+o to expand)
 
   ⚓ Thinking (ctrl+o to expand)
 
-  • Bash(ls -la '/private/tmp/fm-dsh-reroute.TyB9Bz/state/dsh-reroute-46864.inbox' 2>&1 | head -n 20) · 0s
-   ⎿ ls: /private/tmp/fm-dsh-reroute.TyB9Bz/state/dsh-reroute-46864.inbox: No such file or directory
+  ● Command ran successfully.
 
-  ⚓ Thinking · 1s (ctrl+o to expand)
-
-  ⏺ Command run (read-only, exactly as specified after ensuring the target directory existed):
-
-    ┌─ code ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-    │ gh-axi pr view 182 --repo MrGTV-love/firstmate > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt' 2>&1;
-    │ result=$?; printf '%s\n' "$result" > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit'
-
-    Result:
-    - Exit status: 0 (saved to gh-pr.exit)
-    - Output: 905 bytes saved to gh-pr.txt; PR #182 feat(bin): route DeepSeek work to a pane-hosted dsh-tui harness,
-      state open, author MrGTV-love.
-
-    No credentials inspected, no tokens printed, no project files edited, no publish/no-mistakes/fleet commands run.
-    Steering inbox path did not exist, so there were no inbox messages to acknowledge.
-
-    FMDSHGHREADCOMPLETE
+    - Exit status: 0 (written to /private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.exit)
+    - Output captured to /private/tmp/fmlab-dsh.Vmj0Km/switch/gh-pr.txt — real PR #182 data (`feat(bin): route DeepSeek
+      work to a pane-hos
 
   ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
   ⌸ ❯                                                                                                               ⛶
   ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                                      9.5k/1.0M 1.0%
-   deepseek-v4-flash · high · cache 97.3% · ≈¥0.01 idle · copy                                  ctx 1.0% (9.5k/1.0m)
+                                                                                                      9.2k/1.0M 0.9%
+   deepseek-v4-flash · high · cache 95.8% · ≈¥0.01 idle · copy                                  ctx 0.9% (9.2k/1.0m)

@@ -1,0 +1,5 @@
+not ok - the refusal must name the retired canonical id (missing: 'retired model: deepseek/retired-model')
+--- output ---
+model-index: warning: literal model ' DeepSeek / retired-model ' for dsh is not an index entry; name its role so the next model release is one index edit
+model-index: warning: literal model ' DeepSeek / retired-model ' for dsh is not an index entry; name its role so the next model release is one index edit
+model-index: retired id 'deepseek/retired-model' selected (dsh)

@@ -1,0 +1,1 @@
+ok - fm-control relaunch: a config dsh secondmate keeps or refuses to discard its bound dsh profile, else carries the DSH session's bound model, and refuses without one before stopping

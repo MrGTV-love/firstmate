@@ -1,0 +1,33 @@
+warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout/home-1792823160/data/dsh-ship-41847/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout/home-1792823160/data/dsh-ship-41847/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-41847 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-41847 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-41847) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-41847: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-ship-41847 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-live-47643-5050:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+observed dsh-ship-41847 busy
+first session=/private/tmp/fmlab-dsh.Vmj0Km/ship-scout/home-1792823160/state/dsh-ship-41847.dsh/s1792823162.48297.3805/dsh/sessions/--private-tmp-fmlab-dsh.Vmj0Km-copy--/ad637e67-f2b2-4caf-9ecc-1adccaf6625c/session.v4.jsonl
+busy composer=empty
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5P6CVQGQ910WB76XD4XBACG/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+steer acknowledged by dsh-ship-41847
+observed dsh-ship-41847 idle
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+observed dsh-ship-41847 busy
+interrupt-delivered dsh-ship-41847 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-ship-41847 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-47643-5050:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout/home-1792823160/data/dsh-ship-41847/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout/home-1792823160/data/dsh-ship-41847/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-41847 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-41847 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-41847) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-41847: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-ship-41847 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-47643-5050:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+resumed the earlier conversation in place
+stopped dsh-ship-41847 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-47643-5050:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
+error: task dsh-scout-41847's endpoint reads 'unreadable'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh dsh-scout-41847 exit)
+cleanup_exit=1

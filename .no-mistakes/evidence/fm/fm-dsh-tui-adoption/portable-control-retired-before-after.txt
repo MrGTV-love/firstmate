@@ -1,0 +1,2 @@
+before-fix (HEAD~1 bin/fm-control.sh, HEAD test) test_secondmate_config_dsh_relaunch_carries_own_session_model exit=1 secs=18
+after-fix (HEAD) test_secondmate_config_dsh_relaunch_carries_own_session_model exit=0 secs=21

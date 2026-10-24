@@ -4,6 +4,8 @@
 # refusal before stop, and explicit --model role:<r> on control and direct spawn.
 # Copied from run 01M5N4DEJQJWSY8WRH9MTTCX2K and extended for this head with
 # mixed-spelling (DeepSeek/<id>, ' DeepSeek / <id> ') spawn, config and relaunch cases.
+# Run 01M5P6CVQGQ910WB76XD4XBACG (head 857198c1b) adds S-RETIRED-CONTROL: a padded
+# spelling of an id the index retires refuses a live control relaunch before the stop.
 set -eu
 ROOT=$1            # gate worktree
 TASK=$2            # scratch dir for homes/state
@@ -30,7 +32,7 @@ cleanup() {
   PATH="$ORIGINAL_PATH" "$HELPER" teardown "$SESSION" || rc=1
   for home in "$PARENT" "$SECOND"; do
     [ -d "$home/state" ] || continue
-    FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_STATE_OVERRIDE="$home/state" bash "$ROOT/bin/fm-watch-arm.sh" --stop || rc=1
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$home/state" bash "$ROOT/bin/fm-watch-arm.sh" --stop || rc=1
   done
   fm_dsh_live_scrub_credentials "$PARENT" "$SECOND" || rc=1
   left=$(find "$PARENT" "$SECOND" -name '.credentials.yaml' 2>/dev/null | wc -l | tr -d ' ')
@@ -115,6 +117,33 @@ echo "bound: model=$(meta model) effort=$(meta effort) generation=$GEN log=$LOG"
 echo "ok - S-SPELLING-META: mixed-spelling spawn recorded canonical model=$(meta model)"
 wait_reply FMROLEREADY
 wait_idle
+
+echo "=== S-RETIRED-CONTROL: fm-control relaunch --model '$SPACED' while the model index retires ${M#deepseek/}"
+printf '{"version":1,"roles":{},"retired":["%s"]}\n' "${M#deepseek/}" > "$PARENT/config/model-index.json"
+wait_composer_empty
+rb_bytes=$(wc -c < "$LOG" | tr -d ' ')
+cp "$LOG" "$TASK/S-RETIRED-CONTROL.log-before"
+rb_meta=$(shasum "$PARENT/state/$SID.meta" | cut -d' ' -f1)
+rb_journal=$(cat "$PARENT/state/$SID.control-relaunch" 2>/dev/null | shasum | cut -d' ' -f1)
+echo "S-RETIRED-CONTROL: before agent_state=$(fm_backend_agent_state herdr "$SESSION:$PANE") log_bytes=$rb_bytes meta_sha=$rb_meta"
+set +e; out=$(control "$SID" relaunch --model "$SPACED" 2>&1); rc=$?; set -e
+echo "S-RETIRED-CONTROL: control relaunch exit=$rc"
+printf '%s\n' "$out" | sed 's/^/    | /'
+[ "$rc" -ne 0 ] || { echo 'S-RETIRED-CONTROL FAIL: a padded retired id relaunched' >&2; exit 1; }
+case "$out" in *"retired model: $M"*) ;; *) echo "S-RETIRED-CONTROL FAIL: refusal does not name the retired canonical id $M" >&2; exit 1 ;; esac
+case "$out" in *'could not be launched'*|*'was stopped'*) echo 'S-RETIRED-CONTROL FAIL: refusal came after the stop' >&2; exit 1 ;; esac
+[ "$(fm_backend_agent_state herdr "$SESSION:$PANE")" != dead ] || { echo 'S-RETIRED-CONTROL FAIL: agent was stopped' >&2; exit 1; }
+[ "$(binding_root)" = "$GEN" ] || { echo 'S-RETIRED-CONTROL FAIL: generation replaced' >&2; exit 1; }
+[ -s "$LOG" ] && head -c "$rb_bytes" "$LOG" | cmp - "$TASK/S-RETIRED-CONTROL.log-before" || { echo 'S-RETIRED-CONTROL FAIL: conversation bytes changed or log lost' >&2; exit 1; }
+[ "$(find "$PARENT/state/$SID.dsh" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = 1 ] || { echo 'S-RETIRED-CONTROL FAIL: a second generation appeared' >&2; exit 1; }
+[ "$(shasum "$PARENT/state/$SID.meta" | cut -d' ' -f1)" = "$rb_meta" ] || { echo 'S-RETIRED-CONTROL FAIL: meta changed' >&2; exit 1; }
+[ "$(cat "$PARENT/state/$SID.control-relaunch" 2>/dev/null | shasum | cut -d' ' -f1)" = "$rb_journal" ] || { echo 'S-RETIRED-CONTROL FAIL: relaunch journal changed' >&2; exit 1; }
+echo "S-RETIRED-CONTROL: after agent_state=$(fm_backend_agent_state herdr "$SESSION:$PANE") generation=$(binding_root) meta, journal and earlier conversation bytes unchanged"
+lab pane send-text "$PANE" 'Reply FMRETIREDALIVE and the secret word remembered earlier. Do not inspect files or run commands.'
+lab pane send-keys "$PANE" enter
+wait_reply 'FMRETIREDALIVE LILAC58'
+wait_idle
+echo "ok - S-RETIRED-CONTROL: padded retired spelling refused before stop naming $M; the same live agent answered with the secret"
 
 printf '{"version":1,"roles":{"fmlabbound":{"dsh":{"model":"%s"}},"fmlabdrift":{"dsh":{"model":"%s-fmlabdrift"}}},"retired":[]}\n' "$M" "$M" > "$PARENT/config/model-index.json"
 echo "model index roles: fmlabbound -> $M ; fmlabdrift -> $M-fmlabdrift (never launched)"
