@@ -1035,7 +1035,6 @@ tests/fm-remote-secondmate-parent-binding.test.sh 126929
 tests/fm-remote-secondmate-relaunch.test.sh 69311
 tests/fm-remote-secondmate-trace-context.test.sh 290868
 tests/fm-remote-transport-lanes.test.sh 80130
-tests/fm-retired-jev-posttool-advisory.test.sh 1320
 tests/fm-review-agent-select.test.sh 14400
 tests/fm-rovo-harness.test.sh 19818
 tests/fm-rovo-signals-live-e2e.test.sh 425
