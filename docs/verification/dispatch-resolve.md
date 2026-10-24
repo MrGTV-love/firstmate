@@ -56,7 +56,7 @@ The established suite invokes the acceptance cases above and exercises the publi
 It covers request batching, deterministic fact exclusion through the complete resolver, removed workflow labels, session launch restrictions, model/effort floors, approval and quota gates, credential isolation, never-send filtering, frozen rules/index snapshots, chosen-account model checks, private result logging, and the observe-only shadow picker.
 The same script exercises the Node fallback when Bun is absent and leaves the unchanged vendored Level 5 tests in place.
 Its promoted-Vernant-ship case retains the original scout marker and appends the current ship specification, then verifies ship-only routing and the current specification in the actual provider request.
-An explicit kind override and a fenced, non-authoritative ship heading exercise the neighboring boundaries.
+A fenced, non-authoritative ship heading exercises the neighboring boundary.
 These are offline policy and transport checks, not evidence of semantic accuracy from the provider model.
 
 ## Verification boundary

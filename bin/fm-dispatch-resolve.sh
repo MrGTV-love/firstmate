@@ -3,7 +3,7 @@
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
 # Usage:
-#   fm-dispatch-resolve.sh <brief-file> [--project <name>] [--kind ship|scout]
+#   fm-dispatch-resolve.sh <brief-file> [--project <name>]
 #
 # Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
 #   resolution and precedence.
@@ -19,9 +19,10 @@
 # What it does when on with at least one rule: code first filters structured
 #   rule project/kind facts, then one JevClient.systemOne call judges referenced
 #   semantic Nouls alongside ambiguity, desktop access, model tier and effort.
-#   The state is project, kind, and the brief's task-specific text. --kind is
-#   authoritative when supplied; otherwise the current ship heading overrides
-#   a retained scout marker before task extraction. Task prose cannot set project.
+#   The state is project, kind, and the brief's task-specific text. The current
+#   ship heading overrides the scout declaration under the brief's # Setup before
+#   task extraction. Task prose cannot set project; a project-scoped rules file
+#   without --project escalates before anything is sent.
 #   bin/fm-dispatch-level5.ts owns question assembly and effort floors; bun runs
 #   it when installed, otherwise node with type stripping.
 #   The shared client selects TypeSafe explicitly, retains the raw exchange,
@@ -54,7 +55,8 @@
 #     timings: api_ms/quota_ms/local_ms/total_ms
 #     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
 #   These diagnostics accompany normal resolution and structured errors, but
-#   no-rules results contain only status/reason; off paths have no stdout.
+#   no-rules and missing-project results contain only status/reason; off paths
+#   have no stdout.
 #   api_ms and its latency_ms alias are JevClient's elapsedMs in whole
 #   milliseconds, excluding helper startup but including retries and validation.
 #   Unknown api_ms prints null; unknown latency_ms prints -. Unattempted
@@ -82,7 +84,8 @@
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> support below the floor or conflicting rule tie; decide as today
 #   escalate  -> approval required, unverifiable rule floor, high ambiguity, a
-#                desktop capability request, every selected profile
+#                desktop capability request, a project-scoped rule without
+#                --project, every selected profile
 #                filtered out, no candidate rankable, a genuine tie, or a
 #                winner whose established runway is shorter than the task horizon
 #   error     -> API, network, response, quota-axi, or chosen-profile model-index
@@ -177,9 +180,9 @@ die() { printf 'error: %s\n' "$1" >&2; exit 2; }
 die_rules() {
   die "malformed rules file: $RULES_PATH - $1; fix that field in $RULES_PATH resolved against $CONFIG/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>"
 }
-no_rules() {
-  log_result escalate 'no rules to match'
-  printf 'dispatch-resolve:\n  status: escalate\n  reason: no rules to match\n'
+escalate_unsent() {
+  log_result escalate "$1"
+  printf 'dispatch-resolve:\n  status: escalate\n  reason: %s\n' "$1"
   exit 0
 }
 usage() {
@@ -190,12 +193,11 @@ usage() {
   ' "$0"
 }
 
-BRIEF='' PROJECT='' KIND='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
+BRIEF='' PROJECT='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
 NEVER_SEND_PATH="$CONFIG/dispatch-never-send"
 while [ $# -gt 0 ]; do
   case "$1" in
     --project) [ $# -ge 2 ] || die "--project needs a value"; PROJECT=$2; shift 2 ;;
-    --kind) [ $# -ge 2 ] || die "--kind needs a value"; KIND=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown flag $1" ;;
     *) [ -z "$BRIEF" ] || die "one brief file only"; BRIEF=$1; shift ;;
@@ -214,7 +216,7 @@ LAT_MS=null QUOTA_MS=null RESPONSE_VALID=0
 # ---- inputs --------------------------------------------------------------------
 [ -n "$BRIEF" ] || die "brief file required (see --help)"
 [ -r "$BRIEF" ] || die "brief file not readable: $BRIEF"
-[ -e "$RULES_PATH" ] || [ -L "$RULES_PATH" ] || no_rules
+[ -e "$RULES_PATH" ] || [ -L "$RULES_PATH" ] || escalate_unsent 'no rules to match'
 [ -r "$RULES_PATH" ] || die "rules file not readable: $RULES_PATH; fix that path or its permissions, then rerun bin/fm-dispatch-resolve.sh <brief>"
 command -v jq >/dev/null 2>&1 || die "jq required"
 RULES=$(mktemp) || die "mktemp failed"
@@ -370,7 +372,7 @@ emit_error() {
 }
 
 if [ "$RULE_COUNT" -eq 0 ]; then
-  no_rules
+  escalate_unsent 'no rules to match'
 fi
 
 RESP_FILE=$(mktemp) || die "mktemp failed"
@@ -444,12 +446,10 @@ never_send_check() {
 # fm_typesafe_brief_task owns marker removal and the task-section extraction
 # shared with worker skill selection.
 never_send_load
-if [ -z "$KIND" ]; then
-  KIND=ship
-  if ! fm_brief_heading_present "$BRIEF" '# Current ship Firstmate spec' &&
-    grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.' "$BRIEF"; then KIND=scout; fi
-fi
-case "$KIND" in ship|scout) ;; *) die "--kind must be ship or scout" ;; esac
+KIND=ship
+if ! fm_brief_heading_present "$BRIEF" '# Current ship Firstmate spec' &&
+  fm_brief_heading_parse "$BRIEF" '# Setup' unfenced-body |
+    grep -qxF 'This is a SCOUT task: the deliverable is a written report, not a PR.'; then KIND=scout; fi
 fm_typesafe_brief_task "$BRIEF" "$NEVER_SEND_PATH" "$TASK_TEXT" "$KIND" \
   || never_send_off "$FM_TYPESAFE_WITHHELD_REASON"
 # The TypeScript adapter runs under bun when installed, else node with type
@@ -463,6 +463,9 @@ else
 fi
 "${LEVEL5[@]}" validate "$RULES" \
   || die_rules "each rule needs structured match facts/predicates and judgments needs single-judgment Nouls with true/false criteria"
+if [ -z "$PROJECT" ] && jq -e 'any(.rules[]; .match | has("project") or has("exclude_project"))' "$RULES" >/dev/null; then
+  escalate_unsent 'a project-scoped rule needs --project'
+fi
 "${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" "$KIND" > "$MODEL_CONFIG/level5-request.json" \
   || emit_error "Level 5 request preparation failed"
 REQUEST=$(cat "$MODEL_CONFIG/level5-request.json")
