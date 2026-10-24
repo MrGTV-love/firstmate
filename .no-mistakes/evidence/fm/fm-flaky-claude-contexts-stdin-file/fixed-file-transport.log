@@ -1,0 +1,326 @@
+$ /bin/bash tests/.nm-contexts-fixed.sh
+warning: re-init: ignored --initial-branch=main
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+warning: re-init: ignored --initial-branch=main
+ok - tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion
+warning: re-init: ignored --initial-branch=main
+ok - Claude tools: helpers excluded, exact Bash/Read surface, both real Bash authorizations retained
+large-exclusion repeat 1
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+cp: On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/bin: No such file or directory
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+tests/.nm-contexts-fixed.sh: line 1165: On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/bin/fm-watch-arm.sh: No such file or directory
+chmod: On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/bin/fm-watch-arm.sh: No such file or directory
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 2
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 3
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 4
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 5
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 6
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 7
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 8
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 9
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'fm/turnend-guard-test-branch' already exists
+ln: /Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/fakebin/claude: File exists
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh/On branch master
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	AGENTS.md
+	bin/
+	docs/
+	fakebin/
+	state/
+
+nothing added to commit but untracked files present (use "git add" to track)
+/Users/charlesabrooker/tmp/fm-turnend-guard.MPJqrL/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+stdin cleanup: no hook-input.json remains after contexts, tools, and repeated large exclusions
+
+exit=0 duration_seconds=21.74

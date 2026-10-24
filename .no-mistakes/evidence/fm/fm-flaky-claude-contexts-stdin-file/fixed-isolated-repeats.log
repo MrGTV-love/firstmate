@@ -1,0 +1,77 @@
+$ /bin/bash tests/.nm-contexts-fixed.sh
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+ok - tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion
+ok - Claude tools: helpers excluded, exact Bash/Read surface, both real Bash authorizations retained
+large-exclusion repeat 1
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-1/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-1/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-1/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-1/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 2
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-2/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-2/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-2/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-2/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 3
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-3/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-3/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-3/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-3/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 4
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-4/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-4/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-4/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-4/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 5
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-5/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-5/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-5/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-5/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 6
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-6/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-6/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-6/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-6/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 7
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-7/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-7/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-7/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-7/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 8
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-8/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-8/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-8/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-8/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+large-exclusion repeat 9
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-9/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-9/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-9/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.7ptJyu/repeat-9/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+stdin cleanup: no hook-input.json remains after contexts, tools, and repeated large exclusions
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+warning: re-init: ignored --initial-branch=main
+
+exit=0
