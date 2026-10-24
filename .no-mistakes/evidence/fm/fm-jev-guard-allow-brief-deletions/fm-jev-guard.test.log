@@ -15,16 +15,17 @@ ok - actual stalled requests produce typed pre-tool denial and result replacemen
 ok - task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible
 ok - bounded pieces preserve policy/outage decisions; uncoverable shell/results and never-send payloads send nothing, deadlines hold
 ok - Claude hooks retain JSON/exit contracts and admit budget-limited benign writes
-hyphenated-scan-ok bytes=1048576 offline_loopback_ms=1102
-omp: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=733
+hyphenated-scan-ok bytes=1048576 offline_loopback_ms=1418
+omp: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=885
 omp: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
-omp: never-send file present; 396924-byte report admitted in 4152 ms
-omp: never-send file present; 1048576-byte write admitted in 4278 ms
-claude: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=780
+omp: never-send file present; 396924-byte report admitted in 4659 ms
+omp: never-send file present; 1048576-byte write admitted in 4655 ms
+claude: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=918
 claude: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
-claude: never-send file present; 396924-byte report admitted in 4370 ms
-claude: never-send file present; 1048576-byte write admitted in 4281 ms
+claude: never-send file present; 396924-byte report admitted in 4681 ms
+claude: never-send file present; 1048576-byte write admitted in 4597 ms
 punctuation-led URL credentials: both hosts refuse write/edit locally with zero provider requests
 large-write-budget-ok
 ok - 396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited
 ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+exit=0

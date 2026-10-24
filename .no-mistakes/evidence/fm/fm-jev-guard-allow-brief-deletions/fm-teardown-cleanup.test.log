@@ -1,0 +1,97 @@
+ok - a steer to another task completes while a cleanup holds its own task's lease lock
+ok - the lane-registry scan reads each distinct registry once however many records name it
+ok - task teardown completes without reaping another home's abandoned worker
+ok - a missing teardown startup source refuses before cleanup
+ok - an unreadable teardown startup source refuses before cleanup
+ok - a missing adapter sibling refuses before cleanup
+ok - a forced descendant with a missing adapter sibling refuses before cleanup
+ok - a forced secondmate with a missing own adapter sibling refuses before child cleanup
+ok - present required sources still reach the ordinary teardown refusal
+ok - process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay
+ok - manual and missing-backlog retries revoke old close authority before process refusal and restored replay
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+ok - fm-pr-check publishes the PR-ready line on a secondmate's parent channel once
+ok - a secondmate home's teardown delivers the child's final line or refuses until it can
+ok - teardown completes when an exact busy-state sidecar is already absent
+ok - herdr teardown removes pane-owned escalation dedupe state
+ok - herdr flat teardown refuses before returning the isolated copy under lock contention and the retry completes cleanly
+ok - herdr flat teardown never erases records when pane presence is unparseable
+ok - herdr flat teardown preflight refuses before every destructive change
+ok - herdr teardown refuses a foreign-owned per-account namespace (owner-shim arms need the non-Darwin stat branch; skipped on Darwin)
+ok - forced secondmate teardown preflights every Herdr child before cleanup mutation
+ok - forced secondmate teardown holds every descendant lifecycle and metadata lock
+ok - forced secondmate teardown retains Herdr child identity until exact pane disappearance
+ok - forced teardown retains a nested secondmate home and its grandchild's Herdr identity when the grandchild close is unconfirmed
+ok - herdr projection teardown retires its journal only after confirming the exact recorded pane is gone
+ok - herdr projection teardown retains every record when post-close presence is unknown
+ok - herdr projection teardown surfaces failed focus restoration without turning confirmed cleanup into a hard failure
+ok - teardown retires the task's own watcher markers, deletion list and orphaned presentation journal, keeping its audit trail and other tasks' markers
+ok - teardown retains a presentation journal bound to a pane other than the closed endpoint
+ok - teardown retires a v1 presentation journal once its token workspace is confirmed gone
+ok - teardown retains a v1 presentation journal while its token workspace is still present
+ok - teardown retains a v1 presentation journal when the workspace query is ambiguous
+ok - teardown records the task's pipeline spend before removing its branch and record
+ok - teardown skips all pipeline-spend recording when the home has not opted in
+ok - teardown records unavailable pipeline spend for an owned ship task whose copy is gone
+ok - a task's own parked no-mistakes run is aborted, not orphaned, before the worker is removed
+ok - a run that lands on passed-with-override after abort is still recognized as terminal
+ok - a run that lands on passed-with-skips after abort is still recognized as terminal
+ok - a parked run the pipeline advanced past the task copy is still concluded from the runs ledger, not orphaned
+ok - a ledger row for a different head never authorizes a parked-run abort
+ok - a malformed ledger row never authorizes a parked-run abort
+ok - an impossible ledger date never authorizes a parked-run abort
+ok - a terminal status with a stale gate never reaches ledger cleanup
+ok - an advanced head present locally aborts through the strict rule alone - the ledger fallback stays dormant
+ok - an unresolvable active row with no same-branch anchor is never concluded (conservative refusal)
+ok - an ancestor-only anchor never binds an advanced parked run to this task
+ok - a terminal unfetched-head row is stale history and never concludes a run
+ok - a terminal newest row anchored at this worktree's head never authorizes an abort
+ok - a resolvable diverged newer same-branch row makes every older row stale history; no run is concluded
+ok - consecutive unresolvable rows are ambiguous and never conclude a run
+ok - a ledger-proven continuation is still left alone while the run is autonomously active
+ok - teardown refuses before reap or removal when a task-owned run remains parked
+ok - a different run cannot confirm the targeted abort
+ok - empty post-abort status is not accepted as confirmation
+ok - the CLI's exact run-not-found signal confirms completion
+ok - a parked run on another branch is never aborted by this task's teardown (ownership is precise)
+ok - top-level status and ledger query failures remain best effort
+ok - a task-owned autonomous running step is left alone rather than aborted
+ok - a leaked descendant process rooted under the task's worktree is reaped by teardown, not left surviving
+ok - a leaked descendant process rooted under the task's per-task tasktmp is reaped by teardown too
+ok - a real leaked process observes its durable identity audit before TERM, and KILL is audited too
+ok - TERM and KILL audit collection tolerates synchronized real exits, refuses live failures, and preserves unrelated identities
+ok - registered nested-lane and unrelated processes and records remain untouched on forced teardown
+ok - a nested lane registered by a sibling clone of the project is never signalled on forced teardown
+ok - a still-registered nested lane whose .git is missing is never signalled through outer-worktree discovery
+ok - a process inside a deleted but still-registered nested lane is never signalled
+ok - a sibling lane without its .git is preserved because its custody is unproven
+ok - a deleted sibling lane process is preserved because its custody is unproven
+ok - deleted descendants of worktree and non-Git tasktmp roots survive without a signal audit
+ok - ordinary existing descendants of worktree and non-Git tasktmp roots require proven custody
+ok - an unwritable process audit refuses before signalling a real leaked process
+ok - missing lsof refuses teardown instead of sending unaudited process-group signals
+ok - an erroring lsof scan refuses teardown and preserves the task
+ok - a reused pid with a different start time is never force-killed
+ok - an exec change preserves birth identity and the process is reaped
+ok - a process spawned during grace is reaped on a later pass
+ok - persistent leaked processes refuse teardown after bounded retries
+ok - a process exiting during identity lookup does not block teardown
+ok - the run abort and the leaked-process reap both complete before the destructive worktree return
+ok - a landed copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned
+ok - a held copy keeps its unique ignored files in place: nothing of it is copied, moved or removed, and the record has one line
+ok - a task whose own copy landed closes beside a foreign copy with commits on no remote, which stays byte-identical, with the slot still reserved
+ok - each held foreign copy gets one record line with UTC time, closing task, slot, copy and its exact reason
+ok - a held close removes the task's own nested copy, through the driver when it is locked, and leaves the slot, its lease and claim and the held foreign copy alone
+ok - a held close refuses, with nothing removed, when an own nested copy holds a separate repository or another project's worktree
+ok - a submodule of the task's own repository does not stop a held close
+ok - a foreign copy inside the own nested copy is never held or swept away: the close refuses and every copy, the slot, its lease and claim stay as they were
+ok - an ordinary close whose slot gains a copy holding unique ignored files during the project-lock wait refuses with nothing removed
+ok - a stale-lock cleanup refuses when the slot gained a copy holding unique ignored files, instead of turning the close into a held close
+ok - a held close reserves a plain-get slot under a durable lease before it removes anything and leaves the held copy byte-identical
+ok - a held close refuses before it removes anything when the slot cannot be durably leased, and says why
+ok - a held close lists every held copy, says the slot is reserved under a durable lease and stays claimed, and promises no cleanup that does not exist
+ok - a held close refused by a later step leaves its one record line, and the close that completes does not repeat it
+ok - a held close whose record cannot be written refuses with nothing removed, and the rerun closes with one line
+ok - a --legacy-record close beside a held foreign copy still lists the held copy and says the slot return is deferred
+Terminated: 15

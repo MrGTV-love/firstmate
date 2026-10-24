@@ -1,0 +1,1 @@
+{"task":"native","paths":["bin/fm-cd-pretool-check.sh","bin/fm-cd-command-policy.mjs","tests/fm-cd-pretool-check.test.sh","docs/cd-guard.md",".grok/hooks/fm-primary-cd-check.json",".opencode/plugins/fm-primary-cd-check.js"],"list_sha256":"ec3370cdd6661162bf47f3d8c3c596531103dad3a7705f49f7b9328731c391c8","time":"2026-10-24T03:33:04.165Z"}
