@@ -52,7 +52,8 @@
 #                      operation (rebase, merge, cherry-pick, revert, bisect) is
 #                      in progress, it is not locked and holds an ignored file
 #                      that exists nowhere else (the teardown library's rule; a
-#                      locked copy's are preserved before its release), or
+#                      locked copy's are preserved before its release), its
+#                      clone's registered copies cannot be listed, or
 #                      another registered copy with an existing directory is
 #                      inside it:
 #                      a plain `git worktree remove` of the outer copy would
