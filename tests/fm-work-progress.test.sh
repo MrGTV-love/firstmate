@@ -505,7 +505,7 @@ def host_sampler_run(name, runner, sampler, program):
     else:
         tools = home / 'no-python'
         tools.mkdir()
-        for tool in ('bash', 'perl', 'ps', 'dirname'):
+        for tool in ('bash', 'perl', 'ps', 'dirname', 'sleep'):
             (tools / tool).symlink_to(shutil.which(tool))
         env['PATH'] = str(tools)
         command = ['bash', '-c', '. "$1"; shift; command -v python3 && exit 99; fm_run_progress 1 "$@"',
@@ -521,10 +521,10 @@ def host_sampler_run(name, runner, sampler, program):
     return child.returncode, stdout, stderr
 
 def host_samplers():
-    # Each real host sampler (/proc or native Darwin by default, ps when /proc
-    # is hidden) judges CPU at the same 0.01 s resolution.
+    # Each real host sampler: /proc or native Darwin by default, both in 0.01 s
+    # steps, and ps when /proc is hidden (whole seconds from Linux procps).
     poll = [sys.executable, '-c', 'import time\nwhile True: time.sleep(0.05)']
-    burst = ['bash', '-c', '"$1" -c "$2"; sleep 0.5; echo completed', '_', sys.executable, busy]
+    burst = ['bash', '-c', '"$1" -c "$2" && sleep 0.5 && echo completed', '_', sys.executable, busy]
     for runner in ('python', 'perl'):
         for sampler in ('host', 'ps'):
             code, _, stderr = host_sampler_run('poll', runner, sampler, poll)

@@ -269,13 +269,14 @@ bash bin/fm-test-run.sh tests/fm-backlog-read-bound.test.sh tests/fm-work-progre
 # FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=214255
 ```
 
-These recorded runs predate the later unavailable-ctypes blind path, the Darwin per-member CPU fallback, the exited-PID handling and the restriction of the Python-free membership rule to ps sampling; this record does not cover those changes, which rest on the suites' own current results.
+These recorded runs predate the later unavailable-ctypes blind path, the Darwin per-member CPU fallback, the exited-PID handling, the restriction of the Python-free membership rule to ps sampling and the truncation of native Darwin CPU to 0.01 s steps; this record does not cover those changes, which rest on the suites' own current results.
 
 The backlog fixture includes a short completion phase after its CPU worker is reaped, with the existing one-second inactivity interval unchanged.
 The progress suite observes a real shell before and after a complete CPU-producing child lifetime, verifies that the second observation does not prove inactivity, then verifies that subsequent real inactivity does.
 It also exercises runnable work whose exported CPU counter stays rounded to zero, alongside the existing sleeping-tree stop and descendant-cleanup cases, through both Python and Python-free execution.
 Through both runners on a simulated /proc-only host, it checks that a stable tree whose only growing CPU is waited-child CPU is kept and that a tree changing only its membership through short sleeping children is still stopped.
 It also checks that an unavailable ctypes module keeps productive work running with one blind-telemetry warning.
+Through both runners, on the default host sampler and on ps with /proc hidden, it checks that a timed-poll idle process is stopped with 124 and that a reaped four-second CPU burst followed by a short completion phase is kept.
 The [progress owner](../../bin/fm-duration.py) defines accounting and idle-proof semantics; these checks cover shared process behavior rather than vendor-rendered harness signals or backend availability.
 
 ## Semantic busy state
