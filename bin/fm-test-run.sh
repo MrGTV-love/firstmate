@@ -595,6 +595,17 @@ zellij
 orca
 standalone
 unclassified
+tests/fm-guard-audit-closure.test.sh 10258
+tests/fm-guard-lint.test.sh 4609
+tests/fm-guard-refcheck.test.sh 1329
+tests/fm-guard-telemetry.test.sh 3139
+tests/fm-model-picker-shadow-spawn.test.sh 26389
+tests/fm-model-picker-shadow.test.sh 8850
+tests/fm-retired-jev-posttool-advisory.test.sh 1182
+tests/fm-slack-intake-unchanged.test.sh 2972
+tests/fm-slack-secret-scan.test.sh 17961
+tests/fm-slack-watch.test.sh 462747
+tests/fm-spawn-model-pin.test.sh 33955
 EOF
 }
 
