@@ -1,0 +1,21 @@
+{"host": "macOS-27.0.1-arm64-arm-64bit-Mach-O", "python": "3.13.6", "load_workers": 18, "nice": 20, "hide_proc": false, "loadavg_start": [13.34423828125, 10.50830078125, 9.0634765625], "duration_override": null}
+{"rep": 0, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 5.64, "stdout": "completed\n", "stderr": "", "loadavg": [36.720703125, 15.583984375, 10.8798828125]}
+{"rep": 0, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.7, "stdout": "completed\n", "stderr": "", "loadavg": [36.720703125, 15.583984375, 10.8798828125]}
+{"rep": 1, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.63, "stdout": "completed\n", "stderr": "", "loadavg": [43.38916015625, 17.3173828125, 11.51904296875]}
+{"rep": 1, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.6, "stdout": "completed\n", "stderr": "", "loadavg": [48.40283203125, 18.78955078125, 12.072265625]}
+{"rep": 2, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.72, "stdout": "completed\n", "stderr": "", "loadavg": [50.8525390625, 19.7890625, 12.46435546875]}
+{"rep": 2, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.78, "stdout": "completed\n", "stderr": "", "loadavg": [54.7880859375, 21.12060546875, 12.97705078125]}
+{"rep": 3, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.73, "stdout": "completed\n", "stderr": "", "loadavg": [59.529296875, 22.662109375, 13.56884765625]}
+{"rep": 3, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.72, "stdout": "completed\n", "stderr": "", "loadavg": [60.60791015625, 23.49755859375, 13.9169921875]}
+{"rep": 4, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.71, "stdout": "completed\n", "stderr": "", "loadavg": [61.27978515625, 24.2529296875, 14.2392578125]}
+{"rep": 4, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.7, "stdout": "completed\n", "stderr": "", "loadavg": [63.89990234375, 25.41064453125, 14.70654296875]}
+{"rep": 5, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.71, "stdout": "completed\n", "stderr": "", "loadavg": [67.91162109375, 26.88134765625, 15.2880859375]}
+{"rep": 5, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.71, "stdout": "completed\n", "stderr": "", "loadavg": [68.71923828125, 27.72998046875, 15.6552734375]}
+{"rep": 6, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.68, "stdout": "completed\n", "stderr": "", "loadavg": [72.90576171875, 29.2783203125, 16.2724609375]}
+{"rep": 6, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.68, "stdout": "completed\n", "stderr": "", "loadavg": [75.2353515625, 30.4853515625, 16.7744140625]}
+{"rep": 7, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.62, "stdout": "completed\n", "stderr": "", "loadavg": [78.89990234375, 31.98779296875, 17.384765625]}
+{"rep": 7, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.7, "stdout": "completed\n", "stderr": "", "loadavg": [78.58740234375, 32.70166015625, 17.72216796875]}
+{"rep": 8, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.64, "stdout": "completed\n", "stderr": "", "loadavg": [78.58740234375, 32.70166015625, 17.72216796875]}
+{"rep": 8, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.69, "stdout": "completed\n", "stderr": "", "loadavg": [80.0615234375, 33.76904296875, 18.1865234375]}
+{"rep": 9, "runner": "python", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.58, "stdout": "completed\n", "stderr": "", "loadavg": [79.89599609375, 34.5029296875, 18.53662109375]}
+{"rep": 9, "runner": "perl", "case": "burst", "rc": 0, "expected": 0, "verdict": "pass", "elapsed_s": 4.58, "stdout": "completed\n", "stderr": "", "loadavg": [80.705078125, 35.423828125, 18.955078125]}

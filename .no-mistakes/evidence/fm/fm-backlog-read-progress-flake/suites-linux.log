@@ -1,0 +1,74 @@
+source=git-archive 328c136aed690f7e51032ccc0786e441dcc2fa0b
+Linux 7551f2bd4e3f 7.0.14-linuxkit #1 SMP PREEMPT Sun Sep 20 16:14:09 UTC 2026 aarch64 GNU/Linux
+Ubuntu 26.04.1 LTS bash=5.3.9(1)-release Python 3.14.4 perl=v5.40.1 nproc=2
+0.27 0.23 0.40 1/743 12
+FM_TEST_BEGIN 2026-10-24T13:57:28Z tests/fm-backlog-read-bound.test.sh family=unclassified expected_gate_skip=none
+ok - productive slow backlog rows and captain-held calls finish without latching later reads
+ok - a hanging tasks-axi show returns within the per-item bound instead of running unbounded
+ok - a timed-out row read reports one error naming the item that timed out
+ok - after the first bound hit the sweep continues and names every remaining item without paying the bound again
+ok - under an outer progress owner the per-item bound fires and the latch spares later items
+ok - a bound hit stops a captain hold without creating a task
+ok - the teardown verify gate stops at a bound hit without attesting the inventory
+ok - the reconcile-requests intake stops at a bound hit without classifying or recording the row
+ok - a bound hit in the migrated-prefix scan stops verify without attesting the inventory
+Author identity unknown
+
+*** Please tell me who you are.
+
+Run
+
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+
+to set your account's default identity.
+Omit --global to set the identity only in this repository.
+
+fatal: unable to auto-detect email address (got 'ubuntu@7551f2bd4e3f.(none)')
+ok - a wedged backlog backend still leaves a complete digest: wake queue, supervision instructions, fleet state, and context all print
+ok - a full-body restart timeout latches the recovery sweep, naming every worker without another backend read
+# fm-backlog-read-bound.test.sh: all assertions passed
+FM_TEST_END 2026-10-24T13:58:45Z tests/fm-backlog-read-bound.test.sh exit=0 duration_ms=77100 gate_skip=false
+ledger: "/tmp/r/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=77166
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=77100 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-backlog-read-bound.test.sh duration_ms=77100
+ledger: "/tmp/r/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0
+0.13 0.20 0.38 1/742 3138
+FM_TEST_BEGIN 2026-10-24T13:58:46Z tests/fm-work-progress.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - arm_slow_cpu_start_completes
+ok - arm_late_failure_reaches_the_wake_queue_once_its_waiter_left
+ok - arm_failure_seen_by_its_waiter_is_not_queued_again
+ok - omp_slow_readiness_does_not_hold_the_wake
+ok - omp_late_successor_failure_is_surfaced
+ok - claude_slow_successor_does_not_hold_the_rewake
+ok - claude_failed_successor_is_reported_in_the_rewake
+ok - claude_late_successor_failure_reaches_the_wake_queue
+ok - watchdog_old_beacon_preserves_progress_but_stops_proven_stall
+ok - summary_slow_cpu_producer_publishes
+ok - crew_slow_cpu_read_is_authoritative
+ok - fleet_slow_cpu_task_observation_is_included
+ok - summary_worker_cuts_only_the_hung_lane
+ok - reaped_child_cpu_between_observations_prevents_false_idle_then_true_idle_is_detected
+ok - unavailable_ctypes_preserves_productive_work_with_blind_telemetry
+ok - proc_only_sampler_cuts_still_keeps_growing_and_warns_when_blind
+ok - host_samplers_stop_timed_poll_idle_and_keep_reaped_cpu_burst
+ok - contender_preserves_productive_old_beacon_holder
+ok - attached_arm_follows_productive_holder_after_beacon_ages
+ok - attached_arm_admits_productive_already_old_holder
+ok - contender_refuses_a_proven_stalled_holder_that_survives_term
+ok - arm_attaches_to_a_holder_that_resumed_while_its_child_started
+ok - collector_slow_cpu_source_returns
+ok - collector_productive_total_outlives_old_alarm
+ok - python_free_runner_preserves_subtree_cpu_and_output_progress
+ok - python_free_runner_stops_true_inactivity_and_reaps_descendants
+FM_TEST_END 2026-10-24T14:01:39Z tests/fm-work-progress.test.sh exit=0 duration_ms=173165 gate_skip=false
+ledger: "/tmp/r/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=173236
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=173165 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-work-progress.test.sh duration_ms=173165
+ledger: "/tmp/r/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0
+2.57 0.98 0.63 4/762 10189
+done-rc=0
