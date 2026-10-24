@@ -58,7 +58,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 ## Firstmate glue outside this directory
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic tool coverage, egress authorization and input/root/device checks before model screening.
-  `bin/fm-jev-egress.ts` owns the tool classifications and outbound-call detection; the operator contract above owns task grants and the detector's non-sandbox limits.
+  `bin/fm-jev-egress.ts` owns the tool classifications and each tool's egress row; the operator contract above owns task grants and the table's non-sandbox limits.
   It judges every planned piece with the unchanged level 6 policies; calls pass only when every planned piece passes, while result handling applies the explicit advisory and trusted-read rules below.
   Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
   Its host response handling preserves answered middle-band results with an advisory and audit row.

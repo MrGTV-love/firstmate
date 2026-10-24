@@ -2472,34 +2472,34 @@ This is an operator-only migration, not an automated retrofit; isolated verifica
 ### Tool coverage and outbound calls
 
 [`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls and result screening.
-Unknown tool names are refused instead of silently skipping the guard; omp also checks its live `getAllTools()` registry before each call and refuses an unclassified or unavailable registry.
+An unclassified tool is refused when it is called instead of silently skipping the guard; calls to classified tools do not depend on the rest of the host registry.
 The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry without submitting a model turn, and proves that adding an unclassified tool fails coverage.
 Optional host tools need not be installed for the offline regression; the installed-host portion explicitly skips when omp is absent.
 Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
 Other harnesses remain outside this guard integration.
 
-Native semantic `find`, web search, browser automation, subagent dispatch, provider-backed tools and telemetry uploads through `xd://report_issue` require a task egress grant before execution.
-The telemetry device is classified in the same table, not admitted by a filesystem-root or trusted-device exception.
-Remote read/search paths and outbound shell entry points, including `curl`, `wget`, `ssh`, `scp`, GitHub calls, remote git operations, package installs and endpoint arguments, are checked at the same boundary.
+Native semantic `find`, web search, browser automation, subagent dispatch and provider-backed tools require a task egress grant before execution.
+`xd://report_issue` has no table row and no grant path: like every other unadmitted xd device it is refused by the [native-device rule](#model-policy), whatever the task grants.
+Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
+Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
 The rule is deterministic and needs neither a model verdict nor a working provider credential.
 A refusal names the destination classes whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
-Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","github"]`.
-The recognized destination classes are `semantic-search`, `web`, `browser`, `remote-shell`, `github`, `package-registry`, `provider`, `subagent`, `dynamic-code`, `remote-storage` and `telemetry`.
+Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
+The recognized destination classes are `semantic-search`, `web`, `browser`, `provider`, `subagent`, `dynamic-code` and `remote-storage`.
 An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
 Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
 Every required class must be granted, and a grant never bypasses existing path, credential, shell or privacy checks.
 
 Each outbound-call decision adds exactly one terminal audit row with the tool, destination class and fixed argument-shape labels, never raw arguments, query text or destination addresses.
-A granted shell or write call carries those labels on its existing policy row rather than adding a second row; a native paid `find` records its deterministic decision even though it has no shell/write model classification.
+A native paid `find` records its deterministic decision even though it has no shell/write model classification.
 Local `read` remains pre-tool unjudged, `bash` keeps shell screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
-This table detects exposed entry points, not arbitrary network behavior hidden in scripts, executable replacements, shell expansion, local configuration or tool internals.
+This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
 Claude's notebook edits, worktree changes and skill execution use the same explicit confinement-owned classification.
-Other opaque native evaluators and inline general-purpose code require a `dynamic-code` grant because their effects are not statically knowable; granting that class authorizes that execution capability, not a confinement guarantee.
-Shell detection recognizes literal executable paths, quoted/escaped command names, common wrappers and shell command strings, but does not claim to interpret every shell grammar.
+Other opaque native evaluator tools require a `dynamic-code` grant because their effects are not statically knowable; granting that class authorizes that execution capability, not a confinement guarantee.
 
 ### Model policy
 
@@ -2561,7 +2561,7 @@ The shared guard blocks every other spelling without a Jev call because omp can 
 
 Admitted devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can still send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
-`xd://report_issue` remains blocked because it can upload reports; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
+`xd://report_issue` remains blocked because it can upload reports, and no egress grant admits it; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
 Device `edit` calls remain blocked, and every path-spelling refusal tells the agent to use a plain path and report if that is not possible.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
