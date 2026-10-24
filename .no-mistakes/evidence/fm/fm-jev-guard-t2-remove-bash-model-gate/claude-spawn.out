@@ -1,0 +1,10 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LABHOME
+warning: task t2-live: $LABHOME/data/t2-live/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: $LABHOME/data/t2-live/launch-brief.md records no ship branch; defaulting to legacy branch fm/t2-live
+warning: $LABHOME/data/t2-live/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for t2-live: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t2-live harness=claude kind=ship mode=no-mistakes yolo=off window=firstmate:fm-t2-live worktree=$LAB/claude-spawn/wt

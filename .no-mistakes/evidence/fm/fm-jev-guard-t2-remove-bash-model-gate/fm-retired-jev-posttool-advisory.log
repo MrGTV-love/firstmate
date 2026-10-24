@@ -1,0 +1,2 @@
+ok - retired PostToolUse shell/read results and UserPromptSubmit capture emit nothing, exit 0 and start no guard service
+ok - a PreToolUse write failing its credential threshold still reaches the judge and denies at exit 0

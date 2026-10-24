@@ -1,0 +1,4 @@
+7c7
+<             "command": "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QG0DFTX13M2XSHDCEPP6Y1/bin/fm-jev-guard-hook.sh' '$LABHOME' '$LABHOME/config' '$LABHOME/state' 't2-live' '$LAB/claude-spawn/wt' '$LABHOME/data/t2-live' 'project' 'FIRSTMATE_JEV_GUARD_V1'",
+---
+>             "command": "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QG0DFTX13M2XSHDCEPP6Y1/bin/fm-jev-guard-hook.sh' '$LABHOME' '$LABHOME/config' '$LABHOME/state' 't2-live' '$LAB/claude-spawn/wt' '$LABHOME/data/t2-live' 'firstmate' 'FIRSTMATE_JEV_GUARD_V1'",

@@ -1,0 +1,2 @@
+ok - shell calls pass on omp and an old-matcher Claude worker when their judgment could not have run
+ok - a write whose judgment cannot run still denies for review

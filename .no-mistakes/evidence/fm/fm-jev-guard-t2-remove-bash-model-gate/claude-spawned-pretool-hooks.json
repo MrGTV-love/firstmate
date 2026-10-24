@@ -1,0 +1,12 @@
+[
+  {
+    "matcher": "^(Write|Edit)$",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QG0DFTX13M2XSHDCEPP6Y1/bin/fm-jev-guard-hook.sh' '/Users/charlesabrooker/tmp/fm-lab.PgkLYk' '/Users/charlesabrooker/tmp/fm-lab.PgkLYk/config' '/Users/charlesabrooker/tmp/fm-lab.PgkLYk/state' 't2-live' '$LAB/claude-spawn/wt' '/Users/charlesabrooker/tmp/fm-lab.PgkLYk/data/t2-live' 'project' 'FIRSTMATE_JEV_GUARD_V1'",
+        "timeout": 330
+      }
+    ]
+  }
+]

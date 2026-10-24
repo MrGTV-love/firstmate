@@ -1,0 +1,5 @@
+INFO guard-watcher-down-warning: exemptions=1
+LINT_SUMMARY mode=enforce guards=28 violations=0 allowlisted=0 stale=0 shown=0
+lint exit=0
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=4 resurrected=0
+refcheck exit=0
