@@ -118,6 +118,6 @@ test('malformed fact selectors and missing semantic references fail before provi
   for (const match of [{ project: 42 }, { kind: 'review' }, { projects: ['vernant'] }, { all: ['missing'] }, { any: [] }]) {
     writeFileSync(rulesPath, JSON.stringify({ ...cfg, rules: [{ ...cfg.rules[0], match }] }));
     const r = spawnSync(process.execPath, ['--experimental-strip-types', '--no-warnings', helper, 'validate', rulesPath], { encoding: 'utf8' });
-    assert.equal(r.status, 1);
+    assert.equal(r.status, 65);
   }
 });

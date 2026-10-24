@@ -31,6 +31,7 @@ It exited 0 with:
 The tests invoke the actual dispatch adapter's `prepare` and `apply` CLI paths without calling a provider.
 They drive maximally positive semantic answers against incompatible repository/kind facts, exercise predicate conjunction, disjunction and negation, preserve capability and ambiguity thresholds, and reject invalid fact selectors and missing predicate references.
 The baseline adapter fails the fact-scoped selection and removed-workflow escalation cases.
+The same command was re-run on the same host on the review-fix working tree based on commit `9c97cdd7c`, after malformed schemas received their own validator exit status, and again passed 5 of 5.
 
 The fixture [`dispatch-resolve-20261024.json`](../../tests/fixtures/dispatch-resolve-20261024.json) retains only rule choices and coarse reasons from the 136 logged resolves assessed on 2026-10-24.
 Thirty-two records carry the old human-workflow escalation reason.
@@ -44,7 +45,7 @@ No paid replay was performed.
 bash bin/fm-test-run.sh tests/fm-dispatch-resolve.test.sh
 ```
 
-On the same host on 2026-10-24, this command exited 0 with:
+On the same host on 2026-10-24, at commit `f10c20f1b` (before the review fixes), this command exited 0 with:
 
 ```console
 # all fm-dispatch-resolve tests passed
@@ -58,6 +59,10 @@ The same script exercises the Node fallback when Bun is absent and leaves the un
 Its promoted-Vernant-ship case retains the original scout marker and appends the current ship specification, then verifies ship-only routing and the current specification in the actual provider request.
 A fenced, non-authoritative ship heading exercises the neighboring boundary.
 These are offline policy and transport checks, not evidence of semantic accuracy from the provider model.
+
+That pass predates the review fixes and does not validate them.
+The suite now also covers a fenced scout declaration inside an ordinary ship brief, scout detection from the unfenced `# Setup` section, escalation of project-scoped rules without `--project`, an old-format rules file failing closed with exit 2, an override directory's own judgment reaching the request, and an adapter runtime failure reported as `status: error` rather than a malformed rules file.
+No complete run of this entry point on the current code is recorded here; the pipeline's test step owns that evidence.
 
 ## Verification boundary
 
