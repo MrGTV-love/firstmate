@@ -5,9 +5,11 @@
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
 import { egressClass, egressGranted, toolPolicy } from "./fm-jev-egress.ts";
+import { execFileSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
 import type { Questions, State } from "./ten-levels/src/core/types.ts";
 import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, SIZE_REFUSAL_NOTICE, withDecisionBudget,
@@ -186,6 +188,9 @@ function credentialShaped(content: string): boolean {
     || /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s/:@?#"'`<>()\[\]{}\\,;|]*:[^\s/@?#"'`<>()\[\]{}\\,;|]{8,}@/i.test(content);
 }
 
+// Central guard decisions go through the shared state/guard-events.jsonl writer.
+const GUARD_EVENT_WRITER = resolve(dirname(fileURLToPath(import.meta.url)), "fm-guard-event.sh");
+
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
@@ -217,7 +222,18 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };
   }
 
+  const guardEvent = (guard: string, decision: "allow" | "deny", started: number): void => {
+    try {
+      execFileSync("bash", [GUARD_EVENT_WRITER, guard, decision, "--session", c.task, "--elapsed-ms", String(Math.round(performance.now() - started))], {
+        env: { PATH: process.env.PATH ?? "/usr/bin:/bin", FM_HOME: c.home,
+          ...(process.env.FM_GUARD_EVENT_LOG ? { FM_GUARD_EVENT_LOG: process.env.FM_GUARD_EVENT_LOG } : {}) },
+        stdio: "ignore", timeout: 5000,
+      });
+    } catch {}
+  };
+
   pi.on("tool_call", async (event, ctx) => withDecisionBudget(async () => {
+    const started = performance.now();
     const tool = event.toolName;
     const policy = toolPolicy(tool);
     let result: SystemOneResult | undefined;
@@ -226,6 +242,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       branch: "policy", error_type: null, request_started: false,
       ...((tool === "write" || tool === "edit") && object(event.input) && typeof event.input.path === "string"
         ? { refused_path: event.input.path } : {}) };
+    guardEvent("jev-tool-coverage", policy ? "allow" : "deny", started);
     if (!policy) {
       return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
         `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must classify it in fm-jev-egress.ts before execution. No call was made.`);
@@ -234,7 +251,9 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       const destination = egressClass(tool);
       if (destination) {
         terminal.destination_class = destination;
-        if (!egressGranted(c.state, c.task, destination)) {
+        const granted = egressGranted(c.state, c.task, destination);
+        guardEvent("jev-egress-grant", granted ? "allow" : "deny", started);
+        if (!granted) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
             `Missing task egress grant: request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
         }

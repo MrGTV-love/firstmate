@@ -36,3 +36,10 @@ extensionHandlers:
 # Verified against omp 18.12.6 (`dev.autoqa`).
 dev:
   autoqa: false
+# omp's read, grep and ast-grep fetch URL paths by default. Workers reach the
+# web only through a web-classed tool that the task's egress grant admits
+# (docs/configuration.md "Jev guard"), so URL paths fail with omp's own
+# "URL reads are disabled by settings." error.
+# Verified against omp 18.12.4 by tests/fm-jev-guard-omp-live-e2e.test.sh.
+fetch:
+  enabled: false
