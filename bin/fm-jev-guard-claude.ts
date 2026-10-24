@@ -4,7 +4,7 @@
 // The pre-tool deny below is this integration's only coverage.
 // Do not re-add a post-tool branch here without installed-host output-replacement proof.
 import { readFileSync } from "node:fs";
-import { installJevGuard, type GuardCallHandler, type GuardPromptHandler, type GuardResultHandler } from "./fm-jev-guard.ts";
+import { installJevGuard, type GuardCallHandler } from "./fm-jev-guard.ts";
 
 const [home, config, state, task, worktree, data, project, policy] = process.argv.slice(2);
 
@@ -21,11 +21,10 @@ async function main(): Promise<void> {
   if (payload.hook_event_name !== "PreToolUse") return;
   if (typeof payload.tool_name !== "string") throw new Error("Invalid hook input.");
   const tool = payload.tool_name.toLowerCase();
-  // GuardHost still requires all three registrations; this adapter drives only tool_call.
-  type Handlers = { tool_call: GuardCallHandler; tool_result: GuardResultHandler; before_agent_start: GuardPromptHandler };
+  type Handlers = { tool_call: GuardCallHandler };
   const handlers: Partial<Handlers> = {};
   installJevGuard({ on<K extends keyof Handlers>(name: K, handler: Handlers[K]) { handlers[name] = handler; } },
-    { home, config, state, task, worktree, data, project, policy, host: "claude" });
+    { home, config, state, task, worktree, data, project, policy });
   const input = object(payload.tool_input) ? payload.tool_input : {};
   const ctx = { cwd: typeof payload.cwd === "string" ? payload.cwd : worktree };
   const toolCallId = typeof payload.tool_use_id === "string" ? payload.tool_use_id : undefined;

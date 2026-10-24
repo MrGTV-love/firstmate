@@ -38,29 +38,3 @@ test("write: credential and secrets-file equality preserve independent threshold
     assert.equal(l6.gateWrite({ kind: choiceA(kind, confidence, l6.WRITE_QUESTIONS.kind.criteria), contains_secret: noulA(secret) }).block, block);
   }
 });
-
-for (const [probability, expected] of [
-  [0, "clear"], [0.2, "clear"], [0.200001, "review"], [0.799999, "review"], [0.8, "flag"], [1, "flag"],
-] as const) {
-  test(`injection: ${probability} yields ${expected}`, () => {
-    const decision = l6.screenResult({ injection: noulA(probability) });
-    assert.equal(decision.decision, expected);
-  });
-}
-
-for (const [name, answer] of [
-  ["missing", {}], ["null", { injection: null }], ["wrong type", { injection: { type: "choice", noul: 0 } }],
-  ["string", { injection: { type: "noul", noul: "0.2" } }], ["negative", { injection: noulA(-0.01) }],
-  ["above one", { injection: noulA(1.01) }], ["NaN", { injection: noulA(NaN) }], ["infinite", { injection: noulA(Infinity) }],
-] as const) {
-  test(`injection: ${name} is an error, not clear or ambiguous`, () => {
-    assert.throws(() => l6.screenResult(answer), { name: "ContractError" });
-  });
-}
-
-test("empty output is clear without an invented model probability or provider call", async () => {
-  let called = false;
-  const decision = await l6.screenToolResult("bash", "   \n", async () => { called = true; return { answers: {} }; });
-  assert.equal(called, false);
-  assert.deepEqual(decision, { decision: "clear", noul: null });
-});

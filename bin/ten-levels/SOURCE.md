@@ -14,7 +14,7 @@ Firstmate's worker guard uses those policies and the canonical client through `b
 These files remain byte-for-byte copies at their upstream paths:
 
 - `src/core/client.ts`, `helpers.ts`, `mock.ts` and `types.ts`
-- `src/levels/level06/index.ts` and `bash-gate.ts`
+- `src/levels/level06/bash-gate.ts`
 - `src/levels/level05/intent-router.ts` and `index.ts`
 - `tests/level05.test.ts`
 - `LICENSE`
@@ -32,47 +32,31 @@ This is the only change in those copies: combining independent agent and model q
 Question wording, criteria, pure decisions, and thresholds remain upstream's.
 `bin/fm-dispatch-level5.ts` combines the objects with the existing rule question, uses the unchanged core client, and maps the pure decisions into the approved candidates.
 
-## Changed copies: Level 6 result policy and service
+## Changed copies: Level 6 policies and service
 
-- `src/levels/level06/result-screen.ts` owns the frozen, calibrated injection Noul and pure clear/flag/review policy.
-  Invalid answers throw the canonical contract error, empty output invents no probability, and complete result text replaces prefix-only screening.
-  The [accepted frozen calibration summary](../../docs/verification/runtime-backends.md#accepted-frozen-live-calibration) owns measured denominators, abstentions, fixture exclusions and estimated-cost uncertainty.
+- `src/levels/level06/index.ts` exports only the shell and write policies.
+  The unchanged vendored `src/levels/level06/result-screen.ts` is unused: no import or call loads it.
+  Its deletion is deferred until ship T2 (`fm-jev-guard-t2-remove-bash-model-gate`) removes the bash model gate.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
-- `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
-- `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
-  It checks privacy before key lookup, over the whole payload for shell calls and results and over every model-screened piece for writes, plans overlapping pieces that each fit the request ceiling, and retains strict complete-cover planning for shell calls and results (`plan`).
-  Its write-only planner, coverage audit and content-free producer-field exclusion audit follow the [operator contract](../../docs/configuration.md#jev-guard).
-  A write checks its pieces one at a time, so a never-send value longer than about 1,000 JSON-escaped bytes can be cut across a piece boundary and reach the model only as fragments.
-  It uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
-  Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.
-  Durable-record failure is explicit rather than silently optional while active.
-  It allows Claude, and omp's pre-tool shell and write judgments, up to three 90-second tries with cancellable one-second then two-second backoff inside a 300-second decision budget; the worker overlay raises omp's pre-tool handler deadline above that budget.
-  It keeps omp's result screening at two 12-second tries with 500 ms backoff inside 25 seconds because that native handler times out at 30 seconds, without a setting, and forwards the original output.
-  It retains outage-only deny guidance and records elapsed tries and time; each call is judged on its own, with no state carried between calls.
-  These Firstmate-only changes leave the upstream client, questions, thresholds, egress checks and `REVIEW_ON_UNAVAILABLE_V1` pre-tool denial unchanged; the operator contract above owns measurements and enclosing host limits.
+- `tests/level06.test.ts` exercises independent shell/write threshold boundaries and outside-root refusal.
+- `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.
+  The [operator contract](../../docs/configuration.md#jev-guard) owns its privacy checks, bounded write planner, complete-cover shell planner, coverage accounting, failure normalization and cancellation budgets.
+  The canonical client, shell/write questions and thresholds are unchanged.
+  There is no result policy, result request budget or result audit path.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
 
 ## Firstmate glue outside this directory
 
-- `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
-  It judges every planned piece with the unchanged level 6 policies; calls pass only when every planned piece passes, while result handling applies the explicit advisory and trusted-read rules below.
+- `bin/fm-jev-guard.ts` is the single worker pre-tool event entry point and applies deterministic input/root/device checks before model screening.
+  It judges every planned piece with the shell/write policies; calls pass only when every planned piece passes.
   Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
-  Its host response handling preserves answered middle-band results with an advisory and audit row.
-  Native reads of task-owned data/state and tracked own-worktree files, including modified tracked files, pass immediately without a judge; cross-task roots are not trusted.
-  Native source metadata normalizes numeric and database selectors before bounded path admission.
-  Untrusted flags at or above 0.80 remain withheld on omp; write outages still deny, and shell outages deny except the narrow read-only and lab admissions the operator contract owns.
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
-  The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
-  The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
-- `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
-  Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
+  The [operator contract](../../docs/configuration.md#jev-guard) owns enforcement and the shell-only outage admissions.
+- `bin/fm-jev-guard-claude.ts` maps pre-tool input/call identity and refusal to Claude denial; non-pre-tool events return without output.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
   Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.
 - `bin/fm-spawn.sh` remains the launch owner for physical project scope, per-task launch-only guard activation retained on relaunch, context, Claude hook registration, omp extension loading and process-local replace-edit mode.
-  Native omp prompt events and Claude's separate prompt/tool hooks bind exact source reads without copying raw prompts into the latter's task/session-local hash context.
-- The existing `bin/fm-operational-input.sh` publisher owns write-time consistency metadata; `bin/fm-task-inbox-lib.sh` reuses it and names the exact record in its bounded doorbell.
-  The [inbox owner's header](../fm-task-inbox-lib.sh) owns delivery and retry semantics.
 
 [`tests/fm-jev-guard.test.sh`](../../tests/fm-jev-guard.test.sh) exercises the public service and adapters with isolated synthetic HTTP fixtures.
 [Native verification](../../docs/verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes actual host delivery, controlled decision fixtures, live calibration and deployed acceptance.
