@@ -705,7 +705,7 @@
       "layer": "runtime-block",
       "source": "TOOL_POLICY in bin/fm-jev-egress.ts, keyed by the lower-cased host tool name",
       "trigger": "toolPolicy(<tool>) finds no row for the called tool name, for example an MCP tool, a legacy MultiEdit or a newly added host tool",
-      "remedy": "Firstmate adds a row for <tool> to TOOL_POLICY in bin/fm-jev-egress.ts, classified by the tool's real effect, then runs bash tests/fm-jev-guard-audit.test.sh; the deny line names the tool and no call was made",
+      "remedy": "report_issue and SendFeedback upload reports and must never receive a TOOL_POLICY row, so their refusal has no remedy; for every other <tool>, Firstmate adds a row to TOOL_POLICY in bin/fm-jev-egress.ts, classified by the tool's real effect, then runs bash tests/fm-jev-guard-audit.test.sh; the deny line names the tool and no call was made",
       "budget": 1,
       "test": "tests/fm-jev-guard-audit.test.sh",
       "tier": "C",
