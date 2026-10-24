@@ -32,9 +32,10 @@ The proven-isolation admission accepts or refuses an explicit `--jobs` on these 
 `--check-coverage` bounds the modeled makespan packed into the effective bin count, so the two parallel jobs now have a packing bound beside their 60-minute job timeouts.
 The makespan model packs the lane's hinted work into `min(PORTABLE_PARALLEL_JOBS, PORTABLE_PARALLEL_EFFECTIVE_JOBS)` bins, and `--check-coverage` reports that count as `parallel_effective_jobs`.
 From 2026-10-24 the parallel hints are each script's measured wall at three abreast and the effective count equals the job count, so the model packs the real slots without applying a second contention factor; before that the hints were serial-era samples and the effective count was two.
-Run 40121241146 shows why the change was needed: each lane-1 script's three-abreast wall ran 1.83 times its serial-era hint, and the two-bin model under-predicted that lane's 1231 s wall by 24 percent, while packing the measured wall into three slots predicts 1117958 ms for it.
-The guard compares the modeled makespan with the 1200000 ms budget, and the model now reads about nine percent below measured wall time from the packing tail.
-So 1200000 ms bounds a real lane near 22 minutes, and the model reports 1117958 ms against it.
+Run 40121241146 shows why the change was needed: each lane-1 script's three-abreast wall ran 1.83 times its serial-era hint, and the two-bin model under-predicted that lane's 1231 s wall by 24 percent, while packing the measured wall into three slots models the memberships that ran at 1209767 ms and 779131 ms, each about 1.7 percent under its 1231 s and 793 s wall.
+The guard compares the modeled makespan with the 1200000 ms budget, and the model now reads about 1.7 percent below measured wall time.
+So 1200000 ms bounds a real lane near 20.4 minutes.
+The lane 1 membership that ran modeled at 1209767 ms, just above that budget, which is why two scripts moved to lane 2; the rebalanced lane 1 models at 1117958 ms, set by `tests/fm-pr-merge.test.sh` alone.
 A concurrent run starts its scripts in the `--list-scheduled` order, which is the order the makespan model packs.
 
 The earlier shared hint tables were refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
@@ -114,7 +115,7 @@ From 2026-10-24 the table stores that measured wall directly and `PORTABLE_PARAL
 The earlier serial-era samples with two effective bins were retired because they under-predicted a real lane by 24 percent (run 40121241146); the 2026-10-22 refresh below is history.
 
 All 29 parallel hints were last refreshed on 2026-10-24 from the concurrent `--jobs 3` artifacts of [run 40121241146](https://github.com/MrGTV-love/firstmate/actions/runs/40121241146): each hint is that run's measured three-abreast wall `duration_ms` for the script.
-In that run the two lanes took 1231 s and 793 s, and the model predicts 1117958 ms for the slower lane from these hints.
+In that run the two lanes took 1231 s and 793 s, and these hints model those memberships at 1209767 ms and 779131 ms; the rebalanced lane 1 models at 1117958 ms.
 This is one sample per script, not the slowest of several green runs that the procedure above asks for, so it under-covers run-to-run variance and a script that ran fast in that run is under-hinted until the next refresh.
 
 History: three parallel hints were refreshed earlier on 2026-10-24 from the concurrent `--jobs 3` artifacts of [run 40063531528](https://github.com/MrGTV-love/firstmate/actions/runs/40063531528): `tests/fm-pr-merge.test.sh`, `tests/fm-test-run.test.sh`, and `tests/fm-lint.test.sh` each carried that run's `duration_ms` divided by the observed 1.728 inflation, and the lane membership moved one script each way to restore the five percent balance, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) records.

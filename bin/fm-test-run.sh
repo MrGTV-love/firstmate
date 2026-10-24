@@ -286,19 +286,22 @@ PORTABLE_PARALLEL_JOBS=3
 # same effect on today's mix - each script's three-abreast wall ran 1.83 times
 # its serial-era hint on lane 1 - and the two-bin model under-predicted that
 # lane's 1231 s wall by 24 percent. Packing the measured wall into the real
-# slot count predicts 1117958 ms against that lane.
-# measured: value=3 date=2026-10-24 host=github-ubuntu-26.04 margin=1.10 (run 40121241146: lanes ran 1231 s and 793 s at three jobs; the model predicts 1117958 ms for the slower lane from its measured per-script wall)
+# slot count models the memberships that ran at 1209767 ms and 779131 ms, each
+# about 1.7 percent under its 1231 s and 793 s wall.
+# measured: value=3 date=2026-10-24 host=github-ubuntu-26.04 margin=1.02 (run 40121241146: lanes ran 1231 s and 793 s at three jobs; the model predicts 1209767 ms and 779131 ms for those memberships from their measured per-script wall)
 PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 
 # Modeled makespan budget for one portable-parallel job. The guard compares this
 # with the modeled makespan, not with wall time. Since the hints became
 # measured three-abreast wall the model reads close to reality: run 40121241146
-# measured a 1231 s lane where the model predicts 1117958 ms, about nine
-# percent under from the packing tail. So 1200000 ms bounds a real lane near 22
-# minutes, and a new member or a slow path fails the coverage guard instead of
-# quietly stretching the workflow. Like the serial target this is packing
-# arithmetic, not an execution timeout.
-# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (the slower parallel lane measured 1231 s in run 40121241146 and models at 1117958 ms)
+# measured lanes of 1231 s and 793 s where the model predicts 1209767 ms and
+# 779131 ms, each about 1.7 percent under. So 1200000 ms bounds a real lane near
+# 20.4 minutes, and a new member or a slow path fails the coverage guard instead
+# of quietly stretching the workflow. The lane 1 membership that ran modeled at
+# 1209767 ms, just above this budget, so two scripts moved to lane 2; the
+# rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone. Like the
+# serial target this is packing arithmetic, not an execution timeout.
+# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
 # Conservative balance hint for a portable-serial script with no measurement.
