@@ -19,9 +19,14 @@ It has no absolute wall-clock bound and writes no timing or backlog records.
 Each nested runner keeps its own bound, so a hung inner read is stopped by its
 own owner and an outer owner sees an inner sampler's CPU only until then.
 Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
-(/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps. When neither can
-sample, one cpu_telemetry_unavailable line names the platform and nothing is
-stopped for inactivity: a missing sample is neither progress nor a stall.
+(/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps (with libproc CPU
+on Darwin, whose ps omits waited-child time). Without a complete sample,
+including unavailable native imports, one cpu_telemetry_unavailable line names
+the platform and nothing is stopped for inactivity: a missing sample is neither
+progress nor a stall.
+Samples include waited-child CPU so reaping cannot erase work between polls.
+Runnable descendants also prevent an idle verdict: a rounded CPU counter is
+not proof that a process awaiting or using a CPU made no progress.
 communicate_progress provides the same inactivity rule for captured Python
 sources whose caller owns descendant cleanup. progress-check keeps an atomic,
 identity-bound observation record for an existing PID plus optional file
@@ -535,7 +540,7 @@ def import_nm(database, run_id):
 
 
 def proc_table(pid):
-    """{pid: (ppid, cpu_seconds, identity)} from a Linux-compatible /proc, or None.
+    """{pid: (ppid, cpu_seconds, identity, runnable)} from /proc, or None.
 
     Git Bash/MSYS exposes /proc/<pid>/stat but its Cygwin ps rejects the -o
     fields below, so the source is chosen by capability, never by platform name
@@ -558,10 +563,11 @@ def proc_table(pid):
             continue
         try:
             line = (root / name / 'stat').read_text()
-            # Fields after the final comm delimiter: [1] ppid (field 4),
-            # [11]+[12] utime+stime (fields 14+15), [19] starttime (field 22).
+            # Include waited-for children (cutime+cstime): a child can do work
+            # and be reaped entirely between snapshots, including its last burst.
             fields = line[line.rindex(')') + 1:].split()
-            table[int(name)] = (int(fields[1]), (int(fields[11]) + int(fields[12])) / ticks, ('proc', fields[19]))
+            seconds = sum(int(fields[index]) for index in (11, 12, 13, 14)) / ticks
+            table[int(name)] = (int(fields[1]), seconds, ('proc', fields[19]), fields[0] == 'R')
         except (OSError, ValueError, IndexError):
             continue  # The process exited between the listing and the read.
     return table
@@ -569,14 +575,14 @@ def proc_table(pid):
 
 def ps_table():
     try:
-        result = subprocess.run(['ps', '-axo', 'pid=,ppid=,time=,lstart='], capture_output=True, text=True,
+        result = subprocess.run(['ps', '-S', '-axo', 'pid=,ppid=,time=,stat=,lstart='], capture_output=True, text=True,
                                 env=dict(os.environ, LC_ALL='C'))
         if result.returncode:
             return None
         table = {}
         for line in result.stdout.splitlines():
             fields = line.split()
-            if len(fields) < 4:
+            if len(fields) < 5:
                 continue
             child, parent = map(int, fields[:2])
             days, separator, clock = fields[2].rpartition('-')
@@ -585,34 +591,86 @@ def ps_table():
             clock_seconds = 0.0
             for part in parts:
                 clock_seconds = clock_seconds * 60 + float(part)
-            table[child] = (parent, seconds + clock_seconds, tuple(fields[3:]))
+            table[child] = (parent, seconds + clock_seconds, tuple(fields[4:]), fields[3].startswith('R'))
         return table
     except (OSError, ValueError):
         return None
 
 
+@functools.lru_cache(maxsize=1)
+def darwin_cpu_reader():
+    """Native CPU including waited children; macOS ps -S can omit that CPU.
+
+    Each process total is truncated to ps's 0.01 s step, the resolution /proc
+    clock ticks also report, so idle timer wakeups are judged as on other hosts.
+    """
+    import ctypes
+
+    class Usage(ctypes.Structure):
+        # sys/resource.h rusage_info_v1: UUID followed by sixteen uint64 fields.
+        _fields_ = [('uuid', ctypes.c_ubyte * 16), ('counters', ctypes.c_uint64 * 16)]
+
+    class Timebase(ctypes.Structure):
+        _fields_ = [('numer', ctypes.c_uint32), ('denom', ctypes.c_uint32)]
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
+    libc.proc_pid_rusage.restype = ctypes.c_int
+    libc.mach_timebase_info.argtypes = [ctypes.POINTER(Timebase)]
+    libc.mach_timebase_info.restype = ctypes.c_int
+    timebase = Timebase()
+    if ctypes.sizeof(Usage) != 144 or libc.mach_timebase_info(ctypes.byref(timebase)) or not timebase.denom:
+        raise ValueError('cannot read Darwin CPU accounting ABI/timebase')
+
+    def read_cpu(pid):
+        usage = Usage()
+        if libc.proc_pid_rusage(pid, 1, ctypes.byref(usage)):
+            return None
+        # ri_user_time, ri_system_time, ri_child_user_time, ri_child_system_time.
+        nanoseconds = sum(usage.counters[index] for index in (0, 1, 10, 11)) * timebase.numer // timebase.denom
+        return nanoseconds // 10_000_000 / 100
+
+    return read_cpu
+
+
 def tree_cpu(pid, observed):
-    """Cumulative CPU of pid's tree, or None when neither /proc nor ps can sample."""
+    """(CPU high-water sum, runnable), or (None, False) without telemetry.
+
+    Waited-child CPU preserves work missed between snapshots. Retained child
+    maxima may overlap that CPU; this sum proves growth, not resource usage.
+    A runnable tree is not proven idle even when counters round away its CPU.
+    """
     table = proc_table(pid)
+    native_cpu = None
     if table is None:
         table = ps_table()
+        if sys.platform == 'darwin':
+            try:
+                native_cpu = darwin_cpu_reader()
+            except (AttributeError, ImportError, OSError, ValueError):
+                return None, False
     if table is None:
-        return None  # A failed telemetry sample is no progress sample, never a stop reason.
+        return None, False  # Missing evidence never proves a stall.
     children = collections.defaultdict(list)
-    for child, (parent, _, _) in table.items():
+    for child, (parent, _, _, _) in table.items():
         children[parent].append(child)
     todo = [pid]
+    runnable = False
     while todo:
         child = todo.pop()
         if child in table:
-            _, seconds, identity = table[child]
+            _, seconds, identity, running = table[child]
+            native = None if native_cpu is None else native_cpu(child)
+            if native is not None:
+                seconds = native
+            runnable = runnable or running
             observed[(child, identity)] = max(observed.get((child, identity), 0), seconds)
         todo.extend(children[child])
-    return sum(observed.values())
+    return sum(observed.values()), runnable
 
 
 def warn_blind_telemetry():
-    scalar('cpu_telemetry_unavailable', f'neither /proc/<pid>/stat nor ps can sample process CPU on '
+    scalar('cpu_telemetry_unavailable', f'cannot sample complete process-tree CPU on '
            f'{sys.platform}; hung work cannot be recovered here, so nothing is stopped '
            'for inactivity while CPU cannot be sampled', sys.stderr)
 
@@ -633,10 +691,10 @@ def communicate_progress(child, inactivity):
         try:
             return child.communicate(timeout=min(1, inactivity / 4))
         except subprocess.TimeoutExpired as error:
-            cpu = tree_cpu(child.pid, observed)
+            cpu, runnable = tree_cpu(child.pid, observed)
             size = len(error.output or b'') + len(error.stderr or b'')
             now = time.monotonic()
-            if (cpu is not None and cpu > previous_cpu) or size > previous_bytes:
+            if runnable or (cpu is not None and cpu > previous_cpu) or size > previous_bytes:
                 last_progress = now
             previous_bytes = size
             if cpu is None:
@@ -658,7 +716,7 @@ def progress_check(path, pid, inactivity, paths):
     Callers own their lock and must recheck its identity before acting.
     """
     observed = {}
-    cpu = tree_cpu(pid, observed)
+    cpu, runnable = tree_cpu(pid, observed)
     if cpu is None:
         warn_blind_telemetry()
         return 0
@@ -683,7 +741,7 @@ def progress_check(path, pid, inactivity, paths):
         if (previous['pid'] == pid and previous['identity'] == list(identity)
                 and 0 <= previous['since'] <= previous['sampled'] <= now):
             old = {(child, tuple(start)): value for child, start, value in previous['cpu']}
-            advancing = files != previous['files'] or any(value > old.get(key, -1) for key, value in observed.items())
+            advancing = runnable or files != previous['files'] or any(value > old.get(key, -1) for key, value in observed.items())
             if not advancing:
                 record['since'] = previous['since']
     except (OSError, ValueError, KeyError, TypeError):
@@ -1018,26 +1076,28 @@ def run(key, command, calibration_file, *, inactivity=None):
     slower_reported = False
     killed = False
     blind = warned_blind = False
+    cadence = min(1, no_progress / 4)
     try:
         while child.poll() is None:
             if not streams.get_map():
                 with contextlib.suppress(subprocess.TimeoutExpired):
-                    child.wait(1)  # observation cadence, not a deadline
-            for ready, _ in streams.select(1) if streams.get_map() else ():
+                    child.wait(cadence)  # observation cadence, not a deadline
+            for ready, _ in streams.select(cadence) if streams.get_map() else ():
                 if not relay(ready.fileobj, ready.data, 65536):
                     streams.unregister(ready.fileobj)
             elapsed = time.monotonic() - started
             cpu = max(0, previous_cpu)
+            runnable = False
             if child.poll() is None and time.monotonic() >= next_cpu_sample:
-                sample = tree_cpu(child.pid, observed_cpu)
+                sample, runnable = tree_cpu(child.pid, observed_cpu)
                 cpu = cpu if sample is None else sample
                 blind = sample is None and inactivity is not None  # Missing evidence cannot prove a stall.
                 if blind and not warned_blind:
                     warned_blind = True
                     warn_blind_telemetry()
-                next_cpu_sample = time.monotonic() + min(1, no_progress / 4)  # Observation, not a deadline.
+                next_cpu_sample = time.monotonic() + cadence  # Observation, not a deadline.
             now = time.monotonic()
-            if cpu > previous_cpu or output_bytes > previous_bytes:
+            if runnable or cpu > previous_cpu or output_bytes > previous_bytes:
                 last_progress = now
                 if now >= next_progress_report and inactivity is None:
                     scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)

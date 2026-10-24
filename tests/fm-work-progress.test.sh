@@ -377,16 +377,74 @@ def summary_hung_lane():
     require(document['invalidity'].get('ids') == ['hung'], 'only the hung lane is unavailable: ' + json.dumps(document))
 case('summary_worker_cuts_only_the_hung_lane', summary_hung_lane)
 
+def reaped_between_samples():
+    home, env = fixture('reaped-between-samples')
+    record = home / 'state/progress.json'
+    # The observer sees the shell before and after a whole CPU-producing child
+    # lifetime, never the child itself. The shell blocks on stdin between events.
+    child = subprocess.Popen(['bash', '-c',
+        'printf "ready\\n"; read -r _; python3 -c "$1"; printf "reaped\\n"; read -r _',
+        '_', 'import time\nstart = time.process_time()\n'
+             'while time.process_time() - start < 1.1: sum(i*i for i in range(1000))'],
+        env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    def check():
+        return run([sys.executable, home / 'bin/fm-duration.py', 'progress-check',
+                    record, str(child.pid), '1'], env)
+    try:
+        require(child.stdout.readline() == 'ready\n', 'shell did not reach its input wait')
+        require(check().returncode == 0, 'the baseline sample was refused')
+        time.sleep(1.2)
+        child.stdin.write('work\n')
+        child.stdin.flush()
+        require(child.stdout.readline() == 'reaped\n', 'CPU child did not finish and get reaped')
+        result = check()
+        require(result.returncode == 0, 'CPU completed between samples was lost: ' + result.stderr)
+        time.sleep(1.2)
+        result = check()
+        require(result.returncode == 124, 'a subsequently idle tree was not proven idle: ' + result.stderr)
+    finally:
+        child.terminate()
+        child.wait()
+case('reaped_child_cpu_between_observations_prevents_false_idle_then_true_idle_is_detected', reaped_between_samples)
+
+def unavailable_ctypes():
+    home, env = fixture('unavailable-ctypes')
+    modules = home / 'modules'
+    modules.mkdir()
+    (modules / 'ctypes.py').write_text('raise ImportError("fixture: ctypes unavailable")\n')
+    # Exercise the Darwin-only import boundary portably, before any native call.
+    (modules / 'sitecustomize.py').write_text('import sys\nsys.platform = "darwin"\n')
+    env.update(PYTHONPATH=str(modules), FM_PROC_ROOT_OVERRIDE=str(home / 'no-proc'))
+    result = run([sys.executable, home / 'bin/fm-duration.py', 'keep-going', '1', '--',
+                  sys.executable, '-c', busy + 'print("productive source completed")'], env)
+    require(result.returncode == 0 and result.stdout == 'productive source completed\n',
+            f'missing ctypes killed productive work: {result.returncode} {result.stdout} {result.stderr}')
+    require(result.stderr.count('cpu_telemetry_unavailable:') == 1,
+            'missing ctypes did not enter the one-warning blind-telemetry path: ' + result.stderr)
+case('unavailable_ctypes_preserves_productive_work_with_blind_telemetry', unavailable_ctypes)
+
 # Git Bash/MSYS: a /proc-only host whose ps cannot sample. Each fixture process
-# publishes its own stat line (fields 4, 14+15 and 22) under FM_PROC_ROOT_OVERRIDE.
+# publishes its own stat line (fields 3, 4, 14+15, 16 and 22) under FM_PROC_ROOT_OVERRIDE.
 proc_stat = ('my $d = "$ENV{FM_PROC_ROOT_OVERRIDE}/$$"; mkdir $d;'
              'sub stat_line { open my $f, ">", "$d/stat.tmp" or die; '
-             'print $f "$$ (fixture) S 1 0 0 0 0 0 0 0 0 0 $_[0] 0 0 0 20 0 1 0 777\\n"; close $f; '
+             'my $state = $_[1] || "S"; my $waited = $_[2] || 0; '
+             'print $f "$$ (fixture) $state 1 0 0 0 0 0 0 0 0 0 $_[0] 0 $waited 0 20 0 1 0 777\\n"; close $f; '
              'rename "$d/stat.tmp", "$d/stat" or die; }')
 proc_programs = {
     'still': proc_stat + 'stat_line(0); sleep 30;',
     'growing': proc_stat + 'for my $i (1..16) { stat_line($i * 10); sleep 0.25; } exit 0;',
+    # A stable one-process tree whose only growing CPU is its waited children's.
+    'reaped': proc_stat + 'for my $i (1..16) { stat_line(0, "S", $i * 10); sleep 0.25; } exit 0;',
+    # Short sleeping children keep changing tree membership without any CPU.
+    'churn': proc_stat + 'stat_line(0); while (1) { my $c = fork; die unless defined $c; '
+             'if (!$c) { my $e = "$ENV{FM_PROC_ROOT_OVERRIDE}/$$"; mkdir $e; open my $f, ">", "$e/stat" or die; '
+             'print $f "$$ (fixture) S " . getppid() . " 0 0 0 0 0 0 0 0 0 0 0 0 0 20 0 1 0 $$\\n"; close $f; '
+             'sleep 0.1; unlink "$e/stat"; rmdir $e; exit 0; } waitpid $c, 0; }',
     'blind': 'sleep 3; exit 0;',
+    # Deliberately hold the exported counter below one accounting tick while
+    # the real process burns CPU. Runnable state must prevent false idle proof.
+    'rounded': proc_stat + 'stat_line(0, "R"); my $until = time + 4; '
+               'while (time < $until) { my $n = 0; $n += $_*$_ for 1..1000; } print "completed\\n";',
 }
 
 def proc_runner(name, runner, program):
@@ -420,6 +478,15 @@ def proc_sampler():
         result, _ = proc_runner('growing', runner, proc_programs['growing'])
         require(result.returncode == 0,
                 f'{runner}: a /proc-only tree with growing CPU was cut: {result.returncode} {result.stderr}')
+        result, elapsed = proc_runner('churn', runner, proc_programs['churn'])
+        require(result.returncode == 124 and elapsed < 25,
+                f'{runner}: a /proc-only tree changing only membership was not cut: {result.returncode} {elapsed:.1f}s {result.stderr}')
+        result, _ = proc_runner('reaped', runner, proc_programs['reaped'])
+        require(result.returncode == 0,
+                f'{runner}: a /proc-only tree with growing waited-child CPU was cut: {result.returncode} {result.stderr}')
+        result, _ = proc_runner('rounded', runner, proc_programs['rounded'])
+        require(result.returncode == 0 and result.stdout == 'completed\n',
+                f'{runner}: runnable work with rounded CPU was stopped: {result.returncode} {result.stderr}')
         result, elapsed = proc_runner('blind', runner, proc_programs['blind'])
         warnings = [line for line in result.stderr.splitlines() if line.startswith('cpu_telemetry_unavailable:')]
         require(result.returncode == 0 and elapsed >= 3, f'{runner}: work with no CPU sampler was stopped: '
@@ -428,6 +495,44 @@ def proc_sampler():
                 and ' on ' + sys.platform + ';' in warnings[0],
                 f'{runner}: missing one loud platform warning: {result.stderr}')
 case('proc_only_sampler_cuts_still_keeps_growing_and_warns_when_blind', proc_sampler)
+
+def host_sampler_run(name, runner, sampler, program):
+    home, env = fixture(f'host-{runner}-{sampler}-{name}')
+    if sampler == 'ps':
+        env['FM_PROC_ROOT_OVERRIDE'] = str(home / 'no-proc')
+    if runner == 'python':
+        command = [sys.executable, home / 'bin/fm-duration.py', 'keep-going', '1', '--', *program]
+    else:
+        tools = home / 'no-python'
+        tools.mkdir()
+        for tool in ('bash', 'perl', 'ps', 'dirname', 'sleep'):
+            (tools / tool).symlink_to(shutil.which(tool))
+        env['PATH'] = str(tools)
+        command = ['bash', '-c', '. "$1"; shift; command -v python3 && exit 99; fm_run_progress 1 "$@"',
+                   '_', home / 'bin/fm-timeout-lib.sh', *program]
+    child = subprocess.Popen(list(map(str, command)), env=env, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True)
+    try:
+        stdout, stderr = child.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        child.terminate()
+        child.communicate(timeout=10)
+        raise AssertionError(f'{runner}/{sampler}: {name} was still running after 30s')
+    return child.returncode, stdout, stderr
+
+def host_samplers():
+    # Each real host sampler: /proc or native Darwin by default, both in 0.01 s
+    # steps, and ps when /proc is hidden (whole seconds from Linux procps).
+    poll = [sys.executable, '-c', 'import time\nwhile True: time.sleep(0.05)']
+    burst = ['bash', '-c', '"$1" -c "$2" && sleep 0.5 && echo completed', '_', sys.executable, busy]
+    for runner in ('python', 'perl'):
+        for sampler in ('host', 'ps'):
+            code, _, stderr = host_sampler_run('poll', runner, sampler, poll)
+            require(code == 124, f'{runner}/{sampler}: a timed-poll idle process was not stopped: {code} {stderr}')
+            code, stdout, stderr = host_sampler_run('burst', runner, sampler, burst)
+            require(code == 0 and stdout == 'completed\n',
+                    f'{runner}/{sampler}: a reaped CPU burst was stopped: {code} {stdout} {stderr}')
+case('host_samplers_stop_timed_poll_idle_and_keep_reaped_cpu_burst', host_samplers)
 
 import select
 
@@ -648,7 +753,7 @@ def perl_progress():
     env['PATH'] = str(tools)
     cpu = '''my $pid = fork; die unless defined $pid;
 if (!$pid) { my $until = time + 4; while (time < $until) { my $n = 0; $n += $_*$_ for 1..1000; } exit 0; }
-waitpid($pid,0); print "subtree completed\\n";'''
+waitpid($pid,0); sleep 0.5; print "subtree completed\\n";'''
     output = '''$|=1; for (1..12) { print "tick\\n"; sleep 0.25; } print "stream completed\\n";'''
     for program, expected in ((cpu, 'subtree completed\n'),
                               (output, 'tick\n' * 12 + 'stream completed\n')):
