@@ -134,7 +134,10 @@
 # by the closeout script's own liveness check; the sweep cannot close that race.
 # Every ownership, process, cleanliness and remote-content proof is re-read
 # after the driver plan and after preservation, immediately before execution;
-# HEAD and the complete lock's SHA-256 must still match what the plan saw.
+# HEAD and the complete lock's SHA-256 must still match what the plan saw, and
+# the copy's preservable ignored content must still match this run's preserve,
+# or the earlier preserve a run reused. A mismatch runs no execute, uses no slot
+# and takes the reproof-failure route.
 # An unlocked copy goes by a plain `git worktree remove` from the parent clone. A locked
 # one first gets the closeout driver's plan, run from that clone without
 # --execute-cleanup and before ignored payload is copied or hashed. The plan must exit
@@ -1469,10 +1472,11 @@ retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
 # built from the release id, which is no task id. Returns 2 when it stopped
 # before the driver's execute ran.
 teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
-  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity preserved
+  local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity preserved want now dir
   shown=$(fm_refuse_text "$copy")
   release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 2
   preserved=$CONTENT_PRESERVED
+  want=$WAIT_PRESERVED
   if ! identity=$(copy_identity "$copy"); then
     echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
     return 2
@@ -1491,6 +1495,21 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   if ! release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7"; then
     retry_after_preserve "$copy" "$identity" "$7" "$3"
     echo "$RETRY_PRESERVE; the next sweep run plans it again." >&2
+    return 2
+  fi
+  if [ "$preserved" != 1 ]; then
+    want=
+    if dir=$(run_preserve_dir "$copy" "$3"); then
+      if [ -e "$dir" ] || [ -L "$dir" ]; then
+        want=$(preserve_fingerprint "$dir") || want=
+      else
+        want=$(printf '' | teardown_ignored_sha256) || want=
+      fi
+    fi
+  fi
+  if [ -z "$want" ] || ! now=$(content_fingerprint "$copy") || [ "$now" != "$want" ]; then
+    retry_after_preserve "$copy" "$identity" "$7" "$3"
+    echo "REFUSED: the preservable ignored content of $shown changed after it was preserved, or could not be compared with its preserve; it was not released. $RETRY_PRESERVE; the next sweep run plans it again." >&2
     return 2
   fi
   if ! copy_still_holds "$copy" "$identity" "$7" \
@@ -1603,11 +1622,10 @@ apply_removals() {
         continue
       fi
       release_id="$CHECK_ID/$stamp-$head"
-      receipt=$(retained_receipt "$copy") || {
+      preserve_dir=$(run_preserve_dir "$copy" "$release_id") || {
         held="$held$copy"$'\t'"its preservation identity could not be hashed"$'\n'
         continue
       }
-      preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved/${receipt##*/}"
       release_rc=0
       identity=$(copy_identity "$copy") || identity=
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?

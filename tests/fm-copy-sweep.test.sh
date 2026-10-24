@@ -122,6 +122,9 @@ case " $* " in
   *" rev-parse --show-toplevel "*)
     [ -z "${FAKE_GIT_SLEEP_HOME:-}" ] || sleep "$FAKE_GIT_SLEEP_HOME"
     ;;
+  *" rev-parse HEAD "*)
+    [ -z "${FAKE_GIT_HEAD_HOOK:-}" ] || bash "$FAKE_GIT_HEAD_HOOK" "$@"
+    ;;
   *" rev-parse --absolute-git-dir "*)
     [ -z "${FAKE_GIT_SLEEP_ABSDIR:-}" ] || sleep "$FAKE_GIT_SLEEP_ABSDIR"
     ;;
@@ -1269,7 +1272,6 @@ test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run() {
   install_driver "$SLOT" "$W"
   printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
   printf 'durable state\n' > "$(copy_path locked)/unique.dat"
-  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
   real_cp=$(command -v cp)
   cat > "$FAKEBIN/cp" <<SH
 #!/usr/bin/env bash
@@ -1278,23 +1280,25 @@ printf 'new owner state\\n' > "$(copy_path locked)/unique.dat"
 SH
   chmod +x "$FAKEBIN/cp"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
-  [ "$RC" = 1 ] || fail "a temporary refusal after an overwrite should exit 1, got $RC: $OUT"
-  assert_contains "$OUT" "plans it again" "a temporary refusal after an overwrite was not reported retryable"
+  [ "$RC" = 1 ] || fail "an overwrite during preservation should exit 1, got $RC: $OUT"
+  assert_contains "$OUT" "changed after it was preserved" "an overwrite during preservation was not named"
+  assert_contains "$OUT" "plans it again" "an overwrite during preservation was not reported retryable"
+  assert_equals 0 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "the driver executed after an original changed during preservation"
   assert_contains "$OUT" "this run's preserve stays" "the report did not say the old content was kept"
   assert_equals 'new owner state' "$(cat "$(copy_path locked)/unique.dat")" "the copy's changed ignored file was touched"
-  assert_equals 'durable state' "$(cat "$(preserved_unique)")" "a temporary refusal discarded the only saved original"
-  [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "a temporary refusal after an overwrite left a retention receipt"
+  assert_equals 'durable state' "$(cat "$(preserved_unique)")" "the refusal discarded the only saved original"
+  [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "an overwrite during preservation left a retention receipt"
   registered locked || fail "a copy whose original changed after preservation was removed"
-  rm -f "$FAKEBIN/cp" "$W/execute-output"
+  rm -f "$FAKEBIN/cp"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "the retry after an overwrite failed ($RC): $OUT"
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the next run did not retry and release the overwritten copy"
   ! registered locked || fail "the overwritten copy is still registered after the retry"
-  assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the retry did not plan and execute again"
+  assert_equals 3 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the retry did not plan and execute again"
   assert_equals 2 "$(preserved_unique | grep -c .)" "the retry did not add exactly one preserve for the changed content"
   assert_equals "durable state"$'\n'"new owner state" "$(preserved_unique | while IFS= read -r kept; do cat "$kept"; done | sort)" \
     "the preserved old content or the new content is missing"
-  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; after a preserved original changed in the copy the same refusal keeps its preserve of the old content and the next run still retries the copy; the same refusal after an unlock stays held with its preserve"
+  pass "an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; an original that changed in the copy during preservation stops the release before execute, keeps the preserve of the old content and the next run still retries the copy; the same refusal after an unlock stays held with its preserve"
 }
 
 test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases() {
@@ -1303,7 +1307,6 @@ test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_an
   install_driver "$SLOT" "$W"
   printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
   printf 'v0\n' > "$(copy_path locked)/unique.dat"
-  printf '{"allowed": false, "reason": "cleanup_skipped_live_or_unknown"}\n' > "$W/execute-output"
   real_cp=$(command -v cp)
   cat > "$FAKEBIN/cp" <<SH
 #!/usr/bin/env bash
@@ -1312,8 +1315,9 @@ printf 'v1\\n' > "$(copy_path locked)/unique.dat"
 SH
   chmod +x "$FAKEBIN/cp"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
-  [ "$RC" = 1 ] || fail "a temporary refusal after a write should exit 1, got $RC: $OUT"
+  [ "$RC" = 1 ] || fail "a write during preservation should exit 1, got $RC: $OUT"
   assert_contains "$OUT" "this run's preserve stays" "the first run did not keep its preserve of the old content"
+  assert_equals 0 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" "the driver executed after a write during preservation"
   rm -f "$FAKEBIN/cp"
   for run in 2 3 4; do
     printf 'v%s\n' "$run" > "$(copy_path locked)/unique.dat"
@@ -1323,17 +1327,16 @@ SH
     assert_contains "$OUT" "content changing" "run $run: the WAITING reason is missing"
     assert_contains "$OUT" "summary: WAITING=1" "run $run: the changing copy is not counted as waiting"
     assert_contains "$OUT" "summary: HELD-LOCKED=0" "run $run: a copy whose content still changes was held"
-    assert_equals 2 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "run $run: the driver was called for a copy whose content still changes"
+    assert_equals 1 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "run $run: the driver was called for a copy whose content still changes"
     assert_equals 1 "$(preserved_unique | grep -c .)" "run $run: a copy whose content still changes was preserved again"
     assert_equals 'v0' "$(cat "$(preserved_unique)")" "run $run: the preserve of the old content changed"
     registered locked || fail "run $run: a copy whose content still changes was removed"
   done
-  rm -f "$W/execute-output"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "the first quiet run failed ($RC): $OUT"
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "the first quiet run did not release the copy"
   ! registered locked || fail "the copy is still registered after the quiet run"
-  assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the quiet run did not plan and execute exactly once"
+  assert_equals 3 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "the quiet run did not plan and execute exactly once"
   assert_equals 2 "$(preserved_unique | grep -c .)" "the quiet run did not preserve exactly once"
   assert_equals "v0"$'\n'"v4" "$(preserved_unique | while IFS= read -r kept; do cat "$kept"; done | sort)" \
     "the preserve of the old content or of the quiet content is missing"
@@ -1342,7 +1345,6 @@ SH
   install_driver "$SLOT" "$W"
   printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
   printf 'v0\n' > "$(copy_path locked)/unique.dat"
-  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
   real_cp=$(command -v cp)
   cat > "$FAKEBIN/cp" <<SH
 #!/usr/bin/env bash
@@ -1351,13 +1353,12 @@ printf 'v1\\n' > "$(copy_path locked)/unique.dat"
 SH
   chmod +x "$FAKEBIN/cp"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
-  [ "$RC" = 1 ] || fail "revert: a temporary refusal after a write should exit 1, got $RC: $OUT"
+  [ "$RC" = 1 ] || fail "revert: a write during preservation should exit 1, got $RC: $OUT"
   rm -f "$FAKEBIN/cp"
   printf 'v0\n' > "$(copy_path locked)/unique.dat"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "revert: the run that saw the content change back failed ($RC): $OUT"
   assert_class locked WAITING
-  rm -f "$W/execute-output"
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "revert: the quiet run failed ($RC): $OUT"
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path locked)" "revert: the quiet run did not release the copy"
@@ -1368,10 +1369,79 @@ SH
     "revert: the release was not disclosed as unmeasured"
   assert_contains "$(printf '%s\n' "$OUT" | tail -n 1)" "reaped=1 freed=0.00" "revert: the final total counted unmeasured bytes as freed"
   assert_contains "$(tail -n 1 "$HOMED/data/copy-sweep.log")" $'\tpreserved_kib=-\t' "revert: the removal log claimed a measured preserve of the release"
-  assert_equals 4 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "revert: the quiet run did not plan and execute exactly once"
+  assert_equals 3 "$(wc -l < "$W/closeout.log" | tr -d ' ')" "revert: the quiet run did not plan and execute exactly once"
   assert_equals 1 "$(preserved_unique | grep -c .)" "revert: content that changed back to its preserved bytes was preserved again"
   assert_equals 'v0' "$(cat "$(preserved_unique)")" "revert: the preserve of the original content changed"
-  pass "a copy whose preserved content changed during a temporary refusal reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve"
+  pass "a copy whose preserved content changed after its preservation reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve"
+}
+
+# The third HEAD read of a locked copy in one --apply run is its second proof's,
+# after preservation or its reuse and just before the driver's execute: the hook
+# appends to the copy's ignored file there, the way a process outside the copy
+# would.
+test_ignored_content_changed_after_the_last_proof_is_not_released() {
+  local reason line kept name
+  reason='vernant-session-active owner=launcher:999999 launcher=999999'
+  make_world grow-after-proof
+  install_driver "$SLOT" "$W"
+  printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  for name in zgrow c1 c2; do
+    add_copy "$name"
+    git -C "$SLOT" worktree lock --reason "$reason" "$(copy_path "$name")"
+  done
+  printf 'v0\n' > "$(copy_path zgrow)/unique.dat"
+  cat > "$W/head-hook" <<SH
+[ "\$2" = "$(copy_path zgrow)" ] || exit 0
+n=\$(( \$(cat "$W/head-count" 2>/dev/null || printf 0) + 1 ))
+printf '%s\\n' "\$n" > "$W/head-count"
+[ "\$n" = 3 ] || exit 0
+printf 'appended\\n' >> "$(copy_path zgrow)/unique.dat"
+: > "$W/head-hook-ran"
+SH
+  FAKE_GIT_HEAD_HOOK="$W/head-hook" FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ -e "$W/head-hook-ran" ] || fail "built: the hook never ran after the second proof"
+  [ "$RC" = 1 ] || fail "built: content changed after preservation should exit 1, got $RC: $OUT"
+  line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path zgrow)") \
+    || fail "built: the changed content was not reported as FAILED: $OUT"
+  assert_contains "$line" "changed after it was preserved" "built: the FAILED line did not name the content change"
+  assert_contains "$line" "this run's preserve stays" "built: the report did not say the preserve of the old content was kept"
+  assert_no_grep "$(copy_path zgrow) --execute-cleanup" "$W/closeout.log" "built: the driver executed after the content changed"
+  registered zgrow || fail "built: the changed copy was removed"
+  assert_equals "v0"$'\n'"appended" "$(cat "$(copy_path zgrow)/unique.dat")" "built: the copy's changed ignored file was touched"
+  assert_equals 'v0' "$(cat "$(preserved_unique)")" "built: the preserve of the old content was lost"
+  [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "built: a retention receipt was written for an execute that never ran"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path c2)" "built: the refusal used the only release slot"
+  assert_class c1 DEFERRED
+  rm -f "$W/head-count" "$W/head-hook-ran"
+  printf 'v0\n' > "$(copy_path zgrow)/unique.dat"
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "the run that saw the content change back failed ($RC): $OUT"
+  assert_class zgrow WAITING
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path c1)" "the deferred clean copy was not released"
+  add_copy c3
+  git -C "$SLOT" worktree lock --reason "$reason" "$(copy_path c3)"
+  FAKE_GIT_HEAD_HOOK="$W/head-hook" FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ -e "$W/head-hook-ran" ] || fail "reused: the hook never ran after the second proof"
+  [ "$RC" = 1 ] || fail "reused: content changed after the last proof should exit 1, got $RC: $OUT"
+  line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path zgrow)") \
+    || fail "reused: the changed content was not reported as FAILED: $OUT"
+  assert_contains "$line" "changed after it was preserved" "reused: the FAILED line did not name the content change"
+  assert_no_grep "$(copy_path zgrow) --execute-cleanup" "$W/closeout.log" "reused: the driver executed after the content changed"
+  registered zgrow || fail "reused: the changed copy was removed"
+  assert_equals 1 "$(preserved_unique | grep -c .)" "reused: a run that reused its earlier preserve preserved again"
+  assert_equals 'v0' "$(cat "$(preserved_unique)")" "reused: the earlier preserve changed"
+  [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "reused: a retention receipt was written for an execute that never ran"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path c3)" "reused: the refusal used the only release slot"
+  for _ in 1 2; do
+    FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  done
+  [ "$RC" = 0 ] || fail "the quiet run failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path zgrow)" "the quiet run did not release the copy"
+  ! registered zgrow || fail "the released copy is still registered"
+  assert_equals 2 "$(preserved_unique | grep -c .)" "the quiet run did not preserve the new content exactly once"
+  assert_equals "v0"$'\n'"v0,appended" "$(preserved_unique | while IFS= read -r kept; do paste -sd, - < "$kept"; done | sort)" \
+    "the preserve of the old content or of the appended content is missing"
+  pass "ignored content that changes after the last proof, after a preserve was built or an earlier preserve was reused, stops the release before the driver's execute, uses no release slot and keeps every preserved byte, and a later quiet run preserves the new content once and releases the copy"
 }
 
 test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries() {
@@ -2857,6 +2927,7 @@ run_case test_a_plan_that_reports_the_retain_rule_holds_the_copy_and_copies_noth
 run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_drivers_refusal
 run_case test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
 run_case test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
+run_case test_ignored_content_changed_after_the_last_proof_is_not_released
 run_case test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries
 run_case test_a_long_sorted_key_refusal_still_shows_the_drivers_reason
 run_case test_a_failed_preservation_is_the_sweeps_own_human_only_refusal
