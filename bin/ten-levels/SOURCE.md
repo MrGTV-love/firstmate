@@ -69,12 +69,12 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
-- `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
+- `bin/fm-jev-guard-claude.ts` forwards actual write/edit input and call identity and maps pre-tool refusal to Claude denial; it handles no result or prompt event, because the Claude post-tool advisory is retired.
   Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
   Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.
 - `bin/fm-spawn.sh` remains the launch owner for physical project scope, per-task launch-only guard activation retained on relaunch, context, Claude hook registration, omp extension loading and process-local replace-edit mode.
-  Native omp prompt events and Claude's separate prompt/tool hooks bind exact source reads without copying raw prompts into the latter's task/session-local hash context.
+  Native omp prompt events bind exact source reads; Claude registers no prompt or result hook for this guard.
 - The existing `bin/fm-operational-input.sh` publisher owns write-time consistency metadata; `bin/fm-task-inbox-lib.sh` reuses it and names the exact record in its bounded doorbell.
   The [inbox owner's header](../fm-task-inbox-lib.sh) owns delivery and retry semantics.
 
