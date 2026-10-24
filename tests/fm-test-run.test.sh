@@ -3209,7 +3209,7 @@ test_herdr_ci_family_run_has_a_step_timeout
 test_aggregate_json
 
 # The three control-relaunch groups partition one former suite. The union of
-# their registered case lists must be the same 155 cases, each registered by the
+# their registered case lists must be the same 157 cases, each registered by the
 # one file that also defines it, with no case twice. A dropped or duplicated case
 # is exactly what a partition loses while every remaining assertion still passes.
 test_control_relaunch_groups_partition_one_inventory() {
@@ -3243,9 +3243,9 @@ test_control_relaunch_groups_partition_one_inventory() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "a control-relaunch case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 155 ] \
-    || fail "the control-relaunch groups register $total cases, not the 155-case inventory they partition"
-  pass "the control-relaunch groups are a duplicate-free 155-case cover, each case registered by the file that defines it"
+  [ "$total" = 157 ] \
+    || fail "the control-relaunch groups register $total cases, not the 157-case inventory they partition"
+  pass "the control-relaunch groups are a duplicate-free 157-case cover, each case registered by the file that defines it"
 }
 
 # The fm-watch-triage-waits selector called 67 shared-helper cases as one list.
