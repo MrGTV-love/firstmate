@@ -15,6 +15,8 @@ Each finding takes one of these outcomes:
 - A failed DoD mandatory item: block.
 - A real defect that breaks the stated intent, even when no DoD item names it: block.
 - An improvement outside the DoD: a follow-up note, never a block.
+- A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD where the follow-up-note outcome would otherwise apply, unless the PR cites a recorded reassessment of that guard's harm model, such as `data/<id>/report.md`, and the change follows it.
+- Removing a guard rule that such a recorded reassessment recommends: not a block.
 - A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
 
 ## PR body claims

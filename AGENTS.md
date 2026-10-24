@@ -185,8 +185,7 @@ Delivery mode and `yolo` are orthogonal.
 `yolo` governs merge authority only: with it off, the captain approves every PR merge except one the standing merge rule below covers, and every local-only landing; with it on, firstmate merges green, in-scope work itself.
 **Standing merge rule (captain-set 2026-10-24, revisable).** Merge a PR through `bin/fm-pr-merge.sh`, without asking, when an independent PASS from a different model family names the exact head and the required checks are green.
 The reviewer still reports whether the PR loosens a deny or allow-list, widens what a guard permits, or touches customer data, billing or spend as facts in its report; none of these facts is a reason to ask the captain.
-A PR widening what a guard permits through an exception, allow-list entry or trust carve-out is not merged as a patch; reassess the guard's harm model and redesign it to judge that harm directly.
-The independent reviewer records FAIL for such a PR, with its widens-guard answer still recorded, unless the PR cites a recorded reassessment of that guard's harm model; `bin/fm-pr-merge.sh` refuses that FAIL at the live head.
+A PR widening what a guard permits is not merged as a patch: the guard-widening outcome in [`docs/review-rubric.md`](docs/review-rubric.md) owns when the independent reviewer must FAIL it; reassess the guard's harm model and redesign the guard to judge that harm directly.
 This rule covers PR merges only; every local-only landing still needs the captain.
 To change the rule back, delete this block and edit the three pointers to it: hard rule 2, the `yolo` sentence above, and the standing-authority line in `.agents/skills/ship-landing/SKILL.md`.
 Never merge a red PR, or one with a required check that has not reported, under either setting unless a current explicit captain instruction names the GitHub check to waive; `bin/fm-pr-merge.sh`'s header owns the attended-only waiver mechanics and remaining guards.

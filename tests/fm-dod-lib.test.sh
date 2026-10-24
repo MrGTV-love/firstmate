@@ -103,6 +103,7 @@ EOF
   assert_contains "$plan" 'A failed DoD mandatory item: block.' 'plan lost the failed-item outcome'
   assert_contains "$plan" 'A real defect that breaks the stated intent, even when no DoD item names it: block.' 'plan lost the intent-defect outcome'
   assert_contains "$plan" 'An improvement outside the DoD: a follow-up note, never a block.' 'plan lost the follow-up outcome'
+  assert_contains "$plan" 'A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL' 'plan lost the guard-widening FAIL outcome'
   assert_contains "$plan" 'A fix that would add scope beyond the intent: escalate to Main for the owner' 'plan lost the scope-escalation outcome'
   assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
 
@@ -1084,6 +1085,12 @@ test_worker_role_renders_shared_rubric() {
   done <"$ROOT/docs/review-rubric.md"
   assert_grep "apply the shared review rubric below, rendered from \`$ROOT/docs/review-rubric.md\`" "$role_file" \
     "worker role did not introduce the rendered rubric"
+  assert_grep '- A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD' "$role_file" \
+    "worker role did not carry the guard-widening FAIL outcome"
+  assert_grep 'unless the PR cites a recorded reassessment of that guard'"'"'s harm model' "$role_file" \
+    "worker role did not carry the guard-widening reassessment exception"
+  assert_grep '- Removing a guard rule that such a recorded reassessment recommends: not a block.' "$role_file" \
+    "worker role did not carry the reassessed guard-removal outcome"
   mkdir -p "$missing"
   if fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$missing" >/dev/null 2>&1; then
     fail "worker role rendered without the shared rubric"
