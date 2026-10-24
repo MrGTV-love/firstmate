@@ -35,7 +35,8 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
 ## Changed copies: Level 6 policies and service
 
 - `src/levels/level06/index.ts` exports only the shell and write policies.
-  The unchanged vendored `src/levels/level06/result-screen.ts` is unused: no import or call loads it.
+  `src/levels/level06/result-screen.ts` is unchanged by this ship and unused: no import or call loads it.
+  Its Firstmate changes from upstream remain: a frozen, calibrated injection Noul, the canonical contract error on invalid answers, no invented probability for empty output, and complete-text instead of prefix-only screening.
   Its deletion is deferred until ship T2 (`fm-jev-guard-t2-remove-bash-model-gate`) removes the bash model gate.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
 - `tests/level06.test.ts` exercises independent shell/write threshold boundaries and outside-root refusal.

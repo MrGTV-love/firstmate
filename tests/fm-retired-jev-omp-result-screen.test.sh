@@ -1,23 +1,32 @@
 #!/usr/bin/env bash
-# Offline T1 result-delivery acceptance cases through the worker event interface.
+# Retirement test for jev-omp-result-screen and the result-only decision points
+# retired with it: jev-trusted-read, jev-channel-consistency,
+# jev-producer-field-exclusion and jev-result-size-refusal.
+# The omp result screen withheld tool output the injection Noul flagged; the
+# other four existed only to keep it from withholding legitimate output.
+# Pass cases (T1 a-d): results the screen used to withhold or exempt reach the
+# worker unchanged through the installed extension's event interface, with no
+# result audit row, no omp_replace decision and no result-side model call.
+# Pre-tool case: the surviving pre-tool path still judges and audits a write.
+# Every judgment comes from an offline fixture; nothing reaches a provider.
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-TMP_ROOT=$(fm_test_tmproot fm-jev-guard-producer)
+TMP_ROOT=$(fm_test_tmproot fm-retired-jev-omp-result-screen)
 trap fm_test_cleanup EXIT
-export PRODUCER_ROOT="$ROOT" PRODUCER_TMP="$TMP_ROOT"
+export RETIRED_ROOT="$ROOT" RETIRED_TMP="$TMP_ROOT"
 node --experimental-strip-types --experimental-test-module-mocks --no-warnings --input-type=module <<'JS' || fail 'unchanged worker result delivery'
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-const root = process.env.PRODUCER_ROOT;
-const home = process.env.PRODUCER_TMP;
+const root = process.env.RETIRED_ROOT;
+const home = process.env.RETIRED_TMP;
 for (const dir of ['config', 'state', 'repo', 'data']) mkdirSync(`${home}/${dir}`);
 const reportUrl = pathToFileURL(`${root}/bin/ten-levels/extensions/report.ts`).href;
 const report = await import(reportUrl);
-const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'producer', project: 'firstmate',
+const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'retired-result', project: 'firstmate',
   worktree: `${home}/repo`, data: `${home}/data`, policy: report.GUARD_POLICY_VERSION };
 const service = report.createGuardService(context);
 const requests = [];
@@ -32,6 +41,7 @@ mock.module(reportUrl, { namedExports: { ...report, createGuardService: () => ({
 const { installJevGuard } = await import(pathToFileURL(`${root}/bin/fm-jev-guard.ts`));
 const handlers = new Map();
 installJevGuard({ on(name, handler) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); } }, context);
+assert.deepEqual([...handlers.keys()], ['tool_call'], 'the installed extension handles only pre-tool calls');
 const ctx = { cwd: context.worktree };
 const ledger = `${context.state}/jev-guard.jsonl`;
 const rows = () => readFileSync(ledger, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
@@ -104,8 +114,9 @@ await test('T1(d): a worker session records only pre-tool work and sends no resu
     { ...bash(''), content: [{ type: 'text', text: 'one' }, { type: 'text', text: 'two' }], isError: true },
   ]) await deliver(event);
   assert.deepEqual(rows().map(row => row.hook), ['tool_call']);
+  assert.ok(rows().every(row => row.enforcement !== 'omp_replace'), 'no audit row records a replaced result');
   assert.deepEqual(requests, [{ path: 'notes.txt', content: 'ordinary worker file' }]);
   assert.equal(readFileSync(`${context.worktree}/notes.txt`, 'utf8'), 'ordinary worker file');
 });
 JS
-pass 'T1(a-d): unchanged background notice, bounded wait, launch/steering and session audit; no result provider calls'
+pass 'T1(a-d): unchanged background notice, bounded wait, launch/steering and session audit; no omp_replace row and no result provider calls'

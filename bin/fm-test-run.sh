@@ -211,7 +211,7 @@
 # Deleted test assets still select remaining suites that reference them; an
 # unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
 # select the jev-guard behavior suite, and outside the core client and Level 5
-# routers also the offline audit and producer suites. The core client and Level 5 routers
+# routers also the offline audit suite. The core client and Level 5 routers
 # select the typed dispatch resolver suite, their only dispatch consumer.
 set -eu
 
@@ -1748,11 +1748,10 @@ families_for_changed_path() {
       ;;
     bin/ten-levels/*)
       # Vendored upstream jev-guard (see SOURCE.md there) and its Firstmate
-      # report.ts are exercised through the jev-guard behavior suite; the
-      # offline audit and producer suites assert its minimized audit rows.
+      # report.ts are exercised through the jev-guard behavior suite; report.ts
+      # also owns the audit row, which only the offline audit suite asserts.
       printf '%s\n' "__script__:fm-jev-guard.test.sh"
       printf '%s\n' "__script__:fm-jev-guard-audit.test.sh"
-      printf '%s\n' "__script__:fm-jev-guard-producer.test.sh"
       ;;
     tests/fm-pi-watch-loader-live.test.mjs)
       printf '%s\n' __script__:fm-pi-watch-loader-live.test.sh

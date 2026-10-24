@@ -8,5 +8,60 @@
     "why": "it cannot withhold on Claude, so it reported itself as protection it did not provide; the note it appended was advisory only",
     "replaced_by": "nothing; the same invariant is carried by the human review of tool output and by jev-pretool-deny for actions, not reads",
     "retirement_test": "tests/fm-retired-jev-posttool-advisory.test.sh"
+  },
+  {
+    "id": "jev-omp-result-screen",
+    "system": "firstmate",
+    "assessment_point": "D4",
+    "invariant": "untrusted tool output never becomes an omp worker's authority",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.5 and 7.4: 0 true positives in a random sample of 70 of its withholds, no third-party source among 3,431 traced withholds, 29% of omp bash outputs hidden, and Claude workers never had it",
+    "replaced_by": "nothing; tool results reach the worker unchanged, and third-party input, if one is ever added, is labelled by source at the tool boundary",
+    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+  },
+  {
+    "id": "jev-trusted-read",
+    "system": "firstmate",
+    "assessment_point": "D5",
+    "invariant": "a read of bytes the task owns skips the result screen",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2 and 7.4: an exemption that existed only to keep the result screen off task-owned reads; it never refused anything",
+    "replaced_by": "nothing; with no result screen there is nothing to exempt",
+    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+  },
+  {
+    "id": "jev-channel-consistency",
+    "system": "firstmate",
+    "assessment_point": "D6",
+    "invariant": "a launch or steering record whose receipt matches skips the result screen",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 7.4 and 8: it only exempted a consistent record from screening and never refused a forged one, so its publisher receipts had no other consumer",
+    "replaced_by": "nothing; launch and steering records reach the worker unchanged and their publishers write no receipt",
+    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+  },
+  {
+    "id": "jev-producer-field-exclusion",
+    "system": "firstmate",
+    "assessment_point": "D7",
+    "invariant": "a local AXI tool's own help lines are excluded from the result screen",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2 and 7.4: a command list, omp trailer match and wall-time allowance that existed only to keep the result screen from withholding local tool help",
+    "replaced_by": "nothing; local tool output, help lines included, reaches the worker unchanged",
+    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+  },
+  {
+    "id": "jev-result-size-refusal",
+    "system": "firstmate",
+    "assessment_point": "D9",
+    "invariant": "an omp tool result too large to screen completely is withheld",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.6 and 7.4: the result half of the size refusal withheld large outputs only because the result screen could not cover them; the pre-tool size refusal is unchanged",
+    "replaced_by": "nothing; large results reach the worker unchanged",
+    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
   }
 ]
