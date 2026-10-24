@@ -3443,10 +3443,15 @@ SH
   assert_contains "$out" "state: working" "a wedged daemon falls back to the pane"
   assert_contains "$out" "source: pane" "a wedged daemon leaves the pane as the source"
   assert_contains "$out" "run-store: skipped (no output or CPU progress)" "the cut lookup is disclosed, not hidden"
+  # 2026-10-24, Mac-Studio.local: eight loaded-host runs took 2,2,3,2,2,2,2,1s
+  # (worst 3s). CI run 40058102924 passed this same <10s check: integer elapsed
+  # <=9s is all its buffered log proves, not an exact per-case duration.
+  # Keep 10s above both observed bounds, without raising the ceiling: detect a
+  # broken sampler/latch waiting for the 120s stub instead of prompt pane fallback.
   [ "$elapsed" -lt 10 ] || fail "the no-progress bound did not cut the wedged read (elapsed ${elapsed}s)"
   calls=$(awk 'END { print NR + 0 }' "$calls_file" 2>/dev/null || echo 0)
   [ "$calls" -eq 1 ] || fail "a wedged daemon was read again after the cut ($calls calls)"
-  pass "a wedged daemon costs one read and leaves the pane to answer"
+  pass "a wedged daemon costs one read and leaves the pane to answer (elapsed ${elapsed}s)"
 }
 
 # A healthy daemon pays no extra probe: a bound live run makes no daemon status call.

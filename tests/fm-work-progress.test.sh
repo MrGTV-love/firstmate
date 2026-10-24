@@ -551,18 +551,28 @@ def resumed_holder():
     # child samples: the child stands down and the arm attaches, not FAILED.
     # The holder marks that its CPU advanced, and the child's real watcher waits
     # for that mark, so the child always samples after the holder resumed.
-    program = ('import glob, os, sys, time\nstate = os.path.join(sys.argv[1], "state")\n'
-               'while not glob.glob(os.path.join(state, ".watch-arm-output.*")): time.sleep(0.2)\n'
+    program = ('import os, sys, time\nhome = sys.argv[1]\n'
+               'fifo = os.path.join(home, "holder-resume.fifo")\nos.mkfifo(fifo)\n'
+               'fd = os.open(fifo, os.O_RDWR)\n'
+               'open(os.path.join(home, "holder-idle"), "w").close()\n'
+               'os.read(fd, 1)\nos.close(fd)\n'
                'start = time.process_time()\n'
                'while time.process_time() - start < 0.1: sum(i*i for i in range(1000))\n'
                'open(os.path.join(sys.argv[1], "holder-resumed"), "w").close()\n'
                'while True: sum(i*i for i in range(1000))')
     home, env, holder, beat = holder_fixture('resumed-holder', True, program)
     shutil.copy2(home / 'bin/fm-watch.sh', home / 'bin/fm-watch-real.sh')
-    script(home / 'bin/fm-watch.sh', 'for _ in $(seq 250); do [ -e "$FM_HOME/holder-resumed" ] && break; sleep 0.02; done\n'
+    # A FIFO read consumes no CPU while idle; the arm's child releases it only
+    # after the arm has sampled the stall and created its output file.
+    script(home / 'bin/fm-watch.sh', 'printf x > "$FM_HOME/holder-resume.fifo"\n'
+           'for _ in $(seq 250); do [ -e "$FM_HOME/holder-resumed" ] && break; sleep 0.02; done\n'
            'exec bash "$FM_HOME/bin/fm-watch-real.sh" "$@"\n')
     arm_process = None
     try:
+        until = time.monotonic() + 20
+        while not (home / 'holder-idle').exists() and time.monotonic() < until:
+            time.sleep(0.02)
+        require((home / 'holder-idle').exists(), 'the holder never reached its blocking FIFO read')
         progress_check(home, env, holder.pid)
         time.sleep(1.5)
         require(progress_check(home, env, holder.pid) == 124, 'the idle holder was not proven stalled first')
