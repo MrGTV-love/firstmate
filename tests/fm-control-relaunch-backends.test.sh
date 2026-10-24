@@ -1719,23 +1719,52 @@ test_omp_adoption_proof_boundaries() {
 }
 
 test_omp_adoption_live_recorded_pid() {
-  local shape dir id record
-  for shape in other-live-process resolved-live-process; do
+  local shape dir id record agent_pid tries
+  for shape in other-live-agent resolved-live-process; do
     prepare_omp_adoption "live-recorded-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
-    # A record naming a live process belongs to the omp extension running in
-    # it. The shell test process stands in for another live recorded PID, and
+    # A record naming a live agent belongs to the omp extension running in it.
+    # A real process named omp stands in for another live recorded agent, and
     # the resolved PID with an agreeing current session is a healthy record.
     case "$shape" in
-      other-live-process) jq --argjson pid "$$" '.pid=$pid' "$record" > "$record.new" ;;
+      other-live-agent)
+        (exec -a omp /bin/sleep 60) &
+        agent_pid=$!
+        tries=0
+        until [ "$(ps -p "$agent_pid" -o args= 2>/dev/null | cut -d' ' -f1)" = omp ]; do
+          tries=$((tries + 1))
+          [ "$tries" -le 100 ] || fail "the stand-in omp process did not start"
+          sleep 0.05
+        done
+        jq --argjson pid "$agent_pid" '.pid=$pid' "$record" > "$record.new" ;;
       resolved-live-process)
         jq --argjson pid "$(cat "$dir/fake/recovery-pid")" '.pid=$pid | .current_session_file=.task_session_file' \
           "$record" > "$record.new" ;;
     esac
     mv "$record.new" "$record"
-    assert_adoption_refused "$dir" "$id" 'record proof needs the recorded PID to be gone'
+    assert_adoption_refused "$dir" "$id" 'record proof needs the recorded PID to be gone or no longer an agent process'
+    if [ "$shape" = other-live-agent ]; then
+      kill "$agent_pid" 2>/dev/null || true
+      wait "$agent_pid" 2>/dev/null || true
+    fi
   done
-  pass "omp adoption: a record naming a live process is the extension's to maintain and is refused unchanged"
+  pass "omp adoption: a record naming a live agent process is the extension's to maintain and is refused unchanged"
+}
+
+test_omp_adoption_reused_recorded_pid() {
+  prepare_omp_adoption reused-recorded-pid
+  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record out
+  record="$dir/home/state/$id.omp-session.json"
+  # After a reboot the recorded PID can belong to an unrelated live process;
+  # the test shell itself is such a process and names no omp extension.
+  jq --argjson pid "$$" '.pid=$pid' "$record" > "$record.new" && mv "$record.new" "$record"
+  out=$(run_continuation_control "$dir" "$id" adopt) || fail "a recorded PID reused by a process that is not an agent blocked repair: $out"
+  assert_contains "$out" "adopted: $id" "repair over a reused PID reports its exact task"
+  jq -e --arg task "$dir/wt/recorded-session.jsonl" \
+    '. == {version:1,spawn_gen:"old",pid:2000000000,task_session_file:$task,current_session_file:$task}' \
+    "$record" >/dev/null || fail "repair over a reused PID did not publish the live process and preserved task file"
+  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "repair over a reused PID sends no lifecycle input"
+  pass "omp adoption: a recorded PID reused by a process that is not an agent does not block repair"
 }
 
 # The real omp extension, not a model of it, runs as the live process the fake
@@ -1791,34 +1820,32 @@ stop_adoption_extension() {
   wait "$EXT_PROC_PID" 2>/dev/null || true
 }
 
-# Wrap mv and ln: the first call naming the session record announces itself on
-# the events FIFO, then waits for the test to release it.
-arm_adoption_barrier() { # <case-dir> <id> <mv|ln>
-  local dir=$1 id=$2 op=$3 tool
+# Wrap mv: the first call naming the session record, which is publication,
+# announces itself on the events FIFO, then waits for the test to release it.
+arm_adoption_barrier() { # <case-dir> <id>
+  local dir=$1 id=$2
   mkfifo "$dir/fake/barrier-events" "$dir/fake/barrier-resume"
-  for tool in mv ln; do
-    cat > "$dir/fakebin/$tool" <<SH
+  cat > "$dir/fakebin/mv" <<SH
 #!/usr/bin/env bash
 D=\$FM_FAKE_DIR
-if [ "\$(cat "\$D/barrier-op" 2>/dev/null)" = $tool ]; then
+if [ -f "\$D/barrier-armed" ]; then
   for arg in "\$@"; do
     if [ "\${arg##*/}" = "$id.omp-session.json" ]; then
-      rm -f "\$D/barrier-op"
-      printf 'reached %s\n' $tool > "\$D/barrier-events"
+      rm -f "\$D/barrier-armed"
+      printf 'reached mv\n' > "\$D/barrier-events"
       read -r _ < "\$D/barrier-resume"
       break
     fi
   done
 fi
-exec /bin/$tool "\$@"
+exec /bin/mv "\$@"
 SH
-    chmod +x "$dir/fakebin/$tool"
-  done
-  printf '%s' "$op" > "$dir/fake/barrier-op"
+  chmod +x "$dir/fakebin/mv"
+  : > "$dir/fake/barrier-armed"
 }
 
 test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
-  local shape=$1 dir id record line rc=0 out reached=0 before adopt_job absent=0
+  local shape=$1 dir id record line rc=0 out reached=0 before adopt_job
   prepare_omp_adoption "personal-anchor-$shape"
   dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
   write_recovery_native_session "$dir/wt/personal-session.jsonl" "$dir/wt" "personal conversation"
@@ -1830,7 +1857,7 @@ test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
   printf old > "$dir/fake/recovery-spawn-gen"
   [ "$shape" != unreadable ] || : > "$dir/fake/recovery-env-unreadable"
   before=$(cat "$record")
-  arm_adoption_barrier "$dir" "$id" ln
+  arm_adoption_barrier "$dir" "$id"
   exec 6<> "$dir/fake/barrier-events"
   (
     rc=0
@@ -1839,11 +1866,10 @@ test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
   ) &
   adopt_job=$!
   read -r line <&6
-  if [ "$line" = 'reached ln' ]; then
+  if [ "$line" = 'reached mv' ]; then
     reached=1
-    # Before the fix this is the exact after-capture/before-link window.
+    # This is the window after the last comparison and before publication.
     # Activate a different persisted conversation through the REAL extension.
-    [ -e "$record" ] || absent=1
     extension_event personal
     printf 'go\n' > "$dir/fake/barrier-resume"
     read -r line <&6
@@ -1853,7 +1879,7 @@ test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
   out=$(cat "$dir/adopt.out")
   exec 6>&-
   if [ "$reached" = 0 ]; then
-    # The fixed path refuses before capture; the extension still sees T and
+    # The pin refusal comes before staging; the extension still sees T and
     # preserves it as task_session_file when it subsequently activates S.
     assert_equals "$before" "$(cat "$record")" "pin refusal must preserve the record before extension activation"
     extension_event personal
@@ -1867,20 +1893,20 @@ test_omp_adoption_personal_session_anchor_case() { # matching|unreadable
     && anchor_ok=1
   if [ "$anchor_ok" != 1 ]; then
     stop_adoption_extension
-    fail "adoption ($shape) rebound the task anchor to a personal session (capture reached=$reached, canonical absent=$absent): $(cat "$record")"
+    fail "adoption ($shape) rebound the task anchor to a personal session (publication reached=$reached): $(cat "$record")"
   fi
   [ "$rc" -ne 0 ] || fail "adoption ($shape) accepted a pinned or unreadable process: $out"
-  [ "$reached" = 0 ] || fail "adoption ($shape) reached capture/link for a process not proven unpinned: $out"
+  [ "$reached" = 0 ] || fail "adoption ($shape) reached publication for a process not proven unpinned: $out"
   assert_contains "$out" 'launch-pin proof needs a positively readable environment without a usable launch pin' "pin refusal must name the required proof"
   assert_not_contains "$out" 'adopted:' "a refused adoption must not report success"
   assert_equals 0 "$(find "$dir/home/state" -name '.*omp-session*' | wc -l | tr -d ' ')" \
-    "a pin refusal must leave no staged or captured record"
+    "a pin refusal must leave no staged record"
   rc=0
   out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
   stop_adoption_extension
   [ "$rc" -ne 0 ] || fail "adoption ($shape) authorized the personal conversation after probe recovery: $out"
   assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "the personal session must receive no lifecycle input"
-  pass "omp adoption: $shape pin proof refuses before capture and preserves the task anchor across real personal activation"
+  pass "omp adoption: $shape pin proof refuses before staging and preserves the task anchor across real personal activation"
 }
 
 test_omp_adoption_personal_session_anchor() {
@@ -1910,6 +1936,7 @@ test_omp_adoption() {
   test_omp_adoption_caller_gate
   test_omp_adoption_proof_boundaries
   test_omp_adoption_live_recorded_pid
+  test_omp_adoption_reused_recorded_pid
   test_omp_adoption_publication_race
 }
 
