@@ -29,6 +29,27 @@ fm_git_identity fmtest fmtest@example.invalid
 unset FM_HOME FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FRICTION_EPISODE_ID
 export FM_FRICTION_EXECUTION_KIND=test
 
+# The suites drive real git repositories, so a checkout git cannot open turns every
+# case into an assertion failure that names the product instead of the checkout.
+# A linked worktree carries .git as a file pointing at the parent repository; mount
+# that worktree into a container without its common git dir and the pointer dangles,
+# every git call fails, and the report blames teardown. Fail once, naming the cause.
+# Only the dangling-pointer case is checked here; it is a property of the mount, not of
+# git's willingness to run, so an ownership refusal or a missing identity never trips it.
+if [ -f "$ROOT/.git" ]; then
+  fm_gitdir_pointer=$(sed -n 's/^gitdir: //p' "$ROOT/.git" | head -n 1)
+  case "$fm_gitdir_pointer" in
+    /*)
+      if [ ! -d "$fm_gitdir_pointer" ]; then
+        printf 'fm-teardown suites: %s is a linked worktree whose .git points at %s, which does not exist here.\n' \
+          "$ROOT" "$fm_gitdir_pointer" >&2
+        printf 'Mount the parent repository at the same absolute path so the pointer resolves, or run the suite from a clone.\n' >&2
+        exit 1
+      fi
+      ;;
+  esac
+fi
+
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 PR_CHECK="$ROOT/bin/fm-pr-check.sh"
 TMP_ROOT=$(fm_test_tmproot fm-teardown-tests)
