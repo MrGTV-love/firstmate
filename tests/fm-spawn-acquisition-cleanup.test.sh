@@ -589,7 +589,7 @@ pid, seen = os.getpid(), set()
 while pid > 1 and pid not in seen:
     seen.add(pid)
     pid = parents.get(pid, 0)
-if holder not in seen:
+if holder not in seen or pathlib.Path(os.environ.get('FM_TEST_SLOT_REFUSE', '/nonexistent')).exists():
     print(json.dumps({'state': 'BLOCKED', 'reason': 'manifest_live_owner'}))
     sys.exit(2)
 record = dict(repo_root=a.repo_root, worktree_path=a.worktree_path, owner_id=a.owner_id,
@@ -619,4 +619,85 @@ PY
   [ "$(git -C "$SLOT_COPY" branch --show-current)" = "fm/$SLOT_ID" ] || fail 'real-pane provisioning admitted the wrong branch'
   assert_absent "$SLOT_COPY/.claude/worktrees" 'real-pane provisioning created nested isolation'
   pass 'tmux provisioning runs in the acquired shell ancestry before admitting its worker'
+
+  # A contract fixture supplies a transient refusal. The public control path,
+  # real terminal/process liveness, prior refs and checkout are not mocked.
+  standin=$(fm_agent_standin "$SLOT_CASE/native") || {
+    echo 'skip: no native stand-in for public retained-slot relaunch'
+    exit 0
+  }
+  ln -s "$standin" "$SLOT_CASE/native/codex"
+  cat > "$FAKEBIN/codex" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in --version) echo 'codex-cli 0.153.4'; exit 0 ;; --help) exit 0 ;; esac
+printf '%s\\n' "\${FM_TASK_ID:-unset}" >> '$SLOT_CASE/admitted'
+exec '$SLOT_CASE/native/codex' "\$@"
+SH
+  chmod +x "$FAKEBIN/codex"
+  "$REAL_TMUX" kill-window -t "firstmate:fm-$SLOT_ID"
+  slot_base=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  git -C "$SLOT_COPY" checkout -qb retained-ahead
+  printf 'prior work must survive recovery\n' >> "$SLOT_COPY/README.md"
+  git -C "$SLOT_COPY" add README.md
+  git -C "$SLOT_COPY" commit -qm 'fixture retained ahead work'
+  prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
+  cp "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before"
+  touch "$SLOT_CASE/refuse"
+  "$REAL_TMUX" set-environment -g FM_TEST_SLOT_REFUSE "$SLOT_CASE/refuse"
+  RETRY_ID="get-slot-recovery-$$"
+  fm_test_spawn_brief "$FM_HOME" "$RETRY_ID" 'Recover the same retained copy and exact declared scope.'
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-spawn.sh" "$RETRY_ID" "$SLOT_PROJECT" --backend tmux --harness codex --allow-api-key \
+      --mode local-only --yolo off --owned-path scripts --owned-path README.md 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'transient provisioning refusal admitted the task'
+  assert_contains "$out" manifest_live_owner 'transient refusal lost its cause'
+  assert_absent "$SLOT_CASE/admitted" 'refused task entered the harness'
+  cmp -s "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before" || fail 'refusal overwrote the prior declaration'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'refusal did not restore the prior ahead checkout'
+  # Removing the fixture's refusal is not provisioner proof; the separate real
+  # provisioner smoke must establish holder-exit adoption against its own guard.
+  rm "$SLOT_CASE/refuse"
+  git -C "$SLOT_COPY" checkout -q "fm/$RETRY_ID"
+  printf 'independent prepared-branch work\n' > "$SLOT_COPY/prepared-change"
+  git -C "$SLOT_COPY" add prepared-change
+  git -C "$SLOT_COPY" commit -qm 'fixture changed prepared branch'
+  changed_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  git -C "$SLOT_COPY" checkout -q retained-ahead
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'The refusal cleared but independent prepared-branch work must not be reset.' 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'relaunch admitted a changed prepared branch'
+  assert_contains "$out" 'changed or is missing since provisioning refusal' 'changed prepared branch lost its refusal cause'
+  [ "$(git -C "$SLOT_COPY" rev-parse "fm/$RETRY_ID")" = "$changed_head" ] || fail 'relaunch reset independent prepared-branch work'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'relaunch moved the prior ahead checkout on refusal'
+  assert_absent "$SLOT_CASE/admitted" 'changed prepared branch entered the harness'
+  # Explicitly preserve the injected fixture work on its own named branch and
+  # recreate the original prepared ref; no force, reset or manifest edit.
+  git -C "$SLOT_COPY" branch -m "fm/$RETRY_ID" retained-prepared-change
+  git -C "$SLOT_COPY" branch "fm/$RETRY_ID" "$slot_base"
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'The transient refusal cleared; resume the exact assigned copy.' 2>&1)
+  rc=$?
+  expect_code 0 "$rc" "public retained-copy relaunch failed: $out"
+  [ "$(cat "$SLOT_CASE/admitted")" = "$RETRY_ID" ] || fail 'relaunch did not admit the same task'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$slot_base" ] || fail 'relaunch selected the old ahead work instead of the prepared baseline'
+  [ "$(git -C "$SLOT_COPY" branch --show-current)" = "fm/$RETRY_ID" ] || fail 'relaunch selected the wrong task branch'
+  [ "$(git -C "$SLOT_COPY" rev-parse retained-ahead)" = "$prior_head" ] || fail 'relaunch moved the prior branch'
+  git -C "$SLOT_COPY" show retained-ahead:README.md > "$SLOT_CASE/retained-readme"
+  cmp -s "$SLOT_CASE/prior-readme" "$SLOT_CASE/retained-readme" || fail 'relaunch lost prior committed contents'
+  python3 - "$SLOT_CASE/manifest.json" "$SLOT_COPY" "$RETRY_ID" "$slot_base" <<'PY'
+import json, sys
+record = json.load(open(sys.argv[1]))
+assert record['worktree_path'] == sys.argv[2]
+assert record['owner_id'] == sys.argv[3]
+assert record['branch'] == 'fm/' + sys.argv[3]
+assert record['base_sha'] == sys.argv[4]
+assert record['owned_paths'] == ['scripts', 'README.md']
+PY
+  [ "$?" -eq 0 ] || fail 'relaunch changed the retained scope, copy or task identity'
+  [ -e "$SLOT_CASE/lease" ] || fail 'relaunch released its assigned copy lease'
+  assert_absent "$SLOT_COPY/.claude/worktrees" 'relaunch created nested isolation'
+  pass 'tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work'
 fi

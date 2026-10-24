@@ -527,6 +527,12 @@
 #   dirty relaunches refuse rather than bypassing attestation. Provisioner or
 #   dependency refusal retains the copy, lease, endpoint, branches and manifests,
 #   records recovery=slot-provision-refused, and prints the actual refusal/report.
+#   Once that cause clears, use fm-control.sh <task-id> relaunch --note <reason>:
+#   the retained record carries the original explicit scope and launch policy.
+#   Recovery selects the recorded prepared task commit without moving any prior
+#   branch; a changed/missing prepared branch refuses instead of being reset.
+#   A refused launch whose base preparation never completed finishes that same
+#   first-admission preparation, never the reset path for an admitted worker.
 #   Existing-slot adoption is entirely the installed provisioner's decision: a
 #   create-only manifest_exists or incompatible declaration is never forced.
 #   Projects without the provisioner keep the ordinary spawn path unchanged.
@@ -5953,10 +5959,21 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     SPAWN_SLOT_CLAIMED=1
   fi
 fi
+# Select the unchanged guard policy before a pre-admission refusal can become
+# the task's only durable launch contract. Never turn that recovery into a
+# legacy unguarded relaunch merely because the harness was not yet armed.
+guard_policy=
+if [ "$KIND" != secondmate ]; then
+  guard_policy=FIRSTMATE_JEV_GUARD_V1
+  if [ "$RELAUNCH" -eq 1 ]; then
+    guard_policy=$(fm_meta_get "$RELAUNCH_META" jev_guard_policy)
+  fi
+fi
 # A governed provisioner refusal retains this assigned copy and its endpoint:
 # ordinary acquisition-abort cleanup must not release its lease or remove it.
 spawn_slot_refused() {
-  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}"
+  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path
+  [ "$BACKEND" != orca ] || window=$W
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0
   ORCA_ABORT_CLEANUP=0
@@ -5964,7 +5981,7 @@ spawn_slot_refused() {
   fm_slot_restore_base "$WT" || echo "error: could not restore the slot's original checkout; all branches remain preserved" >&2
   if [ "$RELAUNCH" -eq 0 ]; then
     {
-      echo "window=$W"
+      echo "window=$window"
       echo "endpoint_task_id=$ID"
       echo "backend=$BACKEND"
       echo "worktree=$WT"
@@ -5975,6 +5992,24 @@ spawn_slot_refused() {
       echo "branch=${BRANCH:-fm/$ID}"
       [ -z "$MODE" ] || echo "mode=$MODE"
       [ -z "$YOLO" ] || echo "yolo=$YOLO"
+      [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
+      [ -z "$UPSTREAM_CONSENT" ] || echo "upstream_consent=$UPSTREAM_CONSENT"
+      echo "model=${MODEL:-default}"
+      echo "effort=${EFFORT:-default}"
+      [ "$FIXED_FAMILY" = 0 ] || echo 'fixed_family=on'
+      [ "$OMP_NO_HELPERS" = 0 ] || echo 'omp_no_helpers=on'
+      [ "$ALLOW_API_KEY" = 0 ] || echo 'api_key=allow'
+      [ -z "$DISPATCH_RULE" ] || echo "dispatch_rule=$DISPATCH_RULE"
+      [ -z "$DISPATCH_ROUTE" ] || echo "dispatch_route=$DISPATCH_ROUTE"
+      [ -z "$WORKER_ACCOUNT" ] || echo "account=$WORKER_ACCOUNT_DECLARED"
+      [ -z "$WORKER_ACCOUNT_PROVIDER" ] || echo "account_provider=$WORKER_ACCOUNT_PROVIDER"
+      echo "jev_guard_policy=$guard_policy"
+      # Preserve the entire declared scope, never a valid-looking subset of
+      # malformed input that already failed the pre-admission scope check.
+      if fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" >/dev/null 2>&1; then
+        for owned_path in "${SLOT_OWNED_PATHS[@]}"; do echo "slot_owned_path=$owned_path"; done
+      fi
+      [ -z "$FM_SLOT_PREPARED_HEAD" ] || echo "slot_prepared_head=$FM_SLOT_PREPARED_HEAD"
       [ "$BACKEND" != orca ] || printf 'orca_worktree_id=%s\nterminal=%s\n' "$ORCA_WORKTREE_ID" "$ORCA_TERMINAL"
       [ "$BACKEND" != herdr ] || printf 'herdr_session=%s\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_TAB_ID" "$HERDR_PANE_ID"
       [ "$BACKEND" != zellij ] || printf 'zellij_session=%s\nzellij_tab_id=%s\nzellij_pane_id=%s\n' "$ZELLIJ_SES" "$ZELLIJ_TAB_ID" "$ZELLIJ_PANE_ID"
@@ -5991,6 +6026,7 @@ spawn_slot_refused() {
   exit 1
 }
 SLOT_GOVERNED=0
+SLOT_FRESH_BASE=0
 if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
   SLOT_GOVERNED=1
   if [ "$RELAUNCH" -eq 1 ]; then
@@ -5999,10 +6035,21 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
   fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" || spawn_slot_refused
   BRANCH=${BRANCH:-fm/$ID}
   if [ "$RELAUNCH" -eq 0 ]; then
+    SLOT_FRESH_BASE=1
     fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+  elif [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ]; then
+    prepared_head=$(fm_meta_get "$RELAUNCH_META" slot_prepared_head)
+    if [ -n "$prepared_head" ]; then
+      fm_slot_resume_prepared "$PROJ_ABS" "$WT" "$ID" "$BRANCH" "$prepared_head" || spawn_slot_refused
+    else
+      # No agent was admitted and preparation itself had not completed.
+      # Finish the original fresh-base contract without resetting old refs.
+      SLOT_FRESH_BASE=1
+      fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+    fi
   fi
 fi
-if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
+if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" = 1 ]; }; then
   if ! freshen_spawn_worktree_base "$WT" "$BASE_BRANCH"; then
     [ "$SLOT_GOVERNED" = 0 ] || spawn_slot_refused
     exit 1
@@ -6213,13 +6260,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_REPLACEMENT_HARNESS=$HARNESS
   RELAUNCH_REPLACEMENT_STATE=$STATE_REAL
   RELAUNCH_REPLACEMENT_WT=$WT
-fi
-guard_policy=
-if [ "$KIND" != secondmate ]; then
-  guard_policy=FIRSTMATE_JEV_GUARD_V1
-  if [ "$RELAUNCH" -eq 1 ]; then
-    guard_policy=$(fm_meta_get "$RELAUNCH_META" jev_guard_policy)
-  fi
 fi
 # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
 # adapter with a verified semantic source, including a --secondmate launch.
@@ -6880,7 +6920,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp slot_manifest slot_base_sha slot_owned_path base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp slot_manifest slot_base_sha slot_owned_path slot_prepared_head base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
