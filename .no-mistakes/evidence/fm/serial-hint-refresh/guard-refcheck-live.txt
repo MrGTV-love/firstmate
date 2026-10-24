@@ -1,0 +1,35 @@
+$ bin/fm-guard-refcheck.sh   (head, real tree)
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=1 resurrected=0
+exit=0
+
+$ grep -rn jev-posttool-advisory bin/   (live hits in bin/)
+bin/fm-test-run.sh:1032:tests/fm-retired-jev-posttool-advisory.test.sh 1182
+
+$ (base 30f233bc refcheck) fm-guard-refcheck.sh --root <copy of head tree>   (old check on the new hint table)
+RESURRECTED jev-posttool-advisory bin/fm-test-run.sh:1032:tests/fm-retired-jev-posttool-advisory.test.sh 1182
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=1 resurrected=1
+exit=1
+
+$ (head refcheck) fm-guard-refcheck.sh --root <copy of head tree>
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=1 resurrected=0
+exit=0
+
+--- ADVERSARIAL A: append the bare id to the hint line in bin/fm-test-run.sh of the copy
+1032:tests/fm-retired-jev-posttool-advisory.test.sh 1182 # jev-posttool-advisory
+RESURRECTED jev-posttool-advisory bin/fm-test-run.sh:1032:tests/fm-retired-jev-posttool-advisory.test.sh 1182 # jev-posttool-advisory
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=1 resurrected=1
+exit=1
+
+--- ADVERSARIAL B: bare id on its own line in a new bin/ file of the copy
+RESURRECTED jev-posttool-advisory bin/fm-resurrect.sh:2:# re-enable jev-posttool-advisory
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=1 resurrected=1
+exit=1
+
+--- ADVERSARIAL C: id glued to a different path that only contains a near-miss of the test path
+RESURRECTED jev-posttool-advisory bin/fm-nearmiss.sh:1:tests/fm-retired-jev-posttool-advisory.test.bash 5
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=1 resurrected=1
+exit=1
+
+--- after reset, copy is clean again
+REFCHECK_SUMMARY registrations=52 paths=110 missing=0 registry_missing=0 retired=1 resurrected=0
+exit=0

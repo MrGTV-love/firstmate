@@ -1,0 +1,28 @@
+== head: fm-slack-watch is in portable-serial-14of20; --list-scheduled (longest-hint-first) position:
+1:tests/fm-slack-watch.test.sh
+2:tests/fm-project-capacity.test.sh
+3:tests/fm-idle-session-reap.test.sh
+4:tests/fm-task-inbox.test.sh
+5:tests/fm-afk-return.test.sh
+6:tests/fm-procevent-runner-custody.test.sh
+7:tests/fm-watch-typesafe-health.test.sh
+8:tests/fm-slack-secret-scan.test.sh
+9:tests/fm-self-repo-role.test.sh
+10:tests/fm-turnend-foreign-owner-arm-fix.test.sh
+11:tests/fm-backend-cmux.test.sh
+12:tests/fm-fork-free-helpers.test.sh
+   total scripts in shard: 15
+== base: fm-slack-watch is in portable-serial-12of20; --list-scheduled (longest-hint-first) position:
+1:tests/fm-control-relaunch-backends.test.sh
+2:tests/fm-secondmate-harness.test.sh
+3:tests/fm-watcher-lock.test.sh
+4:tests/fm-fleet-sync.test.sh
+5:tests/fm-kimi-harness.test.sh
+6:tests/fm-vendor-auth-probe.test.sh
+7:tests/fm-slack-watch.test.sh
+8:tests/fm-supervision-events.test.sh
+9:tests/fm-host-mirror.test.sh
+10:tests/fm-typesafe-key-source.test.sh
+11:tests/fm-parent-channel-scan-exclusion.test.sh
+12:tests/fm-fleet-snapshot-tmp-leak.test.sh
+   total scripts in shard: 16

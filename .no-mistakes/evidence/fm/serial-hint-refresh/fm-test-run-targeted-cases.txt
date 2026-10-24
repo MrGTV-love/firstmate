@@ -1,0 +1,15 @@
+$ FM_TEST_ONLY=test_portable_parallel_lanes_stay_duration_balanced bash tests/fm-test-run.test.sh
+ok - portable parallel lanes are fully hinted and packed within 5% of each other
+exit=
+$ FM_TEST_ONLY=test_portable_parallel_lanes_run_bounded_and_concurrently bash tests/fm-test-run.test.sh
+ok - portable parallel lanes are bounded by a modeled makespan packed into the effective bin count
+exit=
+$ FM_TEST_ONLY=test_portable_serial_shards_partition_the_serial_lane bash tests/fm-test-run.test.sh
+ok - portable serial shards are a deterministic disjoint cover of the serial lane
+exit=
+$ FM_TEST_ONLY=test_portable_serial_hint_coverage_is_reported_and_bounded bash tests/fm-test-run.test.sh
+ok - coverage guard bounds the unmeasured share and bounds serial packing by the target or one script alone
+exit=
+$ FM_TEST_ONLY=test_portable_serial_packing_budget_boundary bash tests/fm-test-run.test.sh
+ok - serial packing accepts a lone script above the target, accepts a packed shard at it, and refuses one a millisecond above
+exit=

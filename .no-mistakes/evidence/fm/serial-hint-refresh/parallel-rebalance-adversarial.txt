@@ -1,0 +1,8 @@
+--- ADVERSARIAL: new parallel hints kept, lane move undone (crew-state back to lane 2, captain-hold-sweep back to lane 1)
+FM_TEST_COVERAGE ok total=351 parallel=29 parallel_max_ms=2008537 parallel_imbalance_ms=269812 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=2 parallel_makespan_ms=1054053 parallel_budget_ms=1200000 serial=304 serial_shards=20 serial_unhinted=2 serial_max_ms=1198148 serial_budget_ms=1200000 serial_indivisible_ms=917727 herdr=18
+exit=0
+$ FM_TEST_ONLY=test_portable_parallel_lanes_stay_duration_balanced bash tests/fm-test-run.test.sh  (in that copy)
+not ok - parallel lanes differ by 269812ms against a 2008537ms worst lane, more than 5%
+
+--- copy restored to head:
+FM_TEST_COVERAGE ok total=351 parallel=29 parallel_max_ms=1883057 parallel_imbalance_ms=18852 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=2 parallel_makespan_ms=941660 parallel_budget_ms=1200000 serial=304 serial_shards=20 serial_unhinted=2 serial_max_ms=1198148 serial_budget_ms=1200000 serial_indivisible_ms=917727 herdr=18

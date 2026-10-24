@@ -1,0 +1,51 @@
+$ bash tests/fm-guard-audit-closure.test.sh   (head worktree)
+ok - G-10 the registry accounts for all 30 audited Firstmate guards
+ok - G-10b the spec and the registry are checked in and agree
+ok - G-11 the lint rules are proven by a fixture suite, including a prose-only remedy
+ok - G-23 the ratchet is enforcing with an empty allowlist
+ok - G-02 every wired hook path and registry path resolves
+ok - G-03 no retired guard is referenced from live code
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 10 instrumented guards call the event writer
+ok - G-12 every registered remedy carries an executable token or path
+ok - G-14 a malformed brief is refused once with every problem listed
+ok - G-20 worktree isolation names the reassociation repair
+ok - G-22 gate containment names the permitted lab home
+ok - G-21 publication role names where authority is granted
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - fm-guard-audit-closure
+exit=0
+
+$ bash tests/fm-guard-refcheck.test.sh   (head worktree)
+ok - a registration naming an existing script is clean
+ok - a registration naming a missing script fails
+ok - a json filename is not mistaken for a script path
+ok - a missing registry owner path fails
+ok - a missing registry test path fails
+ok - a retired guard referenced from tracked code fails
+ok - a retired id named only by its changelog and retirement test stays clean
+ok - a file naming the retirement test's path stays clean
+ok - the bare id beside the retirement test's path still fails
+ok - a missing registry is left to the lint
+ok - fm-guard-refcheck
+exit=0
+
+$ bash tests/fm-retired-jev-posttool-advisory.test.sh   (head worktree)
+ok - retired PostToolUse shell/read results and UserPromptSubmit capture emit nothing, exit 0 and start no guard service
+ok - a PreToolUse shell call failing its destructive-intent threshold still reaches the judge and denies at exit 0
+exit=0
+
+--- BASE G-04 logic on the head tree: copy base test into head copy and run
+not ok - retired guard ids still appear in bin/: jev-posttool-advisory
+
+--- ADVERSARIAL: bare id in a bin/ file of the head copy, run head audit-closure there
+not ok - the reference check is red: RESURRECTED jev-posttool-advisory bin/fm-resurrect.sh:2:# re-enable jev-posttool-advisory
+
+--- ADVERSARIAL: bare id appended beside the test path on the hint line
+not ok - the reference check is red: RESURRECTED jev-posttool-advisory bin/fm-test-run.sh:1032:tests/fm-retired-jev-posttool-advisory.test.sh 1182 # jev-posttool-advisory
