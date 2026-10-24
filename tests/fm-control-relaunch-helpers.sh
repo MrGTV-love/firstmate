@@ -4,6 +4,9 @@
 # and tests/fm-control-relaunch-backends.test.sh. Each group sources this file,
 # registers control_relaunch_test_cases, and calls control_relaunch_run. The
 # fixtures are hermetic: a stubbed session provider and no real agent.
+# The groups that source this file read globals it assigns, so they read as
+# "unused" here.
+# shellcheck disable=SC2034
 set -u
 unset FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE FM_PROJECTS_OVERRIDE FM_ROOT_OVERRIDE
 
@@ -1283,6 +1286,7 @@ control_relaunch_run() {
   # Validate the complete selection before running any behavioral case.
   for requested_case in "$@"; do
     registered_case=false
+    # shellcheck disable=SC2154 # Each group assigns control_relaunch_test_cases before calling this.
     for test_case in "${control_relaunch_test_cases[@]}"; do
       if [ "$requested_case" = "$test_case" ]; then
         registered_case=true

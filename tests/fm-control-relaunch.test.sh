@@ -307,6 +307,7 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     wait "$control_pid" 2>/dev/null || true
     fail "relaunch did not reach trace delivery"
   }
+  # shellcheck disable=SC2031 # A fixture subshell's PATH change does not reach this parent.
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     FM_REAL_MV="$(command -v mv)" \
     FM_FAKE_LOCK_WAITING="$waiting" \
@@ -1705,6 +1706,7 @@ test_prepublication_failure_keeps_concurrent_durable_metadata() {
     wait_fixture_process "$control_pid" 2>/dev/null || true
     fail "spawn did not fail and release its metadata lock before rollback: $(cat "$dir/control.out")"
   fi
+  # shellcheck disable=SC2031 # A fixture subshell's PATH change does not reach this parent.
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     "$X_LINK" rl30 request-30 --carry-count 2 --carry-ts 1700000000 \
       --carry-platform x --carry-max 280 > "$dir/link.out" 2>&1 &

@@ -1352,6 +1352,7 @@ fm_session_end_relaunch_scan "$2"
 [ "$FM_SESSION_END_WAKE" = "check: $3 auto-relaunched after session-end" ]
 SH
   rc=0
+  # shellcheck disable=SC2031 # The session-end scan's PATH override is confined to its subshell.
   out=$(env -u HERDR_ENV -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_PANE_ID -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
