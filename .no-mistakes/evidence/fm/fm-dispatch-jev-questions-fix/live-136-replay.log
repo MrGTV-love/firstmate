@@ -1,0 +1,141 @@
+row   1 logged=rule_4   old_reason=none                                                         -> status=clear     rule=rule_4
+row   2 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row   3 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row   4 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row   5 logged=rule_4   old_reason=none                                                         -> status=clear     rule=rule_4
+row   6 logged=rule_4   old_reason=none                                                         -> status=clear     rule=rule_4
+row   7 logged=rule_4   old_reason=none                                                         -> status=clear     rule=rule_4
+row   8 logged=rule_4   old_reason=none                                                         -> status=clear     rule=rule_4
+row   9 logged=rule_4   old_reason=none                                                         -> status=clear     rule=rule_4
+row  10 logged=rule_7   old_reason=fast_agent requires an explicit handler or capability decision -> status=clear     rule=rule_7
+row  11 logged=rule_7   old_reason=fast_agent requires an explicit handler or capability decision -> status=clear     rule=rule_7
+row  12 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  13 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  14 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  15 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  16 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row  17 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  18 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  19 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  20 logged=rule_3   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_3
+row  21 logged=rule_3   old_reason=none                                                         -> status=clear     rule=rule_3
+row  22 logged=rule_3   old_reason=none                                                         -> status=clear     rule=rule_3
+row  23 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  24 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  25 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row  26 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  27 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  28 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  29 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  30 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  31 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  32 logged=rule_3   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_3
+row  33 logged=rule_2   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_2
+row  34 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row  35 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  36 logged=rule_2   old_reason=confidence 0.46 below floor 0.6                              -> status=clear     rule=rule_2
+row  37 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  38 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row  39 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row  40 logged=rule_6   old_reason=reasoning_agent requires an explicit handler or capability decision -> status=clear     rule=rule_6
+row  41 logged=rule_6   old_reason=reasoning_agent requires an explicit handler or capability decision -> status=clear     rule=rule_6
+row  42 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  43 logged=rule_3   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_3
+row  44 logged=rule_3   old_reason=rule_3 pooled probability 0.51 below floor 0.6               -> status=clear     rule=rule_3
+row  45 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  46 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  47 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  48 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  49 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  50 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  51 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  52 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row  53 logged=rule_6   old_reason=reasoning_agent requires an explicit handler or capability decision -> status=clear     rule=rule_6
+row  54 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  55 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  56 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  57 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  58 logged=rule_7   old_reason=reasoning_agent requires an explicit handler or capability decision -> status=clear     rule=rule_7
+row  59 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  60 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  61 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  62 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  63 logged=rule_1   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_1
+row  64 logged=rule_2   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_2
+row  65 logged=rule_3   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_3
+row  66 logged=rule_4   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_4
+row  67 logged=rule_5   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_5
+row  68 logged=rule_6   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_6
+row  69 logged=rule_7   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_7
+row  70 logged=rule_1   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_1
+row  71 logged=rule_2   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_2
+row  72 logged=rule_3   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_3
+row  73 logged=rule_4   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_4
+row  74 logged=rule_5   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_5
+row  75 logged=rule_6   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_6
+row  76 logged=rule_7   old_reason=high task ambiguity requires firstmate judgment              -> status=clear     rule=rule_7
+row  77 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  78 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  79 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  80 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  81 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  82 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  83 logged=rule_3   old_reason=none                                                         -> status=clear     rule=rule_3
+row  84 logged=rule_7   old_reason=reasoning_agent requires an explicit handler or capability decision -> status=clear     rule=rule_7
+row  85 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  86 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  87 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  88 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  89 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  90 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  91 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  92 logged=rule_5   old_reason=deterministic_script requires an explicit handler or capability decision -> status=clear     rule=rule_5
+row  93 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  94 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  95 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  96 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row  97 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row  98 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row  99 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 100 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 101 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 102 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 103 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 104 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 105 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row 106 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 107 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 108 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 109 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 110 logged=rule_6   old_reason=reasoning_agent requires an explicit handler or capability decision -> status=clear     rule=rule_6
+row 111 logged=rule_6   old_reason=reasoning_agent requires an explicit handler or capability decision -> status=clear     rule=rule_6
+row 112 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 113 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 114 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 115 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 116 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 117 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 118 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 119 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 120 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 121 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 122 logged=rule_6   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_6
+row 123 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 124 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 125 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 126 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 127 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 128 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 129 logged=rule_4   old_reason=none                                                         -> status=clear     rule=rule_4
+row 130 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 131 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+row 132 logged=rule_6   old_reason=none                                                         -> status=clear     rule=rule_6
+row 133 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 134 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 135 logged=rule_7   old_reason=human requires an explicit handler or capability decision    -> status=clear     rule=rule_7
+row 136 logged=rule_7   old_reason=none                                                         -> status=clear     rule=rule_7
+
+rows=136 escalations=0 q7_human_reasons=0 rule_mismatches=0
+status clear=136 ambiguous=0 other=0
+provider calls: 136; any profile question sent: false
+/Users/charlesabrooker/.no-mistakes/evidence/01M5R0BFX4V25T7RRQ9PMN8VHK/driver/replay.sh: line 44: 74136 Terminated: 15          node "$DRV/provider.mjs" "$SETTINGS" "$WORK/calls.jsonl" "$WORK/port"

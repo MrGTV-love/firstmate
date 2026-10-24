@@ -1,0 +1,14 @@
+node:1: command not found: _nvm_lazy_load
+✔ T6(a): repository and kind facts make non-Vernant rules unreachable for Vernant ships (736.181834ms)
+✔ T6 predicates combine in code, preserve complements, and never pool independent support (365.135208ms)
+✔ T6(b): replay all 136 logged rule structures offline without Q7 escalation (12626.761917ms)
+✔ Q9 desktop capability keeps its boundary; obsolete workflow answers remain inert (811.529166ms)
+✔ malformed fact selectors and missing semantic references fail before provider access (856.234ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15486.896833

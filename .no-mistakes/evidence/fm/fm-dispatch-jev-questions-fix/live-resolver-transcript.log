@@ -1,0 +1,265 @@
+
+=== S1 Vernant ship scaffold can never select a non-Vernant rule (T6a) ===
+  scaffolded vern-ship (vernant --mode): line 1 = FIRSTMATE_DISPATCH: {"project_path": "$LAB/projects/vernant"}
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 17   tokens: 100/20
+    |   rule: rule_1 (Vernant ship that needs design.)   confidence: 0.9
+    |   support: rule_1=0.9 default=0.09999999999999998
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'opus' --effort 'high'
+    |   timings: api_ms=17 quota_ms=15 local_ms=1021 total_ms=1053
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: exit 0
+  PASS: selected the Vernant rule_1
+  PASS: non-Vernant rule_2 never appears in support or fallback
+  PASS: non-Vernant judgment "bounded" is never asked
+  PASS: state.repository is the code-derived id vernant
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+    |   rule: default (No listed rule applies to this task.)   confidence: 1
+    |   support: rule_1=0 default=1
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: no rule matched
+    |   candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'
+    |   timings: api_ms=6 quota_ms=16 local_ms=888 total_ms=910
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: even when the Vernant predicate is false and bounded=1, the non-Vernant haiku rule is not reachable
+
+=== S2 Non-Vernant (pager) ship reaches only its own rule ===
+  scaffolded pager-ship (pager --mode): line 1 = FIRSTMATE_DISPATCH: {"project_path": "$LAB/projects/pager"}
+$ fm-dispatch-resolve.sh \$LAB/data/pager-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 7   tokens: 100/20
+    |   rule: rule_2 (Non-Vernant ship that is well understood.)   confidence: 1
+    |   support: rule_2=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max'
+    |   timings: api_ms=7 quota_ms=19 local_ms=1015 total_ms=1041
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: pager ship selects rule_2
+  PASS: Vernant-only judgment is not asked for pager
+
+=== S3 Adversarial: free-text --project spellings are refused (review finding) ===
+$ fm-dispatch-resolve.sh \$LAB/data/pager-ship/brief.md --project Vernant   -> exit 2
+    | 
+    ! error: unknown flag --project
+  PASS: --project 'Vernant' exits 2 as an unknown flag
+  PASS: --project 'Vernant' sends nothing
+$ fm-dispatch-resolve.sh \$LAB/data/pager-ship/brief.md --project \ vernant   -> exit 2
+    | 
+    ! error: unknown flag --project
+  PASS: --project ' vernant' exits 2 as an unknown flag
+  PASS: --project ' vernant' sends nothing
+$ fm-dispatch-resolve.sh \$LAB/data/pager-ship/brief.md --project vernant   -> exit 2
+    | 
+    ! error: unknown flag --project
+  PASS: --project 'vernant' exits 2 as an unknown flag
+  PASS: --project 'vernant' sends nothing
+
+=== S4 Adversarial: hand-edited project_path cannot fake Vernant identity ===
+$ fm-dispatch-resolve.sh /Users/charlesabrooker/tmp/fm-drive.59vSro/forged.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: brief project_path must resolve to exactly one registered project clone
+  PASS: project_path='$LAB/projects/Vernant' escalates with no profile
+  PASS: project_path='$LAB/projects/Vernant' sends nothing
+$ fm-dispatch-resolve.sh /Users/charlesabrooker/tmp/fm-drive.59vSro/forged.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: brief project_path has no existing project clone
+  PASS: project_path='$LAB/projects/ vernant' escalates with no profile
+  PASS: project_path='$LAB/projects/ vernant' sends nothing
+$ fm-dispatch-resolve.sh /Users/charlesabrooker/tmp/fm-drive.59vSro/forged.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: brief project_path must resolve to exactly one registered project clone
+  PASS: project_path='/Users/charlesabrooker/tmp/fm-drive.59vSro/elsewhere' escalates with no profile
+  PASS: project_path='/Users/charlesabrooker/tmp/fm-drive.59vSro/elsewhere' sends nothing
+$ fm-dispatch-resolve.sh /Users/charlesabrooker/tmp/fm-drive.59vSro/forged.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: brief FIRSTMATE_DISPATCH must be a typed absolute project_path record
+  PASS: project_path='relative/projects/vernant' escalates with no profile
+  PASS: project_path='relative/projects/vernant' sends nothing
+$ fm-dispatch-resolve.sh /Users/charlesabrooker/tmp/fm-drive.59vSro/forged.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: brief project_path must resolve to exactly one registered project clone
+  PASS: a symlink named vernant to an unrelated dir is not the Vernant clone
+$ fm-dispatch-resolve.sh /Users/charlesabrooker/tmp/fm-drive.59vSro/quoted.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: brief is missing FIRSTMATE_DISPATCH project_path
+  PASS: a record quoted in task prose cannot supply identity
+
+=== S5 Adversarial: rules naming 'Vernant' or ' vernant' are config errors ===
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 2
+    | 
+    ! error: malformed rules file: /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/crew-dispatch.json - match.projects contains an unregistered project id; fix that field in /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/crew-dispatch.json resolved against /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>
+  PASS: projects=['Vernant'] exits 2, names the field, sends nothing
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 2
+    | 
+    ! error: malformed rules file: /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/crew-dispatch.json - match.projects contains an unregistered project id; fix that field in /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/crew-dispatch.json resolved against /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>
+  PASS: projects=[' vernant'] exits 2, names the field, sends nothing
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 2
+    | 
+    ! error: malformed rules file: /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/crew-dispatch.json - match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout; fix that field in /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/crew-dispatch.json resolved against /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/model-index.json, then rerun bin/fm-dispatch-resolve.sh <brief>
+  PASS: legacy singular match.project is rejected
+
+=== S6 Request shape: Q6 split, Q7 gone, Q9 criteria, current model, no kind ===
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+    |   rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+    |   support: rule_1=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'opus' --effort 'high'
+    |   timings: api_ms=6 quota_ms=16 local_ms=861 total_ms=883
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  request questions: {"ambiguity":"score","needs_desktop":"noul","model":"choice","effort":"score","judgment_design_judgment":"noul"}
+  request model: jev-latest; state keys: ["repository","task"]
+  needs_desktop: {"type":"noul","instructions":"Does completing `task` require interacting with an authenticated application session or the graphical desktop?","criteria":{"true":"The requested outcome requires operating a logged-in web application, a native GUI application, or the desktop itself.","false":"The task can be completed using repository files, a terminal, public web pages, or an API; mentioning a browser, app, or provider without requiring interactive session access is not enough."}}
+  PASS: model is jev-latest (no pinned version)
+  PASS: Q7 workflow "profile" question is gone
+  PASS: Q6 categorical "rule" choice is gone
+  PASS: every judgment_* question is a single-judgment noul
+  PASS: Q9 needs_desktop is a noul with true/false criteria
+  PASS: state holds only task and repository (no kind)
+  PASS: the clone path record never reaches the provider
+  PASS: no absolute lab path reaches the provider
+
+=== S7 Q7 removed: an obsolete 'profile: human' answer cannot escalate; Q9 still can ===
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+    |   rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+    |   support: rule_1=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'opus' --effort 'high'
+    |   timings: api_ms=6 quota_ms=15 local_ms=878 total_ms=899
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: stray profile=human answer does not escalate
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+    |   rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+    |   support: rule_1=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":true,"escalate":"desktop access requires an explicit capability decision"}
+    |   reason: desktop access requires an explicit capability decision
+    |   candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+    |   timings: api_ms=6 quota_ms=14 local_ms=905 total_ms=925
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: needs_desktop=0.9 escalates for a capability decision
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+    |   rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+    |   support: rule_1=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'opus' --effort 'high'
+    |   timings: api_ms=5 quota_ms=15 local_ms=855 total_ms=875
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: needs_desktop=0.5 (boundary) does not escalate
+
+=== S8 Scout kind comes from the scaffold's # Setup, in code ===
+  scaffolded vern-scout (vernant --scout): line 1 = FIRSTMATE_DISPATCH: {"project_path": "$LAB/projects/vernant"}
+$ fm-dispatch-resolve.sh \$LAB/data/vern-scout/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+    |   rule: rule_3 (Scout on any project.)   confidence: 1
+    |   support: rule_3=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'medium'
+    |   timings: api_ms=6 quota_ms=15 local_ms=862 total_ms=883
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: Vernant scout selects the scout rule_3, not the ship rule
+  PASS: scout kind is not sent in state
+$ fm-dispatch-resolve.sh /Users/charlesabrooker/tmp/fm-drive.59vSro/ship-quoting-scout.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+    |   rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+    |   support: rule_1=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:opus  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'opus' --effort 'high'
+    |   timings: api_ms=6 quota_ms=16 local_ms=938 total_ms=960
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+  PASS: a ship quoting the scout line in a fence stays a ship
+
+=== S9 Never-send screens judgment ids in request keys ===
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | 
+    ! dispatch-resolve: off (brief text matches /Users/charlesabrooker/tmp/fm-lab.cBEY4n/config/dispatch-never-send line 1; nothing sent)
+  PASS: a never-send line matching only a judgment id withholds the request
+
+=== S10 FM_PROJECTS_OVERRIDE binds to the overridden clone directory ===
+  line 1: FIRSTMATE_DISPATCH: {"project_path": "$WORK/alt-projects/vernant"}
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+    |   rule: rule_1 (Vernant ship that needs design.)   confidence: 1
+    |   support: rule_1=1 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+  PASS: override-scaffolded Vernant brief resolves to the Vernant rule
+$ fm-dispatch-resolve.sh \$LAB/data/vern-alt/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: brief project_path must resolve to exactly one registered project clone
+  PASS: without the override the same path is unregistered and nothing is sent
+
+=== S11 Registry failure is named, not a rules error ===
+$ fm-dispatch-resolve.sh \$LAB/data/vern-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: escalate
+    |   reason: project registry data/projects.md is missing or unreadable
+  PASS: missing registry escalates with its own reason and sends nothing
+
+=== S12 Shipped docs/examples/crew-dispatch.json is accepted by the real resolver ===
+  scaffolded fm-ship (firstmate --mode): line 1 = FIRSTMATE_DISPATCH: {"project_path": "$LAB"}
+$ fm-dispatch-resolve.sh \$LAB/data/fm-ship/brief.md   -> exit 0
+    | dispatch-resolve:
+    |   status: clear
+    |   model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+    |   rule: rule_2 (The task is a trivial mechanical edit such as a rote rename,)   confidence: 1
+    |   support: rule_1=0 rule_2=1 rule_3=0 default=0
+    |   routing: {"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"ambiguity":0,"needsDesktopAccess":false}
+    |   note: rule matched
+    |   candidate: claude:haiku  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+    |   profile: --harness 'claude' --model 'haiku' --effort 'max'
+    |   timings: api_ms=5 quota_ms=13 local_ms=912 total_ms=930
+    |   usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+    ! model-index: notice: claude catalog unavailable (effective worker account context is not established); 'haiku' (role 'easy') not validated
+  PASS: example config (with its documented model index) validates and resolves (exit 0 with a status)
+  PASS: example judgments are sent as judgment_* nouls for a firstmate ship
+
+=== Result log ===
+  data/dispatch-resolve.jsonl lines: 19
+  last record: {"ts":"2026-10-24T23:06:35Z","status":"clear","choice":"rule_2","rule":"rule_2","selected":"rule_2","profile":{"harness":"claude","model":"haiku","effort":"max"},"confidence":1,"floor":0.6,"reason":null}
+
+TOTAL PASS=47 FAIL=0
+/Users/charlesabrooker/.no-mistakes/evidence/01M5R0BFX4V25T7RRQ9PMN8VHK/driver/drive.sh: line 210: 10785 Terminated: 15          node "$DRV/provider.mjs" "$SETTINGS" "$CALLS" "$WORK/port"

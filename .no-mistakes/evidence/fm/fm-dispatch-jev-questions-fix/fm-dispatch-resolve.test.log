@@ -1,3 +1,4 @@
+ok - B1 removes free-text project input and rejects missing, unrelated, redirected and absent clone bindings
 ok - pool bias is removed by normalized nonadditive evidence, with explicit ties
 ok - common headroom and economic urgency are normalized before weighting
 ok - quota veto preserves required reasoning class
@@ -53,5 +54,4 @@ ok - chosen Codex and Pi entries never use supervisor catalogs and retain author
 ok - independent support cannot pool, and private result logging retains every outcome
 ok - shadow mode: off is identical and inert; on logs both picks without changing the dispatch, even when Jev fails or the snapshot is untrusted
 # all fm-dispatch-resolve tests passed
-bash tests/fm-dispatch-resolve.test.sh  68.34s user 63.30s system 79% cpu 2:45.62 total
-exit=0
+resolver suite exit=0
