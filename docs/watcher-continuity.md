@@ -599,6 +599,9 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 - The home-gone and state-gone watcher exits.
 - The test reaper that stops a watcher armed for a temporary home.
 
+`tests/fm-watch-checkpoint.test.sh` covers usable-Perl selection, both `timeout` and `gtimeout` fallbacks for a broken Perl installation (without renaming the installed timeout executable), and monotonic stop limits for ordinary and delayed-start group-killed checkpoints.
+Its measured limit and calibration evidence are recorded beside the assertions rather than changing the production cleanup grace.
+
 `tests/fm-watch-recovery-loop.test.sh` covers:
 
 - The once-per-generation announcement bound with the real Pi extension against a refused handling handshake.

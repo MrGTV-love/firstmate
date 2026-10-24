@@ -159,9 +159,9 @@ run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>
   # escalate, which the platform timeout does not: GNU timeout reports 137 when
   # it KILLs a child that could not take INT, and that is a normal quiet
   # checkpoint here. Perl therefore leads, the plain timeout tools remain the
-  # fallback for a host that lacks it, and the last branch is the Perl call
-  # itself, which reports the shell's own 127 when Perl is absent too.
-  if command -v perl >/dev/null 2>&1; then
+  # fallback when Perl cannot load its required POSIX module, and the last
+  # branch preserves the Perl diagnostic if neither timeout tool is available.
+  if perl -MPOSIX=:sys_wait_h -e 'exit 0' >/dev/null 2>&1; then
     run_with_perl_timeout "$seconds" "$signal" "$kill_after" "$@"
   elif command -v timeout >/dev/null 2>&1; then
     timeout --signal="$signal" --kill-after="${kill_after}s" "$seconds" "$@"

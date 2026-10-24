@@ -1880,13 +1880,12 @@ EOF
 # relaunch command and the reassociation alternative. The function runs against
 # a stubbed isolation predicate so the exact refusal text is what is judged.
 test_worktree_isolation_refusal_carries_the_repair() {
-  local source out status
+  # shellcheck disable=SC2034 # SCRIPT_DIR is consumed by the eval'd validate_spawn_worktree body.
+  local source out status SCRIPT_DIR="$ROOT/bin"
   source=$(sed -n '/^validate_spawn_worktree() {/,/^}/p' "$ROOT/bin/fm-spawn.sh")
   [ -n "$source" ] || fail "could not read validate_spawn_worktree from bin/fm-spawn.sh"
   out=$(
     exec 2>&1
-    # shellcheck disable=SC2030,SC2034 # The eval'd guard needs this subshell-local script root.
-    SCRIPT_DIR="$ROOT/bin"
     # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.
     WT="$TMP_ROOT/primary-checkout"
     # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.

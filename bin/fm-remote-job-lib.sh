@@ -1246,7 +1246,10 @@ fm_remote_job_reload_lock_take() { # <lock-link> <from-dir> <tomb-dir> <own-name
 fm_remote_job_reload_lock_acquire() { # <lock-link>
   local lock=$1 dir name owner pid target tomb deadline
   dir=${lock%/*}
-  pid=${BASHPID:-$$}
+  # Bash without BASHPID keeps $$ at the parent even inside a subshell.
+  # exec leaves the probe shell directly below the actual lock holder.
+  pid=${BASHPID:-$(exec sh -c 'printf "%s\n" "$PPID"')} || return 1
+  case "$pid" in ''|*[!0-9]*|0) return 1 ;; esac
   name="${lock##*/}.owner.$pid.$RANDOM$RANDOM"
   owner="$dir/$name"
   FM_REMOTE_JOB_RELOAD_OWNER=

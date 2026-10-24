@@ -90,6 +90,45 @@ PL
   pass "Perl fallback honors the cleanup bound before escalating an INT-ignoring direct watcher"
 }
 
+test_unusable_perl_uses_non_perl_timeout() {
+  local home fallback_bin tool tool_path status timeout_path
+  home=$(make_home unusable-perl)
+  fallback_bin="$home/fallback-bin"
+  mkdir -p "$home/root/bin" "$fallback_bin" "$home/perl-lib"
+  cp "$CHECKPOINT" "$home/root/bin/fm-watch-checkpoint.sh"
+  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$home/root/bin/fm-supervision-engine-lib.sh"
+  # The executable works, but its required module cannot load.
+  cat > "$home/perl-lib/POSIX.pm" <<'PL'
+die "POSIX module unavailable\n";
+PL
+  ln -s "$(type -P perl)" "$fallback_bin/perl"
+  PERL5LIB="$home/perl-lib" "$fallback_bin/perl" -e 'exit 0' \
+    || fail "the unusable-module fixture broke Perl itself"
+  timeout_path=$(type -P timeout || type -P gtimeout) || fail "no non-Perl timeout installed"
+  for tool in bash dirname mktemp rm grep cat; do
+    tool_path=$(type -P "$tool") || fail "could not locate $tool for the unusable-Perl fixture"
+    ln -s "$tool_path" "$fallback_bin/$tool"
+  done
+  cat > "$home/root/bin/fm-watch.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'signal: unusable-perl.status\n'
+SH
+  chmod +x "$home/root/bin/fm-watch-checkpoint.sh" "$home/root/bin/fm-watch.sh"
+  for tool in timeout gtimeout; do
+    # Preserve the installed tool's argv[0]; multicall coreutils reject aliases.
+    printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$timeout_path" > "$fallback_bin/$tool"
+    chmod +x "$fallback_bin/$tool"
+    status=0
+    PATH="$fallback_bin" PERL5LIB="$home/perl-lib" FM_HOME="$home" "$home/root/bin/fm-watch-checkpoint.sh" --seconds 5 \
+      >"$home/out.txt" 2>"$home/err.txt" || status=$?
+    expect_code 0 "$status" "unusable Perl with $tool fallback: $(cat "$home/err.txt")"
+    assert_contains "$(cat "$home/out.txt")" 'signal: unusable-perl.status' \
+      "unusable Perl prevented the watcher from running via $tool"
+    rm "$fallback_bin/$tool"
+  done
+  pass "an unusable Perl falls back to timeout or gtimeout and still runs the watcher"
+}
+
 # An async caller may pass SIGINT ignored. The bound must still interrupt the
 # watcher and let its cleanup run, not KILL it and strand the watcher lock.
 test_checkpoint_resets_an_inherited_ignored_interrupt() {
@@ -122,7 +161,7 @@ SH
 # bound must outlive that kill and still interrupt its watcher, or the orphaned
 # watcher keeps the lock and every later checkpoint reports it as foreign.
 test_group_killed_checkpoint_still_stops_its_watcher() {
-  local home checkpoint_pid watcher_pid status i
+  local home checkpoint_pid watcher_pid status started deadline now gone
   home=$(make_home group-killed)
   TMPDIR="$home" FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
     perl -e 'setpgrp(0, 0); exec @ARGV' "$CHECKPOINT" --seconds 180 \
@@ -134,17 +173,22 @@ test_group_killed_checkpoint_still_stops_its_watcher() {
     fail "group-killed checkpoint did not take the watcher lock"
   }
   watcher_pid=$(cat "$home/state/.watch.lock/pid")
+  started=$(monotonic_ms)
+  deadline=$((started + GROUP_KILL_LIMIT_MS))
   kill -KILL -- "-$checkpoint_pid"
   wait "$checkpoint_pid" 2>/dev/null || true
-  i=0
-  while kill -0 "$watcher_pid" 2>/dev/null && [ "$i" -lt 100 ]; do
+  while :; do
+    gone=1
+    kill -0 "$watcher_pid" 2>/dev/null && gone=0
+    now=$(monotonic_ms)
+    if [ "$now" -gt "$deadline" ]; then
+      kill -KILL "$watcher_pid" 2>/dev/null || true
+      fail "the watcher outlived its group-killed checkpoint's ${GROUP_KILL_LIMIT_MS}ms cleanup limit ($((now - started))ms)"
+    fi
+    [ "$gone" -eq 1 ] && break
     sleep 0.05
-    i=$((i + 1))
   done
-  if kill -0 "$watcher_pid" 2>/dev/null; then
-    kill -KILL "$watcher_pid" 2>/dev/null || true
-    fail "the watcher outlived its group-killed checkpoint's 5-second cleanup grace"
-  fi
+  printf '# group-kill ordinary stop_ms=%s\n' "$((now - started))"
   status=0
   FM_HOME="$home" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 \
     "$CHECKPOINT" --seconds 1 >"$home/out.txt" 2>"$home/err.txt" || status=$?
@@ -157,6 +201,23 @@ test_group_killed_checkpoint_still_stops_its_watcher() {
   pass "a group-killed checkpoint still stops its watcher and frees the next checkpoint"
 }
 
+# Measured 2026-10-22: five serial nice-20 runs under live fleet load on macOS
+# (1-minute load 7.60-9.95; 603-619 user processes) observed ordinary stops of
+# 410/567/420/393/398 ms and delayed-child stops of 417/330/391/347/372 ms.
+# Green main CI run 39838628417 bracketed the complete ordinary/delayed cases
+# at <=906/249 ms; green CI runs 39765810014 and 39832878710 measured upper
+# bounds of <=1074/1286 ms ordinary and <=262/260 ms delayed (adjacent log
+# timestamps, including setup and the ordinary case's next-checkpoint check;
+# conservative upper bounds, not precise signal-to-exit measurements).
+# Orphaned stopped-group stress also stopped honestly in 5158/5305 ms;
+# the 2000 ms margin covers that worst 305 ms overrun of the 5-second grace.
+# The 2000 ms margin rounds ABOVE the worst 1286 ms CI-case upper bound, on top of
+# the unchanged production INT 5-second grace. Both monotonic limits reject
+# a never-stopping watcher/bound or one lingering beyond 7 seconds, including
+# a process first observed gone after the deadline; poll counts cannot stretch it.
+GROUP_KILL_MARGIN_MS=2000
+GROUP_KILL_LIMIT_MS=$((5000 + GROUP_KILL_MARGIN_MS))
+
 monotonic_ms() {
   perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%d\n", clock_gettime(CLOCK_MONOTONIC) * 1000'
 }
@@ -164,7 +225,7 @@ monotonic_ms() {
 # A busy host schedules a freshly forked bound child late. SlowPgrp.pm delays
 # only that child's own setpgrp(0, 0), by longer than the 5-second cleanup
 # grace, and records the child, the bound, and the owner the bound was given.
-# Killing the checkpoint's group then must still stop both within the grace,
+# Killing the checkpoint's group must stop both within GROUP_KILL_LIMIT_MS above,
 # or the watcher the child would go on to start runs with no bound at all.
 test_group_killed_checkpoint_reaches_a_bound_child_slow_to_start() {
   local home checkpoint_pid child watchdog owner watchdog_parent started deadline now gone
@@ -217,7 +278,7 @@ SH
     fail "the bound was not owned by the checkpoint being killed (owner $owner, bound parent $watchdog_parent, checkpoint $checkpoint_pid)"
   fi
   started=$(monotonic_ms)
-  deadline=$((started + 5000))
+  deadline=$((started + GROUP_KILL_LIMIT_MS))
   kill -KILL -- "-$checkpoint_pid"
   wait "$checkpoint_pid" 2>/dev/null || true
   while :; do
@@ -228,11 +289,12 @@ SH
     if [ "$now" -gt "$deadline" ]; then
       kill -KILL -- "-$watchdog" "-$child" 2>/dev/null || true
       kill -KILL "$child" "$watchdog" 2>/dev/null || true
-      fail "the bound and its slow-starting child were not both gone within 5 seconds of the checkpoint's group-kill (gone=$gone, ${now}ms - ${started}ms)"
+      fail "the bound and its slow-starting child were not both gone within ${GROUP_KILL_LIMIT_MS}ms of the checkpoint's group-kill (gone=$gone, $((now - started))ms)"
     fi
     [ "$gone" -eq 1 ] && break
     sleep 0.05
   done
+  printf '# group-kill delayed stop_ms=%s\n' "$((now - started))"
   pass "a group-killed checkpoint still stops a bound child that was slow to make its process group"
 }
 
@@ -659,6 +721,7 @@ test_real_host_checkpoint_ends_quietly_at_its_bound() {
 
 test_quiet_checkpoint_exits_124_cleanly
 test_perl_timeout_fallback_honors_cleanup_bound_before_escalating
+test_unusable_perl_uses_non_perl_timeout
 test_checkpoint_resets_an_inherited_ignored_interrupt
 test_checkpoint_launches_a_watcher_under_a_spaced_root
 test_cancelled_checkpoint_lets_its_watcher_release_the_lock
