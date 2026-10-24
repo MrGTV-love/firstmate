@@ -86,11 +86,11 @@
 # reference. Publication also needs a positively readable live environment
 # without a usable launch pin; a matching or different pin and unreadable
 # probing refuse before staging. A record naming the live PID or another live
-# agent process is the omp extension's to maintain and is refused unchanged,
+# omp process is the omp extension's to maintain and is refused unchanged,
 # including the extension's empty unproven mark and an activation naming
 # another file, even when Herdr still registers the task file. A recorded PID
-# that is gone, or that a process which is not an agent has since reused, does
-# not block repair. The repair writes version=1, the unchanged spawn_gen, the
+# that is gone, or that a process other than omp has since reused, does not
+# block repair. The repair writes version=1, the unchanged spawn_gen, the
 # live pid, task_session_file, and current_session_file, publishing by rename
 # only while the record still holds the bytes the proofs were gathered from.
 # It never unlocks a session, touches project files, starts or stops an agent,
@@ -1418,16 +1418,16 @@ if [ "$VERB" = adopt ]; then
     || die "adopt needs an existing readable session record with the metadata spawn_gen"
   adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
   # The omp extension rewrites the record of the process it runs in, by rename
-  # and without these locks, so a record naming a live agent is the
+  # and without these locks, so a record naming a live omp process is the
   # extension's evidence to keep. A PID reused by any other process after a
-  # restart names no extension and does not block repair.
+  # restart, another harness included, names no extension and does not block repair.
   adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
   adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
     | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
   if [ -n "$adoption_recorded_pid" ] \
     && { [ "$adoption_recorded_pid" = "$adoption_pid" ] \
-      || fm_launch_proof_pid_is_agent "$adoption_recorded_pid"; }; then
-    echo "adopt refused: record proof needs the recorded PID to be gone or no longer an agent process; $adoption_recorded_pid is a live agent process, so the omp extension owns this record and it was not changed" >&2
+      || fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; }; then
+    echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
     exit 1
   fi
   # Only a positively readable unpinned process cannot run the extension's

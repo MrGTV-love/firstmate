@@ -893,7 +893,7 @@ tests/fm-composer-native-idle-hint.test.sh 4023
 tests/fm-contributions-read-saved.test.sh 2078
 tests/fm-contributions.test.sh 248058
 tests/fm-control-reassociate.test.sh 347235
-tests/fm-control-relaunch-backends.test.sh 533609
+tests/fm-control-relaunch-backends.test.sh 537402
 tests/fm-control-relaunch-recovery.test.sh 389000
 tests/fm-control-relaunch.test.sh 236000
 tests/fm-control.test.sh 120383
