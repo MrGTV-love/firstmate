@@ -1,0 +1,3 @@
+GIT_CONFIG_GLOBAL=[<unset>]
+user.name=[FmXdgLabUser]
+HOME=[/private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-xdg-22508.dsh/s1792857982.30394.16936/home]

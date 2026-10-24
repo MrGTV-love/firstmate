@@ -1,0 +1,59 @@
+herdr lab session: fm-lab-dsh-fixes-22516-4554
+== S-EXPLICIT
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-fixes.dU2Xy9
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: /private/tmp/fm-dsh-fixes.dU2Xy9/data/dsh-explicit-22508/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fm-dsh-fixes.dU2Xy9/data/dsh-explicit-22508/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-explicit-22508 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-explicit-22508 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-explicit-22508) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-explicit-22508: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-explicit-22508 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-fixes-22516-4554:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+GIT_CONFIG_GLOBAL=[/private/tmp/fmlab-dsh.V5WkTh/fixes/explicit.gitconfig]
+user.name=[FmExplicitLabUser]
+HOME=[/private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-explicit-22508.dsh/s1792857956.23417.30322/home]
+S-EXPLICIT pass
+observed dsh-explicit-22508 idle
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-fixes.dU2Xy9
+stopped dsh-explicit-22508 harness=dsh backend=herdr endpoint=fm-lab-dsh-fixes-22516-4554:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+== S-XDG
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-fixes.dU2Xy9
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: /private/tmp/fm-dsh-fixes.dU2Xy9/data/dsh-xdg-22508/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fm-dsh-fixes.dU2Xy9/data/dsh-xdg-22508/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-xdg-22508 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-xdg-22508 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-xdg-22508) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-xdg-22508: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-xdg-22508 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-fixes-22516-4554:w2:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+GIT_CONFIG_GLOBAL=[<unset>]
+user.name=[FmXdgLabUser]
+HOME=[/private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-xdg-22508.dsh/s1792857982.30394.16936/home]
+S-XDG pass
+observed dsh-xdg-22508 idle
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-fixes.dU2Xy9
+stopped dsh-xdg-22508 harness=dsh backend=herdr endpoint=fm-lab-dsh-fixes-22516-4554:w2:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+depth-zero log: /private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-xdg-22508.dsh/s1792857982.30394.16936/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/99eb4ea6-36dd-4cff-a148-4bc0c6cf9fed/session.v4.jsonl
+generation: /private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-xdg-22508.dsh/s1792857982.30394.16936
+== S-MALFORMED
+warning: /private/tmp/fm-dsh-fixes.dU2Xy9/data/dsh-xdg-22508/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-xdg-22508 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-xdg-22508 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-xdg-22508) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-xdg-22508: unavailable - no TypeSafe or OpenRouter key
+error: /private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-xdg-22508.dsh/s1792857982.30394.16936/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/00000000-0000-0000-0000-badbadbadbad/session.v4.jsonl does not open with a session header
+relaunch rc=1
+S-MALFORMED pass: refused, generation and v4 log intact
+== S-UNCOMMITTED
+session-file with partial v5: /private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-xdg-22508.dsh/s1792857982.30394.16936/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/99eb4ea6-36dd-4cff-a148-4bc0c6cf9fed/session.v4.jsonl
+position with partial v5: ["/private/tmp/fm-dsh-fixes.dU2Xy9/state/dsh-xdg-22508.dsh/s1792857982.30394.16936/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/99eb4ea6-36dd-4cff-a148-4bc0c6cf9fed/session.v4.jsonl", 26]
+state with partial v5: idle
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-fixes.dU2Xy9
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: /private/tmp/fm-dsh-fixes.dU2Xy9/data/dsh-xdg-22508/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fm-dsh-fixes.dU2Xy9/data/dsh-xdg-22508/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-xdg-22508 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-xdg-22508 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-xdg-22508) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-xdg-22508: unavailable - no TypeSafe or OpenRouter key
+error: dsh-tui session log: no turn started beyond the launch position; inspect window fm-lab-dsh-fixes-22516-4554:w2:p1
+cleanup_exit=1
+credential copies left under task home after scrub: 0
+lab_home=/private/tmp/fm-dsh-fixes.dU2Xy9
+final_exit=1

@@ -1,0 +1,92 @@
+charlesabrooker@Mac-Studio copy % cd -- '/private/tmp/fmlab-dsh.V5WkTh/copy'
+charlesabrooker@Mac-Studio copy % export GOTMPDIR=/tmp/fm-dsh-unc-6944/gotmp
+charlesabrooker@Mac-Studio copy % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio copy % export FM_TASK_ID=dsh-unc-6944
+charlesabrooker@Mac-Studio copy % . '/tmp/fm-dsh-unc-6944+e889cf56d9b4efb9cc3f8dde185a66c046bd6756b25a18e751af4482a6f20
+219/launch.s1792858441.9020.17768.sh'
+
+
+                                            ✦ dsh-TUI  v0.16.1
+                                            ██▀▀▄▄ ██▀▀▀▀ ██▀▀▀▀ ██▀▀▄▄ ██▀▀▀▀ ██▀▀▀▀ ██▀▀▀▀ ██  ██
+                                            █   █  █      █      █   █  ██     █      █      █  ██
+                                            █   █  █ ▀▀▀  █ ▀▀▀  █ ▄▄▀▀  ▀▀▀▀▄ █ ▀▀▀  █ ▀▀▀  █ █
+                        ▄▀▄       ▄         █   █  █      █      █          █  █      █      █  ██
+                        ▀▀▀▀▄  ▄▄▀▀▀        ██▄▄▀▀ ██▄▄▄▄ ██▄▄▄▄ ██     ██▄▄▄▀ ██▄▄▄▄ ██▄▄▄▄ ██  ██
+        ▄▄▄▄▄▄▄▄▄       ▀▀▀▀▀▀▀▀▀▀▀▀
+      ▄▀▀▀▀▀▀▀▀▀▀▀▀▄▄     ▀▀▀▀▀▀▀▀▀         ██  ██   ▄▀▀▄   ██▀▀▄▄  ██  ██  ██▀▀▀▀  ██▀▀▀▀  ██▀▀▀▀
+    ▄▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▄  ▄▀▀▀▀▀            █   █   ██  ██  █   █   █ █ █   █       ██      ██
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀            █ ▀▀█   █ ▀▀█   █ ▄▄▀▀  █  ██   █ ▀▀▀    ▀▀▀▀▄   ▀▀▀▀▄
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀             █   █   █   █   █  ██   █   █   █           █       █
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀              ██  ██  ██  ██  ██  ██  ██  ██  ██▄▄▄▄  ██▄▄▄▀  ██▄▄▄▀
+     ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀               deepseek-v4-flash · High effort
+       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▄              /private/tmp/fmlab-dsh.V5WkTh/copy
+          ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀              Tip: Press ? anytime for the shortcut menu (empty input) · /tips more tips
+
+          Explore the uncharted!
+
+  ❯ FIRSTMATE_OP: v1 launch-brief: # Current worker role contract
+    You are a crewmate: an autonomous worker agent managed by firstmate.
+    This section establishes your current identity before every project or task instruction below and supersedes
+    any conflicting role identity in those instructions.
+    Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+    identity, delegate the task, run fleet supervision, or address the captain.
+    Your steering inbox is `/private/tmp/fm-dsh-uncommit.16xmTf/state/dsh-unc-6944.inbox`; this exact path
+    belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so
+    read and acknowledge its messages as individually announced by native launch or inbox doorbells and do not
+    reject it as another home's state.
+    Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task
+    paths named by this brief.
+    When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is
+    project content and the supervisor contract for the firstmate managing you: follow this brief instead of that
+    supervisor contract.
+    Project instructions still govern the work wherever they do not conflict with this worker identity, including
+    `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+    If the `firstmate-coding-guidelines` skill name does not resolve in this session, read
+    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/.agents/skills/firstmat
+    e-coding-guidelines/SKILL.md` instead.
+    When assigned an independent review, apply the shared review rubric below, rendered from
+    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/docs/review-rubric.md`,
+     against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate
+    if it was not supplied.
+
+    # Shared review rubric
+
+    This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
+    It does not change the selected delivery path, review authority, or merge policy.
+
+    - Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope
+    list.
+    - Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing
+    criteria or evidence explicitly rather than inventing requirements.
+    - Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or
+    authority to widen the ask.
+    - Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the
+    available execution records.
+
+    ## Review outcomes
+
+    Each finding takes one of these outcomes:
+
+    - A failed DoD mandatory item: block.
+    - A real defect that breaks the stated intent, even when no DoD item names it: block.
+    - An improvement outside the DoD: a follow-up note, never a block.
+    - A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
+
+    ## PR body claims
+
+    - Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a
+    verification-plan row id.
+    - When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely
+    re-word it.
+    verification-plan row id.
+    - When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely
+    re-word it.
+
+    # Task
+    ## Captain's intent
+    Report the git identity this DeepSeek ship sees, without changing files.
+    ## Firstmate spec
+    Remember this secret word for later questions: OSPREY6944.
+    Use your Bash tool to run exactly this one command:
+    { printf 'GIT_CONFIG_GLOBAL=[%s]\n' "${GIT_CONFIG_GLOBAL-<unset>}"; printf 'user.name=[%s]\n' "$(git config
+dsh-tui exited unexpectedly (code 1). Enter safe mode? [Y/n]

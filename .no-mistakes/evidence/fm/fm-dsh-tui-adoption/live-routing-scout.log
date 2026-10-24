@@ -1,0 +1,21 @@
+herdr lab session: fm-lab-dsh-rscout-36409-9051
+crew-harness config: omp
+== S-ROUTE-FRESH-SCOUT: fresh scout, no --harness, only a DeepSeek model
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rscout.zAGsKF
+skill selection for dsh-rscout-36405: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-rscout-36405 harness=dsh kind=scout window=firstmate:fm-dsh-rscout-36405 worktree=/Users/charlesabrooker/.treehouse/project-8da207/1/project
+rc=0
+meta: worktree=/Users/charlesabrooker/.treehouse/project-8da207/1/project harness=dsh kind=scout model=deepseek/deepseek-v4-flash 
+dsh-tui processes bound to this task: 3
+GIT_CONFIG_GLOBAL=[<unset>]
+user.name=[]
+HOME=[/private/tmp/fm-dsh-rscout.zAGsKF/state/dsh-rscout-36405.dsh/s1792859399.36629.6315/home]
+observed dsh-rscout-36405 idle
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rscout.zAGsKF
+stopped dsh-rscout-36405 harness=dsh backend=tmux endpoint=firstmate:fm-dsh-rscout-36405 worktree=/Users/charlesabrooker/.treehouse/project-8da207/1/project
+scout worktree: /Users/charlesabrooker/.treehouse/project-8da207/1/project
+S-ROUTE-FRESH-SCOUT pass
+cleanup_exit=0
+credential copies left under task home after scrub: 0
+lab_home=/private/tmp/fm-dsh-rscout.zAGsKF
+final_exit=0

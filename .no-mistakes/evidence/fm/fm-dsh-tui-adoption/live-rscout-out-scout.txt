@@ -1,0 +1,3 @@
+GIT_CONFIG_GLOBAL=[<unset>]
+user.name=[]
+HOME=[/private/tmp/fm-dsh-rscout.zAGsKF/state/dsh-rscout-36405.dsh/s1792859399.36629.6315/home]

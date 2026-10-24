@@ -1,0 +1,47 @@
+herdr lab session: fm-lab-dsh-uncommit-83610-7577
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-uncommit.b2YGNt
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: /private/tmp/fm-dsh-uncommit.b2YGNt/data/dsh-unc-83607/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fm-dsh-uncommit.b2YGNt/data/dsh-unc-83607/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-unc-83607 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-unc-83607 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-unc-83607) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-unc-83607: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-unc-83607 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-uncommit-83610-7577:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+observed dsh-unc-83607 idle
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-uncommit.b2YGNt
+stopped dsh-unc-83607 harness=dsh backend=herdr endpoint=fm-lab-dsh-uncommit-83610-7577:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+v4=/private/tmp/fm-dsh-uncommit.b2YGNt/state/dsh-unc-83607.dsh/s1792858141.85121.1782/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/a42d10a9-9248-4f00-b908-a7537c325ad4/session.v4.jsonl
+gen=/private/tmp/fm-dsh-uncommit.b2YGNt/state/dsh-unc-83607.dsh/s1792858141.85121.1782
+mode=partial; session-file now: /private/tmp/fm-dsh-uncommit.b2YGNt/state/dsh-unc-83607.dsh/s1792858141.85121.1782/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/a42d10a9-9248-4f00-b908-a7537c325ad4/session.v4.jsonl
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-uncommit.b2YGNt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-uncommit.b2YGNt
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: /private/tmp/fm-dsh-uncommit.b2YGNt/data/dsh-unc-83607/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fm-dsh-uncommit.b2YGNt/data/dsh-unc-83607/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-unc-83607 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-unc-83607 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-unc-83607) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-unc-83607: unavailable - no TypeSafe or OpenRouter key
+error: dsh-tui session log: no turn started beyond the launch position; inspect window fm-lab-dsh-uncommit-83610-7577:w1:p1
+error: the replacement agent for dsh-unc-83607 could not be launched on dsh
+error: dsh-unc-83607 was relaunched on dsh but no running agent could be confirmed; its work is preserved at /private/tmp/fmlab-dsh.V5WkTh/copy
+control relaunch rc=1
+binding root after: /private/tmp/fm-dsh-uncommit.b2YGNt/state/dsh-unc-83607.dsh/s1792858141.85121.1782 (same=yes)
+NO RECALL
+--- pane after relaunch (last 40 lines)
+{"error":{"code":"pane_not_found","message":"pane w1:p1 not found"},"id":"cli:pane:read"}
+total 136
+drwx------  5 charlesabrooker  wheel    160 Oct 24 11:09 .
+drwx------  3 charlesabrooker  wheel     96 Oct 24 11:09 ..
+-rw-r--r--  1 charlesabrooker  wheel      0 Oct 24 11:09 session.lock
+-rw-------  1 charlesabrooker  wheel  62706 Oct 24 11:09 session.v4.jsonl
+-rw-r--r--  1 charlesabrooker  wheel     31 Oct 24 11:09 session.v5.jsonl
+v4 bytes before=   62706 after=   62706
+v5 head:
+{"type":"session","id":"partial
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-uncommit.b2YGNt
+endpoint-gone dsh-unc-83607 harness=dsh backend=herdr endpoint=fm-lab-dsh-uncommit-83610-7577:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+DONE
+cleanup_exit=0
+credential copies left under task home after scrub: 0
+lab_home=/private/tmp/fm-dsh-uncommit.b2YGNt
+final_exit=0

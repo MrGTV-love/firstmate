@@ -1,6 +1,13 @@
+FM_TEST_BEGIN 2026-10-24T16:31:52Z tests/fm-dsh-harness.test.sh family=unclassified expected_gate_skip=none
 ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, any log generation admitted by behavior, named unknown checks and generation retirement
 ok - PATH-selected DSH probes accept arbitrary releases, refuse failed commands and require ownership cleanup only for primaries
 ok - the DSH primary resumes its bound model and effort and refuses to replace an unresumable or live conversation
 ok - a DSH primary with no --model reads the operator /model preference at launch and refuses when it names no DeepSeek model
 ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic
 ok - dsh executable-slot attribution, lifecycle capability, fatal cleanup contract and task-home credential scrub
+FM_TEST_END 2026-10-24T16:32:38Z tests/fm-dsh-harness.test.sh exit=0 duration_ms=46173 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=46543
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=46173 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-dsh-harness.test.sh duration_ms=46173
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

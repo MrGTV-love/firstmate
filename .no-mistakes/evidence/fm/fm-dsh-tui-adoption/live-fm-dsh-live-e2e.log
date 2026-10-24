@@ -1,52 +1,52 @@
-warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout2/home-1792823286/data/dsh-ship-53235/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
-warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout2/home-1792823286/data/dsh-ship-53235/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
-notice: dsh-ship-53235 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
-notice: dsh-ship-53235 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-53235) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
-skill selection for dsh-ship-53235: unavailable - no TypeSafe or OpenRouter key
-spawned dsh-ship-53235 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-live-58790-31021:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
-observed dsh-ship-53235 busy
-first session=/private/tmp/fmlab-dsh.Vmj0Km/ship-scout2/home-1792823286/state/dsh-ship-53235.dsh/s1792823288.59424.29292/dsh/sessions/--private-tmp-fmlab-dsh.Vmj0Km-copy--/868edc4e-3fe6-4985-917b-fffa6d16c9d0/session.v4.jsonl
+warning: /private/tmp/fmlab-dsh.V5WkTh/ship-scout/home-1792857667/data/dsh-ship-7075/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fmlab-dsh.V5WkTh/ship-scout/home-1792857667/data/dsh-ship-7075/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-7075 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-7075 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-7075) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-7075: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-ship-7075 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-live-9244-6361:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+observed dsh-ship-7075 busy
+first session=/private/tmp/fmlab-dsh.V5WkTh/ship-scout/home-1792857667/state/dsh-ship-7075.dsh/s1792857669.9606.21680/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/9081a995-22f3-4fc1-a6b4-d5c561a1354b/session.v4.jsonl
 busy composer=empty
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ●  WATCHER DOWN - SUPERVISION IS OFF
 ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
 ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
 ●  This is a supervision warning only; the requested message WILL still be sent.
-●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5P6CVQGQ910WB76XD4XBACG/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
 ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-steer acknowledged by dsh-ship-53235
-observed dsh-ship-53235 idle
+steer acknowledged by dsh-ship-7075
+observed dsh-ship-7075 idle
 WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
-observed dsh-ship-53235 busy
-interrupt-delivered dsh-ship-53235 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
-stopped dsh-ship-53235 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-58790-31021:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
-warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout2/home-1792823286/data/dsh-ship-53235/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
-warning: /private/tmp/fmlab-dsh.Vmj0Km/ship-scout2/home-1792823286/data/dsh-ship-53235/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
-notice: dsh-ship-53235 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
-notice: dsh-ship-53235 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-53235) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
-skill selection for dsh-ship-53235: unavailable - no TypeSafe or OpenRouter key
-relaunched dsh-ship-53235 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-58790-31021:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+observed dsh-ship-7075 busy
+interrupt-delivered dsh-ship-7075 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-ship-7075 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-9244-6361:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+warning: /private/tmp/fmlab-dsh.V5WkTh/ship-scout/home-1792857667/data/dsh-ship-7075/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fmlab-dsh.V5WkTh/ship-scout/home-1792857667/data/dsh-ship-7075/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-ship-7075 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-ship-7075 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-ship-7075) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-ship-7075: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-ship-7075 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-9244-6361:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
 resumed the earlier conversation in place
-stopped dsh-ship-53235 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-58790-31021:w1:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+stopped dsh-ship-7075 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-9244-6361:w1:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
 ok - live dsh-tui ship brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
-skill selection for dsh-scout-53235: unavailable - no TypeSafe or OpenRouter key
-spawned dsh-scout-53235 harness=dsh kind=scout window=fm-lab-dsh-live-58790-31021:w2:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
-observed dsh-scout-53235 busy
-first session=/private/tmp/fmlab-dsh.Vmj0Km/ship-scout2/home-1792823286/state/dsh-scout-53235.dsh/s1792823387.45916.28711/dsh/sessions/--private-tmp-fmlab-dsh.Vmj0Km-copy--/85814c11-23cd-481a-8a54-8a8a199b09a3/session.v4.jsonl
+skill selection for dsh-scout-7075: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-scout-7075 harness=dsh kind=scout window=fm-lab-dsh-live-9244-6361:w2:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+observed dsh-scout-7075 busy
+first session=/private/tmp/fmlab-dsh.V5WkTh/ship-scout/home-1792857667/state/dsh-scout-7075.dsh/s1792857763.61577.11241/dsh/sessions/--private-tmp-fmlab-dsh.V5WkTh-copy--/b5a23d95-90dc-4a14-b0e6-df0859cff5b2/session.v4.jsonl
 busy composer=empty
 WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
-steer acknowledged by dsh-scout-53235
-observed dsh-scout-53235 idle
+steer acknowledged by dsh-scout-7075
+observed dsh-scout-7075 idle
 WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
-observed dsh-scout-53235 busy
-interrupt-delivered dsh-scout-53235 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
-stopped dsh-scout-53235 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-58790-31021:w2:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
-skill selection for dsh-scout-53235: unavailable - no TypeSafe or OpenRouter key
-relaunched dsh-scout-53235 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-58790-31021:w2:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+observed dsh-scout-7075 busy
+interrupt-delivered dsh-scout-7075 harness=dsh backend=herdr verified=agent-alive cancel=unconfirmed
+stopped dsh-scout-7075 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-9244-6361:w2:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
+skill selection for dsh-scout-7075: unavailable - no TypeSafe or OpenRouter key
+relaunched dsh-scout-7075 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-live-9244-6361:w2:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
 resumed the earlier conversation in place
-stopped dsh-scout-53235 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-58790-31021:w2:p1 worktree=/private/tmp/fmlab-dsh.Vmj0Km/copy
+stopped dsh-scout-7075 harness=dsh backend=herdr endpoint=fm-lab-dsh-live-9244-6361:w2:p1 worktree=/private/tmp/fmlab-dsh.V5WkTh/copy
 ok - live dsh-tui scout brief, busy composer, mid-task steer, interrupt, exit, resumed conversation, final exit
-lab_project=/private/tmp/fmlab-dsh.Vmj0Km/project
-lab_copy=/private/tmp/fmlab-dsh.Vmj0Km/copy
-lab_home=/private/tmp/fmlab-dsh.Vmj0Km/ship-scout2/home-1792823286
+lab_project=/private/tmp/fmlab-dsh.V5WkTh/project
+lab_copy=/private/tmp/fmlab-dsh.V5WkTh/copy
+lab_home=/private/tmp/fmlab-dsh.V5WkTh/ship-scout/home-1792857667
 cleanup_exit=0

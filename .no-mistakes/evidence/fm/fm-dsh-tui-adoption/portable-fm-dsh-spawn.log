@@ -1,3 +1,4 @@
+FM_TEST_BEGIN 2026-10-24T16:32:38Z tests/fm-dsh-spawn.test.sh family=unclassified expected_gate_skip=none
 ok - fm-harness: dsh detects by anchored name or script argv, including nested native startup; its marker needs real dsh ancestry
 ok - session lock and process classification: dsh is anchored, decoys stay out
 ok - fm_backend_tmux_agent_state: dsh is alive by name and by script argv, an unrelated node is not
@@ -7,12 +8,20 @@ ok - fm-spawn: DeepSeek spellings omp would resolve to the deepseek provider rou
 ok - fm-spawn: a DeepSeek spelling of a retired id refuses before launch once canonicalized
 ok - fm-spawn: an explicit dsh pin is honored and a dsh launch without a DeepSeek model is refused
 ok - fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME
+ok - fm-spawn: the dsh launch keeps an operator's XDG-only git identity under a private HOME
 ok - fm-spawn: a dsh crew harness mirrored from a DSH primary carries its bound model and the operator's install, and refuses without a live record
 ok - fm-spawn: a dsh secondmate starts on its positional brief and carries the operator's DSH install and home to nested spawns
 ok - fm-spawn: a plain, same-model or same-model role dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation
+ok - fm-spawn: a dsh ship relaunch resumes past uncommitted subagent and newer-version headers and refuses rather than discard a conversation it cannot read
 ok - fm-spawn: the restricted session policy admits canonical dsh-tui DeepSeek launches
 ok - fm-spawn: explicit, raw, and indexed DeepSeek-through-omp routes refuse before launch
 ok - fm-spawn: catalog-listed DeepSeek defaults refuse without --model; non-DeepSeek defaults retain omp
 ok - fm-spawn: a successful version probe and durable turn cannot admit an unrecognized dsh screen
 ok - fm-spawn: exhausted omp replaces its declared DeepSeek stand-in with dsh-tui under the session policy
 ok - live guards: an opted-in run with a missing lab input or no DeepSeek model preference fails before any lab action; the opt-out still skips
+FM_TEST_END 2026-10-24T16:35:06Z tests/fm-dsh-spawn.test.sh exit=0 duration_ms=147339 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=147727
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=147339 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-dsh-spawn.test.sh duration_ms=147339
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Q7KGBVXZQ999M5NBJF5W6V/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
