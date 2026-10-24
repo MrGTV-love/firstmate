@@ -298,7 +298,7 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # minutes, and a new member or a slow path fails the coverage guard instead of
 # quietly stretching the workflow. Like the serial target this is packing
 # arithmetic, not an execution timeout.
-# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.10 (the slower parallel lane measured 1231 s in run 40121241146 and models at 1117958 ms)
+# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (the slower parallel lane measured 1231 s in run 40121241146 and models at 1117958 ms)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
 # Conservative balance hint for a portable-serial script with no measurement.
@@ -652,7 +652,7 @@ tests/fm-x-mode.test.sh
 EOF
 }
 
-# Per-script serial CI duration hints, one "<path> <ms>" per line, used to
+# Per-script three-abreast wall hints, one "<path> <ms>" per line, used to
 # pack only the two portable parallel lanes. Measurement provenance and the
 # refresh procedure are owned by docs/fm-test-portable-shards.md.
 portable_parallel_weight_hints() {
@@ -726,13 +726,13 @@ EOF
 list_portable_parallel_2() {
   cat <<'EOF'
 tests/fm-lint.test.sh
-tests/fm-captain-hold-cleanup.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
-tests/fm-arm-pretool-check.test.sh
+tests/fm-captain-hold-cleanup.test.sh
 tests/fm-captain-hold-sweep.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-archive.test.sh
+tests/fm-arm-pretool-check.test.sh
 tests/fm-backend-herdr.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
