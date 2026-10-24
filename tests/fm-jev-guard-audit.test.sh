@@ -169,27 +169,29 @@ assert.equal(blocked.decision, 'block');
 assert.equal(blocked.attempts, 6);
 assert.equal(blocked.cost.incomplete, true);
 });
-await test('T4(a): telemetry upload requires its own grant and never logs the report body', async () => {
-  const event = { toolName: 'write', input: { path: 'xd://report_issue', content: 'private-report-canary' } };
-  let patch;
-  const denied = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
-  assert.equal(patch?.block, true);
-  assert.equal(denied.branch, 'egress');
-  assert.deepEqual(denied.egress, [{ destination_class: 'telemetry', argv_shape: 'path' }]);
-  writeFileSync(`${state}/audit.meta`, 'egress=["telemetry"]\n');
-  try {
-    const admitted = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
-    assert.equal(patch, undefined, 'the table, not a filesystem exception, owns telemetry dispatch');
-    assert.equal(admitted.decision, 'allow');
-    assert.equal(admitted.request_started, false);
-    assert.ok(!JSON.stringify(admitted).includes('private-report-canary'));
-  } finally { rmSync(`${state}/audit.meta`); }
+await test('T4(a): xd://report_issue is refused by the device rule under every grant and never logs the report body', async () => {
+  const all = '["semantic-search","web","browser","provider","subagent","dynamic-code","remote-storage"]';
+  for (const meta of [undefined, `egress=${all}\n`]) {
+    if (meta) writeFileSync(`${state}/audit.meta`, meta);
+    try {
+      for (const event of [{ toolName: 'write', input: { path: 'xd://report_issue', content: 'private-report-canary' } },
+        { toolName: 'report_issue', input: { body: 'private-report-canary' } }]) {
+        let patch;
+        const r = await fresh(async () => { patch = await handlers.tool_call(event, { cwd: state }); });
+        assert.equal(patch?.block, true, `${event.toolName}: report upload must not execute (grant: ${meta ?? 'none'})`);
+        assert.equal(r.branch, event.toolName === 'write' ? 'device' : 'coverage');
+        assert.equal(r.egress, undefined, 'no egress class can admit a report upload');
+        assert.equal(r.request_started, false);
+        assert.ok(!JSON.stringify(r).includes('private-report-canary'));
+      }
+    } finally { if (meta) rmSync(`${state}/audit.meta`); }
+  }
 });
 await test('T4(c): eval explicitly records T5 as the write-boundary owner, not an egress permission', async () => {
   const { toolPolicy, callEgress } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
   assert.equal(toolPolicy('eval')?.call, 'confinement');
   assert.equal(toolPolicy('eval')?.confinement_owner, 'T5');
-  assert.deepEqual(callEgress('eval', { language: 'py', code: 'print("private-eval-canary")' }), []);
+  assert.deepEqual(callEgress('eval'), []);
   const r = await fresh(async () => {
     assert.equal(await handlers.tool_call({ toolName: 'eval', input: { language: 'py', code: 'print("private-eval-canary")' } }, { cwd: state }), undefined);
   });
@@ -247,25 +249,18 @@ await test('T4(d): Claude built-in inventory is classified and an added tool fai
     { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'NewHostTool', tool_input: {}, cwd: state }), encoding: 'utf8' });
   assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny');
 });
-await test('live registry drift and unavailable inventory refuse even a known local tool', async () => {
-  for (const getAllTools of [() => [{ name: 'read' }, { name: 'new-paid-host-tool' }], () => { throw new Error('fixture inventory unavailable'); }]) {
-    const localHandlers = {};
-    installJevGuard({ getAllTools, on(name, fn) { localHandlers[name] = fn; } }, context);
-    let patch;
-    const r = await fresh(async () => { patch = await localHandlers.tool_call({ toolName: 'read', input: { path: 'file.ts' } }, { cwd: state }); });
-    assert.equal(patch?.block, true);
-    assert.equal(r.branch, 'coverage');
-    assert.equal(r.request_started, false);
-  }
+await test('an unclassified tool elsewhere in the host registry does not refuse a classified call', async () => {
+  const localHandlers = {};
+  installJevGuard({ getAllTools: () => [{ name: 'read' }, { name: 'operator-mcp-tool' }], on(name, fn) { localHandlers[name] = fn; } }, context);
+  const before = rowCount();
+  assert.equal(await localHandlers.tool_call({ toolName: 'read', input: { path: 'file.ts' } }, { cwd: state }), undefined);
+  assert.equal(rowCount(), before);
 });
-await test('Claude native WebSearch and remote Read retain their outbound character at the CLI boundary', async () => {
+await test('Claude native WebSearch retains its outbound character at the CLI boundary', async () => {
   const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
   const args = ['--experimental-strip-types', '--no-warnings', adapter, state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION];
   const call = (tool_name, tool_input) => execFileSync(process.execPath, args, { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input, cwd: state }), encoding: 'utf8' });
-  for (const [tool, input] of [['WebSearch', { query: 'synthetic-query' }], ['Read', { file_path: 'https://synthetic.invalid' }]]) {
-    const denied = JSON.parse(call(tool, input));
-    assert.equal(denied.hookSpecificOutput.permissionDecision, 'deny', tool);
-  }
+  assert.equal(JSON.parse(call('WebSearch', { query: 'synthetic-query' })).hookSpecificOutput.permissionDecision, 'deny');
   writeFileSync(`${state}/audit.meta`, 'egress=["web"]\n');
   try {
     const r = await fresh(async () => { assert.equal(call('WebSearch', { query: 'synthetic-query' }), ''); });
@@ -283,20 +278,7 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
   const cases = [
     ['web_search', { query: 'synthetic' }, 'web'],
     ['browser', { url: 'https://synthetic.invalid' }, 'browser'],
-    ['read', { path: 'https://synthetic.invalid' }, 'web'],
-    ['grep', { path: 'ssh://synthetic/file' }, 'remote-shell'],
-    ['read', { path: 'pr://1' }, 'github'],
-    ['bash', { command: '/usr/bin/curl https://synthetic.invalid' }, 'web'],
-    ['bash', { command: "env X=y c'u'rl https://synthetic.invalid" }, 'web'],
-    ['bash', { command: "bash -c 'wget synthetic.invalid'" }, 'web'],
-    ['bash', { command: 'true; ssh synthetic.invalid' }, 'remote-shell'],
-    ['bash', { command: 'scp file synthetic:file' }, 'remote-shell'],
-    ['bash', { command: 'gh-axi pr view 1' }, 'github'],
-    ['bash', { command: 'npm install synthetic-package' }, 'package-registry'],
-    ['bash', { command: 'python3 -m pip install synthetic-package' }, 'package-registry'],
-    ['bash', { command: 'git fetch origin' }, 'remote-storage'],
-    ['bash', { command: 'client --endpoint https://synthetic.invalid' }, 'provider'],
-    ['write', { path: 'xd://generate_image', content: '{}' }, 'provider'],
+    ['generate_image', { prompt: 'synthetic' }, 'provider'],
     ['task', { task: 'synthetic' }, 'subagent'],
   ];
   for (const [toolName, input, destination] of cases) {
@@ -318,9 +300,17 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
     assert.equal(r.branch, 'device');
     assert.equal(r.request_started, false);
   } finally { rmSync(`${state}/audit.meta`); }
-  const { callEgress } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
-  for (const command of ['echo curl', 'git status --short', 'npm test', 'ps aux']) {
-    assert.deepEqual(callEgress('bash', { command }), [], `local command: ${command}`);
+});
+await test('worker brief shell commands are never refused for a missing egress grant', async () => {
+  const commands = ['gh-axi pr create --title synthetic --body synthetic', 'gh pr checks 1 --watch',
+    'no-mistakes axi run --wait', 'no-mistakes axi respond --action fix --wait', 'git push -u origin HEAD',
+    'git fetch origin', 'git pull --ff-only', 'npm install', 'pnpm install', 'bun install', 'uv sync', 'uv run pytest',
+    'npx tsc --noEmit', 'chrome-devtools-axi open https://synthetic.invalid', 'git commit -m "Fixes https://synthetic.invalid/1"'];
+  for (const command of commands) {
+    parts = []; next = 0;
+    const before = rowCount();
+    assert.equal(await handlers.tool_call({ toolName: 'bash', input: { command } }, { cwd: state }), undefined, command);
+    assert.equal(rowCount(), before, `no egress or model decision row: ${command}`);
   }
 });
 await test('S2(d): local read and bash stay unjudged, write/edit keep credential screening', async () => {

@@ -4,7 +4,7 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
-import { callEgress, callPolicy, egressGranted, uncoveredTools } from "./fm-jev-egress.ts";
+import { callEgress, egressGranted, toolPolicy } from "./fm-jev-egress.ts";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -35,7 +35,6 @@ export interface GuardCallEvent {
 export interface GuardCallPatch { block: true; reason: string }
 export type GuardCallHandler = (event: GuardCallEvent, ctx: GuardRuntimeContext) => Promise<GuardCallPatch | void>;
 export interface GuardHost {
-  getAllTools?: () => { name: string }[];
   on(name: "tool_call", handler: GuardCallHandler): void;
 }
 
@@ -220,27 +219,21 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
 
   pi.on("tool_call", async (event, ctx) => withDecisionBudget(async () => {
     const tool = event.toolName;
-    const policy = callPolicy(tool, event.input);
+    const policy = toolPolicy(tool);
     let result: SystemOneResult | undefined;
     let trail: Trail = {};
     const terminal: GuardTerminal = { hook: "tool_call", tool, decision: "allow", enforcement: "pretool_allow",
       branch: "policy", error_type: null, request_started: false,
       ...((tool === "write" || tool === "edit") && object(event.input) && typeof event.input.path === "string"
         ? { refused_path: event.input.path } : {}) };
-    let covered = policy !== undefined;
-    try {
-      if (pi.getAllTools) covered &&= uncoveredTools(pi.getAllTools().map((entry) => entry.name)).length === 0;
-    } catch { covered = false; }
-    if (!covered || !policy) {
+    if (!policy) {
       return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
-        "Unclassified or unavailable host tool inventory: Firstmate must classify the installed tools in fm-jev-egress.ts before execution.");
+        "Unclassified host tool: Firstmate must classify it in fm-jev-egress.ts before execution.");
     }
     try {
-      const egress = callEgress(tool, event.input);
+      const egress = callEgress(tool);
       if (egress.length > 0) {
         terminal.egress = egress;
-        // Remote paths can contain credentials; egress records keep shapes only.
-        delete terminal.refused_path;
         if (!egressGranted(c.state, c.task, egress)) {
           const requested = [...new Set(egress.map((shape) => shape.destination_class))];
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
