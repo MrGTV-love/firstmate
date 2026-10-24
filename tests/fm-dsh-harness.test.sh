@@ -181,6 +181,12 @@ call('position',state,'task',ok=False)
 v5.write_text(json.dumps({**header,'version':5})+'\n'+json.dumps({'type':'turn/start','seq':3})+'\n'+json.dumps({'type':'turn/end','seq':3})+'\n')
 unknown(state,'task', check='non-monotonic sequence: seq 3 after 3')
 v5.unlink()
+# A subagent log whose header line is not yet committed opens no session, so it
+# neither fails the store nor displaces the live depth-zero log.
+(child / 'session.v4.jsonl').write_text('{"type":"session","version":4,"id":"')
+assert json.loads(call('position',state,'task'))[0] == str(log), 'an uncommitted header must not fail the store'
+assert call('session-file',state,'task') == str(log)
+(child / 'session.v4.jsonl').unlink()
 # A launch with no log yet has no position, so its first turn is the proof.
 no_log = tmp / 'no-log-state'
 no_log.mkdir()

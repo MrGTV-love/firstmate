@@ -409,13 +409,12 @@ test_explicit_harness_is_not_rerouted() {
 }
 
 # Runs the recorded launch command as a pane would: in a clean environment that
-# still carries foreign harness markers, under a fake operator HOME. The fake
-# dsh-tui records what it was given; extra arguments are further pane variables.
+# still carries foreign harness markers, under the operator HOME the launch was
+# prepared from. The fake dsh-tui records what it was given; extra arguments are
+# further pane variables.
 run_recorded_launch() {  # <out-log> <pane-vars...>
-  local log=$1 launch real_home="$CASE_DIR/operator-home" probe="$CASE_DIR/probe-repo"
+  local log=$1 launch real_home="$HOME_DIR/user-home" probe="$CASE_DIR/probe-repo"
   shift
-  mkdir -p "$real_home"
-  printf '[user]\n\tname = Known Operator\n\temail = %s\n' "$KNOWN_EMAIL" > "$real_home/.gitconfig"
   [ -d "$probe/.git" ] || fm_git_init_commit "$probe"
   launch=$(cat "$LAUNCH_LOG")
   : > "$log"
@@ -426,9 +425,10 @@ run_recorded_launch() {  # <out-log> <pane-vars...>
 }
 
 test_launch_environment() {
-  local id=dsh-env log launch_env state_home real_home out
+  local id=dsh-env log launch_env state_home real_home out override
   make_dsh_case env "$id"
-  real_home="$CASE_DIR/operator-home"
+  real_home="$HOME_DIR/user-home"
+  printf '[user]\n\tname = Known Operator\n\temail = %s\n' "$KNOWN_EMAIL" > "$real_home/.gitconfig"
   out=$(run_dsh_spawn "$id" --model "$DSH_MODEL" --scout) || fail "dsh scout spawn failed: $out"
   log="$CASE_DIR/dsh-env.log"
   run_recorded_launch "$log" || fail "the recorded dsh launch command failed: $(cat "$LAUNCH_LOG")"
@@ -452,17 +452,37 @@ $foreign="*|"$foreign="*) fail "the launch must clear the inherited $foreign" ;;
   assert_equals "$KNOWN_EMAIL" "$(cat "$log.author")" \
     "a commit under the private HOME must keep the operator's configured git author"
   assert_contains "$(cat "$log.hooks")" "$id.git-hooks" \
-    "the GIT_CONFIG core.hooksPath guard must survive beside GIT_CONFIG_GLOBAL"
-  assert_equals "$real_home/.gitconfig" "$(sed -n 's/^GIT_CONFIG_GLOBAL=//p' "$log")" \
-    "the worker must read the operator's own git config file"
+    "the GIT_CONFIG core.hooksPath guard must survive beside the operator's global git config"
+  assert_equals "" "$(sed -n 's/^GIT_CONFIG_GLOBAL=//p' "$log")" \
+    "with none exported the launch must not name a global git config file, which would hide the XDG one"
   assert_equals "$real_home/.no-mistakes" "$(sed -n 's/^NM_HOME=//p' "$log")" \
     "with no NM_HOME exported the worker must still reach the operator's no-mistakes home"
-  run_recorded_launch "$log" NM_HOME=/shared/nm GIT_CONFIG_GLOBAL=/shared/gitconfig || fail "the launch with exported paths failed"
+  override="$CASE_DIR/override.gitconfig"
+  printf '[user]\n\tname = Override Operator\n\temail = override@example.test\n' > "$override"
+  run_recorded_launch "$log" NM_HOME=/shared/nm GIT_CONFIG_GLOBAL="$override" || fail "the launch with exported paths failed"
   assert_equals /shared/nm "$(sed -n 's/^NM_HOME=//p' "$log")" "an exported NM_HOME must be carried unchanged"
-  assert_equals /shared/gitconfig "$(sed -n 's/^GIT_CONFIG_GLOBAL=//p' "$log")" "an exported GIT_CONFIG_GLOBAL must be carried unchanged"
+  assert_equals "$override" "$(sed -n 's/^GIT_CONFIG_GLOBAL=//p' "$log")" "an exported GIT_CONFIG_GLOBAL must be carried unchanged"
+  assert_equals override@example.test "$(cat "$log.author")" "a commit must keep the author an exported GIT_CONFIG_GLOBAL names"
   run_recorded_launch "$log" NM_HOME= || fail "the launch with an empty NM_HOME failed"
   assert_equals "$real_home/.no-mistakes" "$(sed -n 's/^NM_HOME=//p' "$log")" "an empty NM_HOME must select the operator's default home"
   pass "fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME"
+}
+
+# An operator who keeps git identity only in the XDG git config has no
+# ~/.gitconfig; the worker must still commit as that operator.
+test_launch_reads_xdg_only_git_config() {
+  local id=dsh-xdg log out real_home
+  make_dsh_case xdg "$id"
+  real_home="$HOME_DIR/user-home"
+  mkdir -p "$real_home/.config/git"
+  printf '[user]\n\tname = Known Operator\n\temail = %s\n' "$KNOWN_EMAIL" > "$real_home/.config/git/config"
+  out=$(run_dsh_spawn "$id" --model "$DSH_MODEL" --scout) || fail "dsh scout spawn failed: $out"
+  log="$CASE_DIR/dsh-xdg.log"
+  run_recorded_launch "$log" || fail "the recorded dsh launch command failed: $(cat "$LAUNCH_LOG")"
+  assert_absent "$real_home/.gitconfig" "the fixture operator must keep git config only in the XDG location"
+  assert_equals "$KNOWN_EMAIL" "$(cat "$log.author")" \
+    "a commit under the private HOME must keep the author configured only in the operator's XDG git config"
+  pass "fm-spawn: the dsh launch keeps an operator's XDG-only git identity under a private HOME"
 }
 
 # A crew harness mirrored from a DSH primary with no model carries that
@@ -629,6 +649,70 @@ PY
     || fail "a missing role must leave the bound conversation log untouched"
   rm -f "$HOME_DIR/config/model-index.json"
   pass "fm-spawn: a plain, same-model or same-model role dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation"
+}
+
+# A ship relaunch resumes its conversation past a delegated subagent log whose
+# header is not yet committed, and refuses, keeping the bound generation and its
+# conversation, when a log in the store opens with anything but a session header.
+test_ship_relaunch_never_discards_an_unreadable_conversation() {
+  local id=dsh-ship-resume binding generation log session subagent bin out status writer
+  make_dsh_case ship-resume "$id"
+  out=$(run_dsh_spawn "$id" --model "$DSH_MODEL" --mode local-only --yolo off 2>&1) || fail "the dsh ship must spawn: $out"
+  binding="$HOME_DIR/state/$id.dsh-session"
+  generation=$(jq -r .root "$binding")
+  log="$generation/dsh/sessions/workspace/session/session.v4.jsonl"
+  session=$(head -n 1 "$log" | jq -r .id)
+  subagent="$generation/dsh/sessions/workspace/subagent"
+  mkdir -p "$subagent"
+  printf '{"type":"session","version":4,"id":"' > "$subagent/session.v4.jsonl"
+  bin="$CASE_DIR/relaunch-shell"
+  mkdir -p "$bin"
+  cat > "$bin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *pane_current_command*) printf 'zsh\\n'; exit 0 ;;
+esac
+exec "$FAKEBIN_DIR/tmux" "\$@"
+SH
+  chmod +x "$bin/tmux"
+  : > "$LAUNCH_LOG"
+  python3 - "$log" "$LAUNCH_LOG" <<'PY' &
+import json, os, sys, time
+log, launch = sys.argv[1:]
+deadline = time.time() + 120
+while time.time() < deadline and not (os.path.exists(launch) and os.path.getsize(launch) > 0):
+    time.sleep(0.02)
+with open(log, "a") as stream:
+    stream.write(json.dumps({"type": "turn/end", "seq": 2}) + "\n" + json.dumps({"type": "turn/start", "seq": 3}) + "\n")
+PY
+  writer=$!
+  out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 \
+    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
+    FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
+    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$bin:$FAKEBIN_DIR" "$id" --relaunch 2>&1)
+  status=$?
+  kill "$writer" 2>/dev/null
+  wait "$writer" 2>/dev/null
+  expect_code 0 "$status" "a ship relaunch past an uncommitted subagent header must resume: $out"
+  assert_equals "$generation" "$(jq -r .root "$binding")" "the relaunch must resume the bound generation"
+  assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "the relaunch must neither delete nor add a generation"
+  assert_equals "$session" "$(jq -r '.[0].config.sessionId' "$generation/launch.yml")" \
+    "the relaunch must resume the recorded conversation"
+  printf '{"type":"note"}\n' > "$subagent/session.v4.jsonl"
+  cp "$log" "$CASE_DIR/session.before"
+  : > "$LAUNCH_LOG"
+  out=$(DSH_HOME='' FM_DSH_SOURCE_HOME='' FM_BACKEND=tmux FM_DSH_START_POLL_INTERVAL=0.05 \
+    FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" FM_FAKE_CAPTURE_FILE="$CASE_DIR/screen" \
+    FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$HOME_DIR/state/$id.meta")" \
+    fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$bin:$FAKEBIN_DIR" "$id" --relaunch 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a ship relaunch over an unreadable session log must refuse: $out"
+  assert_contains "$out" "does not open with a session header" "the refusal must name the unreadable log"
+  assert_equals "$generation" "$(jq -r .root "$binding")" "the refusal must keep the bound generation"
+  assert_equals "$(basename "$generation")" "$(ls "$HOME_DIR/state/$id.dsh")" "the refusal must neither delete nor add a generation"
+  cmp -s "$CASE_DIR/session.before" "$log" || fail "the refusal must leave the bound conversation log untouched"
+  [ ! -s "$LAUNCH_LOG" ] || fail "the refusal must not launch dsh-tui: $(cat "$LAUNCH_LOG")"
+  pass "fm-spawn: a dsh ship relaunch resumes past an uncommitted subagent header and refuses rather than discard a conversation it cannot read"
 }
 
 test_launch_policy_admits_dsh() {
@@ -815,9 +899,11 @@ test_deepseek_spelling_without_a_harness_routes_to_dsh
 test_retired_deepseek_spelling_refuses_before_launch
 test_explicit_harness_is_not_rerouted
 test_launch_environment
+test_launch_reads_xdg_only_git_config
 test_mirrored_dsh_primary_carries_its_bound_model
 test_secondmate_launch_carries_brief_and_operator_home
 test_secondmate_plain_relaunch_resumes_its_recorded_dsh_profile
+test_ship_relaunch_never_discards_an_unreadable_conversation
 test_launch_policy_admits_dsh
 test_deepseek_cannot_launch_on_omp
 test_omp_default_cannot_hide_a_deepseek_route

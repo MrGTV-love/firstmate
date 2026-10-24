@@ -1137,6 +1137,7 @@ tests/fm-watch-triage-waits-declared.test.sh 655000
 tests/fm-watch-triage-waits-pauses.test.sh 136000
 tests/fm-watchdog-check.test.sh 27679
 tests/fm-watcher-lock.test.sh 136753
+tests/fm-work-progress.test.sh 131276
 tests/fm-worker-account-live-e2e.test.sh 4428
 tests/fm-worker-account.test.sh 168745
 EOF

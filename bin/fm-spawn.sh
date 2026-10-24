@@ -2963,16 +2963,17 @@ launch_template() {
   # dsh-tui has no model, effort, or preference flags, so the launch swaps HOME
   # for the task's private one. bin/fm-dsh.py prepare symlinks every operator-home
   # entry except .dsh and .dsh-tui into it, so every kind keeps the operator's CLI
-  # authentication and tool state. GIT_CONFIG_GLOBAL and NM_HOME name the
-  # operator's real git identity file and no-mistakes home, resolved by the pane
-  # shell before HOME changes, so a commit keeps its author and the worker still
-  # reaches the shared daemon. A secondmate's own spawns stage from the
+  # authentication and tool state; git finds the operator's global config
+  # through the linked .gitconfig and .config entries, and an exported
+  # GIT_CONFIG_GLOBAL passes through unchanged. NM_HOME names the operator's
+  # no-mistakes home, resolved by the pane shell before HOME changes, so the
+  # worker still reaches the shared daemon. A secondmate's own spawns stage from the
   # operator's DSH install and link the operator's real home, never this
   # session's private one.
   dsh)
     printf '%s' 'env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_OMP_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u HERDR_ENV FM_DSH_HARNESS=dsh '
     [ "$kind" != secondmate ] || printf '%s' 'FM_DSH_SOURCE_HOME=__DSHSOURCE__ FM_DSH_OPERATOR_HOME=__DSHOPERATOR__ '
-    printf '%s' 'GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}" NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
+    printf '%s' 'NM_HOME="${NM_HOME:-$HOME/.no-mistakes}" HOME=__DSHHOME__ DSH_HOME=__DSHCONFIG__ DSH_TUI_LANG=en DSH_TUI_NO_LAUNCHPAD=1 DSH_PERMISSION_MODE=danger-full-access PATH=__DSHPATH__ __DSHBIN__ --patch __DSHPATCH__ -- "$( __OPINPUT__ encode launch-brief < __BRIEF__)"'
     ;;
   # omp (Oh My Pi), a Pi fork. Same one-positional-brief, --model, --thinking,
   # and -e shape as Pi, verified on omp 18.1.11. The differences are all at
@@ -7035,13 +7036,15 @@ dsh)
   # The launch patch replaces the dsh-tui row config, so it must also carry
   # the sessionId that the stock profile patch would otherwise take from the
   # launcher's --resume env. `resume` rewrites it for the task's newest
-  # session; anything it cannot prove falls back to a fresh session.
+  # session and prints nothing when the binding changed or holds no session,
+  # which prepares a fresh one; a binding it cannot read refuses the launch
+  # rather than replace the conversation it holds.
   DSH_RUNTIME=
   if [ "$RELAUNCH" = 1 ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ]; then
     if [ "$KIND" = secondmate ]; then
       DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" --primary-root "$FM_ROOT") || exit 1
     else
-      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT" 2>/dev/null) || DSH_RUNTIME=
+      DSH_RUNTIME=$(python3 "$SCRIPT_DIR/fm-dsh.py" resume "$STATE_REAL" "$ID" "$MODEL" "$EFFORT" "$WT") || exit 1
     fi
   fi
   # Inside a DSH primary or secondmate DSH_HOME is that session's private
