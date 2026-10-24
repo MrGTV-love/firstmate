@@ -101,6 +101,11 @@ def environment_session(pid, command):
         if not shown.startswith(command) or not shown[len(command):].strip():
             return None
         entries = shown[len(command):].split()
+        # ps loses environment entry boundaries. A HERDR_SESSION token may be
+        # part of another variable's value, so it cannot prove an owner. No
+        # such token means the unscoped server uses default; otherwise refuse.
+        if any(entry.startswith("HERDR_SESSION=") for entry in entries):
+            return None
     values = {entry.split("=", 1)[1] for entry in entries if entry.startswith("HERDR_SESSION=")}
     if len(values) > 1:
         return None

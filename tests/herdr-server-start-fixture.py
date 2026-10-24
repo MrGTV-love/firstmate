@@ -2,6 +2,7 @@
 """Exercise the real adapter with intercepted Herdr launches, never the real CLI."""
 
 import fcntl
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(sys.argv.pop(1)).resolve()
 
@@ -57,6 +59,56 @@ else:
     print('{"error":{"code":"server_not_running"}}')
     sys.exit(1)
 '''
+
+
+class EnvironmentOwnership(unittest.TestCase):
+    """Flattened macOS ps output cannot identify environment entry boundaries."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "herdr_start_guard", ROOT / "bin/backends/herdr-server-start.py")
+        self.guard = importlib.util.module_from_spec(spec)
+        with patch.object(sys, "dont_write_bytecode", True):
+            spec.loader.exec_module(self.guard)
+        self.client = "/mock/herdr"
+        self.command = self.client + " server"
+        self.environment = "OTHER=x PATH=/mock"
+
+    def ps(self, args, **_kwargs):
+        outputs = {
+            ("ps", "-axww", "-o", "pid=,command="): "424242 " + self.command,
+            ("ps", "-axww", "-o", "pid=,comm="): "424242 " + self.client,
+            ("ps", "-E", "-ww", "-p", "424242", "-o", "command="):
+                self.command + " " + self.environment,
+        }
+        self.assertIn(tuple(args), outputs, "unexpected external operation")
+        return subprocess.CompletedProcess(args, 0, stdout=outputs[tuple(args)] + "\n")
+
+    def prove_absence(self, session):
+        with patch.object(self.guard.sys, "platform", "darwin"), \
+                patch.object(self.guard.subprocess, "run", self.ps), \
+                patch.object(self.guard, "process_alive", return_value=True):
+            self.guard.prove_process_absence(session, self.client)
+
+    def test_embedded_session_assignment_cannot_prove_default_absent(self):
+        # The actual environment is OTHER="x HERDR_SESSION=other", PATH=/mock.
+        # It has no HERDR_SESSION entry: this live server belongs to default.
+        self.environment = "OTHER=x HERDR_SESSION=other PATH=/mock"
+        with self.assertRaisesRegex(ValueError, "unreadable session environment|still alive"):
+            self.prove_absence("default")
+
+    def test_unambiguous_default_server_blocks_default_not_other(self):
+        with self.assertRaisesRegex(ValueError, "still alive"):
+            self.prove_absence("default")
+        self.prove_absence("other")
+
+    def test_real_session_entry_is_indistinguishable_from_embedded_text(self):
+        # OTHER=x, HERDR_SESSION=other produces the same flattened text.
+        # Without entry boundaries, refusing is safer than picking an owner.
+        self.environment = "OTHER=x HERDR_SESSION=other PATH=/mock"
+        for session in ("default", "other"):
+            with self.subTest(session=session), self.assertRaises(ValueError):
+                self.prove_absence(session)
 
 
 class StartupSafety(unittest.TestCase):

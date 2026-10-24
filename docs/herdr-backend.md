@@ -591,7 +591,9 @@ A failed, empty, or malformed status is unknown and refuses startup.
 A successful stopped status is necessary but not sufficient: [`herdr-server-start.py`](../bin/backends/herdr-server-start.py) owns serialized startup after proving both process absence for the session and a non-accepting session socket.
 The session socket comes from the status `.server.socket`, or from `session list --json` `.socket_path` when status omits it; with neither, startup and the absence proof refuse.
 The [fm-remote guard](../bin/fm-remote-herdr-guard.sh) execs its own server only after the helper's `--hold-for-exec` mode takes the same start lock and proves absence; that helper process holds the lock until the server reports running or exits.
-A `herdr server` process without `--session` serves the session named by its inherited `HERDR_SESSION`, or `default` when that variable is absent; the helper reads that environment with `ps -E` on macOS or `/proc/<pid>/environ` on Linux.
+A `herdr server` process without `--session` serves the session named by its inherited `HERDR_SESSION`, or `default` when that variable is absent; the helper reads NUL-separated environment entries from `/proc/<pid>/environ` on Linux.
+On macOS, `ps -E` flattens those entry boundaries, so a `HERDR_SESSION=` token could be text inside another variable's value; the helper treats any such token as unknown ownership and refuses the absence proof, even when it could be a real session entry.
+When the readable macOS environment contains no such token, the unscoped server belongs to `default`.
 When that environment cannot be read from a process that is still alive, the process's session is unknown and it blocks startup; a process that exited before the read is skipped.
 A live process, accepting socket, or unreadable proof refuses rather than replacing a server.
 A competing starter waits for the start lock, then re-reads status and reuses the server the first starter brought up, so only one launch happens.
