@@ -556,6 +556,10 @@ if [ -e "$log/retain-ignored" ]; then
   echo '{"reason":"cleanup_ignored_payload_archived_tree_retained"}'
   exit 3
 fi
+if [ -e "$log/execute-unlock-only" ]; then
+  git worktree unlock "\$2" || exit 4
+  exit 0
+fi
 if [ -e "$log/fail-after-unlock" ]; then
   git worktree unlock "\$2" || exit 4
   echo 'injected removal failure after driver released the lock'
@@ -779,7 +783,7 @@ test_locked_release_cap_defers_copies_until_the_next_run() {
       "$setting cap: wrong number of locked copies released"
     assert_equals 2 "$(printf '%s\n' "$OUT" | grep -c $'^DEFERRED\t')" \
       "$setting cap: excess copies were not deferred"
-    assert_contains "$OUT" "per-run cap: $limit completed locked releases reached; eligible next run" \
+    assert_contains "$OUT" "per-run cap: $limit locked release slots used; eligible next run" \
       "$setting cap: deferral did not explain its limit and next-run eligibility"
     assert_contains "$OUT" 'summary: HELD-LOCKED=0' "$setting cap: deferred copies were held"
     assert_equals "$((2 * limit))" "$(wc -l < "$W/closeout.log" | tr -d ' ')" \
@@ -889,7 +893,7 @@ SH
         registered "$name" || fail "run 1: deferred copy $name was removed"
         assert_no_grep "$(copy_path "$name")" "$W/closeout.log" "run 1: deferred copy $name reached the driver"
       done
-      assert_contains "$OUT" "per-run cap: 5 completed locked releases reached; eligible next run" \
+      assert_contains "$OUT" "per-run cap: 5 locked release slots used; eligible next run" \
         "run 1: deferral did not explain its limit"
       assert_contains "$OUT" 'summary: DEFERRED=2' "run 1: wrong number of deferred copies"
     else
@@ -903,6 +907,45 @@ SH
     fi
   done
   pass "a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two"
+}
+
+test_partial_releases_use_release_slots() {
+  local mode name n executed deferred
+  for mode in execute-unlock-only fail-after-unlock; do
+    make_world "driver-cap-$mode"
+    install_driver "$SLOT" "$W"
+    for ((n = 1; n <= 7; n++)); do
+      add_copy "p$n"
+      git -C "$SLOT" worktree lock --reason 'vernant-session-active owner=launcher:999999 launcher=999999' "$(copy_path "p$n")"
+    done
+    : > "$W/$mode"
+    FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=5 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 1 ] || fail "$mode: partial releases should fail the run, got $RC: $OUT"
+    assert_equals 5 "$(grep -c -- '--execute-cleanup' "$W/closeout.log")" \
+      "$mode: partial releases did not use release slots"
+    assert_equals 0 "$(printf '%s\n' "$OUT" | grep -c $'^REMOVED\t')" "$mode: a partial release was reported removed"
+    executed=0
+    deferred=0
+    for ((n = 1; n <= 7; n++)); do
+      name="p$n"
+      registered "$name" || fail "$mode: $name was unregistered"
+      if grep -qFx "$SLOT|--cleanup-worktree $(copy_path "$name") --execute-cleanup" "$W/closeout.log"; then
+        executed=$((executed + 1))
+        printf '%s\n' "$OUT" | grep -qF "FAILED"$'\t'"$(copy_path "$name")" \
+          || fail "$mode: partial release of $name was not reported FAILED: $OUT"
+      else
+        deferred=$((deferred + 1))
+        assert_class "$name" DEFERRED
+        assert_no_grep "$(copy_path "$name")" "$W/closeout.log" "$mode: deferred copy $name reached the driver"
+      fi
+    done
+    assert_equals 5 "$executed" "$mode: wrong number of copies executed"
+    assert_equals 2 "$deferred" "$mode: wrong number of copies deferred"
+    assert_contains "$OUT" 'summary: DEFERRED=2' "$mode: the summary did not count the deferred copies"
+    assert_contains "$OUT" "per-run cap: 5 locked release slots used; eligible next run" \
+      "$mode: deferral did not explain its limit"
+  done
+  pass "a driver execute that reports success but leaves the copy registered, or fails after releasing its lock, uses a release slot, so a systematic partial release reaches at most five copies per run and defers the rest"
 }
 
 test_uuid_owner_lock_is_released_by_the_driver() {
@@ -2631,6 +2674,7 @@ run_case test_dead_launcher_process_inside_copy_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_locked_release_cap_defers_copies_until_the_next_run
 run_case test_refusals_use_no_release_slot_and_cannot_starve_later_copies
+run_case test_partial_releases_use_release_slots
 run_case test_uuid_owner_lock_is_released_by_the_driver
 run_case test_ppid_owner_lock_is_released_by_the_driver
 run_case test_retained_ignored_payload_is_kept_once_without_growth

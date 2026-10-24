@@ -104,12 +104,17 @@
 #
 # --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
 # deepest path first. FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT (default 5; a positive
-# decimal integer, invalid or non-positive values become 5) caps completed locked
-# releases per run. A release completes, and consumes a slot, only when the
-# driver's execute allowed it and the copy is gone. A refused plan, a failed
-# preservation, a failed reproof or a refused execute (including
-# cleanup_skipped_live_or_unknown) removes nothing, so it consumes no slot and
-# the walk goes on to the next copy. Once the cap is reached, the remaining
+# decimal integer, invalid or non-positive values become 5) caps the locked
+# release slots used per run. Once the driver's execute has run for a copy, that
+# copy uses one slot, unless afterwards the copy is provably untouched: still
+# present and registered, the same copy, holding the same creation-lock bytes.
+# So a full release uses a slot, and so does an execute that reports success but
+# leaves the copy present or registered, a failure after a partial release, an
+# archived-tree retention, or any outcome the sweep cannot prove untouched. A
+# refused plan, a failed preservation and a failed reproof run no execute and
+# use no slot, and neither does an execute refusal (such as
+# cleanup_skipped_live_or_unknown) after which the copy is provably untouched;
+# the walk goes on to the next copy. Once the slots are used, the remaining
 # qualifying locked copies are DEFERRED (per-run cap), never HELD, get no driver
 # call or preserve, and are eligible again on the next run.
 # Unlocked removal is unchanged. Review the first batch's records before running
@@ -1453,15 +1458,16 @@ retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
 # run stamp and HEAD; the preservation helper keys each copy by its path. Retained outcomes are never preserved again.
 # The library owns preservation and the driver run; the sweep prints its own
 # REFUSED line on stderr, because the library's envelope names a teardown command
-# built from the release id, which is no task id.
+# built from the release id, which is no task id. Returns 2 when it stopped
+# before the driver's execute ran.
 teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <HEAD> <lock-sha256>
   local clone=$1 copy=$2 rc=0 saved_data=${DATA-} saved_id=${ID-} shown words identity preserved
   shown=$(fm_refuse_text "$copy")
-  release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 1
+  release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7" || return 2
   preserved=$CONTENT_PRESERVED
   if ! identity=$(copy_identity "$copy"); then
     echo "REFUSED: cannot record the driver release of $shown; it was not executed." >&2
-    return 1
+    return 2
   fi
   if [ "$preserved" != 1 ]; then
     DATA=$DATA_DIR
@@ -1472,18 +1478,18 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
   fi
   if [ "$rc" != 0 ]; then
     echo "REFUSED: the ignored files of $shown could not be preserved in $DATA_DIR/$3/nested-copy-preserved; it was not removed. human-only-exit: Which owner-approved storage or disposition preserves them? The next sweep run tries again; no removal or forced cleanup is authorized." >&2
-    return 1
+    return 2
   fi
   if ! release_still_proven "$clone" "$copy" "$4" "$5" "$6" "$7"; then
     retry_after_preserve "$copy" "$identity" "$7" "$3"
     echo "$RETRY_PRESERVE; the next sweep run plans it again." >&2
-    return 1
+    return 2
   fi
   if ! copy_still_holds "$copy" "$identity" "$7" \
     || ! record_driver_retention "$copy" "$7" "$identity" "driver release incomplete; the copy remains protected even if its lock was released"; then
     retry_after_preserve "$copy" "$identity" "$7" "$3"
     echo "REFUSED: cannot record the driver release of $shown; it was not executed. $RETRY_PRESERVE; the next sweep run plans it again." >&2
-    return 1
+    return 2
   fi
   rc=0
   teardown_run_closeout "$clone" "$copy" || rc=$?
@@ -1540,8 +1546,8 @@ clear_stale_receipts() {
 # leaves the copy and is reported, never retried harder.
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
-  local release_id preserve_dir preserved net release_rc receipt lock_hash earlier
-  local driver_released=0 driver_limit deferred=''
+  local release_id preserve_dir preserved net release_rc receipt lock_hash earlier identity
+  local driver_slots=0 driver_limit deferred=''
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1572,7 +1578,7 @@ apply_removals() {
     preserve_dir=
     earlier=0
     if [ "$CLASS" = REAPABLE-DRIVER ]; then
-      if [ "$driver_released" -ge "$driver_limit" ]; then
+      if [ "$driver_slots" -ge "$driver_limit" ]; then
         deferred="$deferred$copy"$'\n'
         continue
       fi
@@ -1595,7 +1601,12 @@ apply_removals() {
       }
       preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved/${receipt##*/}"
       release_rc=0
+      identity=$(copy_identity "$copy") || identity=
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
+      if [ "$release_rc" != 2 ] \
+        && ! { copy_still_holds "$copy" "$identity" "$lock_hash" && list_nested "$clone" | grep -qxF "$copy"; }; then
+        driver_slots=$((driver_slots + 1))
+      fi
       if [ "$release_rc" = 3 ]; then
         held="$held$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
         REMOVAL_REPORT="${REMOVAL_REPORT}KEPT"$'\t'"$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
@@ -1626,7 +1637,6 @@ apply_removals() {
     fi
     receipt=$(waiting_record "$copy") && rm -f -- "$receipt" 2>/dev/null
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
-    [ "$CLASS" != REAPABLE-DRIVER ] || driver_released=$((driver_released + 1))
     gone="$gone$copy"$'\n'
     preserved=0
     if [ "$earlier" = 1 ]; then
@@ -1657,7 +1667,7 @@ apply_removals() {
     COPIES=$(printf '%s\n' "$COPIES" | GONE=$gone awk -F '\t' 'BEGIN { n = split(ENVIRON["GONE"], g, "\n"); for (i = 1; i <= n; i++) if (g[i] != "") drop[g[i]] = 1 } !($4 in drop)')
   fi
   if [ -n "$deferred" ]; then
-    COPIES=$(printf '%s\n' "$COPIES" | DEFERRED=$deferred LIMIT=$driver_limit awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["DEFERRED"], d, "\n"); for (i = 1; i <= n; i++) if (d[i] != "") defer[d[i]] = 1 } $4 in defer { $5 = "DEFERRED"; $7 = "per-run cap: " ENVIRON["LIMIT"] " completed locked releases reached; eligible next run" } { print }')
+    COPIES=$(printf '%s\n' "$COPIES" | DEFERRED=$deferred LIMIT=$driver_limit awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["DEFERRED"], d, "\n"); for (i = 1; i <= n; i++) if (d[i] != "") defer[d[i]] = 1 } $4 in defer { $5 = "DEFERRED"; $7 = "per-run cap: " ENVIRON["LIMIT"] " locked release slots used; eligible next run" } { print }')
   fi
   if [ -n "$held" ]; then
     COPIES=$(printf '%s\n' "$COPIES" | HELD=$held awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["HELD"], h, "\n"); for (i = 1; i <= n; i++) if (h[i] != "") { split(h[i], kv, "\t"); why[kv[1]] = kv[2] } } $4 in why { $5 = "HELD-LOCKED"; $7 = why[$4] } { print }')
