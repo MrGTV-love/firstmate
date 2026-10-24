@@ -1,0 +1,34 @@
+$ bin/fm-test-run.sh --list-scheduled --lane portable-serial-12of20 --exclude-family real-herdr-gated  (base: fm-slack-watch shard)
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-secondmate-harness.test.sh
+tests/fm-watcher-lock.test.sh
+tests/fm-fleet-sync.test.sh
+tests/fm-kimi-harness.test.sh
+tests/fm-vendor-auth-probe.test.sh
+tests/fm-slack-watch.test.sh
+tests/fm-supervision-events.test.sh
+tests/fm-host-mirror.test.sh
+tests/fm-typesafe-key-source.test.sh
+tests/fm-parent-channel-scan-exclusion.test.sh
+tests/fm-fleet-snapshot-tmp-leak.test.sh
+tests/fm-project-mode.test.sh
+tests/fm-stat-shadowing.test.sh
+tests/fm-devin-signals-live-e2e.test.sh
+tests/fm-jev-guard-claude-live-e2e.test.sh
+
+$ bin/fm-test-run.sh --list-scheduled --lane portable-serial-14of20 --exclude-family real-herdr-gated  (head: fm-slack-watch shard)
+tests/fm-slack-watch.test.sh
+tests/fm-project-capacity.test.sh
+tests/fm-idle-session-reap.test.sh
+tests/fm-task-inbox.test.sh
+tests/fm-afk-return.test.sh
+tests/fm-procevent-runner-custody.test.sh
+tests/fm-watch-typesafe-health.test.sh
+tests/fm-slack-secret-scan.test.sh
+tests/fm-self-repo-role.test.sh
+tests/fm-turnend-foreign-owner-arm-fix.test.sh
+tests/fm-backend-cmux.test.sh
+tests/fm-fork-free-helpers.test.sh
+tests/fm-forge-detect.test.sh
+tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh
+tests/fm-devin-signals-live-e2e.test.sh

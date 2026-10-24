@@ -1,0 +1,34 @@
+run 40063531528 measured duration_ms vs head serial hint
+tests/fm-guard-audit-closure.test.sh               ci_shard=8 measured=10258 hint=10258 match=True
+tests/fm-guard-lint.test.sh                        ci_shard=9 measured=4609 hint=4609 match=True
+tests/fm-guard-refcheck.test.sh                    ci_shard=4 measured=1329 hint=1329 match=True
+tests/fm-guard-telemetry.test.sh                   ci_shard=1 measured=3139 hint=3139 match=True
+tests/fm-model-picker-shadow-spawn.test.sh         ci_shard=11 measured=26389 hint=26389 match=True
+tests/fm-model-picker-shadow.test.sh               ci_shard=3 measured=8850 hint=8850 match=True
+tests/fm-retired-jev-posttool-advisory.test.sh     ci_shard=16 measured=1182 hint=1182 match=True
+tests/fm-slack-intake-unchanged.test.sh            ci_shard=5 measured=2972 hint=2972 match=True
+tests/fm-slack-secret-scan.test.sh                 ci_shard=14 measured=17961 hint=17961 match=True
+tests/fm-slack-watch.test.sh                       ci_shard=13 measured=462747 hint=462747 match=True
+tests/fm-spawn-model-pin.test.sh                   ci_shard=19 measured=33955 hint=33955 match=True
+still-unhinted tests/fm-work-progress.test.sh: measured_in_run=None
+still-unhinted tests/fm-jev-guard-producer.test.sh: measured_in_run=None
+fm-test-timing-portable-serial-1.json sum_duration_ms= 955722
+fm-test-timing-portable-serial-2.json sum_duration_ms= 821279
+fm-test-timing-portable-serial-3.json sum_duration_ms= 958583
+fm-test-timing-portable-serial-4.json sum_duration_ms= 1149124
+fm-test-timing-portable-serial-5.json sum_duration_ms= 1057463
+fm-test-timing-portable-serial-6.json sum_duration_ms= 463256
+fm-test-timing-portable-serial-7.json sum_duration_ms= 774832
+fm-test-timing-portable-serial-8.json sum_duration_ms= 1031857
+fm-test-timing-portable-serial-9.json sum_duration_ms= 1119486
+fm-test-timing-portable-serial-10.json sum_duration_ms= 1082927
+fm-test-timing-portable-serial-11.json sum_duration_ms= 932229
+fm-test-timing-portable-serial-12.json sum_duration_ms= 1137783
+fm-test-timing-portable-serial-13.json sum_duration_ms= 1488349
+fm-test-timing-portable-serial-14.json sum_duration_ms= 1073505
+fm-test-timing-portable-serial-15.json sum_duration_ms= 1218885
+fm-test-timing-portable-serial-16.json sum_duration_ms= 843430
+fm-test-timing-portable-serial-17.json sum_duration_ms= 1022069
+fm-test-timing-portable-serial-18.json sum_duration_ms= 1216346
+fm-test-timing-portable-serial-19.json sum_duration_ms= 1030184
+fm-test-timing-portable-serial-20.json sum_duration_ms= 1011168

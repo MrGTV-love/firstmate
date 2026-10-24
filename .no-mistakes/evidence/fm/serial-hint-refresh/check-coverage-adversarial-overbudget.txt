@@ -1,0 +1,4 @@
+$ (temp copy of head with fm-slack-watch hint raised to 1300000 ms) bin/fm-test-run.sh --check-coverage
+fm-test-run: coverage guard: portable serial shard 2 of 20 packs 1236670ms above the 1200000ms target and beyond its own largest script (917727ms), so the excess is packing
+fm-test-run: refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md
+exit=1
