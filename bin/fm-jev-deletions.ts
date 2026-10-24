@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 interface Context { state: string; task: string; worktree: string }
 interface DeletionList { schema: "fm-authorized-deletions.v1"; task: string; worktree: string; paths: string[] }
@@ -146,7 +146,15 @@ function writeList(c: Context, suppliedPaths: string[]): string {
   return hash(bytes);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+function invokedAsMain(): boolean {
+  try {
+    return !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (invokedAsMain()) {
   try {
     const [operation, state, task, ...args] = process.argv.slice(2);
     taskValid(task ?? "");

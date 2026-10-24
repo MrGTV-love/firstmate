@@ -1311,6 +1311,20 @@ const legacy = spawnSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
 assert.notEqual(legacy.status, 0);
 assert.deepEqual(readFileSync(metaPath), originalMeta);
 assert.deepEqual(readFileSync(listPath), originalList);
+// Node keeps a symlinked argv[1] logical; prepare and publication still run.
+symlinkSync(bin, `${home}/linked-bin`);
+const linked = args => execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings',
+  `${home}/linked-bin/fm-jev-deletions.ts`, ...args], { encoding: 'utf8' });
+writeFileSync(`${data}/brief.md`, brief(['listed.txt']));
+const linkedDigest = linked(['prepare', state, 'deletion', worktree, `${data}/brief.md`]).trim();
+assert.equal(linkedDigest, createHash('sha256').update(readFileSync(listPath)).digest('hex'), 'symlinked prepare writes the snapshot');
+assert.deepEqual(JSON.parse(readFileSync(listPath, 'utf8')).paths, ['listed.txt']);
+writeFileSync(listPath, originalList);
+assert.match(linked(['publish', state, 'deletion', '--replace', 'nested/listed.txt']), /list_sha256/);
+assert.deepEqual(JSON.parse(readFileSync(listPath, 'utf8')).paths, ['nested/listed.txt'], 'symlinked publication narrows the list');
+assert.equal(readFileSync(metaPath, 'utf8').match(/^jev_deletions_sha256=(.*)$/m)[1],
+  createHash('sha256').update(readFileSync(listPath)).digest('hex'));
+assert.equal(await omp('rm -rf listed.txt'), 'unjudged', 'symlinked narrowing revokes the dropped path');
 unlinkSync(`${data}/brief.md`);
 publish([]);
 assert.equal(await omp('rm -rf listed.txt'), 'unjudged', 'explicit empty replacement revokes all without a brief');

@@ -2587,6 +2587,7 @@ Firstmate declares the complete replacement list in one exact `## Authorized del
 ````
 
 Fresh guarded launches snapshot that section before the worker starts; relaunches retain the existing snapshot rather than rereading a potentially worker-edited brief.
+A relaunch that relocates the task to another worktree retires that snapshot and its metadata digest, so no allowance applies until Firstmate republishes the paths for the relocated worktree.
 For a task already running, Firstmate supplies the complete replacement paths directly as arguments to [`bin/fm-jev-deletions.sh`](../bin/fm-jev-deletions.sh) from the supervising home; its `--help` owns the exact invocation and override paths.
 This live route never reads `data/<task>/brief.md` or another worker-writable input file: editing a brief cannot add a path to a later publication.
 The command validates the explicit paths and replaces the entire list under the task metadata lock; an explicit empty replacement revokes all allowances.
