@@ -1,0 +1,7 @@
+tree: base 236e7f71e lib + target test file (new regressions)
+not ok - holder release changed deadline contention into an acquisition error: 1  2
+== test_bounded_lock_deadline_holder_release rc=1
+not ok - malformed steal mutex was reported as contention: 1 1
+== test_bounded_lock_malformed_steal_reports_acquire_failure rc=1
+ok - malformed presentation locks report acquire failure instead of contention
+== test_malformed_presentation_lock_reports_acquire_failure rc=0

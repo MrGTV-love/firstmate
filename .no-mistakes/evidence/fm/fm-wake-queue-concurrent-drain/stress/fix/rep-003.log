@@ -1,0 +1,1 @@
+ok - concurrent append plus drain preserves durable records through acknowledgement

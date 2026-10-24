@@ -1,0 +1,28 @@
+host: Darwin arm64 bash=GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26) ncpu=18 commit=649be831b82e9133f7d710b121874f84c61306d0
+load-before:  1:40  up 3 days, 11:11, 3 users, load averages: 21.24 26.28 31.77
+ok - bounded deadline preserves contention when the observed holder releases
+== test_bounded_lock_deadline_holder_release rc=0 secs=8
+ok - a malformed steal mutex reports acquisition error instead of contention
+== test_bounded_lock_malformed_steal_reports_acquire_failure rc=0 secs=6
+ok - malformed presentation locks report acquire failure instead of contention
+== test_malformed_presentation_lock_reports_acquire_failure rc=0 secs=7
+ok - bounded acquire hands ownership to the waiting caller after contention
+== test_bounded_lock_handoff_after_contention rc=0 secs=6
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+== test_live_presentation_holder_is_deadlined_without_weakening_ack rc=0 secs=14
+ok - all lock waiters refuse a dead lock they cannot reclaim instead of waiting on their own steal mutex
+== test_unreclaimable_dead_lock_refuses_without_waiting rc=0 secs=7
+ok - concurrent drains replay until one post-handling acknowledgement consumes records
+== test_atomic_double_drain rc=0 secs=7
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 15 --recovery-generation 18970.1792824102.p8ggIt
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-wake-tangle-root.eCd6Kw/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - concurrent append plus drain preserves durable records through acknowledgement
+== test_concurrent_append_and_drain rc=0 secs=15
+load-after:  1:41  up 3 days, 11:12, 3 users, load averages: 18.58 24.35 30.60

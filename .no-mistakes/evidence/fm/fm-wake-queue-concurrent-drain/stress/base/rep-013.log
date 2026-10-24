@@ -1,0 +1,2 @@
+wake drain: queue lock could not be acquired safely
+not ok - concurrent append/drain subprocess failed

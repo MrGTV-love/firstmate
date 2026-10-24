@@ -1,0 +1,4 @@
+start 2026-10-24T06:43:46Z host=Darwin arm64 ncpu=18 bash=GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26) workers=8 load=14.01 21.04 28.51
+fix runs=      17 fail=0
+base runs=      17 fail=3
+stopped early 2026-10-24T06:51:39Z to return results

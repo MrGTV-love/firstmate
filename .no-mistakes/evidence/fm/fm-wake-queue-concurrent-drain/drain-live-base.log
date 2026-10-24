@@ -1,0 +1,16 @@
+### S-live-holder: a live holder keeps the queue lock past the 1s deadline
+holder_pid=45961 drain_rc=0
+stdout: WAKE DRAIN SKIPPED: queue lock remains held by live pid 45961 after 1s; retry on the next drain.
+stderr: 
+queue unchanged: yes
+### S-malformed-queue-lock: a regular file sits where the queue lock dir belongs
+drain_rc=1
+stdout: 
+stderr: wake drain: queue lock could not be acquired safely
+malformed lock left in place: yes
+### S-holder-releases-in-window: the holder releases inside the deadline, drain then gets the rows
+drain_rc=0 rows_replayed=3
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation <gen>
+### S-ack-stays-blocking: an acknowledgement waits for a live holder (no deadline), then consumes
+ack_rc=0 waited_secs=5 (holder held 4s, presentation timeout 1s)
+queue empty after ack: yes
