@@ -588,7 +588,7 @@ Every Herdr invocation passes an explicit `--session <name>` alongside the envir
 An environment variable alone is not reliable when another Herdr server is running.
 
 A failed, empty, or malformed status is unknown and refuses startup.
-A successful stopped status is necessary but not sufficient: [`herdr-server-start.py`](../bin/backends/herdr-server-start.py) owns serialized startup after proving both process absence for the session and a non-accepting session socket.
+A successful stopped status is necessary but not sufficient: [`herdr-server-start.py`](../bin/backends/herdr-server-start.py) owns serialized startup after proving both process absence for the session and that the session socket path is missing or is a socket with no listener; any other file at that path refuses.
 The session socket comes from the status `.server.socket`, or from `session list --json` `.socket_path` when status omits it; with neither, startup and the absence proof refuse.
 The [fm-remote guard](../bin/fm-remote-herdr-guard.sh) execs its own server only after the helper's `--hold-for-exec` mode takes the same start lock and proves absence; that helper process holds the lock until the server reports running or exits.
 A `herdr server` process without `--session` serves the session named by its inherited `HERDR_SESSION`, or `default` when that variable is absent; the helper reads NUL-separated environment entries from `/proc/<pid>/environ` on Linux.
@@ -599,7 +599,7 @@ A live process, accepting socket, or unreadable proof refuses rather than replac
 A competing starter waits for the start lock, then re-reads status and reuses the server the first starter brought up, so only one launch happens.
 After a launch, the starter polls status from 0.1 seconds, doubling to a 5-second cap, with no deadline; a failed status read is not fatal.
 The helper's exit status names the cause: 1 is a refusal that protects a live or unknown server, 3 is a launched server that exited before reporting running, and 4 is a failure to prepare the start lock or launch the server; `fm_backend_herdr_server_ensure_failure` turns a status into the message the doctor and AFK launch report.
-The absence proof reads process arguments as whitespace words, so quote characters in a client's arguments never block startup; only a server process whose session cannot be read refuses.
+The absence proof reads process arguments as whitespace words and replaces undecodable bytes, so quote characters or non-UTF-8 bytes in a client's arguments never block startup; only a server process whose session cannot be read refuses.
 The detached launch closes inherited file descriptors so neither a background starter shell nor a caller's capture pipe survives for the server's lifetime.
 
 When absence is proven, the adapter launches the server without these inherited values:
