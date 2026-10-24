@@ -17,17 +17,21 @@ bash tests/fm-write-confinement.test.sh
 bash tests/fm-write-confinement-live-e2e.test.sh
 ```
 
-Both the direct kernel fixture and real SessionStart descendants under each installed harness produced:
+The direct fixture builds both the omp and the Claude profile over a synthetic HOME, home, project, gate store and foreign assets, then runs one unconfined control and one confined pass per profile.
+Every confined check was true for both profiles and for real SessionStart descendants under each installed harness:
 
-```json
-{"a":true,"b":true,"busy-transition":true,"c":true,"d":true,"e-append":true,"e-other.status":true,"e-task.other.status":true,"foreign-audit-denied":true,"native-session-proof":true,"own-git-commit":true,"symlink":true,"task-audit-written":true}
-```
+- cases a-e, own Git commit, inbox handling, the real busy writer, native session proof and task audit;
+- a push to the task's own gate through the no-mistakes `pre-receive` and `post-receive` hooks, with `push -u`, `fetch` and `stash`;
+- a duration record appended through `bin/fm-duration.py`, and a tool-cache write under HOME;
+- one refused write per protected asset class: project and home primary checkouts, the primary index, nested and pool worktrees of other tasks, other task state and data, Main-owned `meta`, `control-relaunch` and `git-hooks` records, `config/`, `.env`, another branch, another Firstmate home and another project's gate, including a push to that gate;
+- in the direct fixture only, refused writes to Claude settings, credentials and project memory, omp agent config, plugins and a foreign daemon scope, `~/.codex` and `~/.dsh`, while the Claude transcript, `.claude.json`, omp agent database and own daemon scope stayed writable.
 
-The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial and the symlink escape, while positive worktree writes, own-status append and the real busy writer remained successful.
+The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial, the symlink escape and every refused-write check, while the positive operations remained successful.
+The gate hooks are the installed no-mistakes hooks with `NM_BIN` pointed at a model-free stand-in for the daemon client, so no real daemon run starts.
 The probes invoke the real `createGuardService.record` and `createTaskSessionProof` writers, including native proof publication and shutdown invalidation; no audit or session writer is mocked.
 The task audit succeeds without changing seeded shared legacy history, while another task's audit append fails with `AuditUnavailableError`.
 `bash tests/fm-jev-guard-audit.test.sh` passed 21 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
-The live probes use synthetic agent/config stores, EOF without a submitted model prompt and the installed runtime's existing HOME; no authentication is copied.
+The live probes use synthetic agent/config stores, EOF without a submitted model prompt and the installed runtime's existing HOME; no authentication is copied and real harness homes are never written.
 This proves inherited filesystem enforcement through real harness startup, not a model-submitted native Bash/eval invocation or authenticated provider access.
 Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
 The [live guard](../../tests/fm-write-confinement-live-e2e.test.sh) reports absent harnesses explicitly and refuses a pass with no harness checked.

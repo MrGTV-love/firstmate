@@ -6134,10 +6134,15 @@ if [ "$KIND" != secondmate ]; then
       confinement_args=()
       [ -z "$confinement_agent" ] || confinement_args=(--agent-dir "$confinement_agent")
       [ -z "${BRANCH:-}" ] || confinement_args+=(--branch "$BRANCH")
-      python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" \
-        --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" --temp "$TASK_TMP" \
+      fm_local_firstmate_state_dirs "$STATE" tolerant
+      for confinement_home_state in "${FM_LOCAL_FIRSTMATE_STATES[@]:1}"; do
+        confinement_args+=(--protect "${confinement_home_state%/state}")
+      done
+      python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" --home "$FM_HOME" \
+        --config "$CONFIG" --projects "$PROJECTS" \
+        --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" \
         --harness "$HARNESS" --profile "$WRITE_CONFINEMENT_PROFILE" \
-        "${confinement_args[@]}" || { confinement_refuse false "cannot derive task write roots"; exit 1; }
+        "${confinement_args[@]}" || { confinement_refuse false "cannot derive the protected-asset write profile"; exit 1; }
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
       ;;

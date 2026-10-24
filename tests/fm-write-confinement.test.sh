@@ -8,8 +8,6 @@ if [ "$(uname -s)" != Darwin ]; then
   exit 0
 fi
 TMP_ROOT=$(fm_test_tmproot fm-write-confinement)
-fm_git_worktree "$TMP_ROOT/project" "$TMP_ROOT/project/.claude/worktrees/fm-task" fm/task
-mkdir -p "$TMP_ROOT/data/task" "$TMP_ROOT/state/task.inbox/handled" "$TMP_ROOT/temp" "$TMP_ROOT/agent"
 export OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp
 python3 "$ROOT/tests/fm-write-confinement.py" "$ROOT" "$TMP_ROOT"
-pass "T5 a-e: inherited filesystem enforcement, declared nested worktree, state isolation and real busy writer"
+pass "T5 a-e, gate push, duration record and one refused write per protected asset class under the omp and Claude profiles"
