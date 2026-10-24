@@ -293,7 +293,7 @@ await test('T4(d): an installed tool absent from the policy table is rejected, n
   assert.equal(r.branch, 'coverage');
 });
 await test('T4(d): Claude built-in inventory is classified and an added tool fails coverage', async () => {
-  // Public host tool reference, retrieved 2026-10-24:
+  // Every tool in the public host tool reference, retrieved 2026-10-24:
   // https://code.claude.com/docs/en/tools-reference
   const native = ['Agent', 'Artifact', 'AskUserQuestion', 'Bash', 'CronCreate', 'CronDelete', 'CronList',
     'Edit', 'EndConversation', 'EnterPlanMode', 'EnterWorktree', 'ExitPlanMode', 'ExitWorktree',
@@ -301,15 +301,17 @@ await test('T4(d): Claude built-in inventory is classified and an added tool fai
     'PushNotification', 'Read', 'ReadMcpResourceTool', 'RemoteTrigger', 'ReportFindings', 'ScheduleWakeup',
     'SendFeedback', 'SendMessage', 'SendUserFile', 'ShareOnboardingGuide', 'Skill', 'SubagentHandback',
     'TaskCreate', 'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop', 'TaskUpdate', 'TodoWrite', 'ToolSearch',
-    'WaitForMcpServers', 'WebFetch', 'WebSearch', 'Workflow', 'Write', 'MultiEdit'];
+    'WaitForMcpServers', 'WebFetch', 'WebSearch', 'Workflow', 'Write'];
   const { uncoveredTools } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
   assert.deepEqual(uncoveredTools(native.map(name => name.toLowerCase())), []);
-  assert.deepEqual(uncoveredTools([...native, 'NewHostTool'].map(name => name.toLowerCase())), ['newhosttool']);
+  assert.deepEqual(uncoveredTools([...native, 'NewHostTool', 'MultiEdit'].map(name => name.toLowerCase())), ['multiedit', 'newhosttool']);
   const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
-  const output = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', adapter,
-    state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION],
-    { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'NewHostTool', tool_input: {}, cwd: state }), encoding: 'utf8' });
-  assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny');
+  for (const tool_name of ['NewHostTool', 'MultiEdit']) {
+    const output = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', adapter,
+      state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION],
+      { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input: {}, cwd: state }), encoding: 'utf8' });
+    assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny', tool_name);
+  }
 });
 await test('an unclassified tool elsewhere in the host registry does not refuse a classified call', async () => {
   const localHandlers = {};
@@ -351,7 +353,7 @@ await test('tools that move no data or run no worker code are local; unscreened 
     assert.equal(await handlers.tool_call({ toolName, input: {} }, { cwd: state }), undefined, toolName);
     assert.equal(rowCount(), before, `${toolName}: local tools add no egress or confinement row`);
   }
-  for (const toolName of ['ast_edit', 'init_experiment', 'log_experiment', 'multiedit', 'notebookedit']) {
+  for (const toolName of ['ast_edit', 'init_experiment', 'log_experiment', 'notebook', 'lsp', 'notebookedit', 'python', 'debug', 'run_experiment']) {
     let patch;
     const r = await fresh(async () => { patch = await handlers.tool_call({ toolName, input: {} }, { cwd: state }); });
     assert.equal(patch, undefined, toolName);
