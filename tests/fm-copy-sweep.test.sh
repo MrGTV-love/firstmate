@@ -1304,7 +1304,9 @@ SH
   printf 'unique.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
   printf 'durable state\n' > "$(copy_path locked)/unique.dat"
   printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output"
-  printf 'printf "new owner state\\n" > "$1/unique.dat"\n' > "$W/execute-hook"
+  cat > "$W/execute-hook" <<'SH'
+printf 'new owner state\n' > "$1/unique.dat"
+SH
   FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 1 ] || fail "a temporary refusal after an execute-time write should exit 1, got $RC: $OUT"
   line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path locked)") \
