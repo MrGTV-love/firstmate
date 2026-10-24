@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { ContractError, JevClient, type SystemOneResult } from "../src/core/client.ts";
 import { QuestionValidationError, validateRequest, type Questions, type State } from "../src/core/types.ts";
-import { WRITE_THRESHOLDS } from "../src/levels/level06/index.ts";
 
 export const GUARD_POLICY_VERSION = "FIRSTMATE_JEV_GUARD_V1";
 export const OUTAGE_POLICY = "REVIEW_ON_UNAVAILABLE_V1";
@@ -102,8 +101,6 @@ export interface GuardTerminal {
   destination_class?: string;
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
-  /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */
-  write_coverage?: { model_screened_bytes: number; local_only_bytes: number };
   error_type: GuardFailureType | null;
   request_started: boolean;
   result?: SystemOneResult;
@@ -116,11 +113,6 @@ export interface GuardTerminal {
 export interface GuardService {
   readonly active: boolean;
   decide(state: State, questions: Questions): Promise<SystemOneResult>;
-  /**
-   * The pieces of a write that fit within MAX_CHUNKS requests; the caller screens any remainder locally.
-   * Each piece gets its own never-send check, so a value longer than the overlap can be cut across a boundary.
-   */
-  planWrite(state: { path: string; content: string }, questions: Questions): { pieces: string[]; model_screened_bytes: number; local_only_bytes: number };
   record(terminal: GuardTerminal): void;
 }
 
@@ -140,44 +132,6 @@ function mayRetry(cause: unknown, backoff: number): boolean {
   if (store?.signal.aborted) return false;
   if (store && store.until - performance.now() < TRY_MS + backoff) return false;
   return RETRYABLE_FAILURES.has(failureType(cause));
-}
-
-/** JSON string width without allocating a string or serializing each code point. */
-function escapedPointBytes(point: number): number {
-  if (point === 0x22 || point === 0x5c || point === 8 || point === 9 || point === 10 || point === 12 || point === 13) return 2;
-  if (point < 0x20 || (point >= 0xd800 && point <= 0xdfff)) return 6;
-  return point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
-}
-
-/** Bounded write-only prefix. */
-function writePieces(text: string, room: number): { pieces: string[]; covered: number } {
-  if (room < 2 * CHUNK_OVERLAP_BYTES + 64) throw new GuardUnavailableError("RequestTooLargeError");
-  const pieces: string[] = [];
-  let start = 0;
-  for (;;) {
-    let end = start;
-    let used = 0;
-    while (end < text.length) {
-      const point = text.codePointAt(end)!;
-      const bytes = escapedPointBytes(point);
-      if (used + bytes > room) break;
-      used += bytes;
-      end += point > 0xffff ? 2 : 1;
-    }
-    pieces.push(text.slice(start, end));
-    if (end === text.length || pieces.length === MAX_CHUNKS) return { pieces, covered: end };
-    let back = 0;
-    start = end;
-    while (start > 0) {
-      const last = text.charCodeAt(start - 1);
-      const width = last >= 0xdc00 && last <= 0xdfff && start > 1
-        && text.charCodeAt(start - 2) >= 0xd800 && text.charCodeAt(start - 2) <= 0xdbff ? 2 : 1;
-      const bytes = escapedPointBytes(text.codePointAt(start - width)!);
-      if (back + bytes > CHUNK_OVERLAP_BYTES) break;
-      back += bytes;
-      start -= width;
-    }
-  }
 }
 
 function preflightTimeout(): number {
@@ -254,18 +208,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
           requestStarted ? { attempts: tries, elapsedMs: Math.round(performance.now() - started) } : undefined);
       }
     },
-    planWrite(state, questions) {
-      const whole = JSON.stringify({ model: GUARD_MODEL, state, questions });
-      const bytes = Buffer.byteLength(state.content, "utf8");
-      if (Buffer.byteLength(whole, "utf8") <= MAX_REQUEST_BYTES) {
-        return { pieces: [state.content], model_screened_bytes: bytes, local_only_bytes: 0 };
-      }
-      const frame = Buffer.byteLength(JSON.stringify({ model: GUARD_MODEL, state: { ...state, content: "" }, questions }), "utf8");
-      const { pieces, covered } = writePieces(state.content, MAX_REQUEST_BYTES - frame);
-      for (const piece of pieces) permitted(JSON.stringify({ model: GUARD_MODEL, state: { ...state, content: piece }, questions }));
-      const screened = Buffer.byteLength(state.content.slice(0, covered), "utf8");
-      return { pieces, model_screened_bytes: screened, local_only_bytes: bytes - screened };
-    },
     record(terminal) {
       const result = terminal.result;
       const answered = terminal.results ?? (result ? [result] : []);
@@ -285,18 +227,11 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         // Keep the known subtotal without presenting it as the charge for the whole payload.
         reported_amount: sum(answered.flatMap((r) => r.meta.cost.source === "reported" && r.meta.cost.amount !== null ? [r.meta.cost.amount] : [])),
       };
-      // Question IDs and answer fields are allowlisted; provider extensions can contain input text.
-      const answers: Record<string, { type: "noul"; noul: number } | { type: "choice"; choice: string; confidence: number }> = {};
-      if (result) {
-        for (const key of ["kind", "contains_secret"]) {
-          const answer = result.answers[key];
-          if (answer?.type === "noul") answers[key] = { type: "noul", noul: answer.noul };
-          else if (answer?.type === "choice") answers[key] = { type: "choice", choice: answer.choice, confidence: answer.confidence };
-        }
-      }
+      // No guard question remains, so no answer field is allowlisted; provider extensions can contain input text.
+      const answers = {};
       const row = {
         kind: "terminal", at: Date.now(), task: context.task, policy_version: GUARD_POLICY_VERSION, outage_policy: OUTAGE_POLICY,
-        thresholds: { write: WRITE_THRESHOLDS },
+        thresholds: {},
         hook: terminal.hook, tool: terminal.tool, decision: terminal.decision, enforcement: terminal.enforcement, branch: terminal.branch,
         error_type: terminal.error_type, request_started: requestStarted,
         ...((terminal.tool === "write" || terminal.tool === "edit") && terminal.enforcement === "pretool_deny"
@@ -311,8 +246,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         chunks, planned_chunks: plannedChunks, answers,
         ...(terminal.destination_class ? { destination_class: terminal.destination_class } : {}),
         ...(terminal.confinement_owner ? { confinement_owner: terminal.confinement_owner } : {}),
-        ...(terminal.write_coverage ? { write_coverage: terminal.write_coverage,
-          ...(terminal.write_coverage.local_only_bytes > 0 ? { note: "unscreened remainder: deterministic local rules only" } : {}) } : {}),
       };
       try {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });

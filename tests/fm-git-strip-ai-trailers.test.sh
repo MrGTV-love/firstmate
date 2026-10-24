@@ -464,8 +464,8 @@ SH
   done
   [ -f "$dir/scope" ] || fail "replacement launch never ran the Git probe"
   scope=$(cat "$dir/scope")
-  assert_equals $'local\t.project-hooks' "$scope" \
-    "keep-ai-trailers relaunch retained the obsolete command-scope strip override"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s' "$hooks")" "$scope" \
+    "keep-ai-trailers relaunch lost the credential hooks"
   assert_equals $'first value\nliteral $(false); tail' "$(cat "$dir/preserved")" \
     "relaunch lost or evaluated unrelated numbered Git configuration"
   assert_equals $'command\texplicit' "$(cat "$dir/operator")" \
@@ -516,24 +516,22 @@ SH
     sleep 0.1
   done
   [ -f "$dir/scope" ] || fail "allowlisted replacement never ran the Git probe"
-  assert_equals $'local\t.project-hooks' "$(cat "$dir/scope")" \
-    "allowlisted keep-ai-trailers worker selected a command-scope hook override"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s' "$hooks")" "$(cat "$dir/scope")" \
+    "allowlisted keep-ai-trailers worker lost the credential hooks"
   assert_equals '' "$(cat "$dir/preserved")" "allowlist leaked unrelated pane Git configuration"
   assert_equals "$endpoint" "$(fm_meta_get "$home/state/$id.meta" window)" "allowlisted relaunch replaced the endpoint"
   assert_equals "$pane" "$("$real_tmux" -S "$socket" display-message -p -t "$endpoint" '#{pane_id}')" "allowlisted relaunch replaced the pane"
   assert_equals "$wt" "$(fm_meta_get "$home/state/$id.meta" worktree)" "allowlisted relaunch replaced the isolated copy"
   "$real_tmux" -S "$socket" send-keys -t "$endpoint" \
-    "git config --show-scope --get-all core.hooksPath > '$dir/pane-scope.tmp'; git config --get-all fixture.preserved > '$dir/pane-preserved'; env > '$dir/pane-env'; mv '$dir/pane-scope.tmp' '$dir/pane-scope'" Enter
+    "git config --show-scope --get-all core.hooksPath > '$dir/pane-scope.tmp'; git config --get-all fixture.preserved > '$dir/pane-preserved'; mv '$dir/pane-scope.tmp' '$dir/pane-scope'" Enter
   for n in $(seq 1 100); do
     [ ! -f "$dir/pane-scope" ] || break
     sleep 0.1
   done
   [ -f "$dir/pane-scope" ] || fail "persistent pane never ran the Git probe"
-  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s' "$home/state/other.git-hooks")" \
-    "$(cat "$dir/pane-scope")" "persistent pane retained obsolete hooks or lost operator routing"
+  assert_equals "$(printf 'local\t.project-hooks\ncommand\t%s\ncommand\t%s' "$home/state/other.git-hooks" "$hooks")" \
+    "$(cat "$dir/pane-scope")" "persistent pane lost credential hooks or operator routing"
   assert_equals operator "$(cat "$dir/pane-preserved")" "persistent pane lost unrelated Git configuration"
-  assert_contains "$(cat "$dir/pane-env")" 'GIT_CONFIG_COUNT=2' "persistent pane did not compact Git configuration"
-  assert_not_contains "$(cat "$dir/pane-env")" "$hooks" "persistent pane still exports obsolete task hooks"
 
   rm "$home/config/keep-ai-trailers" "$dir/scope"
   out=$(TMUX='' fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" --relaunch)

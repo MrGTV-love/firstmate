@@ -27,6 +27,29 @@ The [architecture](../architecture.md) owns the shared allocation/publication bo
 
 ## Launch-scoped Git hook selection
 
+Credential-boundary and relaunch verification on 2026-10-24 used Darwin arm64, Node v26.4.0, Python 3.13.6 and Apple Git 2.54.0:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-git-secrets.test.sh
+bash bin/fm-test-run.sh tests/fm-git-strip-ai-trailers.test.sh
+```
+
+Both suites exited 0 with no gate skip; the private Bash/ksh tmux relaunch fixture preserved operator configuration and kept the credential hooks selected with either trailer posture.
+The credential suite observed:
+
+```text
+omp: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+claude: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+credential shapes: complete binary blobs, newline names, anchored prefixes and URL boundaries checked at commit
+```
+
+It exercises both production write adapters offline and real Git commit/push operations through installed task hooks, including both trailer postures, intermediate outgoing commits, new branches, ref deletion and project-hook stdin preservation.
+It does not launch live model sessions or prove another backend's lifecycle behavior; Linux was not exercised.
+The [operator contract](../configuration.md#jev-guard) owns current behavior and residual limits.
+
+### Attribution-only selection evidence (historical)
+
+The records below predate the always-installed credential hooks and do not establish the current strip-to-keep routing.
 Verified on 2026-10-05 on macOS arm64 with tmux 3.5a, Apple Git 2.50.1, and stock Bash 3.2.57:
 
 ```sh
