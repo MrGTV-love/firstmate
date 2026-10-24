@@ -2553,7 +2553,7 @@ Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so 
 Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent, and the never-send policy still checks their whole payload before the first piece leaves; their complete-cover screening is unchanged.
 Write/edit content has no model-screening size limit and no model coverage audit.
 Credential checks run locally in the per-task `pre-commit` and `pre-push` hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope.
-[`bin/fm-git-secrets.py`](../bin/fm-git-secrets.py) scans the complete staged contents of added or changed files at commit time, not their working-copy counterparts.
+[`bin/fm-git-secrets.py`](../bin/fm-git-secrets.py) scans the complete staged contents of added or changed files after the repository's pre-commit hook succeeds, including changes that hook stages, not their working-copy counterparts.
 At push time it scans changed file contents in outgoing commits, including intermediate commits that a later commit cleans up, using the advertised old tips and existing remote-tracking refs as the baseline.
 Ref deletions transfer no content and need no scan; project hooks still run and receive the original pre-push ref-update input.
 The scanner retains the existing anchored shapes: private-key headers, GitHub tokens, AWS access key IDs, Slack tokens and connection URLs with embedded passwords.

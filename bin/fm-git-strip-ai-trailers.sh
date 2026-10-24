@@ -12,6 +12,8 @@
 #       strip unless keep-trailers=1, plus wrappers per client-side hook name
 #       git documents except reference-transaction and post-index-change,
 #       which are deliberately excluded (see FM_GIT_CLIENT_HOOKS below).
+#       Pre-commit first runs the repository's hook in a subshell, preserving
+#       failure; only then does it inspect the final index that Git will commit.
 #       Each wrapper clears GIT_CONFIG_COUNT so Git ignores numbered overrides,
 #       then resolves core.hooksPath (or $GIT_DIR/hooks) in the repository git is actually
 #       running in, so a husky directory that only appears after npm install
@@ -241,7 +243,14 @@ EOF
       printf '#!/usr/bin/env bash\nset -u\n'
       case "$name" in
       pre-commit)
-        printf 'python3 %s pre-commit || exit $?\n' "$(quote_for_hook "${SELF%/*}/fm-git-secrets.py")"
+        # Project hooks may stage generated or reformatted files. Inspect the
+        # final index, and preserve their refusal before running our scanner.
+        cat <<EOF
+(
+$(runtime_chain_body "$hooks_dir")
+) || exit \$?
+python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") pre-commit || exit \$?
+EOF
         ;;
       pre-push)
         # Both scanners and project hooks need the exact ref-update stream.
@@ -256,7 +265,7 @@ trap - EXIT
 EOF
         ;;
       esac
-      runtime_chain_body "$hooks_dir"
+      [ "$name" = pre-commit ] || runtime_chain_body "$hooks_dir"
     } | write_executable "$hooks_dir/$name" || return 1
   done
   chmod 500 "$hooks_dir"
