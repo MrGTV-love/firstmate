@@ -1,0 +1,16 @@
+$ bin/fm-test-isolation-proof.sh --list-exclusions | grep fm-watch-triage-waits
+fm-watch-triage-waits.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-declared.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-pauses.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+fm-watch-triage-waits-away.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+exit=0
+
+$ bin/fm-test-run.sh --list --family watcher-wake-lock | grep waits
+tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits.test.sh
+$ bin/fm-test-run.sh --list --family backend-dispatch | grep relaunch
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch.test.sh

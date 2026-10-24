@@ -1,0 +1,12 @@
+== changed: bin/fm-model-index.sh
+tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh
+== changed: bin/fm-dispatch-capacity.sh
+tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh
+== changed: bin/fm-dispatch-capacity-lib.sh
+tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh

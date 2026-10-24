@@ -1,0 +1,19 @@
+# Dry-run dispatch comparison: cases each real suite file reaches through its own dispatch (bodies skipped by an extdebug DEBUG trap, tracer: case-dryrun.sh)
+# base = 236e7f71 (before split); new = dd5d83d7 (after split); host bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+base-fm-control-relaunch.tsv: 154 dispatched, repeated within base: []
+  new-fm-control-relaunch.tsv: 74 dispatched, repeated within group: []
+  new-fm-control-relaunch-recovery.tsv: 43 dispatched, repeated within group: []
+  new-fm-control-relaunch-backends.tsv: 37 dispatched, repeated within group: []
+  union of groups: 154 dispatched, in more than one group: []
+  dispatched by base only (lost by split): []
+  dispatched by groups only (new): []
+
+base-fm-watch-triage-waits.tsv: 67 dispatched, repeated within base: []
+  new-fm-watch-triage-waits.tsv: 36 dispatched, repeated within group: []
+  new-fm-watch-triage-waits-declared.tsv: 17 dispatched, repeated within group: []
+  new-fm-watch-triage-waits-pauses.tsv: 8 dispatched, repeated within group: []
+  new-fm-watch-triage-waits-away.tsv: 6 dispatched, repeated within group: []
+  union of groups: 67 dispatched, in more than one group: []
+  dispatched by base only (lost by split): []
+  dispatched by groups only (new): []
+

@@ -1,0 +1,14 @@
+$ bash tests/fm-control-relaunch.test.sh --jev-guard
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+ok - relaunch: native Claude and OMP launch prompts announce every surviving record
+ok - relaunch: legacy tasks remain unguarded and current tasks retain launch activation on both hosts
+exit=0
+
+$ bash tests/fm-control-relaunch.test.sh test_spawn_relaunch_refuses_contradicting_flags
+ok - fm-spawn --relaunch: every identity axis comes from the record, and a contradicting flag refuses
+exit=0
+
+$ bash tests/fm-control-relaunch-backends.test.sh test_concurrent_relaunch_is_refused
+ok - fm-control relaunch: two control actions on one task serialize instead of interleaving
+exit=0
+
