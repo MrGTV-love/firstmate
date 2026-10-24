@@ -30,7 +30,9 @@ Level 5 was copied from the same pinned commit on 2026-10-14 (UTC).
 Their original route functions consume those objects unchanged.
 This is the only change in those copies: combining independent agent and model questions in one paid dispatch request requires access to the objects without invoking two separate route calls.
 Question wording, criteria, pure decisions, and thresholds remain upstream's.
-`bin/fm-dispatch-level5.ts` combines the objects with the existing rule question, uses the unchanged core client, and maps the pure decisions into the approved candidates.
+`bin/fm-dispatch-level5.ts` uses the unchanged model questions, model decision and ambiguity rubric, but owns Firstmate's structured rule predicates, desktop criteria and capability policy outside the vendored copies.
+It does not ask or apply the upstream workflow/profile Choice or agent decision.
+The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns that adapter's routing semantics.
 
 ## Changed copies: Level 6 result policy and service
 

@@ -1996,9 +1996,13 @@ This section is the single owner of the canonical schema and its per-field seman
 
 ```json
 {
+  "judgments": {
+    "<judgment_id>": { "type": "noul", "instructions": "<one observable question about task>", "criteria": { "true": "<when true>", "false": "<when false>" } }
+  },
   "rules": [
     {
       "when": "<natural-language condition describing a kind of task>",
+      "match": { "project": "<optional exact project>", "kind": "<ship|scout, optional>", "all": ["<judgment_id>"] },
       "approval": "captain",
       "min_confidence": 0.85,
       "floor": { "scope": "<quota-axi scope>", "min_percent": 20, "provider": "<quota-axi provider>" },
@@ -2021,6 +2025,7 @@ This section is the single owner of the canonical schema and its per-field seman
 | --- | --- |
 | `rules` | May be absent or empty for a default-only configuration. |
 | Rule `when` and `use` | Required for each rule. |
+| Top-level `judgments` and rule `match` | Required only by typed resolution, as "Fields applied only by typed resolution" below defines. |
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
 | Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
@@ -2080,12 +2085,21 @@ Account pins and saved resets are unchanged; reviewer model selection remains ow
 **Fields applied only by typed resolution**
 
 Top-level `task_horizon_minutes`, rule `approval`, `min_confidence`, and `floor`, and profile `provider` and `floor` are optional declarations that only [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) applies in code; without that opt-in they are inert, and firstmate's own intake reads them as ordinary hints.
-The resolver supplies the fixed neutral Choice option `No listed rule applies to this task.` for work that matches no listed rule.
+Typed resolution requires a top-level `judgments` object and a `match` object on every rule; `when` remains the human-readable description, not a question sent to the model.
+Each judgment has `type: "noul"`, one observable question in `instructions`, and concrete `criteria.true` and `criteria.false` strings.
+A rule's `match` may constrain exact `project`, exact `exclude_project`, and `kind` (`ship` or `scout`), and reference judgment ids in nonempty `all`, `any`, and `none` arrays.
+Unknown selector keys, unknown judgment ids, and missing structured matches are configuration errors, not a fallback to prose classification.
+These declarations restrict routing; they do not grant an exception, new profile, or permission.
+The [example configuration](examples/crew-dispatch.json) shows the structured format.
+
+Migration to structured matches (required before typed resolution runs): a rules file written for the retired rule Choice has no `judgments` object and no rule `match`.
+Rewrite each rule's routing facts as `match.project`, `match.exclude_project`, or `match.kind`, and each remaining semantic condition as a single-judgment Noul in `judgments` referenced from `match.all`, `match.any`, or `match.none`.
+There is no compatibility layer: an old-format file with at least one rule fails closed as a malformed rules file (exit 2), so firstmate dispatches through its manual intake until the file is migrated, and bootstrap reports the same `CREW_DISPATCH: invalid` diagnostic while the key is set.
 
 - `approval` accepts only `"captain"` and means a task the rule matches is never dispatched from the tool's answer alone.
 
 `min_confidence` is a number from 0 through 1.
-The rule's own probability in the answer, pooled with any option that selects the identical outcome (see "Confidence and fallback rules" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key)), must reach it, replacing the resolver's global 0.6 floor on the answer's confidence.
+The rule's own predicate support must reach it, replacing the resolver's global 0.6 support floor (see "Confidence and fallback rules" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key)).
 Set it high when a wrong pick is costly and low when the rule is a safe runner-up.
 
 `task_horizon_minutes` is a positive number of minutes, 240 when absent: the runway a resolved candidate needs for one task, as described under "Candidate eligibility and evidence" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
@@ -2134,7 +2148,7 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - When the file exists, bootstrap validates it with `jq`.
 - Valid files stay silent by default unless [model-index warnings](#fleet-model-index-configmodel-indexjson) apply; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
-- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
 - Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 
@@ -2192,18 +2206,24 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 **What the model receives**
 
-When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state in one `JevClient.systemOne` call.
-That call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and one rule Choice whose options are every rule's `when` plus the fixed neutral option for no matching rule.
-The rule Choice alone decides which rule applies, including project-scoped and Claude-only rules; no local text pre-check selects or removes a rule.
-The upstream question wording, rubrics, thresholds, and pure decisions are retained; [the vendor provenance](../bin/ten-levels/SOURCE.md) records the minimal question-object exports needed to batch them.
-The model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
-The Level 5 intent router is vendored unchanged but unused, because dispatch has no script, browser, or human handler, so those agent-router routes escalate to firstmate instead.
+When on and at least one rule exists, the tool sends the project name and task-specific text in one `JevClient.systemOne` call using the current `jev-latest` model.
+Code eliminates rules whose project or kind facts do not match before assembling any semantic questions; an excluded rule cannot reappear in confidence fallback.
+The resolved brief kind stays in code and is never a request field.
+The remaining rules contribute only their referenced individual Noul judgments, each sent once even when several rules share it.
+The request also includes the upstream ambiguity, model-tier and reasoning-effort questions, plus a desktop-access Noul with concrete true/false criteria.
+The upstream workflow/profile Choice is not asked or applied: human, script and browser workflow labels cannot force dispatch escalation.
+The model never sees quota, catalogs, `why`, `when`, `use`, approvals, or confidence floors.
+The [vendor provenance](../bin/ten-levels/SOURCE.md) distinguishes unchanged upstream questions from Firstmate's adapter policy.
 The task-specific text is the brief's `## Captain's intent` and `## Firstmate spec` sections under `# Task` that `bin/fm-brief.sh` scaffolds, read by the same parser that feeds `fm-spawn.sh` validation and the no-mistakes `--intent` contract; a brief with neither section is sent whole.
 Section extraction and the whole-brief fallback both read the brief after any enabled never-send marked regions are removed (see the never-send list below).
 Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
 
 When the sections are sent from a scout brief, the line `Brief kind: scout (report only)` comes first, taken from the scaffold's scout contract line; ship briefs and briefs sent whole get no kind line.
-A ship brief's delivery mode is deliberately not sent, because in live runs naming it pushed a routine ship brief toward the hardest tier (see [the verification record](verification/dispatch-resolve.md)).
+An unfenced `# Current ship Firstmate spec` heading makes the brief a ship; otherwise the scout scaffold's contract line in the unfenced `# Setup` section makes it a scout, and remaining briefs are ships.
+Kind is resolved before task extraction, so a promoted brief sends its current ship specification rather than the obsolete scout specification.
+Project is the caller's `--project` value, never inferred from task prose.
+When any rule declares `project` or `exclude_project` and `--project` is absent, the resolver returns `escalate` before sending anything.
+A ship brief's delivery mode is not sent.
 
 The scaffold's standard setup, rules, and definition-of-done text is the same in every brief, so leaving it out keeps its safety language from reading as a signal about the task.
 
@@ -2252,7 +2272,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string value and object key in the complete assembled request, including question keys built from judgment ids, project, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -2264,7 +2284,7 @@ An absent rules file, a default-only file, or `rules: []` returns the non-clear 
 
 **Checks performed after the answer**
 
-The upstream agent decision escalates human, script, browser, desktop-dependent, and ambiguity scores above 1 to firstmate, because a worker profile cannot provision an unapproved handler or capability.
+Desktop access above 0.5 and ambiguity scores above 1 still escalate to firstmate; dispatch cannot provision an unapproved capability.
 The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates that pass the quota gates: eligible, with known positive headroom or a usable pool whose measurement is a disclosed unknown, and without established runway shorter than the task horizon.
 Among them, a sole usable pool clears and otherwise the composite ranks them.
 When no cheap candidate passes, the whole rule ranks as usual: an exhausted or floor-vetoed cheap set leaves the rule's remaining approved candidates to be ranked before any stand-in is considered, and an established-short cheap candidate only leaves the preferred set, so an overall short winner still escalates under its own identity.
@@ -2314,27 +2334,18 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 **Confidence and fallback rules**
 
-- A rule that declares `min_confidence` is checked against that rule's own probability, whether it is the picked option or a runner-up, so a runner-up never needs weaker support than it would as the pick; a pick's probability is also joined by its equivalent options, as below.
-- A picked rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence exactly as before, so a file with no declared floors and no equivalent options behaves as it did.
-- Options that select the identical outcome pool their probability: the same `use` profiles (in any order) after the session policy and class filter, `approval`, `floor`, `select`, and fallback list, with `when` and `min_confidence` ignored.
-  The neutral option counts as a rule with the `default` array and no approval or floor.
-  The pick is the group holding the answer's `choice`, which a group of one option makes the option itself.
-  That group clears when its support (the answer confidence for the `choice`, or its probability when it declares `min_confidence`, plus the probability of every other member) reaches the `choice` floor: its `min_confidence`, or 0.6.
-  When it does not clear, the pooled group with the most probability becomes the pick if that group clears its own floor on the sum of its members' probabilities; the group is then stood for by its most probable member, whose `min_confidence` or 0.6 is the floor.
-  So a 0.51/0.49 split between rules that dispatch identically resolves, and so does four options sharing 0.7 against one distinct `choice` at 0.3; the output carries a `pooled:` line naming the pooled options and the combined probability.
-  The same split between different profiles, approval, or floor is a real low-confidence pick and stays `ambiguous`, as does a pooled group still below its floor.
-  A `choice` that clears its own declared floor stays the pick, and a runner-up is still checked on its own probability.
-- Deviation from the approved plan, with its codebase reason: the plan reads "add per-rule floors for equivalent rules", and `min_confidence` already existed per rule.
-  The neutral `default` option cannot carry `min_confidence`, so a default pick at 0.51 stays under the global 0.6 however its equivalent rules are configured; pooling the support of identical outcomes is the only change that lets that split resolve without a floor on `default`.
+Code evaluates eligible rule predicates with minimum for `all`, maximum for `any`, and minimum of the complements for `none`; when a rule uses several groups, their minimum is its support.
+A fact-only matching rule has support 1.
+The default support is the minimum complement of all eligible rule supports, or 1 when no rule is eligible.
+These supports are fuzzy predicate scores, not a mutually exclusive probability distribution, so they are never summed or pooled even when rules select identical profiles.
 
-When the group holding the answer's `choice` does not clear its floor, a pooled group with more probability that clears its own floor replaces it before any runner-up is considered, and the output carries a `replaced:` line naming the answer `choice` with its probability and floor, and the pooled group that stands in.
-
-When the picked rule declares its own floor but its probability falls below it and no pooled group replaced it, the tool checks the other options:
-
-1. Find the most probable other option that clears its own floor: the rule's `min_confidence`, or 0.6 otherwise.
-2. Print a `fallback:` line naming both floors and resolve that rule as though it had been picked.
-
-No qualifying option, or two equally probable qualifying options, produces `ambiguous`.
+Code picks the highest-supported eligible rule or default and applies its declared `min_confidence`, or 0.6 when absent.
+An exact highest-support tie between different dispatch outcomes is `ambiguous` before any floor or runner-up check, so rule order and `min_confidence` cannot resolve it; identical profiles, approval, quota floor, selection mode and fallback may share the same outcome without increasing support.
+If the highest-supported rule misses its explicitly declared floor, code considers the highest-supported other eligible option that clears its own floor.
+A qualifying runner-up prints a `fallback:` line; no qualifying option or a tie between different qualifying outcomes is `ambiguous`.
+Without a declared floor, a below-0.6 pick remains `ambiguous` rather than selecting around uncertainty.
+The existing `confidence` result/log field now records the picked rule's support, and the output's `support:` line lists eligible rule supports rather than Choice probabilities.
+New resolves no longer emit the retired categorical `pooled` field.
 
 When every candidate of the resolved rule is proven exhausted, the rule's declared model-matrix stand-in is selected through the shared fallback list above, with a `fallback:` line naming it.
 
@@ -2360,9 +2371,9 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 | Result | Meaning |
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
-| `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
-| `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
+| `ambiguous` | Predicate support below the floor with no runner-up taken, or a conflicting rule-support tie. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, desktop capability request, project-scoped rules without `--project`, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
+| `error` | API, network, malformed response metadata, rendering, quota-axi failure, a Level 5 adapter that cannot run, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.
 
@@ -2374,7 +2385,7 @@ Every result above exits 0.
 **Result log**
 
 Every resolve that reaches a status appends one JSON line to `data/dispatch-resolve.jsonl`, so the rate of results that need firstmate's own intake can be measured as every status other than `clear`.
-A record holds a UTC timestamp `ts`, `status`, the option Jev answered `choice`, the picked option `rule` (the `choice`, or the pooled group member that replaced it), the option whose profiles were used `selected`, the chosen `profile` (harness, model, effort) when clear, the numeric `confidence` and `floor` applied, the `pooled` probability when pooling cleared the floor, and a coarse `reason`.
+A record holds a UTC timestamp `ts`, `status`, the highest-supported eligible option `choice` and `rule`, the option whose profiles were used `selected`, the chosen `profile` (harness, model, effort) when clear, the numeric support in `confidence` and the `floor` applied, and a coarse `reason`.
 No brief text, request, API body, rule criterion, or credential is written, and a failed write never changes the result.
 Opt-out and withheld paths and exit-2 configuration errors have no status and write nothing.
 
@@ -2458,6 +2469,7 @@ Current protection claim: **no protection** until the rebuild is landed and actu
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
 Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
+Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, and desktop criteria.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.

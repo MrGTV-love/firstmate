@@ -1,0 +1,546 @@
+[
+  {
+    "choice": "rule_4",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_4",
+    "reason": null
+  },
+  {
+    "choice": "rule_4",
+    "reason": null
+  },
+  {
+    "choice": "rule_4",
+    "reason": null
+  },
+  {
+    "choice": "rule_4",
+    "reason": null
+  },
+  {
+    "choice": "rule_4",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "fast_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "fast_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_3",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_3",
+    "reason": null
+  },
+  {
+    "choice": "rule_3",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_3",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_2",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_2",
+    "reason": "confidence 0.46 below floor 0.6"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "reasoning_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "reasoning_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_3",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_3",
+    "reason": "rule_3 pooled probability 0.51 below floor 0.6"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "reasoning_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "reasoning_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_1",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_2",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_3",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_4",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_5",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_1",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_2",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_3",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_4",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_5",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "high task ambiguity requires firstmate judgment"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_3",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "reasoning_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_5",
+    "reason": "deterministic_script requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": "reasoning_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": "reasoning_agent requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_4",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  },
+  {
+    "choice": "rule_6",
+    "reason": null
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": "human requires an explicit handler or capability decision"
+  },
+  {
+    "choice": "rule_7",
+    "reason": null
+  }
+]
