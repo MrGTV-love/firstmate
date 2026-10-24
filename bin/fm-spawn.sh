@@ -518,7 +518,10 @@
 #   requires repeatable --owned-path <tracked-path> flags: explicit task scope,
 #   never inferred from the brief. bin/fm-slot-provision-lib.sh calls that actual
 #   provisioner before any harness admission, with origin/main's merge-base and
-#   task id as owner. It uses the assigned copy, never another worktree. Governed
+#   task id as owner. Spawn executes it through the acquired shell, retaining
+#   the primary-project Python cwd, so get/bash holders are actual ancestors;
+#   unrelated live holders remain the provisioner's refusal, not a PID allow-list.
+#   It uses the assigned copy, never another worktree. Governed
 #   scouts start on fm/<id> so default promotion can adopt the same declaration.
 #   Relaunch reuses recorded scope and must pass the actual clean-slot contract;
 #   dirty relaunches refuse rather than bypassing attestation. Provisioner or
@@ -6005,8 +6008,42 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
     exit 1
   fi
 fi
+spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
+  local project=$1 report=$2 script result rc
+  shift 2
+  script=$(umask 077; mktemp "$DATA/$ID/.slot-provision.XXXXXX") || return 1
+  result="$script.result"
+  {
+    # shellcheck disable=SC2016 # PATH belongs to the acquired shell.
+    printf 'set +e\numask 077\n( cd -- %q && PATH=%q:"$PATH" PYTHONDONTWRITEBYTECODE=1 python3' "$project" "$project/.venv/bin"
+    printf ' %q' "$@"
+    # shellcheck disable=SC2016 # The acquired Bash records its own exit status.
+    printf ' ) >%q 2>&1\nslot_rc=$?\nprintf '\''%%s\\n'\'' "$slot_rc" >%q\nmv -- %q %q\n' "$report" "$result.part" "$result.part" "$result"
+  } >"$script" || return 1
+  # This is an agent-free acquired shell, not a lifecycle command to a worker.
+  # Running here makes its get/bash cwd holders real ancestors of the actual
+  # provisioner; no PID exclusions or ownership policy are changed.
+  spawn_send_text_line "$WT_TARGET" "bash -- $(shell_quote "$script")" || {
+    echo "error: could not submit assigned-copy provisioning to $T; no worker admitted" >&2
+    return 1
+  }
+  while [ ! -f "$result" ]; do
+    fm_backend_target_exists "$BACKEND" "$T" "$W" || {
+      echo "error: assigned endpoint $T became unreadable before provisioning completed; report: $report" >&2
+      return 1
+    }
+    sleep 0.2
+  done
+  IFS= read -r rc <"$result" || rc=invalid
+  rm -f -- "$script" "$result"
+  case "$rc" in
+    ''|*[!0-9]*) echo 'error: assigned-copy provisioner completion status is invalid' >&2; return 1 ;;
+  esac
+  [ "$rc" -le 255 ] || { echo 'error: assigned-copy provisioner completion status is out of range' >&2; return 1; }
+  return "$rc"
+}
 if [ "$SLOT_GOVERNED" = 1 ]; then
-  fm_slot_provision "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
+  fm_slot_provision spawn_slot_run_in_pane "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
   render_launch_brief || exit 1
 fi

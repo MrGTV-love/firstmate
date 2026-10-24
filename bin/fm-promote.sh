@@ -309,7 +309,7 @@ if fm_slot_required "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" || grep -q '^slot_man
     while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
   fi
   fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" || exit 1
-  fm_slot_provision "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" "$ID" "$BRANCH" \
+  fm_slot_provision fm_slot_run_local "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-promote.${BASHPID:-$$}.json" "${SLOT_OWNED_PATHS[@]}" || exit 1
 fi
 

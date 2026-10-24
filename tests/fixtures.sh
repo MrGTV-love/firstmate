@@ -155,6 +155,18 @@ case "${1:-}" in
     exit 0
     ;;
   send-keys)
+    # The actual pre-admission provisioning command needs a shell result, even
+    # in fixture transport. Only its private staged script is executed here;
+    # harness launches retain the existing non-executing recorder below.
+    for a in "$@"; do
+      case "$a" in
+        "bash -- '"*"/.slot-provision."*"'")
+          staged=${a#"bash -- '"}
+          staged=${staged%"'"}
+          bash -- "$staged" </dev/null || exit 1
+          ;;
+      esac
+    done
     if [ -n "${FM_FAKE_LAUNCH_LOG:-}" ]; then
       prev=
       for a in "$@"; do

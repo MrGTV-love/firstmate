@@ -555,3 +555,68 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   fi
   pass 'herdr projected refusal terminates under custody and never queues later generic closure'
 fi
+
+if [ "$BACKEND" = tmux ]; then
+  # A provisioner models the actual ownership requirement with real process
+  # ancestry: the acquired get process must be an ancestor of its invocation.
+  # Supervisor-side execution fails even though the pane is a valid isolated copy.
+  SLOT_PROJECT="$TMP_ROOT/slot-project"
+  SLOT_COPY="$TMP_ROOT/slot-copy"
+  SLOT_CASE="$TMP_ROOT/case-slot-provision"
+  SLOT_ID="get-slot-provision-$$"
+  mkdir -p "$SLOT_CASE"
+  fm_git_worktree "$SLOT_PROJECT" "$SLOT_COPY" slot-before
+  mkdir -p "$SLOT_PROJECT/scripts/git-stability"
+  cat > "$SLOT_PROJECT/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import argparse
+import json
+import os
+import pathlib
+import subprocess
+import sys
+p = argparse.ArgumentParser()
+for flag in ('repo-root', 'worktree-path', 'owner-id', 'branch', 'base-sha'):
+    p.add_argument('--' + flag, required=True)
+p.add_argument('--owned-path', action='append', required=True)
+a = p.parse_args()
+holder = int(pathlib.Path(os.environ['FM_TEST_SLOT_HOLDER']).read_text())
+parents = {}
+for row in subprocess.check_output(['ps', '-A', '-o', 'pid=,ppid='], text=True).splitlines():
+    fields = row.split()
+    if len(fields) == 2:
+        parents[int(fields[0])] = int(fields[1])
+pid, seen = os.getpid(), set()
+while pid > 1 and pid not in seen:
+    seen.add(pid)
+    pid = parents.get(pid, 0)
+if holder not in seen:
+    print(json.dumps({'state': 'BLOCKED', 'reason': 'manifest_live_owner'}))
+    sys.exit(2)
+record = dict(repo_root=a.repo_root, worktree_path=a.worktree_path, owner_id=a.owner_id,
+              branch=a.branch, base_sha=a.base_sha, owned_paths=a.owned_path,
+              lifecycle_state='worktree_active')
+manifest = pathlib.Path(os.environ['FM_TEST_SLOT_RECORD'])
+manifest.write_text(json.dumps(record))
+print(json.dumps(dict(state='PASS', manifest_path=str(manifest), **record)))
+PY
+  git -C "$SLOT_PROJECT" add scripts
+  git -C "$SLOT_PROJECT" commit -qm 'fixture ancestry-governed provisioner'
+  git -C "$SLOT_PROJECT" push -q origin main
+  printf 'MODE=success\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
+    "$SLOT_CASE/lease" "$SLOT_CASE/get-pid" "$SLOT_CASE/allow" "$SLOT_CASE/arrived" "$SLOT_COPY" "$SLOT_CASE/ticks" > "$TMP_ROOT/get-config"
+  : > "$SLOT_CASE/ticks"
+  "$REAL_TMUX" set-environment -g FM_TEST_SLOT_HOLDER "$SLOT_CASE/get-pid"
+  "$REAL_TMUX" set-environment -g FM_TEST_SLOT_RECORD "$SLOT_CASE/manifest.json"
+  fm_test_spawn_brief "$FM_HOME" "$SLOT_ID" 'Provision from the actual acquired pane before admission.'
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-spawn.sh" "$SLOT_ID" "$SLOT_PROJECT" --backend tmux --harness codex --allow-api-key \
+      --mode local-only --yolo off --owned-path scripts 2>&1)
+  rc=$?
+  expect_code 0 "$rc" "provisioner did not run in the acquired pane's ancestry: $out"
+  assert_contains "$out" "spawned $SLOT_ID" 'real-pane provisioning did not admit the task'
+  [ -f "$SLOT_CASE/manifest.json" ] || fail 'real-pane provisioning published no declaration'
+  [ -e "$SLOT_CASE/lease" ] || fail 'real-pane provisioning released its acquisition lease'
+  [ "$(git -C "$SLOT_COPY" branch --show-current)" = "fm/$SLOT_ID" ] || fail 'real-pane provisioning admitted the wrong branch'
+  assert_absent "$SLOT_COPY/.claude/worktrees" 'real-pane provisioning created nested isolation'
+  pass 'tmux provisioning runs in the acquired shell ancestry before admitting its worker'
+fi
