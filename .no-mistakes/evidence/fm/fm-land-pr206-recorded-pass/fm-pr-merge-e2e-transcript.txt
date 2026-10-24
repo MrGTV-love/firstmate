@@ -1,0 +1,89 @@
+
+=== M1 GitHub: no recorded review -> refused, no forge merge
+/Users/charlesabrooker/tmp/fm-rr.dbf2Z0/merge-drive.sh: line 13: /Users/charlesabrooker/tmp/fm-pr-merge-tests.2V6wK4/m-no-record/state/review-records.jsonl: No such file or directory
+ledger rows: 0
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 1
+  stderr: error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M2 GitHub: PASS names another head -> refused
+ledger rows:        1
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 1
+  stderr: error: head mismatch: review names 2222222222222222222222222222222222222222, live head is 1111111111111111111111111111111111111111; review the live head and record its PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M3 GitHub: PASS from author's family -> refused
+ledger rows:        1
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 1
+  stderr: error: reader_family anthropic (claude-sonnet-5-5) matches author_groups all (claude-opus-5-5); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M4 GitHub: different-family PASS at live head -> merged
+ledger rows:        1
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 0
+  stderr: review: PASS
+  forge merge calls: 1
+  forge: pr merge 9 --repo example/repo --match-head-commit 1111111111111111111111111111111111111111 --squash
+
+=== M5 GitHub: captain-word H, FAIL H, late PASS at old head -> refused
+ledger rows:        3
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 1
+  stderr: error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806122, report /Users/charlesabrooker/tmp/fm-pr-merge-tests.2V6wK4/m-cw-fail-oldhead/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M6 GitHub: captain-word H, FAIL H, unknown-family PASS H -> refused
+ledger rows:        3
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 1
+  stderr: error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806124, report /Users/charlesabrooker/tmp/fm-pr-merge-tests.2V6wK4/m-cw-fail-unknown/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M7 GitHub: captain-word H, FAIL H, independent PASS H -> merged
+ledger rows:        3
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 0
+  stderr: review: captain-word
+  forge merge calls: 1
+  forge: pr merge 9 --repo example/repo --match-head-commit 1111111111111111111111111111111111111111 --squash
+
+=== M8 GitHub: away record present but no review -> refused (away authority is no substitute)
+/Users/charlesabrooker/tmp/fm-rr.dbf2Z0/merge-drive.sh: line 13: /Users/charlesabrooker/tmp/fm-pr-merge-tests.2V6wK4/m-away-noreview/state/review-records.jsonl: No such file or directory
+ledger rows: 0
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 1
+  stderr: error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M9 GitHub: away record + different-family PASS -> merged
+ledger rows:        1
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/9   -> exit 0
+  stderr: review: PASS
+  forge merge calls: 1
+  forge: pr merge 9 --repo example/repo --match-head-commit 1111111111111111111111111111111111111111 --squash
+
+=== M10 GitLab: no recorded review -> refused
+/Users/charlesabrooker/tmp/fm-rr.dbf2Z0/merge-drive.sh: line 13: /Users/charlesabrooker/tmp/fm-pr-merge-tests.2V6wK4/m-gl-none/state/review-records.jsonl: No such file or directory
+ledger rows: 0
+$ fm-pr-merge.sh task-x1 https://gitlab.example/group/subgroup/project/-/merge_requests/7   -> exit 1
+  stderr: error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M11 GitLab: PASS at live head -> merged
+ledger rows:        1
+$ fm-pr-merge.sh task-x1 https://gitlab.example/group/subgroup/project/-/merge_requests/7   -> exit 0
+  stderr: review: PASS
+  forge merge calls: 1
+  forge: GITLAB_HOST=gitlab.example mr merge 7 -R https://gitlab.example/group/subgroup/project --sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --yes
+
+=== M12 Forgejo: no recorded review -> refused
+/Users/charlesabrooker/tmp/fm-rr.dbf2Z0/merge-drive.sh: line 13: /Users/charlesabrooker/tmp/fm-pr-merge-tests.2V6wK4/m-fj-none/state/review-records.jsonl: No such file or directory
+ledger rows: 0
+$ fm-pr-merge.sh task-x1 https://forgejo.example/fixture/fixture-repo/pulls/9   -> exit 1
+  stderr: error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+  forge merge calls: 0
+
+=== M13 Forgejo: PASS at live head -> merged
+ledger rows:        1
+$ fm-pr-merge.sh task-x1 https://forgejo.example/fixture/fixture-repo/pulls/9   -> exit 0
+  stderr: review: PASS
+  forge merge calls: 1
+M13 recheck: exit 0
+review: PASS
+  forge(tea): api --login fm-fixture --repo fixture/fixture-repo -X POST /repos/{owner}/{repo}/pulls/9/merge -f Do=merge -f head_commit_id=cccccccccccccccccccccccccccccccccccccccc

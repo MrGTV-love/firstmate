@@ -1,0 +1,268 @@
+
+=== S1 no recorded review -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home1)
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S2 PASS names another head -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home2)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 2222222222222222222222222222222222222222 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: head mismatch: review names 2222222222222222222222222222222222222222, live head is 1111111111111111111111111111111111111111; review the live head and record its PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S3 PASS from author family -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home3)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-sonnet-5-5 --author-groups {"all":["claude-opus-5-5"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: reader_family anthropic (claude-sonnet-5-5) matches author_groups all (claude-opus-5-5); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S4 PASS from unknown reader family -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home4)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model mistral-large --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: model family unknown for mistral-large; an unknown family is never independent, so obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S5 different-family PASS at live head -> accept  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home5)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+review: PASS
+[exit 0]
+
+=== S6 newest review FAIL after PASS -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home6)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL; obtain and record a new PASS with fm-review-record.py review, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S7 PASS with yes trigger, no captain-word -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home7)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md --widens-guard yes
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: widens_guard is yes but captain-word is missing at live head 1111111111111111111111111111111111111111; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S8 PASS with yes trigger + captain-word at live head -> accept  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home8)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md --widens-guard yes
+recorded: review
+[exit 0]
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+review: captain-word
+[exit 0]
+
+=== S9 captain-word at stale head only -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home9)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 2222222222222222222222222222222222222222 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S10 captain-word H, FAIL H -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home10)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806068, report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S11 captain-word H, FAIL H, late PASS at old head H0 -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home11)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 2222222222222222222222222222222222222222 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806068, report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S12 captain-word H, FAIL H, late FAIL at old head H0 -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home12)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 2222222222222222222222222222222222222222 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806069, report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S13 captain-word H, FAIL H, unknown-family PASS H -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home13)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model mistral-large --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806069, report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S14 captain-word H, FAIL H, same-family PASS H -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home14)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-sonnet-5-5 --author-groups {"all":["claude-opus-5-5"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806069, report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S15 captain-word H, FAIL H, independent PASS H -> accept  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home15)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+review: captain-word
+[exit 0]
+
+=== S16 FAIL H, then new captain-word H -> accept  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home16)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9 despite the FAIL.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+review: captain-word
+[exit 0]
+
+=== S17 captain-word H, FAIL H, independent PASS H, FAIL H again -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home17)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict FAIL --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792806071, report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S18 captain-word while away record exists -> refuse, nothing appended  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home18)
+(away record entered: . .. .afk-contract )
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words merge PR 9 when green
+error: captain-word refused: the away-posture record /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home18/state/.afk-contract exists, so the captain is away and away words are never captain words; the captain must give the merge word after return
+[exit 2]
+ls: /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home18/state/review-records.jsonl: No such file or directory
+
+=== S19 captain-word under quiet record -> recorded and verifies  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home19)
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+review: captain-word
+[exit 0]
+
+=== S20 other PR's PASS does not count -> refuse  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home20)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/10 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== S21 invalid input refused, nothing appended  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home21)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict MAYBE --reader-model claude-opus-5-5 --author-groups {"all":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+error: verdict must be PASS or FAIL
+[exit 2]
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head main --words Merge.
+error: head must be an exact full commit sha
+[exit 2]
+ls: /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home21/state/review-records.jsonl: No such file or directory
+
+=== S22 latest returns newest review and captain-word  (home /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/home22)
+$ fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"init":["gpt-5.1-codex"],"fix":["gemini-3-pro"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md
+recorded: review
+[exit 0]
+$ fm-review-record.py captain-word --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --words Merge PR 9.
+recorded: captain-word
+[exit 0]
+Expecting value: line 1 column 1 (char 0)
+$ fm-review-record.py latest --pr https://github.com/example/repo/pull/9   (home22, rerun with JSON pretty-print)
+{
+    "review": {
+        "schema": "fm-review-record.v1",
+        "kind": "review",
+        "pr": "https://github.com/example/repo/pull/9",
+        "at": 1792806072,
+        "head": "1111111111111111111111111111111111111111",
+        "verdict": "PASS",
+        "reader_model": "claude-opus-5-5",
+        "reader_family": "anthropic",
+        "author_groups": {
+            "init": [
+                {
+                    "model": "gpt-5.1-codex",
+                    "family": "openai"
+                }
+            ],
+            "fix": [
+                {
+                    "model": "gemini-3-pro",
+                    "family": "google"
+                }
+            ]
+        },
+        "report": "/Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md",
+        "loosens_deny_allow_list": "no",
+        "widens_guard": "no",
+        "customer_data_billing_spend": "no"
+    },
+    "captain-word": {
+        "schema": "fm-review-record.v1",
+        "kind": "captain-word",
+        "pr": "https://github.com/example/repo/pull/9",
+        "at": 1792806072,
+        "head": "1111111111111111111111111111111111111111",
+        "words": "Merge PR 9."
+    }
+}
+[exit ]
+--- raw ledger (append-only JSONL) ---
+{"schema":"fm-review-record.v1","kind":"review","pr":"https://github.com/example/repo/pull/9","at":1792806072,"head":"1111111111111111111111111111111111111111","verdict":"PASS","reader_model":"claude-opus-5-5","reader_family":"anthropic","author_groups":{"init":[{"model":"gpt-5.1-codex","family":"openai"}],"fix":[{"model":"gemini-3-pro","family":"google"}]},"report":"/Users/charlesabrooker/tmp/fm-rr.dbf2Z0/review.md","loosens_deny_allow_list":"no","widens_guard":"no","customer_data_billing_spend":"no"}
+{"schema":"fm-review-record.v1","kind":"captain-word","pr":"https://github.com/example/repo/pull/9","at":1792806072,"head":"1111111111111111111111111111111111111111","words":"Merge PR 9."}
