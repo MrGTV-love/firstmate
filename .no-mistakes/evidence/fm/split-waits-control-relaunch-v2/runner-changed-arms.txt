@@ -1,0 +1,12 @@
+bin/fm-dispatch-capacity-lib.sh
+bin/fm-dispatch-capacity.sh
+$ (scratch copy, edited bin/fm-model-index.sh) bin/fm-test-run.sh --list --changed --base HEAD | grep control-relaunch
+tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh
+
+$ (scratch copy, edited bin/fm-dispatch-capacity.sh) bin/fm-test-run.sh --list --changed --base HEAD | grep control-relaunch
+tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh
+

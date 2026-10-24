@@ -1,0 +1,9 @@
+$ bin/fm-test-isolation-proof.sh --list-exclusions | grep waits
+12:fm-watch-triage-waits.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+13:fm-watch-triage-waits-declared.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+14:fm-watch-triage-waits-pauses.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+15:fm-watch-triage-waits-away.test.sh	watcher/wake/lock family; intentional process locks and daemon races
+exit=
+$ bin/fm-test-isolation-proof.sh --list | grep -E "waits|control-relaunch" (expect none: not proven-isolated)
+grep_exit=1
+list-exclusions exit=0

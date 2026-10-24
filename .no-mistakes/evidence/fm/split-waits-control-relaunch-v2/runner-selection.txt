@@ -1,0 +1,34 @@
+$ bin/fm-test-run.sh --list --family watcher-wake-lock | grep waits
+tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits.test.sh
+
+$ bin/fm-test-run.sh --list --family backend-dispatch | grep relaunch
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch.test.sh
+
+$ bin/fm-test-run.sh --list tests/fm-watch-triage-waits.test.sh
+tests/fm-watch-triage-waits.test.sh
+$ bin/fm-test-run.sh --list tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+$ bin/fm-test-run.sh --list tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+$ bin/fm-test-run.sh --list tests/fm-watch-triage-waits-away.test.sh
+tests/fm-watch-triage-waits-away.test.sh
+$ bin/fm-test-run.sh --list tests/fm-control-relaunch.test.sh
+tests/fm-control-relaunch.test.sh
+$ bin/fm-test-run.sh --list tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+$ bin/fm-test-run.sh --list tests/fm-control-relaunch-backends.test.sh
+tests/fm-control-relaunch-backends.test.sh
+
+$ bin/fm-test-run.sh --list-scheduled tests/fm-watch-triage-waits*.test.sh tests/fm-control-relaunch*.test.sh
+tests/fm-watch-triage-waits-declared.test.sh
+tests/fm-control-relaunch-recovery.test.sh
+tests/fm-control-relaunch-backends.test.sh
+tests/fm-watch-triage-waits.test.sh
+tests/fm-control-relaunch.test.sh
+tests/fm-watch-triage-waits-pauses.test.sh
+tests/fm-watch-triage-waits-away.test.sh

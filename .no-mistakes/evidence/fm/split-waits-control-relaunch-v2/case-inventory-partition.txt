@@ -1,0 +1,27 @@
+# Runtime case inventory: each suite run with a BASH_ENV DEBUG-trap probe that records every case its top level invokes (or the control_relaunch_test_cases array the selector iterates) and skips it.
+
+== control-relaunch ==
+base 07e31643 tests/fm-control-relaunch.test.sh: 154 case invocations, 154 unique
+head fm-control-relaunch-backends: 37 cases
+head fm-control-relaunch-recovery: 43 cases
+head fm-control-relaunch: 74 cases
+head union: 154 invocations, duplicates across groups: []
+RESULT: head union == base inventory (same multiset)
+order check (base order restricted to each group == group order):
+  fm-control-relaunch-backends: same relative order
+  fm-control-relaunch-recovery: same relative order
+  fm-control-relaunch: same relative order
+
+== watch-triage-waits ==
+base 07e31643 tests/fm-watch-triage-waits.test.sh: 67 case invocations, 67 unique
+head fm-watch-triage-waits-away: 6 cases
+head fm-watch-triage-waits-declared: 17 cases
+head fm-watch-triage-waits-pauses: 8 cases
+head fm-watch-triage-waits: 36 cases
+head union: 67 invocations, duplicates across groups: []
+RESULT: head union == base inventory (same multiset)
+order check (base order restricted to each group == group order):
+  fm-watch-triage-waits-away: same relative order
+  fm-watch-triage-waits-declared: same relative order
+  fm-watch-triage-waits-pauses: same relative order
+  fm-watch-triage-waits: same relative order

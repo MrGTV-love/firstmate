@@ -1,0 +1,19 @@
+# Runtime function bodies (bash `declare -f` at the last case call (base) and at the selector or first case call (head)) compared base 07e31643 vs head
+
+== fm-watch-triage-waits == base defines 403 functions
+fm-watch-triage-waits: 403 functions; body differs from base: none; not in base: none
+fm-watch-triage-waits-declared: 403 functions; body differs from base: none; not in base: none
+fm-watch-triage-waits-pauses: 403 functions; body differs from base: none; not in base: none
+fm-watch-triage-waits-away: 403 functions; body differs from base: none; not in base: none
+union across groups: 403 functions; same name with different bodies across groups: none
+base functions defined by no head group: none
+
+== fm-control-relaunch == base defines 601 functions
+fm-control-relaunch: 519 functions; body differs from base: ['__fm_inv_trap']; not in base: ['control_relaunch_run']
+fm-control-relaunch-recovery: 488 functions; body differs from base: ['__fm_inv_trap']; not in base: ['control_relaunch_run']
+fm-control-relaunch-backends: 482 functions; body differs from base: ['__fm_inv_trap']; not in base: ['control_relaunch_run']
+union across groups: 599 functions; same name with different bodies across groups: none
+base functions defined by no head group: ['test_concrete_ask_lifecycle_boundaries', 'test_pinned_personal_session_refuses_lifecycle_boundaries', 'test_proven_task_lifecycle_remains_available']
+
+Note: __fm_inv_trap is the measuring probe itself (its body was edited between the base and head dumps); it is not product code.
+The only head-only function is the new shared selector control_relaunch_run; the only dropped functions are the three unregistered FM_TEST_ONLY wrappers the review round 4 decision removed.

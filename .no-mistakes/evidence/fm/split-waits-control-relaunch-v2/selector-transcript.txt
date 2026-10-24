@@ -1,0 +1,57 @@
+$ bash tests/fm-control-relaunch-backends.test.sh test_secondmate_relaunch_refuses_an_unmarked_home
+ok - fm-control relaunch: a secondmate home that is not this secondmate's is refused
+exit=0
+
+$ bash tests/fm-control-relaunch-recovery.test.sh test_exit_and_relaunch_remove_the_dialog_file
+Unknown test case: test_exit_and_relaunch_remove_the_dialog_file
+Usage: bash tests/fm-control-relaunch-recovery.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-control-relaunch.test.sh test_relaunch_refuses_unsupported_omp_before_stopping
+ok - fm-control relaunch: unsupported omp preserves the running agent and task
+exit=0
+
+## adversarial: a case registered in another group is refused here
+$ bash tests/fm-control-relaunch-backends.test.sh test_relaunch_refuses_unsupported_omp_before_stopping
+Unknown test case: test_relaunch_refuses_unsupported_omp_before_stopping
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2
+
+## adversarial: removed FM_TEST_ONLY-only wrappers are refused
+$ bash tests/fm-control-relaunch-backends.test.sh test_pinned_personal_session_refuses_lifecycle_boundaries
+Unknown test case: test_pinned_personal_session_refuses_lifecycle_boundaries
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-control-relaunch-backends.test.sh test_proven_task_lifecycle_remains_available
+Unknown test case: test_proven_task_lifecycle_remains_available
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-control-relaunch.test.sh test_concrete_ask_lifecycle_boundaries
+Unknown test case: test_concrete_ask_lifecycle_boundaries
+Usage: bash tests/fm-control-relaunch.test.sh [test_function_name ...]
+exit=2
+
+## adversarial: one bad name in a list refuses before any case runs
+$ bash tests/fm-control-relaunch-backends.test.sh test_secondmate_relaunch_refuses_an_unmarked_home test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash tests/fm-control-relaunch-backends.test.sh [test_function_name ...]
+exit=2
+
+## correction: the dialog-file case above is registered in backends, so recovery refused it (this is itself the cross-group refusal)
+$ bash tests/fm-control-relaunch-backends.test.sh test_exit_and_relaunch_remove_the_dialog_file
+ok - fm-control removes the dialog file after exit and after relaunch
+exit=0
+
+$ bash tests/fm-control-relaunch-recovery.test.sh test_held_relaunch_refuses_without_stopping_the_live_owner
+ok - held replacement admission refuses before touching the live owner
+exit=0
+
+## jev-guard entry point kept on tests/fm-control-relaunch.test.sh
+$ bash tests/fm-control-relaunch.test.sh --jev-guard
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+ok - relaunch: native Claude and OMP launch prompts announce every surviving record
+ok - relaunch: legacy tasks remain unguarded and current tasks retain launch activation on both hosts
+exit=0
+
