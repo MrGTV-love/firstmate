@@ -225,7 +225,7 @@ Pi and pi-signed 0.82.0 were reverified on 2026-07-27 through real isolated `fm-
 Refresh its portable production-command verification with:
 
 ```sh
-bash bin/fm-test-run.sh tests/fm-control-relaunch.test.sh
+bash bin/fm-test-run.sh tests/fm-control-relaunch.test.sh tests/fm-control-relaunch-recovery.test.sh
 ```
 
 The suite exercises the production control and launch commands but does not start or stop a real tmux server or Herdr session.
@@ -3783,7 +3783,7 @@ With a fresh temporary `HOME`, the installed binary's `omp config path` returned
 | `PI_PROFILE=billing-probe` only | `.omp/agent` |
 
 Refresh the schema and directory observations with the same model-free commands after an omp upgrade.
-`bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh tests/fm-control-relaunch.test.sh tests/fm-bootstrap.test.sh tests/fm-remote-doctor.test.sh` exercises the public spawn, fallback, relaunch, and diagnostic paths with isolated configuration and no paid model launch.
+`bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh tests/fm-control-relaunch.test.sh tests/fm-control-relaunch-backends.test.sh tests/fm-bootstrap.test.sh tests/fm-remote-doctor.test.sh` exercises the public spawn, fallback, relaunch, and diagnostic paths with isolated configuration and no paid model launch.
 A public `fm-bootstrap.sh` detect-only local smoke reported all three forbidden roles and forbidden fallback keys/targets, left the fixture config byte-identical, and omitted its credential sentinel.
 
 Portable compatibility coverage: `bash bin/fm-test-run.sh --jobs 1 tests/fm-on.test.sh tests/fm-worker-account.test.sh` passed both complete scripts. The worker-account native catalog cases use `openai-codex/*` for omp, covering unsupported/supported non-index literals and indexed role, stand-in, primary-literal, and stand-in-literal selections. The transport fixture includes the doctor's shared billing guard; its executable bootstrap checks accept the current trusted doctor without Git and reject an altered copy. Changes to `fm-remote-doctor.sh` must also refresh the trusted checksum in `fm-remote-entrypoint.sh`.

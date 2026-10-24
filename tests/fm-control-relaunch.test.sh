@@ -2,11 +2,12 @@
 # fm-control.sh relaunch: the transactional replace-the-agent verb.
 #
 # Same-harness replacement, harness switches, profiles and model routing, the
-# progress note, refusals before the agent is touched, and failures after it is
-# stopped.  Recovery, relocation, Herdr reclaim, and continuation authorization
-# live in tests/fm-control-relaunch-recovery.test.sh; secondmate child-work,
-# fm-spawn --relaunch's own refusals, TeamClaude, reboot recovery, and the quota
-# routes live in tests/fm-control-relaunch-backends.test.sh.
+# progress note, refusals before the agent is touched, fm-spawn --relaunch's own
+# refusals, and failures after it is stopped.  Recovery, relocation, Herdr
+# reclaim, and continuation authorization live in
+# tests/fm-control-relaunch-recovery.test.sh; secondmate child-work,
+# lifecycle-lock participation, TeamClaude, reboot recovery, and the quota routes
+# live in tests/fm-control-relaunch-backends.test.sh.
 # Shared fixtures: tests/fm-control-relaunch-helpers.sh.
 
 # shellcheck source=tests/fm-control-relaunch-helpers.sh

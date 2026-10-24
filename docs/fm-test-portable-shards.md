@@ -186,7 +186,7 @@ The cases keep living in `tests/fm-watch-triage-helpers.sh`, so the split is a p
 `tests/fm-control-relaunch-helpers.sh` owns the former suite's setup, fixtures, and helpers, a pure byte-for-byte move, plus the one `control_relaunch_run` selector every group calls.
 `tests/fm-control-relaunch.test.sh` keeps the same-harness contract, harness switches, profiles and model routing, the progress-note cases, and the pre-stop and post-stop failure cases (74); it also keeps the `--jev-guard` entry point.
 `tests/fm-control-relaunch-recovery.test.sh` holds the gone-endpoint, relocation, Herdr reclaim, and held/dependency/continuation cases (44, including the 14 that require a compatible `tasks-axi`).
-`tests/fm-control-relaunch-backends.test.sh` holds secondmate child-work, `fm-spawn --relaunch`'s own refusals, TeamClaude, Herdr lifecycle admission, reboot recovery, and the quota routes (37).
+`tests/fm-control-relaunch-backends.test.sh` holds secondmate child-work, lifecycle-lock participation, TeamClaude, Herdr lifecycle admission, reboot recovery, and the quota routes (37); `fm-spawn --relaunch`'s own refusals stay in `tests/fm-control-relaunch.test.sh`.
 Each group registers its cases in order and hands its arguments to `control_relaunch_run`, which accepts `[test_function_name ...]`, so a single case is selectable from the file that defines it; it replaces the former `FM_TEST_ONLY` hook.
 
 The split preserves the combined suite's per-case shell state: control-relaunch never enabled `errexit` at file scope, and each group still sources the shared setup with `set -u` and its own temporary root, fixture-process registry, and `EXIT` cleanup.

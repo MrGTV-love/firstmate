@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Backend and host surfaces around bin/fm-control.sh relaunch: secondmate
-# child-work safety, fm-spawn --relaunch's own refusals, TeamClaude on every
+# child-work safety, lifecycle-lock participation, TeamClaude on every
 # relaunch path, Herdr lifecycle admission, bounded reboot recovery, and the
 # quota routes that decide whether a replacement may launch.
-# The core relaunch contract lives in tests/fm-control-relaunch.test.sh;
-# recovery, relocation, and continuation authorization live in
+# The core relaunch contract and fm-spawn --relaunch's own refusals live in
+# tests/fm-control-relaunch.test.sh; recovery, relocation, and continuation authorization live in
 # tests/fm-control-relaunch-recovery.test.sh.
 # Shared fixtures: tests/fm-control-relaunch-helpers.sh.
 
