@@ -708,9 +708,109 @@ test_recycled_launcher_lock_is_held() {
   pass "a live recycled launcher pid holds its copy and unchanged lock, with age and lock mtime reported"
 }
 
+test_dead_launcher_dirty_copy_is_held() {
+  local admin before
+  make_locked_copy_case locked-dirty dead
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  printf 'untracked work\n' > "$(copy_path locked)/untracked.txt"
+  FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "dirty locked copy: apply failed ($RC): $OUT"
+  assert_class locked HELD-DIRTY
+  registered locked || fail "the dirty locked copy was unregistered"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the dirty copy's lock changed"
+  assert_equals 'untracked work' "$(cat "$(copy_path locked)/untracked.txt")" "the untracked work changed"
+  assert_absent "$W/closeout.log" "the driver ran on a dirty locked copy"
+  assert_equals '' "$(find "$HOMED/data/copy-sweep" -mindepth 1 -print 2>/dev/null)" \
+    "a dirty locked copy wrote preservation or receipt data"
+  pass "a dead-launcher locked copy with untracked work stays registered and locked, without a driver call or sweep data"
+}
+
+test_dead_launcher_process_inside_copy_is_held() {
+  local admin before
+  make_locked_copy_case locked-process dead
+  install_driver "$SLOT" "$W"
+  admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+  before=$(shasum -a 256 "$admin/locked")
+  FAKE_LSOF_CWD="$(copy_path locked)" FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+  [ "$RC" = 0 ] || fail "locked copy with process: apply failed ($RC): $OUT"
+  assert_class locked HELD-LIVE-TASK
+  registered locked || fail "the locked copy with a process inside was unregistered"
+  assert_equals "$before" "$(shasum -a 256 "$admin/locked")" "the process-owned copy's lock changed"
+  assert_absent "$W/closeout.log" "the driver ran on a locked copy with a process inside"
+  assert_equals '' "$(find "$HOMED/data/copy-sweep" -mindepth 1 -print 2>/dev/null)" \
+    "a locked copy with a process inside wrote preservation or receipt data"
+  pass "a dead-launcher locked copy with a process inside stays registered and locked, without a driver call or sweep data"
+}
+
 test_dead_launcher_lock_is_released_by_the_driver() {
   assert_driver_release driver-dead dead
   pass "a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported"
+}
+
+test_locked_release_cap_defers_copies_until_the_next_run() {
+  local setting limit total n name admin reason before survivors
+  for setting in default 2; do
+    if [ "$setting" = default ]; then
+      unset FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT
+      limit=5
+    else
+      export FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=$setting
+      limit=$setting
+    fi
+    total=$((limit + 2))
+    make_locked_copy_case "driver-cap-$setting" dead
+    install_driver "$SLOT" "$W"
+    admin=$(git -C "$(copy_path locked)" rev-parse --absolute-git-dir)
+    reason=$(cat "$admin/locked")
+    before=$(shasum -a 256 "$admin/locked" | awk '{ print $1 }')
+    for ((n = 2; n <= total; n++)); do
+      add_copy "locked$n"
+      git -C "$SLOT" worktree lock --reason "$reason" "$(copy_path "locked$n")"
+    done
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$setting cap: first apply failed ($RC): $OUT"
+    assert_equals "$limit" "$(printf '%s\n' "$OUT" | grep -c $'^REMOVED\t')" \
+      "$setting cap: wrong number of locked copies released"
+    assert_equals 2 "$(printf '%s\n' "$OUT" | grep -c $'^DEFERRED\t')" \
+      "$setting cap: excess copies were not deferred"
+    assert_contains "$OUT" "per-run cap: $limit locked release attempts reached; eligible next run" \
+      "$setting cap: deferral did not explain its limit and next-run eligibility"
+    assert_contains "$OUT" 'summary: HELD-LOCKED=0' "$setting cap: deferred copies were held"
+    assert_equals "$((2 * limit))" "$(wc -l < "$W/closeout.log" | tr -d ' ')" \
+      "$setting cap: deferred copies reached the driver"
+    survivors=0
+    for ((n = 1; n <= total; n++)); do
+      name=locked
+      [ "$n" = 1 ] || name="locked$n"
+      if registered "$name"; then
+        survivors=$((survivors + 1))
+        assert_class "$name" DEFERRED
+        admin=$(git -C "$(copy_path "$name")" rev-parse --absolute-git-dir)
+        assert_equals "$before" "$(shasum -a 256 "$admin/locked" | awk '{ print $1 }')" \
+          "$setting cap: a deferred copy's lock changed"
+        if grep -Fxq "$SLOT|--cleanup-worktree $(copy_path "$name")" "$W/closeout.log"; then
+          fail "$setting cap: a deferred copy reached the driver's plan"
+        fi
+        assert_no_grep "$(copy_path "$name") " "$W/closeout.log" \
+          "$setting cap: a deferred copy reached the driver's execute"
+      fi
+    done
+    assert_equals 2 "$survivors" "$setting cap: wrong number of copies stayed registered"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$setting cap: second apply failed ($RC): $OUT"
+    assert_equals 2 "$(printf '%s\n' "$OUT" | grep -c $'^REMOVED\t')" \
+      "$setting cap: next run did not release both deferred copies"
+    assert_contains "$OUT" 'summary: DEFERRED=0' "$setting cap: deferral persisted into the next run"
+    for ((n = 1; n <= total; n++)); do
+      name=locked
+      [ "$n" = 1 ] || name="locked$n"
+      ! registered "$name" || fail "$setting cap: $name stayed registered after the next run"
+    done
+  done
+  unset FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT
+  pass "the default cap releases five of seven locked copies and defers two unchanged until the next run; an explicit cap of two behaves the same way"
 }
 
 test_uuid_owner_lock_is_released_by_the_driver() {
@@ -2434,7 +2534,10 @@ run_case test_closed_task_and_secondmate_home_do_not_raise_live_nested_fact
 run_case test_unreadable_registration_is_reported_without_walking_for_copies
 run_case test_apply_removes_only_the_reapable_copy
 run_case test_recycled_launcher_lock_is_held
+run_case test_dead_launcher_dirty_copy_is_held
+run_case test_dead_launcher_process_inside_copy_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
+run_case test_locked_release_cap_defers_copies_until_the_next_run
 run_case test_uuid_owner_lock_is_released_by_the_driver
 run_case test_ppid_owner_lock_is_released_by_the_driver
 run_case test_retained_ignored_payload_is_kept_once_without_growth

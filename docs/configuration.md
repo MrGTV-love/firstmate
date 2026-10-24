@@ -1968,6 +1968,9 @@ The script header owns how a budget is measured, when it is over, and when its w
 `FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) names the Treehouse root.
 `FM_TEARDOWN_VERNANT_PYTHON` (default `<clone>/.venv/bin/python`) names the interpreter that runs Vernant's closeout driver when `--apply` releases a locked copy, exactly as it does for teardown.
 `FM_COPY_SWEEP_PLAN_TIMEOUT` (default `120`, in seconds) bounds the closeout driver's plan for a locked copy; a plan that does not answer in time holds the copy, and the script header owns how the plan is stopped.
+`FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT` (default `5`) caps locked release attempts per `--apply` run; excess candidates are `DEFERRED` (per-run cap), eligible next run, with the script header owning the counting and invalid-value rules.
+Review the first batch's records before unattended operation.
+The header also owns the closeout-script liveness dependency and the fallback's Vernant follow-ups, `vernant-lock-lease` and `vernant-commits-remote-before-lock`.
 `check` takes its time bound from the watcher's `FM_CHECK_TIMEOUT`, which the header describes.
 [`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
@@ -3976,6 +3979,7 @@ FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-too
 FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
 FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_COPY_SWEEP_PLAN_TIMEOUT=120   # seconds the nested-copy sweep waits for Vernant's closeout plan of a locked copy before it holds the copy; a non-positive or non-numeric value becomes 120 (see "Nested task copy sweep")
+FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=5   # maximum locked release attempts per apply run; see the script header ("Nested task copy sweep")
 FM_PROCEVENT_MAX_OUTPUT_BYTES=1048576   # bound on one captured process-to-event result
 FM_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/firstmate/procevent-claims
 FM_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400

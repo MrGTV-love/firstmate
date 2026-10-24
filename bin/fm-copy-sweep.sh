@@ -67,6 +67,8 @@
 #                      changing, so the copy is not idle. It gets no new preserve
 #                      and no driver call, and each run reports it with the reason,
 #                      until a run sees the same fingerprint as the run before.
+#   DEFERRED           --apply's otherwise qualifying locked copy after the
+#                      per-run locked release cap is reached, eligible next run.
 #   REAPABLE-PROVEN    clean, HEAD contained in a remote branch (the whole-slot
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
@@ -101,7 +103,21 @@
 # run. A copy with no live owning record is left to the existing reap path.
 #
 # --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
-# deepest path first.
+# deepest path first. FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT (default 5; a positive
+# decimal integer, invalid or non-positive values become 5) caps locked release
+# attempts per run after an allowed plan. An attempt consumes a slot even when
+# later preservation, reproof or execute refuses; refused plans consume none.
+# Remaining qualifying locked copies are DEFERRED (per-run cap), never HELD,
+# get no driver call or preserve, and are eligible again on the next run.
+# Unlocked removal is unchanged. Review the first batch's records before running
+# the sweep unattended.
+#
+# This sweep is a fallback, not the systemic lock-lifecycle fix. Vernant owns
+# vernant-lock-lease: owner plus heartbeat, dead-owner expiry and reclamation by
+# the pool's own lifecycle. vernant-commits-remote-before-lock guarantees that a
+# copy's commits are on a remote before its lock is taken.
+# A process appearing between the last process scan and execute is covered only
+# by the closeout script's own liveness check; the sweep cannot close that race.
 # Every ownership, process, cleanliness and remote-content proof is re-read
 # after the driver plan and after preservation, immediately before execution;
 # HEAD and the complete lock's SHA-256 must still match what the plan saw.
@@ -1518,6 +1534,11 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier
+  local driver_attempts=0 driver_limit deferred=''
+  driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
+  case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
+  driver_limit=$((10#$driver_limit))
+  [ "$driver_limit" -ge 1 ] || driver_limit=5
   stamp=$(date -u +%Y%m%dT%H%M%SZ).$$
   read -r SCANNED_COUNT SCANNED_KIB SCANNED_UNMEASURED <<< "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++; if ($6 == "-") u++; else k += $6 } END { printf "%d %.0f %d\n", n, k, u }')"
   REMOVAL_REPORT=
@@ -1544,6 +1565,10 @@ apply_removals() {
     preserve_dir=
     earlier=0
     if [ "$CLASS" = REAPABLE-DRIVER ]; then
+      if [ "$driver_attempts" -ge "$driver_limit" ]; then
+        deferred="$deferred$copy"$'\n'
+        continue
+      fi
       earlier=$CONTENT_PRESERVED
       # The copy is Vernant-locked with a launcher pid that is not running. Its
       # driver is the only supported release: it unlocks and removes, after the
@@ -1563,6 +1588,7 @@ apply_removals() {
       }
       preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved/${receipt##*/}"
       release_rc=0
+      driver_attempts=$((driver_attempts + 1))
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
       if [ "$release_rc" = 3 ]; then
         held="$held$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
@@ -1622,6 +1648,9 @@ apply_removals() {
   done < <(printf '%s\n' "$COPIES" | awk -F '\t' '$5 == "REAPABLE-PROVEN" || $5 == "REAPABLE-DRIVER"' | LC_ALL=C sort -t "$(printf '\t')" -k4,4r)
   if [ -n "$gone" ]; then
     COPIES=$(printf '%s\n' "$COPIES" | GONE=$gone awk -F '\t' 'BEGIN { n = split(ENVIRON["GONE"], g, "\n"); for (i = 1; i <= n; i++) if (g[i] != "") drop[g[i]] = 1 } !($4 in drop)')
+  fi
+  if [ -n "$deferred" ]; then
+    COPIES=$(printf '%s\n' "$COPIES" | DEFERRED=$deferred LIMIT=$driver_limit awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["DEFERRED"], d, "\n"); for (i = 1; i <= n; i++) if (d[i] != "") defer[d[i]] = 1 } $4 in defer { $5 = "DEFERRED"; $7 = "per-run cap: " ENVIRON["LIMIT"] " locked release attempts reached; eligible next run" } { print }')
   fi
   if [ -n "$held" ]; then
     COPIES=$(printf '%s\n' "$COPIES" | HELD=$held awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["HELD"], h, "\n"); for (i = 1; i <= n; i++) if (h[i] != "") { split(h[i], kv, "\t"); why[kv[1]] = kv[2] } } $4 in why { $5 = "HELD-LOCKED"; $7 = why[$4] } { print }')
@@ -1922,7 +1951,7 @@ print_report() {  # <mode>
     printf 'note: %s\n' "$line"
   done <<< "$NOTES"
   [ "$SCAN_CUT" != 1 ] || printf 'note: the scan stopped at its time bound; unmeasured copies show ? GiB\n'
-  for class in REAPABLE-PROVEN REAPABLE-DRIVER PENDING-DRIVER WAITING HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
+  for class in REAPABLE-PROVEN REAPABLE-DRIVER PENDING-DRIVER WAITING DEFERRED HELD-LIVE-TASK HELD-LOCKED HELD-UNPUSHED HELD-DIRTY ORPHAN-NO-RECORD; do
     count=$(printf '%s\n' "$COPIES" | awk -F '\t' -v c="$class" '$5 == c { n++ } END { print n + 0 }')
     printf 'summary: %s=%s\n' "$class" "$count"
   done
