@@ -1,0 +1,34 @@
+total 8
+prw-r--r--  1 charlesabrooker  staff  0 Oct 24 02:24 pipe.log
+-rw-r--r--  1 charlesabrooker  staff  9 Oct 24 02:24 run.log
+srwxr-xr-x  1 charlesabrooker  staff  0 Oct 24 02:24 stale.log
+
+===== RUN 1: --apply
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	$LAB/c/th/pool1/1/repo/.claude/worktrees/s	branch fm/s at 5877017988a4, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 47545 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+exit=0
+preserves holding run.log: 1   copy s registered: 0   waiting: 0   receipts: 0
+
+===== preserve contents:
+drwxr-xr-x  5 charlesabrooker  staff  160 Oct 24 02:24 $LAB/c/home/data/copy-sweep/20261024T072436Z.47621-5877017988a4fa674347e217aa81e85998c31cdb/nested-copy-preserved/c5e4826e2ac4762604df5d34f1a4df299c8d96fa287d3d9a0c266e69e9acd089
+-rw-r--r--  1 charlesabrooker  staff   88 Oct 24 02:24 $LAB/c/home/data/copy-sweep/20261024T072436Z.47621-5877017988a4fa674347e217aa81e85998c31cdb/nested-copy-preserved/c5e4826e2ac4762604df5d34f1a4df299c8d96fa287d3d9a0c266e69e9acd089/SHA256SUMS
+-rw-r--r--  1 charlesabrooker  staff   79 Oct 24 02:24 $LAB/c/home/data/copy-sweep/20261024T072436Z.47621-5877017988a4fa674347e217aa81e85998c31cdb/nested-copy-preserved/c5e4826e2ac4762604df5d34f1a4df299c8d96fa287d3d9a0c266e69e9acd089/copy-path
+drwxr-xr-x  3 charlesabrooker  staff   96 Oct 24 02:24 $LAB/c/home/data/copy-sweep/20261024T072436Z.47621-5877017988a4fa674347e217aa81e85998c31cdb/nested-copy-preserved/c5e4826e2ac4762604df5d34f1a4df299c8d96fa287d3d9a0c266e69e9acd089/scripts
+drwxr-xr-x  4 charlesabrooker  staff  128 Oct 24 02:24 $LAB/c/home/data/copy-sweep/20261024T072436Z.47621-5877017988a4fa674347e217aa81e85998c31cdb/nested-copy-preserved/c5e4826e2ac4762604df5d34f1a4df299c8d96fa287d3d9a0c266e69e9acd089/scripts/hooks
+prw-r--r--  1 charlesabrooker  staff    0 Oct 24 02:24 $LAB/c/home/data/copy-sweep/20261024T072436Z.47621-5877017988a4fa674347e217aa81e85998c31cdb/nested-copy-preserved/c5e4826e2ac4762604df5d34f1a4df299c8d96fa287d3d9a0c266e69e9acd089/scripts/hooks/pipe.log
+-rw-r--r--  1 charlesabrooker  staff    9 Oct 24 02:24 $LAB/c/home/data/copy-sweep/20261024T072436Z.47621-5877017988a4fa674347e217aa81e85998c31cdb/nested-copy-preserved/c5e4826e2ac4762604df5d34f1a4df299c8d96fa287d3d9a0c266e69e9acd089/scripts/hooks/run.log
+
+===== copy-sweep.log:
+2026-10-24T07:24:42Z	removed	$LAB/c/th/pool1/1/repo/.claude/worktrees/s	clone=$LAB/c/th/pool1/1/repo	head=5877017988a4fa674347e217aa81e85998c31cdb	branch=fm/s	kib=16	preserved_kib=12	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 47545 is gone

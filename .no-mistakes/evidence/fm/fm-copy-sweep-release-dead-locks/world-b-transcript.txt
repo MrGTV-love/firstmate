@@ -1,0 +1,97 @@
+
+===== RUN 1: --apply while the writer adds files to w
+copy-sweep: mode=apply containers=1 copies=1
+REAPABLE-DRIVER	0.00 GiB	$LAB/b/th/pool1/1/repo/.claude/worktrees/w	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21001 is gone
+FAILED	$LAB/b/th/pool1/1/repo/.claude/worktrees/w	the copy was left: REFUSED: the preservable ignored content of $LAB/b/th/pool1/1/repo/.claude/worktrees/w changed after it was preserved, or could not be compared with its preserve; it was not released. no preserve from this run is kept; the next sweep run plans it again.
+REMOVED	$LAB/b/th/pool1/1/repo/.claude/worktrees/q	branch fm/q at 21dcf3c82bdb, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21001 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=1
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool $LAB/b/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container $LAB/b/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=2 GiB=0.01 reaped=1 freed=0.00
+exit=1
+preserves holding run.log: 1   copy w registered: 1   waiting records: 1   retention receipts: 0
+driver unlock calls on w so far: 0
+0
+
+===== RUN 2: --apply while the writer still adds files to w
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.00 GiB	$LAB/b/th/pool1/1/repo/.claude/worktrees/w	content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool $LAB/b/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container $LAB/b/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+exit=0
+preserves holding run.log: 1   copy w registered: 1   waiting records: 1   retention receipts: 0
+driver unlock calls on w so far: 0
+0
+
+writer stopped; w/scripts/hooks now holds 39 files
+
+===== RUN 3: --apply, first run after the writer stopped
+copy-sweep: mode=apply containers=1 copies=1
+WAITING	0.00 GiB	$LAB/b/th/pool1/1/repo/.claude/worktrees/w	content changing: its preservable ignored content changed since the sweep last recorded it, so it is not idle; no preserve and no driver call until a run sees it unchanged
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=1
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool $LAB/b/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container $LAB/b/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=0 freed=0.00
+exit=0
+preserves holding run.log: 1   copy w registered: 1   waiting records: 1   retention receipts: 0
+driver unlock calls on w so far: 0
+0
+
+===== RUN 4: --apply, second quiet run
+copy-sweep: mode=apply containers=0 copies=0
+REMOVED	$LAB/b/th/pool1/1/repo/.claude/worktrees/w	branch fm/w at f5c538686e2d, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21001 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=1 GiB=0.00 reaped=1 freed=0.00
+exit=0
+preserves holding run.log: 2   copy w registered: 0   waiting records: 0   retention receipts: 0
+driver unlock calls on w so far: 1
+
+===== the preserve of w (every file the writer made must be there):
+files in preserve: 39 (writer made 39)
+checksum mismatches: 0
+
+===== copy-sweep.log:
+2026-10-24T07:24:06Z	removed	$LAB/b/th/pool1/1/repo/.claude/worktrees/q	clone=$LAB/b/th/pool1/1/repo	head=21dcf3c82bdb3cddc3cfa3cb60b10ee0a2d92cbb	branch=fm/q	kib=2944	preserved_kib=2940	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21001 is gone
+2026-10-24T07:24:19Z	removed	$LAB/b/th/pool1/1/repo/.claude/worktrees/w	clone=$LAB/b/th/pool1/1/repo	head=f5c538686e2dcea4ce4ff92ba44516592d3a53a7	branch=fm/w	kib=2972	preserved_kib=3092	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 21001 is gone

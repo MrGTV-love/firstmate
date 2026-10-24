@@ -1,0 +1,118 @@
+dead launcher pid=53445 (not running: yes); live launcher pid=53485
+
+===== RUN 0: report (no flag)
+copy-sweep: mode=report containers=1 copies=10
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/a-refused	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c1	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c2	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c3	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c4	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c5	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c6	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+PENDING-DRIVER	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c7	clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone; driver verdict not checked in report mode, not yet proven removable
+HELD-LOCKED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/live	worktree lock: vernant-session-active owner=launcher:53485 launcher=53485 (launcher 53485 is alive; start age=4s; lock mtime=1792826523)
+HELD-UNPUSHED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=8
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool $LAB/a/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container $LAB/a/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+exit=0
+report changed nothing on disk: yes
+
+===== RUN 1: --apply (default cap 5)
+copy-sweep: mode=apply containers=1 copies=5
+DEFERRED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/a-refused	per-run cap: 5 locked release slots used; eligible next run
+DEFERRED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c1	per-run cap: 5 locked release slots used; eligible next run
+DEFERRED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/c2	per-run cap: 5 locked release slots used; eligible next run
+HELD-LOCKED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/live	worktree lock: vernant-session-active owner=launcher:53485 launcher=53485 (launcher 53485 is alive; start age=7s; lock mtime=1792826523)
+HELD-UNPUSHED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+REMOVED	$LAB/a/th/pool1/1/repo/.claude/worktrees/c7	branch fm/c7 at 8dcafd4cb054, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone)
+REMOVED	$LAB/a/th/pool1/1/repo/.claude/worktrees/c6	branch fm/c6 at 855874b04a4f, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone)
+REMOVED	$LAB/a/th/pool1/1/repo/.claude/worktrees/c5	branch fm/c5 at 01bee8618647, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone)
+REMOVED	$LAB/a/th/pool1/1/repo/.claude/worktrees/c4	branch fm/c4 at a8a6ea5ac601, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone)
+REMOVED	$LAB/a/th/pool1/1/repo/.claude/worktrees/c3	branch fm/c3 at 9b70e78b5a41, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=3
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool $LAB/a/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container $LAB/a/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=10 GiB=0.00 reaped=5 freed=0.00
+exit=0
+--- worktrees:
+worktree $LAB/a/th/pool1/1/repo
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/a-refused
+locked vernant-session-active owner=launcher:53445 launcher=53445
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/c1
+locked vernant-session-active owner=launcher:53445 launcher=53445
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/c2
+locked vernant-session-active owner=launcher:53445 launcher=53445
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/live
+locked vernant-session-active owner=launcher:53485 launcher=53485
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/unpushed
+locked vernant-session-active owner=launcher:53445 launcher=53445
+--- data/copy-sweep:
+copy-sweep
+copy-sweep.log
+copy-sweep/retained
+
+===== RUN 2: --apply
+copy-sweep: mode=apply containers=1 copies=3
+HELD-LOCKED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/a-refused	its closeout driver would not release it (exit 3): verification_stale_or_uncovered_paths: {"allowed": false, "cleanup_command": ["git", "worktree", "remove", "$LAB/a/th/pool1/1/repo/.claude/worktrees/a-refused"], "cleanup_timeout_seconds": 30, "coverage_mode": "blocked", "exact_tree_covered": false, "execute": false, "landed_pr_discovery": {"candidates": [], "pr": null, "reason": "no PR head on origin equals the copy's tip 8818bf23a0db29815b8585ba0a368235c628db22", "tree_tip_sha": "8818bf23a0db29815b8585ba0a368235c628db22"}, "launch_cwd": {"cwd": "$LAB/a/th/pool1/1/repo/.git/vernant-launch", "launch_dir": "/Use
+HELD-LOCKED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/live	worktree lock: vernant-session-active owner=launcher:53485 launcher=53485 (launcher 53485 is alive; start age=39s; lock mtime=1792826523)
+HELD-UNPUSHED	0.00 GiB	$LAB/a/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote; a locked copy is released only when every local commit is on a remote
+REMOVED	$LAB/a/th/pool1/1/repo/.claude/worktrees/c2	branch fm/c2 at 08c6a4d0c7c8, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone)
+REMOVED	$LAB/a/th/pool1/1/repo/.claude/worktrees/c1	branch fm/c1 at ff9931a7f99b, copy 0.00 GiB, preserved 0.00 GiB, net freed 0.00 GiB (clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone)
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=2
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=0
+summary: ORPHAN-NO-RECORD=0
+budget pool $LAB/a/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container $LAB/a/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=5 GiB=0.00 reaped=2 freed=0.00
+exit=0
+--- worktrees:
+worktree $LAB/a/th/pool1/1/repo
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/a-refused
+locked vernant-session-active owner=launcher:53445 launcher=53445
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/live
+locked vernant-session-active owner=launcher:53485 launcher=53485
+worktree $LAB/a/th/pool1/1/repo/.claude/worktrees/unpushed
+locked vernant-session-active owner=launcher:53445 launcher=53445
+--- data/copy-sweep:
+copy-sweep
+copy-sweep.log
+copy-sweep/retained
+
+===== branches on origin after:
+fm/a-refused fm/c1 fm/c2 fm/c3 fm/c4 fm/c5 fm/c6 fm/c7 fm/live *main 
+===== copy-sweep.log:
+2026-10-24T07:22:14Z	removed	$LAB/a/th/pool1/1/repo/.claude/worktrees/c7	clone=$LAB/a/th/pool1/1/repo	head=8dcafd4cb054387e60a79cd1729dc1c24ccd4e25	branch=fm/c7	kib=36	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone
+2026-10-24T07:22:20Z	removed	$LAB/a/th/pool1/1/repo/.claude/worktrees/c6	clone=$LAB/a/th/pool1/1/repo	head=855874b04a4f2bedb9541fe4333cbc510261c805	branch=fm/c6	kib=32	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone
+2026-10-24T07:22:26Z	removed	$LAB/a/th/pool1/1/repo/.claude/worktrees/c5	clone=$LAB/a/th/pool1/1/repo	head=01bee86186472c8c5c485c78a7439d92cc145849	branch=fm/c5	kib=28	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone
+2026-10-24T07:22:32Z	removed	$LAB/a/th/pool1/1/repo/.claude/worktrees/c4	clone=$LAB/a/th/pool1/1/repo	head=a8a6ea5ac6017197f773a39cbe6e9fd89155f402	branch=fm/c4	kib=24	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone
+2026-10-24T07:22:37Z	removed	$LAB/a/th/pool1/1/repo/.claude/worktrees/c3	clone=$LAB/a/th/pool1/1/repo	head=9b70e78b5a4199a8d35c16abfe5f395d8b042d76	branch=fm/c3	kib=20	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone
+2026-10-24T07:22:46Z	removed	$LAB/a/th/pool1/1/repo/.claude/worktrees/c2	clone=$LAB/a/th/pool1/1/repo	head=08c6a4d0c7c8e3967949768a4ee59b9593d9f196	branch=fm/c2	kib=16	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone
+2026-10-24T07:22:51Z	removed	$LAB/a/th/pool1/1/repo/.claude/worktrees/c1	clone=$LAB/a/th/pool1/1/repo	head=ff9931a7f99bcddbb03e3f5be8c0fc5c97396902	branch=fm/c1	kib=12	preserved_kib=0	proof=clean, no process, no record, HEAD contained in a remote branch, Vernant launcher 53445 is gone

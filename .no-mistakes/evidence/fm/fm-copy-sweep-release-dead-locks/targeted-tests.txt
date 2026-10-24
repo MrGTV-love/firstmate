@@ -1,15 +1,32 @@
-ok - the default cap releases five of seven locked copies and defers two unchanged until the next run; an explicit cap of two behaves the same way
+== test_a_new_ignored_file_after_preservation_waits_then_releases_once
+ok - a new ignored file that appears after preservation, with or without an earlier preservable file, stops the release before execute with no release slot and no lost bytes, records the copy's content, so the next run that still sees it changing reports WAITING with no preserve and no driver call, and the first quiet run preserves once and releases the copy
 ok - fm-copy-sweep
-test_locked_release_cap_defers_copies_until_the_next_run rc=
-ok - a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two
+rc=0
+== test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves
+ok - a preservable ignored directory holding a FIFO and a stale socket is compared as preservation copies it: temporary refusals discard each run's preserve with no waiting record, so preserves never accumulate, and the allowed run preserves once and releases the copy
 ok - fm-copy-sweep
-test_refusals_use_no_release_slot_and_cannot_starve_later_copies rc=
+rc=0
+== test_ignored_content_changed_after_the_last_proof_is_not_released
+ok - ignored content that changes after the last proof, after a preserve was built or an earlier preserve was reused, stops the release before the driver's execute, uses no release slot and keeps every preserved byte, and a later quiet run preserves the new content once and releases the copy
+ok - fm-copy-sweep
+rc=0
+== test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
+ok - an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; an original that changed in the copy during preservation stops the release before execute, keeps the preserve of the old content and the next run still retries the copy; an original that changed during execute before the same temporary refusal keeps that preserve with no receipt and the next quiet run releases the copy; the same refusal after an unlock stays held with its preserve
+ok - fm-copy-sweep
+rc=0
+== test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
+ok - a copy whose preserved content changed after its preservation reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve
+ok - fm-copy-sweep
+rc=0
+== test_partial_releases_use_release_slots
 ok - a driver execute that reports success but leaves the copy registered, or fails after releasing its lock, uses a release slot, so a systematic partial release reaches at most five copies per run and defers the rest
 ok - fm-copy-sweep
-test_partial_releases_use_release_slots rc=
-ok - a copy whose preserved content changed during a temporary refusal reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve
+rc=0
+== test_refusals_use_no_release_slot_and_cannot_starve_later_copies
+ok - a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two
 ok - fm-copy-sweep
-test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases rc=
-ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+rc=0
+== test_locked_release_cap_defers_copies_until_the_next_run
+ok - the default cap releases five of seven locked copies and defers two unchanged until the next run; an explicit cap of two behaves the same way
 ok - fm-copy-sweep
-test_dead_launcher_lock_is_released_by_the_driver rc=
+rc=0
