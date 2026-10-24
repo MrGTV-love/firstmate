@@ -141,9 +141,11 @@ fm_progress_check() {
 
 # Preserve the existing Python-optional shell readers. Perl core modules relay
 # both streams and sample the same identity-bound /proc-or-ps CPU facts as
-# fm-duration.py. The bound is inactivity only, including TERM cleanup; while no
-# sample is available one warning names the platform and nothing is stopped for
-# inactivity. Parent death and signals clean up the owned command group.
+# fm-duration.py, without its native Darwin CPU reader; a changed ps tree stands
+# in for waited-child CPU that ps omits. The bound is inactivity only, including
+# TERM cleanup; while no sample is available one warning names the platform and
+# nothing is stopped for inactivity. Parent death and signals clean up the owned
+# command group.
 fm_run_perl_progress() {
   local owner=${BASHPID:-$$}
   # shellcheck disable=SC2016 # Perl, not the sourcing shell, expands this program.
