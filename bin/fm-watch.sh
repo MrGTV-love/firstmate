@@ -2097,11 +2097,13 @@ age_of() {  # seconds since file mtime; "due immediately" if missing
 # when the only bytes it grew past the classified offset are this home's own
 # bookkeeping appends; fm_wake_signal_seen_current (bin/fm-wake-lib.sh) owns that
 # rule and every other signature change still reads as unreported.
-# Pure read: prints one "<seen-file>\t<sig>\t<file>" line per changed file.
-# The caller records reported state only after surfacing or intentional absorption,
+# Prints one "<seen-file>\t<sig>\t<file>" line per changed file. Each status log's
+# markers first pass through status_presentation_marker_adopt_device (the only
+# write here), which owns the device-only remount rule.
+# The caller records new reported state only after surfacing or intentional absorption,
 # and commits a status classification position only after a successful span read.
 scan_signals() {
-  local f sig sf exclude
+  local f sig sf hb exclude task
   # A remote mate's own parent channel is not a self-home task status log; the
   # home-shape-aware exclusion and its precedent live in
   # status_scan_parent_channel_exclude (fm-classify-lib.sh).
@@ -2115,7 +2117,13 @@ scan_signals() {
     [ -n "$sig" ] || continue
     fm_wake_signal_seen_path_to sf "$STATE" "$f"
     case "$f" in
-      *.status) fm_wake_signal_seen_current "$STATE" "$f" "$sig" && continue ;;
+      *.status)
+        status_presentation_marker_adopt_device "$sf" "$f" "$sig" || true
+        task=${f##*/}; task=${task%.status}
+        status_heartbeat_seen_marker_path_to hb "$STATE" "$task"
+        status_presentation_marker_adopt_device "$hb" "$f" "$sig" || true
+        fm_wake_signal_seen_current "$STATE" "$f" "$sig" && continue
+        ;;
       *) [ "$sig" = "$(cat "$sf" 2>/dev/null)" ] && continue ;;
     esac
     printf '%s\t%s\t%s\n' "$sf" "$sig" "$f"
@@ -2414,6 +2422,58 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
   return "$rc"
 }
 
+# Status reclassification uses the same owned, deadline-bounded capture as
+# checks. The existing WATCHER_STALL_BOUND caps one classification; meanwhile
+# the main poll shell refreshes its beacon through run_owned_capture, including
+# a slow span reader or decision fold. A failed/expired read remains unclassified
+# and surfaces conservatively instead of committing a partial endpoint.
+watcher_status_span_output() {
+  local span_record='' span_needs=0 span_rc
+  status_span_first_actionable_record "$1" "$2" span_record span_needs
+  span_rc=$?
+  printf '%s\n%s\n.' "$span_needs" "$span_record"
+  return "$span_rc"
+}
+
+FM_STATUS_CAPTURE_SCRATCH=
+watcher_status_span_cleanup() {
+  [ -z "$FM_STATUS_CAPTURE_SCRATCH" ] || rm -f -- "$FM_STATUS_CAPTURE_SCRATCH"
+  FM_STATUS_CAPTURE_SCRATCH=
+}
+
+# True when <offset> is at or past the end of <file> (or the file is absent):
+# the span read has nothing to read, so it needs no owned capture.
+watcher_status_span_idle() {  # <file> <offset>
+  local idle_size
+  [ -e "$1" ] || [ -L "$1" ] || return 0
+  _fm_status_file_size "$1" idle_size || return 1
+  case "$idle_size:$2" in *[!0-9:]*|:*|*:) return 1 ;; esac
+  [ "$2" -ge "$idle_size" ]
+}
+
+watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out]
+  local span_capture span_rc
+  printf -v "$3" '%s' ''
+  [ -z "${4-}" ] || printf -v "$4" '%s' 0
+  if watcher_status_span_idle "$1" "$2"; then
+    status_span_first_actionable_record "$1" "$2" "$3" "${4-}"
+    return
+  fi
+  FM_STATUS_CAPTURE_SCRATCH="$(_fm_status_span_scratch "$1").span"
+  run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
+    || { watcher_status_span_cleanup; return 2; }
+  span_rc=$FM_CHECK_STATUS
+  watcher_status_span_cleanup
+  case "$span_rc" in 0|1) ;; *) return 2 ;; esac
+  span_capture=$FM_CHECK_RESULT
+  case "$span_capture" in *$'\n.') ;; *) return 2 ;; esac
+  span_capture=${span_capture%$'\n.'}
+  case "$span_capture" in *$'\n'*) ;; *) return 2 ;; esac
+  printf -v "$3" '%s' "${span_capture#*$'\n'}"
+  [ -z "${4-}" ] || printf -v "$4" '%s' "${span_capture%%$'\n'*}"
+  return "$span_rc"
+}
+
 # 0 when any signaled status file carries a captain-relevant event in the bytes
 # appended since this watcher last classified it. The start offset is the
 # classified-position field in that file's .seen-* marker, and fm-status-wake-lib.sh's
@@ -2442,7 +2502,7 @@ signal_files_actionable() {  # <status-file> ...
     watcher_beat
     task=$(basename "$f"); task="${task%.status}"
     record=''; needs_decision=0
-    status_span_first_actionable_record "$f" \
+    watcher_status_span "$f" \
       "$(fm_wake_signal_seen_size "$STATE" "$f")" record needs_decision
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
@@ -2491,9 +2551,10 @@ EOF
 # surfaced to firstmate (.hb-surfaced-<task>). It walks every log rather than only
 # those whose LAST line looks captain-relevant, because the event this backstop
 # most needs to catch is precisely one a later routine append has already moved
-# past. Pure detect, no side effects: the caller enqueues first, then marks
-# surfaced. Because every captain-relevant signal/stale already marks itself
-# surfaced when it wakes firstmate, this normally finds nothing and the heartbeat
+# past. Apart from the device-only marker adoption (status_presentation_marker_adopt_device),
+# detection leaves progress unchanged: the caller enqueues first, then marks surfaced.
+# Because every captain-relevant signal/stale already marks itself surfaced when
+# it wakes firstmate, this normally finds nothing and the heartbeat
 # is absorbed; it surfaces only an event the per-wake path absorbed by mistake -
 # the fail-safe backstop.
 heartbeat_scan_finds_actionable() {
@@ -2507,12 +2568,14 @@ heartbeat_scan_finds_actionable() {
     watcher_beat
     [ "$f" = "$exclude" ] && continue
     task=$(basename "$f"); task="${task%.status}"
-    record=$(status_span_first_actionable_record "$f" "$(hb_surfaced_offset "$task")")
+    status_heartbeat_seen_marker_path_to marker "$STATE" "$task"
+    status_presentation_marker_adopt_device "$marker" "$f" || true
+    record=''
+    watcher_status_span "$f" "$(hb_surfaced_offset "$task")" record
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
       sig=$(status_observed_signature "$f")
-      marker=$(_hb_surfaced_path "$task")
       status_presentation_marker_reported_matches "$marker" "$sig" && continue
       FM_HEARTBEAT_SURFACE_ENDPOINTS="${FM_HEARTBEAT_SURFACE_ENDPOINTS}${f}"$'\t'"ERROR"$'\t'"${sig}"$'\n'
       found=0
@@ -3015,6 +3078,7 @@ watcher_cleanup() {
   fm_active_check_stop || cleanup_status=1
   fm_check_output_cleanup
   fm_capture_output_cleanup
+  watcher_status_span_cleanup
   fm_custom_check_snapshot_cleanup
   if [ "$owns_lock" -eq 1 ] \
     && ! fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" "$transition" "$WATCH_LOCK" \
@@ -3465,7 +3529,10 @@ signal_phase() {
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
     [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
-    pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
+    pending=$(printf '%s\n%s\n' "$pending" "$(scan_signals)" | LC_ALL=C awk -F '\t' '
+      NF == 3 { if (!($3 in row)) order[++n] = $3; row[$3] = $0 }
+      END { for (i = 1; i <= n; i++) print row[order[i]] }
+    ')
     # The final coalesced signal set is the watcher-carried status-change
     # trigger for this home's published summary. Start it before either
     # surfacing or absorbing the signal, but never wait on it: see
