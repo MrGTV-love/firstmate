@@ -2568,9 +2568,10 @@ Bash pre-calls stay unjudged, so no deletion needs a model bypass; this allowanc
 On omp, a single literal `rm` qualifies only when **every** operand resolves to an explicitly listed, existing regular file tracked in the task worktree's `HEAD`.
 The file's canonical path must equal its resolved path inside that worktree: symlinks, symlinked parents, parent traversal, directories, gitlinks and files tracked only in the index do not qualify.
 The working directory must be inside the task worktree.
-The bounded parser accepts space/tab-separated literal operands, single/double quotes, `--`, the short flags `f`, `r`, `v`, and their long forms `--force`, `--recursive`, `--verbose`.
+The bounded parser accepts only the executable spelled exactly `rm`, optional short flags made only of `f` and `r` (such as `-f`, `-rf` or `-fr`), an optional `--`, then space/tab-separated unquoted literal operands.
 It does not interpret shell expansions, backslashes, globs, substitutions, pipelines, redirects, compound commands or other flags.
-Those forms, mixed listed/unlisted operands and every other deletion keep the ordinary unjudged bash path: no Jev decision, no allowance record and no guard audit row.
+Every other spelling, including `/bin/rm` or another path to `rm`, a long option, `-v`, a quoted operand, or any other flag, keeps the ordinary unjudged bash path; a bash call that supplies its own `cwd` or `env` input also keeps that path, so the allowance only resolves operands from the session working directory in the task worktree.
+Those forms, mixed listed/unlisted operands and every other deletion get no Jev decision, no allowance record and no guard audit row.
 This is not a shell deletion guarantee and does not add Jev questions, thresholds or other guards.
 Claude has no `Bash` pre-call hook (see [Tool coverage and outbound calls](#tool-coverage-and-outbound-calls)), so Claude workers' deletions receive neither this check nor its record.
 A listed file may have local modifications; `HEAD` tracking proves a committed version exists, not that uncommitted contents can be restored.
@@ -2592,6 +2593,7 @@ The omp guard rereads the list and digest for each candidate deletion, so live a
 An omp worker already using older guard code must load this implementation through an authorized relaunch before it can consume a new list.
 
 The publisher writes `state/<task>.authorized-deletions.json` and its SHA-256 as `jev_deletions_sha256` in `state/<task>.meta`, binding the snapshot to the task and canonical worktree.
+A fresh launch without the section, and teardown, remove that list, so a reused task id never inherits a previous task's declaration; the `state/<task>.authorized-deletions.jsonl` audit keeps its admitted rows.
 Once either a snapshot or metadata digest declares deletion authorization, a missing, unreadable, malformed or mismatched pair refuses candidate literal `rm` calls with a `branch=deterministic` row, including during the two-file publication window.
 Tasks with neither a snapshot nor a digest declaration keep the unjudged bash path; a valid list also leaves non-applicable commands and unlisted operands on that path.
 The list and its digest are firstmate-written; a worker running as the same OS user could forge both, so this guards against mistakes, not deliberate forgery.
@@ -2599,7 +2601,7 @@ It is not producer authentication, an OS permission boundary, or a filesystem/pr
 Path and `HEAD` checks happen immediately before admission, not atomically with shell execution; concurrent filesystem or Git changes can invalidate that observation.
 Every admitted candidate first appends a task-local line to `state/<task>.authorized-deletions.jsonl` with `task`, canonical worktree-relative `paths`, `list_sha256` and ISO-8601 `time`, then a `branch=deterministic` row to `state/jev-guard.jsonl`.
 That line records permission before execution, not proof the shell succeeded; either an allowance-audit failure or the ordinary guard-audit failure refuses the call.
-The behavioral regression in [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises the omp handler, actual file removal, live publication/revocation, inconsistent lists, scope exclusions and the six obsolete cd-guard paths.
+The behavioral regression in [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises the omp handler, actual file removal, live publication/revocation, inconsistent lists, scope exclusions, unsupported command spellings, omp `cwd`/`env` inputs and the six obsolete cd-guard paths.
 
 The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.

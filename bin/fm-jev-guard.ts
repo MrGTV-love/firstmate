@@ -277,7 +277,8 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         }
       }
       if (confinement_owner) return finishCall({ ...terminal, branch: "confinement" });
-      if (tool === "bash" && object(event.input) && typeof event.input.command === "string") {
+      if (tool === "bash" && object(event.input) && typeof event.input.command === "string"
+        && event.input.cwd === undefined && event.input.env === undefined) {
         // Bash stays unjudged; only a literal rm checked against Firstmate's declared list is recorded or refused here.
         const deletion = authorizedDeletion(event.input.command, ctx.cwd, c);
         if (deletion) {

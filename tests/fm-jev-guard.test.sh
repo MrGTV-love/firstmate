@@ -1160,17 +1160,20 @@ const context = { home, config: `${home}/config`, state, task: 'deletion', workt
 const handlers = {};
 installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
 const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
-const auditCount = () => { try { return readFileSync(auditPath, 'utf8').trim().split('\n').filter(Boolean).length; } catch { return 0; } };
-// Bash stays unjudged: a call is recorded (allowance consumed), refused, or passes unjudged and unrecorded.
-const omp = async (command, cwd = worktree) => {
+const auditRows = () => readFileSync(auditPath, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+const auditCount = () => { try { return auditRows().length; } catch { return 0; } };
+// Bash stays unjudged (Claude has no Bash pre-call hook at all): an omp call is
+// recorded (allowance consumed), refused, or passes unjudged and unrecorded.
+const ompTool = async (input, cwd = worktree) => {
   const before = requests();
   const count = auditCount();
-  const result = await handlers.tool_call({ toolName: 'bash', input: { command } }, { cwd });
-  assert.equal(requests(), before, `${command}: a bash pre-call must send no TypeSafe request`);
+  const result = await handlers.tool_call({ toolName: 'bash', input }, { cwd });
+  assert.equal(requests(), before, `${input.command}: a bash pre-call must send no TypeSafe request`);
   if (result?.block === true) return 'refused';
   assert.equal(result, undefined);
   return auditCount() === count + 1 ? 'recorded' : 'unjudged';
 };
+const omp = async (command, cwd = worktree) => ompTool({ command }, cwd);
 const publish = () => execFileSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
   env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_DATA_OVERRIDE: `${home}/data` }, encoding: 'utf8',
 });
@@ -1199,18 +1202,23 @@ for (const [host, call] of [['omp', omp]]) {
     assert.equal(row.request_started, false);
   };
   assert.equal(await call('rm -f unlisted.txt'), 'unjudged', 'a valid list leaves unlisted files on the unjudged bash path');
-  for (const command of ['rm -rf -- listed.txt', "rm -rf 'plain space.txt'", `/bin/rm -rf ${worktree}/listed.txt`]) {
+  for (const [command, path] of [['rm -f listed.txt', 'listed.txt'], ['rm -rf -- listed.txt', 'listed.txt'],
+    ['rm -fr nested/listed.txt', 'nested/listed.txt'], [`rm -f ${worktree}/listed.txt`, 'listed.txt']]) {
     restore();
-    const count = auditCount();
-    assert.equal(await call(command), 'recorded', `${host}: listed tracked file`);
-    const rows = readFileSync(auditPath, 'utf8').trim().split('\n').map(JSON.parse);
+    const count = auditRows().length;
+    assert.equal(await call(command), 'recorded', `${host}: ${command}`);
+    const rows = auditRows();
     assert.equal(rows.length, count + 1);
     assert.equal(rows.at(-1).task, 'deletion');
     assert.equal(rows.at(-1).list_sha256, digest);
     assert.ok(Number.isFinite(Date.parse(rows.at(-1).time)));
-    assert.deepEqual(rows.at(-1).paths, [command.includes('space') ? 'plain space.txt' : 'listed.txt']);
+    assert.deepEqual(rows.at(-1).paths, [path]);
     execFileSync('/bin/sh', ['-c', command], { cwd: worktree });
-    assert.equal(existsSync(`${worktree}/${rows.at(-1).paths[0]}`), false, 'admitted shell deletion actually removed the file');
+    assert.equal(existsSync(`${worktree}/${path}`), false, 'admitted shell deletion actually removed the file');
+  }
+  for (const command of ['/bin/rm -rf listed.txt', 'rm --force listed.txt', 'rm -v listed.txt', "rm -rf 'plain space.txt'"]) {
+    restore();
+    assert.equal(await call(command), 'unjudged', `${host}: ${command} keeps the unjudged bash path without consuming the allowance`);
   }
   restore();
   const denied = ['rm -rf unlisted.txt', 'rm -rf untracked.txt', `rm -rf ${home}/outside.txt`,
@@ -1266,6 +1274,11 @@ for (const [host, call] of [['omp', omp]]) {
   for (const path of cdPaths) assert.equal(existsSync(`${worktree}/${path}`), false);
   restore();
 }
+// The omp bash cwd/env inputs are not part of the allowance.
+for (const [field, input] of [['cwd', { command: 'rm -f listed.txt', cwd: home }], ['env', { command: 'rm -f listed.txt', env: { PATH: '/usr/bin:/bin' } }]]) {
+  restore();
+  assert.equal(await ompTool(input), 'unjudged', `omp ${field} input keeps the unjudged bash path without consuming the allowance`);
+}
 // A malformed declaration cannot publish a new digest or silently broaden it.
 writeFileSync(`${data}/brief.md`, brief(['../outside.txt']));
 const bad = spawnSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
@@ -1281,7 +1294,7 @@ console.log('authorized-deletions-ok');
 JS
 ) || fail "authorized deletions: $out"
   [ "$out" = authorized-deletions-ok ] || fail "unexpected authorized deletion output: $out"
-  pass "omp records only listed HEAD-tracked literal file deletions with live updates/revocations and mandatory audit; bash stays unjudged and every negative scope and inconsistent list consumes no allowance"
+  pass "omp records only listed HEAD-tracked literal file deletions with live updates/revocations and mandatory audit; bash stays unjudged, inconsistent declared lists refuse, and every negative scope consumes no allowance"
 }
 
 test_bash_without_judgment

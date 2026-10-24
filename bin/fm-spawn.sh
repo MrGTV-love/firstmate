@@ -6754,6 +6754,7 @@ fi
 # Freeze only a firstmate-written initial brief, never a worker-edited brief on
 # relaunch. Live updates use fm-jev-deletions.sh under this same metadata lock.
 JEV_DELETIONS_SHA256=
+[ "$RELAUNCH" -eq 1 ] || rm -f "$STATE_REAL/$ID.authorized-deletions.json"
 if [ "$RELAUNCH" -eq 0 ] && [ "${guard_project:-}" = firstmate ] \
   && grep -qE $'^## Authorized deletions\r?$' "$BRIEF"; then
   # shellcheck source=bin/fm-jev-deletions.sh
