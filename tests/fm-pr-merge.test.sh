@@ -3119,7 +3119,7 @@ test_recorded_review_merge_conditions() {
   local case_dir head url scenario rc expected
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
-  for scenario in stale same-family same-family-model cross-family-model unknown-reader unknown-author-captain fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail captain-then-fail fail-then-captain; do
+  for scenario in stale same-family same-family-model cross-family-model unknown-reader unknown-author-captain fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail captain-then-fail captain-fail-stale-pass captain-fail-stale-fail fail-then-captain captain-fail-pass; do
     case_dir=$(make_case "review-$scenario")
     : > "$case_dir/explicit-review"
     add_gh_mocks "$case_dir" "$head"
@@ -3156,18 +3156,26 @@ test_recorded_review_merge_conditions() {
         review_record_command "$case_dir" captain-word --pr "$url" --head 2222222222222222222222222222222222222222 --words 'Merge the approved pull request.' >/dev/null
         expected='review record is missing' ;;
       valid) record_review "$case_dir" "$url" "$head" >/dev/null ;;
-      captain-then-fail)
+      captain-then-fail|captain-fail-stale-pass|captain-fail-stale-fail)
         review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9.' >/dev/null
         record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null
         expected="verdict is FAIL at live head $head in the review appended after the captain-word (reader claude-opus-5-5, at $("$JQ_BIN" -sr '.[-1].at' "$case_dir/state/review-records.jsonl"), report $case_dir/review.md); the captain must give a new merge word" ;;
       fail-then-captain)
         record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null
         review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9 despite the FAIL.' >/dev/null ;;
+      captain-fail-pass)
+        review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9.' >/dev/null
+        record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null
+        record_review "$case_dir" "$url" "$head" >/dev/null ;;
+    esac
+    case "$scenario" in
+      captain-fail-stale-pass) record_review "$case_dir" "$url" 2222222222222222222222222222222222222222 >/dev/null ;;
+      captain-fail-stale-fail) record_review "$case_dir" "$url" 2222222222222222222222222222222222222222 --verdict FAIL >/dev/null ;;
     esac
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain)
+      valid|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain|captain-fail-pass)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)

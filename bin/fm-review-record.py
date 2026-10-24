@@ -25,9 +25,10 @@ accept any stored known family or unknown; verify derives every family again fro
 the stored model ids, so a later family change neither invalidates history nor
 lets a stale stored family decide independence.
 verify accepts the newest captain-word when it names the exact live head; it then
-stands in for the review and every trigger, unless the newest review is a FAIL at
-that live head appended after it: that FAIL is refused until the captain gives a
-new captain-word, while a captain-word appended after the FAIL stands. Otherwise
+stands in for the review and every trigger, unless the newest review of that live
+head appended after it is a FAIL (reviews of other heads never hide it): that FAIL
+is refused until the captain gives a new captain-word, while a captain-word
+appended after the FAIL stands. Otherwise
 the newest review must be PASS at the exact live head with a known reader family
 outside every known author family, and any yes trigger is refused. Captain words
 waive no existing forge/hold guard. The caller records as captain-word only a
@@ -188,9 +189,9 @@ def ledger(write, home):
 
 def newest(fd, pr):
     result = {"review": None, "captain-word": None}
-    last = None
+    rows = []
     if fd is None:
-        return result, last
+        return result, rows
     with os.fdopen(os.dup(fd), "rb") as stream:
         for line in stream:
             if not line.endswith(b"\n"):
@@ -202,16 +203,22 @@ def newest(fd, pr):
                 raise RecordError(f"review record history is invalid ({exc}); preserve and reconcile it before retrying") from exc
             if row["pr"] == pr:
                 result[row["kind"]] = row
-                last = row
-    return result, last
+                rows.append(row)
+    return result, rows
 
 
-def verify(records, last, head):
+def verify(records, rows, head):
     word = records["captain-word"]
     review = records["review"]
     if word is not None and word["head"] == head:
-        if last is review and review["verdict"] == "FAIL" and review["head"] == head:
-            raise RecordError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {review['reader_model']}, at {review['at']}, report {review['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
+        live = None
+        for row in rows:
+            if row["kind"] == "captain-word":
+                live = None
+            elif row["head"] == head:
+                live = row
+        if live is not None and live["verdict"] == "FAIL":
+            raise RecordError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {live['reader_model']}, at {live['at']}, report {live['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
         return "captain-word"
     if review is None:
         raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
@@ -275,7 +282,7 @@ def main():
         return 2
     try:
         with ledger(write, home) as fd:
-            records, last = newest(fd, pr)
+            records, rows = newest(fd, pr)
             if write:
                 data = (json.dumps(row, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
                 if os.write(fd, data) != len(data):
@@ -285,7 +292,7 @@ def main():
             elif args.command == "latest":
                 print(json.dumps(records, separators=(",", ":")))
             else:
-                print(f"review: {verify(records, last, args.head)}")
+                print(f"review: {verify(records, rows, args.head)}")
     except (RecordError, OSError) as exc:
         print(f"error: {exc}; inspect review-records.jsonl in the PR task home before retrying")
         return 1
