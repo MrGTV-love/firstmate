@@ -10,7 +10,8 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
   fm-review-record.py latest --pr URL
   fm-review-record.py verify --pr URL --head SHA
 
-The relay lane writes into the receiving home by setting FM_HOME explicitly.
+The relay lane stages the reader report on the receiving host before recording
+into the receiving home by setting FM_HOME explicitly.
 FM_STATE_OVERRIDE selects its state directory, as in the PR merge/poll helpers.
 state/review-records.jsonl uses the friction ledger's locked O_APPEND JSONL shape:
 records are never replaced; append order, not wall-clock time, selects the newest
@@ -26,10 +27,11 @@ the stored model ids, so a later family change neither invalidates history nor
 lets a stale stored family decide independence.
 verify accepts the newest captain-word when it names the exact live head; it then
 stands in for the review and every trigger, unless a FAIL at that live head was
-appended after it and no later PASS at that head has a known reader family outside
-every known author family: that FAIL is refused until the captain gives a new
-captain-word, while a captain-word appended after the FAIL stands. Reviews of other
-heads and PASS reviews that are not independent never clear that FAIL. Otherwise
+appended after it and no later PASS at that head would verify on its own (a known
+reader family outside every known author family and no yes trigger): that FAIL is
+refused until the captain gives a new captain-word, while a captain-word appended
+after the FAIL stands. Reviews of other heads and PASS reviews that are not
+independent or carry a yes trigger never clear that FAIL. Otherwise
 the newest review must be PASS at the exact live head with a known reader family
 outside every known author family, and any yes trigger is refused. Captain words
 waive no existing forge/hold guard. The caller records as captain-word only a
@@ -42,11 +44,15 @@ a captain-word recorded before /afk stays valid.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
-The report path records provenance; the report need not be on the receiving host.
+review requires --report to name a regular, non-symlink, readable local file whose
+first line is exactly VERDICT: <PASS|FAIL> head=<head>, matching --verdict and --head.
+It records the report path and whole-file report_sha256 at record time; verification
+uses the recorded evidence, so later report changes do not rewrite history.
 """
 import argparse
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -138,6 +144,23 @@ def validate(row):
         if row.get(trigger) not in ("yes", "no"):
             raise RecordError(f"{trigger} must be yes or no")
     nonempty(row.get("report"), "report")
+
+
+def report_digest(path, verdict, head):
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise RecordError("report must be a regular, non-symlink, readable file on the recording host")
+            first = stream.readline()
+            if first.removesuffix(b"\n") != f"VERDICT: {verdict} head={head}".encode("ascii"):
+                raise RecordError("report first line must be exactly VERDICT: <PASS|FAIL> head=<head> matching --verdict and --head")
+            digest = hashlib.sha256(first)
+            for block in iter(lambda: stream.read(65536), b""):
+                digest.update(block)
+            return digest.hexdigest()
+    except OSError as exc:
+        raise RecordError("report must be a regular, non-symlink, readable file on the recording host; stage it locally before recording") from exc
 
 
 def task_home():
@@ -233,7 +256,7 @@ def verify(records, rows, head):
             elif row["head"] == head:
                 if row["verdict"] == "FAIL":
                     failed = row
-                elif failed is not None and dependence(row, head) is None:
+                elif failed is not None and dependence(row, head) is None and all(row[t] == "no" for t in TRIGGERS):
                     failed = None
         if failed is not None:
             raise RecordError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {failed['reader_model']}, at {failed['at']}, report {failed['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
@@ -286,6 +309,8 @@ def main():
         write = args.command in ("review", "captain-word")
         if write:
             validate(row)
+        if args.command == "review":
+            row["report_sha256"] = report_digest(args.report, args.verdict, args.head)
         if args.command == "captain-word":
             refuse_away(state_dir(home))
     except RecordError as exc:
