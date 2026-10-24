@@ -1,0 +1,2 @@
+ok - teardown retires the task's own watcher markers, deletion list and orphaned presentation journal, keeping its audit trail and other tasks' markers
+exit=0

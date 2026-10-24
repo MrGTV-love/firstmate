@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|Write|Edit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5NM2C1A1MEMZ0DQKW1NRY6R/bin/fm-jev-guard-hook.sh' '$LAB' '$LAB/config' '$LAB/state' 'fm-live-del' '$LAB/wt' '$LAB/data/fm-live-del' 'firstmate' 'FIRSTMATE_JEV_GUARD_V1'",
+            "timeout": 330
+          }
+        ]
+      }
+    ]
+  }
+}

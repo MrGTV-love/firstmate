@@ -1,0 +1,29 @@
+$ FM_HOME=$LAB bin/fm-jev-deletions.sh --help
+Publish the current brief's explicit deletion list for an already-running task.
+Usage: FM_HOME=<home> bin/fm-jev-deletions.sh <task-id>
+Reads data/<task-id>/brief.md and state/<task-id>.meta under the explicit home
+(honoring FM_DATA_OVERRIDE and FM_STATE_OVERRIDE). The brief declares paths in
+one `## Authorized deletions` section containing only a fenced json array of
+literal worktree-relative file names. An absent section publishes an empty
+list, revoking any prior allowance. Publication replaces, never extends, it.
+The task metadata lock serializes publication with spawn and other writers.
+Source this script to use fm_jev_deletions_runtime while already holding that
+lock: spawn's prepare operation writes the list and returns its digest for
+the initial metadata transaction, without acquiring the same lock twice.
+docs/configuration.md "Jev guard" owns the consistency-only trust contract.
+
+$ FM_HOME=$LAB bin/fm-jev-deletions.sh fm-live-del
+task: "fm-live-del"
+list_sha256: "41072e445bf6207a4dd3c5138ac459147ea93b84765d050e5d351e4669202c86"
+exit=0
+
+$ cat state/fm-live-del.meta
+worktree=$LAB/wt
+harness=omp
+kind=ship
+jev_deletions_sha256=41072e445bf6207a4dd3c5138ac459147ea93b84765d050e5d351e4669202c86
+
+$ cat state/fm-live-del.authorized-deletions.json
+{"schema":"fm-authorized-deletions.v1","task":"fm-live-del","worktree":"$LAB/wt","paths":["bin/fm-cd-pretool-check.sh","bin/fm-cd-command-policy.mjs","tests/fm-cd-pretool-check.test.sh","docs/cd-guard.md",".grok/hooks/fm-primary-cd-check.json",".opencode/plugins/fm-primary-cd-check.js"]}
+$ shasum -a 256 state/fm-live-del.authorized-deletions.json
+41072e445bf6207a4dd3c5138ac459147ea93b84765d050e5d351e4669202c86  $LAB/state/fm-live-del.authorized-deletions.json
