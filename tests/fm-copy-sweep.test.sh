@@ -541,6 +541,10 @@ if [ "\${3:-}" != --execute-cleanup ]; then
   echo '{"allowed": true}'
   exit 0
 fi
+if [ -e "$log/execute-output-\${2##*/}" ]; then
+  cat "$log/execute-output-\${2##*/}"
+  exit 3
+fi
 if [ -e "$log/execute-output" ]; then
   if [ -e "$log/execute-unlock-first" ]; then
     git worktree unlock "\$2" || exit 4
@@ -775,7 +779,7 @@ test_locked_release_cap_defers_copies_until_the_next_run() {
       "$setting cap: wrong number of locked copies released"
     assert_equals 2 "$(printf '%s\n' "$OUT" | grep -c $'^DEFERRED\t')" \
       "$setting cap: excess copies were not deferred"
-    assert_contains "$OUT" "per-run cap: $limit locked release attempts reached; eligible next run" \
+    assert_contains "$OUT" "per-run cap: $limit completed locked releases reached; eligible next run" \
       "$setting cap: deferral did not explain its limit and next-run eligibility"
     assert_contains "$OUT" 'summary: HELD-LOCKED=0' "$setting cap: deferred copies were held"
     assert_equals "$((2 * limit))" "$(wc -l < "$W/closeout.log" | tr -d ' ')" \
@@ -811,6 +815,94 @@ test_locked_release_cap_defers_copies_until_the_next_run() {
   done
   unset FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT
   pass "the default cap releases five of seven locked copies and defers two unchanged until the next run; an explicit cap of two behaves the same way"
+}
+
+test_refusals_use_no_release_slot_and_cannot_starve_later_copies() {
+  local reason name admin run n line real_cp z3admin
+  reason='vernant-session-active owner=launcher:999999 launcher=999999'
+  make_world driver-cap-refusals
+  install_driver "$SLOT" "$W"
+  printf 'unpreservable.dat\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  for name in z1 z2 z3 z4 z5 c1 c2 c3 c4 c5 c6 c7; do
+    add_copy "$name"
+    git -C "$SLOT" worktree lock --reason "$reason" "$(copy_path "$name")"
+  done
+  printf 'cannot be copied\n' > "$(copy_path z1)/unpreservable.dat"
+  real_cp=$(command -v cp)
+  printf '#!/usr/bin/env bash\ncase "$*" in *unpreservable.dat*) exit 1 ;; esac\nexec %q "$@"\n' "$real_cp" > "$FAKEBIN/cp"
+  chmod +x "$FAKEBIN/cp"
+  printf '{"allowed": false, "reason": "cleanup_skipped_live_or_unknown"}\n' > "$W/execute-output-z2"
+  printf '{"allowed": false, "reason": "cleanup_lease_conflict"}\n' > "$W/execute-output-z4"
+  z3admin=$(git -C "$(copy_path z3)" rev-parse --absolute-git-dir)
+  cat > "$W/plan-hook" <<SH
+case "\$1" in
+  */z3)
+    if grep -q 'owner=launcher:' "$z3admin/locked"; then
+      printf 'vernant-session-active owner=01234567-89ab-cdef-0123-456789abcdef launcher=999999\n' > "$z3admin/locked"
+    else
+      printf '%s\n' '$reason' > "$z3admin/locked"
+    fi
+    ;;
+  */z5) exit 1 ;;
+esac
+SH
+  for run in 1 2; do
+    FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=5 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 1 ] || fail "run $run: the refused copies should fail the run, got $RC: $OUT"
+    for name in z1 z2 z3 z4 z5; do
+      registered "$name" || fail "run $run: refused copy $name was removed"
+      assert_equals "$run" "$(grep -cFx "$SLOT|--cleanup-worktree $(copy_path "$name")" "$W/closeout.log")" \
+        "run $run: refused copy $name was not planned again"
+    done
+    for name in z1 z2 z4; do
+      admin=$(git -C "$(copy_path "$name")" rev-parse --absolute-git-dir)
+      assert_equals "$reason" "$(cat "$admin/locked")" "run $run: refused copy $name lost its lock"
+    done
+    for name in z1 z3 z5; do
+      line=$(printf '%s\n' "$OUT" | grep -F "$(copy_path "$name")") || fail "run $run: refused copy $name was not reported: $OUT"
+      assert_not_contains "$line" "DEFERRED" "run $run: refused copy $name was deferred"
+    done
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path z1)") || fail "run $run: the failed preservation was not reported: $OUT"
+    assert_contains "$line" "could not be preserved" "run $run: z1 did not fail its preservation"
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path z2)") || fail "run $run: the liveness refusal was not reported: $OUT"
+    assert_contains "$line" "cleanup_skipped_live_or_unknown" "run $run: z2 did not get the driver's liveness refusal"
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path z3)") || fail "run $run: the failed reproof was not reported: $OUT"
+    assert_contains "$line" "changed HEAD or creation-lock bytes" "run $run: z3 did not fail its reproof"
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path z4)") || fail "run $run: the lease refusal was not reported: $OUT"
+    assert_contains "$line" "cleanup_lease_conflict" "run $run: z4 did not get the driver's lease refusal"
+    assert_class z5 HELD-LOCKED
+    for name in z1 z3 z5; do
+      assert_no_grep "$(copy_path "$name") --execute-cleanup" "$W/closeout.log" "run $run: $name reached the driver's execute"
+    done
+    for name in z2 z4; do
+      assert_equals "$run" "$(grep -cFx "$SLOT|--cleanup-worktree $(copy_path "$name") --execute-cleanup" "$W/closeout.log")" \
+        "run $run: $name did not reach the driver's execute"
+    done
+    if [ "$run" = 1 ]; then
+      assert_equals 5 "$(printf '%s\n' "$OUT" | grep -c $'^REMOVED\t')" "run 1: refusals used release slots"
+      for name in c3 c4 c5 c6 c7; do
+        assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path "$name")" "run 1: clean copy $name was not released"
+        ! registered "$name" || fail "run 1: released copy $name is still registered"
+      done
+      for name in c1 c2; do
+        assert_class "$name" DEFERRED
+        registered "$name" || fail "run 1: deferred copy $name was removed"
+        assert_no_grep "$(copy_path "$name")" "$W/closeout.log" "run 1: deferred copy $name reached the driver"
+      done
+      assert_contains "$OUT" "per-run cap: 5 completed locked releases reached; eligible next run" \
+        "run 1: deferral did not explain its limit"
+      assert_contains "$OUT" 'summary: DEFERRED=2' "run 1: wrong number of deferred copies"
+    else
+      assert_equals 2 "$(printf '%s\n' "$OUT" | grep -c $'^REMOVED\t')" "run 2: wrong number of copies released"
+      assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path c1)" "run 2: deferred copy c1 was not released"
+      assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path c2)" "run 2: deferred copy c2 was not released"
+      assert_contains "$OUT" 'summary: DEFERRED=0' "run 2: a copy was deferred again"
+      for ((n = 1; n <= 7; n++)); do
+        ! registered "c$n" || fail "run 2: clean copy c$n is still registered"
+      done
+    fi
+  done
+  pass "a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two"
 }
 
 test_uuid_owner_lock_is_released_by_the_driver() {
@@ -2538,6 +2630,7 @@ run_case test_dead_launcher_dirty_copy_is_held
 run_case test_dead_launcher_process_inside_copy_is_held
 run_case test_dead_launcher_lock_is_released_by_the_driver
 run_case test_locked_release_cap_defers_copies_until_the_next_run
+run_case test_refusals_use_no_release_slot_and_cannot_starve_later_copies
 run_case test_uuid_owner_lock_is_released_by_the_driver
 run_case test_ppid_owner_lock_is_released_by_the_driver
 run_case test_retained_ignored_payload_is_kept_once_without_growth

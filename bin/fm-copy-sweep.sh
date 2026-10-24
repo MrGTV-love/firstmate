@@ -104,18 +104,25 @@
 #
 # --apply removes the REAPABLE-PROVEN and REAPABLE-DRIVER copies, one at a time,
 # deepest path first. FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT (default 5; a positive
-# decimal integer, invalid or non-positive values become 5) caps locked release
-# attempts per run after an allowed plan. An attempt consumes a slot even when
-# later preservation, reproof or execute refuses; refused plans consume none.
-# Remaining qualifying locked copies are DEFERRED (per-run cap), never HELD,
-# get no driver call or preserve, and are eligible again on the next run.
+# decimal integer, invalid or non-positive values become 5) caps completed locked
+# releases per run. A release completes, and consumes a slot, only when the
+# driver's execute allowed it and the copy is gone. A refused plan, a failed
+# preservation, a failed reproof or a refused execute (including
+# cleanup_skipped_live_or_unknown) removes nothing, so it consumes no slot and
+# the walk goes on to the next copy. Once the cap is reached, the remaining
+# qualifying locked copies are DEFERRED (per-run cap), never HELD, get no driver
+# call or preserve, and are eligible again on the next run.
 # Unlocked removal is unchanged. Review the first batch's records before running
 # the sweep unattended.
 #
-# This sweep is a fallback, not the systemic lock-lifecycle fix. Vernant owns
-# vernant-lock-lease: owner plus heartbeat, dead-owner expiry and reclamation by
-# the pool's own lifecycle. vernant-commits-remote-before-lock guarantees that a
-# copy's commits are on a remote before its lock is taken.
+# This sweep is a fallback, not the systemic lock-lifecycle fix. That fix
+# belongs to Vernant, which owns the lock format, and is not built yet. Two
+# proposed Vernant follow-ups would replace this fallback: vernant-lock-lease
+# (the lock records its owner and a heartbeat, a dead owner expires it, and the
+# pool's own lifecycle reclaims the copy) and vernant-commits-remote-before-lock
+# (a copy's commits are on a remote before its lock is taken). Neither exists
+# today, so the sweep keeps every proof of its own, including the
+# every-commit-on-a-remote proof for a locked copy.
 # A process appearing between the last process scan and execute is covered only
 # by the closeout script's own liveness check; the sweep cannot close that race.
 # Every ownership, process, cleanliness and remote-content proof is re-read
@@ -1534,7 +1541,7 @@ clear_stale_receipts() {
 apply_removals() {
   local line container pool clone copy kib head branch err refusal freed gone='' held='' stamp
   local release_id preserve_dir preserved net release_rc receipt lock_hash earlier
-  local driver_attempts=0 driver_limit deferred=''
+  local driver_released=0 driver_limit deferred=''
   driver_limit=${FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT:-5}
   case "$driver_limit" in ''|*[!0-9]*) driver_limit=0 ;; esac
   driver_limit=$((10#$driver_limit))
@@ -1565,7 +1572,7 @@ apply_removals() {
     preserve_dir=
     earlier=0
     if [ "$CLASS" = REAPABLE-DRIVER ]; then
-      if [ "$driver_attempts" -ge "$driver_limit" ]; then
+      if [ "$driver_released" -ge "$driver_limit" ]; then
         deferred="$deferred$copy"$'\n'
         continue
       fi
@@ -1588,7 +1595,6 @@ apply_removals() {
       }
       preserve_dir="$DATA_DIR/$release_id/nested-copy-preserved/${receipt##*/}"
       release_rc=0
-      driver_attempts=$((driver_attempts + 1))
       err=$(teardown_driver_release "$clone" "$copy" "$release_id" "$pool" "$container" "$head" "$lock_hash" 2>&1) || release_rc=$?
       if [ "$release_rc" = 3 ]; then
         held="$held$copy"$'\t'"$(printf '%s' "$err" | tr '\n\t' '  ')"$'\n'
@@ -1620,6 +1626,7 @@ apply_removals() {
     fi
     receipt=$(waiting_record "$copy") && rm -f -- "$receipt" 2>/dev/null
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    [ "$CLASS" != REAPABLE-DRIVER ] || driver_released=$((driver_released + 1))
     gone="$gone$copy"$'\n'
     preserved=0
     if [ "$earlier" = 1 ]; then
@@ -1650,7 +1657,7 @@ apply_removals() {
     COPIES=$(printf '%s\n' "$COPIES" | GONE=$gone awk -F '\t' 'BEGIN { n = split(ENVIRON["GONE"], g, "\n"); for (i = 1; i <= n; i++) if (g[i] != "") drop[g[i]] = 1 } !($4 in drop)')
   fi
   if [ -n "$deferred" ]; then
-    COPIES=$(printf '%s\n' "$COPIES" | DEFERRED=$deferred LIMIT=$driver_limit awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["DEFERRED"], d, "\n"); for (i = 1; i <= n; i++) if (d[i] != "") defer[d[i]] = 1 } $4 in defer { $5 = "DEFERRED"; $7 = "per-run cap: " ENVIRON["LIMIT"] " locked release attempts reached; eligible next run" } { print }')
+    COPIES=$(printf '%s\n' "$COPIES" | DEFERRED=$deferred LIMIT=$driver_limit awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["DEFERRED"], d, "\n"); for (i = 1; i <= n; i++) if (d[i] != "") defer[d[i]] = 1 } $4 in defer { $5 = "DEFERRED"; $7 = "per-run cap: " ENVIRON["LIMIT"] " completed locked releases reached; eligible next run" } { print }')
   fi
   if [ -n "$held" ]; then
     COPIES=$(printf '%s\n' "$COPIES" | HELD=$held awk -F '\t' 'BEGIN { OFS = "\t"; n = split(ENVIRON["HELD"], h, "\n"); for (i = 1; i <= n; i++) if (h[i] != "") { split(h[i], kv, "\t"); why[kv[1]] = kv[2] } } $4 in why { $5 = "HELD-LOCKED"; $7 = why[$4] } { print }')
