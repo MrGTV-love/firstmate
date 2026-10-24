@@ -229,6 +229,8 @@ fm_operational_harness_needs_record() {  # <harness>
   return 1
 }
 
+# Nothing writes *.msg.consistency.json receipts or their .consistency.* temps
+# any more; the patterns stay only so retention still deletes old ones.
 fm_operational_record_prune() {  # <record-dir>
   local stat_cmd path mtime cutoff
   if [ "$(uname)" = Darwin ]; then

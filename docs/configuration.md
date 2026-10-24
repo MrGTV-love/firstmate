@@ -2485,11 +2485,13 @@ Dispatch is separate from this tool-call guard: its [typed resolution contract](
 A Claude worker launched before the `Bash` registration was removed keeps its old matcher until it is respawned: its shell calls still get no judgment, but a missing or crashing runtime still stops them.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
+
 Questions and numeric policy are code-owned:
 
 - Bash pre-calls receive no model judgment or TypeSafe request, do not depend on provider or audit availability, and create no pre-call guard audit row.
   The guard does not assess shell effects or destructive intent and offers no shell deletion or write confinement guarantee.
 - Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
+
 omp and Claude tool results reach the worker unchanged: the guard installs no result handler, makes no TypeSafe request for results, and writes no `tool_result` audit rows.
 There is no result size budget or result-dependent read exemption.
 Launch and steering records use the existing [launch publisher](../bin/fm-operational-input.sh) and [steering-inbox owner](../bin/fm-task-inbox-lib.sh); they publish only the record bytes, with no guard receipt, and their delivery and acknowledgement contracts are unchanged.
@@ -2600,7 +2602,7 @@ Commands, state, questions, raw exchanges, provider extension fields and excepti
 The guard no longer adds raw session report entries.
 An active durable-record failure requires review with `AuditUnavailableError`; if judgment also failed, its stable error type remains visible in the notice.
 Intentionally inactive scope does not become active merely because its optional record cannot be written.
-[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, calibration limitations and deployed acceptance.
+[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, controlled decision fixtures and deployed acceptance.
 
 ## Jev belay Stop hook
 
