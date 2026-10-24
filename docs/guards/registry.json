@@ -839,7 +839,7 @@
       "owner": "bin/fm-git-secrets.py",
       "invariant": "a task commit never adds a line holding a known credential shape",
       "layer": "runtime-block",
-      "source": "lines git diff --cached adds against HEAD and every MERGE_HEAD parent, after the repository pre-commit hook, matched against the anchored shapes in bin/fm-git-secrets.py",
+      "source": "lines git diff --cached adds against HEAD and every MERGE_HEAD parent, after the repository pre-commit hook, net of lines the same diff removes, matched against the anchored shapes in bin/fm-git-secrets.py",
       "trigger": "an added staged line holds a private-key header, a GitHub, AWS access key or Slack token prefix shape, or a connection URL with an embedded password of 8 or more characters",
       "remedy": "remove the credential from the named files, restage them with git add <file>, and rerun git commit; python3 bin/fm-git-secrets.py pre-commit replays the check against the index",
       "budget": 1,
@@ -847,7 +847,7 @@
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task pre-commit and pre-push wrappers installed by bin/fm-git-strip-ai-trailers.sh run the scanner after the repository hook; a refusal repeats only while the same added line stays staged or outgoing"
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. A refusal repeats only while the same new line stays staged or outgoing; each refusal past the budget of 1 in a row in the same worktree also prints an escalation to a human decision, and the operation stays refused"
     },
     {
       "decision": "deny",
@@ -864,7 +864,7 @@
       "owner": "bin/fm-git-secrets.py",
       "invariant": "a task push never sends a commit that adds a line holding a known credential shape",
       "layer": "runtime-block",
-      "source": "lines each outgoing commit adds against all of its parents, where outgoing means reachable from a pushed tip but from no advertised old tip and no remote-tracking ref, matched against the anchored shapes in bin/fm-git-secrets.py",
+      "source": "lines each outgoing commit adds against all of its parents, where outgoing means reachable from a pushed tip but from no advertised old tip and no remote-tracking ref, net of lines the same diff removes, matched against the anchored shapes in bin/fm-git-secrets.py",
       "trigger": "an outgoing commit adds a line holding a private-key header, a GitHub, AWS access key or Slack token prefix shape, or a connection URL with an embedded password of 8 or more characters",
       "remedy": "squash the outgoing commits that add the credential without it: git reset --soft <upstream>, remove the credential from the named files, restage them with git add <file>, git commit, then rerun git push; git log -p <upstream>..HEAD -- <file> shows the adding commits",
       "budget": 1,
@@ -872,7 +872,7 @@
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture",
-      "layer_note": "per-task pre-commit and pre-push wrappers installed by bin/fm-git-strip-ai-trailers.sh run the scanner after the repository hook; a refusal repeats only while the same added line stays staged or outgoing"
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. A refusal repeats only while the same new line stays staged or outgoing; each refusal past the budget of 1 in a row in the same worktree also prints an escalation to a human decision, and the operation stays refused"
     }
   ],
   "excluded": [
