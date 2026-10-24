@@ -3263,13 +3263,28 @@ if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
 else
   MODEL_INDEXED=0
 fi
+MODEL_ADMITTED="$HARNESS:$MODEL"
+# The dsh owner checks the route and canonicalizes a dsh model. A reroute or a
+# canonical spelling changes the pair the index admitted, so the canonical id is
+# admitted again against the same staged index: retirement and entry membership
+# then judge the id that launches, not the spelling that was typed.
+dsh_admit_model() {
+  python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || return 1
+  [ "$HARNESS" = dsh ] || return 0
+  MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$MODEL") || return 1
+  [ "$MODEL_ADMITTED" != "$HARNESS:$MODEL" ] || return 0
+  [ -e "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] || [ -L "${SPAWN_ROUTING_PAIR:-$CONFIG}/model-index.json" ] || return 0
+  MODEL=$(FM_CONFIG_OVERRIDE="${SPAWN_ROUTING_PAIR:-$CONFIG}" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || return 1
+  MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="${SPAWN_ROUTING_PAIR:-$CONFIG}" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || return 1
+  if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+  MODEL_ADMITTED="$HARNESS:$MODEL"
+}
 if [ "$RAW_LAUNCH" = 0 ]; then
   if [ -z "$ARG3" ] && [ "$KIND" != secondmate ] && [ "$(python3 "$SCRIPT_DIR/fm-dsh.py" route "$MODEL")" = dsh ]; then
     HARNESS=dsh
     LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
   fi
-  python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || exit 1
-  [ "$HARNESS" != dsh ] || MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$MODEL") || exit 1
+  dsh_admit_model || exit 1
 fi
 if [ "$RELAUNCH" = 1 ] && [ "$EFFORT_SET" -eq 0 ] && [ "$HARNESS" = dsh ] && [ "$RELAUNCH_PRIOR_HARNESS" = dsh ] \
    && [ "$MODEL" = "$(fm_meta_get "$RELAUNCH_META" model)" ]; then
@@ -3305,13 +3320,13 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
       MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
       MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
       if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+      MODEL_ADMITTED="$HARNESS:$MODEL"
       LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
     fi
   fi
 fi
 if [ "$RAW_LAUNCH" = 0 ]; then
-  python3 "$SCRIPT_DIR/fm-dsh.py" check "$HARNESS" "$MODEL" || exit 1
-  [ "$HARNESS" != dsh ] || MODEL=$(python3 "$SCRIPT_DIR/fm-dsh.py" canonical "$MODEL") || exit 1
+  dsh_admit_model || exit 1
 fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 

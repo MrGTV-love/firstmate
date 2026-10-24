@@ -376,6 +376,23 @@ test_deepseek_spelling_without_a_harness_routes_to_dsh() {
   pass "fm-spawn: DeepSeek spellings omp would resolve to the deepseek provider route to dsh with no harness"
 }
 
+test_retired_deepseek_spelling_refuses_before_launch() {
+  local id out status spelling
+  for spelling in 'DeepSeek/deepseek-v4-flash' ' DeepSeek / deepseek-v4-flash '; do
+    id="dsh-retired-${#spelling}"
+    make_dsh_case "retired-${#spelling}" "$id"
+    printf '{"version":1,"roles":{},"retired":["%s"]}\n' "$DSH_MODEL" > "$HOME_DIR/config/model-index.json"
+    out=$(run_dsh_spawn "$id" --model "$spelling" --scout 2>&1)
+    status=$?
+    [ "$status" -ne 0 ] || fail "'$spelling' naming a retired DeepSeek id must refuse: $out"
+    assert_contains "$out" "retired model: $DSH_MODEL" "'$spelling' refusal must name the canonical retired id"
+    [ ! -s "$LAUNCH_LOG" ] || fail "'$spelling' naming a retired id must launch nothing"
+    assert_absent "$HOME_DIR/state/$id.dsh-session" "'$spelling' naming a retired id must bind no launch store"
+    assert_absent "$HOME_DIR/state/$id.meta" "'$spelling' naming a retired id must publish no task"
+  done
+  pass "fm-spawn: a DeepSeek spelling of a retired id refuses before launch once canonicalized"
+}
+
 test_explicit_harness_is_not_rerouted() {
   local id=dsh-explicit out status
   make_dsh_case explicit "$id" claude
@@ -795,6 +812,7 @@ test_tmux_agent_state_names_dsh
 test_busy_classify_follows_the_launch_session_log
 test_deepseek_model_without_a_harness_routes_to_dsh
 test_deepseek_spelling_without_a_harness_routes_to_dsh
+test_retired_deepseek_spelling_refuses_before_launch
 test_explicit_harness_is_not_rerouted
 test_launch_environment
 test_mirrored_dsh_primary_carries_its_bound_model
