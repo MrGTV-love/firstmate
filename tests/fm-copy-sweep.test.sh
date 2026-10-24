@@ -1459,9 +1459,7 @@ SH
   assert_equals 'v0' "$(cat "$(preserved_unique)")" "reused: the earlier preserve changed"
   [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "reused: a retention receipt was written for an execute that never ran"
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path c3)" "reused: the refusal used the only release slot"
-  for _ in 1 2; do
-    FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
-  done
+  FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
   [ "$RC" = 0 ] || fail "the quiet run failed ($RC): $OUT"
   assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path zgrow)" "the quiet run did not release the copy"
   ! registered zgrow || fail "the released copy is still registered"
@@ -1469,6 +1467,74 @@ SH
   assert_equals "v0"$'\n'"v0,appended" "$(preserved_unique | while IFS= read -r kept; do paste -sd, - < "$kept"; done | sort)" \
     "the preserve of the old content or of the appended content is missing"
   pass "ignored content that changes after the last proof, after a preserve was built or an earlier preserve was reused, stops the release before the driver's execute, uses no release slot and keeps every preserved byte, and a later quiet run preserves the new content once and releases the copy"
+}
+
+# A writer outside the copy adds a new ignored file after preservation, at the
+# copy's third HEAD read of the run (its second proof's), when the copy had a
+# preservable file (existing) or none (empty).
+test_a_new_ignored_file_after_preservation_waits_then_releases_once() {
+  local shape reason line kept
+  reason='vernant-session-active owner=launcher:999999 launcher=999999'
+  for shape in existing empty; do
+    make_world "add-after-proof-$shape"
+    install_driver "$SLOT" "$W"
+    printf 'outbox/\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+    add_copy zadd
+    git -C "$SLOT" worktree lock --reason "$reason" "$(copy_path zadd)"
+    add_copy c1
+    git -C "$SLOT" worktree lock --reason "$reason" "$(copy_path c1)"
+    if [ "$shape" = existing ]; then
+      mkdir -p "$(copy_path zadd)/outbox"
+      printf 'a\n' > "$(copy_path zadd)/outbox/a.msg"
+    fi
+    cat > "$W/head-hook" <<SH
+[ "\$2" = "$(copy_path zadd)" ] || exit 0
+n=\$(( \$(cat "$W/head-count" 2>/dev/null || printf 0) + 1 ))
+printf '%s\\n' "\$n" > "$W/head-count"
+[ "\$n" = 3 ] || exit 0
+mkdir -p "$(copy_path zadd)/outbox"
+printf 'b\\n' > "$(copy_path zadd)/outbox/b.msg"
+: > "$W/head-hook-ran"
+SH
+    FAKE_GIT_HEAD_HOOK="$W/head-hook" FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=1 FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ -e "$W/head-hook-ran" ] || fail "$shape: the hook never ran after the second proof"
+    [ "$RC" = 1 ] || fail "$shape: a file added after preservation should exit 1, got $RC: $OUT"
+    line=$(printf '%s\n' "$OUT" | grep -F "FAILED"$'\t'"$(copy_path zadd)") \
+      || fail "$shape: the added file was not reported as FAILED: $OUT"
+    assert_contains "$line" "changed after it was preserved" "$shape: the FAILED line did not name the content change"
+    assert_not_contains "$line" "could not be recorded" "$shape: the content fingerprint was not recorded"
+    assert_no_grep "$(copy_path zadd) --execute-cleanup" "$W/closeout.log" "$shape: the driver executed after a file was added"
+    assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path c1)" "$shape: the refusal used the only release slot"
+    registered zadd || fail "$shape: the copy was removed"
+    [ -z "$(ls -A "$HOMED/data/copy-sweep/retained" 2>/dev/null)" ] || fail "$shape: a retention receipt was written for an execute that never ran"
+    assert_equals 0 "$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -type f -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')" \
+      "$shape: the run kept a preserve although every original is still in the copy"
+    assert_equals 'b' "$(cat "$(copy_path zadd)/outbox/b.msg")" "$shape: the added file was touched"
+    printf 'c\n' > "$(copy_path zadd)/outbox/c.msg"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$shape: a copy whose content still changes must not fail the run, got $RC: $OUT"
+    assert_class zadd WAITING
+    assert_contains "$OUT" "content changing" "$shape: the WAITING reason is missing"
+    assert_equals 0 "$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -type f -name '*.msg' 2>/dev/null | wc -l | tr -d ' ')" \
+      "$shape: a copy whose content still changes was preserved"
+    assert_equals 1 "$(grep -cFx "$SLOT|--cleanup-worktree $(copy_path zadd)" "$W/closeout.log")" \
+      "$shape: the driver was called for a copy whose content still changes"
+    FM_TEARDOWN_VERNANT_PYTHON="$DRIVER_PY" run_sweep --apply
+    [ "$RC" = 0 ] || fail "$shape: the quiet run failed ($RC): $OUT"
+    assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path zadd)" "$shape: the quiet run did not release the copy"
+    ! registered zadd || fail "$shape: the released copy is still registered"
+    assert_equals 1 "$(grep -c -- "$(copy_path zadd) --execute-cleanup" "$W/closeout.log")" "$shape: the quiet run did not execute exactly once"
+    kept=$(find "$HOMED/data/copy-sweep" -path '*/nested-copy-preserved/*' -type f -name '*.msg' 2>/dev/null | LC_ALL=C sort)
+    if [ "$shape" = existing ]; then
+      assert_equals "a b c" "$(printf '%s\n' "$kept" | while IFS= read -r f; do cat "$f"; done | tr '\n' ' ' | sed 's/ $//')" \
+        "$shape: the quiet run did not preserve every file exactly once"
+    else
+      assert_equals "b c" "$(printf '%s\n' "$kept" | while IFS= read -r f; do cat "$f"; done | tr '\n' ' ' | sed 's/ $//')" \
+        "$shape: the quiet run did not preserve every file exactly once"
+    fi
+    [ -z "$(ls -A "$HOMED/data/copy-sweep/waiting" 2>/dev/null)" ] || fail "$shape: the release left its waiting record"
+  done
+  pass "a new ignored file that appears after preservation, with or without an earlier preservable file, stops the release before execute with no release slot and no lost bytes, records the copy's content, so the next run that still sees it changing reports WAITING with no preserve and no driver call, and the first quiet run preserves once and releases the copy"
 }
 
 test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves() {
@@ -2989,6 +3055,7 @@ run_case test_a_failure_after_an_allowed_plan_leaves_the_copy_and_records_the_dr
 run_case test_a_temporary_execute_refusal_is_planned_and_released_by_the_next_run
 run_case test_content_that_keeps_changing_waits_and_the_first_quiet_run_preserves_once_and_releases
 run_case test_ignored_content_changed_after_the_last_proof_is_not_released
+run_case test_a_new_ignored_file_after_preservation_waits_then_releases_once
 run_case test_a_fifo_and_a_stale_socket_neither_block_release_nor_accumulate_preserves
 run_case test_a_receipt_that_cannot_be_written_keeps_no_preserve_and_retries
 run_case test_a_long_sorted_key_refusal_still_shows_the_drivers_reason

@@ -189,8 +189,11 @@
 # ignored content (each the SHA-256 over the path, type and bytes or link target
 # of every file, symlink and FIFO; a socket, which preservation never copies, is
 # skipped) go to a waiting record under
-# data/copy-sweep/waiting/<sha256 of the path>, beside the receipts. The copy is
-# never held for it: each later run that finds a different content fingerprint
+# data/copy-sweep/waiting/<sha256 of the path>, beside the receipts. A content
+# check just before execute that finds a mismatch but keeps no preserve of this
+# run, as when only new content appeared, records the copy's current fingerprint
+# the same way, with the fingerprint of the latest preserve an earlier record
+# names. The copy is never held for it: each later run that finds a different content fingerprint
 # classes it WAITING and --apply records the new one, and the first run that finds
 # the same fingerprint as the run before plans and executes the copy as usual,
 # preserving it once only when that content differs from the latest preserve. A
@@ -1451,7 +1454,8 @@ discard_run_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
 # allows. A preserve that has to stay is now the latest preserve: the copy's
 # current fingerprint and that preserve's are recorded, so later runs hold the
 # copy WAITING while its content keeps changing and preserve again only content
-# that differs from it. Sets RETRY_PRESERVE to what happened.
+# that differs from it. Sets RETRY_PRESERVE to what happened, and returns 0 only
+# when no preserve from this run is kept.
 RETRY_PRESERVE=
 retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
   local now dir preserved=''
@@ -1464,6 +1468,7 @@ retry_after_preserve() {  # <copy> <identity> <lock-sha256> <release-id>
   if ! now=$(content_fingerprint "$1") || ! record_waiting "$1" "$2" "$now" "$preserved"; then
     RETRY_PRESERVE="$RETRY_PRESERVE, but its content fingerprint could not be recorded"
   fi
+  return 1
 }
 
 # Preserves the ignored entries of a REAPABLE-DRIVER copy, unless the classify of
@@ -1513,7 +1518,11 @@ teardown_driver_release() {  # <clone> <copy> <release-id> <pool> <container> <H
     fi
   fi
   if [ -z "$want" ] || ! now=$(content_fingerprint "$copy") || [ "$now" != "$want" ]; then
-    retry_after_preserve "$copy" "$identity" "$7" "$3"
+    if retry_after_preserve "$copy" "$identity" "$7" "$3" && [ -n "$now" ]; then
+      read_waiting "$(waiting_record "$copy")" "$copy" "$identity" || true
+      record_waiting "$copy" "$identity" "$now" "$WAIT_PRESERVED" \
+        || RETRY_PRESERVE="$RETRY_PRESERVE, but its content fingerprint could not be recorded"
+    fi
     echo "REFUSED: the preservable ignored content of $shown changed after it was preserved, or could not be compared with its preserve; it was not released. $RETRY_PRESERVE; the next sweep run plans it again." >&2
     return 2
   fi
