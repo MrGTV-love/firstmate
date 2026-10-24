@@ -2521,7 +2521,7 @@ That ownership record does not prove confinement is active: the separately deliv
 omp's `python`, `debug` and `run_experiment` code runners have the same effect as `eval` and use the same confinement-owned classification.
 Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), `manage_skill` writes to its managed-skills directory, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
 A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
-Claude `SendFeedback` drafts a bug report for upload, so like `report_issue` it has no row and is refused under every grant.
+`report_issue` and Claude `SendFeedback` upload reports, so they must never receive a `TOOL_POLICY` row and are refused under every grant; every other unclassified tool gets a row classified by its real effect.
 A coverage refusal names the refused host tool and states that no call was made.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
 Claude `Monitor` and `PowerShell` run commands outside the screened `bash` path and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
