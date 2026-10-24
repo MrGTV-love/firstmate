@@ -6106,6 +6106,51 @@ if [ "$KIND" != secondmate ]; then
     guard_policy=$(fm_meta_get "$RELAUNCH_META" jev_guard_policy)
   fi
 fi
+# Whole-worker write confinement applies to isolated guarded-harness workers,
+# independently of the model guard. Secondmates are persistent homes, not tasks.
+WRITE_CONFINEMENT=not-applicable
+WRITE_CONFINEMENT_PROFILE=
+confinement_started=$SECONDS
+confinement_refuse() {
+  local source_ok=$1
+  shift
+  echo "error: $*" >&2
+  echo "repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh $ID <project> --mode <mode> --yolo <on|off>" >&2
+  "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok "$source_ok" \
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" 2>/dev/null || true
+}
+if [ "$KIND" != secondmate ]; then
+  confinement_os=$(uname -s) || { confinement_refuse false "cannot identify worker OS"; exit 1; }
+  case "$confinement_os:$HARNESS" in
+    Darwin:omp | Darwin:claude)
+      [ -x /usr/bin/sandbox-exec ] || { confinement_refuse false "sandbox-exec is required for macOS workers"; exit 1; }
+      WRITE_CONFINEMENT=seatbelt-v1
+      WRITE_CONFINEMENT_PROFILE="$STATE_REAL/$ID.write-confinement.sb"
+      confinement_agent=
+      case "$HARNESS" in
+        omp) confinement_agent=${OMP_AGENT_DIR:-} ;;
+        claude) confinement_agent=${WORKER_ACCOUNT_ROOT:-${CLAUDE_CONFIG_DIR:-}} ;;
+      esac
+      confinement_args=()
+      [ -z "$confinement_agent" ] || confinement_args=(--agent-dir "$confinement_agent")
+      [ -z "${BRANCH:-}" ] || confinement_args+=(--branch "$BRANCH")
+      python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" \
+        --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" --temp "$TASK_TMP" \
+        --harness "$HARNESS" --profile "$WRITE_CONFINEMENT_PROFILE" \
+        "${confinement_args[@]}" || { confinement_refuse false "cannot derive task write roots"; exit 1; }
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
+        --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
+      ;;
+    Darwin:*) WRITE_CONFINEMENT="unconfined-macos-$HARNESS" ;;
+    Linux:*) WRITE_CONFINEMENT=unconfined-linux ;;
+    *) WRITE_CONFINEMENT="unconfined-other-os-$HARNESS" ;;
+  esac
+  confinement_coverage_decision=warn
+  [ "$WRITE_CONFINEMENT" != seatbelt-v1 ] || confinement_coverage_decision=allow
+  "$SCRIPT_DIR/fm-guard-event.sh" spawn-confinement-coverage "$confinement_coverage_decision" --source-ok true \
+    --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by recorded 2>/dev/null || true
+  printf 'confinement audit: harness=%s write_confinement=%s\n' "$HARNESS" "$WRITE_CONFINEMENT"
+fi
 # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
 # adapter with a verified semantic source, including a --secondmate launch.
 # The parent watcher reads this home's record; skipping the arm left a
@@ -6770,7 +6815,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked write_confinement busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -6788,6 +6833,7 @@ preserve_relaunch_meta() {
   [ -z "$YOLO" ] || echo "yolo=$YOLO"
   [ -z "${BRANCH:-}" ] || echo "branch=$BRANCH"
   echo "tasktmp=$TASK_TMP"
+  echo "write_confinement=$WRITE_CONFINEMENT"
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
   [ -z "$UPSTREAM_CONSENT" ] || echo "upstream_consent=$UPSTREAM_CONSENT"
   echo "model=${MODEL:-default}"
@@ -7336,6 +7382,21 @@ if [ -n "$SPAWN_TRACEPARENT" ]; then
     LAUNCH="unset TRACEPARENT; $LAUNCH"
   fi
 fi
+if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
+  case "$HARNESS" in
+    omp)
+      LAUNCH="export PI_CONFIG_DIR=$(shell_quote "${PI_CONFIG_DIR:-.omp}") OMP_PROFILE=$(shell_quote "${OMP_PROFILE-${PI_PROFILE:-}}"); $LAUNCH"
+      ;;
+    claude)
+      if [ -n "$confinement_agent" ]; then
+        LAUNCH="export CLAUDE_CONFIG_DIR=$(shell_quote "$confinement_agent"); $LAUNCH"
+      else
+        LAUNCH="unset CLAUDE_CONFIG_DIR; $LAUNCH"
+      fi
+      ;;
+  esac
+fi
+LAUNCH="export FM_WRITE_CONFINEMENT=$(shell_quote "$WRITE_CONFINEMENT"); $LAUNCH"
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH_ENV_PREFIX='/usr/bin/env -i'
   # The resolved literal below wins over any retained ambient switch.
@@ -7361,6 +7422,12 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
 fi
 LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
+if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
+  # Set all temp selectors inside the final environment boundary, not in the
+  # pane, so native tools and grandchildren use only the task temp root.
+  LAUNCH="export TMPDIR=$(shell_quote "$TASK_TMP") TMP=$(shell_quote "$TASK_TMP") TEMP=$(shell_quote "$TASK_TMP"); $LAUNCH"
+  LAUNCH="/usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") /bin/bash -c $(shell_quote "$LAUNCH")"
+fi
 # Implement the launch-delivery contract in this script's header. The full
 # home-identity hash isolates equal task ids across homes, and the spawn token in
 # the final filename keeps a buffered source line bound to this incarnation.

@@ -2479,6 +2479,39 @@ Claude's guard runs at the pre-tool boundary for every tool except the shell-com
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, and desktop criteria.
 
+### Worker OS write confinement
+
+On macOS, `fm-spawn.sh` wraps the complete omp and Claude ship/scout process tree in `sandbox-exec`, after composing account, environment and Git-hook settings.
+The profile builder is [`bin/fm-write-confinement.py`](../bin/fm-write-confinement.py).
+It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash derivation; missing prerequisites refuse a measured-harness launch rather than silently removing confinement.
+It denies filesystem writes except the task worktree, task data, task temporary root, task-owned state records/inbox/hooks, its linked Git administrative directory, the shared Git object store and its explicitly declared branch/ref-log files.
+Native temp selectors point at the task temporary root; the shared system temp directory is not writable.
+A declared nested `.claude/worktrees/fm-*` worktree is treated as the task root, not rejected by its spelling.
+The measured harness contracts are omp and Claude.
+`codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, `gemini`, `muse`, `rovo`, `agy` and `devin` launch unchanged and unconfined, with no guessed state-root grants.
+Each launch audit prints the actual harness identifier and confinement mode; macOS metadata records `write_confinement=unconfined-macos-<harness>` for these unmeasured harnesses.
+Their root contracts are follow-up work, not coverage supplied by this boundary.
+Secondmates are persistent homes and are not subject to this task-worker boundary.
+
+The necessary harness-state roots remain writable: omp's resolved agent directory and exactly its project-scoped daemon directory, or Claude's selected config directory.
+The omp daemon suffix uses omp's `Bun.hash.wyhash(path.resolve(projectDir))` derivation, not a hard-coded hash or a grant of the shared daemon parent.
+SQLite database creation requires the omp agent directory; an observed `EPERM mkdir` requires the separate daemon scope.
+Claude SessionStart requires creation of `.claude.json` and its backups in the selected config directory; the default layout also permits the single home-level `.claude.json` file.
+`/dev/null` is writable as a non-storage sink because the existing busy-state writer redirects there; no other character-device write grant is installed.
+No authentication or runtime state is copied.
+
+Linux workers remain unconfined, exactly as before; `write_confinement=unconfined-linux` in task metadata is the explicit audit field, while macOS records `seatbelt-v1`.
+Landlock is not enabled because the existing flat state layout cannot isolate creation of task lock/temporary siblings without granting the shared state parent.
+The task-private mutable-state layout is a separate prerequisite, not a reason to broaden this boundary.
+
+This is inherited process-tree filesystem enforcement, not confinement of external authorities.
+The harness-state roots above remain mutable, and an already-running unconfined helper, daemon, Docker service or remote API can still perform delegated writes outside the roots.
+The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
+[`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) checks cross-task glob deletion, aged-file deletion, Python eval unlink, nested-root writes, status isolation, symlink escapes and real busy-state transitions.
+[`tests/fm-write-confinement-live-e2e.test.sh`](../tests/fm-write-confinement-live-e2e.test.sh) repeats the operations in token-free real harness SessionStart descendants; this is not a model-submitted native tool invocation.
+
+### Model guard integration
+
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
 `fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse` except the shell-command tools `Bash`, `Monitor` and `PowerShell`, so every other native call passes tool coverage and egress authorization while a Claude `Bash`, `Monitor` or `PowerShell` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
@@ -2666,7 +2699,11 @@ They perform no guard key lookup or provider request and retain deterministic to
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
-The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, named outage/enforcement branch, usage, models, latency, attempts and cost certainty; `thresholds` and `answers` are empty objects because no guard question remains.
+Confined workers append minimized terminal records to their own `state/<task>.jev-guard.jsonl`; their profile grants only that exact audit file, never the shared ledger.
+Unconfined and primary sessions retain the owning home's private `state/jev-guard.jsonl`.
+[`bin/fm-jev-audit-read.mjs`](../bin/fm-jev-audit-read.mjs) reads the shared legacy file plus every per-task audit file, so historical and new rows remain visible without copying or rewriting either layout.
+The reader orders rows by numeric `at`, preserving source filename and line order for ties, and fails on unreadable or malformed audit files rather than silently omitting history.
+Both destinations retain task, policy version, named outage/enforcement branch, usage, models, latency, attempts and cost certainty; `thresholds` and `answers` are empty objects because no guard question remains.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.

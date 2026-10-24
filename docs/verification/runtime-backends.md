@@ -6,6 +6,32 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## macOS worker write confinement
+
+Verified on 2026-10-24 on macOS 27 arm64 with omp 18.12.4 and Claude Code 2.1.310.
+The configuration owner is [Worker OS write confinement](../configuration.md#worker-os-write-confinement).
+Refresh with these token-free executable entry points:
+
+```sh
+bash tests/fm-write-confinement.test.sh
+bash tests/fm-write-confinement-live-e2e.test.sh
+```
+
+Both the direct kernel fixture and real SessionStart descendants under each installed harness produced:
+
+```json
+{"a":true,"b":true,"busy-transition":true,"c":true,"d":true,"e-append":true,"e-other.status":true,"e-task.other.status":true,"foreign-audit-denied":true,"native-session-proof":true,"own-git-commit":true,"symlink":true,"task-audit-written":true}
+```
+
+The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial and the symlink escape, while positive worktree writes, own-status append and the real busy writer remained successful.
+The probes invoke the real `createGuardService.record` and `createTaskSessionProof` writers, including native proof publication and shutdown invalidation; no audit or session writer is mocked.
+The task audit succeeds without changing seeded shared legacy history, while another task's audit append fails with `AuditUnavailableError`.
+`bash tests/fm-jev-guard-audit.test.sh` passed 21 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
+The live probes use synthetic agent/config stores, EOF without a submitted model prompt and the installed runtime's existing HOME; no authentication is copied.
+This proves inherited filesystem enforcement through real harness startup, not a model-submitted native Bash/eval invocation or authenticated provider access.
+Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
+The [live guard](../../tests/fm-write-confinement-live-e2e.test.sh) reports absent harnesses explicitly and refuses a pass with no harness checked.
+
 ## Pool-only cleanup critical sections
 
 Verified on 2026-10-14 on macOS arm64 with stock Bash 3.2.57 through isolated, model-free executions of the actual `fm-teardown.sh` and `fm-spawn.sh` paths.

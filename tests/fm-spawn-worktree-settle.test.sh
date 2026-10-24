@@ -68,7 +68,14 @@ case "${1:-}" in
     exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
-  send-keys) exit 0 ;;
+  send-keys)
+    if [ -n "${FM_COMPAT_LAUNCH_LOG:-}" ]; then
+      for arg in "$@"; do
+        case "$arg" in '. '*) printf '%s\n' "$arg" > "$FM_COMPAT_LAUNCH_LOG" ;; esac
+      done
+    fi
+    exit 0 ;;
+
 esac
 exit 0
 SH
@@ -265,6 +272,40 @@ test_progress_cannot_outlast_absolute_extreme() {
   pass "output activity cannot keep an acquisition alive beyond the absolute extreme"
 }
 
+test_nonmeasured_harness_stays_unconfined_and_audited() {
+  local rec id out source_line
+  local FM_COMPAT_LAUNCH_LOG FM_COMPAT_MARKER FM_EXPECT_INBOX
+  id=settle-unconfined-codex-z7
+  rec=$(make_settle_case unconfined-codex "$id" 0)
+  read_settle_record "$rec"
+  FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+  FM_COMPAT_MARKER="$HOME_DIR/foreign-write-proof"
+  FM_EXPECT_INBOX="$HOME_DIR/state/$id.inbox"
+  export FM_COMPAT_LAUNCH_LOG FM_COMPAT_MARKER FM_EXPECT_INBOX
+  cat > "$FAKEBIN_DIR/codex" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then printf 'codex-cli 1.0.0\n'; exit 0; fi
+if [ "${FM_TASK_INBOX:-}" = "${FM_EXPECT_INBOX:?}" ]; then
+  printf 'unconfined\n' > "${FM_COMPAT_MARKER:?}"
+fi
+SH
+  chmod +x "$FAKEBIN_DIR/codex"
+  out=$(run_settle_spawn "$id")
+  expect_code 0 "$?" "non-measured codex spawn was refused: $out"
+  if [ "$(uname -s)" = Darwin ]; then
+    assert_grep 'write_confinement=unconfined-macos-codex' "$HOME_DIR/state/$id.meta" "unconfined codex coverage absent from metadata"
+    assert_contains "$out" 'harness=codex write_confinement=unconfined-macos-codex' "coverage audit did not name codex"
+  fi
+  assert_absent "$FM_COMPAT_MARKER" "preflight ran the compatibility probe as a worker"
+  assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver a launch command"
+  source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
+  expect_code 0 "$?" "delivered codex launch did not execute unchanged"
+  assert_equals unconfined "$(cat "$FM_COMPAT_MARKER")" "codex unexpectedly acquired a write boundary"
+  pass "non-measured harness launches unchanged and explicitly reports unconfined coverage"
+}
+
+test_nonmeasured_harness_stays_unconfined_and_audited
 test_single_stale_first_read_is_not_accepted
 test_already_settled_pane_costs_one_confirm_read
 test_transient_primary_checkout_is_not_accepted

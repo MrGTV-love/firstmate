@@ -754,6 +754,9 @@ test_harness_switch_moves_the_record_and_clears_prior_wiring() {
   # Wiring the previous claude incarnation left in the worktree.
   mkdir -p "$dir/wt/.claude"
   printf '{"hooks":{}}\n' > "$dir/wt/.claude/settings.local.json"
+  printf '(version 1)\n(allow default)\n' > "$dir/home/state/rl4.write-confinement.sb"
+  printf '{"at":1,"task":"rl4","decision":"clear"}\n' > "$dir/home/state/rl4.jev-guard.jsonl"
+  cp "$dir/home/state/rl4.jev-guard.jsonl" "$dir/prior-audit"
   printf 'codex' > "$dir/fake/becomes"
   out=$(run_control "$dir" rl4 relaunch --harness codex --note "switching runtime"); rc=$?
   expect_code 0 "$rc" "a harness switch should succeed"$'\n'"$out"
@@ -761,6 +764,8 @@ test_harness_switch_moves_the_record_and_clears_prior_wiring() {
   [ "$(meta_field "$dir" rl4 harness)" = codex ] || fail "the record should follow the switch"
   [ ! -e "$dir/wt/.claude/settings.local.json" ] \
     || fail "the previous harness's per-task wiring must be cleared on a switch"
+  assert_absent "$dir/home/state/rl4.write-confinement.sb" "the old confinement profile must not survive an unconfined replacement"
+  cmp -s "$dir/prior-audit" "$dir/home/state/rl4.jev-guard.jsonl" || fail "harness replacement removed historical task audit rows"
   assert_grep "codex" "$dir/fake/literal" "the replacement launch should be the new harness"
   [ "$(journal_field "$dir" rl4 from_harness)" = claude ] || fail "the journal should record the origin harness"
   [ "$(journal_field "$dir" rl4 to_harness)" = codex ] || fail "the journal should record the target harness"
