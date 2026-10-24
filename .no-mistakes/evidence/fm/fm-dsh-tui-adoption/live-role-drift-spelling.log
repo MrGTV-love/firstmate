@@ -1,0 +1,139 @@
+model resolved at run time: deepseek/deepseek-v4-flash
+mixed spellings: [DeepSeek/deepseek-v4-flash] [ DeepSeek / deepseek-v4-flash ]
+herdr lab session: fm-lab-dsh-role-54837-26914
+/private/tmp/fm-dsh-rparent.KU55TA
+/private/tmp/fm-dsh-rsecond.9aNyRG
+=== S-SPELLING-META: spawn a fresh dsh secondmate with --model 'DeepSeek/deepseek-v4-flash' --effort high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: secondmate dsh-role-54696 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+spawned dsh-role-54696 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+bound: model=deepseek/deepseek-v4-flash effort=high generation=/private/tmp/fm-dsh-rparent.KU55TA/state/dsh-role-54696.dsh/s1792815945.55304.10065 log=/private/tmp/fm-dsh-rparent.KU55TA/state/dsh-role-54696.dsh/s1792815945.55304.10065/dsh/sessions/--private-tmp-fm-dsh-rsecond.9aNyRG--/740afd26-d0d4-40f4-9d3d-00edadfa5b59/session.v4.jsonl
+ok - S-SPELLING-META: mixed-spelling spawn recorded canonical model=deepseek/deepseek-v4-flash
+observed reply: FMROLEREADY
+model index roles: fmlabbound -> deepseek/deepseek-v4-flash ; fmlabdrift -> deepseek/deepseek-v4-flash-fmlabdrift (never launched)
+=== S-ROLE: config/secondmate-harness "dsh role:fmlabbound" agrees with the binding; plain relaunch must resume
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: secondmate dsh-role-54696 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-role-54696 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+observed reply: FMROLERESUMED LILAC58
+ok - S-ROLE: config role resolving to the bound model resumed the same generation /private/tmp/fm-dsh-rparent.KU55TA/state/dsh-role-54696.dsh/s1792815945.55304.10065 and conversation (secret recalled), effort=high
+=== S-DRIFT-MODEL: config names a different model
+S-DRIFT-MODEL: before refusal agent_state=alive log_bytes=196595
+S-DRIFT-MODEL: control relaunch exit=1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+    | error: task dsh-role-54696's bound dsh conversation runs model deepseek/deepseek-v4-flash at effort high, but config/secondmate-harness names model role:fmlabdrift at effort (none); a plain relaunch would discard that conversation. Pass an explicit --model and --effort to start a fresh conversation on the configured profile. The running agent was not stopped
+S-DRIFT-MODEL: after refusal agent_state=alive log_bytes=196595 (first 196595 bytes identical) single generation, meta and journal unchanged
+observed reply: FMDRIFTMODELALIVE LILAC58
+ok - S-DRIFT-MODEL: drift refused before stop; the same live agent answered FMDRIFTMODELALIVE with the secret
+=== S-DRIFT-EFFORT: config names the bound model but a different effort
+S-DRIFT-EFFORT: before refusal agent_state=alive log_bytes=205973
+S-DRIFT-EFFORT: control relaunch exit=1
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+    | error: task dsh-role-54696's bound dsh conversation runs model deepseek/deepseek-v4-flash at effort high, but config/secondmate-harness names model role:fmlabbound at effort max; a plain relaunch would discard that conversation. Pass an explicit --model and --effort to start a fresh conversation on the configured profile. The running agent was not stopped
+S-DRIFT-EFFORT: after refusal agent_state=alive log_bytes=205973 (first 205973 bytes identical) single generation, meta and journal unchanged
+observed reply: FMDRIFTEFFORTALIVE LILAC58
+ok - S-DRIFT-EFFORT: drift refused before stop; the same live agent answered FMDRIFTEFFORTALIVE with the secret
+=== S-EXPLICIT-CONTROL: fm-control relaunch --model role:fmlabbound, no --effort
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: secondmate dsh-role-54696 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-role-54696 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+observed reply: FMCTLROLE LILAC58
+ok - S-EXPLICIT-CONTROL: role resolving to bound model kept effort=high, same generation and conversation
+=== S-EXPLICIT-SPAWN: direct fm-spawn --relaunch --model role:fmlabbound, no --effort
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+stopped dsh-role-54696 harness=dsh backend=herdr endpoint=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: secondmate dsh-role-54696 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+spawned dsh-role-54696 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+observed reply: FMSPAWNROLE LILAC58
+ok - S-EXPLICIT-SPAWN: direct spawn role relaunch kept effort=high, same generation and conversation
+=== S-SPELLING-CONFIG: config/secondmate-harness 'dsh DeepSeek/deepseek-v4-flash'; plain fm-control relaunch must resume, not refuse
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: warning: literal model 'DeepSeek/deepseek-v4-flash' for dsh is not an index entry; name its role so the next model release is one index edit
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: secondmate dsh-role-54696 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-role-54696 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+observed reply: FMSPELLCFG LILAC58
+ok - S-SPELLING-CONFIG: mixed-spelling config resumed generation /private/tmp/fm-dsh-rparent.KU55TA/state/dsh-role-54696.dsh/s1792815945.55304.10065 and conversation, effort=high
+=== S-SPELLING-CONTROL: fm-control relaunch --model ' DeepSeek / deepseek-v4-flash ', no --effort
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: warning: literal model ' DeepSeek / deepseek-v4-flash ' for dsh is not an index entry; name its role so the next model release is one index edit
+model-index: warning: literal model ' DeepSeek / deepseek-v4-flash ' for dsh is not an index entry; name its role so the next model release is one index edit
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: secondmate dsh-role-54696 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+relaunched dsh-role-54696 harness=dsh from=dsh model=deepseek/deepseek-v4-flash effort=high backend=herdr endpoint=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+observed reply: FMSPELLCTL LILAC58
+ok - S-SPELLING-CONTROL: spaced mixed spelling kept effort=high, same generation and conversation
+=== S-SPELLING-SPAWN: direct fm-spawn --relaunch --model 'DeepSeek/deepseek-v4-flash', no --effort
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+stopped dsh-role-54696 harness=dsh backend=herdr endpoint=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+model-index: warning: literal model 'DeepSeek/deepseek-v4-flash' for dsh is not an index entry; name its role so the next model release is one index edit
+model-index: notice: dsh catalog unavailable (effective worker account context is not established); 'deepseek/deepseek-v4-flash' (role 'fmlabbound') not validated
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: secondmate dsh-role-54696 sync skipped before launch: primary default-branch commit cannot be resolved
+fm-config-inherit: warning: skipped model-index.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-dispatch.json for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped crew-harness for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped backlog-backend for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+fm-config-inherit: warning: skipped supervision-host-off for /private/tmp/fm-dsh-rsecond.9aNyRG/config: destination does not allow inherited item (not gitignored or guard failed)
+spawned dsh-role-54696 harness=dsh kind=secondmate mode=secondmate yolo=off window=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+observed reply: FMSPELLSPAWN LILAC58
+ok - S-SPELLING-SPAWN: direct spawn mixed-spelling relaunch kept effort=high, same generation and conversation
+generation dirs under dsh-role-54696.dsh: 1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-rparent.KU55TA
+stopped dsh-role-54696 harness=dsh backend=herdr endpoint=fm-lab-dsh-role-54837-26914:w1:p2 worktree=/private/tmp/fm-dsh-rsecond.9aNyRG
+ok - role/drift live driver complete
+watcher: FAILED - refusing to arm from a disposable validation checkout: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5NVYT0PSTJNKPN9N8WMQZQ6/bin
+watcher: FAILED - refusing to arm from a disposable validation checkout: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5NVYT0PSTJNKPN9N8WMQZQ6/bin
+credential copies left under task homes after scrub: 0
+parent_home=/private/tmp/fm-dsh-rparent.KU55TA
+secondmate_home=/private/tmp/fm-dsh-rsecond.9aNyRG
+cleanup_exit=1

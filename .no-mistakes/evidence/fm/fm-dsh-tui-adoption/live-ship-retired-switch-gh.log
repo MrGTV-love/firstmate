@@ -1,0 +1,39 @@
+model resolved at run time: deepseek/deepseek-v4-flash ; mixed spelling used: DeepSeek/deepseek-v4-flash
+herdr lab session: fm-lab-dsh-reroute-47125-29984
+=== S-REFUSE: fm-spawn dsh-reroute-46864 --relaunch --harness omp --model deepseek/deepseek-v4-flash
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-reroute.TyB9Bz
+    | error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+S-REFUSE exit=1
+S-REFUSE: pane agent_state=dead; no dsh binding; meta unchanged
+ok - S-REFUSE: explicit omp harness with a DeepSeek model refused before launch
+=== S-RETIRED: config/model-index.json retires deepseek/deepseek-v4-flash; FRESH fm-spawn dsh-retired-46864 dsh-lab --scout --model ' DeepSeek / deepseek-v4-flash ' (no harness; crew-harness=omp)
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-reroute.TyB9Bz
+    | model-index: warning: literal model ' DeepSeek / deepseek-v4-flash ' for omp is not an index entry; name its role so the next model release is one index edit
+    | model-index: warning: literal model 'deepseek/deepseek-v4-flash' for dsh is not an index entry; name its role so the next model release is one index edit
+    | jq: error (at <stdin>:4): retired model: deepseek/deepseek-v4-flash
+S-RETIRED exit=1
+S-RETIRED: herdr lab workspaces before=1 after=1
+ok - S-RETIRED: fresh no-harness padded mixed-case selector for a retired DeepSeek id rerouted to dsh and refused naming deepseek/deepseek-v4-flash before endpoint, binding and metadata
+=== S-SWITCH: fm-spawn dsh-reroute-46864 --relaunch --harness dsh --model 'DeepSeek/deepseek-v4-flash' --effort high (recorded harness=omp)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-reroute.TyB9Bz
+warning: model freshness unverified - dsh catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'deepseek/deepseek-v4-flash' not checked
+warning: /private/tmp/fm-dsh-reroute.TyB9Bz/data/dsh-reroute-46864/launch-brief.md records no ship branch; relaunching on the task's recorded branch lab-copy
+warning: /private/tmp/fm-dsh-reroute.TyB9Bz/data/dsh-reroute-46864/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: dsh-reroute-46864 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: dsh-reroute-46864 ships branch=lab-copy while project registers the ship-branch prefix 'fm/' (branch fm/dsh-reroute-46864) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for dsh-reroute-46864: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-reroute-46864 harness=dsh kind=ship mode=local-only yolo=off window=fm-lab-dsh-reroute-47125-29984:w1:p1 worktree=/private/tmp/fmlab-dsh.r9AqPp/copy
+meta after: harness=dsh model=deepseek/deepseek-v4-flash effort=high
+binding: {"root": "/private/tmp/fm-dsh-reroute.TyB9Bz/state/dsh-reroute-46864.dsh/s1792818147.51387.14339", "cwd": "/private/tmp/fmlab-dsh.r9AqPp/copy", "generation": "s1792818147.51387.14339", "model": "deepseek-v4-flash", "effort": "high", "primary_root": null}
+pane agent_state=alive
+=== S-GH: wait for the worker's own Bash tool to finish gh-axi
+pane shows FMDSHGHREADCOMPLETE
+gh-axi exit recorded by the worker: 0
+ok - S-GH: real dsh-tui ship ran gh-axi pr view 182 via its Bash tool, exit=0; worker .config linked to operator home; .dsh/.dsh-tui private
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-reroute.TyB9Bz
+stopped dsh-reroute-46864 harness=dsh backend=herdr endpoint=fm-lab-dsh-reroute-47125-29984:w1:p1 worktree=/private/tmp/fmlab-dsh.r9AqPp/copy
+ok - control exit stopped the switched ship
+cleanup_exit=0
+credential copies left under task home after scrub: 0
+lab_home=/private/tmp/fm-dsh-reroute.TyB9Bz
+final_exit=0

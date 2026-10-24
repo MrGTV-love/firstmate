@@ -1,0 +1,1 @@
+ok - DSH primary enters its digest ahead of the brief in the first step, reports startup failure there, bounds guard follow-ups, preserves wake acknowledgement, excludes children, retires watcher descendants on disposal and native SIGKILL, and parks the supervision host only on an opted-in home it owns

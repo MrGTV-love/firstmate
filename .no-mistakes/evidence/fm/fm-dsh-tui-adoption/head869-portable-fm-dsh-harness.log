@@ -1,0 +1,6 @@
+ok - dsh route boundaries, launchable-model admission, provider normalization, durable transitions, torn append, oversized turns, start-position proof, newest-session selection, any log generation admitted by behavior, named unknown checks and generation retirement
+ok - PATH-selected DSH probes accept arbitrary releases, refuse failed commands and require ownership cleanup only for primaries
+ok - the DSH primary resumes its bound model and effort and refuses to replace an unresumable or live conversation
+ok - a DSH primary with no --model reads the operator /model preference at launch and refuses when it names no DeepSeek model
+ok - dsh frame proves empty, typed draft, and busy-hint furniture; incompatible screens refuse with a parser diagnostic
+ok - dsh executable-slot attribution, lifecycle capability, fatal cleanup contract and task-home credential scrub

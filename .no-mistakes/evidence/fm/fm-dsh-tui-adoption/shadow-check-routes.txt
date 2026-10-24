@@ -1,0 +1,13 @@
+$ FM_HOME=<disposable> bin/fm-model-picker-shadow.sh --check-routes   (config = docs/examples crew-dispatch.json + model-index.json)
+route                              family     currency      projection                         asserted
+claude:haiku                       ?          ?             -                                  UNMAPPED (stays a candidate with UNKNOWN facts)
+claude:opus[1m]                    ?          ?             -                                  UNMAPPED (stays a candidate with UNKNOWN facts)
+codex:gpt-6.1-sol                  ?          ?             -                                  UNMAPPED (stays a candidate with UNKNOWN facts)
+pi:anthropic/claude-sonnet-5-5     ?          ?             -                                  UNMAPPED (stays a candidate with UNKNOWN facts)
+exit=1
+
+$ bin/fm-model-picker-shadow.sh --check-routes --rules <disposable rules: one dsh deepseek/deepseek-v4-flash profile>
+{"rules":[{"when":"DeepSeek work.","use":[{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"high"}]}],"default":[{"harness":"dsh","model":"deepseek/deepseek-v4-flash","effort":"max"}]}
+route                              family     currency      projection                         asserted
+dsh:deepseek/deepseek-v4-flash     deepseek   api           deepseek-v4-flash                  REFUSED: projection deepseek-v4-flash is missing or not a regular file
+exit=1

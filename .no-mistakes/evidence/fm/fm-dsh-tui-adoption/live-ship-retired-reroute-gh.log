@@ -1,0 +1,18 @@
+model resolved at run time: deepseek/deepseek-v4-flash ; mixed spelling used: DeepSeek/deepseek-v4-flash
+herdr lab session: fm-lab-dsh-reroute-51022-12238
+=== S-REFUSE: fm-spawn dsh-reroute-50893 --relaunch --harness omp --model deepseek/deepseek-v4-flash
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-reroute.V3hbmG
+    | error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+S-REFUSE exit=1
+S-REFUSE: pane agent_state=dead; no dsh binding; meta unchanged
+ok - S-REFUSE: explicit omp harness with a DeepSeek model refused before launch
+=== S-RETIRED: config/model-index.json retires deepseek/deepseek-v4-flash; fm-spawn dsh-reroute-50893 --relaunch --model ' DeepSeek / deepseek-v4-flash ' (no harness)
+    | fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-dsh-reroute.V3hbmG
+    | model-index: warning: literal model ' DeepSeek / deepseek-v4-flash ' for omp is not an index entry; name its role so the next model release is one index edit
+    | error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+S-RETIRED exit=1
+S-RETIRED FAIL: refusal does not name the canonical retired id
+cleanup_exit=1
+credential copies left under task home after scrub: 0
+lab_home=/private/tmp/fm-dsh-reroute.V3hbmG
+final_exit=1

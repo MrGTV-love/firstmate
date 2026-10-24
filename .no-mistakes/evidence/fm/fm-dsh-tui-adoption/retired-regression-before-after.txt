@@ -1,0 +1,2 @@
+before-fix (HEAD~1 fm-spawn.sh) retired case exit=1
+after-fix (HEAD fm-spawn.sh) retired case exit=0

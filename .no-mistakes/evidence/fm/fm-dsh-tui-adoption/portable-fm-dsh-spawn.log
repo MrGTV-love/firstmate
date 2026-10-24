@@ -1,0 +1,17 @@
+ok - fm-harness: dsh detects by anchored name or script argv, including nested native startup; its marker needs real dsh ancestry
+ok - session lock and process classification: dsh is anchored, decoys stay out
+ok - fm_backend_tmux_agent_state: dsh is alive by name and by script argv, an unrelated node is not
+ok - fm_busy_classify: dsh follows the launch's own durable session log
+ok - fm-spawn: a ship and a scout on a DeepSeek model with no harness launch on dsh instead of the crew default
+ok - fm-spawn: DeepSeek spellings omp would resolve to the deepseek provider route to dsh with no harness
+ok - fm-spawn: an explicit dsh pin is honored and a dsh launch without a DeepSeek model is refused
+ok - fm-spawn: the dsh launch clears foreign markers, selects full access, and keeps the operator's git config and no-mistakes home under a private HOME
+ok - fm-spawn: a dsh crew harness mirrored from a DSH primary carries its bound model and the operator's install, and refuses without a live record
+ok - fm-spawn: a dsh secondmate starts on its positional brief and carries the operator's DSH install and home to nested spawns
+ok - fm-spawn: a plain, same-model or same-model role dsh secondmate relaunch keeps its recorded model and effort and resumes the same generation
+ok - fm-spawn: the restricted session policy admits canonical dsh-tui DeepSeek launches
+ok - fm-spawn: explicit, raw, and indexed DeepSeek-through-omp routes refuse before launch
+ok - fm-spawn: catalog-listed DeepSeek defaults refuse without --model; non-DeepSeek defaults retain omp
+ok - fm-spawn: a successful version probe and durable turn cannot admit an unrecognized dsh screen
+ok - fm-spawn: exhausted omp replaces its declared DeepSeek stand-in with dsh-tui under the session policy
+ok - live guards: an opted-in run with a missing lab input or no DeepSeek model preference fails before any lab action; the opt-out still skips

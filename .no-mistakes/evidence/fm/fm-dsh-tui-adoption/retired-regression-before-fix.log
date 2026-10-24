@@ -1,0 +1,4 @@
+not ok - 'DeepSeek/deepseek-v4-flash' naming a retired DeepSeek id must refuse: model-index: warning: literal model 'DeepSeek/deepseek-v4-flash' for omp is not an index entry; name its role so the next model release is one index edit
+warning: task dsh-retired-26: /Users/charlesabrooker/tmp/fm-dsh-spawn.4A12Uz/retired-26/home/data/dsh-retired-26/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+skill selection for dsh-retired-26: unavailable - no TypeSafe or OpenRouter key
+spawned dsh-retired-26 harness=dsh kind=scout window=firstmate:fm-dsh-retired-26 worktree=/Users/charlesabrooker/tmp/fm-dsh-spawn.4A12Uz/retired-26/wt

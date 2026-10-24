@@ -1,0 +1,11 @@
+pull_request:
+  number: 182
+  title: "feat(bin): route DeepSeek work to a pane-hosted dsh-tui harness"
+  state: open
+  author: MrGTV-love
+  draft: no
+  merged: no
+  checks: "34 passed, 0 failed, 34 total"
+  body: "## Intent\n\nThe owner said on 2026-10-18: \"dsh is a better harness for deepseek than omp. when routing to deepseek models, please route to `dsh-tui`\". A DeepSeek Harness session filed the full self-contained brief at ~/firstmate/data/dsh-tui-adoption/brief.md (queued as note 1792361658-5AC9h2, request dsh-tui-adoption-20261018). It holds the decisions already taken (terminal frontend hosting via dsh-tui, not ACP and not headless; DeepSeek matched on provider deepseek OR model prefix deepseek/; sc\n... (truncated, 61512 chars total - use --full to see complete body)"
+  comment_count: 0 — use --comments to see full comments
+  review_count: 0 — use --reviews to see full reviews

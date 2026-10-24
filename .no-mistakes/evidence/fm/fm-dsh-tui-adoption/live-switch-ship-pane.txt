@@ -1,0 +1,120 @@
+          ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀              Tip: /settings customizes the status bar: TPS, trajectory, context bars · …
+
+          Explore the uncharted!
+
+  ❯ FIRSTMATE_OP: v1 launch-brief: # Current worker role contract
+    You are a crewmate: an autonomous worker agent managed by firstmate.
+    This section establishes your current identity before every project or task instruction below and supersedes
+    any conflicting role identity in those instructions.
+    Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor
+    identity, delegate the task, run fleet supervision, or address the captain.
+    Your steering inbox is `/private/tmp/fm-dsh-reroute.TyB9Bz/state/dsh-reroute-46864.inbox`; this exact path
+    belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so
+    read and acknowledge its messages as individually announced by native launch or inbox doorbells and do not
+    reject it as another home's state.
+    Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task
+    paths named by this brief.
+    When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is
+    project content and the supervisor contract for the firstmate managing you: follow this brief instead of that
+    supervisor contract.
+    Project instructions still govern the work wherever they do not conflict with this worker identity, including
+    `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+    If the `firstmate-coding-guidelines` skill name does not resolve in this session, read
+    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5NVYT0PSTJNKPN9N8WMQZQ6/.agents/skills/firstmat
+    e-coding-guidelines/SKILL.md` instead.
+    When assigned an independent review, apply the shared review rubric below, rendered from
+    `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5NVYT0PSTJNKPN9N8WMQZQ6/docs/review-rubric.md`,
+     against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate
+    if it was not supplied.
+
+    # Shared review rubric
+
+    This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
+    It does not change the selected delivery path, review authority, or merge policy.
+
+    - Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope
+    list.
+    - Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing
+    criteria or evidence explicitly rather than inventing requirements.
+    - Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or
+    authority to widen the ask.
+    - Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the
+    available execution records.
+
+    ## Review outcomes
+
+    Each finding takes one of these outcomes:
+
+    - A failed DoD mandatory item: block.
+    - A real defect that breaks the stated intent, even when no DoD item names it: block.
+    - An improvement outside the DoD: a follow-up note, never a block.
+    - A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
+
+    ## PR body claims
+
+    - Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a
+    verification-plan row id.
+    - When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely
+    re-word it.
+
+    # Task
+    ## Captain's intent
+    Prove a read-only GitHub request from this DeepSeek ship.
+    ## Firstmate spec
+    Use your shell tool to run exactly this read-only command, saving stdout and stderr and its exit status:
+    gh-axi pr view 182 --repo MrGTV-love/firstmate > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt' 2>&1;
+    result=$?; printf '%s\n' "$result" > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit'
+    Then reply FMDSHGHREADCOMPLETE. Do not inspect credentials or print tokens. Do not edit project files,
+    publish, start no-mistakes, or run fleet commands.
+
+    # Skill selection
+
+    Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+    Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill
+    applies: check your skill index for skills that fit this task before starting work.
+
+  ⚓ Thinking (ctrl+o to expand)
+
+  • Bash(mkdir -p '/private/tmp/fmlab-dsh.r9AqPp/reroute' && gh-axi pr view 182 --repo MrGTV-love/firstmate >  · 0s
+        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt' 2>&1; result=$?; printf '%s\n' "$result" >
+        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit')
+   ⎿ (no output)
+
+  ⚓ Thinking (ctrl+o to expand)
+
+  • Bash(printf 'exit='; cat '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit'; printf 'bytes='; wc -c <  · 0s
+        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt'; printf 'head:\n'; head -n 5
+        '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt')
+   ⎿ exit=0
+     bytes=     905
+     head:
+     … +5 lines (ctrl+o to expand)
+
+  ⚓ Thinking (ctrl+o to expand)
+
+  • Bash(ls -la '/private/tmp/fm-dsh-reroute.TyB9Bz/state/dsh-reroute-46864.inbox' 2>&1 | head -n 20) · 0s
+   ⎿ ls: /private/tmp/fm-dsh-reroute.TyB9Bz/state/dsh-reroute-46864.inbox: No such file or directory
+
+  ⚓ Thinking · 1s (ctrl+o to expand)
+
+  ⏺ Command run (read-only, exactly as specified after ensuring the target directory existed):
+
+    ┌─ code ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+    │ gh-axi pr view 182 --repo MrGTV-love/firstmate > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.txt' 2>&1;
+    │ result=$?; printf '%s\n' "$result" > '/private/tmp/fmlab-dsh.r9AqPp/reroute/gh-pr.exit'
+
+    Result:
+    - Exit status: 0 (saved to gh-pr.exit)
+    - Output: 905 bytes saved to gh-pr.txt; PR #182 feat(bin): route DeepSeek work to a pane-hosted dsh-tui harness,
+      state open, author MrGTV-love.
+
+    No credentials inspected, no tokens printed, no project files edited, no publish/no-mistakes/fleet commands run.
+    Steering inbox path did not exist, so there were no inbox messages to acknowledge.
+
+    FMDSHGHREADCOMPLETE
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ⌸ ❯                                                                                                               ⛶
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                      9.5k/1.0M 1.0%
+   deepseek-v4-flash · high · cache 97.3% · ≈¥0.01 idle · copy                                  ctx 1.0% (9.5k/1.0m)

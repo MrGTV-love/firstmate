@@ -1,0 +1,36 @@
+== fm-dsh.py route (the one harness owner) ==
+[deepseek/deepseek-v4-flash]       -> dsh
+[DeepSeek/deepseek-v4-flash]       -> dsh
+[ DeepSeek / deepseek-v4-flash ]   -> dsh
+[claude-opus-4]                    -> claude
+[claude-sonnet-4-5]                -> claude
+[openai-codex/gpt-5]               -> omp
+[kimi/k2]                          -> omp
+[deepseekish/model]                -> omp
+[provider=deepseek model=v4]       -> dsh
+[provider=DeepSeek model=v4]       -> dsh
+== canonical ==
+[DeepSeek/deepseek-v4-flash]       -> deepseek/deepseek-v4-flash
+[ DeepSeek / deepseek-v4-flash ]   -> deepseek/deepseek-v4-flash
+== check: contradicting harness/model profile is rejected ==
+check omp    deepseek/deepseek-v4-flash     -> error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+exit=1
+check omp    DeepSeek/deepseek-v4-flash     -> error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+exit=1
+check claude deepseek/deepseek-v4-flash     -> error: DeepSeek runs through dsh-tui, not claude; select --harness dsh
+exit=1
+check dsh    claude-opus-4                  -> error: dsh runs only DeepSeek models, not 'claude-opus-4'
+exit=1
+check dsh    kimi/k2                        -> error: dsh runs only DeepSeek models, not 'kimi/k2'
+exit=1
+check dsh    deepseek/deepseek-v4-flash     -> exit=0
+check omp    kimi/k2                        -> exit=0
+check claude claude-opus-4                  -> exit=0
+== raw omp launch guard (fm_omp_api_billing_route_check) ==
+guard [deepseek/deepseek-v4-flash]   -> error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+exit=1
+guard [ DeepSeek / model ]           -> error: DeepSeek runs through dsh-tui, not omp; select --harness dsh
+exit=1
+guard [kimi/k2]                      -> exit=0
+guard [openai/gpt-5]                 -> error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+exit=1

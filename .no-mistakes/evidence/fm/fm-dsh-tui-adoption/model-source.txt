@@ -1,0 +1,4 @@
+source binding: /Users/charlesabrooker/firstmate/data/fm-dsh-tui-adoption/019-live-fixed/home-1792625967/state/dsh-scout-24271.dsh-session (read via bin/fm-dsh.py bound)
+bound model: deepseek/deepseek-v4-flash
+disposable operator home: /private/tmp/fmlab-dsh.BXpS2q/operator-home (symlinks every real HOME entry except .dsh and .dsh-tui; own .dsh-tui/model.json written from the bound model)
+preferred-model resolves: deepseek/deepseek-v4-flash
