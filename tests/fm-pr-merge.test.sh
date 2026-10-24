@@ -3119,7 +3119,7 @@ test_recorded_review_merge_conditions() {
   local case_dir head url scenario rc expected
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
-  for scenario in stale same-family same-family-model cross-family-model unknown-reader unknown-author-captain fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail; do
+  for scenario in stale same-family same-family-model cross-family-model unknown-reader unknown-author-captain fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail captain-then-fail fail-then-captain; do
     case_dir=$(make_case "review-$scenario")
     : > "$case_dir/explicit-review"
     add_gh_mocks "$case_dir" "$head"
@@ -3156,11 +3156,18 @@ test_recorded_review_merge_conditions() {
         review_record_command "$case_dir" captain-word --pr "$url" --head 2222222222222222222222222222222222222222 --words 'Merge the approved pull request.' >/dev/null
         expected='review record is missing' ;;
       valid) record_review "$case_dir" "$url" "$head" >/dev/null ;;
+      captain-then-fail)
+        review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9.' >/dev/null
+        record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null
+        expected="verdict is FAIL at live head $head in the review appended after the captain-word (reader claude-opus-5-5, at $("$JQ_BIN" -sr '.[-1].at' "$case_dir/state/review-records.jsonl"), report $case_dir/review.md); the captain must give a new merge word" ;;
+      fail-then-captain)
+        record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null
+        review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9 despite the FAIL.' >/dev/null ;;
     esac
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|captain-word|captain-only|cross-family-model|unknown-author-captain)
+      valid|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -3187,7 +3194,70 @@ test_missing_review_record_refuses() {
   pass "missing review record refuses before forge merge"
 }
 
+test_gitlab_and_forgejo_missing_review_record_refuse() {
+  local case_dir rc
+  case_dir=$(make_gitlab_case gitlab-missing-review-record)
+  : > "$case_dir/explicit-review"
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "gitlab missing review record must refuse"
+  assert_grep 'review record is missing' "$case_dir/stderr" "gitlab missing review refusal names the field"
+  assert_grep 'fm-review-record.py' "$case_dir/stderr" "gitlab missing review refusal names completing step"
+  [ -z "$(glab_merge_line "$case_dir/glab.log")" ] || fail "gitlab missing review must not reach glab mr merge"
+  case_dir=$(make_forgejo_case forgejo-missing-review-record)
+  : > "$case_dir/explicit-review"
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "forgejo missing review record must refuse"
+  assert_grep 'review record is missing' "$case_dir/stderr" "forgejo missing review refusal names the field"
+  assert_grep 'fm-review-record.py' "$case_dir/stderr" "forgejo missing review refusal names completing step"
+  [ -z "$(tea_merge_line "$case_dir/tea.log")" ] || fail "forgejo missing review must not POST the merge"
+  pass "gitlab and forgejo refuse a missing review record before their forge merge"
+}
+
+test_captain_word_refused_while_away() {
+  local case_dir head url rc posture
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  for posture in away quiet none; do
+    case_dir=$(make_case "captain-word-$posture")
+    case "$posture" in
+      away) write_away_record "$case_dir" --words 'merge PR 9 when green' ;;
+      quiet) FM_AFK_MODE=quiet write_away_record "$case_dir" ;;
+    esac
+    rc=0
+    review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'merge PR 9 when green' \
+      > "$case_dir/out" 2>&1 || rc=$?
+    if [ "$posture" = away ]; then
+      expect_code 2 "$rc" "captain-word must refuse under an away record"
+      assert_grep "away-posture record $case_dir/state/.afk-contract exists" "$case_dir/out" "away refusal names the record"
+      assert_grep 'the captain must give the merge word after return' "$case_dir/out" "away refusal names the return"
+      [ ! -e "$case_dir/state/review-records.jsonl" ] || fail "an away refusal must not append a captain-word"
+    else
+      expect_code 0 "$rc" "captain-word must record under posture $posture: $(cat "$case_dir/out")"
+      review_record_command "$case_dir" verify --pr "$url" --head "$head" > "$case_dir/verify" \
+        || fail "captain-word recorded under posture $posture must verify: $(cat "$case_dir/verify")"
+      assert_grep 'review: captain-word' "$case_dir/verify" "posture $posture captain-word verifies"
+    fi
+  done
+  case_dir=$(make_case captain-word-before-away)
+  : > "$case_dir/explicit-review"
+  add_gh_mocks "$case_dir" "$head"
+  printf '\nyolo=on\n' >> "$case_dir/state/task-x1.meta"
+  review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9.' >/dev/null \
+    || fail "captain-word before /afk must record"
+  write_away_record "$case_dir" --words 'merge PR 9 when green'
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a captain-word recorded before /afk must still verify while away: $(cat "$case_dir/stderr")"
+  assert_grep 'review: captain-word' "$case_dir/stderr" "pre-away captain-word is the verified evidence"
+  assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+  pass "captain-word refuses under an away record, records under quiet or no record, and pre-away words stay valid"
+}
+
 test_missing_review_record_refuses
+test_gitlab_and_forgejo_missing_review_record_refuse
+test_captain_word_refused_while_away
 test_review_record_validation_and_latest
 test_review_record_derives_model_families
 test_review_record_survives_a_later_family_change

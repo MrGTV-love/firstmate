@@ -14,8 +14,9 @@
 # head before its merge command: bin/fm-review-record.py owns the append-only
 # review/captain-word format and recording CLI. A yes escalation trigger needs
 # recorded captain words at the live head, and captain words recorded at the
-# live head stand in for the PASS; neither --attended-override nor away
-# authority substitutes for this evidence, and captain words waive no old guard.
+# live head stand in for the PASS until a newer FAIL at that head; neither
+# --attended-override nor away authority substitutes for this evidence, and
+# captain words waive no old guard.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.

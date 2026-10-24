@@ -25,11 +25,18 @@ accept any stored known family or unknown; verify derives every family again fro
 the stored model ids, so a later family change neither invalidates history nor
 lets a stale stored family decide independence.
 verify accepts the newest captain-word when it names the exact live head; it then
-stands in for the review and every trigger. Otherwise the newest review must be
-PASS at the exact live head with a known reader family outside every known author
-family, and any yes trigger is refused. Captain words waive no existing forge/hold guard. captain-word records only
-a current explicit captain merge instruction naming the concrete PR, given in the
-captain's own turn; away words are never recorded as captain-word.
+stands in for the review and every trigger, unless the newest review is a FAIL at
+that live head appended after it: that FAIL is refused until the captain gives a
+new captain-word, while a captain-word appended after the FAIL stands. Otherwise
+the newest review must be PASS at the exact live head with a known reader family
+outside every known author family, and any yes trigger is refused. Captain words
+waive no existing forge/hold guard. The caller records as captain-word only a
+current explicit captain merge instruction naming the concrete PR, given in the
+captain's own turn. captain-word itself refuses (exit 2) while the state directory
+holds an away-posture record (fm_afk_contract_away_present in fm-afk-contract.sh),
+so away words are never recorded as captain-word and the captain gives the word
+after return; a quiet record does not refuse, because the captain is present, and
+a captain-word recorded before /afk stays valid.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
@@ -140,11 +147,25 @@ def task_home():
     return Path(home)
 
 
-@contextlib.contextmanager
-def ledger(write, home):
+def state_dir(home):
     state = Path(os.environ.get("FM_STATE_OVERRIDE") or home / "state")
     if not state.is_absolute() or state.is_symlink():
         raise RecordError("state directory must be absolute and not a symlink")
+    return state
+
+
+def refuse_away(state):
+    result = subprocess.run(["bash", "-c", '. "$1/fm-afk-contract.sh" || exit 2; fm_afk_contract_away_present "$2" || exit 1',
+                             "fm-review-record", str(BIN), str(state)], capture_output=True, text=True, check=False)
+    if result.returncode == 0:
+        raise RecordError(f"captain-word refused: the away-posture record {state / '.afk-contract'} exists, so the captain is away and away words are never captain words; the captain must give the merge word after return")
+    if result.returncode != 1:
+        raise RecordError(f"captain-word refused: the away-posture record under {state} could not be read")
+
+
+@contextlib.contextmanager
+def ledger(write, home):
+    state = state_dir(home)
     if write:
         state.mkdir(mode=0o700, exist_ok=True)
     flags = os.O_RDWR | os.O_APPEND | os.O_NOFOLLOW | os.O_NONBLOCK
@@ -167,8 +188,9 @@ def ledger(write, home):
 
 def newest(fd, pr):
     result = {"review": None, "captain-word": None}
+    last = None
     if fd is None:
-        return result
+        return result, last
     with os.fdopen(os.dup(fd), "rb") as stream:
         for line in stream:
             if not line.endswith(b"\n"):
@@ -180,14 +202,17 @@ def newest(fd, pr):
                 raise RecordError(f"review record history is invalid ({exc}); preserve and reconcile it before retrying") from exc
             if row["pr"] == pr:
                 result[row["kind"]] = row
-    return result
+                last = row
+    return result, last
 
 
-def verify(records, head):
+def verify(records, last, head):
     word = records["captain-word"]
-    if word is not None and word["head"] == head:
-        return "captain-word"
     review = records["review"]
+    if word is not None and word["head"] == head:
+        if last is review and review["verdict"] == "FAIL" and review["head"] == head:
+            raise RecordError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {review['reader_model']}, at {review['at']}, report {review['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
+        return "captain-word"
     if review is None:
         raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
     if review["verdict"] != "PASS":
@@ -243,12 +268,14 @@ def main():
         write = args.command in ("review", "captain-word")
         if write:
             validate(row)
+        if args.command == "captain-word":
+            refuse_away(state_dir(home))
     except RecordError as exc:
         print(f"error: {exc}")
         return 2
     try:
         with ledger(write, home) as fd:
-            records = newest(fd, pr)
+            records, last = newest(fd, pr)
             if write:
                 data = (json.dumps(row, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
                 if os.write(fd, data) != len(data):
@@ -258,7 +285,7 @@ def main():
             elif args.command == "latest":
                 print(json.dumps(records, separators=(",", ":")))
             else:
-                print(f"review: {verify(records, args.head)}")
+                print(f"review: {verify(records, last, args.head)}")
     except (RecordError, OSError) as exc:
         print(f"error: {exc}; inspect review-records.jsonl in the PR task home before retrying")
         return 1
