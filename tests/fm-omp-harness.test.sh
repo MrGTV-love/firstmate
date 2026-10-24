@@ -1593,8 +1593,9 @@ test_busy_extension_lifecycle() {
   out=$(drive_omp_ext "$ext" handlers) || fail "handler listing failed: $out"
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
+    *" tool_result "*) fail "the omp extension must leave tool results unchanged, got '$out'" ;;
   esac
-  for handler in agent_start agent_end turn_end tool_call tool_result retry_fallback_applied session_start; do
+  for handler in agent_start agent_end turn_end tool_call retry_fallback_applied session_start; do
     case " $out " in
       *" $handler "*) ;;
       *) fail "the omp extension must register $handler, got '$out'" ;;
@@ -1642,7 +1643,7 @@ test_busy_extension_lifecycle() {
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
   fm_busy_source_trusted omp omp-ext || fail "omp must trust its own extension's records"
-  pass "omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification, jev-guard tool hooks installed"
+  pass "omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification, jev-guard tool_call hook installed, no tool_result hook"
 }
 
 # --- 4. Control, composer, supervision model -----------------------------------

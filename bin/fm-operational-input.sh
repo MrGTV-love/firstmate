@@ -237,7 +237,7 @@ fm_operational_record_prune() {  # <record-dir>
     stat_cmd=(stat -c '%Y %n')
   fi
   cutoff=$(( $(date +%s) - FM_OPERATIONAL_RECORD_RETENTION_DAYS * 86400 ))
-  find "$1" -maxdepth 1 -type f \( -name '*.msg' -o -name '.record.*' \) \
+  find "$1" -maxdepth 1 -type f \( -name '*.msg' -o -name '.record.*' -o -name '*.msg.consistency.json' -o -name '.consistency.*' \) \
     -exec "${stat_cmd[@]}" {} + 2>/dev/null | while read -r mtime path; do
     case "$mtime" in ''|*[!0-9]*) continue ;; esac
     if [ "$mtime" -lt "$cutoff" ]; then printf '%s\0' "$path"; fi
