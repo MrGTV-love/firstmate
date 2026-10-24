@@ -321,6 +321,7 @@ run_check_entry() {
 
 seed_merge_review() {
   local dir=$1 url=$2
+  printf 'VERDICT: PASS head=%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" > "$dir/review.md"
   FM_HOME="$dir/home" "$ROOT/bin/fm-review-record.py" review --pr "$url" \
     --head "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" \
     --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \

@@ -695,8 +695,17 @@ glab_merge_line() {
 }
 
 record_review() {
-  local case_dir=$1 url=$2 head=$3
+  local case_dir=$1 url=$2 head=$3 verdict=PASS arg next_verdict=false
   shift 3
+  for arg in "$@"; do
+    if [ "$next_verdict" = true ]; then
+      verdict=$arg
+      next_verdict=false
+    elif [ "$arg" = --verdict ]; then
+      next_verdict=true
+    fi
+  done
+  printf 'VERDICT: %s head=%s\n' "$verdict" "$head" > "$case_dir/review.md"
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
       --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
@@ -3074,6 +3083,51 @@ test_review_record_validation_and_latest() {
   pass "review helper validates fields, retains history, and returns newest canonical grouped evidence"
 }
 
+test_review_record_requires_matching_local_report() {
+  local case_dir head url bad rc digest
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  for bad in missing symlink verdict head directory unreadable trailing-space; do
+    case_dir=$(make_case "review-report-$bad")
+    record_review "$case_dir" "$url" "$head" >/dev/null || fail "could not seed report validation history"
+    cp "$case_dir/state/review-records.jsonl" "$case_dir/before"
+    printf 'VERDICT: PASS head=%s\nReader evidence.\n' "$head" > "$case_dir/report.md"
+    case "$bad" in
+      missing) rm "$case_dir/report.md" ;;
+      symlink) mv "$case_dir/report.md" "$case_dir/target.md"; ln -s "$case_dir/target.md" "$case_dir/report.md" ;;
+      verdict) printf 'VERDICT: FAIL head=%s\n' "$head" > "$case_dir/report.md" ;;
+      head) printf 'VERDICT: PASS head=%s\n' 2222222222222222222222222222222222222222 > "$case_dir/report.md" ;;
+      directory) rm "$case_dir/report.md"; mkdir "$case_dir/report.md" ;;
+      unreadable) chmod 000 "$case_dir/report.md" ;;
+      trailing-space) printf 'VERDICT: PASS head=%s \n' "$head" > "$case_dir/report.md" ;;
+    esac
+    rc=0
+    record_review "$case_dir" "$url" "$head" --report "$case_dir/report.md" > "$case_dir/out" 2>&1 || rc=$?
+    [ "$bad" != unreadable ] || chmod 600 "$case_dir/report.md"
+    expect_code 2 "$rc" "$bad report must refuse"
+    assert_grep report "$case_dir/out" "$bad report refusal must identify report"
+    cmp -s "$case_dir/before" "$case_dir/state/review-records.jsonl" || fail "$bad report changed history"
+    pass "review recording refuses $bad report with exit 2 and appends nothing"
+  done
+  case_dir=$(make_case review-report-digest)
+  printf 'VERDICT: PASS head=%s\nIndependent reader evidence.\n' "$head" > "$case_dir/report.md"
+  digest=$(shasum -a 256 "$case_dir/report.md")
+  digest=${digest%% *}
+  record_review "$case_dir" "$url" "$head" --report "$case_dir/report.md" >/dev/null || fail "matching report must record"
+  review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "could not read report provenance"
+  "$JQ_BIN" -e --arg digest "$digest" --arg report "$case_dir/report.md" \
+    ".review | .report == \$report and .report_sha256 == \$digest" "$case_dir/latest" >/dev/null \
+    || fail "record must retain report path and exact whole-file sha256"
+  printf 'VERDICT: FAIL head=%s\nNew reader finding.\n' "$head" > "$case_dir/report.md"
+  record_review "$case_dir" "$url" "$head" --verdict FAIL --report "$case_dir/report.md" >/dev/null \
+    || fail "matching FAIL report must record"
+  rc=0
+  review_record_command "$case_dir" verify --pr "$url" --head "$head" > "$case_dir/out" 2>&1 || rc=$?
+  expect_code 1 "$rc" "recorded FAIL must refuse verification"
+  assert_grep 'verdict is FAIL' "$case_dir/out" "FAIL report must affect merge evidence"
+  pass "matching local reports record whole-file sha256 and a matching FAIL blocks verification"
+}
+
 test_review_record_derives_model_families() {
   local case_dir head url
   case_dir=$(make_case review-model-families)
@@ -3225,6 +3279,85 @@ test_gitlab_and_forgejo_missing_review_record_refuse() {
   pass "gitlab and forgejo refuse a missing review record before their forge merge"
 }
 
+test_late_fail_before_away_hold_refuses() {
+  local case_dir forge head url rc
+  for forge in github gitlab forgejo; do
+    case "$forge" in
+      github)
+        case_dir=$(make_case late-fail-github)
+        head=1111111111111111111111111111111111111111
+        url=https://github.com/example/repo/pull/9
+        add_gh_mocks "$case_dir" "$head" ;;
+      gitlab) case_dir=$(make_gitlab_case late-fail-gitlab); head=$MR_HEAD; url=$MR_URL ;;
+      forgejo) case_dir=$(make_forgejo_case late-fail-forgejo); head=$FJ_HEAD; url=$FJ_URL ;;
+    esac
+    : > "$case_dir/explicit-review"
+    record_review "$case_dir" "$url" "$head" >/dev/null || fail "$forge could not record initial PASS"
+    review_record_command "$case_dir" verify --pr "$url" --head "$head" > "$case_dir/earlier-verify" \
+      || fail "$forge initial PASS must verify"
+    assert_grep 'review: PASS' "$case_dir/earlier-verify" "$forge must have earlier accepted evidence"
+    printf 'VERDICT: FAIL head=%s\nLate independent finding.\n' "$head" > "$case_dir/late-fail.md"
+    : > "$case_dir/late-fail-pending"
+    # Publish a real FAIL exactly when the merge enters the away-record hold,
+    # after any review verification outside that hold, without a timing sleep.
+    cat > "$case_dir/fakebin/ln" <<'SH'
+#!/usr/bin/env bash
+for target in "$@"; do
+  if [ "$target" = "$FM_STATE_OVERRIDE/.afk-contract.lock" ] && [ -e "$FM_TEST_REVIEW_RACE_DIR/late-fail-pending" ]; then
+    rm "$FM_TEST_REVIEW_RACE_DIR/late-fail-pending" || exit 10
+    "$FM_TEST_ROOT/bin/fm-review-record.py" review --pr "$FM_TEST_REVIEW_RACE_URL" --head "$FM_TEST_REVIEW_RACE_HEAD" \
+      --verdict FAIL --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
+      --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
+      --report "$FM_TEST_REVIEW_RACE_DIR/late-fail.md" > "$FM_TEST_REVIEW_RACE_DIR/late-fail-out" || exit 11
+  fi
+done
+exec "$FM_TEST_REAL_LN" "$@"
+SH
+    chmod +x "$case_dir/fakebin/ln"
+    rc=0
+    FM_TEST_REVIEW_RACE_DIR="$case_dir" FM_TEST_REVIEW_RACE_URL="$url" FM_TEST_REVIEW_RACE_HEAD="$head" \
+      FM_TEST_REAL_LN="$(command -v ln)" run_pr_merge "$case_dir" task-x1 "$url" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ ! -e "$case_dir/late-fail-pending" ] || fail "$forge did not reach the injection boundary"
+    assert_grep 'recorded: review' "$case_dir/late-fail-out" "$forge must append the late FAIL"
+    expect_code 1 "$rc" "$forge must refuse FAIL appended after earlier verification"
+    assert_grep 'verdict is FAIL' "$case_dir/stderr" "$forge must recheck late review evidence"
+    assert_no_grep '^pr merge ' "$case_dir/gh.log" "$forge must not call GitHub merge"
+    case "$forge" in
+      gitlab) [ -z "$(glab_merge_line "$case_dir/glab.log")" ] || fail "late FAIL reached GitLab merge" ;;
+      forgejo) [ -z "$(tea_merge_line "$case_dir/tea.log")" ] || fail "late FAIL reached Forgejo merge" ;;
+    esac
+    pass "$forge refuses a FAIL appended after earlier verify and before the merge hold"
+  done
+}
+
+test_attended_override_without_review_refuses() {
+  local case_dir forge url rc
+  for forge in github gitlab forgejo; do
+    case "$forge" in
+      github)
+        case_dir=$(make_case override-no-review-github)
+        url=https://github.com/example/repo/pull/9
+        add_gh_mocks "$case_dir" 1111111111111111111111111111111111111111 ;;
+      gitlab) case_dir=$(make_gitlab_case override-no-review-gitlab); url=$MR_URL ;;
+      forgejo) case_dir=$(make_forgejo_case override-no-review-forgejo); url=$FJ_URL ;;
+    esac
+    : > "$case_dir/explicit-review"
+    rc=0
+    run_pr_merge "$case_dir" task-x1 "$url" --attended-override \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$forge attended override must not bypass missing review evidence"
+    assert_grep 'review record is missing' "$case_dir/stderr" "$forge attended override must reach the review gate"
+    [ ! -e "$case_dir/state/review-records.jsonl" ] || fail "$forge override unexpectedly recorded evidence"
+    assert_no_grep '^pr merge ' "$case_dir/gh.log" "$forge override must not call GitHub merge"
+    case "$forge" in
+      gitlab) [ -z "$(glab_merge_line "$case_dir/glab.log")" ] || fail "attended override reached GitLab merge" ;;
+      forgejo) [ -z "$(tea_merge_line "$case_dir/tea.log")" ] || fail "attended override reached Forgejo merge" ;;
+    esac
+    pass "$forge attended override cannot merge without recorded review evidence"
+  done
+}
+
 test_captain_word_refused_while_away() {
   local case_dir head url rc posture
   head=1111111111111111111111111111111111111111
@@ -3265,6 +3398,37 @@ test_captain_word_refused_while_away() {
   pass "captain-word refuses under an away record, records under quiet or no record, and pre-away words stay valid"
 }
 
+# Probe P2: a triggered PASS must not revive words voided by a later FAIL.
+test_captain_fail_triggered_pass_refuses() {
+  local case_dir head url trigger rc
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  for trigger in loosens-deny-allow-list widens-guard customer-data-billing-spend; do
+    case_dir=$(make_case "captain-fail-pass-$trigger")
+    : > "$case_dir/explicit-review"
+    add_gh_mocks "$case_dir" "$head"
+    review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge this PR.' >/dev/null \
+      || fail "could not record the original captain-word"
+    record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null || fail "could not record FAIL"
+    record_review "$case_dir" "$url" "$head" "--$trigger" yes >/dev/null || fail "could not record triggered PASS"
+    rc=0
+    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "captain-word, FAIL, PASS with $trigger=yes must refuse"
+    assert_grep 'the captain must give a new merge word' "$case_dir/stderr" "triggered PASS must leave the word voided"
+    assert_no_grep '^pr merge ' "$case_dir/gh.log" "triggered PASS must not reach forge merge"
+    review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge despite the new trigger.' >/dev/null \
+      || fail "could not record renewed captain-word"
+    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" \
+      || fail "a new captain-word must authorize the triggered PASS: $(cat "$case_dir/stderr")"
+    assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+    pass "a $trigger PASS cannot revive a voided captain-word; new words can authorize it"
+  done
+}
+
+test_captain_fail_triggered_pass_refuses
+test_review_record_requires_matching_local_report
+test_late_fail_before_away_hold_refuses
+test_attended_override_without_review_refuses
 test_missing_review_record_refuses
 test_gitlab_and_forgejo_missing_review_record_refuse
 test_captain_word_refused_while_away

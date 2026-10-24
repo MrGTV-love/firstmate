@@ -189,6 +189,7 @@ run_pr_merge() {  # <home> <id> <url>
   local home=$1
   shift
   # Each fixture merge carries an independent PASS for the live head.
+  printf 'VERDICT: PASS head=%s\n' 1111111111111111111111111111111111111111 > "$home/review.md"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-review-record.py" review \
     --pr "$2" --head 1111111111111111111111111111111111111111 \
     --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \

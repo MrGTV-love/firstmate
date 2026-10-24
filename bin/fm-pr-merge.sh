@@ -10,13 +10,10 @@
 # change is refused outright: that adapter is read-only, and the refusal at the
 # parse below owns why.
 #
-# Every supported forge also requires a recorded independent PASS for the live
-# head before its merge command: bin/fm-review-record.py owns the append-only
-# review/captain-word format and recording CLI. A yes escalation trigger needs
-# recorded captain words at the live head, and captain words recorded at the
-# live head stand in for the PASS until a newer FAIL at that head that no later
-# independent PASS at that head clears; neither --attended-override nor away
-# authority substitutes for this evidence, and captain words waive no old guard.
+# Every supported forge verifies recorded review evidence inside the away-record
+# hold immediately before its merge command. bin/fm-review-record.py's header owns
+# the review/captain-word rule and recording CLI; neither --attended-override nor
+# away authority substitutes for this evidence, and captain words waive no guard.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.
@@ -1845,13 +1842,13 @@ case "$PROVIDER" in
     fi
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
-    require_recorded_review || exit 1
     hold_away_record_for_merge || exit 1
     away_status=0
     require_current_away_authority || away_status=$?
     [ "$away_status" -eq 0 ] || exit "$away_status"
     refuse_github_queue_while_away || exit 2
     merge_status=0
+    require_recorded_review || exit 1
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?
@@ -1901,7 +1898,6 @@ case "$PROVIDER" in
     # the conditions above are what authorize the merge.
     # The away record is locked first, so this last presence and authority read
     # and the forge command below share one live-owner critical section.
-    require_recorded_review || exit 1
     hold_away_record_for_merge || exit 1
     away_status=0
     require_current_away_authority || away_status=$?
@@ -1911,6 +1907,7 @@ case "$PROVIDER" in
     if [ "$FM_PR_AWAY_POSTURE" = true ]; then
       gitlab_merge_args=(--auto-merge=false)
     fi
+    require_recorded_review || exit 1
     GITLAB_HOST="$FM_PR_HOST" glab mr merge "$PR_NUMBER" -R "$PROJECT_URL" \
       --sha "$FM_PR_MERGE_HEAD" --yes "$@" "${gitlab_merge_args[@]+"${gitlab_merge_args[@]}"}" || merge_status=$?
     if [ "$merge_status" -ne 0 ]; then
@@ -1934,7 +1931,6 @@ case "$PROVIDER" in
     forgejo_verify_mergeable || exit 1
     # The away record is locked first, so this last presence and authority
     # read and the forge command below share one live-owner critical section.
-    require_recorded_review || exit 1
     hold_away_record_for_merge || exit 1
     away_status=0
     require_current_away_authority || away_status=$?
@@ -1944,6 +1940,7 @@ case "$PROVIDER" in
     # against a real instance), matching --match-head-commit/--sha above. tea
     # exposes no such flag on its own merge subcommand, so the API is called
     # directly through "tea api" instead.
+    require_recorded_review || exit 1
     merge_output=$(tea api --login "$FORGEJO_LOGIN" --repo "$PR_OWNER/$PR_REPO" \
       -X POST "/repos/{owner}/{repo}/pulls/$PR_NUMBER/merge" \
       -f "Do=$forgejo_method" -f "head_commit_id=$FM_PR_MERGE_HEAD" 2>&1) || true
