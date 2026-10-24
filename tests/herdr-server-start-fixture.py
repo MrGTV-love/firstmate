@@ -226,6 +226,17 @@ class StartupSafety(unittest.TestCase):
         self.assertEqual(self.ensure()[0], 0)
         self.assertEqual(len(self.starts()), 1)
 
+    def test_undecodable_process_text_does_not_block_other_session_start(self):
+        undecodable = os.fsdecode(b"caf\xe9.log")
+        quiet = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.children.append(subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)",
+                                               undecodable], **quiet))
+        env = dict(self.env, FIXTURE_TEXT=undecodable)
+        env.pop("HERDR_SESSION", None)
+        self.children.append(subprocess.Popen([str(self.sleeper("undecodable")), "server"], env=env, **quiet))
+        self.assertEqual(self.ensure()[0], 0)
+        self.assertEqual(len(self.starts()), 1)
+
     def test_unscoped_server_inheriting_the_session_blocks_its_start(self):
         self.unscoped_server(self.dir.name)
         self.assertNotEqual(self.ensure()[0], 0)

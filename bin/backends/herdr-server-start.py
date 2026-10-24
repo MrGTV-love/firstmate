@@ -73,7 +73,7 @@ def socket_path(body, session, client):
 def process_table(column):
     table = subprocess.run(["ps", "-axww", "-o", f"pid=,{column}="], check=True,
                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                           text=True, timeout=STARTUP_SECONDS).stdout
+                           text=True, errors="replace", timeout=STARTUP_SECONDS).stdout
     if not table.strip():
         raise ValueError("empty process inventory")
     rows = {}
@@ -95,7 +95,7 @@ def environment_session(pid, command):
     else:
         shown = subprocess.run(["ps", "-E", "-ww", "-p", pid, "-o", "command="],
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                               text=True, timeout=STARTUP_SECONDS).stdout.strip()
+                               text=True, errors="replace", timeout=STARTUP_SECONDS).stdout.strip()
         # ps appends the environment to the unquoted argv; macOS shows nothing
         # after argv for a process whose environment it withholds.
         if not shown.startswith(command) or not shown[len(command):].strip():
