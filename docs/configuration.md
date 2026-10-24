@@ -2502,7 +2502,7 @@ Egress is judged only at the tool boundary from each tool's own row; shell comma
 Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
 The rule is deterministic and needs neither a model verdict nor a working provider credential.
 Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
-A refusal names the destination classes whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
+A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
 Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
 The recognized destination classes are `semantic-search`, `web`, `browser`, `provider`, `subagent`, `dynamic-code` and `remote-storage`.
@@ -2517,9 +2517,11 @@ Local `read` remains pre-tool unjudged, `bash` receives no model screening, `wri
 This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
-Claude's multi-file and notebook edits and worktree changes, and omp's structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification.
+omp's `python`, `debug` and `run_experiment` code runners have the same effect as `eval` and use the same confinement-owned classification.
+Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
+A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop` and `SubagentHandback`, are classified `local`.
-Other opaque native evaluator tools require a `dynamic-code` grant because their effects are not statically knowable; granting that class authorizes that execution capability, not a confinement guarantee.
+Claude `Monitor` and `PowerShell` run commands outside the screened `bash` path and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
 
 ### Model policy
 
