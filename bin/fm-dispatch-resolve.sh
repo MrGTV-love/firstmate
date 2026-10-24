@@ -420,11 +420,11 @@ never_send_load() {
     || never_send_off "could not read $NEVER_SEND_PATH"
 }
 
-# Checks every string the request carries. grep stderr can echo the pattern.
+# Checks every string value and object key the request carries. grep stderr can echo the pattern.
 never_send_check() {
   local value n=0 rc
   [ -n "$NEVER_SEND_LIST" ] || return 0
-  jq -r '.. | strings | gsub("\\s+"; " ")' <<<"$REQUEST" > "$SEND_TEXT" 2>/dev/null \
+  jq -r '.. | (strings, (objects | keys_unsorted[])) | gsub("\\s+"; " ")' <<<"$REQUEST" > "$SEND_TEXT" 2>/dev/null \
     || never_send_off "could not extract the request text to check"
   while IFS= read -r value; do
     n=$((n + 1))

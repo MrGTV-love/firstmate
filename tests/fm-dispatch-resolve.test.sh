@@ -697,6 +697,15 @@ expect_withheld 'a project-name match' "brief text matches $NEVER_SEND line 1" '
 printf '%s\n' 'Does task exhibit property' > "$NEVER_SEND"
 withheld_run -- "$BRIEF" --project pager
 expect_withheld 'a judgment-criterion match' "brief text matches $NEVER_SEND line 1" 'Does task exhibit property'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+structure_rules "$RULES"
+jq '.judgments.acme_migration = .judgments.r1 | del(.judgments.r1) | .rules[0].match.all = ["acme_migration"]' "$RULES" > "$TMP_ROOT/judgment-id.json"
+cp "$TMP_ROOT/judgment-id.json" "$RULES"
+printf '%s\n' 'acme' > "$NEVER_SEND"
+withheld_run -- "$BRIEF" --project pager
+expect_withheld 'a match only in a judgment id' "brief text matches $NEVER_SEND line 1" 'acme'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+structure_rules "$RULES"
 
 SECOND_HOME="$TMP_ROOT/secondmate-home"
 mkdir -p "$SECOND_HOME/config"
