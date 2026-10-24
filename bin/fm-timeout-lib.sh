@@ -176,7 +176,7 @@ fm_run_perl_progress() {
     STDOUT->autoflush(1); STDERR->autoflush(1);
     my $streams = IO::Select->new($out_r, $err_r);
     my %sink = (fileno($out_r) => \*STDOUT, fileno($err_r) => \*STDERR);
-    my (%observed, $last_cpu, $blind, $warned);
+    my (%observed, $last_cpu, $blind, $warned, $active, $last_tree);
     my $last_progress = clock_gettime(CLOCK_MONOTONIC);
     my $next_sample = 0;
     my $cadence = $idle / 4 < 1 ? $idle / 4 : 1;
@@ -185,7 +185,8 @@ fm_run_perl_progress() {
     my $cpu = sub {
       my (%children, %times);
       # A Linux-compatible /proc (Git Bash/MSYS too, whose ps rejects these
-      # -o fields) is chosen by capability; stat fields 4, 14+15 and 22.
+      # -o fields) is chosen by capability. Include waited-child CPU so work
+      # cannot vanish when a child is reaped between samples.
       if (-r "$proc/$pid/stat" && opendir my $dir, $proc) {
         for my $child (grep { /^\d+$/ } readdir $dir) {
           open my $stat, "<", "$proc/$child/stat" or next;
@@ -194,14 +195,15 @@ fm_run_perl_progress() {
           my @field = split " ", substr($line, $at + 1);
           next unless @field >= 20 && $field[1] =~ /^\d+$/;
           push @{$children{$field[1]}}, $child;
-          $times{$child} = [($field[11] + $field[12]) / $ticks, "proc $field[19]"];
+          $times{$child} = [($field[11] + $field[12] + $field[13] + $field[14]) / $ticks,
+                            "proc $field[19]", $field[0] eq "R"];
         }
         closedir $dir;
       } else {
         local $ENV{LC_ALL} = "C";
-        open my $ps, "-|", "ps", "-axo", "pid=,ppid=,time=,lstart=" or return;
+        open my $ps, "-|", "ps", "-S", "-axo", "pid=,ppid=,time=,stat=,lstart=" or return;
         while (my $line = <$ps>) {
-          my ($child, $parent, $clock, $identity) = split " ", $line, 4;
+          my ($child, $parent, $clock, $state, $identity) = split " ", $line, 5;
           next unless defined $identity && $child =~ /^\d+$/ && $parent =~ /^\d+$/;
           chomp $identity;
           my $seconds = 0;
@@ -209,20 +211,30 @@ fm_run_perl_progress() {
           my $part = 0;
           $part = $part * 60 + $_ for split /:/, $clock;
           push @{$children{$parent}}, $child;
-          $times{$child} = [$seconds + $part, $identity];
+          $times{$child} = [$seconds + $part, $identity, $state =~ /^R/];
         }
         close $ps or return;
       }
+      return unless exists $times{$pid};
+      $active = 0;
+      my @members;
       my @todo = ($pid);
       while (@todo) {
         my $child = pop @todo;
         if (exists $times{$child}) {
-          my ($seconds, $identity) = @{$times{$child}};
+          my ($seconds, $identity, $running) = @{$times{$child}};
+          $active ||= $running;
           my $key = "$child:$identity";
+          push @members, $key;
           $observed{$key} = $seconds if !exists $observed{$key} || $seconds > $observed{$key};
         }
         push @todo, @{$children{$child} || []};
       }
+      # ps may omit waited-child CPU on Darwin. A changed tree is not a
+      # consecutive idle observation, even when its last CPU burst was missed.
+      my $tree = join "\\n", sort @members;
+      $active ||= defined $last_tree && $tree ne $last_tree;
+      $last_tree = $tree;
       my $total = 0;
       $total += $_ for values %observed;
       return $total;
@@ -267,7 +279,7 @@ fm_run_perl_progress() {
         if ($blind && !$warned++) {
           print STDERR "cpu_telemetry_unavailable: neither /proc/<pid>/stat nor ps can sample process CPU on $^O; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled\n";
         }
-        $last_progress = $now if defined $sample && (!defined $last_cpu || $sample > $last_cpu);
+        $last_progress = $now if defined $sample && ($active || !defined $last_cpu || $sample > $last_cpu);
         $last_cpu = $sample if defined $sample;
         $next_sample = $now + $cadence;
       }

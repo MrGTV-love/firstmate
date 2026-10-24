@@ -117,6 +117,9 @@ until = time.monotonic() + 4
 while time.monotonic() < until:
     sum(i*i for i in range(1000))
 PY
+  # A short completion phase after reaping must not erase the worker's last
+  # CPU burst and spend a whole no-progress interval that never happened.
+  sleep 0.5
   if [ "$1" = list ]; then
     printf 'count: 1\ntasks[1]{id,state,kind,repo,title}:\n  slow-first,queued,ship,firstmate,Slow row\n'
   else
@@ -495,7 +498,7 @@ cat > "$E2E_FAKEBIN/ps" <<'SH'
 #!/usr/bin/env bash
 set -u
 case "$*" in
-  *"pid=,ppid=,time=,lstart="*) exec /bin/ps "$@" ;;
+  *"pid=,ppid=,time=,stat=,lstart="*) exec /bin/ps "$@" ;;
   *"comm="*) printf '%s\n' '/usr/local/bin/claude'; exit 0 ;;
   *"args="*) printf '%s\n' 'claude'; exit 0 ;;
   *"ppid="*) exit 1 ;;

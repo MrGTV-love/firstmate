@@ -377,16 +377,51 @@ def summary_hung_lane():
     require(document['invalidity'].get('ids') == ['hung'], 'only the hung lane is unavailable: ' + json.dumps(document))
 case('summary_worker_cuts_only_the_hung_lane', summary_hung_lane)
 
+def reaped_between_samples():
+    home, env = fixture('reaped-between-samples')
+    record = home / 'state/progress.json'
+    # The observer sees the shell before and after a whole CPU-producing child
+    # lifetime, never the child itself. The shell blocks on stdin between events.
+    child = subprocess.Popen(['bash', '-c',
+        'printf "ready\\n"; read -r _; python3 -c "$1"; printf "reaped\\n"; read -r _',
+        '_', 'import time\nstart = time.process_time()\n'
+             'while time.process_time() - start < 1.1: sum(i*i for i in range(1000))'],
+        env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    def check():
+        return run([sys.executable, home / 'bin/fm-duration.py', 'progress-check',
+                    record, str(child.pid), '1'], env)
+    try:
+        require(child.stdout.readline() == 'ready\n', 'shell did not reach its input wait')
+        require(check().returncode == 0, 'the baseline sample was refused')
+        time.sleep(1.2)
+        child.stdin.write('work\n')
+        child.stdin.flush()
+        require(child.stdout.readline() == 'reaped\n', 'CPU child did not finish and get reaped')
+        result = check()
+        require(result.returncode == 0, 'CPU completed between samples was lost: ' + result.stderr)
+        time.sleep(1.2)
+        result = check()
+        require(result.returncode == 124, 'a subsequently idle tree was not proven idle: ' + result.stderr)
+    finally:
+        child.terminate()
+        child.wait()
+case('reaped_child_cpu_between_observations_prevents_false_idle_then_true_idle_is_detected', reaped_between_samples)
+
 # Git Bash/MSYS: a /proc-only host whose ps cannot sample. Each fixture process
 # publishes its own stat line (fields 4, 14+15 and 22) under FM_PROC_ROOT_OVERRIDE.
 proc_stat = ('my $d = "$ENV{FM_PROC_ROOT_OVERRIDE}/$$"; mkdir $d;'
              'sub stat_line { open my $f, ">", "$d/stat.tmp" or die; '
-             'print $f "$$ (fixture) S 1 0 0 0 0 0 0 0 0 0 $_[0] 0 0 0 20 0 1 0 777\\n"; close $f; '
+             'my $state = $_[1] || "S"; '
+             'print $f "$$ (fixture) $state 1 0 0 0 0 0 0 0 0 0 $_[0] 0 0 0 20 0 1 0 777\\n"; close $f; '
              'rename "$d/stat.tmp", "$d/stat" or die; }')
 proc_programs = {
     'still': proc_stat + 'stat_line(0); sleep 30;',
     'growing': proc_stat + 'for my $i (1..16) { stat_line($i * 10); sleep 0.25; } exit 0;',
     'blind': 'sleep 3; exit 0;',
+    # Deliberately hold the exported counter below one accounting tick while
+    # the real process burns CPU. Runnable state must prevent false idle proof.
+    'rounded': proc_stat + 'stat_line(0, "R"); my $until = time + 4; '
+               'while (time < $until) { my $n = 0; $n += $_*$_ for 1..1000; } print "completed\\n";',
 }
 
 def proc_runner(name, runner, program):
@@ -420,6 +455,9 @@ def proc_sampler():
         result, _ = proc_runner('growing', runner, proc_programs['growing'])
         require(result.returncode == 0,
                 f'{runner}: a /proc-only tree with growing CPU was cut: {result.returncode} {result.stderr}')
+        result, _ = proc_runner('rounded', runner, proc_programs['rounded'])
+        require(result.returncode == 0 and result.stdout == 'completed\n',
+                f'{runner}: runnable work with rounded CPU was stopped: {result.returncode} {result.stderr}')
         result, elapsed = proc_runner('blind', runner, proc_programs['blind'])
         warnings = [line for line in result.stderr.splitlines() if line.startswith('cpu_telemetry_unavailable:')]
         require(result.returncode == 0 and elapsed >= 3, f'{runner}: work with no CPU sampler was stopped: '
@@ -648,7 +686,7 @@ def perl_progress():
     env['PATH'] = str(tools)
     cpu = '''my $pid = fork; die unless defined $pid;
 if (!$pid) { my $until = time + 4; while (time < $until) { my $n = 0; $n += $_*$_ for 1..1000; } exit 0; }
-waitpid($pid,0); print "subtree completed\\n";'''
+waitpid($pid,0); sleep 0.5; print "subtree completed\\n";'''
     output = '''$|=1; for (1..12) { print "tick\\n"; sleep 0.25; } print "stream completed\\n";'''
     for program, expected in ((cpu, 'subtree completed\n'),
                               (output, 'tick\n' * 12 + 'stream completed\n')):
