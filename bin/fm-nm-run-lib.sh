@@ -38,6 +38,7 @@ fm_nm_bounded() {  # <dir> <timeout_secs> <command> <args...>
   shift 2
   if [ "${FM_NM_READ_PROGRESS:-0}" = 1 ]; then
     [ "${FM_NM_READ_STALLED:-0}" != 1 ] || return 124
+    fm_posix_python || true
     ( cd "$dir" && fm_run_progress "$timeout_secs" "$@" )
     return $?
   fi

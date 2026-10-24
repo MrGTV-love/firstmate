@@ -426,6 +426,7 @@ fm_backlog_row_show() {  # <resolved-data-dir> <id> [flag...]
   if [ -n "$FM_BACKLOG_AXI_FILE" ]; then
     set -- "$@" --file "$FM_BACKLOG_AXI_FILE"
   fi
+  fm_posix_python || true
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
   out=$(fm_run_progress "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi show "$@"' \
     _ "$FM_BACKLOG_AXI_ROOT" "$id" "$@" 2>&1)
@@ -475,6 +476,7 @@ fm_backlog_row_states() {  # <data-dir>
   fm_backlog_tasks_axi_addressing "$data" || return 1
   [ "$FM_BACKLOG_ROW_SHOW_WEDGED" != 1 ] || return 1
   [ -z "$FM_BACKLOG_AXI_FILE" ] || args+=(--file "$FM_BACKLOG_AXI_FILE")
+  fm_posix_python || true
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
   out=$(fm_run_progress "$secs" bash -c 'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi list "$@"' \
     _ "$FM_BACKLOG_AXI_ROOT" ${args[@]+"${args[@]}"} 2>/dev/null)

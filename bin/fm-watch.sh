@@ -161,8 +161,8 @@
 # grace). Only that proven stall is evicted with TERM, after its identity is
 # re-verified, and this arm starts in its place, printing "watcher: replaced
 # stalled pid <N> (...)". A holder that is not identity-matched is refused with
-# "lock held by live pid ... but heartbeat is stale"; a holder that survives TERM
-# keeps the refusal and the nonzero exit.
+# "lock held by live pid ... but heartbeat is stale", and so is a proven-stalled
+# holder that survives TERM: both keep the refusal and the nonzero exit.
 # Once per poll the watcher also checks that its home (when it existed at
 # start), its state directory, and its own bin directory still exist; when one
 # is gone it logs "watcher: exiting - <what> no longer exists: <path>" to stderr
@@ -2634,8 +2634,9 @@ fi
 # proves the lock's own recorded identity (fm_watcher_lock_matches_pid: this
 # home, this script, and the starttime+cmdline proof the lock carries), checked
 # again right before the signal, so a recycled pid is never touched; TERM only,
-# never KILL, and never a name or pattern match. Succeeds only once the holder
-# has exited within the bounded wait.
+# never KILL, and never a name or pattern match. Returns 0 once the holder has
+# exited within the bounded wait, 1 when it was not signalled (unmatched or not
+# proven stalled), and 2 when it was proven stalled and signalled but survived.
 evict_stalled_holder() {
   local pid=$1 i=0 progress_rc=0
   fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$pid" "$FM_HOME" || return 1
@@ -2647,7 +2648,8 @@ evict_stalled_holder() {
     sleep 0.1
     i=$((i + 1))
   done
-  ! fm_pid_alive "$pid"
+  fm_pid_alive "$pid" && return 2
+  return 0
 }
 
 EVICTED_PID=
@@ -2661,13 +2663,18 @@ while ! fm_lock_try_acquire "$WATCH_LOCK"; do
         # One eviction per arm: the retry re-reads the lock and beacon, so a
         # holder that exited leaves a dead-pid lock the normal reclaim takes,
         # and a rival arm that won first reads as a fresh running watcher.
-        if [ -z "$EVICTED_PID" ] && evict_stalled_holder "$FM_LOCK_HELD_PID"; then
+        evict_rc=1
+        if [ -z "$EVICTED_PID" ]; then
+          evict_stalled_holder "$FM_LOCK_HELD_PID"
+          evict_rc=$?
+        fi
+        if [ "$evict_rc" -eq 0 ]; then
           EVICTED_PID=$FM_LOCK_HELD_PID
           EVICTED_BEAT_AGE=$beat_age
           continue
         fi
         # An identity-matched holder not proven stalled is a slow cycle.
-        if [ -z "$EVICTED_PID" ] \
+        if [ -z "$EVICTED_PID" ] && [ "$evict_rc" -eq 1 ] \
           && fm_watcher_lock_matches_pid "$STATE" "$WATCH_PATH" "$FM_LOCK_HELD_PID" "$FM_HOME"; then
           echo "watcher: already running pid $FM_LOCK_HELD_PID"
           exit 0

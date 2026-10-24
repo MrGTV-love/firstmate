@@ -297,6 +297,33 @@ test_missing_resume_command_fails_and_logs() {
   pass "an absent resume command is recorded without changing the unhealthy exit"
 }
 
+# A live, identity-matched watcher kept for lack of a no-progress proof is not
+# "no live watcher": the no-op detail names the preserved watcher instead.
+test_noop_names_a_preserved_live_watcher() {
+  local home dir holder identity
+  home=$(make_home preserved dead)
+  dir=$(dirname "$home")
+  write_ledger "$home" rewake "$(dead_pid)"
+  write_stubs "$home" 'true'
+  rm -f "$home/config/watchdog-resume"
+  holder=$(start_session)
+  identity=$(bash -c '. "$1"; fm_pid_identity "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$holder") \
+    || fail "could not identify the fake watcher"
+  mkdir -p "$home/state/.watch.lock"
+  printf '%s\n' "$holder" > "$home/state/.watch.lock/pid"
+  printf '%s\n' "$identity" > "$home/state/.watch.lock/pid-identity"
+  printf '%s\n' "$home" > "$home/state/.watch.lock/fm-home"
+  printf '%s\n' "$ROOT/bin/fm-watch.sh" > "$home/state/.watch.lock/watcher-path"
+  run_check "$home" FM_WATCHDOG_NOW=1000
+  expect_code 1 "$CODE" "a preserved watcher with a missing session stays unhealthy"
+  assert_contains "$OUT" "no-op (attempt 1) - live watcher pid=$holder preserved without a no-progress proof and no config/watchdog-resume" \
+    "the no-op names the live watcher it kept"
+  assert_not_contains "$OUT" "no live watcher to stop" "a kept live watcher is not reported missing"
+  assert_absent "$dir/arm.calls" "the preserved watcher was not stopped"
+  kill -0 "$holder" 2>/dev/null || fail "the preserved watcher was signalled"
+  pass "a no-op attempt names the live watcher it preserved"
+}
+
 test_noop_attempts_alarm_on_original_schedule() {
   local home dir
   home=$(make_home noop dead)
@@ -641,6 +668,7 @@ test_absent_lock_is_missing_session
 test_failed_recovery_alarms_after_threshold
 test_missing_resume_command_fails_and_logs
 test_noop_attempts_alarm_on_original_schedule
+test_noop_names_a_preserved_live_watcher
 test_stop_only_attempt_is_a_failed_recovery
 test_empty_resume_command_is_a_noop
 test_watchdog_and_away_alarm_titles

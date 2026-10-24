@@ -428,14 +428,14 @@ case('proc_only_sampler_cuts_still_keeps_growing_and_warns_when_blind', proc_sam
 
 import select
 
-def holder_fixture(name, stale):
+def holder_fixture(name, stale, program='while True: sum(i*i for i in range(1000))'):
     home, env = fixture(name)
     env.update(FM_GUARD_GRACE='1', FM_WATCHER_STALE_GRACE='1', FM_WATCHER_STALL_BOUND='1',
                FM_ARM_CONFIRM_TIMEOUT='1', FM_ARM_ATTACH_POLL='0.1', FM_POLL='1',
                FM_SIGNAL_GRACE='0', FM_CHECK_INTERVAL='999999', FM_HEARTBEAT='999999',
                FM_WATCH_HANDLING_SUCCESSOR='1')
     # A watcher busy in a long handling turn: identity-matched, CPU advancing.
-    holder = subprocess.Popen([sys.executable, '-c', 'while True: sum(i*i for i in range(1000))'])
+    holder = subprocess.Popen([sys.executable, '-c', program, str(home)])
     lock = home / 'state/.watch.lock'
     lock.mkdir()
     identity = run(['bash', '-c', '. "$1"; fm_pid_identity "$2"', '_', home / 'bin/fm-wake-lib.sh',
@@ -517,6 +517,64 @@ def attached(stale):
         stop_process(holder)
 case('attached_arm_follows_productive_holder_after_beacon_ages', lambda: attached(False))
 case('attached_arm_admits_productive_already_old_holder', lambda: attached(True))
+
+def progress_check(home, env, pid):
+    return run([sys.executable, home / 'bin/fm-duration.py', 'progress-check', home / 'state/.watchdog-progress',
+                str(pid), '1', home / 'state/.last-watcher-beat'], env).returncode
+
+def term_survivor():
+    # Proven to make no progress, and it ignores TERM: the eviction fails, so the
+    # contender keeps its refusal and nonzero exit instead of calling it running.
+    home, env, holder, beat = holder_fixture('term-survivor', True,
+        'import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(300)')
+    try:
+        first = run([home / 'bin/fm-watch.sh'], env)
+        require(first.returncode == 0 and 'already running pid ' + str(holder.pid) in first.stdout,
+                'a first sample must not prove a stall: ' + first.stdout + first.stderr)
+        time.sleep(1.5)
+        second = run([home / 'bin/fm-watch.sh'], env)
+        require(holder.poll() is None, 'the TERM-ignoring holder exited')
+        require(second.returncode != 0 and 'heartbeat is stale' in second.stderr
+                and 'already running' not in second.stdout,
+                'a proven-stalled holder that survived TERM was reported running: '
+                + str(second.returncode) + second.stdout + second.stderr)
+    finally:
+        holder.kill()
+        holder.wait()
+case('contender_refuses_a_proven_stalled_holder_that_survives_term', term_survivor)
+
+def resumed_holder():
+    # Proven idle when the arm samples it, then working again before the arm's
+    # child samples: the child stands down and the arm attaches, not FAILED.
+    program = ('import glob, os, sys, time\nstate = os.path.join(sys.argv[1], "state")\n'
+               'while not glob.glob(os.path.join(state, ".watch-arm-output.*")): time.sleep(0.2)\n'
+               'while True: sum(i*i for i in range(1000))')
+    home, env, holder, beat = holder_fixture('resumed-holder', True, program)
+    arm_process = None
+    try:
+        progress_check(home, env, holder.pid)
+        time.sleep(1.5)
+        require(progress_check(home, env, holder.pid) == 124, 'the idle holder was not proven stalled first')
+        arm_process = subprocess.Popen([str(home / 'bin/fm-watch-arm.sh')], env=env,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        until = time.monotonic() + 20
+        lines = []
+        while time.monotonic() < until and arm_process.poll() is None:
+            if select.select([arm_process.stdout], [], [], 0.1)[0]:
+                line = arm_process.stdout.readline()
+                lines.append(line)
+                if line.startswith('watcher: attached pid=') or line.startswith('watcher: FAILED'):
+                    break
+        require(any(line.startswith('watcher: attached pid=' + str(holder.pid)) for line in lines),
+                'the arm did not attach to the resumed holder: ' + ''.join(lines))
+        require(not any('FAILED' in line for line in lines), 'the arm failed a resumed holder: ' + ''.join(lines))
+        time.sleep(2)
+        require(holder.poll() is None and arm_process.poll() is None,
+                'the resumed holder or its attached arm ended')
+    finally:
+        stop_process(arm_process)
+        stop_process(holder)
+case('arm_attaches_to_a_holder_that_resumed_while_its_child_started', resumed_holder)
 
 def load_collector():
     spec = importlib.util.spec_from_file_location('progress_collector', root / 'bin/fm_open_loops.py')

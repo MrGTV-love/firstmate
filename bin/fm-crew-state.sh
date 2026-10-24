@@ -247,6 +247,8 @@ case "$NM_TIMEOUT" in ''|*[!0-9]*|0) NM_TIMEOUT=$((15 * 60)) ;; esac
 # Shell-local: only this read-only consumer opts into the shared runner mode.
 FM_NM_READ_PROGRESS=1
 FM_NM_READ_STALLED=0
+# Answer the Python capability probe once here: every read runs in a subshell.
+fm_posix_python || true
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (fm_nm_runs_status_for_worktree in bin/fm-nm-run-lib.sh) scans for the legacy
 # fallback or an unfetched-head continuation (docs/configuration.md owns the

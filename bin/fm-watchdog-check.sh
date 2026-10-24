@@ -249,6 +249,7 @@ raise_alarm() {  # <summary> <verdict>
 }
 
 RECOVERY_ACTION_RAN=0
+WATCHER_PRESERVED=
 RESUME_UNAVAILABLE=
 stop_stale_watcher() {
   local pid
@@ -267,6 +268,7 @@ stop_stale_watcher() {
   if [ "$pid" != "$WATCHDOG_STUCK_PID" ] \
     || [ "$FM_WATCHER_MATCHED_IDENTITY" != "$WATCHDOG_STUCK_IDENTITY" ]; then
     log "preserving watcher pid=$pid: no identity-matched no-progress proof"
+    WATCHER_PRESERVED=$pid
     return 0
   fi
   log "stopping watcher pid=$pid: no CPU or beacon progress for ${STALE_SECS}s, identity reverified; through $(basename "$ARM") --stop"
@@ -341,7 +343,11 @@ watchdog_main() {
     log "recovery attempt $EP_ATTEMPTS failed; verdict now $WATCHDOG_VERDICT"
   else
     latest="no-op"
-    detail=" - no live watcher to stop and $RESUME_UNAVAILABLE"
+    if [ -n "$WATCHER_PRESERVED" ]; then
+      detail=" - live watcher pid=$WATCHER_PRESERVED preserved without a no-progress proof and $RESUME_UNAVAILABLE"
+    else
+      detail=" - no live watcher to stop and $RESUME_UNAVAILABLE"
+    fi
     log "attempt $EP_ATTEMPTS was a no-op; verdict now $WATCHDOG_VERDICT"
   fi
   [ "$EP_ATTEMPTS" -eq 1 ] && checks=check

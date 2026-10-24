@@ -199,11 +199,13 @@ fm_watch_poll_seconds() {
 }
 
 # fm_watcher_stall_bound [poll-seconds]
-# Hard bound on a live watcher holder's beacon age: FM_WATCHER_STALL_BOUND,
+# The no-progress interval for a live watcher holder: FM_WATCHER_STALL_BOUND,
 # defaulting to 3x the watcher's stale grace (FM_WATCHER_STALE_GRACE, else
-# FM_GUARD_GRACE, else fm_poll_derived_grace). Under it a live holder with a
-# stale beacon is a slow cycle; at or past it bin/fm-watch.sh evicts that holder
-# and bin/fm-watch-arm.sh stops following it, so both read this one definition.
+# FM_GUARD_GRACE, else fm_poll_derived_grace). Beacon age alone never ends a
+# live, identity-matched holder; only when fm_progress_check (fm-timeout-lib.sh)
+# proves its process tree and beacon made no progress for this interval does
+# bin/fm-watch.sh evict that holder and bin/fm-watch-arm.sh stop following it,
+# so both read this one definition.
 fm_watcher_stall_bound() {
   local poll=${1:-${FM_POLL:-15}} grace
   grace=${FM_WATCHER_STALE_GRACE:-${FM_GUARD_GRACE:-$(fm_poll_derived_grace "$poll")}}

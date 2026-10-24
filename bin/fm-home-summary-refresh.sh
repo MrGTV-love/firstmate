@@ -357,6 +357,8 @@ if [ "$HOME_SUMMARY_MODE" = release-lock ]; then
 fi
 
 if [ "$HOME_SUMMARY_MODE" = parent ]; then
+  # Answer the Python capability probe once here: each attempt runs in a subshell.
+  fm_posix_python || true
   if [ "$DETACH" -eq 1 ]; then
     # Detached three ways, as bin/fm-startup-network.sh detaches its worker:
     # stdio to /dev/null so no caller's pipe is held open, nohup so the refresh

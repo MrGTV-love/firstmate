@@ -467,7 +467,7 @@ attach_and_wait() {
       echo "watcher: FAILED - attached watcher pid=$attached_pid stalled (no CPU or beacon progress for ${STALL_BOUND}s; beacon ${age}s)"
       return 1
     fi
-    if wait_for_healthy_successor; then
+    if wait_for_healthy_successor || progressing_stale_holder; then
       cycle_log_append unknown unknown attached-cycle-ended "attached:$HEALTHY_PID"
       attached_pid=$HEALTHY_PID
       cycle_begin "$attached_pid" attached "$HEALTHY_IDENTITY"
@@ -784,7 +784,7 @@ owned_child_finished() {
   fi
 
   if [ "$rc" -eq 0 ]; then
-    if wait_for_healthy_successor; then
+    if wait_for_healthy_successor || progressing_stale_holder; then
       cycle_log_append "$rc" "$signal" unexpected-clean-exit "attached:$HEALTHY_PID"
       print_watch_output "$child_out"
       rm -f "$child_out" 2>/dev/null || true
