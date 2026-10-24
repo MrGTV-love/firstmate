@@ -399,23 +399,45 @@ await test('M4: each coverage and egress decision emits one content-free central
     const before = events().length;
     await handlers.tool_call(event, { cwd: state });
     const added = events().slice(before);
-    assert.deepEqual(added.map(e => [e.guard, e.decision]), expected, event.toolName);
+    assert.deepEqual(added.map(e => [e.guard, e.decision, e.session]), expected, event.toolName);
     for (const e of added) {
       assert.deepEqual(Object.keys(e).sort(), ['cleared_by', 'decision', 'elapsed_ms', 'guard', 'override', 'repeat', 'session', 'source_ok', 'system', 'ts', 'version']);
-      assert.equal(e.session, 'audit');
       assert.equal(e.system, 'firstmate');
       assert.equal(e.source_ok, true);
       assert.ok(Number.isInteger(e.elapsed_ms));
       assert.ok(!JSON.stringify(e).includes('private-event-canary'), 'events carry no call content');
     }
   };
-  await decide({ toolName: 'read', input: { path: 'private-event-canary' } }, [['jev-tool-coverage', 'allow']]);
-  await decide({ toolName: 'new-paid-host-tool', input: { q: 'private-event-canary' } }, [['jev-tool-coverage', 'deny']]);
-  await decide({ toolName: 'find', input: { query: 'private-event-canary' } }, [['jev-tool-coverage', 'allow'], ['jev-egress-grant', 'deny']]);
+  await decide({ toolName: 'read', input: { path: 'private-event-canary' } }, [['jev-tool-coverage', 'allow', 'audit:read']]);
+  await decide({ toolName: 'new-paid-host-tool', input: { q: 'private-event-canary' } }, [['jev-tool-coverage', 'deny', 'audit:new-paid-host-tool']]);
+  await decide({ toolName: 'find', input: { query: 'private-event-canary' } },
+    [['jev-tool-coverage', 'allow', 'audit:find'], ['jev-egress-grant', 'deny', 'audit:semantic-search']]);
   writeFileSync(`${state}/audit.meta`, 'egress=["semantic-search"]\n');
   try {
-    await decide({ toolName: 'find', input: { query: 'private-event-canary' } }, [['jev-tool-coverage', 'allow'], ['jev-egress-grant', 'allow']]);
+    await decide({ toolName: 'find', input: { query: 'private-event-canary' } },
+      [['jev-tool-coverage', 'allow', 'audit:find'], ['jev-egress-grant', 'allow', 'audit:semantic-search']]);
   } finally { rmSync(`${state}/audit.meta`); }
+});
+await test('M4: an unrelated allow never clears a later deny in the real metrics reader', async () => {
+  const log = `${state}/metrics-events.jsonl`;
+  process.env.FM_GUARD_EVENT_LOG = log;
+  writeFileSync(`${state}/audit.meta`, 'egress=["semantic-search"]\n');
+  try {
+    await handlers.tool_call({ toolName: 'read', input: { path: 'file.ts' } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'new-paid-host-tool', input: {} }, { cwd: state });
+    await handlers.tool_call({ toolName: 'find', input: { query: 'synthetic' } }, { cwd: state });
+    await handlers.tool_call({ toolName: 'web_search', input: { query: 'synthetic' } }, { cwd: state });
+  } finally { rmSync(`${state}/audit.meta`); delete process.env.FM_GUARD_EVENT_LOG; }
+  const out = JSON.parse(execFileSync('bash', [`${process.env.AUDIT_ROOT}/bin/fm-guard-metrics.sh`, '--log', log,
+    '--registry', `${process.env.AUDIT_ROOT}/docs/guards/registry.json`, '--min-opportunities', '1', '--json'], { encoding: 'utf8' }));
+  const metric = id => out.guards.find(g => g.id === id);
+  for (const id of ['jev-tool-coverage', 'jev-egress-grant']) {
+    assert.equal(metric(id).denies, 1, id);
+    assert.equal(metric(id).recurrences, 0, `${id}: an allow of another subject is not a clear`);
+    assert.equal(metric(id).median_clear_attempts, 0, id);
+    assert.equal(metric(id).verdict, 'keep', id);
+  }
+  rmSync(log);
 });
 await test('worker brief shell commands are never refused for a missing egress grant', async () => {
   const commands = ['gh-axi pr create --title synthetic --body synthetic', 'gh pr checks 1 --watch',
