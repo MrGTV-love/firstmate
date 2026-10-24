@@ -3207,3 +3207,98 @@ test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation
 test_herdr_ci_family_run_has_a_step_timeout
 test_aggregate_json
+
+# The three control-relaunch groups partition one former suite. The union of
+# their registered case lists must be the same 155 cases, each registered by the
+# one file that also defines it, with no case twice. A dropped or duplicated case
+# is exactly what a partition loses while every remaining assertion still passes.
+test_control_relaunch_groups_partition_one_inventory() {
+  local group file registered defined union total dup diff name
+  local -a groups=(fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends)
+  union=''
+  for group in "${groups[@]}"; do
+    file="$ROOT/tests/$group.test.sh"
+    [ -f "$file" ] || fail "missing control-relaunch group file: tests/$group.test.sh"
+    registered=$(awk '
+      /^[[:space:]]*control_relaunch_test_cases=\(\)/ { next }
+      /^[[:space:]]*control_relaunch_test_cases=\(/ { inarr = 1; next }
+      /^[[:space:]]*control_relaunch_test_cases\+=\(/ { inarr = 1; next }
+      inarr && /^[[:space:]]*\)[[:space:]]*$/ { inarr = 0; next }
+      inarr {
+        line = $0
+        sub(/^[[:space:]]+/, "", line)
+        sub(/[[:space:]]+$/, "", line)
+        if (line ~ /^test_[A-Za-z0-9_]+$/) print line
+      }
+    ' "$file" | LC_ALL=C sort)
+    [ -n "$registered" ] || fail "tests/$group.test.sh registers no cases"
+    defined=$(grep -oE '^test_[A-Za-z0-9_]+\(\)' "$file" | sed 's/()$//' | LC_ALL=C sort)
+    for name in $registered; do
+      printf '%s\n' "$defined" | grep -qx "$name" \
+        || fail "tests/$group.test.sh registers $name but does not define it"
+    done
+    union=$(printf '%s\n%s\n' "$union" "$registered")
+  done
+  union=$(printf '%s\n' "$union" | grep '^test_' | LC_ALL=C sort)
+  dup=$(printf '%s\n' "$union" | uniq -d)
+  [ -z "$dup" ] || fail "a control-relaunch case is registered in more than one group: $dup"
+  total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
+  [ "$total" = 155 ] \
+    || fail "the control-relaunch groups register $total cases, not the 155-case inventory they partition"
+  pass "the control-relaunch groups are a duplicate-free 155-case cover, each case registered by the file that defines it"
+}
+
+# The fm-watch-triage-waits selector called 67 shared-helper cases as one list.
+# Its three group files must still call exactly those cases once each; the case
+# bodies live in the shared helper, so the cover is checked against the helper's
+# definitions rather than against the group file.
+test_watch_triage_waits_groups_partition_one_inventory() {
+  local group file registered defined union total dup name
+  local -a groups=(fm-watch-triage-waits fm-watch-triage-waits-declared fm-watch-triage-waits-pauses fm-watch-triage-waits-away)
+  defined=$(grep -oE '^test_[A-Za-z0-9_]+\(\)' "$ROOT/tests/fm-watch-triage-helpers.sh" | sed 's/()$//' | LC_ALL=C sort)
+  union=''
+  for group in "${groups[@]}"; do
+    file="$ROOT/tests/$group.test.sh"
+    [ -f "$file" ] || fail "missing watch-triage-waits group file: tests/$group.test.sh"
+    registered=$(grep -E '^test_[A-Za-z0-9_]+$' "$file" | LC_ALL=C sort)
+    [ -n "$registered" ] || fail "tests/$group.test.sh calls no cases"
+    for name in $registered; do
+      printf '%s\n' "$defined" | grep -qx "$name" \
+        || fail "tests/$group.test.sh calls $name but tests/fm-watch-triage-helpers.sh does not define it"
+    done
+    union=$(printf '%s\n%s\n' "$union" "$registered")
+  done
+  union=$(printf '%s\n' "$union" | grep '^test_' | LC_ALL=C sort)
+  dup=$(printf '%s\n' "$union" | uniq -d)
+  [ -z "$dup" ] || fail "a watch-triage-waits case is called in more than one group: $dup"
+  total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
+  [ "$total" = 67 ] \
+    || fail "the watch-triage-waits groups call $total cases, not the 67-case inventory they partition"
+  pass "the watch-triage-waits groups are a duplicate-free 67-case cover, each case defined in the shared helper"
+}
+
+# Every new group must stay independently runnable and keep its lane coverage.
+test_split_suites_stay_selectable_in_their_families() {
+  local watcher backend group script listed
+  local -a control_groups=(fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends)
+  local -a waits_groups=(fm-watch-triage-waits fm-watch-triage-waits-declared fm-watch-triage-waits-pauses fm-watch-triage-waits-away)
+  watcher=$("$RUNNER" --list --family watcher-wake-lock)
+  backend=$("$RUNNER" --list --family backend-dispatch)
+  for group in "${waits_groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$watcher" "tests/$script" "the watcher-wake-lock family must keep $script"
+    listed=$("$RUNNER" --list "tests/$script")
+    [ "$listed" = "tests/$script" ] || fail "$script must be independently selectable: $listed"
+  done
+  for group in "${control_groups[@]}"; do
+    script=$group.test.sh
+    assert_contains "$backend" "tests/$script" "the backend-dispatch family must keep $script"
+    listed=$("$RUNNER" --list "tests/$script")
+    [ "$listed" = "tests/$script" ] || fail "$script must be independently selectable: $listed"
+  done
+  pass "every split group is independently selectable and keeps its lane family"
+}
+
+test_control_relaunch_groups_partition_one_inventory
+test_watch_triage_waits_groups_partition_one_inventory
+test_split_suites_stay_selectable_in_their_families

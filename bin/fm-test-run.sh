@@ -421,7 +421,10 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|\
+    fm-watch-triage-waits-declared.test.sh|fm-watch-triage-waits-pauses.test.sh|\
+    fm-watch-triage-waits-away.test.sh|\
+    fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -498,7 +501,9 @@ family_for_basename() {
       ;;
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
     fm-tmux-agent-liveness.test.sh|\
-    fm-control.test.sh|fm-control-relaunch.test.sh|fm-control-reassociate.test.sh|\
+    fm-control.test.sh|fm-control-relaunch.test.sh|\
+    fm-control-relaunch-recovery.test.sh|fm-control-relaunch-backends.test.sh|\
+    fm-control-reassociate.test.sh|\
     fm-launch-proof.test.sh|\
     fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
@@ -879,7 +884,9 @@ tests/fm-composer-native-idle-hint.test.sh 4023
 tests/fm-contributions-read-saved.test.sh 2078
 tests/fm-contributions.test.sh 248058
 tests/fm-control-reassociate.test.sh 347235
-tests/fm-control-relaunch.test.sh 1358153
+tests/fm-control-relaunch-backends.test.sh 447000
+tests/fm-control-relaunch-recovery.test.sh 538000
+tests/fm-control-relaunch.test.sh 238000
 tests/fm-control.test.sh 120383
 tests/fm-copy-sweep.test.sh 207702
 tests/fm-cpu-pass.test.sh 26909
@@ -1107,7 +1114,10 @@ tests/fm-watch-open-loops.test.sh 322294
 tests/fm-watch-typesafe-health.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59837
 tests/fm-watch-triage.test.sh 539000
-tests/fm-watch-triage-waits.test.sh 1433371
+tests/fm-watch-triage-waits.test.sh 351000
+tests/fm-watch-triage-waits-away.test.sh 76000
+tests/fm-watch-triage-waits-declared.test.sh 712000
+tests/fm-watch-triage-waits-pauses.test.sh 148000
 tests/fm-watchdog-check.test.sh 27679
 tests/fm-watcher-lock.test.sh 136753
 tests/fm-worker-account-live-e2e.test.sh 4428
@@ -1882,7 +1892,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       printf '%s\n' "__script__:fm-omp-harness.test.sh"
-      printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch-backends.test.sh"
       printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
     bin/fm-quota-axi-lib.sh)

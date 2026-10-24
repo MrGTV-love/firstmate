@@ -22,8 +22,8 @@ The corpus grows from fifteen to eighteen serial shards, which packs the slowest
 The per-shard packing check below then refused eighteen and nineteen shards, because one shard packed 1282762 ms and 1202486 ms of several scripts behind a 898093 ms largest suite, so the corpus moves to twenty serial shards, the fewest that pass.
 The packing target stays at 1200000 ms, and the 60-minute job timeout is unchanged.
 The guard checks each shard on its own: it refuses a shard whose packed sum is above the target and above that shard's own largest script.
-So a shard that holds `tests/fm-watch-triage-waits.test.sh` alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
-If every shard must return under 1200000 ms without that exception, splitting `tests/fm-watch-triage-waits.test.sh` is the agreed follow-up, the same way the former combined watch-triage suite was split below.
+So a shard that holds one indivisible script alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
+`tests/fm-watch-triage-waits.test.sh` and `tests/fm-control-relaunch.test.sh` were the two remaining indivisible members and are now four and three independently runnable groups, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) describes.
 The two parallel lanes now pass `--jobs 3`, the `PORTABLE_PARALLEL_JOBS` count, because their membership is exactly the proven-isolated set.
 The recorded four-way proof of that set in [fm-test-isolation-proof.md](fm-test-isolation-proof.md) ran on a macOS host, where `tests/fm-pi-primary-types.test.sh` gate-skipped and `tests/fm-pr-merge.test.sh` failed, so those two members are not yet proven to pass concurrently.
 The first three-wide run on the 26.04 image is [run 39757092565](https://github.com/MrGTV-love/firstmate/actions/runs/39757092565) of PR #198 at head `2f5fd300`: all 30 jobs passed, the workflow finished in 23 minutes, and the two parallel jobs took 20 and 13 minutes against 33 and 28 minutes when they ran serially in [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843) at head `12a9cef0`, before either job passed `--jobs`; both members the macOS proof missed exited zero there (`fm-pr-merge` in 907277 ms, `fm-pi-primary-types` in 4187 ms, no gate skip), which is one sample beside a proof rather than a replacement for it.
@@ -173,7 +173,30 @@ The workflow finished in 31 minutes 39 seconds, down from that earlier run's 35 
 
 The hint table also carries the run 39838628417 measurements that grew by more than 30 seconds - `fm-pr-check-security` (342666 to 420272 ms), `fm-control-relaunch` (1318470 to 1358153 ms), and `fm-spawn-compact-adviser-disable-remote` (294998 to 352918 ms) - plus four measured but previously unhinted serial members: `fm-api-key-guard-lib` (3850), `fm-copy-sweep` (207702), `fm-friction-ledger` (2020), and `fm-jev-guard-audit` (1281 ms).
 Both sets are successful per-script `duration_ms` records from that run's `fm-test-timing-portable-serial-*` artifacts.
-The serial lane still passes `--check-coverage` at the unchanged twenty shards, and the largest remaining single script is `fm-watch-triage-waits` at 1433371 ms, so splitting that suite is the way to a packed shard below it.
+The serial lane still passes `--check-coverage` at the unchanged twenty shards. The two members that then held the floor are split in [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch).
+
+## Split watch-triage-waits and control-relaunch
+
+The former `tests/fm-watch-triage-waits.test.sh` (67 case calls over the shared `tests/fm-watch-triage-helpers.sh`) and `tests/fm-control-relaunch.test.sh` (155 cases that also own their bodies) each held a serial shard alone.
+They are now four and three files that are independently selectable by name.
+
+`tests/fm-watch-triage-waits.test.sh` keeps the stale, wedge, busy-turn, and write-deferral cases (36); `tests/fm-watch-triage-waits-declared.test.sh` holds the declared-wait, restated-wait, wedge-threshold, and bounded-recheck cases (17); `tests/fm-watch-triage-waits-pauses.test.sh` holds the captain-call churn and secondmate pause cases (8); `tests/fm-watch-triage-waits-away.test.sh` holds the away-record and quiet-record cases (6).
+The cases keep living in `tests/fm-watch-triage-helpers.sh`, so the split is a partition of the call list and no body moves.
+
+`tests/fm-control-relaunch-helpers.sh` owns the former suite's setup, fixtures, and helpers, a pure byte-for-byte move.
+`tests/fm-control-relaunch.test.sh` keeps the same-harness contract, harness switches, profiles and model routing, the progress-note cases, and the pre-stop and post-stop failure cases (74); it also keeps the `--jev-guard` entry point.
+`tests/fm-control-relaunch-recovery.test.sh` holds the gone-endpoint, relocation, Herdr reclaim, and held/dependency/continuation cases (43, including the 14 that require a compatible `tasks-axi`).
+`tests/fm-control-relaunch-backends.test.sh` holds secondmate child-work, `fm-spawn --relaunch`'s own refusals, TeamClaude, Herdr lifecycle admission, reboot recovery, and the quota routes (37).
+Each group registers its cases in order and accepts `[test_function_name ...]`, so a single case is selectable from the file that defines it.
+
+The split preserves the combined suite's per-case shell state: control-relaunch never enabled `errexit` at file scope, and each group still sources the shared setup with `set -u` and its own temporary root, fixture-process registry, and `EXIT` cleanup.
+Every helper and case body was compared definition by definition against the pre-split file and is byte-identical; the union of the registered lists is the same 155 cases with nothing duplicated or dropped.
+
+`tests/fm-test-run.test.sh` holds the partition: `test_control_relaunch_groups_partition_one_inventory` requires the three registered lists to be a duplicate-free 155-case cover with every case registered by the file that defines it, `test_watch_triage_waits_groups_partition_one_inventory` requires the four call lists to be a duplicate-free 67-case cover against the shared helper, and `test_split_suites_stay_selectable_in_their_families` requires each group to stay independently selectable and to keep its family.
+
+The `watcher-wake-lock` and `backend-dispatch` family memberships are otherwise unchanged; `backend-dispatch` is not an admitted `--jobs` family, so the control groups add no concurrency admission, and the waits groups join the already-admitted `watcher-wake-lock` family.
+The group hints are apportioned from a local Ubuntu 26.04 container measurement of each group (waits 230 s, 465 s, 97 s, and 50 s; control 121 s, 243 s, and 255 s on the prefixes that did not hit a container-only node and harness gap), scaled by 0.95 so the unchanged twenty shards pack inside the 1200000 ms target.
+They are apportioned estimates, not CI measurements; the first `fm-test-timing-portable-serial-*` artifacts for the new files replace them, as the refresh procedure above requires.
 
 ## Portable serial remainder
 
