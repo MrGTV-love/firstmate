@@ -728,7 +728,7 @@
       "version": "1",
       "id": "jev-egress-grant",
       "owner": "bin/fm-jev-guard.ts",
-      "invariant": "a tool whose policy row names a destination class never runs without a task grant for that class; shell-command execution (Bash, Monitor and PowerShell) has no pre-call rule or egress class",
+      "invariant": "a tool whose policy row names a destination class never runs without a task grant for that class",
       "layer": "runtime-block",
       "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts plus the single egress= JSON line in state/<task>.meta",
       "trigger": "egressClass(<tool>) returns a destination class and state/<task>.meta has no single valid egress= line listing it: absent, malformed, duplicated, an unknown class, unreadable or symlinked",
