@@ -193,6 +193,20 @@ for (const host of ['omp', 'claude']) {
     assert.equal(readFileSync(`${data}/large.txt`, 'utf8'), 'x'.repeat(300000));
   });
 }
+await test('claude: Bash, Monitor and PowerShell start no generated pre-call hook', () => {
+  for (const tool of ['Bash', 'Monitor', 'PowerShell']) {
+    assert.deepEqual(claudePretool(tool), [], `${tool}: shell admission must not depend on the hook runtime or its availability`);
+  }
+});
+await test('claude: outbound and unknown shell-prefix names still reach the generated guard', () => {
+  for (const [tool, input] of [['WebSearch', { query: 'synthetic-query' }], ['MonitorStatus', {}], ['PowerShellExtra', {}], ['BashScript', {}]]) {
+    const hooks = claudePretool(tool);
+    assert.equal(hooks.length, 1, `${tool}: only the exact shell-command names are excluded`);
+    const output = execFileSync('sh', ['-c', hooks[0].command], { encoding: 'utf8',
+      input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input }) });
+    assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny', `${tool}: coverage and egress refusals must remain active`);
+  }
+});
 await test('claude: Write and Edit still reach the generated jev-guard hook', () => {
   for (const [tool, input] of [['Write', { file_path: '/etc/fm-jev-guard-outside', content: 'x' }],
     ['Edit', { file_path: '/etc/fm-jev-guard-outside', old_string: 'x', new_string: 'y' }]]) {
