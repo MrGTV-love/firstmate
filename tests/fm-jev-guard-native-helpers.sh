@@ -163,14 +163,13 @@ fm_jev_native_omp_url_reads() {  # <subject> <lab> <provider-base>
   pass "$subject: worker overlay refuses ungranted URL read and grep paths and keeps ordinary file reads"
 }
 
-# omp's tool_call handler is refused by the host after 30 seconds unless the worker overlay raises its deadline,
-# so a judgment that answers after 31 seconds must still decide the write call under that real overlay.
+# Write admission is deterministic: under the real worker overlay the write call runs with no Jev request.
 fm_jev_native_omp_pretool() {  # <subject> <lab> <provider-base>
   local subject=$1 lab=$2 base=$3 marker="$2/worktree/pretool-ran" status
   rm -rf -- "${lab:?}/home" "${lab:?}/worktree"
   mkdir -p "$lab/home/config" "$lab/home/state" "$lab/home/data" "$lab/worktree"
   printf 'TYPESAFE_API_KEY=synthetic-local-only\n' > "$lab/home/.env"
-  jq -n --arg path "$marker" '{phase:"normal",tool:"write",args:{path:$path,content:"ran",i:"Write one fixture file"},benign:true,judge_delay:31}' > "$lab/scenario.json"
+  jq -n --arg path "$marker" '{phase:"normal",tool:"write",args:{path:$path,content:"ran",i:"Write one fixture file"}}' > "$lab/scenario.json"
   : > "$lab/jev.jsonl"
   : > "$lab/model.jsonl"
   curl --max-time 10 -fsS -X POST -d '{}' "$base/reset" > /dev/null || fail "$subject: provider reset failed"
@@ -180,9 +179,10 @@ fm_jev_native_omp_pretool() {  # <subject> <lab> <provider-base>
     < /dev/null > "$lab/native.out" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "$subject: pre-tool native run exited $status: $(cat "$lab/native.out")"
-  [ -e "$marker" ] || fail "$subject: the write call was refused although the judgment answered: $(cat "$lab/native.out")"
-  jq -se 'map(select(.hook == "tool_call")) | length == 1 and .[0].decision == "allow" and .[0].error_type == null and .[0].request_started == true and .[0].ms >= 31000' \
-    "$lab/home/state/jev-guard.jsonl" > /dev/null || fail "$subject: the 31-second answer was not the pre-tool decision: $(cat "$lab/home/state/jev-guard.jsonl")"
+  [ "$(cat "$marker" 2>/dev/null)" = ran ] || fail "$subject: the write call did not write its file: $(cat "$lab/native.out")"
+  jq -se 'map(select(.hook == "tool_call")) | length == 1 and .[0].tool == "write" and .[0].decision == "allow" and .[0].enforcement == "pretool_allow" and .[0].branch == "deterministic" and .[0].error_type == null and .[0].request_started == false' \
+    "$lab/home/state/jev-guard.jsonl" > /dev/null || fail "$subject: the write call was not admitted deterministically: $(cat "$lab/home/state/jev-guard.jsonl")"
+  [ ! -s "$lab/jev.jsonl" ] || fail "$subject: write admission sent a Jev request: $(cat "$lab/jev.jsonl")"
   ! grep -q 'timed out after' "$lab/native.out" || fail "$subject: the host timed out the pre-tool handler: $(cat "$lab/native.out")"
-  pass "$subject: pre-tool write judgment answered after 31 seconds decides the call under the worker overlay"
+  pass "$subject: write call admitted deterministically under the worker overlay with no Jev request"
 }
