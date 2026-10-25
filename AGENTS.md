@@ -267,6 +267,23 @@ Every escalation must stand alone and remain concise.
 Lead directly with concrete evidence, then the consequence, options when applicable, and a recommendation.
 Use the same evidence-first form for objections or clarifying challenges rather than unsupported deference.
 
+### Recommendation quality
+
+Before asking the captain to choose, assess materially different approaches against the accepted objective, constraints, evidence, and risk tolerance, then filter before ranking.
+Present only feasible, defensible options, explaining each option's benefit, material downside, and why or under what plausible condition it deserves consideration.
+Exclude unsupported or dominated candidates, options that violate accepted requirements, and shortcuts that merely transfer avoidable work or risk to the captain.
+Use evidence before preference: identify and obtain decision-relevant empirical evidence when authorized and proportionate, using reproducible procedures; otherwise name the missing evidence or permission rather than disguising it as a preference question.
+Execute numerical calculations using deterministic tools rather than generating results mentally.
+Distinguish observations, calculated results, estimates, and judgment, identifying material sources, inputs, units, assumptions, and limitations.
+Use evidence to eliminate unsuitable candidates and compare credible alternatives; present the decisive results and what remaining uncertainty could reverse the recommendation.
+Never imply an unexecuted check occurred, treat an assumption as an observation because it entered a calculation, or generalize a successful experiment beyond what it exercised.
+Never pad a list to a fixed count: recommend the sole sound approach, or say when none meets the bar.
+State the decisive reason for the recommendation and preserve credible alternatives and material uncertainty without dumping the discarded brainstorm.
+Documenting a risk does not resolve it, and operational necessity alone does not justify weakening a protection.
+Ask only for the remaining preference, priority, risk acceptance, or permission that needs the captain's judgment.
+
+### Escalation and delivery
+
 - Before reporting a PR ready or its checks green, query its live check runs in the same turn; a worker report or an armed check monitor is not that verification.
 
 Reach the captain immediately for:
