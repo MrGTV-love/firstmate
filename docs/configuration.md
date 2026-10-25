@@ -2489,7 +2489,7 @@ Activation is selected per task at its initial launch and retained across relaun
 
 ### Tool coverage and outbound calls
 
-[`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls and result screening.
+[`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls.
 An unclassified tool is refused when it is called instead of silently skipping the guard; calls to classified tools do not depend on the rest of the host registry.
 The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry and with the tool list in the installed Claude Code init event, reached through a dead local proxy, without submitting a model turn, and proves that adding an unclassified tool fails coverage.
 The Claude init list depends on the binary's feature gates, so a gated tool absent from that run is checked only when it appears.
@@ -2501,6 +2501,7 @@ Native semantic `find`, web search, browser automation and provider-backed tools
 Subagent dispatch (omp `task`, Claude `Agent`, `SendMessage` and `Workflow`) is local: it needs no grant, and each tool a subagent then calls meets its own coverage and egress row.
 omp's memory operations `recall`, `reflect`, `memory_edit`, `retain` and `learn` are classified by their effect under the worker's live omp settings, which the generated worker extension reads from omp's own settings registry, so the global configuration, project settings and every `--config` overlay count.
 Only an effect proven local runs without a grant: with `memory.backend: mnemopi` and `mnemopi.noEmbeddings: true`, `recall`, `reflect` and `memory_edit` read or edit the local SQLite store, and `retain` and `learn` are local only when `mnemopi.llmMode` is `none`; a `learn` under `memory.backend: local` appends to a local file.
+A `learn` that carries a `skill` argument also writes a managed skill, so after its memory effect passes this rule it records the same confinement owner as `manage_skill`, whatever the backend.
 A `retain` or `learn` whose `mnemopi.llmMode` is `smol` or `remote` makes an extraction model call, and every `memory.backend: hindsight` operation calls the remote Hindsight API, so each requires a `provider` grant.
 An unreadable setting, another backend, `mnemopi.noEmbeddings` other than `true` or an unrecognized `mnemopi.llmMode` cannot prove a local effect, so the operation also requires a `provider` grant and its refusal names the operation, the effect it could not prove and the grant remedy; a host without live omp settings, such as Claude, proves nothing local.
 These effects were measured in the installed omp 18.12.6 binary; Mnemopi's background auto-recall and auto-retain are session behavior, not tool calls, and this rule does not judge them.
@@ -2522,12 +2523,12 @@ Each tool has at most one destination class, which must be granted, and a memory
 
 Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
 A native paid `find` records its deterministic decision even though it has no model classification.
-Local file `read` remains pre-tool unjudged, `bash` receives no model screening, `write` and `edit` keep credential/path screening, and result classifications are unchanged.
+Local file `read` remains pre-tool unjudged, `bash` receives no model screening, and `write` and `edit` keep credential/path screening.
 This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
 omp's `python`, `debug` and `run_experiment` code runners have the same effect as `eval` and use the same confinement-owned classification.
-Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), `manage_skill` writes to its managed-skills directory, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
+Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), `manage_skill` and `learn`-with-`skill` writes to the managed-skills directory, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
 A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
 `report_issue` and Claude `SendFeedback` upload reports, so they must never receive a `TOOL_POLICY` row and are refused under every grant; every other unclassified tool gets a row classified by its real effect.
 A coverage refusal names the refused host tool, states the remedy of a `TOOL_POLICY` row classified by its real effect, notes that `report_issue` and `SendFeedback` never get one, and states that no call was made.

@@ -337,6 +337,23 @@ await test('memory operations need a provider grant unless the live worker setti
   } finally { rmSync(`${state}/audit.meta`); }
   settings = { ...live, 'mnemopi.llmMode': 'none' };
   assert.equal(await call('retain'), undefined, 'retain without extraction or embeddings stays local');
+  const skill = { action: 'create', name: 'synthetic-skill', description: 'synthetic', body: 'private-memory-canary' };
+  for (const backend of ['mnemopi', 'local']) {
+    settings = { ...live, 'mnemopi.llmMode': 'none', 'memory.backend': backend };
+    const before = rowCount();
+    assert.equal(await memory.tool_call({ toolName: 'learn', input: { memory: 'synthetic' } }, { cwd: state }), undefined, `${backend}: learn without skill stays local`);
+    assert.equal(rowCount(), before, `${backend}: learn without skill adds no row`);
+    let patch;
+    const r = await fresh(async () => { patch = await memory.tool_call({ toolName: 'learn', input: { memory: 'synthetic', skill } }, { cwd: state }); });
+    assert.equal(patch, undefined, `${backend}: a learn skill write is left to T5 confinement`);
+    assert.equal(r.branch, 'confinement', `${backend}: a learn skill write is not silently allowed`);
+    assert.equal(r.confinement_owner, 'T5');
+    assert.ok(!JSON.stringify(r).includes('private-memory-canary'));
+  }
+  settings = live;
+  assert.equal((await memory.tool_call({ toolName: 'learn', input: { memory: 'synthetic', skill } }, { cwd: state }))?.block, true,
+    'a skill argument never admits a model-calling learn without its provider grant');
+  settings = { ...live, 'mnemopi.llmMode': 'none' };
   for (const [indeterminate, toolName, effect] of [
     [new Error('unreadable'), 'recall', 'could not be proven local because the worker\'s live memory settings are unreadable'],
     [{ ...live, 'mnemopi.noEmbeddings': false }, 'recall', 'could not be proven local because mnemopi.noEmbeddings is not true'],

@@ -121,6 +121,12 @@ export function egressGranted(state: string, task: string, destination: Destinat
   } catch { return { granted: false, sourceOk }; }
 }
 
+/** A learn call carrying a skill also writes a managed skill, so it takes manage_skill's write owner. */
+export function confinementOwner(tool: string, input: unknown): "T5" | undefined {
+  const policy = toolPolicy(tool === "learn" && input !== null && typeof input === "object" && (input as { skill?: unknown }).skill !== undefined ? "manage_skill" : tool);
+  return policy?.call === "confinement" ? policy.confinement_owner : undefined;
+}
+
 export function egressClass(tool: string): DestinationClass | undefined {
   const policy = toolPolicy(tool);
   return policy && destinationClass(policy.call) ? policy.call : undefined;

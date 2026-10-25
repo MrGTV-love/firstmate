@@ -4,7 +4,7 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
-import { egressClass, egressGranted, memoryEgress, toolPolicy } from "./fm-jev-egress.ts";
+import { confinementOwner, egressClass, egressGranted, memoryEgress, toolPolicy } from "./fm-jev-egress.ts";
 import { execFileSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -262,9 +262,8 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
             `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
         }
       }
-      if (policy.call === "confinement") {
-        return finishCall({ ...terminal, branch: "confinement", confinement_owner: policy.confinement_owner });
-      }
+      const confinement_owner = confinementOwner(tool, event.input);
+      if (confinement_owner) return finishCall({ ...terminal, branch: "confinement", confinement_owner });
       if (policy.call !== "write" && policy.call !== "edit") {
         return destination ? finishCall({ ...terminal, branch: "egress" }) : undefined;
       }
