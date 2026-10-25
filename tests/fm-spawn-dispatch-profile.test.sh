@@ -1338,7 +1338,10 @@ test_pi_exclude_tools_malformed_entry_refuses_before_endpoint() {
 }
 
 test_pi_exclude_tools_read_failure_refuses_before_launch() {
-  local harness kind rec id out status bash_env
+  local harness kind rec id out status bash_env real_python
+  # Resolve once before injecting BASH_ENV, so this regression needs neither
+  # pyenv nor any particular Python version installed on the test host.
+  real_python=$(python3 -c 'import sys; print(sys.executable)') || fail "cannot resolve Python"
   for harness in pi pi-signed; do
     for kind in ship scout; do
       id="excl-read-failure-${harness}-${kind}"
@@ -1351,7 +1354,9 @@ test_pi_exclude_tools_read_failure_refuses_before_launch() {
       cat > "$bash_env" <<'SH'
 function [ {
   local status=0
-  builtin test "${@:1:$#-1}" || status=$?
+  # Bash 3.2 collapses a quoted argument slice when IFS=: (as in pyenv-prefix).
+  # Forward the complete argv to the matching builtin, including its closing ].
+  builtin [ "$@" || status=$?
   if builtin [ "$#" -eq 4 ] && builtin [ "$1" = '!' ] &&
     builtin [ "$2" = -r ] &&
     builtin [ "$3" = "${FM_CONFIG_OVERRIDE:-}/crew-exclude-tools" ]; then
@@ -1360,10 +1365,29 @@ function [ {
   return "$status"
 }
 SH
+      # pyenv-prefix changes IFS before asking whether a version is "system".
+      # Exercise that decision in a shell interpreter launcher, but reject a
+      # false match instead of actually starting the incident's recursive tree.
+      cat > "$FAKEBIN_DIR/python3" <<'SH'
+#!/usr/bin/env bash
+(
+  IFS=:
+  if [ selected-version = system ]; then
+    echo 'recursive interpreter route: non-system version treated as system' >&2
+    exit 97
+  fi
+) || exit "$?"
+exec "$FM_TEST_REAL_PYTHON" "$@"
+SH
+      chmod +x "$FAKEBIN_DIR/python3"
+      out=$(FM_TEST_REAL_PYTHON="$real_python" BASH_ENV="$bash_env" PATH="$FAKEBIN_DIR:$PATH" \
+        python3 "$ROOT/bin/fm-dsh.py" route deepseek/test-model 2>&1)
+      expect_code 0 "$?" "the exclusion hook must preserve interpreter selection: $out"
+      assert_equals dsh "$out" "the interpreter route must finish without entering the pyenv prefix cycle"
       if [ "$kind" = scout ]; then
-        out=$(BASH_ENV="$bash_env" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout)
+        out=$(FM_TEST_REAL_PYTHON="$real_python" BASH_ENV="$bash_env" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout)
       else
-        out=$(BASH_ENV="$bash_env" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+        out=$(FM_TEST_REAL_PYTHON="$real_python" BASH_ENV="$bash_env" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
       fi
       status=$?
       [ ! -e "$HOME_DIR/config/crew-exclude-tools" ] || fail "the read-failure injection did not remove the list"
