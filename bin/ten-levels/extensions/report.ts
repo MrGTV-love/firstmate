@@ -113,13 +113,8 @@ export interface GuardService {
   readonly active: boolean;
   decide(state: State, questions: Questions): Promise<SystemOneResult>;
   /**
-   * The text of `state[field]` as the pieces to screen: itself when the whole request fits the ceiling, otherwise
-   * overlapping pieces that each fit it. Refuses before any egress when the payload cannot be covered completely.
-   */
-  plan(state: Record<string, unknown>, field: string, questions: Questions): string[];
-  /**
    * The pieces of a write that fit within MAX_CHUNKS requests; the caller screens any remainder locally.
-   * Unlike `plan`, each piece gets its own never-send check, so a value longer than the overlap can be cut across a boundary.
+   * Each piece gets its own never-send check, so a value longer than the overlap can be cut across a boundary.
    */
   planWrite(state: { path: string; content: string }, questions: Questions): { pieces: string[]; model_screened_bytes: number; local_only_bytes: number };
   record(terminal: GuardTerminal): void;
@@ -143,33 +138,6 @@ function mayRetry(cause: unknown, backoff: number): boolean {
   return RETRYABLE_FAILURES.has(failureType(cause));
 }
 
-/**
- * Cuts `text` into at most MAX_CHUNKS pieces whose JSON-escaped size is at most `room` bytes.
- * Each piece starts up to `overlap` escaped bytes before the previous one ended,
- * so every span of up to `overlap` minus one character's escape width lies whole inside some piece. Returns null when no complete cover fits.
- */
-export function splitForRoom(text: string, room: number, overlap = CHUNK_OVERLAP_BYTES): string[] | null {
-  if (room < 2 * overlap + 64 || text.length > MAX_CHUNKS * room) return null;
-  const points = Array.from(text);
-  const sizes = points.map((point) => Buffer.byteLength(JSON.stringify(point), "utf8") - 2);
-  const pieces: string[] = [];
-  let start = 0;
-  for (;;) {
-    let end = start;
-    let used = 0;
-    while (end < points.length && used + sizes[end] <= room) used += sizes[end++];
-    if (end === points.length) {
-      pieces.push(points.slice(start).join(""));
-      return pieces;
-    }
-    pieces.push(points.slice(start, end).join(""));
-    if (pieces.length >= MAX_CHUNKS) return null;
-    let back = 0;
-    start = end;
-    while (start > 0 && back + sizes[start - 1] <= overlap) back += sizes[--start];
-  }
-}
-
 /** JSON string width without allocating a string or serializing each code point. */
 function escapedPointBytes(point: number): number {
   if (point === 0x22 || point === 0x5c || point === 8 || point === 9 || point === 10 || point === 12 || point === 13) return 2;
@@ -177,7 +145,7 @@ function escapedPointBytes(point: number): number {
   return point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
 }
 
-/** Bounded write-only prefix; result plans still require a complete cover. */
+/** Bounded write-only prefix. */
 function writePieces(text: string, room: number): { pieces: string[]; covered: number } {
   if (room < 2 * CHUNK_OVERLAP_BYTES + 64) throw new GuardUnavailableError("RequestTooLargeError");
   const pieces: string[] = [];
@@ -282,19 +250,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
           requestStarted ? { attempts: tries, elapsedMs: Math.round(performance.now() - started) } : undefined);
       }
     },
-    plan(state, field, questions) {
-      const text = state[field];
-      if (typeof text !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-      if (text.length > MAX_CHUNKS * MAX_REQUEST_BYTES) throw new GuardUnavailableError("RequestTooLargeError");
-      const whole = JSON.stringify({ model: GUARD_MODEL, state, questions });
-      if (Buffer.byteLength(whole, "utf8") <= MAX_REQUEST_BYTES) return [text];
-      const frame = Buffer.byteLength(JSON.stringify({ model: GUARD_MODEL, state: { ...state, [field]: "" }, questions }), "utf8");
-      const pieces = splitForRoom(text, MAX_REQUEST_BYTES - frame);
-      if (!pieces) throw new GuardUnavailableError("RequestTooLargeError");
-      // The never-send policy sees the whole payload before any piece leaves, so one clean piece is never sent beside a refused one.
-      permitted(whole);
-      return pieces;
-    },
     planWrite(state, questions) {
       const whole = JSON.stringify({ model: GUARD_MODEL, state, questions });
       const bytes = Buffer.byteLength(state.content, "utf8");
@@ -365,7 +320,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         try {
           execFileSync("python3", [resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py"),
             "refusal", "FM-JEV-SIZE", "complete-screening-budget", `${terminal.hook}-${terminal.tool}`,
-            `${context.task}:${terminal.hook}:${terminal.tool}`, terminal.tool === "write" || terminal.tool === "edit" ? "machine" : "human-only",
+            `${context.task}:${terminal.hook}:${terminal.tool}`, "machine",
             context.task, fileURLToPath(import.meta.url)], {
             env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"], timeout: preflightTimeout(),
           });

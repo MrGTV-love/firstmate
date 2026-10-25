@@ -650,7 +650,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const { splitForRoom, MAX_REQUEST_BYTES, MAX_CHUNKS, CHUNK_OVERLAP_BYTES } = await import(pathToFileURL(process.env.REPORT));
+const { MAX_REQUEST_BYTES, MAX_CHUNKS, CHUNK_OVERLAP_BYTES } = await import(pathToFileURL(process.env.REPORT));
 const home = process.env.HOME_DIR;
 const handlers = {};
 installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'oversize', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
@@ -751,35 +751,6 @@ try {
   assert.equal(sent().length, before, 'a clean piece must not leave beside a refused one');
 } finally {
   rmSync(`${home}/config/dispatch-never-send`);
-}
-
-// Every short span lies whole inside one piece, and every piece fits its room in escaped bytes.
-const room = MAX_REQUEST_BYTES - 900;
-const samples = {
-  tokens: Array.from({ length: 6000 }, (_, i) => `<${i}>`).join(''),
-  escapes: Array.from({ length: 5000 }, (_, i) => `é"\\<${i}>\t`).join(''),
-  astral: Array.from({ length: 5000 }, (_, i) => `😀<${i}>`).join(''),
-};
-for (const [name, text] of Object.entries(samples)) {
-  const pieces = splitForRoom(text, room);
-  assert.ok(pieces.length >= 3 && pieces.length <= MAX_CHUNKS, `${name}: ${pieces.length}`);
-  for (const piece of pieces) assert.ok(Buffer.byteLength(JSON.stringify(piece)) - 2 <= room, `${name}: a piece exceeds its room`);
-  for (const token of text.match(/<\d+>/g)) assert.ok(pieces.some(piece => piece.includes(token)), `${name}: ${token} was cut`);
-  assert.ok(pieces.every(piece => !/[\ud800-\udfff]/.test(piece.replace(/[\ud800-\udbff][\udc00-\udfff]/g, ''))), `${name}: a surrogate pair was split`);
-}
-assert.equal(splitForRoom('x', 100), null, 'no room beyond the overlap means no complete cover');
-
-// A span of 1,000 bytes lies whole inside one piece wherever the cut falls, including a cut through the middle of it.
-const tight = 2 * CHUNK_OVERLAP_BYTES + 64;
-for (const span of ['m'.repeat(1000), '😀'.repeat(250)]) {
-  let cutThrough = 0;
-  for (let at = tight - 1000; at <= tight; at++) {
-    const pieces = splitForRoom('a'.repeat(at) + span + 'b'.repeat(50), tight);
-    assert.equal(pieces.length, 2, `span at ${at}`);
-    assert.ok(pieces.some(piece => piece.includes(span)), `a 1,000-byte span at ${at} was cut`);
-    if (!pieces[0].includes(span)) cutThrough++;
-  }
-  assert.equal(cutThrough, 1000, 'the cut fell through the span at every offset but one');
 }
 
 console.log('oversize-ok');

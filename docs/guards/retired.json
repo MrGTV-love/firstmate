@@ -59,7 +59,7 @@
     "tier": "A",
     "why": "data/fm-jev-guard-e2e/report.md sections 3.2 and 7.4: an exemption that existed only to keep the result screen off task-owned reads; it never refused anything",
     "replaced_by": "nothing; with no result screen there is nothing to exempt",
-    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+    "retirement_test": "tests/fm-retired-jev-trusted-read.test.sh"
   },
   {
     "id": "jev-channel-consistency",
@@ -70,7 +70,7 @@
     "tier": "A",
     "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 7.4 and 8: it only exempted a consistent record from screening and never refused a forged one, so its publisher receipts had no other consumer",
     "replaced_by": "nothing; launch and steering records reach the worker unchanged and their publishers write no receipt",
-    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+    "retirement_test": "tests/fm-retired-jev-channel-consistency.test.sh"
   },
   {
     "id": "jev-producer-field-exclusion",
@@ -81,7 +81,7 @@
     "tier": "A",
     "why": "data/fm-jev-guard-e2e/report.md sections 3.2 and 7.4: a command list, omp trailer match and wall-time allowance that existed only to keep the result screen from withholding local tool help",
     "replaced_by": "nothing; local tool output, help lines included, reaches the worker unchanged",
-    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+    "retirement_test": "tests/fm-retired-jev-producer-field-exclusion.test.sh"
   },
   {
     "id": "jev-result-size-refusal",
@@ -92,6 +92,6 @@
     "tier": "A",
     "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.6 and 7.4: the result half of the size refusal withheld large outputs only because the result screen could not cover them; the pre-tool size refusal is unchanged",
     "replaced_by": "nothing; large results reach the worker unchanged",
-    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+    "retirement_test": "tests/fm-retired-jev-result-size-refusal.test.sh"
   }
 ]

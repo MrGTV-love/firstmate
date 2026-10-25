@@ -22,7 +22,6 @@ const answer = (noul = 0.05) => ({ model: 'fixture', answers: {
   kind: { type: 'choice', choice: 'code', confidence: 1 }, contains_secret: { type: 'noul', noul },
 }, usage: { input_tokens: 3, output_tokens: 1 }, meta: { provider: 'typesafe', attempts: 1, elapsedMs: 7, cost: { amount: 0.001, source: 'reported' } } });
 mock.module(reportUrl, { namedExports: { ...report, createGuardService: () => ({ ...service,
-  plan: () => parts.map((_, i) => String(i)),
   planWrite: state => ({ pieces: parts.map((_, i) => String(i)), model_screened_bytes: Buffer.byteLength(state.content), local_only_bytes: 0 }),
   decide: async () => { const part = parts[next++]; if (part instanceof Error) throw part; return part; },
 }) } });
