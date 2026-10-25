@@ -1890,7 +1890,9 @@ fm_lint_load_average() {
 }
 
 fm_lint_aggregate_cpu() {
-  ps -A -o %cpu= 2>/dev/null | awk '{sum += $1} END {printf "%.2f", sum + 0}'
+  local sample
+  sample=$(ps -A -o %cpu= 2>/dev/null) || { printf 'unavailable'; return 0; }
+  printf '%s\n' "$sample" | awk '{sum += $1} END {printf "%.2f", sum + 0}'
 }
 
 TELEMETRY_START_EPOCH=0

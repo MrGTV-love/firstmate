@@ -281,6 +281,36 @@ def child(manifest):
         zombie.wait()
     finally:
         os.environ.pop("FM_WRITE_CONFINEMENT")
+    # The orphan reaper and the lint CPU sample read process facts through the
+    # helper or report the sample as unavailable, never a false 0.00.
+    repo_bin = Path(manifest["repo"]) / "bin"
+    reap_dir = Path(os.environ["TMPDIR"]).resolve() / "reap"
+    reap_root = reap_dir / "fm-reap-probe"
+    reap_root.mkdir(parents=True)
+    gone = subprocess.Popen(["true"])
+    gone.wait()
+    (reap_root / ".fm-test-fixture").write_text(f"{gone.pid}\ngone owner\n")
+    spawner = subprocess.run(["/bin/sh", "-c", 'python3 -c "import time; time.sleep(60)" "$1" >/dev/null 2>&1 & echo $!', "sh",
+                              str(reap_root / "stub")], capture_output=True, text=True)
+    orphan = int(spawner.stdout.strip())
+    reap = subprocess.run(["bash", str(repo_bin / "fm-test-reap-orphans.sh"), "--tmpdir", str(reap_dir)],
+                          capture_output=True, text=True, env=dict(os.environ, FM_WRITE_CONFINEMENT="seatbelt-v1"))
+    for _ in range(50):
+        try:
+            os.kill(orphan, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
+        os.kill(orphan, signal.SIGKILL)
+        orphan = None
+    results["reap-orphan"] = reap.returncode == 0 and orphan is not None
+    telemetry = Path(os.environ["TMPDIR"]) / "lint-telemetry.tsv"
+    subprocess.run(["bash", str(repo_bin / "fm-lint.sh"), "--telemetry", str(telemetry), str(repo_bin / "fm-proc-budget.sh")],
+                   capture_output=True, text=True, env=dict(os.environ, FM_DURATION_FILE="off"))
+    rows = dict(line.split("\t", 1) for line in telemetry.read_text().splitlines() if "\t" in line) if telemetry.exists() else {}
+    cpu = (rows.get("aggregate_cpu_percent_start"), rows.get("aggregate_cpu_percent_end"))
+    results["lint-cpu-sample"] = None not in cpu and all(value != "0.00" for value in cpu)
     with (state / "task.status").open("a") as stream:
         stream.write("working\n")
     results["e-append"] = (state / "task.status").read_text() == "working\n"
