@@ -1,0 +1,1 @@
+{"hook":"tool_call","tool":"write","decision":"block","enforcement":"pretool_deny","branch":"policy","error_type":null}

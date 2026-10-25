@@ -1,0 +1,16 @@
+== change only bin/fm-jev-guard.ts -> bin/fm-test-run.sh --list --changed --base HEAD~1 | grep retired
+tests/fm-retired-jev-channel-consistency.test.sh
+tests/fm-retired-jev-omp-result-screen.test.sh
+tests/fm-retired-jev-producer-field-exclusion.test.sh
+tests/fm-retired-jev-result-size-refusal.test.sh
+tests/fm-retired-jev-trusted-read.test.sh
+== change only bin/fm-operational-input.sh -> bin/fm-test-run.sh --list --changed --base HEAD~1 | grep retired
+tests/fm-retired-jev-channel-consistency.test.sh
+== change only bin/fm-task-inbox-lib.sh -> bin/fm-test-run.sh --list --changed --base HEAD~1 | grep retired
+tests/fm-retired-jev-channel-consistency.test.sh
+== change only bin/ten-levels/extensions/report.ts -> bin/fm-test-run.sh --list --changed --base HEAD~1 | grep retired
+tests/fm-retired-jev-channel-consistency.test.sh
+tests/fm-retired-jev-omp-result-screen.test.sh
+tests/fm-retired-jev-producer-field-exclusion.test.sh
+tests/fm-retired-jev-result-size-refusal.test.sh
+tests/fm-retired-jev-trusted-read.test.sh

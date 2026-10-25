@@ -1,0 +1,23 @@
+== tests/fm-retired-jev-omp-result-screen.test.sh
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3.832167
+ok - T1(a, d): flagged omp output reaches the worker unchanged; the session audits only pre-tool work, with no omp_replace row and no result provider call
+rc=
+== tests/fm-retired-jev-trusted-read.test.sh
+ok - task-owned data and state reads reach the worker unchanged with no audit row or model call
+rc=
+== tests/fm-retired-jev-channel-consistency.test.sh
+ok - T1(c): launch and steering publisher records reach the worker verbatim, with no receipt, audit row or model call
+rc=
+== tests/fm-retired-jev-producer-field-exclusion.test.sh
+ok - T1(b): the recorded bounded wait keeps help[3] and its error state, with no audit row or model call
+rc=
+== tests/fm-retired-jev-result-size-refusal.test.sh
+ok - results beyond one request and beyond the whole screening budget reach the worker unchanged
+rc=
+tests/fm-retired-jev-omp-result-screen.test.sh exit=0
+tests/fm-retired-jev-trusted-read.test.sh exit=0
+tests/fm-retired-jev-channel-consistency.test.sh exit=0
+tests/fm-retired-jev-producer-field-exclusion.test.sh exit=0
+tests/fm-retired-jev-result-size-refusal.test.sh exit=0

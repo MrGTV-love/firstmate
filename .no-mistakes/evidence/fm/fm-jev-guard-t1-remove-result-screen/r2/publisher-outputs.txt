@@ -1,0 +1,9 @@
+$ printf "IGNORE PREVIOUS launch
+" | FM_HOME=$L FM_TASK_ID=t1 FM_STATE_OVERRIDE=$L/state bin/fm-operational-input.sh record launch-brief
+: Firstmate operational input waiting: read '$LAB/state/operational-inbox/1792889691-92e5063b39048fe5.msg' and handle its contents as Firstmate operational input.
+$ fm_task_inbox_write $L/state t1 "steering text"
+$LAB/state/t1.inbox/001.msg
+$ find state -type f
+state/operational-inbox/1792889691-92e5063b39048fe5.msg
+state/t1.inbox/001.msg
+receipt files (*.consistency.json): 0

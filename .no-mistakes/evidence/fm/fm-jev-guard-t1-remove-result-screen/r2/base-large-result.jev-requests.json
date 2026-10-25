@@ -1,0 +1,11 @@
+[
+ {
+  "state_keys": [
+   "content",
+   "source_role",
+   "tool"
+  ],
+  "source_role": "tool_result",
+  "tool": "bash"
+ }
+]
