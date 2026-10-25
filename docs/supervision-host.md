@@ -232,7 +232,8 @@ Every path that cannot finish a wake the engine took hands that wake to main, wi
 Before handing it back, the host stops its successor cycle, and whenever a successor generation was recorded (confirmed or not), it explicitly republishes downtime for that generation.
 That publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
 If that publication fails, the hand-back adds a `supervision-host: watcher downtime could not be restored` line and the host exits nonzero.
-Claude delivers an actionable host close through its normal generation-owned rewake even when a concurrent drain leaves the unacknowledged marker in handling; [watcher continuity](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns eligibility and refusal, independent of successor health.
+Claude delivers an actionable host close through its normal generation-owned rewake even when a concurrent drain leaves the unacknowledged marker in handling, as long as main still has a queued row its drains have not presented.
+When main's own drain already presented every row, the rewake is refused in silence, because main's turn already holds the close; [watcher continuity](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns eligibility and refusal, independent of successor health.
 So the owner's next arm starts from the same state as without the host, and the wake stays durable in the queue.
 
 ### Paths that hand the wake back

@@ -1549,6 +1549,7 @@ write_host_fixture() {
         [ "$kind" = lost-handback ] || marker=announced
         printf "printf '%s:handling:fixture-generation\\\\n' > \"\$FM_HOME/state/.watcher-down\"\\n" "$marker"
         cat <<'SH'
+printf '1\t1\tsignal\tfixture.status\tsignal: fixture.status\n' >> "$FM_HOME/state/.wake-queue"
 printf 'signal: fixture.status\n'
 printf 'supervision-host: branch-outcome: fixture\n'
 printf 'supervision-host: watcher downtime could not be restored for the main hand-back\n'
@@ -1794,6 +1795,63 @@ SH
   done
 }
 
+# The same overlap when main's own drain presents the newer row inside the host
+# successor window: main's turn already holds that close, so the host's copy is
+# refused in silence instead of waking main a second time for it.
+test_host_handback_main_presented_is_not_redelivered() {
+  local phase watcher dir out status pid identity drain generation cutoff
+  for phase in pending announced; do
+    for watcher in absent live; do
+      dir=$(make_primary_dir "$TMP_ROOT/host-main-drain-$phase-$watcher")
+      rm -f "$dir/config/supervision-host-off"
+      : > "$dir/state/task.meta"
+      cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ ! -e "$FM_HOME/state/host-prepared" ]; then
+  . "$FM_TEST_REAL_BIN/fm-wake-lib.sh"
+  fm_wake_append check main-new 'check: newer main-only host handback'
+  if [ "$FM_TEST_OVERLAP_PHASE" = announced ]; then
+    fm_recovery_marker_arm_check "$STATE/.watcher-down"
+  fi
+  FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$STATE/main-drain" 2>&1
+  fm_recovery_marker_snapshot "$STATE/.watcher-down"
+  printf '%s\n' "$FM_RECOVERY_MARKER_TOKEN" > "$STATE/before-handback"
+  : > "$STATE/host-prepared"
+fi
+printf 'check: newer main-only host handback\n'
+SH
+      chmod +x "$dir/bin/fm-supervision-host.sh"
+      pid=
+      if [ "$watcher" = live ]; then
+        live_fixture &
+        pid=$!
+        identity=$(watcher_identity "$dir" "$pid") || fail "could not identify main-drain successor"
+        record_watcher_lock "$dir" "$pid" "$identity"
+        touch "$dir/state/.last-watcher-beat"
+      fi
+      out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+      if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+      fi
+      assert_contains "$(cat "$dir/state/before-handback")" "$phase:handling:" "the real main drain must expose the handling interleaving"
+      assert_contains "$(cat "$dir/state/main-drain")" 'check: newer main-only host handback' "main's drain must present the newer row"
+      expect_code 0 "$status" "$phase/$watcher: a close main already presented must not wake main again"
+      assert_not_contains "$out" 'auto-arm FAILED' "$phase/$watcher: a deduplicated handback is not an auto-arm failure"
+      [ "$(epoch_outcome "$dir")" = refused ] || fail "$phase/$watcher: main-presented handback was not refused: $(epoch_outcome "$dir")"
+      assert_absent "$dir/state/.claude-autoarm-failure-notified" "a deduplicated handback opened a failure episode"
+      [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" -eq 1 ] || fail "refusal consumed a durable row"
+      drain=$(cat "$dir/state/main-drain")
+      generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
+      cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+      FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 || fail "main's acknowledgement of its presented row failed"
+      [ ! -s "$dir/state/.wake-queue" ] || fail "main's acknowledgement left rows behind"
+      pass "auto-arm: $phase/$watcher host handback main already presented is refused without a second wake"
+    done
+  done
+}
+
 test_host_stand_down_is_silent() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/host-stand-down")
@@ -2024,6 +2082,7 @@ test_host_handback_carries_every_host_line
 test_host_stand_down_is_silent
 test_host_benign_rewake_refusal_opens_no_failure_episode
 test_host_handback_during_open_handling_commits_normally
+test_host_handback_main_presented_is_not_redelivered
 test_host_handling_handback_lost_session_never_delivers
 test_host_actionable_failed_restoration_still_commits_normally
 test_host_failed_handback_is_not_retried

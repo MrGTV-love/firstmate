@@ -269,10 +269,11 @@ autoarm_commit() {  # <outcome> [marker-file]
       pending:handling:*|announced:handling:*)
         # A shared recovery phase is not a delivery receipt for this host's
         # close: a branch drain can enter handling with main's wake still
-        # queued. The current host's actionable close stays owed until the
-        # episode is acknowledged, subject to the same session/generation
-        # ownership checks as a downtime close.
+        # queued. The close stays owed only while main has a queued row its
+        # drains have not presented; once main presented them all, its own
+        # turn already holds the close and a rewake would duplicate it.
         [ "$HOST_MODE" -eq 1 ] || return 2
+        fm_wake_main_unpresented || return 2
         recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
         ;;
       *) return 2 ;;

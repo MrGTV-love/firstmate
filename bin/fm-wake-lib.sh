@@ -3051,6 +3051,30 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   printf '%s\n' "$count"
 }
 
+# 0 when main owns a queued row its drains have not yet presented: a
+# structurally valid row no live branch grant reserves and main's presented-row
+# claim (state/.main-eligible-rows, written by bin/fm-wake-drain.sh before it
+# enters handling) does not name. Read without the queue lock, like the count
+# above; a queue that exists but cannot be read counts as unpresented.
+fm_wake_main_unpresented() {
+  local rows="$STATE/.branch-eligible-rows" owner="$STATE/.branch-eligible-owner"
+  local presented="$STATE/.main-eligible-rows" grant='' count=''
+  [ -f "$FM_WAKE_QUEUE" ] || return 1
+  if fm_wake_branch_grant_live "$rows" "$owner"; then
+    grant=$rows
+  fi
+  count=$(awk -F '\t' -v seqs="$grant" -v presented="$presented" '
+    BEGIN {
+      if (seqs != "") while ((getline line < seqs) > 0) reserved[line] = 1
+      while ((getline line < presented) > 0) shown[line] = 1
+    }
+    NF >= 5 && $2 ~ /^[0-9]+$/ && !($2 in reserved) && !($2 in shown) { n++ }
+    END { print n + 0 }
+  ' "$FM_WAKE_QUEUE") || return 0
+  case "$count" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$count" -gt 0 ]
+}
+
 fm_wake_main_rows() {
   local rows="$STATE/.branch-eligible-rows" queued parent
   local owner="$STATE/.branch-eligible-owner" grant=''
