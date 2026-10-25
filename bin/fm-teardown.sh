@@ -76,10 +76,6 @@
 # An absent recorded copy or one that is not a Git worktree completes only
 # when its recorded GitHub PR is confirmed merged by the forge, or through
 # captain-authorized forced discard below; otherwise the backlog stays open.
-# Teardown deletes a task branch only from inside a copy it returns or removes,
-# so retiring a record whose copy is already gone keeps the branch and its
-# commits in the shared repository; docs/agent-control.md "Relocating a task
-# whose worktree is gone" relies on that to recover such a task's work.
 # The one exception is a task's own nested copy that an earlier teardown
 # removed: teardown_nested_slot judges it first by its branch= ref.
 # After landing and runtime cleanup pass, ship teardown also reaps only local

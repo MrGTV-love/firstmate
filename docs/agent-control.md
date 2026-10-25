@@ -556,24 +556,7 @@ A scout has no branch to match and a secondmate's home is not a task copy, so bo
 The lease is the only accepted source: a hand-made `git worktree add` copy, an Orca-allocated worktree, and a project with no Treehouse pool refuse by name, because none of them can prove which allocator produced the copy.
 The `<pool>/<slot>/<repo>` layout is not that proof, since a hand-made copy can reproduce it; the copy must also have an entry, in any lease state, in its pool's Treehouse state file, which only Treehouse writes.
 
-**A task whose project has no Treehouse lease.**
-For a ship of an Orca-backed project, or of a project with no Treehouse pool, in-place relocation is unavailable, because no copy made for it carries lease proof.
-Its branch and commits still survive in the shared repository, so recover the work as a new task on top of that branch, never by recreating it:
-
-1. Read the recorded branch from `branch=` in `state/<id>.meta` (`fm/<id>` when the line is absent), confirm that `git -C <project> log <branch>` shows the task's commits, and note its head with `git -C <project> rev-parse <branch>`.
-   Do not delete that branch or run `git worktree prune`, because the branch and the vanished copy's registration are the only record of the work.
-2. Retire the old task record before spawning its replacement.
-   Its copy is gone and its work has not landed, so [`bin/fm-teardown.sh`](../bin/fm-teardown.sh) completes it only as a captain-authorized drop: write the captain's own words approving the drop to a file and run `bin/fm-teardown.sh <id> --force --drop-file <file>`.
-   Teardown deletes a task branch only from inside a copy it returns or removes, so retiring a record whose copy is already gone keeps the branch and its commits in the shared repository.
-   The old backlog item closes as dropped, and the record no longer holds a place in the project's worker capacity.
-3. Scaffold and spawn a new ship task for the same project the ordinary way, with `bin/fm-brief.sh` and `bin/fm-spawn.sh`, under a new task id.
-   Its `## Firstmate spec` names the surviving branch and the head from step 1, and tells the worker to bring that work in first.
-4. Inside its own copy, the new worker runs `git merge <surviving branch>`, then confirms that `git merge-base --is-ancestor <surviving head> HEAD` succeeds.
-   The commits are already in the shared repository, so the merge brings them in from the recorded branch and no work is rewritten.
-5. The surviving branch, not the old record, carries the work.
-   Retiring the record first therefore loses nothing, and a project that declares a worker capacity is never blocked by a record whose copy is gone.
-
-A Treehouse project's hand-made copy does not take this route: it takes the lease procedure below.
+A ship of an Orca-backed project, or of a project with no Treehouse pool, has no in-place relocation, because no lease can prove its copy; continue its work on a new task from the surviving branch, and a detailed procedure for that is follow-up work.
 
 [`bin/fm-control-worktree-lib.sh`](../bin/fm-control-worktree-lib.sh) owns the proof, and both `fm-control` and `fm-spawn --relaunch --worktree` run it, so the two cannot disagree.
 The control-plane preflight checks all of the conditions below before stopping the agent or writing the relaunch journal or progress note.
