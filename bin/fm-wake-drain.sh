@@ -1078,6 +1078,7 @@ if [ "$ACTOR" = main ]; then
     assert_watcher_liveness
     exit "$BRANCH_OUTCOMES_RC"
   fi
+  fm_wake_main_presentation_hold 2>/dev/null || true
 fi
 
 fm_recovery_marker_snapshot "$RECOVERY_MARKER" || true

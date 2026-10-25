@@ -1796,16 +1796,20 @@ SH
 }
 
 # The same overlap when main's own drain presents the newer row inside the host
-# successor window: main's turn already holds that close, so the host's copy is
-# refused in silence instead of waking main a second time for it.
-test_host_handback_main_presented_is_not_redelivered() {
-  local phase watcher dir out status pid identity drain generation cutoff
-  for phase in pending announced; do
-    for watcher in absent live; do
-      dir=$(make_primary_dir "$TMP_ROOT/host-main-drain-$phase-$watcher")
-      rm -f "$dir/config/supervision-host-off"
-      : > "$dir/state/task.meta"
-      cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
+# successor window. While the presenting main turn is open, or after it acked
+# in-turn, that turn holds the close, so the host's copy is refused in silence.
+# Once that turn's Stop fires (deferring to the parked host's open claim)
+# without an ack, nothing holds the still-queued row and the close is delivered
+# exactly once.
+test_host_handback_after_main_presentation() {
+  local phase watcher mode dir out status pid identity drain generation cutoff queued
+  for mode in open acked ended; do
+    for phase in pending announced; do
+      for watcher in absent live; do
+        dir=$(make_primary_dir "$TMP_ROOT/host-main-drain-$mode-$phase-$watcher")
+        rm -f "$dir/config/supervision-host-off"
+        : > "$dir/state/task.meta"
+        cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
 set -eu
 if [ ! -e "$FM_HOME/state/host-prepared" ]; then
@@ -1817,37 +1821,71 @@ if [ ! -e "$FM_HOME/state/host-prepared" ]; then
   FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$STATE/main-drain" 2>&1
   fm_recovery_marker_snapshot "$STATE/.watcher-down"
   printf '%s\n' "$FM_RECOVERY_MARKER_TOKEN" > "$STATE/before-handback"
+  case "$FM_TEST_MAIN_TURN" in
+    acked)
+      # shellcheck disable=SC2046
+      set -- $(sed -n 's|^WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh ||p' "$STATE/main-drain")
+      FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" "$@" > "$STATE/main-ack" 2>&1
+      ;;
+    ended)
+      rc=0
+      printf '%s\n' '{"session_id":"sess-autoarm","stop_hook_active":false}' \
+        | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$STATE/turn-stop" 2>&1 || rc=$?
+      printf '%s\n' "$rc" > "$STATE/turn-stop-rc"
+      ;;
+  esac
   : > "$STATE/host-prepared"
 fi
 printf 'check: newer main-only host handback\n'
 SH
-      chmod +x "$dir/bin/fm-supervision-host.sh"
-      pid=
-      if [ "$watcher" = live ]; then
-        live_fixture &
-        pid=$!
-        identity=$(watcher_identity "$dir" "$pid") || fail "could not identify main-drain successor"
-        record_watcher_lock "$dir" "$pid" "$identity"
-        touch "$dir/state/.last-watcher-beat"
-      fi
-      out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
-      if [ -n "$pid" ]; then
-        kill "$pid" 2>/dev/null || true
-        wait "$pid" 2>/dev/null || true
-      fi
-      assert_contains "$(cat "$dir/state/before-handback")" "$phase:handling:" "the real main drain must expose the handling interleaving"
-      assert_contains "$(cat "$dir/state/main-drain")" 'check: newer main-only host handback' "main's drain must present the newer row"
-      expect_code 0 "$status" "$phase/$watcher: a close main already presented must not wake main again"
-      assert_not_contains "$out" 'auto-arm FAILED' "$phase/$watcher: a deduplicated handback is not an auto-arm failure"
-      [ "$(epoch_outcome "$dir")" = refused ] || fail "$phase/$watcher: main-presented handback was not refused: $(epoch_outcome "$dir")"
-      assert_absent "$dir/state/.claude-autoarm-failure-notified" "a deduplicated handback opened a failure episode"
-      [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" -eq 1 ] || fail "refusal consumed a durable row"
-      drain=$(cat "$dir/state/main-drain")
-      generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
-      cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
-      FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 || fail "main's acknowledgement of its presented row failed"
-      [ ! -s "$dir/state/.wake-queue" ] || fail "main's acknowledgement left rows behind"
-      pass "auto-arm: $phase/$watcher host handback main already presented is refused without a second wake"
+        chmod +x "$dir/bin/fm-supervision-host.sh"
+        pid=
+        if [ "$watcher" = live ]; then
+          live_fixture &
+          pid=$!
+          identity=$(watcher_identity "$dir" "$pid") || fail "could not identify main-drain successor"
+          record_watcher_lock "$dir" "$pid" "$identity"
+          touch "$dir/state/.last-watcher-beat"
+        fi
+        out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" FM_TEST_MAIN_TURN="$mode" run_autoarm "$dir" 2>/dev/null); status=$?
+        if [ -n "$pid" ]; then
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+        fi
+        assert_contains "$(cat "$dir/state/before-handback")" "$phase:handling:" "the real main drain must expose the handling interleaving"
+        assert_contains "$(cat "$dir/state/main-drain")" 'check: newer main-only host handback' "main's drain must present the newer row"
+        assert_not_contains "$out" 'auto-arm FAILED' "$mode/$phase/$watcher: a main-presented handback is not an auto-arm failure"
+        assert_absent "$dir/state/.claude-autoarm-failure-notified" "$mode/$phase/$watcher: a main-presented handback opened a failure episode"
+        queued=$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')
+        case "$mode" in
+          open)
+            expect_code 0 "$status" "$phase/$watcher: a close the open main turn holds must not wake main again"
+            [ "$(epoch_outcome "$dir")" = refused ] || fail "open/$phase/$watcher: held handback was not refused: $(epoch_outcome "$dir")"
+            [ "$queued" -eq 1 ] || fail "open/$phase/$watcher: refusal consumed a durable row"
+            ;;
+          acked)
+            expect_code 0 "$status" "$phase/$watcher: a close main acknowledged in-turn must not wake main again"
+            [ "$(epoch_outcome "$dir")" = refused ] || fail "acked/$phase/$watcher: acknowledged handback was not refused: $(epoch_outcome "$dir")"
+            [ "$queued" -eq 0 ] || fail "acked/$phase/$watcher: the in-turn acknowledgement left rows behind"
+            ;;
+          ended)
+            [ "$(cat "$dir/state/turn-stop-rc")" = 0 ] || fail "ended/$phase/$watcher: the turn's Stop firing did not defer to the open claim: $(cat "$dir/state/turn-stop")"
+            expect_code 2 "$status" "$phase/$watcher: a close left unacknowledged by an ended main turn must reach main"
+            [ "$(epoch_outcome "$dir")" = rewake ] || fail "ended/$phase/$watcher: unheld handback did not commit: $(epoch_outcome "$dir")"
+            [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "ended/$phase/$watcher: handback was not delivered exactly once: $out"
+            [ "$queued" -eq 1 ] || fail "ended/$phase/$watcher: translation consumed a durable row"
+            ;;
+        esac
+        if [ "$mode" != acked ]; then
+          drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "main could not drain its presented row again: $drain"
+          assert_contains "$drain" 'check: newer main-only host handback' "the unacknowledged row must remain drainable"
+          generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
+          cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+          FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 || fail "main's acknowledgement of its presented row failed"
+          [ ! -s "$dir/state/.wake-queue" ] || fail "main's acknowledgement left rows behind"
+        fi
+        pass "auto-arm: $mode/$phase/$watcher host handback after a main presentation is delivered at most once, and once when unheld"
+      done
     done
   done
 }
@@ -2082,7 +2120,7 @@ test_host_handback_carries_every_host_line
 test_host_stand_down_is_silent
 test_host_benign_rewake_refusal_opens_no_failure_episode
 test_host_handback_during_open_handling_commits_normally
-test_host_handback_main_presented_is_not_redelivered
+test_host_handback_after_main_presentation
 test_host_handling_handback_lost_session_never_delivers
 test_host_actionable_failed_restoration_still_commits_normally
 test_host_failed_handback_is_not_retried

@@ -226,6 +226,10 @@ if [ "$RECOVER_SESSION_LOCK" -eq 1 ]; then
   fm_session_lock_owned_by_self "$STATE" || exit 0
 fi
 
+# This Stop ends the owning session's main turn, so rows that turn presented
+# are no longer held by it, even when this firing defers to an open claim below.
+fm_wake_main_presentation_release 2>/dev/null || true
+
 # --- single-flight generation claim --------------------------------------------
 # Claude runs one background process per firing with no dedupe. Exactly one
 # generation owner arms and translates per event epoch: every firing defers to
@@ -269,9 +273,9 @@ autoarm_commit() {  # <outcome> [marker-file]
       pending:handling:*|announced:handling:*)
         # A shared recovery phase is not a delivery receipt for this host's
         # close: a branch drain can enter handling with main's wake still
-        # queued. The close stays owed only while main has a queued row its
-        # drains have not presented; once main presented them all, its own
-        # turn already holds the close and a rewake would duplicate it.
+        # queued. The close stays owed while main has a queued row no open
+        # main turn holds (fm_wake_main_unpresented); while main's open turn
+        # holds every row it presented, a rewake would duplicate the close.
         [ "$HOST_MODE" -eq 1 ] || return 2
         fm_wake_main_unpresented || return 2
         recovery=${FM_RECOVERY_MARKER_TOKEN##*:}

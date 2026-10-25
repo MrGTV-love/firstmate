@@ -3051,22 +3051,31 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   printf '%s\n' "$count"
 }
 
-# 0 when main owns a queued row its drains have not yet presented: a
-# structurally valid row no live branch grant reserves and main's presented-row
-# claim (state/.main-eligible-rows, written by bin/fm-wake-drain.sh before it
-# enters handling) does not name. Read without the queue lock, like the count
-# above; a queue that exists but cannot be read counts as unpresented.
+# Main's presented-row claim (state/.main-eligible-rows) outlives the turn that
+# presented it, because only an acknowledgement shrinks it and a branch grant
+# must keep excluding those rows. Whether an open main turn still holds them is
+# the separate held flag: bin/fm-wake-drain.sh sets it when main presents rows,
+# and the Claude Stop hook (bin/fm-claude-stop-autoarm.sh) clears it when a
+# main turn ends.
+fm_wake_main_presentation_hold() { : > "$STATE/.main-eligible-rows.held"; }
+fm_wake_main_presentation_release() { rm -f -- "$STATE/.main-eligible-rows.held"; }
+
+# 0 when main owns a queued row no open main turn holds: a structurally valid
+# row no live branch grant reserves, unless main's presented-row claim names it
+# while the held flag above is set. Read without the queue lock, like the count
+# above; a queue that exists but cannot be read counts as unheld.
 fm_wake_main_unpresented() {
   local rows="$STATE/.branch-eligible-rows" owner="$STATE/.branch-eligible-owner"
-  local presented="$STATE/.main-eligible-rows" grant='' count=''
+  local presented='' grant='' count=''
   [ -f "$FM_WAKE_QUEUE" ] || return 1
   if fm_wake_branch_grant_live "$rows" "$owner"; then
     grant=$rows
   fi
+  [ ! -e "$STATE/.main-eligible-rows.held" ] || presented="$STATE/.main-eligible-rows"
   count=$(awk -F '\t' -v seqs="$grant" -v presented="$presented" '
     BEGIN {
       if (seqs != "") while ((getline line < seqs) > 0) reserved[line] = 1
-      while ((getline line < presented) > 0) shown[line] = 1
+      if (presented != "") while ((getline line < presented) > 0) shown[line] = 1
     }
     NF >= 5 && $2 ~ /^[0-9]+$/ && !($2 in reserved) && !($2 in shown) { n++ }
     END { print n + 0 }
