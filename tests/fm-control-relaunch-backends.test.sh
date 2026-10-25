@@ -2071,6 +2071,33 @@ test_retiring_omp_removes_only_its_generated_configuration() {
   pass "OMP replacement retires generated policy without removing user configuration"
 }
 
+test_retiring_omp_for_an_unconfined_harness_removes_its_profile() {
+  local dir out rc artifact
+  dir=$(new_case omp-profile-retirement rl-omp-sb)
+  add_ship_task "$dir" rl-omp-sb omp
+  printf omp > "$dir/fake/command"
+  printf codex > "$dir/fake/becomes"
+  printf '(version 1)\n(allow default)\n' > "$dir/home/state/rl-omp-sb.write-confinement.sb"
+  printf 'export default () => {};\n' > "$dir/home/state/rl-omp-sb.omp-ext.ts"
+  printf '{"retry":{"modelFallback":false}}\n' > "$dir/home/state/rl-omp-sb.omp-fallback.yml"
+  printf '{"current_session_file":"retired"}\n' > "$dir/home/state/rl-omp-sb.omp-session.json"
+  for artifact in write-confinement.sb omp-ext.ts omp-fallback.yml omp-session.json; do
+    printf 'another task\n' > "$dir/home/state/rl-omp-sb-2.$artifact"
+  done
+  out=$(run_control "$dir" rl-omp-sb relaunch --harness codex --note "replace omp with an unconfined runtime"); rc=$?
+  expect_code 0 "$rc" "an omp to codex replacement must complete: $out"
+  assert_contains "$out" "harness=codex from=omp" "the outcome should name both harnesses"
+  assert_absent "$dir/home/state/rl-omp-sb.write-confinement.sb" "the omp confinement profile must not survive an unconfined replacement"
+  assert_absent "$dir/home/state/rl-omp-sb.omp-fallback.yml" "retired omp model policy must not survive replacement"
+  assert_absent "$dir/home/state/rl-omp-sb.omp-ext.ts" "retired omp callbacks must not survive replacement"
+  assert_absent "$dir/home/state/rl-omp-sb.omp-session.json" "the retired omp session binding must not survive replacement"
+  for artifact in write-confinement.sb omp-ext.ts omp-fallback.yml omp-session.json; do
+    assert_equals 'another task' "$(cat "$dir/home/state/rl-omp-sb-2.$artifact" 2>/dev/null)" \
+      "replacement must leave another task's $artifact in place"
+  done
+  pass "OMP replacement by an unconfined harness retires its own profile and generated files only"
+}
+
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
   local dir out rc recorded id
   for recorded in none stale; do
@@ -2096,6 +2123,7 @@ test_bounded_reboot_recovery_advances_after_interrupted_inspection
 test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
 test_retiring_omp_removes_only_its_generated_configuration
+test_retiring_omp_for_an_unconfined_harness_removes_its_profile
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
 test_quota_exhaustion_relaunches_only_a_permitted_route
 test_quota_recovery_keeps_the_typed_route_class
