@@ -228,6 +228,45 @@ test_push_baseline_is_every_remote() {
   pass "pushes to a URL, a new remote and a remote with no tracking refs skip origin's history and refuse a new credential"
 }
 
+test_remote_content_replays_name_the_likely_cause() {
+  local repo origin hooks out before
+  repo="$TMP_ROOT/remote-replay"
+  origin="$TMP_ROOT/remote-replay-origin.git"
+  hooks="$TMP_ROOT/hooks-remote-replay"
+  make_repo "$repo"
+  git init -q --bare "$origin"
+  git -C "$repo" remote add origin "$origin"
+  git -C "$repo" push -q origin main
+  git -C "$repo" checkout -q -b side
+  printf 'E2E_KEY=%s\n' "$(aws_shape)" >"$repo/fixture.sh"
+  git -C "$repo" add fixture.sh
+  git -C "$repo" commit -qm 'fixture already on a remote'
+  git -C "$repo" push -q origin side
+  git -C "$repo" checkout -q main
+  git -C "$repo" branch -q -D side
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q -b topic
+  git -C "$repo" merge -q --squash origin/side >/dev/null
+  before=$(git -C "$repo" rev-parse HEAD)
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'squash of a commit already on origin' 2>&1) &&
+    fail "F2: a squash of remote content was committed by the check"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "F2: refused squash moved HEAD"
+  assert_contains "$out" fixture.sh "F2: squash refusal did not name the file"
+  assert_contains "$out" "cherry-pick, revert or squash of a commit already on a remote" "F2: squash refusal did not name the likely cause"
+  assert_contains "$out" "escalate to Firstmate naming the file and line" "F2: squash refusal did not name the next step"
+  assert_not_contains "$out" AKIA "F2: squash refusal printed the matching value"
+  git -C "$repo" reset -q --hard main
+  git -C "$repo" cherry-pick origin/side >/dev/null
+  out=$(with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic 2>&1) &&
+    fail "F2: a cherry-pick of remote content was pushed by the check"
+  assert_contains "$out" fixture.sh "F2: cherry-pick push refusal did not name the file"
+  assert_contains "$out" "cherry-pick, revert or squash of a commit already on a remote" "F2: cherry-pick push refusal did not name the likely cause"
+  assert_contains "$out" "escalate to Firstmate naming the file and line" "F2: cherry-pick push refusal did not name the next step"
+  assert_not_contains "$out" AKIA "F2: cherry-pick push refusal printed the matching value"
+  assert_equals '' "$(git -C "$origin" for-each-ref refs/heads/topic)" "F2: refused cherry-pick push reached the remote"
+  pass "squash and cherry-pick replays of remote content stay refused and name the likely cause and escalation"
+}
+
 test_moved_lines_are_not_rescanned() {
   local repo remote hooks out before old=tests/fm-voice-relay.test.sh moved=tests/fm-voice-relay-e2e.test.sh lines
   repo="$TMP_ROOT/moved-fixtures"
@@ -436,6 +475,7 @@ test_credentials_are_checked_at_commit_and_push 1
 test_existing_lines_are_not_rescanned_at_commit
 test_merges_scan_only_lines_new_to_every_parent
 test_push_baseline_is_every_remote
+test_remote_content_replays_name_the_likely_cause
 test_moved_lines_are_not_rescanned
 test_repeated_refusals_escalate_without_admitting
 test_inspection_failures_escalate_and_keep_line_counts pre-commit

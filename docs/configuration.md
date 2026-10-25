@@ -2623,6 +2623,8 @@ Existing and moved lines are not scanned again; only new lines are: within one d
 A merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
 At push time it scans the lines each outgoing commit adds relative to all of its parents, with the same per-commit move cancellation, including intermediate commits that a later commit cleans up.
 A commit is outgoing unless an advertised old tip or any remote-tracking ref, of any remote, already reaches it, so pushing to a URL or a new remote does not rescan history already on another remote.
+This exclusion follows commits, not content: a cherry-pick, revert or squash (including `git merge --squash`) of a commit already on a remote makes a new commit whose diff adds that commit's lines again, so a credential-shaped line already on a remote can be falsely refused at commit or push.
+Each content refusal names that likely cause and tells the worker, in that case, to escalate to Firstmate naming the file and line, so Firstmate can confirm the line is already on `origin`; the check itself stays refused and has no content baseline.
 Each commit and push decision appends one `git-commit-credential-shapes` or `git-push-credential-shapes` event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh), whose `repeat` is the highest consecutive refusal count for the same credential-shaped line, identified by its content hash; different refused content starts at one even if an earlier attempt was abandoned.
 A failed inspection is a separate episode: it counts under a reserved `inspection-failed` key, reaches the same escalation on retry, and keeps the per-line counts.
 Only an allowed decision clears the counts.
@@ -2633,7 +2635,7 @@ It reports affected file names only, never matching values, and refuses when ins
 Writing a credential to an ignored `.env` is allowed and stages nothing; force-adding that file still subjects it to the commit check.
 Placeholders such as `replace-me` pass, but an added placeholder shaped like one of the listed credentials can fail; unfamiliar or encoded credentials can be missed.
 This is a client-side check, not a security boundary against hook bypass, alternate Git object writers, or pushes made outside the task launch environment.
-[`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, renamed and split files, conflicted merges, repeated and abandoned refusals, outgoing history, URL and new-remote pushes and complete 396,924-byte report writes through both write adapters without provider calls.
+[`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, renamed and split files, conflicted merges, repeated and abandoned refusals, outgoing history, URL and new-remote pushes, squash and cherry-pick replays of a commit already on a remote, and complete 396,924-byte report writes through both write adapters without provider calls.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
 
 The service uses the canonical shared Jev client, pinned to the calibrated model, with TypeSafe direct only and no provider fallback.

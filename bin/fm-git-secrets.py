@@ -9,10 +9,12 @@ adds against all of its parents. Within one such diff, each removed copy of a
 line cancels one added copy anywhere, so moved or renamed content is not new.
 Outgoing commits are those reachable from the pushed tips but not from an
 advertised old tip or any remote-tracking ref, so history already on a remote
-is not inspected again. Pre-push consumes Git's ref-update records on stdin;
-the hook wrapper preserves those bytes for the repository's own hook. No file
-content or match is printed, no provider is called, and no working-tree file
-is read. Each decision appends one event through fm-guard-event.sh carrying
+is not inspected again. That exclusion follows commits, not content: a
+cherry-pick, revert or squash of a commit already on a remote makes a new
+commit, so its lines are inspected and can be falsely refused. Pre-push
+consumes Git's ref-update records on stdin; the hook wrapper preserves those
+bytes for the repository's own hook. No file content or match is printed, no
+provider is called, and no working-tree file is read. Each decision appends one event through fm-guard-event.sh carrying
 the highest consecutive refusal count for the same credential-shaped line,
 identified by its content hash. Different content starts at one. A failed
 inspection is counted under the reserved inspection-failed key and keeps the
@@ -122,7 +124,7 @@ def outgoing_lines():
     if not tips:
         return
     revisions = b"\n".join(sorted(tips) + [b"^" + oid for oid in sorted(excluded)]) + b"\n"
-    # Content already on any remote is not new exposure, whichever remote this push names.
+    # Skip commits reachable from any remote-tracking ref, whichever remote this push names; content is not matched.
     for entry in git("rev-list", "--parents", "--stdin", "--not", "--remotes", data=revisions).splitlines():
         commit, *parents = entry.decode().split()
         if parents:
@@ -211,6 +213,9 @@ def main():
         print("error: credential-shaped content in lines that staged or outgoing commits add")
         print(f"files[{len(paths)}]: " + ", ".join(json.dumps(path.decode('utf-8', 'surrogateescape'), ensure_ascii=True) for path in paths))
         print("help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.")
+        print("cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, "
+              "this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.")
+        print("next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.")
     if count > BUDGET:
         print(f"escalate: this check refused {count} times in a row, past its budget of {BUDGET}; "
               "stop retrying and report the refusal to Firstmate for a human decision. "
