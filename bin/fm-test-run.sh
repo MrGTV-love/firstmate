@@ -211,7 +211,10 @@
 # Deleted test assets still select remaining suites that reference them; an
 # unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
 # select the jev-guard behavior suite, and outside the core client and Level 5
-# routers also the offline audit and producer suites. The core client and Level 5 routers
+# routers also the offline audit suite and every retirement test in
+# docs/guards/retired.json that names bin/ten-levels/; the steering-inbox owner
+# and the pure-contract arm holding bin/fm-operational-input.sh likewise add the
+# retirement tests that name the changed path. The core client and Level 5 routers
 # select the typed dispatch resolver suite, their only dispatch consumer.
 set -eu
 
@@ -1709,6 +1712,22 @@ scripts_for_test_reference() {
   [ "$found" -eq 1 ]
 }
 
+# Retirement tests listed in docs/guards/retired.json that name <needle>,
+# selected per script. Reading the changelog keeps retired guard ids out of
+# this file, where bin/fm-guard-refcheck.sh would count them as resurrected.
+retirement_tests_for_reference() {
+  local needle=$1 t
+  local found=0
+  [ -f docs/guards/retired.json ] || return 1
+  while IFS= read -r t; do
+    if [ -f "$t" ] && grep -Fq "$needle" "$t"; then
+      printf '__script__:%s\n' "$(basename "$t")"
+      found=1
+    fi
+  done < <(sed -nE 's/.*"retirement_test": *"([^"]+)".*/\1/p' docs/guards/retired.json | LC_ALL=C sort -u)
+  [ "$found" -eq 1 ]
+}
+
 # bin/ scripts other than <needle> itself that name <needle>.
 bin_consumers_of() {
   local needle=$1 b
@@ -1777,11 +1796,13 @@ families_for_changed_path() {
       ;;
     bin/ten-levels/*)
       # Vendored upstream jev-guard (see SOURCE.md there) and its Firstmate
-      # report.ts are exercised through the jev-guard behavior suite; the
-      # offline audit and producer suites assert its minimized audit rows.
+      # report.ts are exercised through the jev-guard behavior suite; report.ts
+      # also owns the audit row, which only the offline audit suite asserts.
+      # Retirement tests that drive the installed guard through these files
+      # prove its retired decision points stay gone.
       printf '%s\n' "__script__:fm-jev-guard.test.sh"
       printf '%s\n' "__script__:fm-jev-guard-audit.test.sh"
-      printf '%s\n' "__script__:fm-jev-guard-producer.test.sh"
+      retirement_tests_for_reference 'bin/ten-levels/' || true
       ;;
     tests/fm-pi-watch-loader-live.test.mjs)
       printf '%s\n' __script__:fm-pi-watch-loader-live.test.sh
@@ -2160,6 +2181,7 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       printf '%s\n' watcher-wake-lock
       printf '%s\n' live-harness-optin
+      retirement_tests_for_reference "$path" || true
       ;;
     bin/fm-bearings-snapshot.sh|bin/fm-fleet-snapshot.sh|bin/fm-fleet-view.sh|bin/fm-contributions.sh|bin/fm-contributions.jq|\
     bin/fm-home-summary-refresh.sh)
@@ -2183,6 +2205,7 @@ families_for_changed_path() {
     bin/fm-primary-scope-lib.sh|bin/fm-project-mode.sh|bin/fm-forge-detect.sh|bin/fm-promote.sh|\
     bin/fm-ff-lib.sh|bin/fm-gotmp*|bin/*pretool*)
       printf '%s\n' pure-contract-unit
+      retirement_tests_for_reference "$path" || true
       ;;
     .agents/skills/quota-array-dispatch/SKILL.md)
       printf '%s\n' pure-contract-unit

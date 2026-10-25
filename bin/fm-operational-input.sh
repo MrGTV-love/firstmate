@@ -36,15 +36,6 @@
 # Calm mod), while fm_operational_doorbell_kind also requires the record to sit in
 # the given home's own operational inbox, which the away-mode return check uses.
 #
-# Guard consistency receipt (launch-brief with FM_TASK_ID, and task-inbox owner):
-#   <record>.consistency.json is published before the record becomes visible.
-#   schema=fm-channel-consistency.v1; task, kind, record_name, record_path,
-#   byte_length, file_sha256, doorbell_sha256, error_type=null.
-#   The SHA256 values cover exact file bytes and the exact emitted doorbell line.
-#   This has the role-file receipt trust limit, not producer authentication:
-#   a same-user process deliberately forging the recorded digest can pass.
-#   SHA256 tooling and jq are required only when publishing this receipt.
-#
 # CLI:
 #   fm-operational-input.sh encode <kind>  # body on stdin, encoded input stdout
 #   fm-operational-input.sh kind           # current input on stdin, kind stdout
@@ -238,46 +229,8 @@ fm_operational_harness_needs_record() {  # <harness>
   return 1
 }
 
-# Hash stdin without placing record contents on a process command line.
-fm_operational_sha256() {
-  local hash
-  if command -v shasum >/dev/null 2>&1; then
-    hash=$(shasum -a 256) || return 1
-  elif command -v sha256sum >/dev/null 2>&1; then
-    hash=$(sha256sum) || return 1
-  else
-    return 1
-  fi
-  hash=${hash%% *}
-  case "$hash" in ''|*[!0-9a-f]*) return 1 ;; esac
-  [ "${#hash}" -eq 64 ] || return 1
-  printf '%s' "$hash"
-}
-
-# Called by the existing launch/inbox publishers, never by a reader to backfill.
-# Consistency only, with the role-file receipt trust limit: a same-user process
-# deliberately forging the recorded digest can pass; this is not authentication.
-fm_operational_consistency_write() {  # <staged-bytes> <record-path> <kind> <task> <doorbell>
-  local source=$1 record=$2 kind=$3 task=$4 doorbell=$5 dir name bytes file_hash doorbell_hash receipt_tmp
-  case "$kind" in launch-brief|steering-inbox) ;; *) return 2 ;; esac
-  [ -n "$task" ] || return 2
-  dir=$(cd -P "${record%/*}" 2>/dev/null && pwd -P) || return 1
-  name=${record##*/}
-  record="$dir/$name"
-  file_hash=$(fm_operational_sha256 < "$source") || return 1
-  doorbell_hash=$(printf '%s' "$doorbell" | fm_operational_sha256) || return 1
-  bytes=$(LC_ALL=C wc -c < "$source" | tr -d '[:space:]') || return 1
-  case "$bytes" in ''|*[!0-9]*) return 1 ;; esac
-  receipt_tmp=$(mktemp "$dir/.consistency.XXXXXX") || return 1
-  if ! jq -cn --arg task "$task" --arg kind "$kind" --arg name "$name" --arg path "$record" \
-    --argjson bytes "$bytes" --arg file_hash "$file_hash" --arg doorbell_hash "$doorbell_hash" \
-    '{schema:"fm-channel-consistency.v1",task:$task,kind:$kind,record_name:$name,record_path:$path,byte_length:$bytes,file_sha256:$file_hash,doorbell_sha256:$doorbell_hash,error_type:null}' \
-    > "$receipt_tmp" || ! mv -f "$receipt_tmp" "$record.consistency.json"; then
-    rm -f "$receipt_tmp"
-    return 1
-  fi
-}
-
+# Nothing writes *.msg.consistency.json receipts or their .consistency.* temps
+# any more; the patterns stay only so retention still deletes old ones.
 fm_operational_record_prune() {  # <record-dir>
   local stat_cmd path mtime cutoff
   if [ "$(uname)" = Darwin ]; then
@@ -286,7 +239,7 @@ fm_operational_record_prune() {  # <record-dir>
     stat_cmd=(stat -c '%Y %n')
   fi
   cutoff=$(( $(date +%s) - FM_OPERATIONAL_RECORD_RETENTION_DAYS * 86400 ))
-  find "$1" -maxdepth 1 -type f \( -name '*.msg' -o -name '*.msg.consistency.json' -o -name '.record.*' -o -name '.consistency.*' \) \
+  find "$1" -maxdepth 1 -type f \( -name '*.msg' -o -name '.record.*' -o -name '*.msg.consistency.json' -o -name '.consistency.*' \) \
     -exec "${stat_cmd[@]}" {} + 2>/dev/null | while read -r mtime path; do
     case "$mtime" in ''|*[!0-9]*) continue ;; esac
     if [ "$mtime" -lt "$cutoff" ]; then printf '%s\0' "$path"; fi
@@ -318,14 +271,8 @@ fm_operational_record_write() {  # <state-dir> <kind> <body> <doorbell-var>
     rm -f "$tmp"
     return 1
   fi
-  if [ "$kind" = launch-brief ] && [ -n "${FM_TASK_ID:-}" ]; then
-    if ! fm_operational_consistency_write "$tmp" "$abs/$name" "$kind" "$FM_TASK_ID" "$fm_op_doorbell"; then
-      rm -f "$tmp"
-      return 1
-    fi
-  fi
   if ! mv -f "$tmp" "$dir/$name"; then
-    rm -f "$tmp" "$abs/$name.consistency.json"
+    rm -f "$tmp"
     return 1
   fi
   fm_operational_record_prune "$dir"
@@ -427,8 +374,6 @@ The from-firstmate kind uses its established live-charter-compatible carrier.
 A record-backed doorbell counts as operational input only when the record it
 names holds a current generic envelope; `open` also requires that record to be
 in this home's own state/operational-inbox.
-A launch-brief publication with FM_TASK_ID also requires the publisher-owned
-consistency receipt (format and trust limit in this script's header).
 EOF
 }
 

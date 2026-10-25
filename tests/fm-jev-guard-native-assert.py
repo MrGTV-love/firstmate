@@ -39,55 +39,12 @@ if backend == 'claude':
     frame, separator, notice = text.partition('\n\n<system-reminder>')
     assert frame == framed_source, 'complete Claude source text absent or changed in next model context'
     text = separator + notice
-positive = kind in ('launch', 'inbox')
-requests = (lab / 'jev.jsonl').read_text().splitlines()
-trusted = kind == 'changed'
-error_type = {
-    'normal': None, 'privacy': 'PrivacyWithheldError', 'credentials': 'CredentialUnavailableError',
-    'provider': 'Error', 'audit': 'AuditUnavailableError',
-}[phase]
-expected_requests = 0 if positive or trusted or phase in ('privacy', 'credentials') else (3 if backend == 'claude' else 2) if phase == 'provider' else 1
-assert len(requests) == expected_requests, f'unexpected Jev egress count: expected {expected_requests}, got {len(requests)}'
-if positive:
-    if backend == 'omp':
-        assert source in text, 'original exact instruction bytes absent from next model context'
-    if phase == 'audit':
-        assert 'not producer authentication' in text, 'same-user consistency trust limit absent from notice'
-        assert 'AuditUnavailableError' in text, 'audit-unavailable notice absent from next model context'
-    else:
-        assert '[jev-guard]' not in text, 'consistent native instruction was screened'
-elif trusted:
-    if backend == 'omp':
-        assert source in text, 'trusted state read disappeared from next model context'
-    if phase == 'audit':
-        assert 'AuditUnavailableError' in text, 'trusted read lost the audit failure notice'
-    else:
-        assert '[jev-guard]' not in text, 'trusted state unnecessarily replaced or annotated'
-else:
-    assert '[jev-guard]' in text, 'native review notice absent from next model context'
-    if backend == 'omp':
-        assert 'synthetic-native-authority-canary' not in text, 'untrusted original leaked into OMP model context'
-        assert 'Untrusted output was withheld' in text, 'native replacement did not reach model context'
-    else:
-        assert 'Advisory only' in text and 'no protection' in text, 'Claude advisory status absent from model context'
-    assert f'Tool output requires review ({error_type or "flag"}).' in text, 'wrong terminal outcome consumed by native model context'
-    assert 'REVIEW_ON_UNAVAILABLE_V1' in text, 'named outage policy absent from native notice'
-if phase != 'audit':
-    ledger = [json.loads(line) for line in (lab / 'home/state/jev-guard.jsonl').read_text().splitlines()]
-    result = [row for row in ledger if row['hook'] == 'tool_result']
-    assert len(result) == 1, 'native tool-result audit absent or duplicated'
-    terminal = result[0]
-    if positive:
-        expected = ('clear', 'supervisor_consistency', None, False, 'result_pass')
-    elif trusted:
-        expected = ('clear', 'trusted_read', None, False, 'result_pass')
-    elif phase == 'normal':
-        expected = ('flag', 'policy', None, True, 'claude_advisory_only' if backend == 'claude' else 'omp_replace')
-    else:
-        expected = ('review', 'outage', error_type, phase == 'provider',
-                    'claude_advisory_only' if backend == 'claude' else 'omp_replace')
-    observed = tuple(terminal[key] for key in ('decision', 'branch', 'error_type', 'request_started', 'enforcement'))
-    assert observed == expected, f'native terminal mismatch: expected {expected}, got {observed}'
-    assert terminal['policy_version'] == 'FIRSTMATE_JEV_GUARD_V1'
-    assert terminal['outage_policy'] == 'REVIEW_ON_UNAVAILABLE_V1'
-print(f'{backend}: {phase}/{kind}: native read and next model context consumed')
+if backend == 'omp':
+    assert text == source, 'complete original read bytes changed in the receiving model context'
+assert '[jev-guard]' not in text, 'retired result screen appended or replaced native output'
+assert (lab / 'jev.jsonl').read_text() == '', 'a native read result reached TypeSafe'
+ledger = lab / 'home/state/jev-guard.jsonl'
+if phase != 'audit' and ledger.exists():
+    terminal = [json.loads(line) for line in ledger.read_text().splitlines()]
+    assert not any(row['hook'] == 'tool_result' for row in terminal), 'retired result audit row was written'
+print(f'{backend}: {phase}/{kind}: unchanged native read in next model context; no result request or audit row')

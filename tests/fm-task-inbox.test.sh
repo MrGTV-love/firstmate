@@ -477,6 +477,26 @@ test_handled_mv_dedups_by_sequence() {
   pass "inbox: the handled mv is the idempotent ack and sequences are never reissued"
 }
 
+test_survivor_doorbells_stay_bounded_until_acknowledged() {
+  local state task rec bell announced
+  state="$TMP_ROOT/survivors/state"; mkdir -p "$state"
+  for task in native fm-jev-guard-rebuild-scout "$(printf 'x%.0s' $(seq 1 64))"; do
+    rec=$(inbox_lib "$state" fm_task_inbox_write "$state" "$task" "bounded carrier fixture") \
+      || fail "inbox write failed for ${#task}-character task"
+    bell=$(inbox_lib "$state" fm_task_inbox_doorbell_line "$rec") \
+      || fail "doorbell unavailable for ${#task}-character task"
+    [ "$(printf '%s' "$bell" | LC_ALL=C wc -c | tr -d ' ')" -lt 200 ] \
+      || fail "${#task}-character task carrier is not under 200 bytes: $bell"
+    announced=$(inbox_lib "$state" fm_task_inbox_doorbells "$state" "$task"; printf x)
+    [ "$announced" = "$bell"$'\n'x ] \
+      || fail "survivor replay must announce exactly the canonical carrier, got: ${announced%x}"
+    mv "$rec" "$state/$task.inbox/handled/"
+    announced=$(inbox_lib "$state" fm_task_inbox_doorbells "$state" "$task"; printf x)
+    [ "$announced" = x ] || fail "an acknowledged record is still announced: ${announced%x}"
+  done
+  pass "inbox: survivor replay announces each bounded carrier until its record is acknowledged"
+}
+
 test_concurrent_writers_never_clobber() {
   local state i pids=() count
   state="$TMP_ROOT/race/state"; mkdir -p "$state"
@@ -1290,6 +1310,7 @@ test_ring_submits_its_own_stuck_doorbell
 test_idempotent_write_dedups_exact_body
 test_idempotent_write_follows_concurrent_ack
 test_handled_mv_dedups_by_sequence
+test_survivor_doorbells_stay_bounded_until_acknowledged
 test_concurrent_writers_never_clobber
 test_writer_retries_after_a_vanished_lock_collision
 test_ladder_writes_ignore_vanished_inbox

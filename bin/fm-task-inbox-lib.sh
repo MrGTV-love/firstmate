@@ -25,12 +25,10 @@
 # been acknowledged. At checkpoints, workers list the inbox but read only
 # announced records and report unannounced survivors for re-delivery.
 # Launch and relaunch prompts announce surviving records individually in
-# numeric order; announcement never creates or repairs a consistency receipt.
+# numeric order.
 #
 # Layout under <state-dir>:
 #   <task>.inbox/NNN.msg       one durable steer, numeric sequence, atomic rename
-#   <task>.inbox/NNN.msg.consistency.json
-#                              write-time receipt; fm-operational-input.sh owns its format
 #   <task>.inbox/handled/      the worker's `mv` here IS the acknowledgement
 #   <task>.inbox/.seq.lock     serializes sequence allocation across writers
 #                              (the session and the away daemon)
@@ -107,8 +105,6 @@ _FM_TASK_INBOX_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" 
 . "$_FM_TASK_INBOX_LIB_DIR/fm-wake-lib.sh"
 # shellcheck source=/dev/null
 . "$_FM_TASK_INBOX_LIB_DIR/fm-backend.sh"
-# shellcheck source=/dev/null
-. "$_FM_TASK_INBOX_LIB_DIR/fm-operational-input.sh"
 
 FM_TASK_INBOX_SCHEMA='fm-task-inbox.v1'
 FM_TASK_INBOX_GRACE_DEFAULT=90
@@ -211,7 +207,7 @@ fm_task_inbox_lock_acquire() {  # <lock-path>
 # Write one record into the next sequence slot: temp-write, then atomic
 # rename. Prints the record path. Caller must hold .seq.lock.
 _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
-  local dir=$1 text=$2 delivery_mode=${3:-} seq tmp rec line task status=0
+  local dir=$1 text=$2 delivery_mode=${3:-} seq tmp rec status=0
   seq=$(fm_task_inbox_next_seq "$dir")
   rec="$dir/$seq.msg"
   tmp=$(mktemp "$dir/.staging.XXXXXX") || return 1
@@ -222,15 +218,8 @@ _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
     printf -- '--\n'
     printf '%s' "$text"
   } > "$tmp" || status=1
-  task=${dir##*/}
-  task=${task%.inbox}
-  # An unrenderable inbox name still retains the durable steer for recovery;
-  # it cannot produce a host doorbell or gain the guard's consistency exception.
-  if [ "$status" -eq 0 ] && line=$(fm_task_inbox_doorbell_line "$rec"); then
-    fm_operational_consistency_write "$tmp" "$rec" steering-inbox "$task" "$line" || status=1
-  fi
   if [ "$status" -ne 0 ] || ! mv "$tmp" "$rec"; then
-    rm -f "$tmp" "$rec.consistency.json"
+    rm -f "$tmp"
     return 1
   fi
   printf '%s' "$rec"
