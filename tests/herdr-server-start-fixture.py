@@ -23,6 +23,13 @@ ROOT = Path(sys.argv.pop(1)).resolve()
 # measured: value=8.115 date=2026-10-25 host=Mac-Studio.local margin=3.7
 # (slowest of 4 concurrent runs of this fixture against the intercepted CLI)
 CALL_SECONDS = 30
+# Serialize every StartupSafety test across all copies of this fixture on the host.
+# bin/backends/herdr-server-start.py proves absence by scanning the whole host
+# process table, so a fake server one copy starts (unscoped, or with an unreadable
+# session) makes another copy's absence proof refuse. The interference is
+# host-wide, so the lock path is fixed and outlives any one run. Each test holds
+# it from setUp until its fake servers are killed after tearDown.
+HOST_LOCK = "/tmp/firstmate-herdr-server-start-fixture.lock"
 
 STUB = r'''
 import json, os, pathlib, sys, time
@@ -35,17 +42,19 @@ if "--session" not in args or args[args.index("--session") + 1] != root.name:
 cmd = args[0]
 if cmd == "status":
     mode = os.environ.get("START_STATUS", "false")
-    if not (root / "pid").exists():
+    # Read the launch marker once so a server starting mid-call cannot skip a failure.
+    launched = (root / "pid").exists()
+    if not launched:
         if mode == "error": sys.exit(1)
         if mode == "timeout": sys.exit(124)
         if mode == "empty": sys.exit(0)
     failures = root / "post-launch-failures"
-    if (root / "pid").exists() and os.environ.get("START_STATUS_FAILS_AFTER_LAUNCH"):
+    if launched and os.environ.get("START_STATUS_FAILS_AFTER_LAUNCH"):
         failed = int(failures.read_text()) if failures.exists() else 0
         if failed < int(os.environ["START_STATUS_FAILS_AFTER_LAUNCH"]):
             failures.write_text(str(failed + 1))
             sys.exit(1)
-    server = {"running": (root / "pid").exists(), "session": root.name}
+    server = {"running": launched, "session": root.name}
     if not os.environ.get("START_NO_STATUS_SOCKET"):
         server["socket"] = os.environ.get("START_SOCKET", str(root / "herdr.sock"))
     print(json.dumps({"server": server}))
@@ -119,6 +128,10 @@ class EnvironmentOwnership(unittest.TestCase):
 
 class StartupSafety(unittest.TestCase):
     def setUp(self):
+        # Read-only open so a lock file another user created still works.
+        host_lock = os.open(HOST_LOCK, os.O_RDONLY | os.O_CREAT, 0o666)
+        self.addCleanup(os.close, host_lock)
+        fcntl.flock(host_lock, fcntl.LOCK_EX)
         # Keep Unix socket paths below Darwin's 104-byte sockaddr_un limit.
         self.tmp = tempfile.TemporaryDirectory(prefix="fm-lab-start-", dir="/tmp")
         self.dir = Path(self.tmp.name)
