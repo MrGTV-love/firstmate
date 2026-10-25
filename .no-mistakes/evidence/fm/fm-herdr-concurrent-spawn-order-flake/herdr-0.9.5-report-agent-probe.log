@@ -1,0 +1,9 @@
+session=fm-lab-nm-agent-probe-99945-27503
+provisioned
+pane=w1:p1
+report-agent exit=0
+--- agent get after report-agent idle
+{"error":null,"agent_status":"idle","agent":"test-agent"}
+--- pane process-info
+{"shell_pid":1458,"foreground":[{"argv":["-zsh"],"argv0":"zsh","cmdline":"-zsh","cwd":"/private/tmp","name":"zsh","pid":1458}]}
+teardown exit=0

@@ -1,0 +1,8 @@
+session=fm-lab-nm-agent-ttl-32971-20397
+provisioned
+delay=0s pane=w1:p1 agent_get={"err":null,"status":"idle"} elapsed=0.19
+delay=1s pane=w2:p1 agent_get={"err":"agent_not_found","status":null} elapsed=1.18
+delay=2s pane=w3:p1 agent_get={"err":"agent_not_found","status":null} elapsed=2.2
+delay=4s pane=w4:p1 agent_get={"err":"agent_not_found","status":null} elapsed=4.28
+delay=8s pane=w5:p1 agent_get={"err":"agent_not_found","status":null} elapsed=8.22
+teardown exit=0

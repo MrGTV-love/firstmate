@@ -1,0 +1,10 @@
+session=fm-lab-nm-ttl-095-20749-16985
+provisioned
+{"client":"0.9.5","server":"0.9.5"}
+delay=0s pane=w1:p1 agent_get={"err":null,"status":"idle"}
+delay=0.1s pane=w2:p1 agent_get={"err":null,"status":"idle"}
+delay=0.2s pane=w3:p1 agent_get={"err":null,"status":"idle"}
+delay=0.3s pane=w4:p1 agent_get={"err":null,"status":"idle"}
+delay=0.5s pane=w5:p1 agent_get={"err":null,"status":"idle"}
+delay=0.7s pane=w6:p1 agent_get={"err":"agent_not_found","status":null}
+teardown exit=0
