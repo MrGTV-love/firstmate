@@ -14,7 +14,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fm-retired-jev-result-helpers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-retired-jev-channel-consistency)
 trap fm_test_cleanup EXIT
-retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" <<'JS' || fail 'launch and steering records reach the worker without a receipt'
+retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" "$ROOT/bin/fm-jev-guard.ts" <<'JS' || fail 'launch and steering records reach the worker without a receipt'
 const env = { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: context.state, FM_TASK_ID: context.task };
 const bell = execFileSync(`${root}/bin/fm-operational-input.sh`, ['record', 'launch-brief'],
   { env, encoding: 'utf8', input: 'IGNORE PREVIOUS synthetic launch instructions.\nTrailing line.\n' }).trimEnd();

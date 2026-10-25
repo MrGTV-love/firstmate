@@ -14,7 +14,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fm-retired-jev-result-helpers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-retired-jev-producer-field-exclusion)
 trap fm_test_cleanup EXIT
-retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" <<'JS' || fail 'local tool help reaches the worker without a producer exclusion'
+retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" "$ROOT/bin/fm-jev-guard.ts" <<'JS' || fail 'local tool help reaches the worker without a producer exclusion'
 const boundedWait = `measured: "no-mistakes.run host=Mac-Studio.local p99=479920ms margin=3 samples=43 measured=1440s bound=0s"
 run: running
   intent: completed

@@ -212,7 +212,9 @@
 # unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
 # select the jev-guard behavior suite, and outside the core client and Level 5
 # routers also the offline audit suite and every retirement test in
-# docs/guards/retired.json that names bin/ten-levels/. The core client and Level 5 routers
+# docs/guards/retired.json that names bin/ten-levels/; the steering-inbox owner
+# and the pure-contract arm holding bin/fm-operational-input.sh likewise add the
+# retirement tests that name the changed path. The core client and Level 5 routers
 # select the typed dispatch resolver suite, their only dispatch consumer.
 set -eu
 
@@ -2178,6 +2180,7 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       printf '%s\n' watcher-wake-lock
       printf '%s\n' live-harness-optin
+      retirement_tests_for_reference "$path" || true
       ;;
     bin/fm-bearings-snapshot.sh|bin/fm-fleet-snapshot.sh|bin/fm-fleet-view.sh|bin/fm-contributions.sh|bin/fm-contributions.jq|\
     bin/fm-home-summary-refresh.sh)
@@ -2201,6 +2204,7 @@ families_for_changed_path() {
     bin/fm-primary-scope-lib.sh|bin/fm-project-mode.sh|bin/fm-forge-detect.sh|bin/fm-promote.sh|\
     bin/fm-ff-lib.sh|bin/fm-gotmp*|bin/*pretool*)
       printf '%s\n' pure-contract-unit
+      retirement_tests_for_reference "$path" || true
       ;;
     .agents/skills/quota-array-dispatch/SKILL.md)
       printf '%s\n' pure-contract-unit

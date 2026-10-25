@@ -15,7 +15,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fm-retired-jev-result-helpers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-retired-jev-omp-result-screen)
 trap fm_test_cleanup EXIT
-retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" <<'JS' || fail 'omp results are no longer screened'
+retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" "$ROOT/bin/fm-jev-guard.ts" <<'JS' || fail 'omp results are no longer screened'
 assert.deepEqual([...handlers.keys()], ['tool_call'], 'the installed extension handles only pre-tool calls');
 await test('T1(a): the recorded omp background-job notice reaches the worker verbatim', async () => {
   await deliver(bash('Backgrounded as job bg_N; its output is injected into the conversation as a follow-up the moment it finishes. Do NOT poll for it (no `sleep`, `ps`, `pgrep`, `top`, `pidwait`, log tailing): every poll is a wasted turn. Do other work, or end your reply and wait to be woken.'));

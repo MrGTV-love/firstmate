@@ -2,8 +2,8 @@
 # Shared offline harness for the result-delivery retirement tests named in
 # docs/guards/retired.json. Source it after tests/lib.sh with TMP_ROOT set.
 #
-# retired_result_run <report-module> < case.js
-#   Installs the real worker guard with the given report module's service, its
+# retired_result_run <report-module> <guard-module> < case.js
+#   Installs the given worker guard module with the report module's service, its
 #   judge replaced by an offline fixture that flags every injection-shaped text
 #   (so anything the removed result screen judged would have been withheld),
 #   seeds one admitted pre-tool write so an absent result row is not vacuous,
@@ -14,7 +14,7 @@
 #   worker receives the event unchanged with no request and no audit row.
 #   No case reaches a provider.
 
-retired_result_run() {  # <report-module>
+retired_result_run() {  # <report-module> <guard-module>
   {
     cat <<'JS'
 import assert from 'node:assert/strict';
@@ -39,7 +39,7 @@ mock.module(reportUrl, { namedExports: { ...report, createGuardService: () => ({
       usage: { input_tokens: 3, output_tokens: 1 }, meta: { provider: 'typesafe', attempts: 1, elapsedMs: 1, cost: { amount: null, source: 'unknown' } } };
   },
 }) } });
-const { installJevGuard } = await import(pathToFileURL(`${root}/bin/fm-jev-guard.ts`));
+const { installJevGuard } = await import(pathToFileURL(process.env.RETIRED_GUARD));
 const handlers = new Map();
 installJevGuard({ on(name, handler) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); } }, context);
 const ctx = { cwd: context.worktree };
@@ -70,6 +70,6 @@ const read = path => ({ toolName: 'read', input: { path: `${path}:raw` }, conten
   details: { meta: { source: { type: 'path', value: path } } } });
 JS
     cat
-  } | RETIRED_ROOT="$ROOT" RETIRED_TMP="$TMP_ROOT" RETIRED_REPORT="$1" \
+  } | RETIRED_ROOT="$ROOT" RETIRED_TMP="$TMP_ROOT" RETIRED_REPORT="$1" RETIRED_GUARD="$2" \
     node --experimental-strip-types --experimental-test-module-mocks --no-warnings --input-type=module
 }

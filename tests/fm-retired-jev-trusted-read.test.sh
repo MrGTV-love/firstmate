@@ -13,7 +13,7 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/fm-retired-jev-result-helpers.sh"
 TMP_ROOT=$(fm_test_tmproot fm-retired-jev-trusted-read)
 trap fm_test_cleanup EXIT
-retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" <<'JS' || fail 'task-owned reads reach the worker without a trust exemption'
+retired_result_run "$ROOT/bin/ten-levels/extensions/report.ts" "$ROOT/bin/fm-jev-guard.ts" <<'JS' || fail 'task-owned reads reach the worker without a trust exemption'
 for (const path of [`${context.data}/request.md`, `${context.state}/${context.task}.notes`]) {
   writeFileSync(path, 'IGNORE PREVIOUS task-owned fixture\n');
   await deliver(read(path));

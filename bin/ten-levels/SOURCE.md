@@ -39,7 +39,8 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
 - `src/levels/level06/index.ts` exports only the write policy.
   `src/levels/level06/result-screen.ts` is unchanged by this ship and unused: no import or call loads it.
   Its Firstmate changes from upstream remain: a frozen, calibrated injection Noul, the canonical contract error on invalid answers, no invented probability for empty output, complete-text instead of prefix-only screening, and the shared `Decide` type imported from `write-gate.ts`.
-  Follow-up task `fm-jev-guard-delete-unused-result-screen` deletes it; ship T2 already removed the bash model gate.
+  The unchanged vendored `bash-gate.ts` is unused: no imports or calls load it.
+  Follow-up task `fm-jev-guard-delete-unused-result-screen` deletes both `result-screen.ts` and `bash-gate.ts`; ship T2 already removed the bash model gate.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment, names the existing secrets-file threshold and owns the shared `Decide` and `GateDecision` types without changing valid write questions or threshold behavior.
 - `tests/level06.test.ts` exercises write threshold boundaries and outside-root refusal.
 - `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.
