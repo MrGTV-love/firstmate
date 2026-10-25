@@ -170,7 +170,7 @@ assert.equal(blocked.attempts, 6);
 assert.equal(blocked.cost.incomplete, true);
 });
 await test('T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body', async () => {
-  const all = '["semantic-search","web","browser","provider","subagent","remote-storage"]';
+  const all = '["semantic-search","web","browser","provider","remote-storage"]';
   for (const meta of [undefined, `egress=${all}\n`]) {
     if (meta) writeFileSync(`${state}/audit.meta`, meta);
     try {
@@ -274,7 +274,7 @@ await test('coverage and egress refusals hold in an inactive project scope', asy
   const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
   const args = ['--experimental-strip-types', '--no-warnings', adapter, state, `${state}/config`, state, 'audit', state, state, 'other-project', report.GUARD_POLICY_VERSION];
   const call = (tool_name, tool_input) => execFileSync(process.execPath, args, { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input, cwd: state }), encoding: 'utf8' });
-  for (const [tool, input] of [['WebSearch', { query: 'synthetic-query' }], ['Agent', { prompt: 'synthetic' }], ['mcp__synthetic__tool', {}]]) {
+  for (const [tool, input] of [['WebSearch', { query: 'synthetic-query' }], ['PushNotification', { message: 'synthetic' }], ['mcp__synthetic__tool', {}]]) {
     assert.equal(JSON.parse(call(tool, input)).hookSpecificOutput.permissionDecision, 'deny', tool);
   }
   assert.equal(call('TaskStop', { task_id: 'synthetic' }), '');
@@ -293,12 +293,68 @@ await test('tools that move no data or run no worker code are local; unscreened 
     assert.equal(r.confinement_owner, 'T5', toolName);
   }
 });
+await test('subagent dispatch needs no grant while the outbound tools a subagent calls still refuse', async () => {
+  for (const toolName of ['task', 'agent', 'sendmessage', 'workflow']) {
+    const before = rowCount();
+    assert.equal(await handlers.tool_call({ toolName, input: { prompt: 'synthetic' } }, { cwd: state }), undefined, toolName);
+    assert.equal(rowCount(), before, `${toolName}: local dispatch adds no egress row`);
+  }
+  const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
+  const args = ['--experimental-strip-types', '--no-warnings', adapter, state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION];
+  const call = tool_name => execFileSync(process.execPath, args, { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input: { prompt: 'synthetic' }, cwd: state }), encoding: 'utf8' });
+  assert.equal(call('Agent'), '', 'a Claude worker with no egress= line can dispatch a subagent');
+  assert.equal(JSON.parse(call('WebSearch')).hookSpecificOutput.permissionDecision, 'deny', 'a subagent web search still needs its own grant');
+  for (const toolName of ['find', 'web_search']) {
+    assert.equal((await handlers.tool_call({ toolName, input: { query: 'synthetic' } }, { cwd: state }))?.block, true, toolName);
+  }
+});
+await test('memory operations need a provider grant unless the live worker settings prove them local', async () => {
+  const live = { 'memory.backend': 'mnemopi', 'mnemopi.noEmbeddings': true, 'mnemopi.llmMode': 'smol' };
+  let settings = live;
+  const memory = {};
+  installJevGuard({ on(name, fn) { memory[name] = fn; } }, { ...context, ompSetting: id => { if (settings instanceof Error) throw settings; return settings[id]; } });
+  const call = toolName => memory.tool_call({ toolName, input: { query: 'private-memory-canary', items: [{ content: 'private-memory-canary' }] } }, { cwd: state });
+  for (const toolName of ['recall', 'reflect', 'memory_edit']) {
+    const before = rowCount();
+    assert.equal(await call(toolName), undefined, `${toolName}: a local FTS store call without embeddings needs no grant`);
+    assert.equal(rowCount(), before, toolName);
+  }
+  for (const toolName of ['retain', 'learn']) {
+    let patch;
+    const r = await fresh(async () => { patch = await call(toolName); });
+    assert.equal(patch?.block, true, `${toolName}: extraction with llmMode smol is a model call`);
+    assert.ok(patch.reason.includes(`memory operation "${toolName}" makes a Mnemopi extraction model call (mnemopi.llmMode=smol)`), patch.reason);
+    assert.ok(patch.reason.includes('egress=["provider"]'), patch.reason);
+    assert.equal(r.branch, 'egress');
+    assert.equal(r.destination_class, 'provider');
+    assert.ok(!JSON.stringify(r).includes('private-memory-canary'));
+  }
+  writeFileSync(`${state}/audit.meta`, 'egress=["provider"]\n');
+  try {
+    const r = await fresh(async () => { assert.equal(await call('retain'), undefined, 'the provider grant admits the model-calling retain'); });
+    assert.equal(r.decision, 'allow');
+    assert.equal(r.destination_class, 'provider');
+  } finally { rmSync(`${state}/audit.meta`); }
+  settings = { ...live, 'mnemopi.llmMode': 'none' };
+  assert.equal(await call('retain'), undefined, 'retain without extraction or embeddings stays local');
+  for (const [indeterminate, toolName, effect] of [
+    [new Error('unreadable'), 'recall', 'could not be proven local because the worker\'s live memory settings are unreadable'],
+    [{ ...live, 'mnemopi.noEmbeddings': false }, 'recall', 'could not be proven local because mnemopi.noEmbeddings is not true'],
+    [{ ...live, 'memory.backend': 'sharpshooter' }, 'recall', 'could not be proven local because memory.backend is not mnemopi'],
+    [{ ...live, 'memory.backend': 'hindsight' }, 'recall', 'makes a remote Hindsight memory call'],
+  ]) {
+    settings = indeterminate;
+    const patch = await call(toolName);
+    assert.equal(patch?.block, true, effect);
+    assert.ok(patch.reason.includes(`memory operation "${toolName}" ${effect}`), patch.reason);
+  }
+  assert.equal((await handlers.tool_call({ toolName: 'recall', input: {} }, { cwd: state }))?.block, true, 'a host without live omp settings proves nothing local');
+});
 await test('S2 egress classes are permissions, never a bypass of existing write checks', async () => {
   const cases = [
     ['web_search', { query: 'synthetic' }, 'web'],
     ['browser', { url: 'https://synthetic.invalid' }, 'browser'],
     ['generate_image', { prompt: 'synthetic' }, 'provider'],
-    ['task', { task: 'synthetic' }, 'subagent'],
     ['designsync', { method: 'list_projects' }, 'remote-storage'],
   ];
   for (const [toolName, input, destination] of cases) {
@@ -465,6 +521,37 @@ assert.deepEqual(uncoveredTools([...installed, 'new-paid-host-tool']), ['new-pai
 console.log(`installed omp: ${installed.length} tools classified; injected unknown tool rejected; no model turn`);
 JS
   pass 'installed omp registry coverage (no model turn submitted)'
+  node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'installed omp live memory settings'
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+const lab = `${process.env.AUDIT_TMP}/memory-settings`;
+mkdirSync(`${lab}/agent`, { recursive: true });
+writeFileSync(`${lab}/agent/config.yml`, 'setupVersion: 2\nmemory:\n  backend: mnemopi\nmnemopi:\n  llmMode: smol\n');
+writeFileSync(`${lab}/overlay.yml`, 'mnemopi:\n  llmMode: none\n  noEmbeddings: true\n');
+const extension = `${lab}/memory.ts`;
+// The same live-settings import the extension generated by bin/fm-spawn.sh makes; omp resolves it only in an entry file.
+writeFileSync(extension, `import { writeFileSync } from 'node:fs';
+import { memoryEgress } from ${JSON.stringify(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`)};
+const setting = await Promise.all([import("@oh-my-pi/pi-coding-agent/config/settings"), import("@oh-my-pi/pi-coding-agent/config/registry")])
+  .then(([{ settings }, { lookup }]) => (id: string) => lookup(id)?.get(settings), () => undefined);
+export default function(pi: { on(name: string, fn: () => void): void }) {
+  pi.on('session_start', () => {
+    writeFileSync(${JSON.stringify(`${lab}/effects.json`)}, JSON.stringify(Object.fromEntries(['recall', 'retain', 'learn'].map(tool => [tool, memoryEgress(tool, setting) ?? 'local']))));
+    process.exit(0);
+  });
+}`);
+const dead = 'http://127.0.0.1:9';
+execFileSync(`${process.env.AUDIT_ROOT}/bin/fm-proc-budget.sh`, ['--', 'omp', '--mode', 'rpc', '--no-session',
+  '--no-extensions', '-e', extension, '--config', `${lab}/overlay.yml`, '--no-skills', '--no-rules', '--no-title', '--no-lsp'],
+  { cwd: lab, input: '', env: { PATH: process.env.PATH, HOME: lab, PI_CODING_AGENT_DIR: `${lab}/agent`, OMP_SKIP_SETUP: '1',
+    OPENAI_API_KEY: 'synthetic-settings-only', HTTP_PROXY: dead, HTTPS_PROXY: dead, ALL_PROXY: dead }, stdio: ['pipe', 'pipe', 'pipe'] });
+const effects = JSON.parse(readFileSync(`${lab}/effects.json`, 'utf8'));
+assert.deepEqual(effects, { recall: 'local', retain: 'local', learn: 'local' },
+  'the guard reads the global backend and the --config overlay llmMode and noEmbeddings from the live omp settings');
+console.log('installed omp: memory effects read from live global and --config overlay settings; no model turn');
+JS
+  pass 'installed omp live memory settings (no model turn submitted)'
 else
   printf 'SKIP: installed tool coverage requires omp; offline added-tool regression ran above\n'
 fi

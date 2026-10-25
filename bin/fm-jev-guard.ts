@@ -4,7 +4,7 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
-import { egressClass, egressGranted, toolPolicy } from "./fm-jev-egress.ts";
+import { egressClass, egressGranted, memoryEgress, toolPolicy } from "./fm-jev-egress.ts";
 import { execFileSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -23,6 +23,8 @@ export interface JevGuardContext extends GuardServiceContext {
   data: string;
   /** Native device admission belongs to the adapter, not the model service. */
   host?: "omp" | "claude";
+  /** The omp worker's live setting values by id, supplied by the generated omp extension; absent on other hosts. */
+  ompSetting?: (id: string) => unknown;
 }
 
 export interface GuardRuntimeContext {
@@ -248,15 +250,16 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made.`);
     }
     try {
-      const destination = egressClass(tool);
+      const egressStarted = performance.now();
+      const memory = policy.call === "memory" ? memoryEgress(tool, c.ompSetting) : undefined;
+      const destination = memory ? "provider" : egressClass(tool);
       if (destination) {
         terminal.destination_class = destination;
-        const egressStarted = performance.now();
         const { granted, sourceOk } = egressGranted(c.state, c.task, destination);
         guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
         if (!granted) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
-            `Missing task egress grant: request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
+            `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
         }
       }
       if (policy.call === "confinement") {

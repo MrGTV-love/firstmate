@@ -6499,6 +6499,11 @@ import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-se
 import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
 import { appendFileSync, readFileSync } from "node:fs";
 
+// omp resolves its settings modules only for this entry file. They hold the
+// worker's live layered settings for the Jev guard's memory-effect rule; an
+// omp without them leaves the settings unreadable, so memory calls fail closed.
+const ompSetting = await Promise.all([import("@oh-my-pi/pi-coding-agent/config/settings"), import("@oh-my-pi/pi-coding-agent/config/registry")])
+  .then(([{ settings }, { lookup }]) => (id: string) => lookup(id)?.get(settings), () => undefined);
 const notifyTurnEnd = $busy_notify_turnend;
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
@@ -6511,7 +6516,7 @@ export default function (pi: any) {
   const guardContext = $guard_context;
   if (notifyTurnEnd) {
     installTypesafeJudge(pi, guardContext);
-    installJevGuard(pi, guardContext);
+    installJevGuard(pi, { ...guardContext, ompSetting });
     installTaskSessionProof(pi, "$STATE_REAL", "$ID");
     // Secondmates publish their live model through their home-local extension.
     installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");

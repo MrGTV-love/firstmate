@@ -2497,7 +2497,13 @@ Optional host tools need not be installed for the offline regression; each insta
 Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
 Other harnesses remain outside this guard integration.
 
-Native semantic `find`, web search, browser automation, subagent dispatch and provider-backed tools require a task egress grant before execution.
+Native semantic `find`, web search, browser automation and provider-backed tools require a task egress grant before execution.
+Subagent dispatch (omp `task`, Claude `Agent`, `SendMessage` and `Workflow`) is local: it needs no grant, and each tool a subagent then calls meets its own coverage and egress row.
+omp's memory operations `recall`, `reflect`, `memory_edit`, `retain` and `learn` are classified by their effect under the worker's live omp settings, which the generated worker extension reads from omp's own settings registry, so the global configuration, project settings and every `--config` overlay count.
+Only an effect proven local runs without a grant: with `memory.backend: mnemopi` and `mnemopi.noEmbeddings: true`, `recall`, `reflect` and `memory_edit` read or edit the local SQLite store, and `retain` and `learn` are local only when `mnemopi.llmMode` is `none`; a `learn` under `memory.backend: local` appends to a local file.
+A `retain` or `learn` whose `mnemopi.llmMode` is `smol` or `remote` makes an extraction model call, and every `memory.backend: hindsight` operation calls the remote Hindsight API, so each requires a `provider` grant.
+An unreadable setting, another backend, `mnemopi.noEmbeddings` other than `true` or an unrecognized `mnemopi.llmMode` cannot prove a local effect, so the operation also requires a `provider` grant and its refusal names the operation, the effect it could not prove and the grant remedy; a host without live omp settings, such as Claude, proves nothing local.
+These effects were measured in the installed omp 18.12.6 binary; Mnemopi's background auto-recall and auto-retain are session behavior, not tool calls, and this rule does not judge them.
 `xd://report_issue` has no table row and no grant path: like every other unadmitted xd device it is refused by the [native-device rule](#model-policy), whatever the task grants.
 Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
 Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
@@ -2507,12 +2513,12 @@ Tool coverage and egress-grant refusals apply whether or not the project scope i
 A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
 Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
-The recognized destination classes are `semantic-search`, `web`, `browser`, `provider`, `subagent` and `remote-storage`.
+The recognized destination classes are `semantic-search`, `web`, `browser`, `provider` and `remote-storage`; a grant naming the removed `subagent` class grants nothing.
 An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
 Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
 The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
 This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
-Each tool has at most one destination class, which must be granted; a grant never bypasses existing path, credential, shell or privacy checks.
+Each tool has at most one destination class, which must be granted, and a memory operation's class is `provider` whenever its local effect is not proven; a grant never bypasses existing path, credential, shell or privacy checks.
 
 Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
 A native paid `find` records its deterministic decision even though it has no model classification.
@@ -2529,7 +2535,7 @@ Tools that move no data and run no worker code, such as Claude `Skill`, `ListAge
 Claude `DesignSync` reads and uploads files in claude.ai design-system projects, so it requires a `remote-storage` grant.
 Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
 Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
-The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the existing plain-path guard.
+The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the native-device rule of the existing `jev-write-path-gate`.
 Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name or destination class, so an allow of another tool or class never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
 The egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
 The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.

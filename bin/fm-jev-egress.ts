@@ -3,10 +3,10 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export type DestinationClass = "semantic-search" | "web" | "browser" | "provider" | "subagent" | "remote-storage";
+export type DestinationClass = "semantic-search" | "web" | "browser" | "provider" | "remote-storage";
 type ToolPolicy = { result: "screen" | "unjudged" } & (
   { call: "confinement"; confinement_owner: "T5" }
-  | { call: "shell" | "write" | "edit" | "local" | "paths" | DestinationClass; confinement_owner?: never }
+  | { call: "shell" | "write" | "edit" | "local" | "paths" | "memory" | DestinationClass; confinement_owner?: never }
 );
 
 // One coverage owner for native tools and extension tools exposed as xd devices.
@@ -26,14 +26,14 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   // T4 records ownership; T5 enforces writes at process launch, not by parsing code here.
   eval: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   python: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
-  task: { call: "subagent", result: "unjudged" },
+  task: { call: "local", result: "unjudged" },
   generate_image: { call: "provider", result: "unjudged" },
   security_scan: { call: "provider", result: "unjudged" },
-  learn: { call: "provider", result: "unjudged" },
-  recall: { call: "provider", result: "unjudged" },
-  reflect: { call: "provider", result: "unjudged" },
-  retain: { call: "provider", result: "unjudged" },
-  memory_edit: { call: "local", result: "unjudged" },
+  learn: { call: "memory", result: "unjudged" },
+  recall: { call: "memory", result: "unjudged" },
+  reflect: { call: "memory", result: "unjudged" },
+  retain: { call: "memory", result: "unjudged" },
+  memory_edit: { call: "memory", result: "unjudged" },
   manage_skill: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   ast_edit: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   debug: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
@@ -49,7 +49,7 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   wait: { call: "local", result: "unjudged" },
   // Claude built-ins, lower-cased at the adapter boundary. Unknown extensions/MCP
   // names still fail coverage; these rows classify capabilities, not trusted tools.
-  agent: { call: "subagent", result: "unjudged" },
+  agent: { call: "local", result: "unjudged" },
   artifact: { call: "provider", result: "unjudged" },
   askuserquestion: { call: "local", result: "unjudged" },
   croncreate: { call: "local", result: "unjudged" },
@@ -71,7 +71,7 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   remotetrigger: { call: "provider", result: "unjudged" },
   reportfindings: { call: "local", result: "unjudged" },
   schedulewakeup: { call: "local", result: "unjudged" },
-  sendmessage: { call: "subagent", result: "unjudged" },
+  sendmessage: { call: "local", result: "unjudged" },
   senduserfile: { call: "provider", result: "unjudged" },
   shareonboardingguide: { call: "provider", result: "unjudged" },
   skill: { call: "local", result: "unjudged" },
@@ -86,7 +86,7 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   todowrite: { call: "local", result: "unjudged" },
   toolsearch: { call: "local", result: "unjudged" },
   waitformcpservers: { call: "local", result: "unjudged" },
-  workflow: { call: "subagent", result: "unjudged" },
+  workflow: { call: "local", result: "unjudged" },
   websearch: { call: "web", result: "unjudged" },
 });
 
@@ -98,7 +98,7 @@ export function uncoveredTools(names: readonly string[]): string[] {
 }
 
 const classes: Readonly<Record<string, true>> = {
-  "semantic-search": true, web: true, browser: true, provider: true, subagent: true, "remote-storage": true,
+  "semantic-search": true, web: true, browser: true, provider: true, "remote-storage": true,
 };
 function destinationClass(value: string): value is DestinationClass {
   return Object.hasOwn(classes, value);
@@ -124,4 +124,27 @@ export function egressGranted(state: string, task: string, destination: Destinat
 export function egressClass(tool: string): DestinationClass | undefined {
   const policy = toolPolicy(tool);
   return policy && destinationClass(policy.call) ? policy.call : undefined;
+}
+
+/**
+ * The effect of one omp memory operation under the worker's live settings, as measured in
+ * omp 18.12.6: every Hindsight call reaches its remote API; Mnemopi recall, reflect and
+ * memory_edit read or edit the local SQLite store and embed only when mnemopi.noEmbeddings
+ * is off; Mnemopi retain and learn also run model extraction unless mnemopi.llmMode is none;
+ * the local backend's learn appends to a local file. Returns undefined only for a proven
+ * local effect, otherwise the effect that needs a provider grant or could not be proven.
+ */
+export function memoryEgress(tool: string, setting: ((id: string) => unknown) | undefined): string | undefined {
+  let backend: unknown, noEmbeddings: unknown, llmMode: unknown;
+  try {
+    if (!setting) throw new Error("no live settings");
+    [backend, noEmbeddings, llmMode] = [setting("memory.backend"), setting("mnemopi.noEmbeddings"), setting("mnemopi.llmMode")];
+  } catch { return "could not be proven local because the worker's live memory settings are unreadable"; }
+  if (backend === "hindsight") return "makes a remote Hindsight memory call";
+  if (backend === "local" && tool === "learn") return undefined;
+  if (backend !== "mnemopi") return "could not be proven local because memory.backend is not mnemopi or a local-backend learn";
+  if (noEmbeddings !== true) return "could not be proven local because mnemopi.noEmbeddings is not true, so it may embed through a model";
+  if ((tool !== "retain" && tool !== "learn") || llmMode === "none") return undefined;
+  return llmMode === "smol" || llmMode === "remote" ? `makes a Mnemopi extraction model call (mnemopi.llmMode=${llmMode})`
+    : "could not be proven local because mnemopi.llmMode is not none, smol or remote";
 }
