@@ -738,9 +738,9 @@ ok - claude (2.1.310 (Claude Code)): claude: audit/changed: unchanged native rea
 FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=389394
 ```
 
-### 2026-10-24 retained write pre-tool verification
+### 2026-10-24 write pre-tool verification (historical)
 
-On macOS arm64 with omp 18.12.4, `bash tests/fm-jev-guard-omp-live-e2e.test.sh` passed its 20 native read cases and its retained write-deadline case using only private scripted loopback providers.
+On macOS arm64 with omp 18.12.4, `bash tests/fm-jev-guard-omp-live-e2e.test.sh` passed its 20 native read cases and its then-retained write-deadline case using only private scripted loopback providers.
 The final output was:
 
 ```text
@@ -749,7 +749,8 @@ ok - omp (omp/18.12.4): pre-tool write judgment answered after 31 seconds decide
 
 The former shell judgment is no longer exercised because bash pre-calls have no model gate.
 That run used the ship T2 source, which still screened results, so its read cases are not evidence for the unchanged delivery recorded above.
-This is installed-host delivery evidence for the retained write policy, not live-provider accuracy or production activation.
+This was installed-host delivery evidence for the write policy, not live-provider accuracy or production activation.
+The write file-kind and credential questions it exercised are now retired, so this record does not describe current write admission.
 
 ### Pre-tool deadline verification (2026-10-17)
 
@@ -761,7 +762,7 @@ With the real guard extension and a synthetic judge that answered a benign shell
 The same guard without that overlay was cut off by the host at 30 seconds, wrote no guard row and did not run the command.
 Each case is one run with scripted local providers, so they establish the host mechanism and the overlay's effect, not judge latency or production activation.
 The shell-judgment observations above are historical: bash pre-calls no longer receive a model judgment.
-`tests/fm-jev-guard-omp-live-e2e.test.sh` now exercises the retained write judgment's 31-second overlay case through `fm_jev_native_omp_pretool`.
+Write/edit pre-calls no longer receive one either, so no current pre-tool handler waits on an answered judgment under this deadline.
 
 ### Native device verification (2026-10-12)
 
