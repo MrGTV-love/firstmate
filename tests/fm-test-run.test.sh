@@ -3210,7 +3210,8 @@ test_aggregate_json
 
 # The three control-relaunch groups partition one former suite. The union of
 # their registered case lists must be its 157 cases plus the omp adoption case
-# that joined the backends group, 158 in all, each registered by the one file
+# that joined the backends group and test_relocation_refuses_a_non_lease_copy
+# that joined the recovery group, 159 in all, each registered by the one file
 # that also defines it, with no case twice. A dropped or duplicated case
 # is exactly what a partition loses while every remaining assertion still passes.
 test_control_relaunch_groups_partition_one_inventory() {
