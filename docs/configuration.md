@@ -2476,13 +2476,13 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
 Both integrations enforce only pre-tool checks; neither screens, annotates or withholds tool results.
-Claude's guard runs at the pre-tool boundary for every tool except `Bash`; omp's runs for every tool call.
+Claude's guard runs at the pre-tool boundary for every tool except the shell-command tools `Bash`, `Monitor` and `PowerShell`; omp's runs for every tool call.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, and desktop criteria.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
-`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse` except `Bash`, so every other native call passes tool coverage and egress authorization while a Claude `Bash` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse` except the shell-command tools `Bash`, `Monitor` and `PowerShell`, so every other native call passes tool coverage and egress authorization while a Claude `Bash`, `Monitor` or `PowerShell` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
 A Claude worker launched with an older matcher keeps it until it is respawned: an old `Bash` registration gives shell calls no judgment, but a missing or crashing runtime still stops them, and an old `Write|Edit` matcher leaves other calls without coverage or egress checks.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
