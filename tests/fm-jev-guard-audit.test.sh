@@ -238,7 +238,7 @@ await test('omp github read ops need a remote-storage grant while write ops refu
         assert.ok(patch.reason.includes(`GitHub op ${JSON.stringify(op ?? null)} refused under every grant`), patch.reason);
         assert.ok(patch.reason.includes('no-mistakes pipeline') && patch.reason.includes('gh-axi'), patch.reason);
         assert.equal(r.decision, 'block');
-        assert.equal(r.branch, 'egress');
+        assert.equal(r.branch, 'github-write-op', 'a write-op refusal is not recorded as a missing grant');
         assert.equal(r.destination_class, 'remote-storage');
         assert.equal(r.request_started, false);
       }

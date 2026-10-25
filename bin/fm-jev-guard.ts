@@ -260,7 +260,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         const githubOp = refusedGithubOp(event.input);
         await guardEvent("jev-github-write-op", githubOp ? "github-write" : "github-read", githubOp ? "deny" : "allow", egressStarted, remainingMs);
         if (githubOp) {
-          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
+          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "github-write-op" },
             `GitHub op ${githubOp} refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made.`,
             "Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read.");
         }

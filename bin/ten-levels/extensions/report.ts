@@ -95,7 +95,7 @@ export interface GuardTerminal {
   tool: string;
   decision: "allow" | "block" | "review" | "inactive";
   enforcement: "pretool_allow" | "pretool_deny" | "inactive_no_protection";
-  branch: "policy" | "deterministic" | "device" | "outage" | "inactive" | "egress" | "coverage" | "confinement";
+  branch: "policy" | "deterministic" | "device" | "outage" | "inactive" | "egress" | "coverage" | "confinement" | "github-write-op";
   /** Policy owner only; not proof that launch-time OS confinement is active. */
   confinement_owner?: "T5";
   /** The tool's fixed egress class only; no outbound text or addresses. */
