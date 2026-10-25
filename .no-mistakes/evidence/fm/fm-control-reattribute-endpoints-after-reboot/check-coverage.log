@@ -1,2 +1,1 @@
-FM_TEST_COVERAGE ok total=356 parallel=29 parallel_max_ms=1883057 parallel_imbalance_ms=18852 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=2 parallel_makespan_ms=941660 parallel_budget_ms=1200000 serial=309 serial_shards=21 serial_unhinted=0 serial_max_ms=1117381 serial_budget_ms=1200000 serial_indivisible_ms=916930 herdr=18
-rc=0
+FM_TEST_COVERAGE ok total=359 parallel=29 parallel_max_ms=2894605 parallel_imbalance_ms=23604 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1117958 parallel_budget_ms=1200000 serial=312 serial_shards=21 serial_unhinted=0 serial_max_ms=1117705 serial_budget_ms=1200000 serial_indivisible_ms=916930 herdr=18

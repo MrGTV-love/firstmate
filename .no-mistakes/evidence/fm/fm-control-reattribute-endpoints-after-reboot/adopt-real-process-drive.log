@@ -1,0 +1,153 @@
+
+=== case happy: task rcv-94655-ckpD3a-drive-happy; real agent pid 5057 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-happy-2836/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-happy interrupt   
+error: task rcv-94655-ckpD3a-drive-happy cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+(exit 1)
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-happy adopt   
+adopted: rcv-94655-ckpD3a-drive-happy
+(exit 0)
+record: {"version": 1, "spawn_gen": "old", "pid": 5057, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-happy-2836/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-happy-2836/wt/recorded-session.jsonl"}
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-happy interrupt   
+interrupt-delivered rcv-94655-ckpD3a-drive-happy harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+(exit 0)
+herdr calls during the whole case:
+  herdr pane get %7 --session fmlab
+  herdr agent get %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+  herdr pane get %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+  herdr agent get %7 --session fmlab
+  herdr pane get %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+  herdr agent get %7 --session fmlab
+  herdr pane get %7 --session fmlab
+  herdr agent get %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+  herdr pane get %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+  herdr agent get %7 --session fmlab
+  herdr status --json --session fmlab
+  herdr pane send-keys %7 escape --session fmlab
+  herdr pane get %7 --session fmlab
+  herdr pane get %7 --session fmlab
+  herdr agent get %7 --session fmlab
+  herdr pane process-info --pane %7 --session fmlab
+>>> S1-happy-adopt-then-interrupt: PASS
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-happy adopt   
+error: adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names 5057, so it was not changed
+(exit 1)
+>>> S4-rerun-adopt-same-pid: PASS
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-happy interrupt   
+error: task rcv-94655-ckpD3a-drive-happy cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+(exit 1)
+>>> S12-recheck-after-workspace-lost: PASS
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-happy adopt   [FM_TASK_ID=rcv-94655-ckpD3a-drive-happy]
+error: workers cannot adopt a session record
+(exit 1)
+>>> S11a-worker-refused: PASS
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-happy adopt   [FM_SUPERVISION_ACTOR=branch]
+error: session record adoption (fm-control) refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)
+(exit 6)
+>>> S11b-branch-refused: PASS
+
+=== case reused-claude: task rcv-94655-ckpD3a-drive-reused-claude; real agent pid 22583 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-reused-claude-10021/wt/subdirectory
+recorded pid now 23224 (claude -e setTimeout(()=>{},900000))
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-reused-claude adopt   
+adopted: rcv-94655-ckpD3a-drive-reused-claude
+(exit 0)
+record: {"version": 1, "spawn_gen": "old", "pid": 22583, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-reused-claude-10021/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-reused-claude-10021/wt/recorded-session.jsonl"}
+>>> S2-reused-pid-claude-does-not-block: PASS
+
+=== case reused-non-agent: task rcv-94655-ckpD3a-drive-reused-non-agent; real agent pid 28026 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-reused-non-agent-30633/wt/subdirectory
+recorded pid now 28400 (worker -e setTimeout(()=>{},900000))
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-reused-non-agent adopt   
+adopted: rcv-94655-ckpD3a-drive-reused-non-agent
+(exit 0)
+record: {"version": 1, "spawn_gen": "old", "pid": 28026, "task_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-reused-non-agent-30633/wt/recorded-session.jsonl", "current_session_file": "/Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-reused-non-agent-30633/wt/recorded-session.jsonl"}
+>>> S2-reused-pid-non-agent-does-not-block: PASS
+
+=== case other-live-omp: task rcv-94655-ckpD3a-drive-other-live-omp; real agent pid 33189 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-other-live-omp-25185/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-other-live-omp adopt   
+adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; 34139 is a live omp process, so the omp extension owns this record and it was not changed
+(exit 1)
+>>> S3-recorded-pid-live-omp: PASS
+
+=== case pin-other: task rcv-94655-ckpD3a-drive-pin-other; real agent pid 39140 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-pin-other-9704/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-pin-other adopt   
+adopt refused: generation proof needs the live process not to be pinned to another launch generation
+(exit 1)
+>>> S5-real-env-pinned-other-generation: PASS
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-pin-other interrupt   
+error: task rcv-94655-ckpD3a-drive-pin-other cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+(exit 1)
+>>> S5b-interrupt-still-refused: PASS
+
+=== case pin-same: task rcv-94655-ckpD3a-drive-pin-same; real agent pid 47092 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-pin-same-22412/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-pin-same adopt   
+error: adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates
+(exit 1)
+>>> S6-real-env-pinned-same-generation: PASS
+
+=== case fg-claude: task rcv-94655-ckpD3a-drive-fg-claude; real agent pid 52430 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-fg-claude-29452/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-fg-claude adopt   
+adopt refused: process proof needs the resolved foreground process to be a readable omp process
+(exit 1)
+>>> S7-foreground-not-omp: PASS
+
+=== case cwd-outside: task rcv-94655-ckpD3a-drive-cwd-outside; real agent pid 55426 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-cwd-outside-10432/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-cwd-outside adopt   
+adopt refused: workspace proof needs the foreground cwd inside this task's recorded worktree
+(exit 1)
+>>> S8a-cwd-outside-worktree: PASS
+
+=== case cwd-foreign: task rcv-94655-ckpD3a-drive-cwd-foreign; real agent pid 58771 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-cwd-foreign-17761/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-cwd-foreign adopt   
+adopt refused: workspace proof needs this task to be the unique deepest match; cwd belongs to foreign
+(exit 1)
+>>> S8b-cwd-in-other-task-deeper-worktree: PASS
+
+=== case dup-pane: task rcv-94655-ckpD3a-drive-dup-pane; real agent pid 62912 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-dup-pane-945/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-dup-pane adopt   
+adopt refused: unique-claim proof needs no other local task to claim this pane; claimed by duplicate
+(exit 1)
+>>> S9-two-metas-claim-pane: PASS
+
+=== case gen-mismatch: task rcv-94655-ckpD3a-drive-gen-mismatch; real agent pid 66509 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-gen-mismatch-22948/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-gen-mismatch adopt   
+adopt refused: generation proof needs the existing record spawn_gen to equal metadata spawn_gen
+(exit 1)
+>>> S10-record-generation-mismatch: PASS
+
+=== case ambiguous: task rcv-94655-ckpD3a-drive-ambiguous; real agent pid 70585 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-ambiguous-16610/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-ambiguous adopt   
+adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane
+(exit 1)
+>>> S13-ambiguous-foreground: PASS
+
+=== case non-owner: task rcv-94655-ckpD3a-drive-non-owner; real agent pid 73654 (omp -e setTimeout(()=>{},900000)); real cwd /Users/charlesabrooker/tmp/fm-control-relaunch.ckpD3a/drive-non-owner-15878/wt/subdirectory
+$ FM_HOME=<lab> bin/fm-control.sh rcv-94655-ckpD3a-drive-non-owner adopt   
+error: session record adoption requires the actual lock-owning main Firstmate
+(exit 1)
+>>> S14-non-lock-owner: PASS
+
+=== SUMMARY
+S1-happy-adopt-then-interrupt: PASS
+S4-rerun-adopt-same-pid: PASS
+S12-recheck-after-workspace-lost: PASS
+S11a-worker-refused: PASS
+S11b-branch-refused: PASS
+S2-reused-pid-claude-does-not-block: PASS
+S2-reused-pid-non-agent-does-not-block: PASS
+S3-recorded-pid-live-omp: PASS
+S5-real-env-pinned-other-generation: PASS
+S5b-interrupt-still-refused: PASS
+S6-real-env-pinned-same-generation: PASS
+S7-foreground-not-omp: PASS
+S8a-cwd-outside-worktree: PASS
+S8b-cwd-in-other-task-deeper-worktree: PASS
+S9-two-metas-claim-pane: PASS
+S10-record-generation-mismatch: PASS
+S13-ambiguous-foreground: PASS
+S14-non-lock-owner: PASS
