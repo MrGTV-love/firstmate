@@ -1,0 +1,12 @@
+== real tree
+ok - the fm-pr-merge groups are a duplicate-free 149-case cover, each case registered by the file that defines it
+rc=0
+== broken: one case dropped from forges registration
+not ok - the fm-pr-merge groups register 148 cases, not the 149-case inventory they partition
+rc=1
+== broken: checks case also registered in forges
+not ok - tests/fm-pr-merge-forges.test.sh registers test_github_review_required_refuses but does not define it
+rc=1
+== broken: checks group file missing
+not ok - missing fm-pr-merge group file: tests/fm-pr-merge-checks.test.sh
+rc=1

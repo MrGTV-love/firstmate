@@ -1,0 +1,10 @@
+fm-pr-merge registered=50
+fm-pr-merge-forges registered=49
+fm-pr-merge-checks registered=50
+base cases=149 split cases=149 unique=149
+ORDER: identical (base call order == concatenated group registrations)
+functions only in base:
+functions only in split:
+pr_merge_run
+shared functions compared (declare -f, all three groups)=240 bodies differing=0
+test_ cases compared=149

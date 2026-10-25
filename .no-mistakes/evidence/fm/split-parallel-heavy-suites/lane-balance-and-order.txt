@@ -1,0 +1,6 @@
+$ FM_TEST_ONLY=test_portable_parallel_lanes_stay_duration_balanced bash tests/fm-test-run.test.sh
+ok - portable parallel lanes are fully hinted and packed within 5% of each other
+rc=0
+$ FM_TEST_ONLY=test_portable_parallel_run_order_matches_list_scheduled bash tests/fm-test-run.test.sh
+ok - portable parallel lanes start their scripts in the order the makespan model packs
+rc=0

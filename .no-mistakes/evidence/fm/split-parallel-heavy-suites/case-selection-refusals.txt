@@ -1,0 +1,20 @@
+$ bash tests/fm-pr-merge.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash fm-pr-merge.test.sh [test_function_name ...]
+rc=2
+$ bash tests/fm-pr-merge-forges.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash fm-pr-merge-forges.test.sh [test_function_name ...]
+rc=2
+$ bash tests/fm-pr-merge-checks.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash fm-pr-merge-checks.test.sh [test_function_name ...]
+rc=2
+$ bash tests/fm-pr-merge-forges.test.sh test_github_review_required_refuses   # a case owned by another group
+Unknown test case: test_github_review_required_refuses
+Usage: bash fm-pr-merge-forges.test.sh [test_function_name ...]
+rc=2
+$ bash tests/fm-pr-merge-checks.test.sh test_absent_backlog_still_merges   # a forges case asked of checks
+Unknown test case: test_absent_backlog_still_merges
+Usage: bash fm-pr-merge-checks.test.sh [test_function_name ...]
+rc=2

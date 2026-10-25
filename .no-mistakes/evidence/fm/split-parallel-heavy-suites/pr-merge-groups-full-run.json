@@ -1,0 +1,49 @@
+{
+  "families": [
+    {
+      "count": 3,
+      "duration_ms": 679140,
+      "failed": 0,
+      "name": "pr-forge"
+    }
+  ],
+  "finished_at": "2026-10-25T17:29:51Z",
+  "run_id": "fm-test-run-1792948919798-12397",
+  "scripts": [
+    {
+      "duration_ms": 190386,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pr-merge.test.sh"
+    },
+    {
+      "duration_ms": 208518,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pr-merge-forges.test.sh"
+    },
+    {
+      "duration_ms": 280236,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pr-merge-checks.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=4",
+  "started_at": "2026-10-25T17:21:59Z",
+  "summary": {
+    "duration_ms": 471646,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 3
+  }
+}

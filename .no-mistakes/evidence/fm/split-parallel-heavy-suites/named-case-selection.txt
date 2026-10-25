@@ -1,28 +1,22 @@
+$ bash tests/fm-pr-merge.test.sh test_github_review_required_refuses
+Unknown test case: test_github_review_required_refuses
+Usage: bash fm-pr-merge.test.sh [test_function_name ...]
+rc=2
+$ bash tests/fm-pr-merge-forges.test.sh test_absent_backlog_still_merges test_bundled_repo_override_args_refuse_before_recording
+ok - fm-pr-merge refuses a bundled short-option repo override and refuses -d unless attended
+ok - fm-pr-merge proceeds when the home carries no backlog at all
+rc=0
+$ bash tests/fm-pr-merge-checks.test.sh test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
+ok - a multi-PR task merges the named green PR after a sibling merged and lost its branch
+rc=0
+$ bash tests/fm-pr-merge.test.sh test_triggered_review_verifies_only_when_independent
+ok - yes-trigger review verification: independent
+ok - yes-trigger review verification: same-family
+ok - yes-trigger review verification: unknown-reader
+ok - yes-trigger review verification: unknown-author
+ok - yes-trigger review verification: wrong-head
+ok - yes-trigger review verification: fail
+rc=0
 $ bash tests/fm-pr-merge-checks.test.sh test_github_review_required_refuses
 ok - fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED
-exit=0
-
-$ bash tests/fm-pr-merge.test.sh test_captain_fail_triggered_pass_refuses
-ok - a loosens-deny-allow-list PASS cannot revive a voided captain-word; new words can authorize it
-ok - a widens-guard PASS cannot revive a voided captain-word; new words can authorize it
-ok - a customer-data-billing-spend PASS cannot revive a voided captain-word; new words can authorize it
-exit=0
-
-$ bash tests/fm-pr-merge-checks.test.sh test_captain_fail_triggered_pass_refuses
-Unknown test case: test_captain_fail_triggered_pass_refuses
-Usage: bash fm-pr-merge-checks.test.sh [test_function_name ...]
-exit=2
-
-$ bash tests/fm-pr-merge-forges.test.sh test_no_such_case
-Unknown test case: test_no_such_case
-Usage: bash fm-pr-merge-forges.test.sh [test_function_name ...]
-exit=2
-
-$ bash tests/fm-pr-merge-checks.test.sh test_github_review_required_refuses test_no_such_case
-Unknown test case: test_no_such_case
-Usage: bash fm-pr-merge-checks.test.sh [test_function_name ...]
-exit=2
-
-$ bash tests/fm-pr-merge-helpers.sh
-exit=0
-
+rc=0
