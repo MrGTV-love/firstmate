@@ -1,0 +1,13 @@
+round 1 run 2 rc=0
+round 1 run 3 rc=0
+round 1 run 4 rc=0
+round 1 run 1 rc=0
+round 2 run 3 rc=0
+round 2 run 1 rc=0
+round 2 run 2 rc=0
+round 2 run 4 rc=0
+round 3 run 4 rc=0
+round 3 run 1 rc=0
+round 3 run 3 rc=0
+round 3 run 2 rc=0
+elapsed 445s

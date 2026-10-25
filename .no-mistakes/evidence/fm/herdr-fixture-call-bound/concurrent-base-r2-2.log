@@ -1,0 +1,14 @@
+..........................F..
+======================================================================
+FAIL: test_unscoped_default_server_does_not_block_other_session_start (__main__.StartupSafety.test_unscoped_default_server_does_not_block_other_session_start)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/tmp/herdr-base.YBlSc1/base-fixture.py", line 226, in test_unscoped_default_server_does_not_block_other_session_start
+    self.assertEqual(self.ensure()[0], 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 29 tests in 16.600s
+
+FAILED (failures=1)

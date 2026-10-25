@@ -1,0 +1,17 @@
+.................F...........
+======================================================================
+FAIL: test_read_only_state_never_starts_unreachable_server (__main__.StartupSafety.test_read_only_state_never_starts_unreachable_server) (status='false', entry='fm_backend_agent_state herdr')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5TDG3KC94FYXDP5ARDWT3AD/tests/herdr-server-start-fixture.py", line 323, in test_read_only_state_never_starts_unreachable_server
+    self.assertEqual(out, expected)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+AssertionError: 'unreadable' != 'missing'
+- unreadable
++ missing
+
+
+----------------------------------------------------------------------
+Ran 29 tests in 16.790s
+
+FAILED (failures=1)

@@ -1,0 +1,5 @@
+suite run 1 rc=1
+suite run 2 rc=1
+suite run 3 rc=1
+suite run 4 rc=1
+elapsed 42s

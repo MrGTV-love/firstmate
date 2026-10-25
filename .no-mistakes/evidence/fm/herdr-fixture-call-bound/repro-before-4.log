@@ -1,0 +1,15 @@
+...................F.........
+======================================================================
+FAIL: test_session_list_supplies_a_missing_status_socket (__main__.StartupSafety.test_session_list_supplies_a_missing_status_socket)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5TDG3KC94FYXDP5ARDWT3AD/tests/herdr-server-start-fixture.py", line 491, in test_session_list_supplies_a_missing_status_socket
+    self.assertEqual(self.ensure()[0], 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 29 tests in 15.019s
+
+FAILED (failures=1)
+not ok - Herdr server startup safety regression

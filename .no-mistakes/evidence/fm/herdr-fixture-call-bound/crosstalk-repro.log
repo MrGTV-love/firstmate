@@ -1,0 +1,44 @@
+# sibling process standing in for a concurrent fixture's test_server_with_unreadable_session_refuses:
+53211 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/herdr-xtalk.TZWiRQ/broken/herdr server --session
+# head fixture, read-only state test, while that sibling is alive:
+FF
+======================================================================
+FAIL: test_read_only_state_never_starts_unreachable_server (__main__.StartupSafety.test_read_only_state_never_starts_unreachable_server) (status='false', entry='fm_backend_agent_state herdr')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5TDG3KC94FYXDP5ARDWT3AD/tests/herdr-server-start-fixture.py", line 323, in test_read_only_state_never_starts_unreachable_server
+    self.assertEqual(out, expected)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+AssertionError: 'unreadable' != 'missing'
+- unreadable
++ missing
+
+
+======================================================================
+FAIL: test_stopped_server_reads_missing_only_with_proven_absence (__main__.StartupSafety.test_stopped_server_reads_missing_only_with_proven_absence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5TDG3KC94FYXDP5ARDWT3AD/tests/herdr-server-start-fixture.py", line 327, in test_stopped_server_reads_missing_only_with_proven_absence
+    self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "missing"))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: (0, 'unreadable') != (0, 'missing')
+
+First differing element 1:
+'unreadable'
+'missing'
+
+- (0, 'unreadable')
++ (0, 'missing')
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.904s
+
+FAILED (failures=2)
+rc=1
+# same tests after the sibling exits:
+..
+----------------------------------------------------------------------
+Ran 2 tests in 1.170s
+
+OK
+rc=0

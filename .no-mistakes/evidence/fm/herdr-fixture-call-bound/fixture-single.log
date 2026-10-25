@@ -1,0 +1,6 @@
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 15.012s
+
+OK
+python3 tests/herdr-server-start-fixture.py "$PWD"  4.41s user 4.03s system 55% cpu 15.161 total

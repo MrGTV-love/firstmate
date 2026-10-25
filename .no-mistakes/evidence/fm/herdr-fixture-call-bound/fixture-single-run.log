@@ -1,0 +1,35 @@
+test_embedded_session_assignment_cannot_prove_default_absent (__main__.EnvironmentOwnership.test_embedded_session_assignment_cannot_prove_default_absent) ... ok
+test_real_session_entry_is_indistinguishable_from_embedded_text (__main__.EnvironmentOwnership.test_real_session_entry_is_indistinguishable_from_embedded_text) ... ok
+test_unambiguous_default_server_blocks_default_not_other (__main__.EnvironmentOwnership.test_unambiguous_default_server_blocks_default_not_other) ... ok
+test_concurrent_starters_launch_only_once (__main__.StartupSafety.test_concurrent_starters_launch_only_once) ... ok
+test_crew_state_reads_without_starting (__main__.StartupSafety.test_crew_state_reads_without_starting) ... ok
+test_failed_status_after_launch_keeps_polling (__main__.StartupSafety.test_failed_status_after_launch_keeps_polling) ... ok
+test_guard_and_adapter_starts_race_to_one_server (__main__.StartupSafety.test_guard_and_adapter_starts_race_to_one_server) ... ok
+test_guard_releases_the_start_lock_once_its_server_runs (__main__.StartupSafety.test_guard_releases_the_start_lock_once_its_server_runs) ... ok
+test_guard_releases_the_start_lock_when_its_server_fails (__main__.StartupSafety.test_guard_releases_the_start_lock_when_its_server_fails) ... ok
+test_launched_server_exit_is_distinct_from_a_refusal (__main__.StartupSafety.test_launched_server_exit_is_distinct_from_a_refusal) ... ok
+test_live_process_without_socket_does_not_launch (__main__.StartupSafety.test_live_process_without_socket_does_not_launch) ... ok
+test_live_socket_failed_status_does_not_launch (__main__.StartupSafety.test_live_socket_failed_status_does_not_launch) ... ok
+test_no_socket_from_status_or_session_list_refuses (__main__.StartupSafety.test_no_socket_from_status_or_session_list_refuses) ... ok
+test_non_socket_path_is_not_proven_absence (__main__.StartupSafety.test_non_socket_path_is_not_proven_absence) ... ok
+test_other_process_arguments_are_not_server_identity (__main__.StartupSafety.test_other_process_arguments_are_not_server_identity) ... ok
+test_proven_absence_starts_once_and_reuses_server (__main__.StartupSafety.test_proven_absence_starts_once_and_reuses_server) ... ok
+test_quoted_client_argv_does_not_block_cold_start (__main__.StartupSafety.test_quoted_client_argv_does_not_block_cold_start) ... ok
+test_read_only_state_never_starts_unreachable_server (__main__.StartupSafety.test_read_only_state_never_starts_unreachable_server) ... ok
+test_server_with_unreadable_session_refuses (__main__.StartupSafety.test_server_with_unreadable_session_refuses) ... ok
+test_session_list_supplies_a_missing_status_socket (__main__.StartupSafety.test_session_list_supplies_a_missing_status_socket) ... ok
+test_stale_socket_does_not_prevent_proven_absence_start (__main__.StartupSafety.test_stale_socket_does_not_prevent_proven_absence_start) ... ok
+test_start_failures_name_their_cause (__main__.StartupSafety.test_start_failures_name_their_cause) ... ok
+test_starter_exits_and_closes_inherited_descriptors (__main__.StartupSafety.test_starter_exits_and_closes_inherited_descriptors) ... ok
+test_stopped_server_reads_missing_only_with_proven_absence (__main__.StartupSafety.test_stopped_server_reads_missing_only_with_proven_absence) ... ok
+test_undecodable_process_text_does_not_block_other_session_start (__main__.StartupSafety.test_undecodable_process_text_does_not_block_other_session_start) ... ok
+test_unreadable_process_inventory_cannot_license_start (__main__.StartupSafety.test_unreadable_process_inventory_cannot_license_start) ... ok
+test_unscoped_default_server_does_not_block_other_session_start (__main__.StartupSafety.test_unscoped_default_server_does_not_block_other_session_start) ... ok
+test_unscoped_server_gone_before_its_environment_read_does_not_block (__main__.StartupSafety.test_unscoped_server_gone_before_its_environment_read_does_not_block) ... ok
+test_unscoped_server_inheriting_the_session_blocks_its_start (__main__.StartupSafety.test_unscoped_server_inheriting_the_session_blocks_its_start) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 17.557s
+
+OK
+python3 tests/herdr-server-start-fixture.py "$PWD" -v  4.40s user 4.09s system 47% cpu 17.717 total

@@ -1,0 +1,24 @@
+................F..........F.
+======================================================================
+FAIL: test_quoted_client_argv_does_not_block_cold_start (__main__.StartupSafety.test_quoted_client_argv_does_not_block_cold_start)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5TDG3KC94FYXDP5ARDWT3AD/tests/herdr-server-start-fixture.py", line 474, in test_quoted_client_argv_does_not_block_cold_start
+    self.assertEqual(self.ensure()[0], 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_unscoped_server_gone_before_its_environment_read_does_not_block (__main__.StartupSafety.test_unscoped_server_gone_before_its_environment_read_does_not_block)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5TDG3KC94FYXDP5ARDWT3AD/tests/herdr-server-start-fixture.py", line 465, in test_unscoped_server_gone_before_its_environment_read_does_not_block
+    self.assertEqual(self.ensure()[0], 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 29 tests in 15.744s
+
+FAILED (failures=2)
+not ok - Herdr server startup safety regression

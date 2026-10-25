@@ -1,0 +1,21 @@
+...................F.........
+======================================================================
+FAIL: test_session_list_supplies_a_missing_status_socket (__main__.StartupSafety.test_session_list_supplies_a_missing_status_socket)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/tmp/herdr-base.YBlSc1/base-fixture.py", line 479, in test_session_list_supplies_a_missing_status_socket
+    self.assertEqual(self.state("fm_backend_agent_state herdr", "false"), (0, "missing"))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: (0, 'unreadable') != (0, 'missing')
+
+First differing element 1:
+'unreadable'
+'missing'
+
+- (0, 'unreadable')
++ (0, 'missing')
+
+----------------------------------------------------------------------
+Ran 29 tests in 15.722s
+
+FAILED (failures=1)
