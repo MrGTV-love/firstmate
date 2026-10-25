@@ -2746,7 +2746,7 @@ They perform no guard key lookup or provider request and retain deterministic to
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
-Confined workers append minimized terminal records to their own `state/<task>.jev-guard.jsonl`; their profile grants only that exact audit file, never the shared ledger.
+Confined workers append minimized terminal records to their own `state/<task>.jev-guard.jsonl`; their [write profile](#worker-os-write-confinement) denies the shared ledger and the audit file of every other task known at launch.
 Unconfined and primary sessions retain the owning home's private `state/jev-guard.jsonl`.
 [`bin/fm-jev-audit-read.mjs`](../bin/fm-jev-audit-read.mjs) reads the shared legacy file plus every per-task audit file, so historical and new rows remain visible without copying or rewriting either layout.
 The reader orders rows by numeric `at`, preserving source filename and line order for ties, and fails on unreadable or malformed audit files rather than silently omitting history.
