@@ -1,0 +1,37 @@
+===== commit 6c7728737: test_claude_node_pretool, test_omp_permissions, test_omp_device_effects =====
+ok - pure write boundaries
+ok - node type stripping still enforces the Claude pre-tool deny
+not ok - OMP permissions: node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ {
++   block: true,
++   reason: '[jev-guard] Device "xd://lsp" refused: native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate. Refused path: "xd://lsp". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.'
++ }
+- undefined
+
+    at file://<tmp>/6c7728737/[eval1]:51:12
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    block: true,
+    reason: '[jev-guard] Device "xd://lsp" refused: native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate. Refused path: "xd://lsp". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.'
+  },
+  expected: undefined,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.4.0
+exit=1
+===== commit 9f924ea92: test_claude_node_pretool, test_omp_permissions, test_omp_device_effects =====
+ok - pure write boundaries
+ok - node type stripping still enforces the Claude pre-tool deny
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+exit=0
