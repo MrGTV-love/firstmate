@@ -266,6 +266,7 @@ It refuses without changing the record, instructions, or copies when:
 - a recorded GitHub PR has no full recorded `pr_head=` and no readable forge head, either head is missing from Git or not an ancestor of the replacement's HEAD, or a successful forge response is malformed; other forge providers retain the recorded-PR refusal;
   The proof checks both the recorded head and the current forge head when reachable, regardless of whether the PR is open, closed, or merged, and retains the PR identity rather than treating closure as permission to lose its history;
 - a pending backlog close or an unfinished relaunch transaction exists;
+- the task is a ship whose recorded copy no longer exists: reassociation re-points a live copy and is never a vanished-copy recovery, so the refusal names relocation through `relaunch --worktree`, which runs the lease proof in [Relocating a task whose worktree is gone](#relocating-a-task-whose-worktree-is-gone);
 - the task has no regular `brief.md` to carry the note, the record already names the replacement copy, or the record carries more than one `kind=` line, more than one `branch=` line for a ship, or a `project=` that is not a directory;
 - the replacement copy is not an isolated worktree root of the project's own repository, or is the project or primary checkout itself;
 - a ship's replacement copy has a detached HEAD, or any brief `Ship branch:` line disagrees with the recorded branch, even when the replacement keeps that branch;
@@ -383,7 +384,7 @@ It then publishes, in order, so an earlier failure rolls back to the record that
 
 1. pool slot claims: a managed pool slot that overlaps the replacement copy is claimed for the task, keeping an existing claim's home, and one that overlaps only the copy it leaves has the task's claim released, so the pool may hand it out again;
 2. the brief, with a ship's `Ship branch:` line moved to the replacement copy's branch and a `## Copy reassociation (<timestamp>)` block carrying the note, so a later relaunch agrees with the record and its worker knows where to work;
-3. the record, with `worktree=` and a ship's `branch=` naming the replacement copy and one more `prior_worktree=` line naming the copy it left, or a `released_worktree=` line when that copy lies in a released pool slot (an earlier prior copy inside that slot moves to `released_worktree=` too). A recorded copy that no longer exists but sat in Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file is recorded as `released_worktree=` as well, and the task's claim beside it is released, so the vanished path never blocks the task Treehouse later hands that slot to.
+3. the record, with `worktree=` and a ship's `branch=` naming the replacement copy and one more `prior_worktree=` line naming the copy it left, or a `released_worktree=` line when that copy lies in a released pool slot (an earlier prior copy inside that slot moves to `released_worktree=` too). A scout's recorded copy that no longer exists but sat in Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file is recorded as `released_worktree=` as well, and the task's claim beside it is released, so the vanished path never blocks the task Treehouse later hands that slot to.
 
 The brief and record are each read whole and staged with every write checked, so a read or write failure refuses before anything is published.
 The brief is the durable reassociation narrative; no separate reassociation audit log is created.
@@ -553,6 +554,7 @@ A pool slot can vanish while its task's branch and every commit on it survive in
 Plain `relaunch` refuses that task because it cannot checkpoint the missing recorded copy.
 `fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh copy of the same branch that the project's Treehouse lease allocated.
 A scout has no branch to match and a secondmate's home is not a task copy, so both refuse.
+`reassociate` is not a route here: it re-points only a ship whose recorded copy still exists, and refuses one whose copy is gone.
 The lease is the only accepted source: a hand-made `git worktree add` copy, an Orca-allocated worktree, and a project with no Treehouse pool refuse by name, because none of them can prove which allocator produced the copy.
 The `<pool>/<slot>/<repo>` layout is not that proof, since a hand-made copy can reproduce it; the copy must also have an entry, in any lease state, in its pool's Treehouse state file, which only Treehouse writes.
 
