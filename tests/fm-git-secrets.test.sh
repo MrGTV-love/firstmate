@@ -256,7 +256,11 @@ test_remote_content_replays_name_the_likely_cause() {
   assert_contains "$out" "escalate to Firstmate naming the file and line" "F2: squash refusal did not name the next step"
   assert_not_contains "$out" AKIA "F2: squash refusal printed the matching value"
   git -C "$repo" reset -q --hard main
+  printf 'benign topic work\n' >>"$repo/README.md"
+  git -C "$repo" commit -qam 'topic moved on before the replay'
   git -C "$repo" cherry-pick origin/side >/dev/null
+  [ "$(git -C "$repo" rev-parse HEAD)" != "$(git -C "$repo" rev-parse origin/side)" ] ||
+    fail "F2: the cherry-pick reproduced the remote commit instead of making a new one"
   out=$(with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic 2>&1) &&
     fail "F2: a cherry-pick of remote content was pushed by the check"
   assert_contains "$out" fixture.sh "F2: cherry-pick push refusal did not name the file"

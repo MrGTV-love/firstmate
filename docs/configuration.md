@@ -118,7 +118,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 ### Friction ledger
 
-The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev size refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
+The pilot refusal instrument records teardown nested-copy/preservation predicates in the explicit owning `FM_HOME/state/friction.jsonl`.
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
 Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
 A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
@@ -133,8 +133,6 @@ The teardown completing command re-enters its existing proof and automatic ignor
 It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, and one teardown process keeps one operation across all its refusals, so a refusal, a refusal on retry and the later success are one operation; a human-only exit prints no command and carries none.
 A forced or legacy-record teardown prints a human-only exit for that refusal instead, because the printed command carries no force or legacy flags and so could not complete that run; the owner re-runs it with the owner's own flags.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
-Jev's size message, for write/edit pre-calls that cannot be planned, names the existing request/overlap budget and a human-only question without changing their screening or admission.
-A refusal line and a blocked event are produced only where the guard denies a call; tool results are neither printed as `REFUSED` nor counted.
 
 The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
 Only an explicit absolute `FM_HOME` selects the ledger; cwd and `FM_STATE_OVERRIDE` do not redirect it.
@@ -155,7 +153,7 @@ The pilot leaves adjudication, theater and fact delta unknown rather than invent
 A retry is a new attempt/event under the same operation/episode, so a retry that is refused again is another `blocked` event; a terminal event appends its measured elapsed time without rewriting the blocked event.
 The writer's `outcome` interface appends a follow-up only for the `FM_FRICTION_OPERATION_ID` it is given, only when that operation already holds a blocked event for the same guard, task and subject, and a terminal outcome (`retry-succeeded`, `completed`, `abandoned`) at most once; elapsed time runs from the first block.
 Teardown records `retried` when a run starts with such an operation, `retry-succeeded` when it removes a copy that was refused, and `completed` when the teardown finishes without a lost slot.
-No site observes `abandoned`, `worked-around`, `bypassed` or `escalated`, so none is recorded; Jev's size bridge sees only the refusal, so it records no outcome.
+No site observes `abandoned`, `worked-around`, `bypassed` or `escalated`, so none is recorded.
 `FM_FRICTION_EVENT_ID`, `FM_FRICTION_ATTEMPT_ID`, `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` supply existing correlation identities when available; otherwise the constructor generates a fresh event/attempt identity, without guessing continuity across invocations.
 `FM_FRICTION_EXECUTION_KIND=test` separates fixtures, and `FM_FRICTION_ACTOR` supplies a known typed role; absent actor information remains unknown.
 Commands, completing questions, tool output, credentials, raw paths and customer content are never ledger fields.
@@ -167,7 +165,7 @@ A short/crashed append leaves its existing bytes intact; subsequent writes diagn
 A complete line that fails the schema is diagnosed the same way, as invalid history, never as a fault of the new event.
 Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
 An omitted event remains missing evidence, not a guarded-operation failure.
-The optional friction writer is separate from Jev's existing mandatory audit: that audit's `AuditUnavailableError` behavior is unchanged.
+The Jev guard writes no friction events; its mandatory audit's `AuditUnavailableError` behavior is unchanged.
 [`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references
@@ -2650,8 +2648,8 @@ The 90-second per-try limit protects only against a judge that never answers; it
 Claude's host hook envelope uses `fm-duration.py limit` with a 330-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
 omp refuses a call when a `tool_call` handler outlasts `extensionHandlers.toolCallTimeoutMs`, which defaults to 30 seconds.
 [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) raises it to 330 seconds, above the 300-second pre-tool budget, for worker launches through the existing per-launch `--config` overlay; no global or user omp setting is changed.
-A raw launch that omits the overlay keeps the 30-second default, so a pre-tool judgment slower than that is refused by the host rather than reviewed; that failure stays closed.
-Each call obtains its own bounded judgment; no outcome of one call is carried to another, so a slow or failed judgment never refuses a later call by itself.
+A raw launch that omits the overlay keeps the 30-second default, so a pre-tool handler slower than that is refused by the host; that failure stays closed.
+Each call is decided on its own; no outcome of one call is carried to another.
 Write/edit admission does not depend on provider availability.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.

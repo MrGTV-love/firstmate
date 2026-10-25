@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { createGuardService, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, SIZE_REFUSAL_NOTICE, withDecisionBudget,
+import { createGuardService, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, withDecisionBudget,
   type GuardServiceContext, type GuardTerminal } from "./ten-levels/extensions/report.ts";
 import { insideRepo } from "./ten-levels/src/levels/level06/index.ts";
 
@@ -164,8 +164,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : alternative ? `${reason} ${alternative}` : reason;
     const path = final.refused_path === undefined ? "" : ` Refused path: ${JSON.stringify(final.refused_path)}.`;
     const next = `${alternative && !final.audit_error_type ? "Apart from the alternative this refusal names, do" : "Do"} not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.`;
-    const guidance = final.error_type === "RequestTooLargeError" && !final.audit_error_type
-      ? SIZE_REFUSAL_NOTICE : terminal.decision === "review" ? OUTAGE_NOTICE : next;
+    const guidance = terminal.decision === "review" ? OUTAGE_NOTICE : next;
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };
   }
 

@@ -90,7 +90,7 @@
     "invariant": "an omp tool result too large to screen completely is withheld",
     "retired": "2026-10-24",
     "tier": "A",
-    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.6 and 7.4: the result half of the size refusal withheld large outputs only because the result screen could not cover them; the pre-tool size refusal is unchanged",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.6 and 7.4: the result half of the size refusal withheld large outputs only because the result screen could not cover them; the write-time size refusal retired separately with the write content judgment",
     "replaced_by": "nothing; large results reach the worker unchanged",
     "retirement_test": "tests/fm-retired-jev-result-size-refusal.test.sh"
   },

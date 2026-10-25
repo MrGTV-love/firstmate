@@ -921,7 +921,7 @@
     {
       "point": "D9 Size refusal, result half",
       "evidence": "data/fm-jev-guard-e2e/report.md",
-      "reason": "never registered: the result half of the size refusal, which served only the omp result screen while the pre-tool size refusal stays, so its retirement record adds to the audited population"
+      "reason": "never registered: the result half of the size refusal, which served only the omp result screen, so its retirement record adds to the audited population"
     },
     {
       "point": "D2 Write kind Choice (Q3)",

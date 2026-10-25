@@ -13,15 +13,6 @@ export const GUARD_POLICY_VERSION = "FIRSTMATE_JEV_GUARD_V1";
 export const OUTAGE_POLICY = "REVIEW_ON_UNAVAILABLE_V1";
 export const GUARD_MODEL = "jev-1.13.0";
 export const MAX_REQUEST_BYTES = 16_384;
-/** A payload over the ceiling is screened as overlapping pieces, each one a complete request that fits it. */
-export const MAX_CHUNKS = 16;
-/** A span up to 1,000 JSON-escaped bytes always lies whole inside one piece; a longer one can be cut, and each half is still screened. */
-export const CHUNK_OVERLAP_BYTES = 1_024;
-/** Presentation only: these are the existing screening limits, not a new admission rule. */
-const SIZE_REFUSAL_HEAD = `REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within ${MAX_CHUNKS} requests of ${MAX_REQUEST_BYTES} UTF-8 bytes each, including model, questions and JSON framing, with ${CHUNK_OVERLAP_BYTES} JSON-escaped bytes of overlap. `
-  + `The ${MAX_CHUNKS * MAX_REQUEST_BYTES}-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. `;
-export const SIZE_REFUSAL_NOTICE = SIZE_REFUSAL_HEAD
-  + "For an unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
 /** Outage-only deny guidance; the worker adapter owns policy-refusal next steps. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
@@ -251,21 +242,6 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });
       } catch (cause) {
         throw new GuardUnavailableError("AuditUnavailableError", terminal.request_started, cause);
-      }
-      // Mirror only a named size refusal the guard actually enforced, never raw inputs or a second judgment.
-      // This optional bridge must not acquire the mandatory Jev audit's semantics.
-      if (active && terminal.error_type === "RequestTooLargeError"
-        && terminal.enforcement === "pretool_deny") {
-        try {
-          execFileSync("python3", [resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py"),
-            "refusal", "FM-JEV-SIZE", "complete-screening-budget", `${terminal.hook}-${terminal.tool}`,
-            `${context.task}:${terminal.hook}:${terminal.tool}`, "machine",
-            context.task, fileURLToPath(import.meta.url)], {
-            env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"], timeout: preflightTimeout(),
-          });
-        } catch {
-          console.error("fm-friction: size telemetry unavailable; guarded result unchanged; retry telemetry later with the same event identity");
-        }
       }
     },
   };

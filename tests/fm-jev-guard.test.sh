@@ -760,7 +760,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const { MAX_REQUEST_BYTES, MAX_CHUNKS } = await import(pathToFileURL(process.env.REPORT));
+const { MAX_REQUEST_BYTES } = await import(pathToFileURL(process.env.REPORT));
 const home = process.env.HOME_DIR;
 const handlers = {};
 installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'oversize', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
@@ -781,7 +781,7 @@ try {
     ['oversized', 'src/big.ts', benign],
     ['never-send', 'src/big.ts', benign + 'never-send-canary-value\n'],
     ['unplannable path', `src/${'p'.repeat(MAX_REQUEST_BYTES)}.ts`, 'ordinary content'],
-    ['beyond the former coarse precheck', 'src/huge.ts', 'x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1)],
+    ['beyond the former coarse precheck', 'src/huge.ts', 'x'.repeat(16 * MAX_REQUEST_BYTES + 1)],
   ]) {
     for (const toolName of ['write', 'edit']) {
       const before = sent();
