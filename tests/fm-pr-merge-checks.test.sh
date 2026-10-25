@@ -13,9 +13,9 @@
 # shellcheck source=tests/fm-pr-merge-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-pr-merge-helpers.sh"
 
-# Recorded the same day, PR 3197: the copy rested on PR 3202's head, that PR
-# merged, and its branch was deleted, so the head named by the copy was no
-# longer on any remote ref.
+# Recorded 2026-10-10 (task vernant-phase-a-gre-2030), PR 3197: the copy
+# rested on PR 3202's head, that PR merged, and its branch was deleted, so the
+# head named by the copy was no longer on any remote ref.
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head() {
   local case_dir forge_head=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
   case_dir=$(make_direct_pr_local_tip_case multi-pr-merged-sibling)
