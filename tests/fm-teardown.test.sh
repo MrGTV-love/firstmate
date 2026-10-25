@@ -1868,9 +1868,12 @@ test_ship_without_git_copy_refuses_unconfirmed_pr() {
 }
 
 test_ship_without_git_copy_requires_captain_words_to_drop() {
-  local case_dir copy out rc words
+  local case_dir copy out rc words head
   for copy in absent non-git; do
     case_dir=$(make_case "missing-copy-drop-$copy")
+    wt_commit_file "$case_dir" feature.txt "unlanded-$copy" "unlanded work on the task branch"
+    head=$(git -C "$case_dir/project" rev-parse fm/task-x1)
+    rm -rf "$case_dir/wt"
     [ "$copy" != non-git ] || mkdir "$case_dir/missing-wt"
     write_windowless_legacy_meta "$case_dir" no-mistakes ship "$case_dir/missing-wt"
     seed_backlog_in_flight "$case_dir"
@@ -1894,8 +1897,10 @@ test_ship_without_git_copy_requires_captain_words_to_drop() {
       || fail "missing-copy-drop-$copy: authorized drop lacked drop classification"
     assert_absent "$case_dir/state/task-x1.meta" \
       "missing-copy-drop-$copy: authorized drop retained metadata"
+    [ "$(git -C "$case_dir/project" rev-parse --verify --quiet fm/task-x1)" = "$head" ] \
+      || fail "missing-copy-drop-$copy: retiring the record did not keep the task branch at its head"
   done
-  pass "ships without Git copies require retained captain words for forced drops"
+  pass "ships without Git copies require retained captain words for forced drops, and the drop keeps the task branch"
 }
 
 test_windowless_legacy_record_still_refuses_unlanded_work() {
