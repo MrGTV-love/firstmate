@@ -1,6 +1,6 @@
 // Installs Firstmate's worker guard using the shared ten-levels policies and
 // client (bin/ten-levels/SOURCE.md) into one ship or scout worker session.
-// Usage: installJevGuard(pi, {home, config, state, task, worktree, data, project, policy, noHelpers}) from the
+// Usage: installJevGuard(pi, {home, config, state, task, worktree, data, project, policy, noHelpers, host}) from the
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
@@ -18,6 +18,8 @@ export interface JevGuardContext extends GuardServiceContext {
   worktree: string;
   policy?: string;
   data: string;
+  /** Native device admission belongs to the adapter, not the model service. */
+  host?: "omp" | "claude";
 }
 
 export interface GuardRuntimeContext {
@@ -234,7 +236,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         if (device) {
           terminal.branch = "device";
           const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
-          if (tool !== "write" || service.host !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
+          if (tool !== "write" || (c.host ?? "omp") !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
           if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
           if (device.effect === "refused") {
             let alternative: string | undefined;

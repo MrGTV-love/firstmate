@@ -53,6 +53,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 ## Firstmate glue outside this directory
 
 - `bin/fm-jev-guard.ts` is the single worker pre-tool event entry point and applies deterministic input/root/device checks before model screening.
+  Native device admission uses the adapter context's host (default `omp`, explicitly `claude` in the Claude adapter), not the model service; host identity remains required even without host-specific result budgets.
   It judges every planned write piece with the unchanged level 6 policy; writes pass only when every planned piece passes.
   Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
   Bash pre-calls return without judging effects or destructive intent, planning provider requests, inspecting lab markers, classifying read-only commands or writing audit rows.

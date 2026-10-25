@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   type Handlers = { tool_call: GuardCallHandler };
   const handlers: Partial<Handlers> = {};
   installJevGuard({ on<K extends keyof Handlers>(name: K, handler: Handlers[K]) { handlers[name] = handler; } },
-    { home, config, state, task, worktree, data, project, policy });
+    { home, config, state, task, worktree, data, project, policy, host: "claude" });
   const input = object(payload.tool_input) ? payload.tool_input : {};
   const ctx = { cwd: typeof payload.cwd === "string" ? payload.cwd : worktree };
   const toolCallId = typeof payload.tool_use_id === "string" ? payload.tool_use_id : undefined;
