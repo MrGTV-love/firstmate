@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(sys.argv.pop(1)).resolve()
-# Bound one adapter call from .invoke(). The adapter waits for a competing
+# Bound every adapter call or start-lock wait. The adapter waits for a competing
 # starter's lock and then for its readiness poll, so this must exceed
 # bin/backends/herdr-server-start.py's own STARTUP_SECONDS.
 # measured: value=8.115 date=2026-10-25 host=Mac-Studio.local margin=3.7
@@ -293,7 +293,7 @@ class StartupSafety(unittest.TestCase):
             self.children.append(subprocess.Popen(
                 ["bash", "-c", script, "fixture", str(ROOT), self.dir.name], env=self.env,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True))
-        results = [child.communicate(timeout=8) for child in self.children]
+        results = [child.communicate(timeout=CALL_SECONDS) for child in self.children]
         self.assertEqual([child.returncode for child in self.children], [0, 0], results)
         self.assertEqual(len(self.starts()), 1)
 
@@ -354,7 +354,7 @@ class StartupSafety(unittest.TestCase):
         return child
 
     def wait_for(self, predicate):
-        for _ in range(200):
+        for _ in range(round(CALL_SECONDS / .05)):
             if predicate():
                 return
             time.sleep(.05)
@@ -371,7 +371,7 @@ class StartupSafety(unittest.TestCase):
             self.children.append(ensure)
             time.sleep(2)
             self.assertEqual(self.servers(), [], "a starter launched while another held the start lock")
-        out, err = ensure.communicate(timeout=20)
+        out, err = ensure.communicate(timeout=CALL_SECONDS)
         self.assertEqual(ensure.returncode, 0, err)
         self.wait_for(lambda: (self.dir / "pid").exists())
         time.sleep(2)
@@ -386,7 +386,7 @@ class StartupSafety(unittest.TestCase):
         self.wait_for(self.lock_is_free)
 
     def test_guard_releases_the_start_lock_when_its_server_fails(self):
-        out, _ = self.guard(START_SERVER_FAILS="1").communicate(timeout=20)
+        out, _ = self.guard(START_SERVER_FAILS="1").communicate(timeout=CALL_SECONDS)
         self.assertIn("exited before reporting running; releasing the start lock", out)
         self.assertEqual(self.servers(), [])
         self.assertTrue(self.lock_is_free())
