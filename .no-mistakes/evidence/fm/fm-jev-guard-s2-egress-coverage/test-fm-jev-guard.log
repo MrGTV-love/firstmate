@@ -1,0 +1,53 @@
+ok - pure write boundaries
+✔ omp T2(a), B68: remove own smoke.py (34.72075ms)
+✔ omp T2(b), B69: four-file probe cleanup (33.33975ms)
+✔ omp T2(c), B57: six tracked cd-guard deletions (62.987042ms)
+✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (77.291584ms)
+✔ omp T2(e), O13: acknowledge inbox with provider unreachable (30.353125ms)
+✔ omp T2(f): shell admission does not depend on audit availability or payload size (100.371833ms)
+✔ claude T2(a), B68: remove own smoke.py (5.088625ms)
+✔ claude T2(b), B69: four-file probe cleanup (5.003209ms)
+✔ claude T2(c), B57: six tracked cd-guard deletions (33.822167ms)
+✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (49.589333ms)
+✔ claude T2(e), O13: acknowledge inbox with provider unreachable (4.614042ms)
+✔ claude T2(f): shell admission does not depend on audit availability or payload size (73.392042ms)
+✔ claude: Bash, Monitor and PowerShell start no generated pre-call hook (0.092917ms)
+✔ claude: outbound and unknown shell-prefix names still reach the generated guard (354.684625ms)
+✔ claude: Write and Edit still reach the generated jev-guard hook (117.747167ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 987.620958
+ok - T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it
+ok - Claude pre-tool credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - pre-tool complete credential tails, audit failure, inactive independence, network TypeError retry and refused write/edit path
+ok - node type stripping still enforces the Claude pre-tool deny
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+ok - actual stalled requests produce typed pre-tool denial before each documented host deadline
+ok - bounded pieces preserve policy/outage decisions; unplannable writes and never-send payloads send nothing
+ok - Claude hooks retain JSON/exit contracts and admit budget-limited benign writes
+hyphenated-scan-ok bytes=1048576 offline_loopback_ms=1093
+omp: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=718
+omp: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
+omp: never-send file present; 396924-byte report admitted in 4114 ms
+omp: never-send file present; 1048576-byte write admitted in 3916 ms
+claude: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=797
+claude: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
+claude: never-send file present; 396924-byte report admitted in 4066 ms
+claude: never-send file present; 1048576-byte write admitted in 3876 ms
+punctuation-led URL credentials: both hosts refuse write/edit locally with zero provider requests
+large-write-budget-ok
+ok - 396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+exit=0
