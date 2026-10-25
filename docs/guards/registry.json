@@ -766,7 +766,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an op that is missing, not a string or not a recognized read op is refused; the read-op list is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each github call emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision (allow for a read op, deny for any other op), source_ok and elapsed time only, keyed to session <task>:github; a read op then still meets jev-egress-grant; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each github call emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision (allow for a read op, deny for any other op), source_ok and elapsed time only, keyed to session <task>:github-read for an allow and <task>:github-write for a deny, so a read op never counts as clearing a write-op refusal, which nothing clears; a read op then still meets jev-egress-grant; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",

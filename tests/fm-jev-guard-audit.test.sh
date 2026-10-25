@@ -461,19 +461,20 @@ await test('M4: each coverage and egress decision emits one content-free central
       [['jev-tool-coverage', 'allow', 'audit:find', true], ['jev-egress-grant', 'allow', 'audit:semantic-search', true]]);
   } finally { rmSync(`${state}/audit.meta`); }
   await decide({ toolName: 'github', input: { op: 'pr_push', body: 'private-event-canary' } },
-    [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'deny', 'audit:github', true]]);
+    [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'deny', 'audit:github-write', true]]);
   await decide({ toolName: 'github', input: { op: 'repo_view', repo: 'private-event-canary' } },
-    [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'allow', 'audit:github', true], ['jev-egress-grant', 'deny', 'audit:remote-storage', false]]);
+    [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'allow', 'audit:github-read', true], ['jev-egress-grant', 'deny', 'audit:remote-storage', false]]);
 });
 await test('M4: an unrelated allow never clears a later deny in the real metrics reader', async () => {
   const log = `${state}/metrics-events.jsonl`;
   process.env.FM_GUARD_EVENT_LOG = log;
-  writeFileSync(`${state}/audit.meta`, 'egress=["semantic-search"]\n');
+  writeFileSync(`${state}/audit.meta`, 'egress=["semantic-search","remote-storage"]\n');
   try {
     await handlers.tool_call({ toolName: 'read', input: { path: 'file.ts' } }, { cwd: state });
     await handlers.tool_call({ toolName: 'new-paid-host-tool', input: {} }, { cwd: state });
     await handlers.tool_call({ toolName: 'find', input: { query: 'synthetic' } }, { cwd: state });
     await handlers.tool_call({ toolName: 'web_search', input: { query: 'synthetic' } }, { cwd: state });
+    for (const op of ['pr_push', 'repo_view', 'pr_create']) await handlers.tool_call({ toolName: 'github', input: { op } }, { cwd: state });
   } finally { rmSync(`${state}/audit.meta`); delete process.env.FM_GUARD_EVENT_LOG; }
   const out = JSON.parse(execFileSync('bash', [`${process.env.AUDIT_ROOT}/bin/fm-guard-metrics.sh`, '--log', log,
     '--registry', `${process.env.AUDIT_ROOT}/docs/guards/registry.json`, '--min-opportunities', '1', '--json'], { encoding: 'utf8' }));
@@ -484,6 +485,10 @@ await test('M4: an unrelated allow never clears a later deny in the real metrics
     assert.equal(metric(id).median_clear_attempts, 0, id);
     assert.equal(metric(id).verdict, 'keep', id);
   }
+  assert.equal(metric('jev-github-write-op').denies, 2);
+  assert.equal(metric('jev-github-write-op').recurrences, 0, 'a GitHub read allow never clears a write-op refusal');
+  assert.equal(metric('jev-github-write-op').median_clear_attempts, 0);
+  assert.equal(metric('jev-github-write-op').verdict, 'keep');
   rmSync(log);
 });
 await test('Claude Monitor and PowerShell share Bash shell-command treatment without a grant', async () => {
