@@ -381,7 +381,7 @@ test_compound_launch_credentials_and_account() {
     # A confined launch clears a pane's stale CLAUDE_CONFIG_DIR so an unpinned
     # Claude runs under the default root its write profile grants.
     if [ "$pin" = none ] && grep -qx 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta"; then
-      root=unset
+      root='unset'
     fi
     for probe in version worker; do
       [ -f "$CASE_DIR/observed.$probe" ] \

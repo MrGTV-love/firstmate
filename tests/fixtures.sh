@@ -435,7 +435,7 @@ assert_launch_contains() {
 # and that uuid must be the claude_session_id the metadata records; an
 # unconfined launch must pass none. Prints nothing and fails otherwise.
 fm_test_claude_session_args() {
-  local args=$1 meta=$2 session
+  local args_file=$1 meta=$2 session
   if grep -qx 'write_confinement=seatbelt-v1' "$meta"; then
     session=$(grep '^claude_session_id=' "$meta" | tail -1 | cut -d= -f2-)
     [ -n "$session" ] || return 1
@@ -443,10 +443,10 @@ fm_test_claude_session_args() {
       $0 == "--session-id" { if (seen++ || getline id <= 0 || id != session) bad = 1; next }
       { kept[++n] = $0 }
       END { if (bad || !seen) exit 1; for (i = 1; i <= n; i++) print kept[i] }
-    ' "$args"
+    ' "$args_file"
   else
-    ! grep -qx -- --session-id "$args" || return 1
-    cat "$args"
+    ! grep -qx -- --session-id "$args_file" || return 1
+    cat "$args_file"
   fi
 }
 

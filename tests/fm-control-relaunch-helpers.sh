@@ -1185,8 +1185,14 @@ enable_teamclaude() {  # <case-dir>
 # <value> right after <prefix>. A confined launch nests the command in more
 # single-quoted levels, so only quote characters may separate them.
 assert_launch_word() {
-  local value
-  value=$(sed 's/[][\.*^$+?(){}|]/\\&/g' <<<"$3")
+  local value='' char i
+  for ((i = 0; i < ${#3}; i++)); do
+    char=${3:i:1}
+    case $char in
+      '[' | ']' | \\ | '.' | '*' | '^' | '$' | '+' | '?' | '(' | ')' | '{' | '}' | '|') value+="\\$char" ;;
+      *) value+=$char ;;
+    esac
+  done
   grep -Eq -e "$2[\\\\']*'$value'" "$1" || fail "$4 (missing: $2'$3' in $(cat "$1"))"
 }
 
