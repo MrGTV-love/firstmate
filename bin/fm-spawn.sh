@@ -527,8 +527,9 @@
 #   dirty relaunches refuse rather than bypassing attestation. Provisioner or
 #   dependency refusal retains the copy, lease, endpoint, branches and manifests,
 #   records recovery=slot-provision-refused, and prints the actual refusal/report.
-#   Once that cause clears, use fm-control.sh <task-id> relaunch --note <reason>:
-#   the retained record carries the original explicit scope and launch policy.
+#   Once that cause clears on a backend with existing recovery-grade control
+#   support, use fm-control.sh <task-id> relaunch --note <reason>: the retained
+#   record carries the original explicit scope and launch policy.
 #   Recovery selects the recorded prepared task commit without moving any prior
 #   branch; a changed/missing prepared branch refuses instead of being reset.
 #   A refused launch whose base preparation never completed finishes that same
@@ -5995,6 +5996,7 @@ spawn_slot_refused() {
       [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
       [ -z "$UPSTREAM_CONSENT" ] || echo "upstream_consent=$UPSTREAM_CONSENT"
       echo "model=${MODEL:-default}"
+      [ -z "${MODEL_STALE:-}" ] || echo "model_stale=$MODEL_STALE"
       echo "effort=${EFFORT:-default}"
       [ "$FIXED_FAMILY" = 0 ] || echo 'fixed_family=on'
       [ "$OMP_NO_HELPERS" = 0 ] || echo 'omp_no_helpers=on'

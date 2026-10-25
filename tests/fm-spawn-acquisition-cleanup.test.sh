@@ -696,7 +696,8 @@ assert record['branch'] == 'fm/' + sys.argv[3]
 assert record['base_sha'] == sys.argv[4]
 assert record['owned_paths'] == ['scripts', 'README.md']
 PY
-  [ "$?" -eq 0 ] || fail 'relaunch changed the retained scope, copy or task identity'
+  rc=$?
+  expect_code 0 "$rc" 'relaunch changed the retained scope, copy or task identity'
   [ -e "$SLOT_CASE/lease" ] || fail 'relaunch released its assigned copy lease'
   assert_absent "$SLOT_COPY/.claude/worktrees" 'relaunch created nested isolation'
   pass 'tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work'
