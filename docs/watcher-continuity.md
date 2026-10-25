@@ -355,7 +355,9 @@ An acknowledged episode does not freeze the generation, because the next downtim
 ### Who presents queued wakes between turns
 
 While an auto-arm claim is open ([claim predicate](turnend-guard.md#auto-arm-generation-claim)), the Claude Stop hook is the only deliverer of queued wakes between turns.
-Its rewake commit accepts only a downtime marker, so a drain that moves the marker to handling makes the hook drop its wake in silence.
+A supervision-host close commits against any valid unacknowledged recovery episode, whether downtime or handling: the shared phase is not proof that this host's particular close reached main, since a branch drain can enter handling while a newer main-only row is still queued.
+Session-lock ownership and the generation-owned terminal write remain mandatory, and acknowledged, missing or invalid episodes refuse delivery.
+The direct-arm path still requires downtime.
 The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.
 When the claim is open, the re-emit reports how many records are queued and leaves both the queue and the marker alone.
 The drain takes the queue lock before checking the claim under the ownership micro-mutex; ownership-mutex contention also defers presentation without mutation.
@@ -364,8 +366,8 @@ Claim publication waits up to ten seconds for the queue lock before attempting t
 The ownership micro-mutex is never held across a lock wait or output.
 The handling turn the hook starts then runs the ordinary presentation drain, which enters handling, and uses the emitted `--ack-through` command only after handling completes.
 Once the claim is finished or absent and the ownership micro-mutex is available, the re-emit drains as before; homes without a Claude epoch ledger retain their ordinary drain behavior.
-A refused rewake commit (including a non-downtime marker or lost session-lock ownership) exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
-`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, and refusal cleanup.
+A refused rewake commit exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
+`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, refusal cleanup, and a branch presentation overlapping a main-only host handback with and without a healthy successor.
 
 ## Per-actor acknowledgement
 

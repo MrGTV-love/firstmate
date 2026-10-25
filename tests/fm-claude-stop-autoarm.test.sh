@@ -1555,6 +1555,13 @@ printf 'supervision-host: watcher downtime could not be restored for the main ha
 exit 1
 SH
         ;;
+      handling-lock-lost)
+        cat <<'SH'
+printf 'pending:handling:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
+printf '%s\n' "$FM_TEST_OTHER_SESSION_PID" > "$FM_HOME/state/.lock"
+printf 'check: handback after session ownership changed\n'
+SH
+        ;;
       benign-refusal)
         cat <<'SH'
 printf 'acked:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
@@ -1711,6 +1718,82 @@ test_host_handback_carries_every_host_line() {
   pass "auto-arm: a host handback delivers every host line, while its wake lines keep their cap"
 }
 
+# The recovery phase is shared by both actors, not a delivery receipt for the
+# host's current close. A branch presentation can enter handling while a newer
+# main-only row is still queued. Drive that interleaving with the real queue,
+# grant and drain, rather than manufacturing a handling token in the stub.
+test_host_handback_during_open_handling_commits_normally() {
+  local phase watcher dir out status pid identity drain generation cutoff replay
+  for phase in pending announced downtime; do
+    for watcher in absent live; do
+      dir=$(make_primary_dir "$TMP_ROOT/host-overlap-$phase-$watcher")
+      rm -f "$dir/config/supervision-host-off"
+      : > "$dir/state/task.meta"
+      cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ ! -e "$FM_HOME/state/host-prepared" ]; then
+  . "$FM_TEST_REAL_BIN/fm-wake-lib.sh"
+  fm_wake_append signal branch-task.status 'signal: branch-task.status old handling work'
+  bash "$FM_TEST_REAL_BIN/fm-wake-grant.sh" activate "$$" overlap
+  bash "$FM_TEST_REAL_BIN/fm-wake-grant.sh" publish overlap 1
+  fm_wake_append check main-new 'check: newer main-only host handback'
+  fm_recovery_marker_snapshot "$STATE/.watcher-down"
+  printf '%s\n' "$FM_RECOVERY_MARKER_TOKEN" > "$STATE/after-append"
+  if [ "$FM_TEST_OVERLAP_PHASE" = announced ]; then
+    fm_recovery_marker_arm_check "$STATE/.watcher-down"
+  fi
+  if [ "$FM_TEST_OVERLAP_PHASE" != downtime ]; then
+    FM_SUPERVISION_ACTOR=branch bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$STATE/branch-drain" 2>&1
+  fi
+  fm_recovery_marker_snapshot "$STATE/.watcher-down"
+  printf '%s\n' "$FM_RECOVERY_MARKER_TOKEN" > "$STATE/before-handback"
+  bash "$FM_TEST_REAL_BIN/fm-wake-grant.sh" deactivate "$$" overlap
+  : > "$STATE/host-prepared"
+fi
+printf 'check: newer main-only host handback\n'
+SH
+      chmod +x "$dir/bin/fm-supervision-host.sh"
+      pid=
+      if [ "$watcher" = live ]; then
+        live_fixture &
+        pid=$!
+        identity=$(watcher_identity "$dir" "$pid") || fail "could not identify overlap successor"
+        record_watcher_lock "$dir" "$pid" "$identity"
+        touch "$dir/state/.last-watcher-beat"
+      fi
+      out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+      if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+      fi
+      expect_code 2 "$status" "$phase/$watcher: an outstanding main handback must reach main"
+      assert_contains "$(cat "$dir/state/after-append")" 'pending:downtime:' "a new queue append itself republishes downtime"
+      if [ "$phase" != downtime ]; then
+        assert_contains "$(cat "$dir/state/before-handback")" "$phase:handling:" "the real branch drain must expose the handling interleaving"
+        assert_contains "$(cat "$dir/state/branch-drain")" 'signal: branch-task.status old handling work' "the branch must present its own row"
+        assert_not_contains "$(cat "$dir/state/branch-drain")" 'check: newer main-only host handback' "the branch must not have presented main's newer wake"
+      fi
+      assert_not_contains "$out" 'auto-arm FAILED' "$phase/$watcher: a valid actionable handback is not an auto-arm failure"
+      [ "$(epoch_outcome "$dir")" = rewake ] || fail "$phase/$watcher: handback did not commit normally: $(epoch_outcome "$dir")"
+      [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "handback was not delivered exactly once: $out"
+      assert_absent "$dir/state/.claude-autoarm-failure-notified" "normal handling overlap opened a failure episode"
+      [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" -eq 2 ] || fail "translation consumed a durable row"
+      drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "main could not drain overlap rows: $drain"
+      assert_contains "$drain" 'check: newer main-only host handback' "handed-back work must remain drainable"
+      generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
+      cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+      FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 || fail "overlap acknowledgement failed"
+      [ ! -s "$dir/state/.wake-queue" ] || fail "overlap acknowledgement left rows behind"
+      replay=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+      expect_code 0 "$status" "an acknowledged host close must not be delivered again"
+      [ "$(epoch_outcome "$dir")" = refused ] || fail "acknowledged handback was not refused"
+      # Exit 0 is the harness's discard boundary, including buffered stderr.
+      pass "auto-arm: $phase/$watcher host overlap commits once, stays durable, and is silent after acknowledgement"
+    done
+  done
+}
+
 test_host_stand_down_is_silent() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/host-stand-down")
@@ -1744,36 +1827,41 @@ test_host_benign_rewake_refusal_opens_no_failure_episode() {
   pass "auto-arm: a host rewake refused on an acknowledged marker opens no failure episode"
 }
 
-# The host handed a wake back but left the marker in handling (pending or
-# announced) with no live successor, so no rewake can commit: the hook delivers
-# the failure notice once per episode and keeps exiting 2 without repeating it.
-assert_host_lost_handback_notifies_once_per_episode() {
-  local kind=$1 dir out status
-  dir=$(make_primary_dir "$TMP_ROOT/host-$kind")
-  mkdir -p "$dir/config"
+test_host_handling_handback_lost_session_never_delivers() {
+  local dir other out status
+  dir=$(make_primary_dir "$TMP_ROOT/host-handling-session-lost")
   rm -f "$dir/config/supervision-host-off"
   : > "$dir/state/task.meta"
-  write_host_fixture "$dir" "$kind"
-  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
-  expect_code 2 "$status" "a lost hand-back must reach main"
-  assert_contains "$out" "auto-arm FAILED - the supervision host returned an actionable wake" "a lost hand-back must deliver the failure notice"
-  assert_present "$dir/state/.claude-autoarm-failure-notified" "a lost hand-back did not record its failure episode"
-  [ "$(epoch_outcome "$dir")" = failed ] || fail "a lost hand-back must record outcome=failed, got: $(epoch_outcome "$dir")"
-  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
-  expect_code 2 "$status" "a repeated lost hand-back must still reach main"
-  assert_not_contains "$out" "auto-arm FAILED" "a repeated lost hand-back must not repeat the failure notice"
-  [ "$(epoch_outcome "$dir")" = failed-suppressed ] \
-    || fail "a repeated lost hand-back must record outcome=failed-suppressed, got: $(epoch_outcome "$dir")"
+  write_host_fixture "$dir" handling-lock-lost
+  live_fixture &
+  other=$!
+  out=$(FM_TEST_OTHER_SESSION_PID="$other" run_autoarm "$dir" 2>/dev/null); status=$?
+  kill "$other" 2>/dev/null || true
+  wait "$other" 2>/dev/null || true
+  expect_code 0 "$status" "a handling handback must not bypass session ownership via the failure path"
+  assert_not_contains "$out" 'auto-arm FAILED' "session loss is a refusal, not an auto-arm failure"
+  assert_absent "$dir/state/.claude-autoarm-failure-notified" "a different session's handback opened a failure episode"
+  [ "$(epoch_outcome "$dir")" = refused ] || fail "session loss did not record refusal"
+  pass "auto-arm: a handling-phase host handback never delivers after session ownership changes"
 }
 
-test_host_lost_handback_notifies_once_per_episode() {
-  assert_host_lost_handback_notifies_once_per_episode lost-handback
-  pass "auto-arm: a lost host hand-back notifies once per failure episode"
-}
-
-test_host_lost_announced_handback_notifies_once_per_episode() {
-  assert_host_lost_handback_notifies_once_per_episode lost-announced-handback
-  pass "auto-arm: a lost host hand-back on an announced marker notifies once per failure episode"
+# An actionable handback remains deliverable even if the host could not restore
+# downtime. Preserve its diagnostic, not an invented auto-arm failure episode.
+test_host_actionable_failed_restoration_still_commits_normally() {
+  local kind dir out status
+  for kind in lost-handback lost-announced-handback; do
+    dir=$(make_primary_dir "$TMP_ROOT/host-$kind")
+    rm -f "$dir/config/supervision-host-off"
+    : > "$dir/state/task.meta"
+    write_host_fixture "$dir" "$kind"
+    out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 2 "$status" "an actionable hand-back must reach main"
+    assert_contains "$out" 'supervision-host: watcher downtime could not be restored' "the host diagnostic must not be hidden"
+    assert_not_contains "$out" 'auto-arm FAILED' "handling phase is not an auto-arm failure"
+    assert_absent "$dir/state/.claude-autoarm-failure-notified" "a deliverable hand-back opened a failure episode"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "an actionable hand-back did not commit normally"
+    pass "auto-arm: $kind delivers its host diagnostic through the normal rewake"
+  done
 }
 
 # An explicit failed hand-back must notify, not park on another host, even if
@@ -1935,8 +2023,9 @@ test_plain_arm_banner_keeps_its_wake_line_cap
 test_host_handback_carries_every_host_line
 test_host_stand_down_is_silent
 test_host_benign_rewake_refusal_opens_no_failure_episode
-test_host_lost_handback_notifies_once_per_episode
-test_host_lost_announced_handback_notifies_once_per_episode
+test_host_handback_during_open_handling_commits_normally
+test_host_handling_handback_lost_session_never_delivers
+test_host_actionable_failed_restoration_still_commits_normally
 test_host_failed_handback_is_not_retried
 test_host_crash_is_retried_then_reported
 test_arguments_never_arm

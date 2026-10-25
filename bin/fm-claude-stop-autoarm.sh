@@ -266,6 +266,15 @@ autoarm_commit() {  # <outcome> [marker-file]
     fm_recovery_marker_snapshot "$STATE/.watcher-down" || return 2
     case "$FM_RECOVERY_MARKER_TOKEN" in
       pending:downtime:*|announced:downtime:*) recovery=${FM_RECOVERY_MARKER_TOKEN##*:} ;;
+      pending:handling:*|announced:handling:*)
+        # A shared recovery phase is not a delivery receipt for this host's
+        # close: a branch drain can enter handling with main's wake still
+        # queued. The current host's actionable close stays owed until the
+        # episode is acknowledged, subject to the same session/generation
+        # ownership checks as a downtime close.
+        [ "$HOST_MODE" -eq 1 ] || return 2
+        recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
+        ;;
       *) return 2 ;;
     esac
     fm_autoarm_write_owned "$STATE" "$MY_GEN" "$outcome" "$marker" "$session_pid" "$recovery"
@@ -558,23 +567,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 2
   fi
-  if [ "$HOST_MODE" -eq 1 ] && fm_autoarm_still_owner "$STATE" "$MY_GEN" \
-    && fm_recovery_marker_snapshot "$STATE/.watcher-down" \
-    && [[ "$FM_RECOVERY_MARKER_TOKEN" == pending:handling:* || "$FM_RECOVERY_MARKER_TOKEN" == announced:handling:* ]] \
-    && ! fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
-    LOST_HANDBACK_COMMITTED=0
-    if [ ! -e "$FAILURE_NOTICE" ]; then
-      printf 'firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed.\n' >&2
-      autoarm_commit failed "$FAILURE_NOTICE" && LOST_HANDBACK_COMMITTED=1
-    else
-      autoarm_commit failed-suppressed && LOST_HANDBACK_COMMITTED=1
-    fi
-    if [ "$LOST_HANDBACK_COMMITTED" -eq 1 ]; then
-      [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
-      exit 2
-    fi
-  fi
-  # Refused (marker not downtime, lock lost) or superseded: the wake is dropped
+  # Refused (episode not eligible, lock lost) or superseded: the wake is dropped
   # in silence, so leave a forensic trace. A superseded generation cannot write.
   autoarm_record refused
   [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true

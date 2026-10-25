@@ -112,7 +112,7 @@ test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main
   pass "host+hook: a successor closed before exit_to_main does not suppress the branch-outcome rewake"
 }
 
-assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails() {
+assert_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails() {
   local status=$1 home real_mktemp successor
   home=$(make_primary_home "hook-successor-restore-fails-$status")
   ln -s "$ROOT/.agents" "$home/.agents"
@@ -149,20 +149,20 @@ SH
   : > "$home/fail-downtime-write"
   printf 'continue\n' > "$home/stub-release"
   wait_until 250 hook_exited "$home" || fail "restore failure: the Stop hook did not finish"
-  expect_code 2 "$(cat "$home/hook.rc")" "the Stop hook must notify main when neither hand-back nor downtime restoration commits"
-  assert_grep 'firstmate watcher auto-arm FAILED' "$home/hook.err" "the refused rewake must turn into a delivered failure notice"
-  assert_re '^epoch=[0-9]+ owner_pid=[0-9]+ outcome=failed ' "$home/state/.claude-autoarm-epoch" \
-    "the failed hand-back must be committed"
+  assert_rewoke_main "$home" "failed downtime restoration"
+  assert_grep 'supervision-host: watcher downtime could not be restored' "$home/hook.err" "the host restoration diagnostic must reach main"
+  assert_no_grep 'firstmate watcher auto-arm FAILED' "$home/hook.err" "a valid actionable handback must not become an auto-arm failure"
+  assert_absent "$home/state/.claude-autoarm-failure-notified" "an actionable handback opened a failure episode"
 }
 
-test_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails() {
-  assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails pending
-  pass "host+hook: a refused hand-back becomes a delivered failure notice"
+test_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails() {
+  assert_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails pending
+  pass "host+hook: an actionable hand-back commits normally despite failed downtime restoration"
 }
 
-test_claude_stop_hook_notifies_when_closed_announced_successor_downtime_restore_fails() {
-  assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails announced
-  pass "host+hook: a refused hand-back on an announced handling marker becomes a delivered failure notice"
+test_claude_stop_hook_rewakes_when_closed_announced_successor_downtime_restore_fails() {
+  assert_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails announced
+  pass "host+hook: an announced handling hand-back commits normally despite failed downtime restoration"
 }
 
 test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn() {
@@ -544,8 +544,8 @@ test_unrecorded_successor_is_stopped_rather_than_left_for_main() {
 
 run_host_case test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main
 run_host_case test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn
-run_host_case test_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails
-run_host_case test_claude_stop_hook_notifies_when_closed_announced_successor_downtime_restore_fails
+run_host_case test_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails
+run_host_case test_claude_stop_hook_rewakes_when_closed_announced_successor_downtime_restore_fails
 run_host_case test_claude_stop_hook_delivers_a_main_only_pass_through
 run_host_case test_claude_stop_hook_rewakes_a_present_captain_beside_a_quiet_record
 run_host_case test_claude_stop_hook_runs_the_host_without_the_file_and_off_opts_out
