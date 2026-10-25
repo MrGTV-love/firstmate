@@ -739,7 +739,7 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an unreadable, malformed or symlinked grant record grants nothing; the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision and elapsed time only, keyed to session <task>:<destination-class> so only a later allow of the same subject clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, keyed to session <task>:<destination-class> so only a later allow of the same subject clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",
