@@ -1,0 +1,8 @@
+== byte diff of pr.diff vs repair-edits.patch ==
+IDENTICAL-BYTES
+== content-only diff (+/- lines, ignoring headers/index) ==
+IDENTICAL-CHANGED-LINES
+== files changed ==
+.agents/skills/ask-user-authority/SKILL.md
+AGENTS.md
+== patch applies to base (reverse-check on target) ==

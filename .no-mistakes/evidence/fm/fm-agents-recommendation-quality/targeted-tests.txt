@@ -1,0 +1,2 @@
+tests/fm-ask-user-authority.test.sh rc=0 ok=1 notok=0
+tests/fm-branch-supervision.test.sh rc=0 ok=35 notok=0

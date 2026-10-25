@@ -1,0 +1,11 @@
+# probe: claude -p in lab FM_HOME, cwd = target worktree (fbb860d83)
+Answer from the project instructions already loaded in your context (the AGENTS.md imported by CLAUDE.md). Do not use any tools and do not run session start. Reply with exactly three lines:
+LINE1: the exact heading text of the first ### subsection inside section 9, verbatim.
+LINE2: the first sentence under that subsection, verbatim.
+LINE3: the exact heading text of the ### subsection that contains the bullet starting "Before reporting a PR ready", verbatim.
+If any item is not in your loaded context, write NOT-IN-CONTEXT for it.
+# answer (CLI settings-rule warnings from user settings omitted)
+LINE1: Recommendation quality
+LINE2: Before asking the captain to choose, assess materially different approaches against the accepted objective, constraints, evidence, and risk tolerance, then filter before ranking.
+LINE3: Escalation and delivery
+EXIT=0

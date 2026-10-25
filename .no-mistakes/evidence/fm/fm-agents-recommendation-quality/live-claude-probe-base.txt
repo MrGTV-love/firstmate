@@ -1,0 +1,5 @@
+# probe: same question as live-claude-probe-target.txt, lab FM_HOME, cwd = base worktree (bdb380d0f)
+LINE1: NOT-IN-CONTEXT (Captain, section 9 is loaded, but it has no ### subsection)
+LINE2: NOT-IN-CONTEXT (there is no such subsection, so it has no first sentence)
+LINE3: NOT-IN-CONTEXT (the bullet is directly under "## 9. Escalation and captain etiquette", not under a ### subsection)
+EXIT=0

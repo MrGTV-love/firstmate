@@ -1,0 +1,6 @@
+252c252
+< 3. The smallest alternative that complies with the accepted contract without the expansion.
+---
+> 3. The smallest alternative that complies with the accepted contract without the expansion, if one is established; otherwise state why none is established rather than inventing one.
+256a257
+> Apply `AGENTS.md` section 9's recommendation-quality standard when selecting what to present.
