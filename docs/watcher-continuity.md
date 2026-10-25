@@ -364,11 +364,14 @@ A main presentation drain sets that held flag with a token unique to that presen
 Every Claude Stop firing of the session-lock owner that passes the AFK and need gates clears it before it defers to an open claim, because that Stop ends the turn that presented the rows.
 The firing reads the token before any gate or library load and clears the flag under the queue lock only while it still carries that token, so a late asynchronous firing never clears a hold that a newer turn's drain wrote.
 A turn that ends with no Stop releases it at the next proof: `bin/fm-claude-hold-release.sh` runs on `StopFailure` (an API error) and on the next `UserPromptSubmit`, which Claude fires for a typed prompt, a steer, and an asyncRewake turn, so it also follows a mid-stream Escape, which fires no hook ([Claude reference](../.agents/skills/harness-adapters/references/harness/claude.md)).
+Whether Claude also fires `UserPromptSubmit` for a message typed while a turn is still running is not verified live; if it does, the release ends that turn's hold early, and a later host close for its rows is delivered as a duplicate, which main handles idempotently.
 The next main drain replaces the hold with its own.
 The shared phase is not proof that this host's close reached main, since a branch drain can enter handling while a newer main-only row is still queued.
 When main's own drain entered handling and the turn that presented every row still holds them, that turn holds the close, so the rewake is refused rather than delivered twice; the row stays queued until main acknowledges it, and a watcher stays live beside it.
-Once that turn's hold is released without an acknowledgement, the claim no longer counts as held, so the still-queued close is delivered once.
-Between a mid-stream Escape and the next prompt nothing proves the turn ended, so a close in that window is refused beside a live watcher, and the row waits for the captain's next turn drain.
+Once that turn's hold is released without an acknowledgement, the claim no longer counts as held, so a host close that arrives after the release is delivered once.
+A close refused before the release is owed too: no arm re-presents a handling episode, because `fm_recovery_marker_arm_check` waits on one, so the next Claude Stop firing that takes a new generation checks for a handling episode whose queued main rows no hold covers and rewakes main before it arms.
+That covers a turn that ended through Stop and the turn after the next prompt, including the prompt after a mid-stream Escape.
+A turn that ended on an API error releases its hold through `StopFailure`, but that hook cannot rewake main, so its owed rows wait for the next turn's Stop.
 Session-lock ownership and the generation-owned terminal write remain mandatory, and acknowledged, missing or invalid episodes refuse delivery.
 The direct-arm path still requires downtime.
 The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.

@@ -54,9 +54,10 @@
 #     that is unsafe or holds nothing for the branch) stay main's. That
 #     pass-through starts the successor watcher cycle and leaves it running
 #     before the close is printed, so supervision continues when the session
-#     drops the handoff. A failed start is retried once; a second failure
-#     republishes downtime before the close is printed, as every attended
-#     pass-through that leaves no successor does. It confirms no engine
+#     drops the handoff. A failed start is retried once; a second failure,
+#     or a successor still starting, republishes downtime before the close is
+#     printed, as every attended pass-through that leaves no proven successor
+#     does. It confirms no engine
 #     handling handoff, so the host
 #     leaves the recovery marker reading downtime; docs/watcher-continuity.md
 #     owns the re-arm owner's delivery eligibility when another drain changes
@@ -747,8 +748,9 @@ detach_successor() {
 # docs/watcher-continuity.md owns delivery eligibility if another drain changes
 # the shared recovery phase. A failed start is retried once; a second failure
 # returns 1, and the caller restores downtime (restore_downtime_without_watcher)
-# before it prints the close unchanged. A successor still
-# starting is left running too, and SUCCESSOR_NOTE carries the line saying so.
+# before it prints the close unchanged. A successor still starting is left
+# running too, and SUCCESSOR_NOTE carries the line saying so, but it is not yet a
+# live successor, so it also returns 1 and the caller restores downtime.
 SUCCESSOR_NOTE=
 leave_successor_for_main() {
   local rc=0
@@ -766,7 +768,8 @@ leave_successor_for_main() {
     return 1
   fi
   [ "$rc" -eq 0 ] || SUCCESSOR_NOTE=$SUCCESSOR_STARTING_LINE
-  detach_successor
+  detach_successor || return 1
+  [ "$rc" -eq 0 ]
 }
 
 # The engine conversation for this turn: the recorded one while it belongs to

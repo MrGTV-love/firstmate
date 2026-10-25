@@ -545,12 +545,15 @@ test_unrecorded_successor_is_stopped_rather_than_left_for_main() {
 # The held-refusal-without-watcher sequence: main's open turn drains the
 # watcher's wake while the parked host classifies it (its presentation hold is
 # set and the marker reads handling), that turn ends with no Stop (an Escape or
-# an API error), and the main-only successor cannot start, even when retried.
-# The host republishes downtime, so the Stop hook still rewakes main, and the
-# row stays queued for main to present again and acknowledge.
-test_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor() {
-  local home real_node entry
-  home=$(make_primary_home hook-held-no-successor)
+# an API error), and the main-only successor is not proven live: it cannot
+# start even when retried (failed), or it is still starting at the readiness
+# bound and fails later (starting). The host republishes downtime, so the Stop
+# hook still rewakes main, and the row stays queued for main to present again
+# and acknowledge.
+assert_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor() {
+  local mode=$1 home real_node entry delay=0 timeout=''
+  [ "$mode" = failed ] || { delay=4; timeout=1; }
+  home=$(make_primary_home "hook-held-no-successor-$mode")
   rm "$home/bin"
   mkdir "$home/bin"
   for entry in "$ROOT"/bin/*; do ln -s "$entry" "$home/bin/${entry##*/}"; done
@@ -560,6 +563,7 @@ test_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor() {
 #!/usr/bin/env bash
 if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ] && [ -e "$FM_HOME/fail-successor" ]; then
   printf '%s\n' "$$" >> "$FM_HOME/successor-attempts"
+  sleep "$(cat "$FM_HOME/fail-successor")"
   printf 'watcher: FAILED - the fixture successor could not start\n'
   exit 1
 fi
@@ -579,19 +583,28 @@ esac
 exec "$real_node" "\$@"
 SH
   chmod +x "$home/fakebin/node"
-  start_hook_session "$home"
+  if [ -n "$timeout" ]; then
+    FM_SUPERVISION_HOST_READY_TIMEOUT=$timeout start_hook_session "$home"
+  else
+    start_hook_session "$home"
+  fi
   turn_end "$home"
   wait_until 150 watcher_live "$home" || fail "held close: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
-  : > "$home/fail-successor"
+  printf '%s\n' "$delay" > "$home/fail-successor"
   : > "$home/drain-at-offer"
   append_status "$home" 'which export format?' needs-decision
   wait_until 250 hook_exited "$home" || fail "held close: the Stop hook never closed: $(cat "$home/state/.supervision-host.log")"
   assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" "fixture: the close was not a main-only pass-through"
   assert_re '	signal	demo\.status	' "$home/interrupted-turn-drain" "fixture: main's turn did not present the watcher's wake"
   assert_present "$home/state/.main-eligible-rows.held" "fixture: main's presentation hold is missing"
-  [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 2 ] || fail "held close: the failed successor start was not retried exactly once"
-  assert_re '	pass-through	successor-retry	signal:' "$home/state/.supervision-host.log" "held close: the retry was not logged"
-  assert_re '	pass-through	successor-unverified	signal:' "$home/state/.supervision-host.log" "held close: the second failure was not logged"
+  if [ "$mode" = failed ]; then
+    [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 2 ] || fail "held close: the failed successor start was not retried exactly once"
+    assert_re '	pass-through	successor-retry	signal:' "$home/state/.supervision-host.log" "held close: the retry was not logged"
+    assert_re '	pass-through	successor-unverified	signal:' "$home/state/.supervision-host.log" "held close: the second failure was not logged"
+  else
+    [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 1 ] || fail "held close: a still-starting successor must not be started twice"
+    assert_grep 'the successor watcher cycle is still starting' "$home/hook.err" "held close: the close must say the successor is still starting"
+  fi
   assert_re '^(pending|announced):downtime:' "$home/state/.watcher-down" "held close: the host must leave the true downtime state"
   assert_rewoke_main "$home" "held close without a successor"
   assert_re '^signal: .*demo.status' "$home/hook.err" "held close: the rewake must carry the close"
@@ -603,7 +616,16 @@ SH
   FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/fm-wake-drain.sh" $MAIN_ACK \
     || fail "held close: main's acknowledgement failed: $MAIN_ACK"
   [ ! -s "$home/state/.wake-queue" ] || fail "held close: main's acknowledgement left the row queued"
+}
+
+test_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor() {
+  assert_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor failed
   pass "host+hook: a held close whose successor cannot start republishes downtime, rewakes main, and stays acknowledgeable"
+}
+
+test_claude_stop_hook_rewakes_main_when_a_held_close_successor_is_still_starting() {
+  assert_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor starting
+  pass "host+hook: a held close whose successor is still starting republishes downtime, rewakes main, and stays acknowledgeable"
 }
 
 run_host_case test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main
@@ -622,3 +644,4 @@ run_host_case test_next_park_takes_over_the_cycle_a_pass_through_left_for_main
 run_host_case test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park
 run_host_case test_unrecorded_successor_is_stopped_rather_than_left_for_main
 run_host_case test_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor
+run_host_case test_claude_stop_hook_rewakes_main_when_a_held_close_successor_is_still_starting

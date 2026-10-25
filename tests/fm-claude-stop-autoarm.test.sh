@@ -1940,6 +1940,63 @@ SH
   done
 }
 
+# The refused-first order: the parked host's close for row R is refused while
+# the open main turn that presented R still holds it, and that turn then ends
+# through Stop without acknowledging R. No arm re-presents a handling episode,
+# so that Stop firing must rewake main for R before it parks another host.
+test_host_refusal_before_hold_release_rewakes_at_the_next_stop() {
+  local phase dir out status pid identity drain generation cutoff
+  for phase in pending announced; do
+    dir=$(make_primary_dir "$TMP_ROOT/host-refused-first-$phase")
+    rm -f "$dir/config/supervision-host-off"
+    : > "$dir/state/task.meta"
+    cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ -e "$FM_HOME/state/host-prepared" ]; then
+  : > "$FM_HOME/state/host-parked-again"
+  exit 0
+fi
+. "$FM_TEST_REAL_BIN/fm-wake-lib.sh"
+fm_wake_append check main-new 'check: newer main-only host handback'
+if [ "$FM_TEST_OVERLAP_PHASE" = announced ]; then
+  fm_recovery_marker_arm_check "$STATE/.watcher-down"
+fi
+FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$STATE/main-drain" 2>&1
+: > "$STATE/host-prepared"
+printf 'check: newer main-only host handback\n'
+SH
+    chmod +x "$dir/bin/fm-supervision-host.sh"
+    live_fixture &
+    pid=$!
+    identity=$(watcher_identity "$dir" "$pid") || fail "could not identify refused-first successor"
+    record_watcher_lock "$dir" "$pid" "$identity"
+    touch "$dir/state/.last-watcher-beat"
+    out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 0 "$status" "$phase: a close the open turn still holds is refused"
+    [ "$(epoch_outcome "$dir")" = refused ] || fail "$phase: the held close was not refused: $(epoch_outcome "$dir")"
+    assert_present "$dir/state/.main-eligible-rows.held" "fixture: the presenting turn's hold is missing"
+    out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    expect_code 2 "$status" "$phase: the turn end after a refused held close must rewake main for its row"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "$phase: the owed row did not commit a rewake: $(epoch_outcome "$dir")"
+    assert_contains "$out" 'presented to a turn that ended without acknowledging them' "$phase: the rewake must say why the row is owed"
+    assert_contains "$out" 'Run bin/fm-wake-drain.sh first' "$phase: the rewake must tell main to drain"
+    assert_not_contains "$out" 'auto-arm FAILED' "$phase: an owed row is not an auto-arm failure"
+    assert_absent "$dir/state/host-parked-again" "$phase: the Stop firing parked a host beside rows nothing re-presents"
+    assert_absent "$dir/state/.main-eligible-rows.held" "$phase: the ended turn's hold survived its Stop"
+    drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "$phase: main could not drain the owed row: $drain"
+    assert_contains "$drain" 'check: newer main-only host handback' "$phase: the rewoken turn must present the row again"
+    generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
+    cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+    FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+      || fail "$phase: the owed row could not be acknowledged"
+    [ ! -s "$dir/state/.wake-queue" ] || fail "$phase: the acknowledgement left the owed row queued"
+    pass "auto-arm: $phase refused-first held close is redelivered at the next Stop and acknowledged"
+  done
+}
+
 test_host_stand_down_is_silent() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/host-stand-down")
@@ -2171,6 +2228,7 @@ test_host_stand_down_is_silent
 test_host_benign_rewake_refusal_opens_no_failure_episode
 test_host_handback_during_open_handling_commits_normally
 test_host_handback_after_main_presentation
+test_host_refusal_before_hold_release_rewakes_at_the_next_stop
 test_host_handling_handback_lost_session_never_delivers
 test_host_actionable_failed_restoration_still_commits_normally
 test_host_failed_handback_is_not_retried

@@ -328,6 +328,13 @@ The blocking and bounded-follow-up mechanisms were validated across seven harnes
 | Grok | 0.2.112 native and 0.2.73 pre-native | Running-payload adaptive `Stop` | Native false-to-true continuation stayed in one process with two model turns and zero resume launches; the field-absent pre-native process launched exactly one guarded resume. |
 | Cursor | 2026.08.11-e8db854 | Awaited `stop` hook park returning one `followup_message` | Exit 2 ended the turn normally, proving it cannot block; a returned follow-up ran a genuine second turn; a sleeping hook held the boundary open and the wake landed after it; `loop_limit` stopped the hook being invoked at its ceiling. |
 
+### Claude presentation-hold release, 2026-10-25
+
+`bin/fm-claude-hold-release.sh` (registered for `UserPromptSubmit` and `StopFailure`) is not yet validated against the real harness.
+The scratch probe was blocked before Claude started: a task-scoped `CLAUDE_CONFIG_DIR` is signed out (`claude auth status` exited 1 on Claude Code installed on 2026-10-25), copying a credential into it is refused by the [worker account contract](../configuration.md), and the default store would have Claude itself write the real `~/.claude.json`.
+So three cases stay unreproduced live: a message typed while a turn is still running, Escape followed by a new prompt, and an API-error turn end (`StopFailure`).
+The behavior is covered model-free by `tests/fm-claude-stop-autoarm.test.sh` and `tests/fm-supervision-host-hook.test.sh`, which run the real hook scripts against a fake harness.
+
 ### DSH native message identity, 2026-10-22
 
 The native `user/message` event carries `UserMessage` directly in `data`, including `data.id`; it does not use the wrapper carried by `assistant/message`.

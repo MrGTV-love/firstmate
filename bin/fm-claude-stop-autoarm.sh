@@ -445,6 +445,24 @@ if fm_supervision_host_enabled "$CONFIG" claude; then
   HOST_MODE=1
   ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)'
 fi
+
+# A row counts as delivered only once main acknowledges it. A handling episode
+# whose queued main rows no presentation hold covers any more (the turn that
+# presented them ended unacknowledged, or a close for them was refused while
+# that turn still held them) is owed to main, and no arm re-presents it:
+# fm_recovery_marker_arm_check waits on a handling episode. So this generation
+# rewakes main at once instead of parking beside rows nothing would show again.
+# A duplicate costs main one short idempotent turn; parking would strand them.
+if [ ! -e "$FAILURE_ALARM" ] && fm_autoarm_still_owner "$STATE" "$MY_GEN" \
+  && fm_recovery_marker_read "$STATE/.watcher-down" \
+  && [[ "$FM_RECOVERY_MARKER_TOKEN" == pending:handling:* || "$FM_RECOVERY_MARKER_TOKEN" == announced:handling:* ]] \
+  && fm_wake_main_unpresented && autoarm_commit rewake; then
+  {
+    printf 'firstmate watcher wake - queued wake rows were presented to a turn that ended without acknowledging them, so they need a handling turn now.\n'
+    printf 'Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.\n'
+  } >&2
+  exit 2
+fi
 attempt=0
 while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   # A superseded owner must not start or attach another watcher or mutate any
