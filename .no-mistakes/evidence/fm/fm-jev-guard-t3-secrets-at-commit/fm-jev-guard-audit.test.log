@@ -1,0 +1,12 @@
+✔ write: deterministic admission records no request, piece or cost (1.389541ms)
+✔ call: invalid tool input fails before planning and invents no piece (0.324125ms)
+✔ real decide: a guard-retried success keeps the client result and a complete reported cost (1042.154542ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1045.537166
+ok - offline guard settlement and cost completeness

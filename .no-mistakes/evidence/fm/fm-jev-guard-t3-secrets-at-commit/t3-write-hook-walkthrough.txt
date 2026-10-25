@@ -1,0 +1,28 @@
+== T3(b) Write token to ignored .env
+   Write $HOME_LAB/wt/.env (54 bytes) -> exit 0, ADMITTED
+   output contains token bytes? False
+== T3(d) Write 396924-byte report
+   Write $HOME_LAB/wt/report.md (396924 bytes) -> exit 0, ADMITTED
+   output contains token bytes? False
+== T3(d) Edit with the 396924-byte report
+   Edit $HOME_LAB/wt/report.md (396924 bytes) -> exit 0, ADMITTED
+   output contains token bytes? False
+== token written to tracked file (commit hook owns it now)
+   Write $HOME_LAB/wt/config.txt (43 bytes) -> exit 0, ADMITTED
+   output contains token bytes? False
+== adversarial: write outside the worktree
+   Write /etc/t3-outside.txt (2 bytes) -> exit 0, REFUSED
+   stdout: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] outside the repo: /etc/t3-outside.txt Refused path: \"/etc/t3-outside.txt\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alte
+   output contains token bytes? False
+== adversarial: relative escape ../
+   Write ../escape.txt (2 bytes) -> exit 0, REFUSED
+   stdout: {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] outside the repo: ../escape.txt Refused path: \"../escape.txt\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."}}
+   output contains token bytes? False
+== audit ledger state/jev-guard.jsonl
+   {'tool': 'write', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'request_started': False, 'chunks': 0}
+   {'tool': 'write', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'request_started': False, 'chunks': 0}
+   {'tool': 'edit', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'request_started': False, 'chunks': 0}
+   {'tool': 'write', 'decision': 'allow', 'enforcement': 'pretool_allow', 'branch': 'deterministic', 'request_started': False, 'chunks': 0}
+   {'tool': 'write', 'decision': 'block', 'enforcement': 'pretool_deny', 'branch': 'deterministic', 'request_started': False, 'chunks': 0}
+   {'tool': 'write', 'decision': 'block', 'enforcement': 'pretool_deny', 'branch': 'deterministic', 'request_started': False, 'chunks': 0}
+ledger contains token bytes? False

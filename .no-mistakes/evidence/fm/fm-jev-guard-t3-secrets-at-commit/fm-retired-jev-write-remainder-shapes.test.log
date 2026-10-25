@@ -1,0 +1,2 @@
+ok - a long write whose remainder holds a credential shape is admitted with no judgment
+ok - the same shapes refuse the added lines at commit, and the admitting guard was active

@@ -1,0 +1,2 @@
+ok - report writes are admitted with no judgment during an outage and under never-send text
+ok - the guard that admitted those writes during the outage was active and still refuses a write outside its roots

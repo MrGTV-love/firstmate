@@ -1,0 +1,167 @@
+== setup: repo, bare remote, task hooks installed by the production installer
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5T69CZCEVS0TGNKJCJBBX96/bin/fm-git-strip-ai-trailers.sh install /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks /Users/charlesabrooker/tmp/t3-walk.xxIdrP/repo 0
+    [exit 0]
+applypatch-msg commit-msg post-applypatch post-checkout post-commit post-merge post-rewrite pre-applypatch pre-auto-gc pre-commit pre-merge-commit pre-push pre-rebase prepare-commit-msg sendemail-validate 
+
+== S1 T3(a): commit a file holding a 36-char ghp_ token
+$ hk git commit -m add config
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: "config.txt"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    [exit 1]
+HEAD moved? no
+refusal text contains token bytes? 0
+
+== S2 repeated retry past budget escalates, still refused
+$ hk git commit -m retry 3
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: "config.txt"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    escalate: this check refused 3 times in a row, past its budget of 1; stop retrying and report the refusal to Firstmate for a human decision. The commit or push stays refused until inspection succeeds and finds no new credential-shaped line.
+    [exit 1]
+
+== S3 T3(b): write token to ignored .env
+$ git add -A
+    [exit 0]
+staged files: []
+$ hk git commit -m nothing to commit
+    On branch main
+    nothing to commit, working tree clean
+    [exit 1]
+HEAD moved? no
+secret still on disk (local only)? yes
+
+== S4 adversarial: git add -f .env bypasses .gitignore
+$ git add -f .env
+    [exit 0]
+$ hk git commit -m force-add env
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: ".env"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    [exit 1]
+
+== S5 T3(c): placeholder replace-me commits and pushes
+$ hk git commit -m placeholder example
+    [main 8b35f07] placeholder example
+     1 file changed, 1 insertion(+)
+     create mode 100644 .env.example
+    [exit 0]
+$ hk git push origin main
+    To /Users/charlesabrooker/tmp/t3-walk.xxIdrP/remote.git
+       f94c341..8b35f07  main -> main
+    [exit 0]
+remote has placeholder commit? 8b35f07 placeholder example
+
+== S6 adversarial: commit made WITHOUT the hooks, token removed at tip; push with hooks
+$ hk git push origin main
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: "leak.txt"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    error: failed to push some refs to '/Users/charlesabrooker/tmp/t3-walk.xxIdrP/remote.git'
+    [exit 1]
+remote moved? no
+
+== S7 adversarial: other retained shapes (AKIA, private key header) and a benign near-miss
+$ hk git commit -m aws
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: "aws.txt"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    [exit 1]
+$ hk git commit -m key
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: "id_rsa"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    [exit 1]
+$ hk git commit -m benign notes
+    [main 07c095a] benign notes
+     1 file changed, 1 insertion(+)
+     create mode 100644 notes.md
+    [exit 0]
+
+== S8 project pre-commit hook: its staging is scanned; its failure propagates
+$ hk git commit -m project hook stages a token
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: "generated.txt"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    [exit 1]
+$ hk git commit -m project hook refuses
+    project-hook-says-no
+    [exit 1]
+
+== S9 keep-ai-trailers=1: trailers kept, credential check still on
+$ hk git commit -m keep-trailers credential
+    error: credential-shaped content in lines that staged or outgoing commits add
+    files[1]: "keep.txt"
+    help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+    cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+    next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+    [exit 1]
+trailer kept: 1
+default install strips trailer (count): 0
+
+== guard events (one per decision; no content)
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 2}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 3}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-push-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-push-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'deny', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+    {'guard': 'git-commit-credential-shapes', 'decision': 'allow', 'source_ok': True, 'repeat': 1}
+events contain token bytes? 0
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/keep.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP/task.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/t3-walk.xxIdrP: Directory not empty
+== teardown done
