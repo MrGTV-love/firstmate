@@ -608,7 +608,7 @@
       "layer": "runtime-block",
       "source": "bin/fm-jev-guard.ts deviceEffects and lspEffects tables, plain-path regex, repository roots, realpaths and session-owned running-job snapshot",
       "trigger": "a filesystem target fails its path/root check, a device has no measured effect or fails its local scope proof, or a device is refused for its measured effect (xd://report_issue egress, xd://github unscreened results)",
-      "remedy": "for files use a plain absolute or worktree-relative path; for devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls need an existing worktree file or a workspace symbols search; for GitHub reads (repo_view, file_read) use gh-axi through the shell, and report every other GitHub op to Firstmate",
+      "remedy": "for files use a plain absolute or worktree-relative path; for devices run read xd://<device> and report the refused device and intended effect to Firstmate for a measured rule in bin/fm-jev-guard.ts; local LSP calls other than status need an existing worktree file or a workspace symbols search (file \"*\"); for GitHub reads (repo_view, file_read) use gh-axi through the shell, and report every other GitHub op to Firstmate",
       "budget": 1,
       "test": "tests/fm-jev-guard.test.sh",
       "tier": "C",
