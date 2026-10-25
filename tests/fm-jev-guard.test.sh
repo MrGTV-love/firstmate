@@ -573,7 +573,7 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
     assert.equal(requests(), before, 'deterministic refusals must not egress');
   };
   for (const toolName of ['write', 'edit']) {
-    for (const path of ['~/a', '~other/a', ':./a', ':../a', ':/tmp/a', '@/tmp/a', '@~/a', 'file:///tmp/a', 'FILE:///tmp/a', '[/x/a]', 'src/a#ABCD]', 'https://example.invalid/a', 's3://bucket/a', 'xd://report_issue', 'xd://security_scan', 'xd://lsp/topic', 'proc://bg_1/mode', 'proc://bg_1', 'proc://bg_1/kill?x=1', 'C:/a', '+note.txt', '']) {
+    for (const path of ['~/a', '~other/a', ':./a', ':../a', ':/tmp/a', '@/tmp/a', '@~/a', 'file:///tmp/a', 'FILE:///tmp/a', '[/x/a]', 'src/a#ABCD]', 'https://example.invalid/a', 's3://bucket/a', 'xd://security_scan', 'xd://lsp/topic', 'proc://bg_1/mode', 'proc://bg_1', 'proc://bg_1/kill?x=1', 'C:/a', '+note.txt', '']) {
       await deny(toolName === 'write' ? { path, content: 'fixture' } : { path, old_string: 'old', new_string: 'fixture' }, ctx, toolName);
     }
     for (const path of ['src/note.txt', `${process.env.WT}/src/note.txt`]) {
@@ -590,14 +590,15 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
   for (const input of [{ path: 'src/a.ts' }, { path: 'src/a.ts', newText: 'legacy' }, { paths: ['src/a.ts'], input: 'patch' }, { new_string: 'fixture' }, { path: null, new_string: 'fixture' }, { path: 'src/a.ts', new_string: 1 }]) await deny(input, ctx, 'edit');
   const lsp = args => ({ path: 'xd://lsp', content: JSON.stringify(args) });
   for (const input of [
-    ...['references', 'definition', 'implementation', 'type_definition', 'hover', 'symbols'].map(action => lsp({ action, file: 'source.ts', line: 1, symbol: 'value' })),
+    ...['references', 'definition', 'implementation', 'type_definition', 'hover', 'symbols', 'diagnostics', 'capabilities', 'reload', 'code_actions'].map(action => lsp({ action, file: 'source.ts', line: 1, symbol: 'value' })),
+    lsp({ action: 'status' }), lsp({ action: 'rename', file: 'source.ts', apply: false, new_name: 'renamed' }),
     ...['plain space.ts', 'unicode-λ.ts'].map(file => lsp({ action: 'references', file })), { path: 'proc://bg_1/kill' },
   ]) {
     const before = requests();
     assert.equal(await handlers.tool_call({ toolName: 'write', input }, ctx), undefined);
     assert.equal(requests(), before);
   }
-  for (const action of ['diagnostics', 'request', 'rename', 'rename_file', 'code_actions', 'format', 'reload', 'status', 'capabilities', 'unknown', 'References', '']) await deny(lsp({ action, file: 'source.ts', apply: true }));
+  for (const action of ['request', 'rename', 'rename_file', 'code_actions', 'format', 'unknown', 'References', '__proto__', 'constructor', 'toString', '']) await deny(lsp({ action, file: 'source.ts', apply: true }));
   for (const file of [...rewritten, ...rewritten.map(file => `${process.env.WT}/${file}`), '/etc/hosts', `${process.env.TASK_DATA}/outside.ts`, 'escape.ts', '../outside.ts', 'missing.ts', '.', process.env.WT, '/', 'file:///etc/hosts', '~/.env', '@source.ts', ':./source.ts', '[source.ts]', 'src/**/*.ts', '*', '']) await deny(lsp({ action: 'references', file }));
   await deny(lsp({ action: 'symbols' }));
   for (const content of ['', 'not json', 'null', '[]', '1', '{"action":"references","file":1}']) await deny({ path: 'xd://lsp', content });
@@ -613,6 +614,101 @@ JS
 ) || fail "OMP permissions: $out"
   [ "$out" = permissions-ok ] || fail "unexpected permissions output: $out"
   pass "path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments"
+}
+
+test_omp_device_effects() {
+  local out
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const { MAX_CHUNKS, MAX_REQUEST_BYTES } = await import(pathToFileURL(process.env.REPORT));
+const home = process.env.HOME_DIR;
+const config = `${home}/device-config`;
+mkdirSync(config);
+const sent = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+const install = (scope = {}) => {
+  const handlers = {};
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config, state: `${home}/state`, task: 'devices', worktree: process.env.WT, data: process.env.TASK_DATA, policy: 'FIRSTMATE_JEV_GUARD_V1', project: 'firstmate', host: 'omp', ...scope });
+  return handlers.tool_call;
+};
+const ctx = { cwd: process.env.WT, getAsyncJobSnapshot: () => ({ running: [{ id: 'bg_1' }] }) };
+const call = (handler, path, content, toolName = 'write') => handler({ toolName, input: { path, content, ...(toolName === 'edit' ? { new_string: content } : {}) } }, ctx);
+const active = install();
+// Recorded diagnostics refusal: an existing file in the worker root is a local
+// code-index query, including with no credentials/helpers or authorized project.
+for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
+  const before = sent().length;
+  const handler = install(scope);
+  assert.equal(await call(handler, 'xd://lsp', JSON.stringify({ action: 'diagnostics', file: 'source.ts' })), undefined);
+  assert.equal(sent().length, before);
+  for (const file of ['escape.ts', '*', 'src/**/*.ts', '/etc/hosts', 'missing.ts', '.', ...[0x00a0, 0x2000, 0x202f, 0x205f, 0x3000].map(c => `x${String.fromCodePoint(c)}.ts`)]) {
+    const refused = await call(handler, 'xd://lsp', JSON.stringify({ action: 'diagnostics', file }));
+    assert.equal(refused?.block, true);
+    assert.match(refused.reason, /xd:\/\/lsp/);
+    assert.match(refused.reason, /existing file inside this task worktree/);
+    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
+  }
+  assert.equal(sent().length, before, 'failed diagnostics scope proofs never send data');
+}
+// The Auto QA report and GitHub transport can egress. Their arguments pass the
+// existing privacy, credential, complete-screening and outage rules, not roots.
+for (const [path, content] of [['xd://report_issue', 'write: refused Auto QA grievance report'], ['xd://github', '{"op":"repo_view","repo":"fixture/repo"}']]) {
+  let before = sent().length;
+  assert.equal(await call(active, path, content), undefined);
+  assert.equal(sent().length, before + 1);
+  assert.deepEqual(sent().at(-1).body && JSON.parse(sent().at(-1).body).state, { path, content });
+  for (const scope of [{ noHelpers: true }, { project: 'vernant' }, { project: '' }]) {
+    before = sent().length;
+    const refused = await call(install(scope), path, content);
+    assert.equal(refused?.block, true);
+    assert.ok(refused.reason.includes(path));
+    assert.match(refused.reason, /egress review is inactive/);
+    assert.equal(sent().length, before);
+  }
+  const secret = await call(active, path, 'sk-live-fixture');
+  assert.equal(secret?.block, true);
+  assert.match(secret.reason, /failed credential screening/);
+  const outage = await call(active, path, 'http402');
+  assert.equal(outage?.block, true);
+  assert.match(outage.reason, /Review required/);
+  assert.ok(outage.reason.includes(path));
+  assert.doesNotMatch(outage.reason, /needs a plain absolute or worktree-relative path/);
+  before = sent().length;
+  writeFileSync(`${config}/dispatch-never-send`, 'device-private-canary\n');
+  assert.equal((await call(active, path, 'device-private-canary'))?.block, true);
+  unlinkSync(`${config}/dispatch-never-send`);
+  assert.equal(sent().length, before, 'never-send must stop device egress before transport');
+  // Oversized outbound devices must not inherit the local-file unscreened-tail
+  // allowance, even when no credential-shaped value is present in that tail.
+  const oversize = await call(active, path, 'x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
+  assert.equal(oversize?.block, true);
+  assert.match(oversize.reason, /complete-screening-budget/);
+  assert.equal(sent().length, before);
+  for (const handler of [install({ host: 'claude' }), active]) {
+    const tool = handler === active ? 'edit' : 'write';
+    assert.equal((await call(handler, path, content, tool))?.block, true);
+    assert.equal(sent().length, before, 'non-native invocation must not egress');
+  }
+}
+// Neither a registered opaque callback nor an unrecognized device may be
+// guessed harmless from its URI spelling or from a benign-looking payload.
+for (const path of ['xd://propose', 'xd://resolve', 'xd://reject', 'xd://inspect_image', 'xd://future_device', 'xd://report_issue/topic', 'proc://other-task/kill']) {
+  const before = sent().length;
+  const refused = await call(active, path, '{}');
+  assert.equal(refused?.block, true);
+  assert.ok(refused.reason.includes(path));
+  assert.match(refused.reason, /Firstmate/);
+  assert.match(refused.reason, /read |Read proc:\/\//);
+  assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
+  assert.equal(sent().length, before);
+}
+console.log('device-effects-ok');
+JS
+) || fail "OMP device effects: $out"
+  [ "$out" = device-effects-ok ] || fail "unexpected device effects output: $out"
+  pass "measured local devices skip models; Auto QA and GitHub retain egress checks; unknown devices name their review remedy"
 }
 
 test_deadlines() {
@@ -1446,6 +1542,7 @@ test_result_and_audit_policy
 test_claude_node_pretool
 test_channel_consistency
 test_omp_permissions
+test_omp_device_effects
 test_deadlines
 test_trusted_reads_and_independent_judgment
 test_oversize_screening
