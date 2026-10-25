@@ -74,8 +74,8 @@
 # not own the home lock is refused, as for authorize-continuation and
 # reassociate. It refuses, naming the missing proof, unless all of these hold:
 #   (1) window and herdr_pane_id agree, and the worktree and pane exist;
-#   (2) the launch-proof owner resolves one foreground PID that classifies as
-#       an agent process;
+#   (2) the launch-proof owner resolves one foreground PID whose process name
+#       or argv[0] is omp;
 #   (3) that PID's kernel cwd is inside this task's recorded worktree and is
 #       not inside another task's worktree that is as deep or deeper;
 #   (4) no other local task claims the pane;
@@ -85,10 +85,11 @@
 # when the field is absent) must identify the same persisted file as that
 # reference. Publication also needs a positively readable live environment
 # without a usable launch pin; a matching or different pin and unreadable
-# probing refuse before staging. A record naming the live PID or another live
-# omp process is the omp extension's to maintain and is refused unchanged,
-# including the extension's empty unproven mark and an activation naming
-# another file, even when Herdr still registers the task file. A recorded PID
+# probing refuse before staging. A record that already names the live PID is
+# refused unchanged, including the extension's empty unproven mark and an
+# activation naming another file, even when Herdr still registers the task
+# file. A record naming another live omp process is that process's extension's
+# to maintain and is refused unchanged too. A recorded PID
 # that is gone, or that a process other than omp has since reused, does not
 # block repair. The repair writes version=1, the unchanged spawn_gen, the
 # live pid, task_session_file, and current_session_file, publishing by rename
@@ -1424,9 +1425,9 @@ if [ "$VERB" = adopt ]; then
   adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
   adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
     | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
-  if [ -n "$adoption_recorded_pid" ] \
-    && { [ "$adoption_recorded_pid" = "$adoption_pid" ] \
-      || fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; }; then
+  [ "$adoption_recorded_pid" != "$adoption_pid" ] \
+    || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
+  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; then
     echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
     exit 1
   fi

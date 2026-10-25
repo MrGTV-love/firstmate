@@ -56,16 +56,6 @@ fm_launch_proof_pid_unpinned() { # <pid>
   ! printf '%s\n' "$environment" | grep -Eq '^FM_SPAWN_GEN=.+$'
 }
 
-# Succeeds only for a live process whose readable identity classifies as an
-# agent; a gone, unreadable, or other process fails. Prints nothing.
-fm_launch_proof_pid_is_agent() { # <pid>
-  local pid=$1 comm args
-  comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
-    && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) \
-    && [ -n "$comm" ] && [ -n "$args" ] \
-    && [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$pid")" = agent ]
-}
-
 # Succeeds only for a live process whose readable name or argv[0] is omp, the
 # anchored name the agent classifier gives it. Prints nothing.
 fm_launch_proof_pid_is_omp() { # <pid>
@@ -146,9 +136,9 @@ fm_launch_proof_omp_adoption() { # <meta> -> candidate session-record JSON
     echo 'adopt refused: foreground proof needs one uniquely resolved live process in the recorded pane' >&2; return 1;
   }
   # A lingering registration must not turn whatever now runs in the worktree
-  # into a lifecycle target: the resolved process itself has to be an agent.
-  fm_launch_proof_pid_is_agent "$pid" || {
-    echo 'adopt refused: process proof needs the resolved foreground process to be a readable agent process' >&2; return 1;
+  # into a lifecycle target: the resolved process itself has to be omp.
+  fm_launch_proof_pid_is_omp "$pid" || {
+    echo 'adopt refused: process proof needs the resolved foreground process to be a readable omp process' >&2; return 1;
   }
   if fm_launch_proof_pid_pinned_elsewhere "$pid" "$(fm_meta_get "$meta" spawn_gen)"; then
     echo 'adopt refused: generation proof needs the live process not to be pinned to another launch generation' >&2; return 1

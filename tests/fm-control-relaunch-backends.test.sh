@@ -1593,23 +1593,35 @@ test_omp_adoption_unproven_same_pid() {
   pass "omp adoption: the extension's unproven mark for the live PID is not overwritten"
 }
 
-test_omp_adoption_non_agent_process() {
-  prepare_omp_adoption non-agent
-  local dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID out rc=0
-  : > "$dir/fake/recovery-foreign-foreground"
-  printf python3 > "$dir/fake/holder-comm"
-  printf 'python3 -c input()' > "$dir/fake/holder-args"
-  assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable agent process'
-  rm -f "$dir/fake/recovery-foreign-foreground"
-  printf omp > "$dir/fake/holder-comm"
-  printf omp > "$dir/fake/holder-args"
-  out=$(run_continuation_control "$dir" "$id" adopt) || fail "agent process must adopt: $out"
-  printf python3 > "$dir/fake/holder-comm"
-  printf 'python3 -c input()' > "$dir/fake/holder-args"
-  out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
-  [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input once the process stopped being an agent: $out"
-  assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a non-agent process must receive no lifecycle input"
-  pass "omp adoption: non-agent foreground process refused at adoption and at the lifecycle recheck"
+test_omp_adoption_non_omp_process() {
+  local shape dir id out rc comm args
+  for shape in non-agent other-agent; do
+    prepare_omp_adoption "non-omp-$shape"
+    dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID rc=0
+    # Herdr still registers the omp task file while something else runs in the
+    # pane: a plain program, or another harness's agent started in its shell.
+    case "$shape" in
+      non-agent)
+        comm=python3 args='python3 -c input()'
+        : > "$dir/fake/recovery-foreign-foreground" ;;
+      other-agent)
+        comm=claude args='claude --continue'
+        printf claude > "$dir/fake/recovery-harness" ;;
+    esac
+    printf '%s' "$comm" > "$dir/fake/holder-comm"
+    printf '%s' "$args" > "$dir/fake/holder-args"
+    assert_adoption_refused "$dir" "$id" 'process proof needs the resolved foreground process to be a readable omp process'
+    rm -f "$dir/fake/recovery-foreign-foreground" "$dir/fake/recovery-harness"
+    printf omp > "$dir/fake/holder-comm"
+    printf omp > "$dir/fake/holder-args"
+    out=$(run_continuation_control "$dir" "$id" adopt) || fail "omp process must adopt: $out"
+    printf '%s' "$comm" > "$dir/fake/holder-comm"
+    printf '%s' "$args" > "$dir/fake/holder-args"
+    out=$(FM_CONTROL_SETTLE_WAIT=.05 run_control "$dir" "$id" interrupt) || rc=$?
+    [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input once a $shape process replaced omp: $out"
+    assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a $shape process must receive no lifecycle input"
+  done
+  pass "omp adoption: non-agent and other-harness foreground processes refused at adoption and at the lifecycle recheck"
 }
 
 test_omp_adoption_unreadable_environment() {
@@ -1741,9 +1753,9 @@ test_omp_adoption_live_recorded_pid() {
   for shape in other-live-omp resolved-live-process; do
     prepare_omp_adoption "live-recorded-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID record="$HERDR_CASE_DIR/home/state/$HERDR_CASE_ID.omp-session.json"
-    # A record naming a live omp process belongs to the extension running in
-    # it. A real process named omp stands in for another live recorded omp, and
-    # the resolved PID with an agreeing current session is a healthy record.
+    # A record naming another live omp process belongs to the extension running
+    # in it, and a real process named omp stands in for it. A record already
+    # naming the resolved PID, as an earlier adopt leaves it, is not rewritten.
     case "$shape" in
       other-live-omp)
         start_stand_in omp
@@ -1753,10 +1765,15 @@ test_omp_adoption_live_recorded_pid() {
           "$record" > "$record.new" ;;
     esac
     mv "$record.new" "$record"
-    assert_adoption_refused "$dir" "$id" 'record proof needs the recorded PID to be gone or no longer an omp process'
-    [ "$shape" != other-live-omp ] || stop_stand_in
+    case "$shape" in
+      other-live-omp)
+        assert_adoption_refused "$dir" "$id" "$STAND_IN_PID is a live omp process, so the omp extension owns this record"
+        stop_stand_in ;;
+      resolved-live-process)
+        assert_adoption_refused "$dir" "$id" "the record already names $(cat "$dir/fake/recovery-pid"), so it was not changed" ;;
+    esac
   done
-  pass "omp adoption: a record naming a live omp process is the extension's to maintain and is refused unchanged"
+  pass "omp adoption: a record already naming the live PID or naming another live omp process is refused unchanged"
 }
 
 test_omp_adoption_reused_recorded_pid() {
@@ -1945,7 +1962,7 @@ test_omp_adoption() {
   test_omp_adoption_generation_mismatch
   test_omp_adoption_current_session_contradiction
   test_omp_adoption_unproven_same_pid
-  test_omp_adoption_non_agent_process
+  test_omp_adoption_non_omp_process
   test_omp_adoption_unreadable_environment
   test_omp_adoption_other_generation_pin
   test_omp_adoption_caller_gate
