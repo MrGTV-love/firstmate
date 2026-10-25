@@ -452,9 +452,12 @@ export default function(pi: { on(name: string, fn: () => void): void; getAllTool
     process.exit(0);
   });
 }`);
+const dead = 'http://127.0.0.1:9';
 execFileSync(`${process.env.AUDIT_ROOT}/bin/fm-proc-budget.sh`, ['--', 'omp', '--mode', 'rpc', '--no-session',
   '--no-extensions', '-e', extension, '--no-skills', '--no-rules', '--no-title', '--no-lsp'],
-  { cwd: lab, input: '', env: { ...process.env, PI_CODING_AGENT_DIR: `${lab}/agent`, OMP_SKIP_SETUP: '1', TYPESAFE_API_KEY: 'synthetic-inventory-only' }, stdio: ['pipe', 'pipe', 'pipe'] });
+  { cwd: lab, input: '', env: { PATH: process.env.PATH, HOME: lab, PI_CODING_AGENT_DIR: `${lab}/agent`, OMP_SKIP_SETUP: '1',
+    TYPESAFE_API_KEY: 'synthetic-inventory-only', OPENAI_API_KEY: 'synthetic-inventory-only',
+    HTTP_PROXY: dead, HTTPS_PROXY: dead, ALL_PROXY: dead }, stdio: ['pipe', 'pipe', 'pipe'] });
 const installed = JSON.parse(readFileSync(`${lab}/tools.json`, 'utf8'));
 assert.ok(installed.includes('find'), 'the real host inventory must include the missed paid tool');
 assert.deepEqual(uncoveredTools(installed), [], 'every installed host tool needs an explicit classification');
