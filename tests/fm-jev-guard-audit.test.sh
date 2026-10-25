@@ -231,27 +231,18 @@ await test('T4(d): an installed tool absent from the policy table is rejected, n
   assert.equal(patch?.block, true);
   assert.equal(r.branch, 'coverage');
   assert.ok(patch.reason.includes('Unclassified host tool "new-paid-host-tool"'), patch.reason);
+  assert.ok(patch.reason.includes('add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect'), patch.reason);
   assert.ok(patch.reason.includes('No call was made.'), patch.reason);
 });
-await test('T4(d): Claude built-in inventory is classified and an added tool fails coverage', async () => {
-  // Every tool in the public host tool reference, retrieved 2026-10-24:
-  // https://code.claude.com/docs/en/tools-reference
-  const native = ['Agent', 'Artifact', 'AskUserQuestion', 'Bash', 'CronCreate', 'CronDelete', 'CronList',
-    'Edit', 'EndConversation', 'EnterPlanMode', 'EnterWorktree', 'ExitPlanMode', 'ExitWorktree',
-    'Glob', 'Grep', 'ListAgents', 'ListMcpResourcesTool', 'LSP', 'Monitor', 'NotebookEdit', 'PowerShell',
-    'PushNotification', 'Read', 'ReadMcpResourceTool', 'RemoteTrigger', 'ReportFindings', 'ScheduleWakeup',
-    'SendMessage', 'SendUserFile', 'ShareOnboardingGuide', 'Skill', 'SubagentHandback',
-    'TaskCreate', 'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop', 'TaskUpdate', 'TodoWrite', 'ToolSearch',
-    'WaitForMcpServers', 'WebFetch', 'WebSearch', 'Workflow', 'Write'];
-  const { uncoveredTools } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
-  assert.deepEqual(uncoveredTools(native.map(name => name.toLowerCase())), []);
-  assert.deepEqual(uncoveredTools([...native, 'NewHostTool', 'MultiEdit', 'SendFeedback'].map(name => name.toLowerCase())), ['multiedit', 'newhosttool', 'sendfeedback']);
+await test('T4(d): an added Claude host tool fails coverage at the adapter boundary', async () => {
   const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
   for (const tool_name of ['NewHostTool', 'MultiEdit', 'SendFeedback']) {
     const output = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', adapter,
       state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION],
       { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input: {}, cwd: state }), encoding: 'utf8' });
-    assert.equal(JSON.parse(output).hookSpecificOutput.permissionDecision, 'deny', tool_name);
+    const decision = JSON.parse(output).hookSpecificOutput;
+    assert.equal(decision.permissionDecision, 'deny', tool_name);
+    assert.ok(decision.permissionDecisionReason.includes(`Unclassified host tool ${JSON.stringify(tool_name.toLowerCase())}`), decision.permissionDecisionReason);
   }
 });
 await test('an unclassified tool elsewhere in the host registry does not refuse a classified call', async () => {
@@ -289,7 +280,7 @@ await test('coverage and egress refusals hold in an inactive project scope', asy
   assert.equal(call('TaskStop', { task_id: 'synthetic' }), '');
 });
 await test('tools that move no data or run no worker code are local; unscreened writers name T5', async () => {
-  for (const toolName of ['skill', 'listagents', 'waitformcpservers', 'subagenthandback', 'taskstop']) {
+  for (const toolName of ['skill', 'listagents', 'waitformcpservers', 'subagenthandback', 'taskstop', 'structuredoutput']) {
     const before = rowCount();
     assert.equal(await handlers.tool_call({ toolName, input: {} }, { cwd: state }), undefined, toolName);
     assert.equal(rowCount(), before, `${toolName}: local tools add no egress or confinement row`);
@@ -308,6 +299,7 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
     ['browser', { url: 'https://synthetic.invalid' }, 'browser'],
     ['generate_image', { prompt: 'synthetic' }, 'provider'],
     ['task', { task: 'synthetic' }, 'subagent'],
+    ['designsync', { method: 'list_projects' }, 'remote-storage'],
   ];
   for (const [toolName, input, destination] of cases) {
     let patch;
@@ -447,4 +439,34 @@ JS
   pass 'installed omp registry coverage (no model turn submitted)'
 else
   printf 'SKIP: installed tool coverage requires omp; offline added-tool regression ran above\n'
+fi
+
+# The init event lists the tools the installed Claude Code binary exposes before any request;
+# the dead proxy and base URL keep the run off the network, so no model turn is submitted.
+if command -v claude >/dev/null 2>&1; then
+  node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'installed Claude tool coverage'
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { uncoveredTools } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
+const lab = `${process.env.AUDIT_TMP}/claude-inventory`;
+mkdirSync(`${lab}/config`, { recursive: true });
+writeFileSync(`${lab}/config/.claude.json`, JSON.stringify({ hasCompletedOnboarding: true }));
+const dead = 'http://127.0.0.1:9';
+const run = spawnSync(`${process.env.AUDIT_ROOT}/bin/fm-proc-budget.sh`, ['--', 'claude', '-p', 'inventory', '--output-format', 'stream-json', '--verbose',
+  '--max-turns', '1', '--json-schema', '{"type":"object","properties":{}}'],
+  { cwd: lab, input: '', encoding: 'utf8', env: { PATH: process.env.PATH, HOME: lab, CLAUDE_CONFIG_DIR: `${lab}/config`,
+    ANTHROPIC_API_KEY: 'synthetic-inventory-only', ANTHROPIC_BASE_URL: dead, HTTPS_PROXY: dead, HTTP_PROXY: dead, CLAUDE_CODE_MAX_RETRIES: '0' } });
+const init = run.stdout.split('\n').filter(Boolean).map(line => JSON.parse(line)).find(event => event.type === 'system' && event.subtype === 'init');
+assert.ok(Array.isArray(init?.tools), `no init tool inventory (exit ${run.status})`);
+const installed = init.tools.map(name => name.toLowerCase());
+assert.ok(installed.includes('webfetch'), 'the real host inventory must include an outbound tool');
+assert.deepEqual(uncoveredTools(installed), [], 'every installed Claude tool needs an explicit classification');
+assert.deepEqual(uncoveredTools([...installed, 'newhosttool']), ['newhosttool'], 'T4(d): an added installed tool fails coverage');
+console.log(`installed Claude ${init.claude_code_version}: ${installed.length} tools classified; injected unknown tool rejected; no model turn`);
+JS
+  pass 'installed Claude registry coverage (no model turn submitted)'
+else
+  printf 'SKIP: installed Claude tool coverage requires claude; offline added-tool regression ran above\n'
 fi

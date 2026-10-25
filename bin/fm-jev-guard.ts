@@ -245,14 +245,15 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     guardEvent("jev-tool-coverage", tool, policy ? "allow" : "deny", started, remainingMs);
     if (!policy) {
       return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
-        `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must classify it in fm-jev-egress.ts before execution. No call was made.`);
+        `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made.`);
     }
     try {
       const destination = egressClass(tool);
       if (destination) {
         terminal.destination_class = destination;
+        const egressStarted = performance.now();
         const { granted, sourceOk } = egressGranted(c.state, c.task, destination);
-        guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", started, remainingMs, sourceOk);
+        guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
         if (!granted) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
             `Missing task egress grant: request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
