@@ -813,11 +813,17 @@ make_relocation_case() {
   git -C "$dir/wt" rev-parse HEAD > "$dir/committed-head"
   printf 'pr_head=%s\n' "$(cat "$dir/committed-head")" >> "$dir/home/state/$id.meta"
   rm -rf "$dir/wt"
+  # G-20: a relocation destination must be a Treehouse pool slot, so the fresh
+  # copy gets the managed pool's <pool>/<slot>/<repo> layout with its pool state
+  # beside it. A plain linked worktree is no longer a destination the launcher
+  # accepts, and test_relocation_refuses_a_non_lease_copy proves that.
+  mkdir -p "$dir/th/1"
+  printf '{}\n' > "$dir/th/treehouse-state.json"
   if [ "$keep" = keep-registration ]; then
-    git -C "$dir/proj" worktree add -q -f "$dir/dest" "task-$id"
+    git -C "$dir/proj" worktree add -q -f "$dir/th/1/dest" "task-$id"
   else
     git -C "$dir/proj" worktree prune
-    git -C "$dir/proj" worktree add -q "$dir/dest" "task-$id"
+    git -C "$dir/proj" worktree add -q "$dir/th/1/dest" "task-$id"
   fi
   printf zsh > "$dir/fake/command"
   printf '%s' "$dir/wt" > "$dir/fake/cwd"
@@ -827,7 +833,7 @@ make_relocation_case() {
 # run_relocation_refusal <case-dir> <id> <fragment> <what> [destination]: the
 # relocation must refuse before anything is stopped, journaled or edited.
 run_relocation_refusal() {
-  local dir=$1 id=$2 fragment=$3 what=$4 dest=${5:-$1/dest} out rc meta_before brief_before journal_before=
+  local dir=$1 id=$2 fragment=$3 what=$4 dest=${5:-$1/th/1/dest} out rc meta_before brief_before journal_before=
   meta_before=$(cat "$dir/home/state/$id.meta")
   brief_before=$(cat "$dir/home/data/$id/brief.md")
   if [ -f "$dir/home/state/$id.control-relaunch" ]; then

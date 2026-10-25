@@ -519,8 +519,9 @@ The worktree and the task's records are unaffected either way.
 
 A pool slot can vanish while its task's branch and every commit on it survive in the shared repository.
 Plain `relaunch` refuses that task because it cannot checkpoint the missing recorded copy.
-`fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh isolated copy of the same branch that the caller has already prepared.
+`fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh copy of the same branch that the project's Treehouse lease allocated.
 A scout has no branch to match and a secondmate's home is not a task copy, so both refuse.
+The lease is the only accepted source: a hand-made `git worktree add` copy, an Orca-allocated worktree, and a project with no Treehouse pool refuse by name, because none of them can prove which allocator produced the copy.
 
 [`bin/fm-control-worktree-lib.sh`](../bin/fm-control-worktree-lib.sh) owns the proof, and both `fm-control` and `fm-spawn --relaunch --worktree` run it, so the two cannot disagree.
 The control-plane preflight checks all of the conditions below before stopping the agent or writing the relaunch journal or progress note.
@@ -534,7 +535,7 @@ The launch owner repeats the proof before publication; a later refusal can there
 - **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
 - **Its HEAD contains every surviving recorded head:** the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.
-  A task with no PR and no prior control relaunch has only the reflog, so prepare the copy with `git worktree add -f <path> <branch>` and do not run `git worktree prune` first.
+  A task with no PR and no prior control relaunch has only the reflog, so allocate the copy with `treehouse get -b <branch>` from the recorded project and do not run `git worktree prune` first; only the pool slot the lease enters is an accepted destination.
   If the registration was already pruned, give a known commit of the branch as evidence, scoped by task:
   a task with no recorded `pr=` takes one line, `pr_head=<sha>`, in its task record (`state/<id>.meta`);
   a task with a recorded `pr=` takes the three lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` in its control journal (`state/<id>.control-relaunch`), never a hand-written `pr_head=`, because `bin/fm-dod-lib.sh` and `bin/fm-review-diff.sh` read `pr_head` as the head the forge reported.
@@ -542,7 +543,7 @@ The launch owner repeats the proof before publication; a later refusal can there
   The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
   Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
 - **No other task of any local Firstmate home records it** (the root home and every registered local secondmate home, the same walk teardown uses); an unreadable home or registry refuses. Records are checked by path or alias in both `worktree` and `home`, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
-  Every relocation, pool or not, repeats the ownership proof under the existing shared project lock and keeps that lock through atomic task-record publication. A free pool slot is claimed for this task under that lock, as a fresh spawn does; an unpublished abort removes only the claim that attempt newly acquired, before releasing the lock. Pre-existing claims and claims paired with a published replacement record remain intact.
+  Every relocation repeats the ownership proof under the existing shared project lock and keeps that lock through atomic task-record publication. A free pool slot is claimed for this task under that lock, as a fresh spawn does; an unpublished abort removes only the claim that attempt newly acquired, before releasing the lock. Pre-existing claims and claims paired with a published replacement record remain intact.
 - **It holds none of the harness files the launch overwrites or deletes** (the worktree-resident paths of `fm_control_harness_wiring_paths` in bin/fm-control-lib.sh).
   The control plane checks, and the launch owner checks again at the moment it would write.
   A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
