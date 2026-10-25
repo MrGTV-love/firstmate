@@ -534,7 +534,8 @@ family_for_basename() {
       printf '%s\n' backend-dispatch
       ;;
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|\
-    fm-pr-merge.test.sh|fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
+    fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
+    fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
     fm-review-diff.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
     fm-teardown-cleanup.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
@@ -646,6 +647,8 @@ tests/fm-herdr-lab.test.sh
 tests/fm-lint.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-pr-merge.test.sh
+tests/fm-pr-merge-forges.test.sh
+tests/fm-pr-merge-checks.test.sh
 tests/fm-review-diff.test.sh
 tests/fm-send-popup-settle.test.sh
 tests/fm-send-settle.test.sh
@@ -682,7 +685,9 @@ tests/fm-grok-harness.test.sh 10027
 tests/fm-herdr-lab.test.sh 29438
 tests/fm-lint.test.sh 713491
 tests/fm-pi-primary-types.test.sh 3677
-tests/fm-pr-merge.test.sh 1117958
+tests/fm-pr-merge.test.sh 370000
+tests/fm-pr-merge-forges.test.sh 370000
+tests/fm-pr-merge-checks.test.sh 378000
 tests/fm-review-diff.test.sh 12861
 tests/fm-send-popup-settle.test.sh 10405
 tests/fm-send-settle.test.sh 3052
@@ -716,6 +721,8 @@ portable_parallel_lane_weight() {
 list_portable_parallel_1() {
   cat <<'EOF'
 tests/fm-pr-merge.test.sh
+tests/fm-pr-merge-forges.test.sh
+tests/fm-pr-merge-checks.test.sh
 tests/fm-test-run.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-crew-state.test.sh

@@ -242,6 +242,13 @@ The measured lane sums are now 2871001 ms and 2894605 ms, a 0.8 percent imbalanc
 The backends group's main samples predate `test_omp_adoption`, so its hint is its slowest main sample (514105 ms, run 40121241146) scaled for that case: a local macOS run of the whole group took 639 s and 576 s without the case, and the case's 63 s there scales to 67.5 s for the later reused-PID test by a local macOS run of the case alone (54.4 s with it, 50.8 s without it), giving 514105 x 643.46 / 576 = 574316 ms.
 That factor is a local estimate, not a CI measurement, and it predates the other-harness foreground shape of the non-omp process case; replace the hint from the group's own artifacts once main runs the adoption case.
 
+## Split the fm-pr-merge suite
+
+`tests/fm-pr-merge.test.sh` was the parallel lane's longest single script (1117958 ms in run 40121241146), so it set that lane's wall no matter how the rest packed.
+It is now a shared helpers module plus three groups: the review and captain-word authority with the GitHub outcome cases (49), the GitLab, Forgejo, reporting, and backlog cases (49), and the check-run, rollup, waiver, and away-authority cases (50).
+Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` pins the 148-case cover.
+The three new files' parallel hints are apportioned from the former hint by case share (370000, 370000, and 378000 ms), pending the first measured artifacts for them; `--check-coverage` reports `parallel_makespan_ms` 1016757.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
