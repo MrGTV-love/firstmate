@@ -263,29 +263,38 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
       done
     done
   done
-  # A Treehouse slot also carries a claim, written by whichever task took it.
-  if declare -F fm_treehouse_pool_slot >/dev/null 2>&1 && fm_treehouse_pool_slot "$project" "$real"; then
-    fm_treehouse_slot_owner_state "$real" "$id"
-    case "$FM_TREEHOUSE_SLOT_OWNER" in
-      absent) ;;
-      mine)
-        owner_home=$(cd "$FM_TREEHOUSE_SLOT_OWNER_HOME" 2>/dev/null && pwd -P) || owner_home=
-        this_home=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || this_home=
-        if [ -z "$FM_TREEHOUSE_SLOT_OWNER_HOME" ] || [ -z "$this_home" ] || [ "$owner_home" != "$this_home" ]; then
-          echo "error: the pool slot $dest is claimed by task $id of home $FM_TREEHOUSE_SLOT_OWNER_HOME, not this home" >&2
-          return 1
-        fi
-        ;;
-      other)
-        echo "error: the pool slot $dest is claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID${FM_TREEHOUSE_SLOT_OWNER_HOME:+ (home $FM_TREEHOUSE_SLOT_OWNER_HOME)}, not by $id" >&2
-        return 1
-        ;;
-      *)
-        echo "error: the pool slot $dest carries a claim that cannot be read, so its owner cannot be established" >&2
-        return 1
-        ;;
-    esac
+  # The lease is the only source of a fresh copy. Everything above proves what
+  # this copy IS; only a Treehouse pool slot proves that the project's lease
+  # ALLOCATED it. Without that requirement the launcher accepts any isolated
+  # worktree a caller can prepare, so worktree isolation ends up tested against
+  # a path the launcher already tolerates. A hand-made `git worktree add` copy,
+  # an Orca-allocated worktree, and a project with no Treehouse pool carry no
+  # lease proof and refuse here rather than being accepted on the caller's word.
+  if ! fm_treehouse_pool_slot "$project" "$real"; then
+    echo "error: the fresh copy $dest is not a Treehouse pool slot, so no lease allocated it; relocation accepts only a slot the project's lease allocated. Run 'treehouse get -b $branch' from $project in a scratch pane and pass the slot it enters. A hand-made 'git worktree add' copy, an Orca-allocated worktree, and a project without a Treehouse pool carry no lease proof, so start the task fresh instead" >&2
+    return 1
   fi
+  # A Treehouse slot also carries a claim, written by whichever task took it.
+  fm_treehouse_slot_owner_state "$real" "$id"
+  case "$FM_TREEHOUSE_SLOT_OWNER" in
+    absent) ;;
+    mine)
+      owner_home=$(cd "$FM_TREEHOUSE_SLOT_OWNER_HOME" 2>/dev/null && pwd -P) || owner_home=
+      this_home=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || this_home=
+      if [ -z "$FM_TREEHOUSE_SLOT_OWNER_HOME" ] || [ -z "$this_home" ] || [ "$owner_home" != "$this_home" ]; then
+        echo "error: the pool slot $dest is claimed by task $id of home $FM_TREEHOUSE_SLOT_OWNER_HOME, not this home" >&2
+        return 1
+      fi
+      ;;
+    other)
+      echo "error: the pool slot $dest is claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID${FM_TREEHOUSE_SLOT_OWNER_HOME:+ (home $FM_TREEHOUSE_SLOT_OWNER_HOME)}, not by $id" >&2
+      return 1
+      ;;
+    *)
+      echo "error: the pool slot $dest carries a claim that cannot be read, so its owner cannot be established" >&2
+      return 1
+      ;;
+  esac
 
   fm_control_worktree_wiring_free "$real" "$state" "$id" || return 1
 
