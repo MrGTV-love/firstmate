@@ -355,6 +355,7 @@
 #   text-only recall without loading a separate embedding model per session.
 #   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
 #   300-second write and edit judgment budget (docs/configuration.md "Jev guard").
+#   It also sets dev.autoqa false, so workers never upload Auto QA reports.
 #   Workers also enable eager native account rotation without waiting for usage
 #   resets and receive a task-owned --config overlay permitting only declared
 #   OMP model fallbacks, with an empty default chain so ambient role chains

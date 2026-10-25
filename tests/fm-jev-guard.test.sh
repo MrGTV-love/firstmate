@@ -573,7 +573,7 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
     assert.equal(requests(), before, 'deterministic refusals must not egress');
   };
   for (const toolName of ['write', 'edit']) {
-    for (const path of ['~/a', '~other/a', ':./a', ':../a', ':/tmp/a', '@/tmp/a', '@~/a', 'file:///tmp/a', 'FILE:///tmp/a', '[/x/a]', 'src/a#ABCD]', 'https://example.invalid/a', 's3://bucket/a', 'xd://report_issue', 'xd://security_scan', 'xd://lsp/topic', 'proc://bg_1/mode', 'proc://bg_1', 'proc://bg_1/kill?x=1', 'C:/a', '+note.txt', '']) {
+    for (const path of ['~/a', '~other/a', ':./a', ':../a', ':/tmp/a', '@/tmp/a', '@~/a', 'file:///tmp/a', 'FILE:///tmp/a', '[/x/a]', 'src/a#ABCD]', 'https://example.invalid/a', 's3://bucket/a', 'xd://security_scan', 'xd://lsp/topic', 'proc://bg_1/mode', 'proc://bg_1', 'proc://bg_1/kill?x=1', 'C:/a', '+note.txt', '']) {
       await deny(toolName === 'write' ? { path, content: 'fixture' } : { path, old_string: 'old', new_string: 'fixture' }, ctx, toolName);
     }
     for (const path of ['src/note.txt', `${process.env.WT}/src/note.txt`]) {
@@ -590,18 +590,23 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
   for (const input of [{ path: 'src/a.ts' }, { path: 'src/a.ts', newText: 'legacy' }, { paths: ['src/a.ts'], input: 'patch' }, { new_string: 'fixture' }, { path: null, new_string: 'fixture' }, { path: 'src/a.ts', new_string: 1 }]) await deny(input, ctx, 'edit');
   const lsp = args => ({ path: 'xd://lsp', content: JSON.stringify(args) });
   for (const input of [
-    ...['references', 'definition', 'implementation', 'type_definition', 'hover', 'symbols'].map(action => lsp({ action, file: 'source.ts', line: 1, symbol: 'value' })),
+    ...['references', 'definition', 'implementation', 'type_definition', 'hover', 'symbols', 'diagnostics', 'capabilities', 'reload', 'code_actions'].map(action => lsp({ action, file: 'source.ts', line: 1, symbol: 'value' })),
+    lsp({ action: 'status' }), lsp({ action: 'rename', file: 'source.ts', apply: false, new_name: 'renamed' }),
+    lsp({ action: 'symbols', file: '*', query: 'value' }), lsp({ action: 'code_actions', file: 'source.ts', line: 1, apply: false }),
     ...['plain space.ts', 'unicode-λ.ts'].map(file => lsp({ action: 'references', file })), { path: 'proc://bg_1/kill' },
   ]) {
     const before = requests();
     assert.equal(await handlers.tool_call({ toolName: 'write', input }, ctx), undefined);
     assert.equal(requests(), before);
   }
-  for (const action of ['diagnostics', 'request', 'rename', 'rename_file', 'code_actions', 'format', 'reload', 'status', 'capabilities', 'unknown', 'References', '']) await deny(lsp({ action, file: 'source.ts', apply: true }));
+  for (const action of ['request', 'rename', 'rename_file', 'code_actions', 'format', 'unknown', 'References', '__proto__', 'constructor', 'toString', '']) await deny(lsp({ action, file: 'source.ts', apply: true }));
   for (const file of [...rewritten, ...rewritten.map(file => `${process.env.WT}/${file}`), '/etc/hosts', `${process.env.TASK_DATA}/outside.ts`, 'escape.ts', '../outside.ts', 'missing.ts', '.', process.env.WT, '/', 'file:///etc/hosts', '~/.env', '@source.ts', ':./source.ts', '[source.ts]', 'src/**/*.ts', '*', '']) await deny(lsp({ action: 'references', file }));
-  await deny(lsp({ action: 'symbols' }));
+  for (const file of ['src/*.ts', '**', ' *', `*${String.fromCodePoint(0x00a0)}`]) await deny(lsp({ action: 'symbols', file, query: 'value' }));
+  await deny(lsp({ action: 'symbols', query: 'value' }));
+  for (const apply of ['true', 'yes', 'on', '1', ' TRUE ', 1, 'false', 0, null, {}]) await deny(lsp({ action: 'code_actions', file: 'source.ts', line: 1, apply, query: '0' }));
   for (const content of ['', 'not json', 'null', '[]', '1', '{"action":"references","file":1}']) await deny({ path: 'xd://lsp', content });
   await deny(lsp({ action: 'references', file: 'source.ts' }), { ...ctx, cwd: process.env.TASK_DATA });
+  await deny(lsp({ action: 'symbols', file: '*', query: 'value' }), { ...ctx, cwd: process.env.TASK_DATA });
   await deny(lsp({ action: 'references', file: 'source.ts' }), { cwd: process.env.WT });
   await deny({ ...lsp({ action: 'references', file: 'source.ts' }), path: 'XD://lsp' });
   await deny({ ...lsp({ action: 'references', file: 'source.ts' }), new_string: 'x' }, ctx, 'edit');
@@ -613,6 +618,102 @@ JS
 ) || fail "OMP permissions: $out"
   [ "$out" = permissions-ok ] || fail "unexpected permissions output: $out"
   pass "path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments"
+}
+
+test_omp_device_effects() {
+  local out
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = process.env.HOME_DIR;
+const config = `${home}/device-config`;
+mkdirSync(config);
+const sent = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+const install = (scope = {}) => {
+  const handlers = {};
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config, state: `${home}/state`, task: 'devices', worktree: process.env.WT, data: process.env.TASK_DATA, policy: 'FIRSTMATE_JEV_GUARD_V1', project: 'firstmate', host: 'omp', ...scope });
+  return handlers.tool_call;
+};
+const ctx = { cwd: process.env.WT, getAsyncJobSnapshot: () => ({ running: [{ id: 'bg_1' }] }) };
+const call = (handler, path, content, toolName = 'write') => handler({ toolName, input: { path, content, ...(toolName === 'edit' ? { new_string: content } : {}) } }, ctx);
+const active = install();
+// Recorded diagnostics refusal: an existing file in the worker root is a local
+// code-index query, including with no credentials/helpers or authorized project.
+for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
+  const before = sent().length;
+  const handler = install(scope);
+  assert.equal(await call(handler, 'xd://lsp', JSON.stringify({ action: 'diagnostics', file: 'source.ts' })), undefined);
+  assert.equal(sent().length, before);
+  for (const file of ['escape.ts', '*', 'src/**/*.ts', '/etc/hosts', 'missing.ts', '.', ...[0x00a0, 0x2000, 0x202f, 0x205f, 0x3000].map(c => `x${String.fromCodePoint(c)}.ts`)]) {
+    const refused = await call(handler, 'xd://lsp', JSON.stringify({ action: 'diagnostics', file }));
+    assert.equal(refused?.block, true);
+    assert.match(refused.reason, /xd:\/\/lsp/);
+    assert.match(refused.reason, /existing file inside this task worktree/);
+    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
+  }
+  assert.equal(sent().length, before, 'failed diagnostics scope proofs never send data');
+}
+// Auto QA uploads every pending grievance and GitHub results return as
+// unscreened write output, so both stay refused whatever the arguments say.
+for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
+  const handler = install(scope);
+  for (const [path, content, reason] of [
+    ['xd://report_issue', 'write: refused Auto QA grievance report', /Auto QA is off for firstmate workers/],
+    ...['repo_view', 'file_read'].map(op => ['xd://github', JSON.stringify({ op, repo: 'fixture/repo', path: 'README.md' }), /For this read, use gh-axi through the shell instead\..* Apart from the alternative this refusal names, do not retry an equivalent action/]),
+  ]) {
+    const before = sent().length;
+    const refused = await call(handler, path, content);
+    assert.equal(refused?.block, true);
+    assert.ok(refused.reason.includes(path));
+    assert.match(refused.reason, reason);
+    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path|result is screened/);
+    assert.equal(sent().length, before, 'refused devices stop before any screening request');
+  }
+  for (const content of [...['pr_push', 'pr_create', 'pr_checkout', 'future_op'].map(op => JSON.stringify({ op, repo: 'fixture/repo', path: 'README.md' })), 'not-json', '{}']) {
+    const before = sent().length;
+    const refused = await call(handler, 'xd://github', content);
+    assert.equal(refused?.block, true);
+    assert.ok(refused.reason.includes('xd://github'));
+    assert.doesNotMatch(refused.reason, /gh-axi|\bgh\b|shell|Apart from/);
+    assert.match(refused.reason, /Do not retry an equivalent action through another command, tool, path or encoding\. Report the refused action and reason to Firstmate/);
+    assert.equal(sent().length, before, 'refused devices stop before any screening request');
+  }
+}
+for (const path of ['~/a', '/etc/hosts']) {
+  const refused = await call(active, path, 'fixture');
+  assert.equal(refused?.block, true);
+  assert.match(refused.reason, /Do not retry an equivalent action through another command, tool, path or encoding/);
+  assert.doesNotMatch(refused.reason, /Apart from the alternative/);
+}
+for (const handler of [install({ host: 'claude' }), active]) {
+  const before = sent().length;
+  const tool = handler === active ? 'edit' : 'write';
+  assert.equal((await call(handler, 'xd://lsp', JSON.stringify({ action: 'hover', file: 'source.ts' }), tool))?.block, true);
+  assert.equal(sent().length, before, 'non-native invocation must not reach a device');
+}
+// Neither a registered opaque callback nor an unrecognized device may be
+// guessed harmless from its URI spelling or from a benign-looking payload.
+for (const path of ['xd://propose', 'xd://resolve', 'xd://reject', 'xd://inspect_image', 'xd://future_device', 'xd://report_issue/topic', 'proc://other-task/kill']) {
+  const before = sent().length;
+  const refused = await call(active, path, '{}');
+  assert.equal(refused?.block, true);
+  assert.ok(refused.reason.includes(path));
+  assert.match(refused.reason, /Firstmate/);
+  assert.match(refused.reason, /read |Read proc:\/\//);
+  assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
+  assert.equal(sent().length, before);
+}
+console.log('device-effects-ok');
+JS
+) || fail "OMP device effects: $out"
+  [ "$out" = device-effects-ok ] || fail "unexpected device effects output: $out"
+  command -v ruby >/dev/null 2>&1 || fail "ruby is required to parse .omp/fm-worker-overlay.yml as YAML"
+  out=$(ruby -ryaml -e 'print YAML.safe_load(File.read(ARGV[0])).fetch("dev").fetch("autoqa").inspect' "$ROOT/.omp/fm-worker-overlay.yml" 2>&1) \
+    || fail "worker overlay has no dev.autoqa setting: $out"
+  [ "$out" = false ] || fail "worker overlay must disable omp Auto QA, got dev.autoqa=$out"
+  pass "local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy"
 }
 
 test_deadlines() {
@@ -1446,6 +1547,7 @@ test_result_and_audit_policy
 test_claude_node_pretool
 test_channel_consistency
 test_omp_permissions
+test_omp_device_effects
 test_deadlines
 test_trusted_reads_and_independent_judgment
 test_oversize_screening

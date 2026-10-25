@@ -30,3 +30,9 @@ retry:
 # Verified against omp 18.12.0 (`omp config list`).
 extensionHandlers:
   toolCallTimeoutMs: 330000
+# Auto QA (xd://report_issue) uploads every pending grievance off the machine,
+# so workers keep it off and omp's tool prompt never offers the device; the Jev
+# guard still refuses it (docs/configuration.md "Jev guard").
+# Verified against omp 18.12.6 (`dev.autoqa`).
+dev:
+  autoqa: false

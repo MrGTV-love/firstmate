@@ -2537,24 +2537,41 @@ The allowed write roots are the task worktree, the task's own data directory, an
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
 File write and edit paths must use a plain absolute or worktree-relative spelling.
 A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
-The shared guard blocks every other spelling without a Jev call because omp can rewrite such paths before execution, except for these exact native-device `write` invocations:
+Filesystem paths failing that spelling check are blocked without a Jev call because omp can rewrite them before execution.
+Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-guard.ts`, established against installed omp 18.12.6:
 
-- `xd://lsp` with JSON `action` equal to `references`, `definition`, `implementation`, `type_definition`, `hover`, or document `symbols`, and a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
-  The `file` must not contain U+00A0, U+2000-U+200A, U+202F, U+205F, or U+3000, which omp replaces with ASCII spaces before resolving the path; rejecting those spellings keeps the realpath check on the execution target without banning ordinary Unicode or ASCII-space names.
-  The session's real working directory must equal that worktree.
-  Workspace-wide `file: "*"` or file-less forms, directories, missing files, glob spellings, symlink escapes, `diagnostics`, raw requests, rename, code actions, formatting, reload, and every other action remain blocked.
-  The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup to prevent shared rust-analyzer multiplexing.
-- `proc://<id>/kill` when the exact `<id>` appears in the running jobs of the current session's owner-filtered job snapshot at call time.
-  Finished or missing jobs, named project services absent from that snapshot, stdin, mode changes, and every other proc write remain blocked.
+| Device | Effect and guard decision |
+| --- | --- |
+| `xd://lsp` | Proved task-local reads, previews and file-scoped server state changes skip Jev under the scope proofs below. |
+| `proc://<id>/kill` | Cancels a job without Jev only when that exact id is in the current session's owner-filtered running-job snapshot. |
+| `xd://report_issue` | Refused: native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so omp's worker tool prompt never offers the device; the refusal says Auto QA is off for firstmate workers. |
+| `xd://github` | Refused: its native results return as `write` tool output, which the result screen never inspects, so remote content would reach the worker unscreened. Only for the read ops `repo_view` and `file_read` does the refusal name an alternative, `gh-axi` through the shell; every write op (such as `pr_create`, `pr_push` or `pr_checkout`) and unknown op names none and keeps the full report-to-Firstmate rule. |
+| `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
+| `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
+| Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
 
-Admitted devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
-This is bounded trusted local-tool access, not a confinement claim: an LSP server can still send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
-`xd://report_issue` remains blocked because it can upload reports; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
-Device `edit` calls remain blocked, and every path-spelling refusal tells the agent to use a plain path and report if that is not possible.
+LSP `references`, `definition`, `implementation`, `type_definition`, `hover`, document `symbols`, file `diagnostics`, and file `capabilities` require a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
+The same file proof admits rename preview only with `apply: false`, code-action listing only when `apply` is absent or exactly `false` (omp repairs values such as `"true"`, `"yes"` or `1` to `true` before dispatch), and file-scoped reload of the local server.
+`status` reads local session/server configuration and requires no file.
+Workspace `symbols` search (exactly `file: "*"`) runs `workspace/symbol` on the local language servers in the session workspace, no wider than `references`, and requires no file.
+All admitted LSP calls require the session's real working directory to equal the task worktree and a native session context.
+The `file` must not contain U+00A0, U+2000-U+200A, U+202F, U+205F, or U+3000, which omp replaces with ASCII spaces before resolving the path; rejecting those spellings keeps the realpath check on the execution target without banning ordinary Unicode or ASCII-space names.
+For every other action, workspace-wide `file: "*"`, glob expansion, directories, missing files and symlink escapes do not supply the file proof.
+Raw requests, applying rename or code actions, rename_file (including its separate destination/expanded source set), and unrecognized actions remain refused because their complete effects cannot be proved before dispatch.
+The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup to prevent shared rust-analyzer multiplexing.
+Finished or missing jobs, named project services absent from the owner snapshot, stdin and mode changes do not supply the proc cancellation proof.
+
+Local devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
+No device that sends data off the machine is admitted.
+This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
+Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
+The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.
+Device `edit` calls and other schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked; ordinary filesystem spelling refusals still request a plain path.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
 A policy block (write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
+Only the `xd://github` read-op refusal names an alternative, `gh-axi` through the shell, and it exempts only that named alternative from this rule.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.

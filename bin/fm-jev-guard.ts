@@ -111,13 +111,23 @@ export function supervisorReadAdmission(event: GuardResultEvent, c: JevGuardCont
   }
 }
 
-const navigationActions: Readonly<Record<string, true>> = {
-  references: true,
-  definition: true,
-  implementation: true,
-  type_definition: true,
-  hover: true,
-  symbols: true,
+// Native omp actions, not filesystem writes. Preview-only actions must stay
+// previews; applying server-supplied edits/commands has no bounded target proof.
+const lspEffects: Readonly<Record<string, "file-read" | "session-read" | "preview" | "file-state" | "unbounded">> = {
+  references: "file-read",
+  definition: "file-read",
+  implementation: "file-read",
+  type_definition: "file-read",
+  hover: "file-read",
+  symbols: "file-read",
+  diagnostics: "file-read",
+  capabilities: "file-read",
+  status: "session-read",
+  code_actions: "preview",
+  rename: "preview",
+  rename_file: "unbounded",
+  reload: "file-state",
+  request: "unbounded",
 };
 
 function plainPath(path: string): boolean {
@@ -129,33 +139,62 @@ function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-// Device payloads are tool invocations, not file contents for the upstream judge.
-// These are bounded trusted operations, not a filesystem or process sandbox.
-function admittedDevice(input: { path?: unknown; content?: unknown }, ctx: unknown, worktree: string): boolean {
-  try {
-    if (input.path === "xd://lsp") {
-      if (typeof input.content !== "string" || !object(ctx) || typeof ctx.cwd !== "string"
-        || typeof ctx.getAsyncJobSnapshot !== "function") return false;
-      const args: unknown = JSON.parse(input.content);
-      if (!object(args) || typeof args.action !== "string" || navigationActions[args.action] !== true
-        || typeof args.file !== "string") return false;
-      const root = realpathSync(worktree);
-      if (realpathSync(ctx.cwd) !== root) return false;
-      // omp's path resolver replaces these Unicode spaces before resolving the file.
-      // Reject rewritten spellings so the realpath check sees the execution target.
-      if (!plainPath(args.file) || /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/.test(args.file)) return false;
-      const file = realpathSync(resolve(worktree, args.file));
-      return statSync(file).isFile() && insideRepo(file, root);
-    }
-    const job = typeof input.path === "string" ? /^proc:\/\/([A-Za-z0-9][A-Za-z0-9._-]*)\/kill$/.exec(input.path) : null;
-    if (!job || !object(ctx) || typeof ctx.getAsyncJobSnapshot !== "function") return false;
-    const snapshot: unknown = ctx.getAsyncJobSnapshot();
-    if (!object(snapshot)) return false;
-    return Array.isArray(snapshot.running)
-      && snapshot.running.some((entry: unknown) => object(entry) && entry.id === job[1]);
-  } catch {
-    return false;
-  }
+type DeviceInput = { path?: unknown; content?: unknown };
+type DeviceRule = { effect: "local"; prove: (input: DeviceInput, ctx: GuardRuntimeContext, worktree: string) => boolean; remedy: string }
+  | { effect: "refused"; reason: string; alternative?: (input: DeviceInput) => string | undefined }
+  | { effect: "unknown"; reason: string };
+
+function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: string): boolean {
+  if (typeof input.content !== "string" || typeof ctx.getAsyncJobSnapshot !== "function") return false;
+  const args: unknown = JSON.parse(input.content);
+  if (!object(args) || typeof args.action !== "string" || !Object.hasOwn(lspEffects, args.action)) return false;
+  const effect = lspEffects[args.action];
+  const root = realpathSync(worktree);
+  if (realpathSync(ctx.cwd) !== root || effect === "unbounded") return false;
+  if (effect === "session-read") return true;
+  if (args.action === "symbols" && args.file === "*") return true;
+  if (effect === "preview" && (args.action === "rename" ? args.apply !== false : args.apply !== undefined && args.apply !== false)) return false;
+  // omp replaces these Unicode spaces before resolving the file. Diagnostics
+  // also accepts globs; only an existing regular file proves a single target.
+  if (typeof args.file !== "string" || !plainPath(args.file)
+    || /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/.test(args.file)) return false;
+  const file = realpathSync(resolve(worktree, args.file));
+  return statSync(file).isFile() && insideRepo(file, root);
+}
+
+function githubReadAlternative(input: DeviceInput): string | undefined {
+  const args: unknown = typeof input.content === "string" ? JSON.parse(input.content) : undefined;
+  if (object(args) && (args.op === "repo_view" || args.op === "file_read")) return "For this read, use gh-axi through the shell instead.";
+}
+
+function ownJob(input: DeviceInput, ctx: GuardRuntimeContext): boolean {
+  const job = typeof input.path === "string" ? /^proc:\/\/([A-Za-z0-9][A-Za-z0-9._-]*)\/kill$/.exec(input.path) : null;
+  if (!job || typeof ctx.getAsyncJobSnapshot !== "function") return false;
+  const snapshot: unknown = ctx.getAsyncJobSnapshot();
+  return object(snapshot) && Array.isArray(snapshot.running)
+    && snapshot.running.some((entry: unknown) => object(entry) && entry.id === job[1]);
+}
+
+// Effects established against native omp 18.12.6 (docs/configuration.md "Jev guard").
+// Device arguments are not file contents. Auto QA flushes its whole pending
+// queue off the machine, and xd://github results return as unscreened write results.
+const deviceEffects: Readonly<Record<string, DeviceRule>> = {
+  "xd://lsp": { effect: "local", prove: scopedLsp,
+    remedy: "Use a file-scoped read, a rename preview (apply: false), code-action listing (apply absent or false), or reload with a plain existing file inside this task worktree, or a workspace symbols search (file \"*\"), with the session cwd equal to that worktree. For other workspace scope, edits, commands or raw requests, report the intended action to Firstmate for effect/target review." },
+  "proc://<job>/kill": { effect: "local", prove: ownJob,
+    remedy: "Read proc:// to identify a running job owned by this session, then use its exact proc://<job>/kill path. Ask Firstmate to handle other tasks or shared services." },
+  "xd://report_issue": { effect: "refused", reason: "Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead" },
+  "xd://github": { effect: "refused", reason: "its results return as write-tool output, which this guard never screens for injected instructions", alternative: githubReadAlternative },
+  "xd://propose": { effect: "unknown", reason: "the plan handler's downstream effects are not available to this guard" },
+  "xd://resolve": { effect: "unknown", reason: "the pending apply callback's targets and downstream effects are not available to this guard" },
+  "xd://reject": { effect: "unknown", reason: "the pending discard callback's targets and downstream effects are not available to this guard" },
+  "xd://inspect_image": { effect: "unknown", reason: "this device is not mounted by the measured native omp installation" },
+};
+
+function deviceRule(path: string): DeviceRule | undefined {
+  if (Object.hasOwn(deviceEffects, path)) return deviceEffects[path];
+  if (/^proc:\/\/[A-Za-z0-9][A-Za-z0-9._-]*\/kill$/.test(path)) return deviceEffects["proc://<job>/kill"];
+  if (/^(?:xd|proc):/i.test(path)) return { effect: "unknown", reason: "no measured effect is registered for this exact device" };
 }
 
 function real(path: string): string[] {
@@ -360,14 +399,14 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     }
   }
 
-  function finishCall(terminal: GuardTerminal, reason?: string): GuardCallPatch | undefined {
+  function finishCall(terminal: GuardTerminal, reason?: string, alternative?: string): GuardCallPatch | undefined {
     const final = record(terminal);
     if (final.decision !== "block" && final.decision !== "review") return;
     const why = final.audit_error_type
       ? `Review required: AuditUnavailableError; judgment error_type=${final.error_type ?? "null"}.`
-      : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : reason;
+      : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : alternative ? `${reason} ${alternative}` : reason;
     const path = final.refused_path === undefined ? "" : ` Refused path: ${JSON.stringify(final.refused_path)}.`;
-    const next = "Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.";
+    const next = `${alternative && !final.audit_error_type ? "Apart from the alternative this refusal names, do" : "Do"} not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.`;
     const guidance = final.error_type === "RequestTooLargeError" && !final.audit_error_type
       ? SIZE_REFUSAL_NOTICE : terminal.decision === "review" ? OUTAGE_NOTICE : next;
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };
@@ -407,8 +446,22 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
             "jev-guard needs omp replace edit mode. Report this configuration problem rather than working around it.");
         }
-        if (tool === "write" && admittedDevice(input, ctx, c.worktree)) return finishCall({ ...terminal, branch: "device" });
         const path = typeof input.path === "string" ? input.path : "";
+        const device = deviceRule(path);
+        if (device) {
+          terminal.branch = "device";
+          const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
+          if (tool !== "write" || service.host !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
+          if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
+          if (device.effect === "refused") {
+            let alternative: string | undefined;
+            try { alternative = device.alternative?.(input); } catch { /* Unparsed arguments name no alternative. */ }
+            return deny(`${device.reason}.`, alternative);
+          }
+          let admitted = false;
+          try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
+          return admitted ? finishCall(terminal) : deny(device.remedy);
+        }
         if (!plainPath(path)) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
             "jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block.");
