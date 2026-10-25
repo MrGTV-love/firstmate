@@ -1,0 +1,28 @@
+$ bash tests/fm-pr-merge-checks.test.sh test_github_review_required_refuses
+ok - fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED
+exit=0
+
+$ bash tests/fm-pr-merge.test.sh test_captain_fail_triggered_pass_refuses
+ok - a loosens-deny-allow-list PASS cannot revive a voided captain-word; new words can authorize it
+ok - a widens-guard PASS cannot revive a voided captain-word; new words can authorize it
+ok - a customer-data-billing-spend PASS cannot revive a voided captain-word; new words can authorize it
+exit=0
+
+$ bash tests/fm-pr-merge-checks.test.sh test_captain_fail_triggered_pass_refuses
+Unknown test case: test_captain_fail_triggered_pass_refuses
+Usage: bash fm-pr-merge-checks.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-pr-merge-forges.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash fm-pr-merge-forges.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-pr-merge-checks.test.sh test_github_review_required_refuses test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash fm-pr-merge-checks.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-pr-merge-helpers.sh
+exit=0
+

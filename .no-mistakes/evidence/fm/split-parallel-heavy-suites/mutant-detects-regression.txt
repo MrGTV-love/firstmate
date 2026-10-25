@@ -1,0 +1,14 @@
+# Mutant copy of HEAD at a temp dir: bin/fm-pr-merge.sh replaced with 'exit 0'.
+$ bash <mutant-copy>/tests/fm-pr-merge.test.sh test_malformed_url_refuses_before_merge
+not ok - malformed-url: fm-pr-merge should refuse a malformed merge request URL: expected exit 2, got 0
+exit=1
+
+$ bash <mutant-copy>/tests/fm-pr-merge-forges.test.sh test_explicit_merge_method_not_overridden
+not ok - expected gh merge line: pr merge 22 --repo example/repo --match-head-commit 5555555555555555555555555555555555555555 --merge
+got: 
+exit=1
+
+$ bash <mutant-copy>/tests/fm-pr-merge-checks.test.sh test_github_review_required_refuses
+not ok - github-review-required: a PR awaiting review must refuse: expected exit 1, got 0
+exit=1
+
