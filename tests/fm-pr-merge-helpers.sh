@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Tests for bin/fm-pr-merge.sh: the one path firstmate uses to merge a task's
-# PR, which must record pr= and any available pr_head= into the task's meta so
-# fm-teardown.sh's landed-check has a PR reference to verify against, even on
-# repos with no PR CI where the usual "checks green" fm-pr-check.sh trigger
-# never fires.
+# Shared fixture and runner module for the three bin/fm-pr-merge.sh test
+# groups: tests/fm-pr-merge.test.sh, tests/fm-pr-merge-forges.test.sh, and
+# tests/fm-pr-merge-checks.test.sh. bin/fm-pr-merge.sh is the one path
+# firstmate uses to merge a task's PR, which must record pr= and any available
+# pr_head= into the task's meta so fm-teardown.sh's landed-check has a PR
+# reference to verify against, even on repos with no PR CI where the usual
+# "checks green" fm-pr-check.sh trigger never fires.
 #
-# The test_* functions below name the covered merge, refusal, live-head,
-# away-authority, outcome-publication, and recovery behavior directly.
+# This file defines no test cases. It holds the sandbox, forge-mock, and
+# assertion helpers the groups share, and pr_merge_run, which runs a group's
+# registered cases.
 set -u
 
 # shellcheck source=tests/lib.sh

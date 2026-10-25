@@ -1019,8 +1019,8 @@ tests/fm-pi-watch-loader-live.test.sh 1032
 tests/fm-pi-windows-shell-invocation.test.sh 5121
 tests/fm-pipeline-spend.test.sh 2576
 tests/fm-pr-check-security.test.sh 452157
-tests/fm-pr-merge-checks.test.sh 130000
-tests/fm-pr-merge-forges.test.sh 130000
+tests/fm-pr-merge-checks.test.sh 191000
+tests/fm-pr-merge-forges.test.sh 153000
 tests/fm-pr-reviewers.test.sh 742
 tests/fm-pr-state-live-e2e.test.sh 926
 tests/fm-pr-state.test.sh 1682
