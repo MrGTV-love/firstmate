@@ -1,0 +1,11 @@
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.5
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/2/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/2/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-lab-t5-a/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=lab-t5-a
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-lab-t5-a+cbcd64f1e209b75def6c86fef901cc4edfacb09a78422c5f0cba68e6fdf55804/launch.s1792899547.56366.32211.sh'
+stand-in omp for lab-t5-a: plan done; idling

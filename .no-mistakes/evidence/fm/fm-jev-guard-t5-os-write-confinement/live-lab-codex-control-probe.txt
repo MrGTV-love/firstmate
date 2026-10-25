@@ -1,0 +1,26 @@
+harness=codex self=lab-t5-d victim=lab-t5-b
+worktree=/private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/4/demo
+FM_WRITE_CONFINEMENT=unconfined-macos-codex TMPDIR=/Users/charlesabrooker/tmp
+sandboxed-ancestor=ps-works
+--- (a) B3 glob delete of another task's temp fixture
+a.claude-temp-root base.fmlab-dd5a7eb7/payload: deleted
+a.task-temp /tmp/fm-lab-t5-b/base.fixture/payload: deleted
+--- (b) B15 age sweep of ~/tmp
+b.foreign ~/tmp/fm-teardown.lab-t5-b/old: deleted
+b.own ~/tmp/fm-teardown.lab-t5-d/old: deleted
+--- (c) H3 eval Path(...).unlink()
+c.foreign /private/tmp/fm-lab.gTPwcx/data/lab-t5-b/eval-target: rc=0 deleted 
+c.foreign /private/tmp/fm-lab.gTPwcx/projects/demo/README.md: rc=0 deleted 
+c.foreign /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo/README.md: rc=0 deleted 
+c.own /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/4/demo/own-eval-target: rc=0 deleted
+--- (d) write and commit in the declared nested worktree root
+d.worktree-is-nested-under-primary=yes
+d.own-commit rc=0 head=lab own commit
+--- (e) status append vs whole-file rewrite
+e.own-append rc=0 content=working|
+e.foreign-rewrite content=hijacked
+e.own-main-meta-rewrite first-line=hijacked
+--- extra: foreign worktree append and primary checkout append
+x.foreign-worktree-append rc=0
+x.primary-append rc=0
+done

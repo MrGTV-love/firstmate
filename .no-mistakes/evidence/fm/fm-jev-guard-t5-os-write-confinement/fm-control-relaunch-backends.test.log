@@ -1,0 +1,87 @@
+ok - bounded ticks inspect one recorded unmanaged launch, rotate past drafts, and wrap without mutation
+ok - bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes
+ok - bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch
+ok - fm-control removes the dialog file after exit and after relaunch
+ok - fm-control exit removes the dialog file before it releases the control lock
+ok - OMP replacement retires generated policy without removing user configuration
+ok - OMP replacement by an unconfined harness retires its own profile and generated files only
+ok - relaunch without a usable recorded rule treats an ambiguous match as no fallback
+ok - supervised OMP quota recovery uses the declared stand-in or preserves the strongest route and work
+ok - supervised OMP recovery enforces the typed route class and effort on stand-ins
+ok - fm-control relaunch: a secondmate's child work is accounted for and its charter is left alone
+ok - default-model secondmate replacements keep warning-only routing inheritance
+ok - fm-control relaunch: a secondmate home that is not this secondmate's is refused
+ok - fm-control relaunch: unreadable child records fail checkpoint
+ok - fm-control relaunch: unlistable state fails checkpoint
+ok - fm-control relaunch: a vanished watcher scratch file does not fail the child-record checkpoint
+ok - fm-control relaunch: two control actions on one task serialize instead of interleaving
+ok - fm-spawn relaunch: direct entry participates in lifecycle serialization
+ok - fm-promote: promotion participates in lifecycle serialization
+ok - relaunch re-reads the backlog item instead of blindly re-running the transition
+ok - relaunch heals an item that drifted out of In flight while the task stayed live
+ok - config/claude-launcher=teamclaude: tmux fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude
+ok - config/claude-launcher=teamclaude: herdr fm-spawn --relaunch, fm-control relaunch, and session-end auto-relaunch reach claude through TeamClaude
+ok - fm-spawn: substantive ship/scout asks complete launch with isolated fake runtime state
+ok - fm-spawn: fresh secondmate charters bypass the concrete-ask minimum
+ok - config/claude-launcher=teamclaude: a Claude second mate respawns through TeamClaude on tmux and herdr
+ok - config/claude-launcher=teamclaude: fresh herdr ship and second mate launches reach claude through TeamClaude
+ok - fm-control relaunch: a stopped TeamClaude proxy or malformed launcher file refuses before the old agent stops
+ok - direct and sweep inspection skip readable unpinned foreground without lifecycle input or task mutation
+ok - direct and sweep recovery refuse missing or mismatched non-omp pins for ships, scouts and secondmates without mutation
+ok - reboot inspection preserves secondmate profile, pane, charter and child work
+ok - network bootstrap inspects its derived home without mutating unmanaged native launches
+ok - direct and sweep inspection preserve unmanaged busy Bash/Python drafts without lifecycle input
+ok - env-v1/direct/different-cwd inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/different-resume inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/in-process-personal inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/pinned-personal inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/header-only inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/historical-startup inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/managed inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/managed-claude inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/unknown-harness inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/mismatched inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/unreadable inspection preserves recorded and unrecorded personal panes
+ok - env-v1/direct/missing-registration inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/different-cwd inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/different-resume inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/in-process-personal inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/pinned-personal inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/header-only inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/historical-startup inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/managed inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/managed-claude inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/unknown-harness inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/mismatched inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/unreadable inspection preserves recorded and unrecorded personal panes
+ok - env-v1/sweep/missing-registration inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/different-cwd inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/different-resume inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/in-process-personal inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/pinned-personal inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/header-only inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/historical-startup inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/managed inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/managed-claude inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/unknown-harness inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/mismatched inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/unreadable inspection preserves recorded and unrecorded personal panes
+ok - legacy/direct/missing-registration inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/different-cwd inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/different-resume inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/in-process-personal inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/pinned-personal inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/header-only inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/historical-startup inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/managed inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/managed-claude inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/unknown-harness inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/mismatched inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/unreadable inspection preserves recorded and unrecorded personal panes
+ok - legacy/sweep/missing-registration inspection preserves recorded and unrecorded personal panes
+ok - all lifecycle verbs refuse native startup and pinned personal session switches without input or task mutation
+ok - legacy Herdr records without a launch pin keep exit and relaunch
+ok - managed versioned and legacy launches retain interrupt, exit, busy-exit and same-pane relaunch
+ok - ordinary lifecycle accepts genuine unregistered shell panes with process-table proof
+ok - ordinary managed relaunch requires matching readable replacement pin for alive confirmation
+rc=0

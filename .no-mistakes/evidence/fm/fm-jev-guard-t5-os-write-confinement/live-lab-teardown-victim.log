@@ -1,0 +1,15 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.gTPwcx
+WARNING: watcher still down (same stale episode; last beat: 393s ago, grace 300s) - full banner already printed this episode.
+A new version of treehouse is available: v3.1.4 → v3.1.5
+Run "treehouse update" to update
+
+🌳 Leased worktree 1 at /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo. Run 'treehouse return /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo' to release it.
+/private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo
+teardown: reaping leaked worktree process(es) for lab-t5-b: 40116 42980 43063
+teardown: force-killing leaked worktree process(es) for lab-t5-b: 40116
+A new version of treehouse is available: v3.1.4 → v3.1.5
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown lab-t5-b complete (window primary:fm-lab-t5-b, worktree /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo)
+Backlog: lab-t5-b just finished (this home keeps no markdown backlog at /private/tmp/fm-lab.gTPwcx/data/backlog.md). Update /private/tmp/fm-lab.gTPwcx/data/backlog.md - move lab-t5-b to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.

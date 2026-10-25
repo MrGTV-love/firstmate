@@ -1,0 +1,16 @@
+### bin/fm-spawn.sh lab-t5-r1 <project> --mode local-only --yolo off --harness 'omp --profile work --auto-approve'
+error: this raw omp launch command selects its own omp profile, so its write profile cannot follow it; launch the profile through --harness omp with OMP_PROFILE set in the environment instead
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh lab-t5-r1 <project> --mode <mode> --yolo <on|off>
+rc=1 meta=absent profile=absent
+### bin/fm-spawn.sh lab-t5-r2 <project> --mode local-only --yolo off --harness 'OMP_PROFILE=work omp --auto-approve'
+error: this raw omp launch command selects its own omp profile, so its write profile cannot follow it; launch the profile through --harness omp with OMP_PROFILE set in the environment instead
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh lab-t5-r2 <project> --mode <mode> --yolo <on|off>
+rc=1 meta=absent profile=absent
+### bin/fm-spawn.sh lab-t5-r3 <project> --mode local-only --yolo off --harness 'PI_CODING_AGENT_DIR=$HOME/agent omp --auto-approve'
+error: this raw omp launch command sets PI_CODING_AGENT_DIR to a value that needs shell expansion or is not one leading assignment, so its write profile cannot follow it; pass the resolved absolute path as a leading literal PI_CODING_AGENT_DIR= assignment instead
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh lab-t5-r3 <project> --mode <mode> --yolo <on|off>
+rc=1 meta=absent profile=absent
+### bin/fm-spawn.sh lab-t5-r4 <project> --mode local-only --yolo off --harness 'PI_CONFIG_DIR=.other omp --auto-approve'
+error: this raw omp launch command selects its own omp config directory, so its write profile cannot be derived; launch with --harness omp and set PI_CONFIG_DIR in the environment instead
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh lab-t5-r4 <project> --mode <mode> --yolo <on|off>
+rc=1 meta=absent profile=absent

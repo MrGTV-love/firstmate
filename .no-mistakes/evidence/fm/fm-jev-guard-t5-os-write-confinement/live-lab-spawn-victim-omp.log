@@ -1,0 +1,8 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.gTPwcx
+warning: task lab-t5-b: /private/tmp/fm-lab.gTPwcx/data/lab-t5-b/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /private/tmp/fm-lab.gTPwcx/data/lab-t5-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-t5-b
+warning: /private/tmp/fm-lab.gTPwcx/data/lab-t5-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lab-t5-b ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for lab-t5-b: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=omp write_confinement=seatbelt-v1
+spawned lab-t5-b harness=omp kind=ship mode=local-only yolo=off window=primary:fm-lab-t5-b worktree=/private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo

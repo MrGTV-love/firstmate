@@ -1,0 +1,32 @@
+harness=claude self=lab-t5-c victim=lab-t5-b
+worktree=/private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/3/demo
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-lab-t5-c
+sandboxed-ancestor=ps-refused
+--- (a) B3 glob delete of another task's temp fixture
+a.claude-temp-root base.fmlab-dd5a7eb7/payload: survived
+a.task-temp /tmp/fm-lab-t5-b/base.fixture/payload: survived
+--- (b) B15 age sweep of ~/tmp
+b.foreign ~/tmp/fm-teardown.lab-t5-b/old: survived
+b.own ~/tmp/fm-teardown.lab-t5-c/old: deleted
+--- (c) H3 eval Path(...).unlink()
+c.foreign /private/tmp/fm-lab.gTPwcx/data/lab-t5-b/eval-target: rc=1 survived PermissionError: [Errno 1] Operation not permitted: '/private/tmp/fm-lab.gTPwcx/data/lab-t5-b/eval-target'
+c.foreign /private/tmp/fm-lab.gTPwcx/projects/demo/README.md: rc=1 survived PermissionError: [Errno 1] Operation not permitted: '/private/tmp/fm-lab.gTPwcx/projects/demo/README.md'
+c.foreign /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo/README.md: rc=1 survived PermissionError: [Errno 1] Operation not permitted: '/private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/1/demo/README.md'
+c.own /private/tmp/fm-lab.gTPwcx/projects/demo/.claude/worktrees/.treehouse/demo-3d9bc8/3/demo/own-eval-target: rc=0 deleted
+--- (d) write and commit in the declared nested worktree root
+d.worktree-is-nested-under-primary=yes
+d.own-commit rc=0 head=lab own commit
+--- (e) status append vs whole-file rewrite
+e.own-append rc=0 content=working|
+PermissionError: [Errno 1] Operation not permitted: '/private/tmp/fm-lab.gTPwcx/state/lab-t5-b.status'
+e.foreign-rewrite content=original
+PermissionError: [Errno 1] Operation not permitted: '/private/tmp/fm-lab.gTPwcx/state/lab-t5-c.meta'
+e.own-main-meta-rewrite first-line=window=primary:fm-lab-t5-c
+--- extra: foreign worktree append and primary checkout append
+x.foreign-worktree-append rc=1
+x.primary-append rc=1
+--- claude session state (session-id=ad69d694-5c2b-4f96-9c26-c98b99bcf662)
+claude.own-session-env rc=0
+claude.other-session-env rc=1
+claude.settings-json-write rc=1
+done
