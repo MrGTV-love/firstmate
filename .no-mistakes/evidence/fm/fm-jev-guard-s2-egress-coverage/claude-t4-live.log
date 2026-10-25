@@ -1,0 +1,28 @@
+== fm-spawn generated PreToolUse hooks:
+[{"matcher":"^(?!(Bash|Monitor|PowerShell)$).*","hooks":[{"type":"command","command":"'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RFFDJ06KGFGBKR6RM8WYGA/bin/fm-jev-guard-hook.sh' '<lab>/spawn/home' '<lab>/spawn/home/config' '<lab>/spawn/home/state' 't4-claude' '<lab>/spawn/wt' '<lab>/spawn/home/data/t4-claude' 'project' 'FIRSTMATE_JEV_GUARD_V1'","timeout":330}]}]
+== spawned task meta keys: window endpoint_task_id worktree project harness kind mode yolo branch tasktmp model effort jev_guard_policy skill_selection skill_selection_reason busy_gen spawn_gen 
+== claude 2.1.310 (Claude Code)
+PASS WebFetch without a task grant is refused before any request
+    central guard events: ["jev-tool-coverage","allow","t4-claude:webfetch",true] ["jev-egress-grant","deny","t4-claude:web",true] 
+    tool result seen by model: PreToolUse:WebFetch hook error: [jev-guard] Missing task egress grant: request Firstmate authorization for egress=["web"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized corr
+PASS WebFetch with egress=["web"] passes the guard (then fails on the dead proxy)
+    central guard events: ["jev-tool-coverage","allow","t4-claude:webfetch",true] ["jev-egress-grant","allow","t4-claude:web",true] 
+    tool result seen by model: Unable to verify if domain example.invalid is safe to fetch. This may be due to network restrictions or enterprise security policies blocking claude.ai.  <system-reminder> <total_tokens>14999998 tokens left</total_tokens> </system-reminder> 
+PASS WebFetch with only egress=["semantic-search"] is still refused
+    central guard events: ["jev-tool-coverage","allow","t4-claude:webfetch",true] ["jev-egress-grant","deny","t4-claude:web",true] 
+    tool result seen by model: PreToolUse:WebFetch hook error: [jev-guard] Missing task egress grant: request Firstmate authorization for egress=["web"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized corr
+PASS Unlisted MCP tool is refused by coverage even with every grant
+    central guard events: ["jev-tool-coverage","deny","t4-claude:mcp__probe__probe",true] 
+    tool result seen by model: PreToolUse:mcp__probe__probe hook error: [jev-guard] Unclassified host tool "mcp__probe__probe": Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action throu
+PASS Bash runs with no guard process and no grant
+    central guard events: <none: no guard process ran>
+    tool result seen by model: live-shell-canary-ok  <system-reminder> <total_tokens>14999998 tokens left</total_tokens> </system-reminder> 
+PASS Read (local paths) reaches coverage and is allowed
+    central guard events: ["jev-tool-coverage","allow","t4-claude:read",true] 
+    tool result seen by model: 1	# project 2  <system-reminder> <total_tokens>14999998 tokens left</total_tokens> </system-reminder> 
+== Monitor input schema: ["description","timeout_ms"]
+PASS Monitor runs with no guard process and no grant
+    central guard events: <none: no guard process ran>
+    tool result seen by model: Monitor started (task bm1zw2lsp, expires in 30s unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do not poll or sleep. Events may arrive while you are waiting for the user — an event is not their reply.  <system-reminder> <total_tokens>14999998 tokens left</to
+== tools Claude offered the model: Agent Bash CronCreate CronDelete CronList Edit EnterWorktree ExitWorktree ListAgents Monitor NotebookEdit Read ReportFindings ScheduleWakeup SendMessage Skill TaskCreate TaskGet TaskList TaskStop TaskUpdate WebFetch WebSearch Workflow Write mcp__probe__probe 
+RESULT failures=0

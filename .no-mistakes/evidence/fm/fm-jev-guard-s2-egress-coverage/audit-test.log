@@ -1,48 +1,50 @@
-✔ result: a fully answered estimated piece keeps its amount and source (1.713625ms)
-✔ result: a fully answered reported piece keeps its amount and source (0.245458ms)
-✔ result: an answered piece with an unsent planned piece stays incomplete (0.264917ms)
-✔ result: every failed chunk survives settlement (0.503625ms)
-✔ result: partial cost is incomplete and unsent chunks are not egress (0.573834ms)
-✔ result: a planned payload with no request sent is not-called and not incomplete (0.20575ms)
-✔ result: complete runs retain full reported cost without failures (0.230708ms)
-✔ write: every failed chunk survives settlement (32.645667ms)
-✔ write: partial cost is incomplete and unsent chunks are not egress (108.899166ms)
-✔ write: a planned payload with no request sent is not-called and not incomplete (30.906666ms)
-✔ write: complete runs retain full reported cost without failures (32.497959ms)
-✔ result: a blank middle piece is not planned screening work (50.429125ms)
-✔ result: an unsent failed piece stays planned beside a blank piece (24.695875ms)
-✔ result: an all-blank result plans no screening and sends nothing (0.222958ms)
-✔ call: invalid tool input fails before planning and invents no piece (35.452292ms)
-✔ result: an oversize result no plan can cover fails before planning and invents no piece (124.357625ms)
-✔ result: a never-send refusal while planning invents no piece (39.278334ms)
-✔ result: an unsupported tool result fails before planning and invents no piece (0.796166ms)
-✔ real decide: a guard-retried success keeps the client result and a complete reported cost (543.365833ms)
-✔ policy verdict precedence never discards failed spend (0.23575ms)
-✔ T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body (189.750625ms)
-✔ T4(c): eval explicitly records T5 as the write-boundary owner, not an egress permission (30.294209ms)
-✔ T4(b): paid find requires a task grant and records exactly one content-free decision (171.949458ms)
-✔ T4(d): an installed tool absent from the policy table is rejected, not silently ignored (67.233958ms)
-✔ T4(d): an added Claude host tool fails coverage at the adapter boundary (362.536334ms)
-✔ an unclassified tool elsewhere in the host registry does not refuse a classified call (31.615041ms)
-✔ Claude native WebSearch retains its outbound character at the CLI boundary (357.765208ms)
-✔ coverage and egress refusals hold in an inactive project scope (526.629458ms)
-✔ tools that move no data or run no worker code are local; unscreened writers name T5 (464.2025ms)
-✔ S2 egress classes are permissions, never a bypass of existing write checks (487.412292ms)
-✔ M4: each coverage and egress decision emits one content-free central guard event (373.307416ms)
-✔ M4: an unrelated allow never clears a later deny in the real metrics reader (249.214708ms)
-✔ worker brief shell commands are never refused for a missing egress grant (430.497667ms)
-✔ S2(d): local read and bash stay unjudged, write/edit keep credential screening (115.234708ms)
-ℹ tests 34
+✔ result: a fully answered estimated piece keeps its amount and source (2.156292ms)
+✔ result: a fully answered reported piece keeps its amount and source (0.303708ms)
+✔ result: an answered piece with an unsent planned piece stays incomplete (0.317166ms)
+✔ result: every failed chunk survives settlement (0.723209ms)
+✔ result: partial cost is incomplete and unsent chunks are not egress (1.446917ms)
+✔ result: a planned payload with no request sent is not-called and not incomplete (0.611ms)
+✔ result: complete runs retain full reported cost without failures (0.5215ms)
+✔ write: every failed chunk survives settlement (37.757333ms)
+✔ write: partial cost is incomplete and unsent chunks are not egress (113.096166ms)
+✔ write: a planned payload with no request sent is not-called and not incomplete (36.495459ms)
+✔ write: complete runs retain full reported cost without failures (38.653458ms)
+✔ result: a blank middle piece is not planned screening work (63.407584ms)
+✔ result: an unsent failed piece stays planned beside a blank piece (31.352792ms)
+✔ result: an all-blank result plans no screening and sends nothing (0.377042ms)
+✔ call: invalid tool input fails before planning and invents no piece (37.04025ms)
+✔ result: an oversize result no plan can cover fails before planning and invents no piece (144.552583ms)
+✔ result: a never-send refusal while planning invents no piece (46.985333ms)
+✔ result: an unsupported tool result fails before planning and invents no piece (0.892958ms)
+✔ real decide: a guard-retried success keeps the client result and a complete reported cost (550.455708ms)
+✔ policy verdict precedence never discards failed spend (0.396167ms)
+✔ T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body (207.491875ms)
+✔ T4(c): eval explicitly records T5 as the write-boundary owner, not an egress permission (35.557625ms)
+✔ T4(b): paid find requires a task grant and records exactly one content-free decision (138.696625ms)
+✔ T4(d): an installed tool absent from the policy table is rejected, not silently ignored (36.467292ms)
+✔ T4(d): an added Claude host tool fails coverage at the adapter boundary (380.635208ms)
+✔ an unclassified tool elsewhere in the host registry does not refuse a classified call (35.06175ms)
+✔ Claude native WebSearch retains its outbound character at the CLI boundary (377.960584ms)
+✔ coverage and egress refusals hold in an inactive project scope (507.411917ms)
+✔ tools that move no data or run no worker code are local; unscreened writers name T5 (506.008166ms)
+✔ S2 egress classes are permissions, never a bypass of existing write checks (563.915209ms)
+✔ M4: each coverage and egress decision emits one content-free central guard event (477.318583ms)
+✔ M4: an unrelated allow never clears a later deny in the real metrics reader (290.000125ms)
+✔ Claude Monitor and PowerShell share Bash shell-command treatment without a grant (335.810958ms)
+✔ a removed execution class cannot authorize an otherwise valid web grant (69.223667ms)
+✔ worker brief shell commands are never refused for a missing egress grant (485.08775ms)
+✔ S2(d): local read and bash stay unjudged, write/edit keep credential screening (136.02125ms)
+ℹ tests 36
 ℹ suites 0
-ℹ pass 34
+ℹ pass 36
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 4891.028208
+ℹ duration_ms 5697.237541
 ok - offline guard settlement, cost completeness and S2 egress acceptance
 installed omp: 19 tools classified; injected unknown tool rejected; no model turn
 ok - installed omp registry coverage (no model turn submitted)
 installed Claude 2.1.310: 24 tools classified; injected unknown tool rejected; no model turn
 ok - installed Claude registry coverage (no model turn submitted)
-bash tests/fm-jev-guard-audit.test.sh  4.22s user 7.08s system 98% cpu 11.491 total
+exit=0

@@ -20,4 +20,4 @@ ok - omp (omp/18.12.6): omp: audit/copy: native read and next model context cons
 ok - omp (omp/18.12.6): omp: audit/changed: native read and next model context consumed
 ok - omp (omp/18.12.6): worker overlay refuses ungranted URL read and grep paths and keeps ordinary file reads
 ok - omp (omp/18.12.6): pre-tool write judgment answered after 31 seconds decides the call under the worker overlay
-rc=0
+exit=0

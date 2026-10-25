@@ -1,0 +1,3 @@
+INFO guard-watcher-down-warning: exemptions=1
+LINT_SUMMARY mode=enforce guards=31 violations=0 allowlisted=0 stale=0 shown=0
+exit=0
