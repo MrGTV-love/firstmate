@@ -142,8 +142,7 @@ const githubReadOps: Readonly<Record<string, true>> = {
 };
 
 /** A github call naming any op but a read op is refused under every grant; returns that op, JSON-encoded. */
-export function refusedGithubOp(tool: string, input: unknown): string | undefined {
-  if (tool !== "github") return undefined;
+export function refusedGithubOp(input: unknown): string | undefined {
   const op = input !== null && typeof input === "object" ? (input as { op?: unknown }).op : undefined;
   return typeof op === "string" && Object.hasOwn(githubReadOps, op) ? undefined : JSON.stringify(op ?? null);
 }

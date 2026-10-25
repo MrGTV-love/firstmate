@@ -255,16 +255,17 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       const egressStarted = performance.now();
       const memory = policy.call === "memory" ? memoryEgress(tool, c.ompSetting) : undefined;
       const destination = memory ? "provider" : egressClass(tool);
-      const githubOp = refusedGithubOp(tool, event.input);
-      if (destination && githubOp) {
-        terminal.destination_class = destination;
-        await guardEvent("jev-egress-grant", "github-write", "deny", egressStarted, remainingMs);
-        return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
-          `GitHub op ${githubOp} refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made.`,
-          "Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read.");
+      if (destination) terminal.destination_class = destination;
+      if (tool === "github") {
+        const githubOp = refusedGithubOp(event.input);
+        await guardEvent("jev-github-write-op", tool, githubOp ? "deny" : "allow", egressStarted, remainingMs);
+        if (githubOp) {
+          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
+            `GitHub op ${githubOp} refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made.`,
+            "Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read.");
+        }
       }
       if (destination) {
-        terminal.destination_class = destination;
         const { granted, sourceOk } = egressGranted(c.state, c.task, destination);
         await guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
         if (!granted) {

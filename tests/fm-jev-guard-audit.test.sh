@@ -460,6 +460,10 @@ await test('M4: each coverage and egress decision emits one content-free central
     await decide(find,
       [['jev-tool-coverage', 'allow', 'audit:find', true], ['jev-egress-grant', 'allow', 'audit:semantic-search', true]]);
   } finally { rmSync(`${state}/audit.meta`); }
+  await decide({ toolName: 'github', input: { op: 'pr_push', body: 'private-event-canary' } },
+    [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'deny', 'audit:github', true]]);
+  await decide({ toolName: 'github', input: { op: 'repo_view', repo: 'private-event-canary' } },
+    [['jev-tool-coverage', 'allow', 'audit:github', true], ['jev-github-write-op', 'allow', 'audit:github', true], ['jev-egress-grant', 'deny', 'audit:remote-storage', false]]);
 });
 await test('M4: an unrelated allow never clears a later deny in the real metrics reader', async () => {
   const log = `${state}/metrics-events.jsonl`;
