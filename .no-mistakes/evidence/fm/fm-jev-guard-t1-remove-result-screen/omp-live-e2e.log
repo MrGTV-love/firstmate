@@ -1,22 +1,22 @@
-ok - omp (omp/18.12.4): omp: normal/launch: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: normal/inbox: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: normal/copy: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: normal/changed: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: privacy/launch: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: privacy/inbox: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: privacy/copy: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: privacy/changed: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: credentials/launch: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: credentials/inbox: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: credentials/copy: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: credentials/changed: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: provider/launch: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: provider/inbox: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: provider/copy: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: provider/changed: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: audit/launch: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: audit/inbox: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: audit/copy: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): omp: audit/changed: unchanged native read in next model context; no result request or audit row
-ok - omp (omp/18.12.4): pre-tool shell judgment answered after 31 seconds decides the call under the worker overlay
+ok - omp (omp/18.12.6): omp: normal/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: normal/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: normal/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: normal/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): pre-tool write judgment answered after 31 seconds decides the call under the worker overlay
 exit=0

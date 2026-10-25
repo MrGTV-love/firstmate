@@ -1,0 +1,34 @@
+## tests/fm-retired-jev-channel-consistency.test.sh
+ok - T1(c): launch and steering publisher records reach the worker verbatim, with no receipt, audit row or model call
+exit=
+## tests/fm-retired-jev-omp-result-screen.test.sh
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3.509125
+ok - T1(a, d): flagged omp output reaches the worker unchanged; the session audits only pre-tool work, with no omp_replace row and no result provider call
+exit=
+## tests/fm-retired-jev-posttool-advisory.test.sh
+ok - retired PostToolUse shell/read results and UserPromptSubmit capture emit nothing, exit 0 and start no guard service
+ok - a PreToolUse write failing its credential threshold still reaches the judge and denies at exit 0
+exit=
+## tests/fm-retired-jev-producer-field-exclusion.test.sh
+ok - T1(b): the recorded bounded wait keeps help[3] and its error state, with no audit row or model call
+exit=
+## tests/fm-retired-jev-result-size-refusal.test.sh
+ok - results beyond one request and beyond the whole screening budget reach the worker unchanged
+exit=
+## tests/fm-retired-jev-shell-model-gate.test.sh
+ok - shell commands the gate refused pass on omp and an old-matcher Claude worker without a judge request or audit row
+ok - a write the same judge refuses still reaches it and denies
+exit=
+## tests/fm-retired-jev-shell-outage-admissions.test.sh
+ok - shell commands both outage admissions refused pass on omp and an old-matcher Claude worker without an audit row
+ok - a write in a lab home whose judgment cannot run still denies
+exit=
+## tests/fm-retired-jev-shell-outage-deny.test.sh
+ok - shell calls pass on omp and an old-matcher Claude worker when their judgment could not have run
+ok - a write whose judgment cannot run still denies for review
+exit=
+## tests/fm-retired-jev-trusted-read.test.sh
+ok - task-owned data and state reads reach the worker unchanged with no audit row or model call
+exit=
