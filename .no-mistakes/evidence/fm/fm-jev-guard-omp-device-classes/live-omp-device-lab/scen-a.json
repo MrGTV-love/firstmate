@@ -1,0 +1,199 @@
+{
+ "calls": [
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"diagnostics\", \"file\": \"source.fmprobe\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"hover\", \"file\": \"source.fmprobe\", \"line\": 1, \"symbol\": \"value\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"symbols\", \"file\": \"source.fmprobe\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"symbols\", \"file\": \"*\", \"query\": \"value\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"references\", \"file\": \"source.fmprobe\", \"line\": 1, \"symbol\": \"value\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"status\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"code_actions\", \"file\": \"source.fmprobe\", \"line\": 1}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"code_actions\", \"file\": \"source.fmprobe\", \"line\": 1, \"apply\": \"true\", \"query\": \"0\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"code_actions\", \"file\": \"source.fmprobe\", \"line\": 1, \"apply\": true, \"query\": \"0\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"diagnostics\", \"file\": \"/etc/hosts\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"diagnostics\", \"file\": \"escape.fmprobe\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"diagnostics\", \"file\": \"*\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"symbols\", \"query\": \"value\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"request\", \"method\": \"workspace/executeCommand\", \"file\": \"source.fmprobe\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://lsp",
+    "content": "{\"action\": \"rename\", \"file\": \"source.fmprobe\", \"line\": 1, \"symbol\": \"value\", \"new_name\": \"x\", \"apply\": true}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://report_issue",
+    "content": "write: tool misbehaved LAB_REPORT_CANARY"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://github",
+    "content": "{\"op\": \"repo_view\", \"repo\": \"fixture/repo\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://github",
+    "content": "{\"op\": \"pr_push\", \"repo\": \"fixture/repo\", \"branch\": \"main\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://future_device",
+    "content": "{}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "xd://propose",
+    "content": "{}"
+   }
+  },
+  {
+   "tool": "edit",
+   "args": {
+    "path": "xd://lsp",
+    "old_string": "a",
+    "new_string": "{\"action\": \"hover\", \"file\": \"source.fmprobe\"}"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "~/a",
+    "content": "fixture"
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "proc://bg_not_mine/kill",
+    "content": ""
+   }
+  },
+  {
+   "tool": "write",
+   "args": {
+    "path": "new-note.txt",
+    "content": "ordinary content"
+   }
+  }
+ ],
+ "names": [
+  "diagnostics-file",
+  "hover",
+  "symbols-file",
+  "symbols-workspace-star",
+  "references",
+  "status",
+  "code_actions-listing",
+  "code_actions-apply-string-true",
+  "code_actions-apply-true",
+  "diagnostics-outside",
+  "diagnostics-symlink-escape",
+  "diagnostics-star",
+  "symbols-no-file",
+  "raw-request",
+  "rename-apply",
+  "report_issue",
+  "github-repo_view",
+  "github-pr_push",
+  "future-device",
+  "propose",
+  "lsp-via-edit",
+  "plain-tilde",
+  "proc-other-kill",
+  "ordinary-file-write"
+ ]
+}

@@ -1,0 +1,1 @@
+{"calls":[{"tool":"write","args":{"path":"xd://lsp","content":"{\"action\":\"diagnostics\",\"file\":\"source.fmprobe\"}"}}]}

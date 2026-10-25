@@ -1,0 +1,1 @@
+{"path": "/autoqa", "body": {"agent": {"name": "omp", "version": "18.12.6"}, "installId": "979fb9ec-2d9a-4abc-a698-684346a3a7df", "platform": "darwin", "arch": "arm64", "entries": [{"id": 1, "model": "lab/gpt-6.1-sol", "version": "18.12.6", "tool": "write", "report": "tool misbehaved LAB_REPORT_CANARY"}]}}

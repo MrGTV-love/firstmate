@@ -1,0 +1,4 @@
+ok - pure write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+exit=0
