@@ -592,7 +592,7 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
   for (const input of [
     ...['references', 'definition', 'implementation', 'type_definition', 'hover', 'symbols', 'diagnostics', 'capabilities', 'reload', 'code_actions'].map(action => lsp({ action, file: 'source.ts', line: 1, symbol: 'value' })),
     lsp({ action: 'status' }), lsp({ action: 'rename', file: 'source.ts', apply: false, new_name: 'renamed' }),
-    lsp({ action: 'symbols', file: '*', query: 'value' }), lsp({ action: 'symbols', query: 'value' }),
+    lsp({ action: 'symbols', file: '*', query: 'value' }), lsp({ action: 'code_actions', file: 'source.ts', line: 1, apply: false }),
     ...['plain space.ts', 'unicode-λ.ts'].map(file => lsp({ action: 'references', file })), { path: 'proc://bg_1/kill' },
   ]) {
     const before = requests();
@@ -602,6 +602,8 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
   for (const action of ['request', 'rename', 'rename_file', 'code_actions', 'format', 'unknown', 'References', '__proto__', 'constructor', 'toString', '']) await deny(lsp({ action, file: 'source.ts', apply: true }));
   for (const file of [...rewritten, ...rewritten.map(file => `${process.env.WT}/${file}`), '/etc/hosts', `${process.env.TASK_DATA}/outside.ts`, 'escape.ts', '../outside.ts', 'missing.ts', '.', process.env.WT, '/', 'file:///etc/hosts', '~/.env', '@source.ts', ':./source.ts', '[source.ts]', 'src/**/*.ts', '*', '']) await deny(lsp({ action: 'references', file }));
   for (const file of ['src/*.ts', '**', ' *', `*${String.fromCodePoint(0x00a0)}`]) await deny(lsp({ action: 'symbols', file, query: 'value' }));
+  await deny(lsp({ action: 'symbols', query: 'value' }));
+  for (const apply of ['true', 'yes', 'on', '1', ' TRUE ', 1, 'false', 0, null, {}]) await deny(lsp({ action: 'code_actions', file: 'source.ts', line: 1, apply, query: '0' }));
   for (const content of ['', 'not json', 'null', '[]', '1', '{"action":"references","file":1}']) await deny({ path: 'xd://lsp', content });
   await deny(lsp({ action: 'references', file: 'source.ts' }), { ...ctx, cwd: process.env.TASK_DATA });
   await deny(lsp({ action: 'symbols', file: '*', query: 'value' }), { ...ctx, cwd: process.env.TASK_DATA });
@@ -667,9 +669,16 @@ for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
     assert.equal(refused?.block, true);
     assert.ok(refused.reason.includes(path));
     assert.match(refused.reason, reason);
+    assert.match(refused.reason, /Apart from the next step this refusal names, do not retry an equivalent action/);
     assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
     assert.equal(sent().length, before, 'refused devices stop before any screening request');
   }
+}
+for (const path of ['~/a', '/etc/hosts']) {
+  const refused = await call(active, path, 'fixture');
+  assert.equal(refused?.block, true);
+  assert.match(refused.reason, /Do not retry an equivalent action through another command, tool, path or encoding/);
+  assert.doesNotMatch(refused.reason, /Apart from the next step/);
 }
 for (const handler of [install({ host: 'claude' }), active]) {
   const before = sent().length;

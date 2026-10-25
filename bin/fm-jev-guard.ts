@@ -152,8 +152,8 @@ function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: strin
   const root = realpathSync(worktree);
   if (realpathSync(ctx.cwd) !== root || effect === "unbounded") return false;
   if (effect === "session-read") return true;
-  if (args.action === "symbols" && (args.file === undefined || args.file === "*")) return true;
-  if (effect === "preview" && (args.action === "rename" ? args.apply !== false : args.apply === true)) return false;
+  if (args.action === "symbols" && args.file === "*") return true;
+  if (effect === "preview" && (args.action === "rename" ? args.apply !== false : args.apply !== undefined && args.apply !== false)) return false;
   // omp replaces these Unicode spaces before resolving the file. Diagnostics
   // also accepts globs; only an existing regular file proves a single target.
   if (typeof args.file !== "string" || !plainPath(args.file)
@@ -175,7 +175,7 @@ function ownJob(input: DeviceInput, ctx: GuardRuntimeContext): boolean {
 // queue off the machine, and xd://github results return as unscreened write results.
 const deviceEffects: Readonly<Record<string, DeviceRule>> = {
   "xd://lsp": { effect: "local", prove: scopedLsp,
-    remedy: "Use a file-scoped read, a rename preview (apply: false), code-action listing (apply not true), or reload with a plain existing file inside this task worktree, or a workspace symbols search (file \"*\"), with the session cwd equal to that worktree. For other workspace scope, edits, commands or raw requests, report the intended action to Firstmate for effect/target review." },
+    remedy: "Use a file-scoped read, a rename preview (apply: false), code-action listing (apply absent or false), or reload with a plain existing file inside this task worktree, or a workspace symbols search (file \"*\"), with the session cwd equal to that worktree. For other workspace scope, edits, commands or raw requests, report the intended action to Firstmate for effect/target review." },
   "proc://<job>/kill": { effect: "local", prove: ownJob,
     remedy: "Read proc:// to identify a running job owned by this session, then use its exact proc://<job>/kill path. Ask Firstmate to handle other tasks or shared services." },
   "xd://report_issue": { effect: "refused", reason: "Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead" },
@@ -401,7 +401,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       ? `Review required: AuditUnavailableError; judgment error_type=${final.error_type ?? "null"}.`
       : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : reason;
     const path = final.refused_path === undefined ? "" : ` Refused path: ${JSON.stringify(final.refused_path)}.`;
-    const next = "Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.";
+    const next = `${final.branch === "device" ? "Apart from the next step this refusal names, do" : "Do"} not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.`;
     const guidance = final.error_type === "RequestTooLargeError" && !final.audit_error_type
       ? SIZE_REFUSAL_NOTICE : terminal.decision === "review" ? OUTAGE_NOTICE : next;
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };

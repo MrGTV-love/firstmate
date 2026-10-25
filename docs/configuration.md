@@ -2551,9 +2551,9 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
 
 LSP `references`, `definition`, `implementation`, `type_definition`, `hover`, document `symbols`, file `diagnostics`, and file `capabilities` require a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
-The same file proof admits rename preview only with `apply: false`, code-action listing only when `apply` is not true, and file-scoped reload of the local server.
+The same file proof admits rename preview only with `apply: false`, code-action listing only when `apply` is absent or exactly `false` (omp repairs values such as `"true"`, `"yes"` or `1` to `true` before dispatch), and file-scoped reload of the local server.
 `status` reads local session/server configuration and requires no file.
-Workspace `symbols` search (`file: "*"`, or no `file`, which omp answers with its own missing-file error) runs `workspace/symbol` on the local language servers in the session workspace, no wider than `references`, and requires no file.
+Workspace `symbols` search (exactly `file: "*"`) runs `workspace/symbol` on the local language servers in the session workspace, no wider than `references`, and requires no file.
 All admitted LSP calls require the session's real working directory to equal the task worktree and a native session context.
 The `file` must not contain U+00A0, U+2000-U+200A, U+202F, U+205F, or U+3000, which omp replaces with ASCII spaces before resolving the path; rejecting those spellings keeps the realpath check on the execution target without banning ordinary Unicode or ASCII-space names.
 For every other action, workspace-wide `file: "*"`, glob expansion, directories, missing files and symlink escapes do not supply the file proof.
@@ -2571,6 +2571,7 @@ omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
 A policy block (write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
+A device refusal that names a next step, such as `gh` through the shell for `xd://github`, exempts only that named step from this rule.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.
