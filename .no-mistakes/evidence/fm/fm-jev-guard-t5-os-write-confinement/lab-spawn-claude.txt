@@ -1,0 +1,37 @@
+# lab spawn transcript: claude (measured harness) - real fm-spawn.sh, real tmux (lab socket), real sandbox-exec; harness binary is a model-free stand-in
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+warning: task lab-ship-claude-b2: $LAB/data/lab-ship-claude-b2/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: $LAB/data/lab-ship-claude-b2/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-ship-claude-b2
+warning: $LAB/data/lab-ship-claude-b2/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for lab-ship-claude-b2: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned lab-ship-claude-b2 harness=claude kind=ship mode=no-mistakes yolo=off window=primary:fm-lab-ship-claude-b2 worktree=$LAB/pool/demo-1
+
+# state/lab-ship-claude-b2.meta:
+write_confinement=seatbelt-v1
+claude_session_id=26305817-5958-4503-b4cb-b47ab2b17813
+
+# probe results written by the worker inside the delivered launch:
+pwd=$LAB/pool/demo-1
+confinement=seatbelt-v1 tmpdir=/tmp/fm-lab-ship-claude-b2
+a(rm -rf /private/tmp/claude-501/base.fmlab*): foreign fixture kept
+b(age sweep ~/tmp): foreign fixture kept
+c(eval Path.unlink other task data): kept
+d(nested .claude/worktrees/fm-nested write in own worktree): nested root writable
+e1(append own status): ok
+e2(rewrite other task status): content=other-task status
+$LAB/fakebin/lab-probe: line 15: $LAB/state/lab-other-z1.status.tmp: Operation not permitted
+e3(atomic replace other task status): content=other-task status
+$LAB/fakebin/lab-probe: line 16: $LAB/projects/demo/README.md: Operation not permitted
+x(project primary README): original
+own-data: ok
+own-tmp: ok
+$LAB/fakebin/lab-probe: line 19: $LAB/state/lab-ship-claude-b2.meta: Operation not permitted
+own-meta: refused
+own-git-commit(detached HEAD in worktree gitdir + shared objects): ok
+residual(tmux server writes for worker): residual
+claude --session-id=26305817-5958-4503-b4cb-b47ab2b17813

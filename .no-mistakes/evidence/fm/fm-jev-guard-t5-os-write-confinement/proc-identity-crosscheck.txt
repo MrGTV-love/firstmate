@@ -1,0 +1,10 @@
+# process argv: python3 -c 'import time; time.sleep(120)' josé $'line1\nline2' $'tab\there' (raw bytes printed with printf %s, no echo escape processing)
+unconfined ps                         : Sun Oct 25 12:25:29 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(120) josM-CM-) line1\012line2 tab\011here
+unconfined bin/fm-proc-info.py        : Sun Oct 25 12:25:29 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(120) josM-CM-) line1\012line2 tab\011here
+confined bin/fm-proc-info.py          : Sun Oct 25 12:25:29 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(120) josM-CM-) line1\012line2 tab\011here
+confined fm_pid_identity (wake-lib)   : Sun Oct 25 12:25:29 2026     /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 -c import time; time.sleep(120) josM-CM-) line1\012line2 tab\011here
+confined ps                           : sandbox-exec: execvp() of 'ps' failed: Operation not permitted
+ rc=71
+ps vs unconfined helper: EQUAL
+ps vs confined helper  : EQUAL
+ps vs confined fm_pid_identity: EQUAL

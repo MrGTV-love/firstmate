@@ -8,4 +8,3 @@ ok - a pane stuck on the primary checkout fails loudly at the deadline
 ok - a get with changing output keeps waiting beyond ten minutes of scaled total time
 ok - output activity cannot keep an acquisition alive beyond the absolute extreme
 # all fm-spawn-worktree-settle tests passed
-rc=0

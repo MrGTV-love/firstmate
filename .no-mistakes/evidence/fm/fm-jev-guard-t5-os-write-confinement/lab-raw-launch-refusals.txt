@@ -1,0 +1,18 @@
+# adversarial raw launches that try to move the harness root out from under the profile
+$ bin/fm-spawn.sh lab-raw-omp-d4 $LAB/projects/demo --mode no-mistakes --yolo off --harness 'PI_CONFIG_DIR=/tmp/elsewhere omp'  -> exit 1
+error: this raw omp launch command selects its own omp config directory, so its write profile cannot be derived; launch with --harness omp and set PI_CONFIG_DIR in the environment instead
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh lab-raw-omp-d4 <project> --mode <mode> --yolo <on|off>
+
+$ bin/fm-spawn.sh lab-raw-claude-e5 $LAB/projects/demo --mode no-mistakes --yolo off --harness 'CLAUDE_CONFIG_DIR=$HOME/alt claude'  -> exit 1
+error: this raw claude launch command sets CLAUDE_CONFIG_DIR to a value that needs shell expansion or is not one leading assignment, so its write profile cannot follow it; pass the resolved absolute path as a leading literal CLAUDE_CONFIG_DIR= assignment instead
+repair: preserve this task's worktree; ask Main to resolve its measured root contract before retrying bin/fm-spawn.sh lab-raw-claude-e5 <project> --mode <mode> --yolo <on|off>
+
+# lab tmux windows after both attempts (no worker window was opened for either):
+bash
+fm-lab-ship-omp-a1
+fm-lab-ship-claude-b2
+fm-lab-ship-codex-c3
+
+# guard-events.jsonl deny rows:
+spawn-write-confinement deny lab-raw-omp-d4
+spawn-write-confinement deny lab-raw-claude-e5

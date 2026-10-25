@@ -1,0 +1,29 @@
+# lab spawn transcript: codex (non-measured harness, unconfined control) - real fm-spawn.sh, real tmux, model-free stand-in
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned lab-ship-codex-c3 harness=codex kind=ship mode=no-mistakes yolo=off window=primary:fm-lab-ship-codex-c3 worktree=$LAB/pool/demo-2
+
+write_confinement=unconfined-macos-codex
+
+# same probes, no confinement: every foreign fixture is destroyed (control)
+pwd=$LAB/pool/demo-2
+confinement=unconfined-macos-codex tmpdir=/Users/charlesabrooker/tmp
+a(rm -rf /private/tmp/claude-501/base.fmlab*): foreign fixture gone
+b(age sweep ~/tmp): foreign fixture gone
+c(eval Path.unlink other task data): gone
+d(nested .claude/worktrees/fm-nested write in own worktree): nested root writable
+e1(append own status): ok
+e2(rewrite other task status): content=clobbered
+e3(atomic replace other task status): content=x
+x(project primary README): replaced
+own-data: ok
+own-tmp: ok
+own-meta: WRITTEN
+own-git-commit(detached HEAD in worktree gitdir + shared objects): ok
+residual(tmux server writes for worker): residual
+
+# guard-events.jsonl confinement rows (guard, decision, session):
+spawn-write-confinement allow lab-ship-omp-a1
+spawn-confinement-coverage allow lab-ship-omp-a1
+spawn-write-confinement allow lab-ship-claude-b2
+spawn-confinement-coverage allow lab-ship-claude-b2
+spawn-confinement-coverage warn lab-ship-codex-c3
