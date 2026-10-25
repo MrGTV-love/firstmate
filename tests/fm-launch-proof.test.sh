@@ -134,6 +134,8 @@ test_launch_proof_recorded_native_identity() {
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane process-info --pane w1:p1') printf '%s' "$INFO" ;;
+      'lab pane get w1:p1') printf '{"result":{"pane":{"pane_id":"w1:p1"}}}' ;;
+      'lab agent get w1:p1') printf '{"error":{"code":"agent_not_found"}}' ;;
       *) printf '%s\n' "$*" >> "$TMP/endpoint-violations"; return 1 ;;
     esac
   }

@@ -18,7 +18,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
 
 `bin/fm-control-lib.sh` is the single executable owner of three capability tables, which have no side effects, so they can be read as a contract:
 
-- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`.
+- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`, `adopt`.
   There is no arbitrary-text and no generic raw-key entry point.
   A caller either names an allowlisted verb or is refused.
 - **Per-harness mechanics**: the key that cancels a running turn, how many times it must be delivered, whether the composer needs clearing afterwards, the command that exits the agent, and which task kinds the adapter is verified to run.
@@ -39,6 +39,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | `exit` | Stop the agent, preserving the endpoint, the worktree, and every uncommitted change. | The backend's recovery-grade classifier reports the agent gone. Already-stopped is idempotent success. A `missing` endpoint goes through the shared [absence proof](#reclaiming-a-task-whose-endpoint-is-gone): proven gone reports `endpoint-gone`, a surviving idle pane reports `already-stopped`, and a surviving agent takes the ordinary interrupt-then-exit path. Unproven absence refuses. |
 | `stay` | Close Claude's background-task exit picker for a live task and leave the agent running; see [Exit and the background-task picker](#exit-and-the-background-task-picker). | A readable viewport no longer shows the recognised picker and the endpoint still classifies the agent alive. Any other screen, harness, or stopped agent refuses with nothing sent. |
 | `relaunch` | Replace the running agent with a new one in the same worktree by default (see the [missing-worktree exception](#relocating-a-task-whose-worktree-is-gone)) - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
+| `adopt` | Repair a live local Herdr omp task's session record without sending input or restarting anything. | The recorded pane, unique foreground PID, unique deepest workspace match, exclusive local pane claim, and unchanged generation are proved before publishing; see [Repairing a restored omp session record](#repairing-a-restored-omp-session-record). |
 | `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
 | `reassociate` | Re-point a ship or scout's record at the replacement copy its work moved to, without stopping, starting, or removing anything. With `--also <task>=<copy>` it re-points several records that share one pool slot root in the same call. | The record names the replacement copy and the copy it left as `prior_worktree=` (or `released_worktree=` for a pool slot it left); the old copy, the endpoint, and any pipeline run are untouched. Every record named in one call is re-pointed or none is. See [Reassociating a task with a replacement copy](#reassociating-a-task-with-a-replacement-copy). |
 
@@ -151,6 +152,7 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 
 Herdr can resume a live omp harness after reboot without the Firstmate launch command.
 That native restore is unmanaged: neither its resume path nor the original launch message proves which conversation the live process currently owns.
+Only the explicit [omp session-record repair](#repairing-a-restored-omp-session-record) can later authorize lifecycle control for it.
 `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and reports unmanaged live launches without lifecycle input or task-record mutation.
 The script's [header and help](../bin/fm-reboot-recover.sh) own invocation, bounded-scan scheduling, and its durable cursor.
 Deferred startup inspection follows the existing bootstrap sweeps, which keep their recovery responsibilities.
@@ -169,10 +171,39 @@ A legacy record (empty `launch_proof`) keeps exit and relaunch, so inspection re
 The bounded sweep reports that legacy notice once per restored-agent identity, like an unmanaged notice.
 Drafts, busy state, task instructions, profile axes, charters, child records, and unlanded work remain unchanged.
 
+### Repairing a restored omp session record
+
+Run `FM_HOME=<home> bash bin/fm-control.sh <task-id> adopt` to repair a local Herdr omp session record after a restart.
+Only the actual lock-owning main Firstmate may run it: a worker, the supervision branch in any posture, or a session that does not own the home's lock is refused without changing the record, under the same rule as `authorize-continuation` and `reassociate`.
+The [control script header](../bin/fm-control.sh) owns the five required proofs, exact fields, locks, publication, and refusal contract; [the launch-proof library](../bin/fm-launch-proof-lib.sh) owns pane and foreground-process attribution.
+The command writes only the session record, never unlocks a session, modifies a project, sends keys, or starts or stops an agent.
+It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
+A stale registration alone grants no authority.
+The resolved foreground process must also be omp by its readable process name or argv[0], so a registration that outlives its agent cannot make another program or another harness's agent in the worktree a lifecycle target.
+Only a resolved foreground process with a positively readable environment without a usable launch pin is a repair candidate.
+A matching or different usable pin, or an unreadable environment, refuses before staging the record, because a pinned process's extension may rewrite the record during repair and an unreadable environment cannot rule that out.
+A record that already names the resolved foreground PID is refused unchanged, and the refusal says the record already names that PID, so a repeated `adopt` after a successful repair is reported as such.
+That covers a record an earlier `adopt` wrote, a healthy activation for the resolved foreground PID, the extension's own empty unproven mark (written on shutdown, before a switch, or after a failed start), and an activation naming another file (a different conversation).
+A record naming another live omp process is refused unchanged too, because that process's extension rewrites its record by rename and without the control locks.
+Herdr still registering the original task file never overrides that evidence.
+A recorded PID that is gone, or that a process other than omp has since reused (for example after a reboot), does not block repair, even when that process is another harness's agent.
+Publication renames the new record into place only while the record still holds the bytes the proofs were gathered from; a changed record refuses.
+Every refusal names the missing proof, and no refusal lowers the workspace or duplicate-pane requirements.
+
+**This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**
+Lifecycle readers recheck the adoption proofs and the same live PID and session file before using that alternative authorization, so a workspace claimed by another task, a duplicate pane claim, or a changed generation still refuses even after a successful repair.
+After a permitted repair, a newly unreadable environment still reads `unknown` and authorizes nothing, while a different launch-generation pin refuses the alternative authorization at every recheck.
+This is an explicit repair, not an automatic restart fix: the omp extension's launch-generation recovery and empty-session classification are unchanged.
+
+**Residual risk:** nothing watches which conversation an adopted process runs.
+The omp extension rewrites the record on every conversation switch only for a launch-pinned process, and an adopted process has no pin.
+An adopted record therefore relies on Herdr's session registration until the extension records switches without a launch pin.
+A switch to a personal conversation that Herdr has not yet registered is not seen, and the record can still read as managed.
+
 ### Live Herdr task attribution
 
 `bin/fm-launch-proof-lib.sh` owns launch attribution, and runtime lifecycle paths to a live Herdr agent use one shared positive task-attribution guard before lifecycle input or a relaunch checkpoint, note, or record mutation.
-A recorded endpoint or matching cwd alone never proves live task ownership.
+A recorded endpoint or matching cwd alone never proves live task ownership; the explicit [omp repair route](#repairing-a-restored-omp-session-record) combines them with independent process, unique-claim, generation, and session-file proof.
 The stopped-agent exception requires process-backed absence even when Herdr has not registered an agent; a live process still requires launch attribution, and unreadable process evidence refuses recovery.
 Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch of a record with `launch_proof`.
 A record published before launch proofs existed (empty `launch_proof`) keeps the earlier rule: its live agent at the validated endpoint is attributed without a pin, and its relaunch publishes a proven launch.
@@ -182,13 +213,14 @@ An enabled `config/launch-env-allowlist` still selects the existing cleared-envi
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
 A process that Herdr lists but the later process table lacks has already exited and is dropped; a vanished agent, a broken chain, or two agents still read `unknown`.
-The kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
+On the ordinary launch-proof route, the kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
 That matching live pin proves the launch incarnation, including interpreter-based harnesses and older records without a launch-proof field.
-For omp, the existing worker extension or local-secondmate watcher must also record the current session file and live PID for that task.
+For omp, the existing worker extension, local-secondmate watcher, or explicit repair must also record the current session file and live PID for that task.
 Argv and text embedded in other environment values never supply incarnation evidence.
-An omp process without that matching pin is unmanaged, including Herdr-native `omp --resume`.
-Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for extension-recorded current-session proof.
-An in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
+Without the matching pin, an omp process is unmanaged, including Herdr-native `omp --resume`, unless its repaired session record passes the [full adoption proof](#repairing-a-restored-omp-session-record).
+Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for current-session proof on their own.
+For a launch-pinned omp process, an in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
+An adopted process has no pin, so this switch protection does not cover it; see the [residual risk](#repairing-a-restored-omp-session-record).
 Every other recorded harness remains unknown with missing or mismatched pins.
 Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
 Neither unmanaged nor unknown proof authorizes lifecycle action for a record with `launch_proof`.
@@ -196,8 +228,8 @@ Every Herdr replacement must have matching managed-launch proof, including curre
 The normal failed-launch and published-record reconciliation rules below still apply.
 
 The omp task record binds its initial session pathname once per launch generation and updates the active pathname and PID synchronously on session activation or switch, including before JSONL persistence under an existing canonical session directory; managed authority still requires persisted task and active files identifying the same file.
-The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation; missing, invalid, or personal-session proof refuses lifecycle action.
-Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
+The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation, proved by the live environment pin or by the guarded [adoption route](#repairing-a-restored-omp-session-record); missing, invalid, or personal-session proof refuses lifecycle action.
+Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged unless repaired by `adopt`.
 Cancelled or rolled-back switches and branches restore the predecessor proof only after omp's session transition settles and only if no newer transition or shutdown intervened.
 Every proof callback requires a unique registered top-level session sharing its context's session manager, and settled restoration rechecks that owner, so delegated or unregistered sessions cannot mutate the parent proof without relying on a context agent field.
 The proof installer uses the live registry exposed by omp's extension API rather than importing an on-disk SDK package.
@@ -620,6 +652,6 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, the exit-picker answers and `stay`, and marker non-regression, all against a stubbed session provider.
 - `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, and rollback.
 - `tests/fm-control-relaunch-recovery.test.sh` - Herdr reclaim, sequential tmux-to-Herdr reclaim, tmux absence scoped to the recorded endpoint despite unrelated servers, refusal of other configured backends, conservative process-read refusals, and refusals on a live window, a worktree-holding agent, or unreadable evidence; missing-worktree relocation cases cover recorded-head containment, foreign harness-file preservation, failure-journal recovery, concurrent destination ownership, and unpublished pool-claim cleanup.
-- `tests/fm-control-relaunch-backends.test.sh` - positive live Herdr ownership and no-pin refusals across every lifecycle verb, and unmanaged native restore inspection and bounded copied-home diagnostics.
+- `tests/fm-control-relaunch-backends.test.sh` - positive live Herdr ownership and no-pin refusals across every lifecycle verb, and unmanaged native restore inspection and bounded copied-home diagnostics; omp session-record `adopt` cases cover each named proof refusal, the caller gates, refusal of a non-agent or other-harness foreground process under a lingering omp registration, refusal of a record that already names the live PID or names another live omp process, repair over a recorded PID reused by a process that is not an agent or by another harness's agent, and refusal of a pinned or unreadable-environment process before staging while the real extension activates a personal session.
 - `tests/fm-launch-proof.test.sh` - versioned and legacy managed incarnation proof across supported harnesses, native restore and same-PID personal-session switches remaining unmanaged, and conservative foreground and process-environment refusals.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.

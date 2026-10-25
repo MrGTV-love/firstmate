@@ -5,6 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
+#        fm-control.sh <task-id> adopt
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -67,6 +68,41 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
+# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
+# under the task's control and metadata locks. The lock-owning main Firstmate
+# alone may run it: a worker, the supervision branch, or a session that does
+# not own the home lock is refused, as for authorize-continuation and
+# reassociate. It refuses, naming the missing proof, unless all of these hold:
+#   (1) window and herdr_pane_id agree, and the worktree and pane exist;
+#   (2) the launch-proof owner resolves one foreground PID whose process name
+#       or argv[0] is omp;
+#   (3) that PID's kernel cwd is inside this task's recorded worktree and is
+#       not inside another task's worktree that is as deep or deeper;
+#   (4) no other local task claims the pane;
+#   (5) the existing record has the same nonempty spawn_gen as the metadata,
+#       and the live PID does not carry a launch pin for another generation.
+# The preserved task_session_file (or the pane's omp session-file reference
+# when the field is absent) must identify the same persisted file as that
+# reference. Publication also needs a positively readable live environment
+# without a usable launch pin; a matching or different pin and unreadable
+# probing refuse before staging. A record that already names the live PID is
+# refused unchanged, including the extension's empty unproven mark and an
+# activation naming another file, even when Herdr still registers the task
+# file. A record naming another live omp process is that process's extension's
+# to maintain and is refused unchanged too. A recorded PID
+# that is gone, or that a process other than omp has since reused, does not
+# block repair. The repair writes version=1, the unchanged spawn_gen, the
+# live pid, task_session_file, and current_session_file, publishing by rename
+# only while the record still holds the bytes the proofs were gathered from.
+# It never unlocks a session, touches project files, starts or stops an agent,
+# or sends lifecycle input.
+# This widens lifecycle authorization: a repaired record can authorize a
+# restored omp without the launch environment pin, only while the launch-proof
+# owner can recheck all adoption proofs and the same live PID and session
+# file. Ordinary empty or invalid session records still refuse, and other
+# harnesses and backends keep their existing proof rules.
+# docs/agent-control.md "Repairing a restored omp session record" owns the
+# operator contract and the residual risk of an unpinned adopted process.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -1363,6 +1399,57 @@ if [ "$BACKEND" = herdr ]; then
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
   fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
+if [ "$VERB" = adopt ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot adopt a session record"
+  fm_lease_forbid_branch "session record adoption (fm-control)"
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "session record adoption requires the actual lock-owning main Firstmate"
+  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
+    || die "adopt needs a local Herdr omp task; no session record was changed"
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  adoption_prior=$(cat "$STATE/$ID.omp-session.json" 2>/dev/null) \
+    || die "adopt needs an existing readable session record with the metadata spawn_gen"
+  adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  # The omp extension rewrites the record of the process it runs in, by rename
+  # and without these locks, so a record naming a live omp process is the
+  # extension's evidence to keep. A PID reused by any other process after a
+  # restart, another harness included, names no extension and does not block repair.
+  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
+  adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
+    | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
+  [ "$adoption_recorded_pid" != "$adoption_pid" ] \
+    || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
+  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; then
+    echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
+    exit 1
+  fi
+  # Only a positively readable unpinned process cannot run the extension's
+  # pinned publication path, so its extension never rewrites the record meanwhile.
+  fm_launch_proof_pid_unpinned "$adoption_pid" \
+    || die "adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates"
+  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
+    || die "adopt needs a writable session-record directory"
+  printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
+    || die "adopt could not stage the session record; original record preserved"
+  # Refuse a changing foreground, session registration, generation, or task
+  # record rather than publishing a proof gathered for a different activation.
+  adoption_recheck=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  [ "$adoption_record" = "$adoption_recheck" ] \
+    && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
+    || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
+    || die "adopt could not publish the session record; original record preserved"
+  CONTROL_META_TMP=
+  printf 'adopted: %s\n' "$ID"
+  exit 0
 fi
 
 # --- shared helpers ---------------------------------------------------------
