@@ -34,6 +34,35 @@ stop_probe() {
   PID=
 }
 
+# No real PID or endpoint is read: each ps query must match the synthetic PID.
+test_launch_proof_omp_executable_identity() (
+  local synthetic_comm synthetic_args
+  ps() {
+    case "$*" in
+      '-p 2000000000 -o comm=') printf '%s\n' "$synthetic_comm" ;;
+      '-p 2000000000 -o args=') printf '%s\n' "$synthetic_args" ;;
+      *) fail "unexpected identity ps query: $*" ;;
+    esac
+  }
+  assert_identity() { # <expected> <comm> <args> <description>
+    local expected=$1 actual=refuse
+    synthetic_comm=$2 synthetic_args=$3
+    if fm_launch_proof_pid_is_omp 2000000000; then actual=accept; fi
+    assert_equals "$expected" "$actual" "$4"
+  }
+  assert_identity accept omp 'omp --resume=task' 'bare omp is accepted'
+  assert_identity accept omp 'bun --resume=task' 'readable omp name alone is sufficient'
+  assert_identity accept bun 'omp --resume=task' 'omp argv[0] alone is sufficient'
+  assert_identity accept /Users/operator/.bun/bin/omp 'bun --resume=task' 'Bun-installed omp executable name is accepted'
+  assert_identity accept bun '/Users/operator/.bun/bin/omp --resume=task' 'Bun-installed omp argv[0] is accepted'
+  assert_identity refuse python3 'python3 -c input()' 'unrelated executable is refused'
+  assert_identity refuse /opt/omp/bin/python3 'python3 -c input()' 'omp directory in executable path is refused'
+  assert_identity refuse python3 '/opt/omp/bin/python3 -c input()' 'omp directory in argv[0] is refused'
+  assert_identity refuse bun 'bun /opt/bin/omp' 'omp in a later argument is not argv[0]'
+  assert_identity refuse ompd 'ompd --resume=task' 'omp executable name must be exact'
+  pass 'omp identity uses only the executable basename or argv[0], including Bun-installed entry points'
+)
+
 test_launch_proof_pinned_personal_switch() {
   local meta="$FM_HOME/state/pinned.meta" task="$TMP/task.jsonl" personal="$TMP/personal.jsonl"
   local SWITCH_INFO actual
@@ -306,5 +335,6 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
   exit 0
 fi
+test_launch_proof_omp_executable_identity
 test_launch_proof_recorded_native_identity
 test_launch_proof_pinned_personal_switch

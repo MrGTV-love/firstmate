@@ -1595,7 +1595,7 @@ test_omp_adoption_unproven_same_pid() {
 
 test_omp_adoption_non_omp_process() {
   local shape dir id out rc comm args
-  for shape in non-agent other-agent; do
+  for shape in non-agent other-agent omp-directory-comm omp-directory-argv0; do
     prepare_omp_adoption "non-omp-$shape"
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID rc=0
     # Herdr still registers the omp task file while something else runs in the
@@ -1607,6 +1607,10 @@ test_omp_adoption_non_omp_process() {
       other-agent)
         comm=claude args='claude --continue'
         printf claude > "$dir/fake/recovery-harness" ;;
+      omp-directory-comm)
+        comm=/opt/omp/bin/python3 args='python3 -c input()' ;;
+      omp-directory-argv0)
+        comm=python3 args='/opt/omp/bin/python3 -c input()' ;;
     esac
     printf '%s' "$comm" > "$dir/fake/holder-comm"
     printf '%s' "$args" > "$dir/fake/holder-args"
@@ -1621,7 +1625,7 @@ test_omp_adoption_non_omp_process() {
     [ "$rc" -ne 0 ] || fail "adopted record authorized lifecycle input once a $shape process replaced omp: $out"
     assert_not_contains "$(cat "$dir/fake/herdr-log")" 'send-' "a $shape process must receive no lifecycle input"
   done
-  pass "omp adoption: non-agent and other-harness foreground processes refused at adoption and at the lifecycle recheck"
+  pass "omp adoption: unrelated executables, including paths under an omp directory, refused at adoption and at the lifecycle recheck"
 }
 
 test_omp_adoption_unreadable_environment() {
