@@ -49,14 +49,15 @@ fm_proc_budget_count() {
   set -o pipefail
   case "$(uname -s)" in
     Linux) count=$(ps -L -U "$uid" -o lwp= | wc -l) || return 1 ;;
-    # Setuid ps cannot run inside a confined worker's sandbox, so a confined
-    # worker reads the count through bin/fm-proc-info.py instead.
+    # A confined worker's sandbox refuses to run setuid ps (exit 126), so the
+    # count then comes from bin/fm-proc-info.py instead.
     *)
-      if [ "${FM_WRITE_CONFINEMENT:-}" = seatbelt-v1 ]; then
-        count=$(python3 "$FM_PROC_BUDGET_DIR/fm-proc-info.py" count-uid "$uid") || return 1
-      else
-        count=$(ps -U "$uid" -o pid= | wc -l) || return 1
-      fi
+      count=$(ps -U "$uid" -o pid= 2>/dev/null)
+      case $? in
+        0) [ -n "$count" ] || return 1; count=$(printf '%s\n' "$count" | wc -l) || return 1 ;;
+        126) count=$(python3 "$FM_PROC_BUDGET_DIR/fm-proc-info.py" count-uid "$uid") || return 1 ;;
+        *) return 1 ;;
+      esac
       ;;
   esac
   count=$(printf '%s' "$count" | tr -d '[:space:]')

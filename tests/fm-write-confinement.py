@@ -180,6 +180,7 @@ def child(manifest):
     # switch would hide exactly the write under test.
     os.environ.pop("FM_DURATION_FILE", None)
     os.environ.update(GIT_ENV, NM_HOME=manifest["nm"], FM_DURATION_HOME=manifest["home"])
+    os.environ.pop("FM_WRITE_CONFINEMENT", None)
     home = Path(manifest["home"])
     state = home / "state"
     data = home / "data"
@@ -237,50 +238,49 @@ def child(manifest):
     ledger = data / "command-durations.jsonl"
     results["duration"] = (record.returncode == 0 and ledger.exists()
                            and any(json.loads(line).get("key") == "fixture.write-confinement" for line in ledger.read_text().splitlines()))
-    # fm-duration's process reads: without the gate the sandbox refuses setuid
-    # ps, and with it bin/fm-proc-info.py answers instead.
+    # Process reads need no confinement variable: the sandbox refuses setuid ps
+    # outright, and every tool then asks bin/fm-proc-info.py instead.
     spec = importlib.util.spec_from_file_location("fm_duration", Path(manifest["repo"]) / "bin/fm-duration.py")
     duration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(duration)
-    os.environ.pop("FM_WRITE_CONFINEMENT", None)
-    results["refused-setuid-ps"] = duration.ps_table() is None
-    os.environ["FM_WRITE_CONFINEMENT"] = "seatbelt-v1"
     try:
-        table = duration.ps_table() or {}
-        results["duration-ps-table"] = table.get(os.getpid(), (None,))[0] == os.getppid()
-        try:
-            idle = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-duration.py"), "keep-going", "1", "--", "sleep", "20"],
-                                  capture_output=True, text=True, timeout=15)
-            results["duration-keep-going"] = idle.returncode == 124 and "cpu_telemetry_unavailable" not in idle.stderr
-        except subprocess.TimeoutExpired:
-            results["duration-keep-going"] = False  # nothing stopped the inactive child
-        gone = subprocess.Popen(["true"])
-        gone.wait()
-        since = int(time.time())
-        results["duration-stale-holder"] = duration.holder_is_stale(gone.pid, since) and not duration.holder_is_stale(os.getpid(), since)
-        # A group whose only member is a zombie answers a group signal with
-        # EPERM on Darwin; the inventory must prove it complete, not re-raise.
-        zombie = subprocess.Popen(["true"], start_new_session=True)
-        for _ in range(100):
-            states = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-proc-info.py"), "table", "pid,stat"],
-                                    capture_output=True, text=True).stdout.splitlines()
-            if f"{zombie.pid} Z" in states:
-                break
-            time.sleep(0.05)
-        try:
-            os.killpg(zombie.pid, 0)
-            eperm = False
-        except PermissionError:
-            eperm = True
-        reaped = type("Reaped", (), {"pid": zombie.pid, "poll": lambda self: 0})()
-        try:
-            duration.signal_group(reaped, signal.SIGKILL)
-            results["duration-group-complete"] = eperm
-        except (OSError, ValueError):
-            results["duration-group-complete"] = False
-        zombie.wait()
-    finally:
-        os.environ.pop("FM_WRITE_CONFINEMENT")
+        subprocess.run(["ps", "-p", str(os.getpid())], capture_output=True)
+        results["refused-setuid-ps"] = False
+    except PermissionError:
+        results["refused-setuid-ps"] = True
+    table = duration.ps_table() or {}
+    results["duration-ps-table"] = table.get(os.getpid(), (None,))[0] == os.getppid()
+    try:
+        idle = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-duration.py"), "keep-going", "1", "--", "sleep", "20"],
+                              capture_output=True, text=True, timeout=15)
+        results["duration-keep-going"] = idle.returncode == 124 and "cpu_telemetry_unavailable" not in idle.stderr
+    except subprocess.TimeoutExpired:
+        results["duration-keep-going"] = False  # nothing stopped the inactive child
+    gone = subprocess.Popen(["true"])
+    gone.wait()
+    since = int(time.time())
+    results["duration-stale-holder"] = duration.holder_is_stale(gone.pid, since) and not duration.holder_is_stale(os.getpid(), since)
+    # A group whose only member is a zombie answers a group signal with
+    # EPERM on Darwin; the inventory must prove it complete, not re-raise.
+    zombie = subprocess.Popen(["true"], start_new_session=True)
+    for _ in range(100):
+        states = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-proc-info.py"), "table", "pid,stat"],
+                                capture_output=True, text=True).stdout.splitlines()
+        if f"{zombie.pid} Z" in states:
+            break
+        time.sleep(0.05)
+    try:
+        os.killpg(zombie.pid, 0)
+        eperm = False
+    except PermissionError:
+        eperm = True
+    reaped = type("Reaped", (), {"pid": zombie.pid, "poll": lambda self: 0})()
+    try:
+        duration.signal_group(reaped, signal.SIGKILL)
+        results["duration-group-complete"] = eperm
+    except (OSError, ValueError):
+        results["duration-group-complete"] = False
+    zombie.wait()
     # The orphan reaper and the lint CPU sample read process facts through the
     # helper or report the sample as unavailable, never a false 0.00.
     repo_bin = Path(manifest["repo"]) / "bin"
@@ -294,7 +294,7 @@ def child(manifest):
                               str(reap_root / "stub")], capture_output=True, text=True)
     orphan = int(spawner.stdout.strip())
     reap = subprocess.run(["bash", str(repo_bin / "fm-test-reap-orphans.sh"), "--tmpdir", str(reap_dir)],
-                          capture_output=True, text=True, env=dict(os.environ, FM_WRITE_CONFINEMENT="seatbelt-v1"))
+                          capture_output=True, text=True)
     for _ in range(50):
         try:
             os.kill(orphan, 0)
@@ -331,7 +331,7 @@ def child(manifest):
         'printf "session:\\n  status: ended\\n  ended_by: user\\n"\n')
     (lavish_bin / "lavish-axi").chmod(0o755)
     procedure_env = dict(os.environ, FM_ROOT_OVERRIDE=manifest["repo"], FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
-                         FM_DATA_OVERRIDE=str(data), FM_CONFIG_OVERRIDE=str(home / "config"), FM_WRITE_CONFINEMENT="seatbelt-v1",
+                         FM_DATA_OVERRIDE=str(data), FM_CONFIG_OVERRIDE=str(home / "config"),
                          LAVISH_AXI_STATE_DIR=str(lavish_state), PATH=str(lavish_bin) + os.pathsep + os.environ["PATH"])
     board = data / "task/board.html"
     board.write_text("<h1>board</h1>\n")
@@ -417,6 +417,18 @@ console.log(JSON.stringify({ foreignDenied }));
         results["refused-" + name] = refused(path)
     for name, path in manifest["writable"].items():
         results[name] = writable(path)
+    # The transcript container holds other sessions' transcripts: moving it to
+    # a writable place must fail while this session's own transcript writes.
+    container = manifest.get("transcript_container")
+    if container:
+        moved = Path(os.environ["TMPDIR"]) / "moved-transcripts"
+        try:
+            Path(container).rename(moved)
+        except PermissionError:
+            results["refused-transcript-container-rename"] = Path(container).is_dir()
+        else:
+            moved.rename(container)
+            results["refused-transcript-container-rename"] = False
     # Renaming a protected folder, or a folder above one, would move it away.
     for name, path in manifest["renamed"].items():
         results["refused-rename-" + name] = rename_refused(path)
@@ -539,12 +551,15 @@ def fixture(repo, base, harness, user_home, other):
         writable_paths.update({"claude-transcript": user_home / f".claude/projects/{slug}/{OWN_SESSION}.jsonl",
                                "claude-transcript-sidecar": user_home / f".claude/projects/{slug}/{OWN_SESSION}/subagents/agent.jsonl",
                                "claude-session-env": user_home / f".claude/session-env/{OWN_SESSION}/hook.sh",
-                               "claude-json": user_home / ".claude.json", "claude-json-backup": user_home / ".claude/backups/.claude.json.backup.1",
+                               "claude-json-backup": user_home / ".claude/backups/.claude.json.backup.1",
                                "claude-file-history": user_home / f".claude/file-history/{OWN_SESSION}/backup",
                                "claude-tasks": user_home / f".claude/tasks/{OWN_SESSION}/1.json",
                                "claude-history": user_home / ".claude/history.jsonl",
                                "claude-history-lock": user_home / ".claude/history.jsonl.lock/lock",
                                "claude-statsig": user_home / ".claude/statsig/cache", "claude-debug": user_home / ".claude/debug/session.txt"})
+        # Claude's config carries MCP server commands later sessions run.
+        protected.update({"claude-json": user_home / ".claude.json", "claude-json-config-dir": user_home / ".claude/.claude.json",
+                          "claude-json-config-dir-atomic": user_home / ".claude/.claude.json.tmp.1"})
     else:
         writable_paths.update({"omp-agent-db": user_home / ".omp/agent/agent.db", "omp-agent-db-wal": user_home / ".omp/agent/agent.db-wal",
                                "omp-models-db-shm": user_home / ".omp/agent/models.db-shm",
@@ -553,6 +568,7 @@ def fixture(repo, base, harness, user_home, other):
     return {"repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
             "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
             "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp), "late": [str(path) for path in late.values()],
+            "transcript_container": str(user_home / f".claude/projects/{slug}") if harness == "claude" else "",
             "protected": {name: str(path) for name, path in protected.items()},
             "writable": {name: str(path) for name, path in writable_paths.items()},
             "renamed": {name: str(path) for name, path in renamed.items()}}

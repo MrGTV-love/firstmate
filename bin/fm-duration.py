@@ -20,8 +20,8 @@ Each nested runner keeps its own bound, so a hung inner read is stopped by its
 own owner and an outer owner sees an inner sampler's CPU only until then.
 Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
 (/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps (with libproc CPU
-on Darwin, whose ps omits waited-child time). Under FM_WRITE_CONFINEMENT=seatbelt-v1
-the sandbox refuses setuid ps, so the process table, the process-group check
+on Darwin, whose ps omits waited-child time). Where a confined worker's sandbox
+refuses to execute setuid ps, the process table, the process-group check
 behind a Darwin EPERM group signal and a slot holder's start time come from
 bin/fm-proc-info.py instead. Without a complete sample,
 including unavailable native imports, one cpu_telemetry_unavailable line names
@@ -578,19 +578,21 @@ def proc_table(pid):
     return table
 
 
-def confined():
-    """True in a confined worker, whose sandbox refuses setuid ps."""
-    return os.environ.get('FM_WRITE_CONFINEMENT') == 'seatbelt-v1'
+def proc_read(command, info, **kwargs):
+    """Run the ps COMMAND, or bin/fm-proc-info.py INFO where a confined worker's
+    sandbox refuses to execute setuid ps; the flag is True when ps ran."""
+    try:
+        return subprocess.run(command, capture_output=True, text=True, **kwargs), True
+    except PermissionError:
+        return subprocess.run([sys.executable, str(PROC_INFO), *info], capture_output=True, text=True, **kwargs), False
 
 
 def ps_table():
     # The helper prints no CPU column; Darwin's libproc reader supplies the CPU
     # (tree_cpu), and a zero here never exceeds a retained high-water value.
-    timed = not confined()
-    command = (['ps', '-S', '-axo', 'pid=,ppid=,time=,stat=,lstart='] if timed
-               else [sys.executable, str(PROC_INFO), 'table', 'pid,ppid,stat,lstart'])
     try:
-        result = subprocess.run(command, capture_output=True, text=True, env=dict(os.environ, LC_ALL='C'))
+        result, timed = proc_read(['ps', '-S', '-axo', 'pid=,ppid=,time=,stat=,lstart='], ['table', 'pid,ppid,stat,lstart'],
+                                  env=dict(os.environ, LC_ALL='C'))
         if result.returncode:
             return None
         table = {}
@@ -790,8 +792,7 @@ def signal_group(child, sig):
         # zombie or is exiting (flag E); neither can run again.
         if child.poll() is None:
             raise
-        inventory = subprocess.run([sys.executable, str(PROC_INFO), 'table', 'pgid,stat'] if confined()
-                                   else ['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
+        inventory, _ = proc_read(['ps', '-axo', 'pgid=,stat='], ['table', 'pgid,stat'])
         if inventory.returncode:
             raise
         for line in inventory.stdout.splitlines():
@@ -889,9 +890,7 @@ def slot_holders(directory, limit):
 def holder_is_stale(pid, since):
     """True when PID is gone, or started after the epoch SINCE and so cannot be the process that took the slot."""
     try:
-        result = subprocess.run([sys.executable, str(PROC_INFO), 'lstart', str(pid)] if confined()
-                                else ['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
-                                env=dict(os.environ, LC_ALL='C'))
+        result, _ = proc_read(['ps', '-o', 'lstart=', '-p', str(pid)], ['lstart', str(pid)], env=dict(os.environ, LC_ALL='C'))
     except OSError:
         return False
     if result.returncode != 0 or not result.stdout.strip():

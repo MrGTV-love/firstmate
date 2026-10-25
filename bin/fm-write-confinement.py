@@ -121,7 +121,7 @@ def build(args):
         deny += [canonical(gate) for gate in gates.iterdir() if gate.name.endswith(".git") and gate.name != own_gate]
     others = [task for task in dict.fromkeys(task_ids(state) + [t for h in protect for t in task_ids(Path(h) / "state")]) if task != args.task]
 
-    runtime = []
+    runtime, created = [], []
     if args.harness == "omp":
         # Match omp's macOS resolver: XDG applies only on Linux; a named
         # profile selects its own agent directory instead of the override.
@@ -160,16 +160,17 @@ def build(args):
         session = args.claude_session or ""
         if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", session):
             raise ValueError("a confined Claude worker needs its lowercase --claude-session UUID")
-        runtime += [under(claude, r"\.claude\.json(\..+)?"), under(claude, r"history\.jsonl(\.lock(/.*)?)?")]
+        # Claude's .claude.json carries user-scoped MCP server commands that
+        # later unconfined sessions run, so it stays protected in both layouts.
+        runtime += [under(claude, r"history\.jsonl(\.lock(/.*)?)?")]
         runtime += [f"(subpath {quoted(claude + '/' + name)})"
                     for name in ("backups", "statsig", "debug", "session-env/" + session, "file-history/" + session, "tasks/" + session)]
+        # The transcript container holds other sessions' transcripts, so the
+        # worker may create it but never rename or delete it.
         for slug in slugs(worktree, args.worktree):
             project = claude + "/projects/" + slug
-            runtime += [f"(literal {quoted(project)})", f"(literal {quoted(project + '/' + session + '.jsonl')})",
-                        f"(subpath {quoted(project + '/' + session)})"]
-        # Default Claude stores config beside, not inside, its .claude directory.
-        if not (args.agent_dir or os.environ.get("CLAUDE_CONFIG_DIR")):
-            runtime.append(f"(literal {quoted(home + '/.claude.json')})")
+            created.append(f"(literal {quoted(project)})")
+            runtime += [f"(literal {quoted(project + '/' + session + '.jsonl')})", f"(subpath {quoted(project + '/' + session)})"]
         harness_protected = [under(claude, r"projects/[^/]+/memory(/.*)?")]
 
     deny = list(dict.fromkeys(deny))
@@ -229,6 +230,7 @@ def build(args):
             for suffix in ("", ".lock"):
                 lines.append(f"(allow file-write* (literal {quoted(str(path) + suffix)}))")
     lines += [f"(allow file-write* {item})" for item in runtime]
+    lines += [f"(allow file-write-create {item})" for item in created]
     lines += [f"(deny file-write* {item})" for item in harness_protected]
     # A protected folder, a folder holding protected entries, and every folder
     # above them refuse rename and deletion; creating children stays allowed.

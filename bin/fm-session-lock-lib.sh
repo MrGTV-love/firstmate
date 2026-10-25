@@ -22,15 +22,15 @@ _FM_SESSION_LOCK_LIB_DIR=${BASH_SOURCE[0]%/*}
 [ "$_FM_SESSION_LOCK_LIB_DIR" != "${BASH_SOURCE[0]}" ] || _FM_SESSION_LOCK_LIB_DIR=.
 _FM_SESSION_LOCK_PROC_INFO=$(cd "$_FM_SESSION_LOCK_LIB_DIR" && pwd)/fm-proc-info.py
 
-# One process fact for <pid>: comm, args or ppid. Setuid ps cannot run inside a
-# confined worker's sandbox, so a confined worker reads it through
+# One process fact for <pid>: comm, args or ppid. A confined worker's sandbox
+# refuses to run setuid ps (exit 126), so the fact then comes from
 # bin/fm-proc-info.py instead.
 fm_session_lock_proc() {  # <comm|args|ppid> <pid>
-  if [ "${FM_WRITE_CONFINEMENT:-}" = seatbelt-v1 ]; then
-    python3 "$_FM_SESSION_LOCK_PROC_INFO" "$1" "$2" 2>/dev/null
-    return
-  fi
+  local status
   ps -o "$1=" -p "$2" 2>/dev/null
+  status=$?
+  [ "$status" -eq 126 ] || return "$status"
+  python3 "$_FM_SESSION_LOCK_PROC_INFO" "$1" "$2" 2>/dev/null
 }
 # shellcheck source=bin/fm-cursor-lib.sh
 . "${_FM_SESSION_LOCK_LIB_DIR:-/}/fm-cursor-lib.sh"

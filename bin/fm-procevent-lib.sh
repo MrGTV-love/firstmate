@@ -36,20 +36,25 @@ fm_procevent_claim_root() {
 }
 
 # One process fact: ppid, pgid or lstart for <pid>, or a process table with the
-# comma-separated fields among pid, ppid, pgid, lstart and command. Setuid ps
-# cannot run inside a confined worker's sandbox, so a confined worker reads them
-# through bin/fm-proc-info.py instead. lstart is the C-locale start time with
-# runs of spaces collapsed, from either source.
+# comma-separated fields among pid, ppid, pgid, lstart and command. Inside a
+# confined worker's sandbox, which refuses to run setuid ps (exit 126), they come
+# from bin/fm-proc-info.py instead. lstart is the C-locale start time with runs
+# of spaces collapsed, from either source.
 fm_procevent_proc() {  # <ppid|pgid|lstart> <pid> | table <fields>
-  if [ "${FM_WRITE_CONFINEMENT:-}" = seatbelt-v1 ]; then
-    python3 "${SCRIPT_DIR:-${BASH_SOURCE[0]%/*}}/fm-proc-info.py" "$1" "$2" 2>/dev/null
-    return
-  fi
+  local out status
   case "$1" in
-    table) LC_ALL=C ps -axo "${2//,/=,}=" 2>/dev/null ;;
-    lstart) LC_ALL=C ps -o lstart= -p "$2" 2>/dev/null | awk '{ $1 = $1; print }' ;;
-    *) ps -o "$1=" -p "$2" 2>/dev/null ;;
+    table) LC_ALL=C ps -axo "${2//,/=,}=" 2>/dev/null; status=$? ;;
+    lstart)
+      out=$(LC_ALL=C ps -o lstart= -p "$2" 2>/dev/null); status=$?
+      if [ "$status" -ne 126 ]; then
+        [ -z "$out" ] || printf '%s\n' "$out" | awk '{ $1 = $1; print }'
+        return 0
+      fi
+      ;;
+    *) ps -o "$1=" -p "$2" 2>/dev/null; status=$? ;;
   esac
+  [ "$status" -eq 126 ] || return "$status"
+  python3 "${SCRIPT_DIR:-${BASH_SOURCE[0]%/*}}/fm-proc-info.py" "$1" "$2" 2>/dev/null
 }
 
 # Functions only: a runner started with exported functions does not inherit
