@@ -9,7 +9,8 @@
 # prepares the fresh copy (docs/agent-control.md "Relocating a task whose
 # worktree is gone" owns the procedure and why it is not allocated here).
 # Requires fm-backend.sh (fm_meta_get), fm-wake-lib.sh (slot ownership and
-# fm_local_firstmate_state_dirs), and fm-secondmate-registry-lib.sh for that walk.
+# fm_local_firstmate_state_dirs), fm-task-copy-lib.sh (the pool state entry),
+# and fm-secondmate-registry-lib.sh for that walk.
 #
 # fm_control_worktree_relocation <meta> <id> <state-dir> <destination>
 #   Returns 0 and sets, for the caller to journal and publish:
@@ -81,7 +82,7 @@ fm_control_worktree_registered_head() {  # <git-common-dir> <path>
 fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   local meta=$1 id=$2 state=$3 dest=$4
   local kind old probe parent real top project common project_common git_dir branch checked
-  local head='' evidence='' journal other_meta owned status source i owner_home this_home s field
+  local head='' evidence='' journal other_meta owned status source i owner_home this_home s field remedy
   local -a heads=() sources=()
 
   kind=$(fm_meta_get "$meta" kind)
@@ -207,7 +208,7 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   if [ -n "$head" ]; then heads+=("$head"); sources+=("meta-pr_head"); fi
   [ -n "${heads[*]-}" ] || {
     echo "error: no recorded head exists for branch '$branch', so the fresh copy cannot be shown to contain the task's work" >&2
-    echo "  Re-create the copy with 'git worktree add -f <path> $branch' and do not run 'git worktree prune' first: the vanished copy's registration keeps its reflog head." >&2
+    echo "  Re-create the copy from the lease: run 'treehouse get' (without -b) from $project, then run 'git checkout --ignore-other-worktrees $branch' in the slot it enters, and do not run 'git worktree prune' first: the vanished copy's registration keeps its reflog head." >&2
     if [ -z "$(fm_meta_get "$meta" pr)" ]; then
       echo "  If the registration was already pruned, give a known commit of the branch: write one line, pr_head=<sha>, into the task record $meta." >&2
     else
@@ -264,16 +265,30 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
     done
   done
   # The lease is the only source of a fresh copy. Everything above proves what
-  # this copy IS; only a Treehouse pool slot proves that the project's lease
-  # ALLOCATED it. Without that requirement the launcher accepts any isolated
-  # worktree a caller can prepare, so worktree isolation ends up tested against
-  # a path the launcher already tolerates. A hand-made `git worktree add` copy,
-  # an Orca-allocated worktree, and a project with no Treehouse pool carry no
-  # lease proof and refuse here rather than being accepted on the caller's word.
+  # this copy IS; only a Treehouse pool slot that the pool's own state records
+  # proves that the project's lease ALLOCATED it. The <pool>/<slot>/<repo>
+  # layout alone is not that proof, because a hand-made `git worktree add` can
+  # reproduce it; an entry in any lease state is, because only Treehouse writes
+  # one. A hand-made copy, an Orca-allocated worktree, and a project with no
+  # Treehouse pool carry no lease proof and refuse here rather than being
+  # accepted on the caller's word.
+  remedy="Run 'treehouse get' (without -b, which fails for the existing branch) from $project in a scratch pane, then run 'git checkout --ignore-other-worktrees $branch' in the slot it enters and pass that slot. A hand-made 'git worktree add' copy, an Orca-allocated worktree, and a project without a Treehouse pool carry no lease proof, so start the task fresh instead"
   if ! fm_treehouse_pool_slot "$project" "$real"; then
-    echo "error: the fresh copy $dest is not a Treehouse pool slot, so no lease allocated it; relocation accepts only a slot the project's lease allocated. Run 'treehouse get -b $branch' from $project in a scratch pane and pass the slot it enters. A hand-made 'git worktree add' copy, an Orca-allocated worktree, and a project without a Treehouse pool carry no lease proof, so start the task fresh instead" >&2
+    echo "error: the fresh copy $dest is not a Treehouse pool slot, so no lease allocated it; relocation accepts only a slot the project's lease allocated. $remedy" >&2
     return 1
   fi
+  # shellcheck disable=SC2034
+  FM_TASK_COPY_POOL_STATE_FILE=
+  # shellcheck disable=SC2034
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$real" || true
+  case "$FM_TASK_COPY_SLOT_STATE" in
+    held|unleased|conflicting|recovered) ;;
+    *)
+      echo "error: the fresh copy $dest $FM_TASK_COPY_SLOT_REASON; relocation accepts only a slot the project's lease allocated. $remedy" >&2
+      return 1
+      ;;
+  esac
   # A Treehouse slot also carries a claim, written by whichever task took it.
   fm_treehouse_slot_owner_state "$real" "$id"
   case "$FM_TREEHOUSE_SLOT_OWNER" in

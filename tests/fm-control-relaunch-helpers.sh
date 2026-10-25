@@ -806,6 +806,16 @@ set_case_meta_field() {  # <case-dir> <id> <key> <value>
   ' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
 }
 
+# write_pool_state <pool> <slot-checkout>...: the Treehouse state of <pool>, one
+# unleased entry per slot checkout, as the pane-driven `treehouse get` a spawn
+# runs records it.
+write_pool_state() {
+  local pool=$1
+  shift
+  jq -n '{worktrees: [$ARGS.positional[] | {name: (split("/") | .[-2]), path: ., leased: false}]}' \
+    --args "$@" > "$pool/treehouse-state.json"
+}
+
 # make_relocation_case <case-dir> <id> [keep-registration]: a ship task with one
 # commit made in its copy, then the copy vanishes.
 # <case-dir>/first-head and committed-head hold the branch's two commits.
@@ -818,18 +828,17 @@ make_relocation_case() {
   git -C "$dir/wt" rev-parse HEAD > "$dir/committed-head"
   printf 'pr_head=%s\n' "$(cat "$dir/committed-head")" >> "$dir/home/state/$id.meta"
   rm -rf "$dir/wt"
-  # G-20: a relocation destination must be a Treehouse pool slot, so the fresh
-  # copy gets the managed pool's <pool>/<slot>/<repo> layout with its pool state
-  # beside it. A plain linked worktree is no longer a destination the launcher
-  # accepts, and test_relocation_refuses_a_non_lease_copy proves that.
+  # G-20: a relocation destination must be a Treehouse pool slot that the
+  # pool's state records, so the fresh copy gets the managed pool's
+  # <pool>/<slot>/<repo> layout and a state entry beside it, and the branch is
+  # checked out the documented way: in the detached slot `treehouse get` hands
+  # out, past the vanished copy's kept registration. A copy without that proof
+  # refuses, and test_relocation_refuses_a_non_lease_copy proves that.
   mkdir -p "$dir/th/1"
-  printf '{}\n' > "$dir/th/treehouse-state.json"
-  if [ "$keep" = keep-registration ]; then
-    git -C "$dir/proj" worktree add -q -f "$dir/th/1/dest" "task-$id"
-  else
-    git -C "$dir/proj" worktree prune
-    git -C "$dir/proj" worktree add -q "$dir/th/1/dest" "task-$id"
-  fi
+  write_pool_state "$dir/th" "$dir/th/1/dest" "$dir/th/2/next"
+  [ "$keep" = keep-registration ] || git -C "$dir/proj" worktree prune
+  git -C "$dir/proj" worktree add -q --detach "$dir/th/1/dest"
+  git -C "$dir/th/1/dest" checkout -q --ignore-other-worktrees "task-$id"
   printf zsh > "$dir/fake/command"
   printf '%s' "$dir/wt" > "$dir/fake/cwd"
   printf 'working: preserved history\n' > "$dir/home/state/$id.status"

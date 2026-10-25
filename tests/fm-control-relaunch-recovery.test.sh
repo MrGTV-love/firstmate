@@ -356,7 +356,8 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
   make_relocation_case "$dir" "$id"
   set_case_meta_field "$dir" "$id" pr_head ""
   run_relocation_refusal "$dir" "$id" "no recorded head exists" "no surviving recorded head"
-  run_relocation_refusal "$dir" "$id" "git worktree add -f <path> task-$id" "no-head refusal names the forced add"
+  run_relocation_refusal "$dir" "$id" "run 'treehouse get' (without -b) from" "no-head refusal names the lease allocation"
+  run_relocation_refusal "$dir" "$id" "git checkout --ignore-other-worktrees task-$id" "no-head refusal names the checkout past the kept registration"
   run_relocation_refusal "$dir" "$id" "do not run 'git worktree prune' first" "no-head refusal warns against pruning"
   out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
   expect_code 1 "$rc" "relocation must refuse (no-head remedy)"$'\n'"$out"
@@ -768,7 +769,7 @@ test_relocation_claims_and_respects_pool_slot_ownership() {
     pool="$dir/pool"
     git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
     mkdir -p "$pool/1"
-    printf '{}\n' > "$pool/treehouse-state.json"
+    write_pool_state "$pool" "$pool/1/repo"
     git -C "$dir/proj" worktree add -q "$pool/1/repo" "task-$id"
     printf '%s' "$pool/1/repo" > "$dir/fake/cwd"
     marker="$pool/1/.fm-slot-owner"
@@ -852,17 +853,26 @@ test_concurrent_pool_slot_claim_publishes_one_owner() {
 }
 
 test_relocation_refuses_a_non_lease_copy() {
-  local dir id=rl113plain out rc
-  dir=$(new_case relocate-non-lease "$id")
-  make_relocation_case "$dir" "$id"
-  git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
-  git -C "$dir/proj" worktree add -q "$dir/plain" "task-$id"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/plain" --note "resume"); rc=$?
-  expect_code 1 "$rc" "a hand-made linked worktree must not be a relocation destination"$'\n'"$out"
-  assert_contains "$out" "is not a Treehouse pool slot" "the non-lease refusal did not name the lease requirement"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "a refused non-lease relocation changed the record"
-  assert_absent "$dir/home/state/$id.control-relaunch" "a refused non-lease relocation wrote a journal"
-  pass "relocation: a hand-made linked worktree outside the lease refuses"
+  local dir id variant dest fragment out rc
+  for variant in plain unrecorded; do
+    id="rl113$variant"
+    dir=$(new_case "relocate-non-lease-$variant" "$id")
+    make_relocation_case "$dir" "$id"
+    git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
+    case "$variant" in
+      plain) dest="$dir/plain"; fragment="is not a Treehouse pool slot" ;;
+      unrecorded) dest="$dir/th/9/dest"; fragment="has no entry in Treehouse state" ;;
+    esac
+    git -C "$dir/proj" worktree add -q "$dest" "task-$id"
+    run_relocation_refusal "$dir" "$id" "$fragment" "hand-made $variant copy" "$dest"
+    out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dest"); rc=$?
+    expect_code 1 "$rc" "the launch owner must refuse a hand-made $variant copy"$'\n'"$out"
+    assert_contains "$out" "$fragment" "the launch owner refused the $variant copy for the wrong reason"
+    assert_contains "$out" "run 'git checkout --ignore-other-worktrees task-$id' in the slot it enters" \
+      "the $variant refusal did not name the lease procedure"
+    [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "a refused $variant relocation changed the record"
+  done
+  pass "relocation: a hand-made linked worktree refuses, in or out of the pool layout, unless the pool state records it"
 }
 
 test_unpublished_relocation_releases_only_its_new_pool_claim() {
@@ -875,7 +885,7 @@ test_unpublished_relocation_releases_only_its_new_pool_claim() {
     pool="$dir/pool"
     git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
     mkdir -p "$pool/1" "$pool/2"
-    printf '{}\n' > "$pool/treehouse-state.json"
+    write_pool_state "$pool" "$pool/1/repo" "$pool/2/repo"
     git -C "$dir/proj" worktree add -q "$pool/1/repo" "task-$id"
     git -C "$dir/proj" worktree add -q -f "$pool/2/repo" "task-$id"
     marker="$pool/1/.fm-slot-owner"

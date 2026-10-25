@@ -554,6 +554,7 @@ Plain `relaunch` refuses that task because it cannot checkpoint the missing reco
 `fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh copy of the same branch that the project's Treehouse lease allocated.
 A scout has no branch to match and a secondmate's home is not a task copy, so both refuse.
 The lease is the only accepted source: a hand-made `git worktree add` copy, an Orca-allocated worktree, and a project with no Treehouse pool refuse by name, because none of them can prove which allocator produced the copy.
+The `<pool>/<slot>/<repo>` layout is not that proof, since a hand-made copy can reproduce it; the copy must also have an entry, in any lease state, in its pool's Treehouse state file, which only Treehouse writes.
 
 [`bin/fm-control-worktree-lib.sh`](../bin/fm-control-worktree-lib.sh) owns the proof, and both `fm-control` and `fm-spawn --relaunch --worktree` run it, so the two cannot disagree.
 The control-plane preflight checks all of the conditions below before stopping the agent or writing the relaunch journal or progress note.
@@ -564,10 +565,11 @@ The launch owner repeats the proof before publication; a later refusal can there
   A path that exists, a dangling symlink, or an unreadable ancestry is "cannot say", never "gone".
   An unmounted volume looks like a deleted copy, so do not relocate while one is offline.
 - **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
+- **It is a Treehouse pool slot of the recorded project that its pool's state file records**; an entry in any lease state counts, and an unreadable state file or one with no entry for the slot refuses.
 - **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
 - **Its HEAD contains every surviving recorded head:** the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.
-  A task with no PR and no prior control relaunch has only the reflog, so allocate the copy with `treehouse get -b <branch>` from the recorded project and do not run `git worktree prune` first; only the pool slot the lease enters is an accepted destination.
+  A task with no PR and no prior control relaunch has only the reflog, so prepare the copy with `treehouse get` (no `-b`) from the recorded project and `git checkout --ignore-other-worktrees <branch>` in the slot it enters, and do not run `git worktree prune` first; only the pool slot the lease enters is an accepted destination.
   If the registration was already pruned, give a known commit of the branch as evidence, scoped by task:
   a task with no recorded `pr=` takes one line, `pr_head=<sha>`, in its task record (`state/<id>.meta`);
   a task with a recorded `pr=` takes the three lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` in its control journal (`state/<id>.control-relaunch`), never a hand-written `pr_head=`, because `bin/fm-dod-lib.sh` and `bin/fm-review-diff.sh` read `pr_head` as the head the forge reported.
@@ -591,10 +593,12 @@ Uncommitted changes in the vanished copy are not recoverable, and the progress n
 
 **Why the caller prepares the copy.**
 The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
-It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration or force the checkout, and both change repository administration that every lane's worktrees share.
+It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration, which changes repository administration that every lane's worktrees share, or force the checkout on the caller's behalf.
 It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a progress-based isolation poll (pane path or output) that has an absolute extreme, and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
-The caller prepares the copy with `git worktree add -f <path> <branch>`, never after `git worktree prune`: the forced add keeps the vanished copy's registration, whose reflog may be the task's only recorded head.
+The caller prepares the copy from the lease, never after `git worktree prune`: run `treehouse get` with no `-b` from the recorded project, then run `git checkout --ignore-other-worktrees <branch>` inside the slot it enters, and pass that slot.
+`treehouse get -b <branch>` fails because the branch already exists, and a plain `git checkout <branch>` refuses while the vanished copy's registration still names the branch.
+That registration must stay, because its reflog may be the task's only recorded head.
 If that registration is already gone and no other head survives, the refusal asks for a known commit as evidence: one `pr_head=<sha>` line in the task record for a task with no recorded `pr=`, or the three control journal lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` for a task with one.
 That evidence only gives the proof a head to check; the proof and the launch owner still make every change.
 Rebinding the task by hand-editing its `worktree=` has none of those checks, no journal, and no lock against a concurrent launch.
