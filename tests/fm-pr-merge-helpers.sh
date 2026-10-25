@@ -55,6 +55,10 @@ make_case() {
   mkdir -p "$case_dir/state" "$case_dir/home/data" "$case_dir/home/config" "$fakebin"
   fm_git_init_commit "$case_dir/wt"
   git -C "$case_dir/wt" update-ref refs/remotes/origin/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  git -C "$case_dir/wt" rev-parse refs/remotes/origin/main > "$case_dir/github-base"
+  git -C "$case_dir/wt" commit -q --allow-empty -m 'ship implementation'
+  git -C "$case_dir/wt" update-ref refs/remotes/origin/fm/fixture "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  fm_fake_ship_review_history "$fakebin"
   fm_test_tasks_toml "$case_dir/home/.tasks.toml"
   printf '%s\n' '## In flight' '' '## Queued' '' '## Done' \
     > "$case_dir/home/data/backlog.md"
@@ -63,6 +67,8 @@ make_case() {
     "worktree=$case_dir/wt" \
     "project=$case_dir/project" \
     "kind=ship" \
+    "model=gpt-5.1-codex" \
+    "branch=fm/fixture" \
     "mode=no-mistakes"
   printf '%s\n' \
     'state=MERGED' \
@@ -113,7 +119,7 @@ write_github_live_json() {
   local case_dir=$1 head=$2
   printf '%s\n' "$head" > "$case_dir/github-head"
   cat > "$case_dir/github-view.json" <<JSON
-{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}
+{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","baseRefOid":"$(cat "$case_dir/github-base")","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}
 JSON
 }
 
@@ -121,7 +127,7 @@ write_github_red_json() {
   local case_dir=$1 head=$2 name=$3
   printf '%s\n' "$head" > "$case_dir/github-head"
   cat > "$case_dir/github-view.json" <<JSON
-{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"$name","status":"COMPLETED","conclusion":"FAILURE"}]}
+{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","baseRefOid":"$(cat "$case_dir/github-base")","statusCheckRollup":[{"__typename":"CheckRun","name":"$name","status":"COMPLETED","conclusion":"FAILURE"}]}
 JSON
 }
 
@@ -156,7 +162,7 @@ write_github_rollup_json() {
   done
   printf '%s\n' "$head" > "$case_dir/github-head"
   cat > "$case_dir/github-view.json" <<JSON
-{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","statusCheckRollup":[$rollup]}
+{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","baseRefOid":"$(cat "$case_dir/github-base")","statusCheckRollup":[$rollup]}
 JSON
 }
 
@@ -445,10 +451,10 @@ write_mr_json() {
   if [ "$pipeline" = present ]; then
     pipeline=$(printf '{"sha":"%s","status":"%s"}' "$pipeline_sha" "$pipeline_status")
   fi
-  printf '{"iid":7,"state":"%s","detailed_merge_status":"%s","has_conflicts":%s,' \
+  printf '{"iid":7,"target_branch":"main","state":"%s","detailed_merge_status":"%s","has_conflicts":%s,' \
     "$state" "$detail" "$conflicts" > "$file"
-  printf '"blocking_discussions_resolved":%s,"sha":"%s","head_pipeline":%s,' \
-    "$discussions" "$head" "$pipeline" >> "$file"
+  printf '"blocking_discussions_resolved":%s,"sha":"%s","head_pipeline":%s,"diff_refs":{"head_sha":"%s","base_sha":"0000000000000000000000000000000000000000"},' \
+    "$discussions" "$head" "$pipeline" "$head" >> "$file"
   printf '"merge_when_pipeline_succeeds":%s,"merge_after":%s}\n' \
     "$merge_when_pipeline_succeeds" "$merge_after" >> "$file"
 }
@@ -577,7 +583,7 @@ write_forgejo_pr_json() {
       *) fail "write_forgejo_pr_json: unknown field '$key'" ;;
     esac
   done
-  printf '{"state":"%s","mergeable":%s,"merged":%s,"draft":%s,"head":{"sha":"%s"}}\n' \
+  printf '{"state":"%s","mergeable":%s,"merged":%s,"draft":%s,"base":{"ref":"main","sha":"0000000000000000000000000000000000000000"},"head":{"sha":"%s"}}\n' \
     "$state" "$mergeable" "$merged" "$draft" "$head" > "$file"
 }
 
@@ -712,8 +718,9 @@ record_review() {
     fi
   done
   printf 'VERDICT: %s head=%s\n' "$verdict" "$head" > "$case_dir/review.md"
+  PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
-    "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
+    "$ROOT/bin/fm-review-record.py" review --task task-x1 --base main --pr "$url" --head "$head" \
       --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
       --report "$case_dir/review.md" "$@"
@@ -852,6 +859,7 @@ parent_reply_lines() {  # <file> <url>
 review_record_command() {
   local case_dir=$1
   shift
+  PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
   FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-review-record.py" "$@"
 }
@@ -867,6 +875,8 @@ make_direct_pr_local_tip_case() {  # <name>
     "worktree=$case_dir/wt" \
     "project=$case_dir/project" \
     "kind=ship" \
+    "model=gpt-5.1-codex" \
+    "branch=fm/fixture" \
     "mode=direct-PR"
   git -C "$case_dir/wt" commit -q --allow-empty -m 'local tip no remote ref holds'
   printf '%s\n' "$case_dir"

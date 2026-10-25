@@ -543,13 +543,15 @@ fi
 
 require_recorded_review() {
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    python3 "$SCRIPT_DIR/fm-review-record.py" verify --pr "$URL" --head "$FM_PR_MERGE_HEAD" >&2
+    python3 "$SCRIPT_DIR/fm-review-record.py" verify --pr "$URL" --head "$FM_PR_MERGE_HEAD" \
+      --task "$ID" --base "$FM_PR_MERGE_BASE" >&2
 }
 
 # Pre-merge conditions for a GitLab merge request, read from one live view of
 # the merge request. Sets FM_PR_MERGE_HEAD to the verified head on success and
 # returns non-zero after reporting every condition that failed.
 FM_PR_MERGE_HEAD=
+FM_PR_MERGE_BASE=
 FM_PR_GITLAB_ASYNC_CONFIGURED=false
 gitlab_verify_mergeable() {
   local json fields line
@@ -648,6 +650,8 @@ FIELDS
   printf 'verified: %s is open and mergeable, with a successful pipeline at head %s\n' \
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
+  FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er 'select(.diff_refs.head_sha == .sha) | .diff_refs.base_sha') || return 1
+  fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the GitLab PR base commit for author evidence' >&2; return 1; }
   FM_PR_GITLAB_ASYNC_CONFIGURED=$async_configured
 }
 
@@ -778,6 +782,8 @@ FIELDS
   printf 'verified: %s is open and mergeable, with a successful combined status at head %s\n' \
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
+  FM_PR_MERGE_BASE=$(printf '%s' "$pr_json" | jq -er '.base.sha') || return 1
+  fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the Forgejo PR base commit for author evidence' >&2; return 1; }
 }
 
 # The caller's own extra arguments may only name a merge method, in the same
@@ -1052,7 +1058,7 @@ github_verify_mergeable() {
   local -a unwaived_red=() unwaived_missing=()
   FM_PR_GREEN_HEAD_BLOCKED=false
 
-  if ! json=$(gh pr view "$URL" --json state,isDraft,reviewDecision,mergeable,mergeStateStatus,headRefOid,baseRefName 2>/dev/null) \
+  if ! json=$(gh pr view "$URL" --json state,isDraft,reviewDecision,mergeable,mergeStateStatus,headRefOid,baseRefName,baseRefOid 2>/dev/null) \
     || [ -z "$json" ]; then
     echo "error: could not read the GitHub pull request state before merging" >&2
     return 4
@@ -1271,6 +1277,8 @@ EOF
   printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
+  FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er '.baseRefOid') || return 4
+  fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the GitHub PR base commit for author evidence' >&2; return 4; }
   FM_PR_GITHUB_BASE=$base
 }
 

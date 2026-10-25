@@ -1092,6 +1092,28 @@ fm_git_worktree() {
   git -C "$repo" worktree add --quiet -b "$branch" "$worktree"
 }
 
+# fm_fake_ship_review_history <fakebin>: legacy forge/hold fixtures have symbolic
+# heads, not Git objects. Mock only the author-history query shapes with one ship
+# commit; real attribution regressions must NOT install this adapter.
+fm_fake_ship_review_history() {
+  local fakebin=$1
+  printf '#!/usr/bin/env bash\nREAL_GIT=%q\n' "$(command -v git)" > "$fakebin/git"
+  cat >> "$fakebin/git" <<'SH'
+if [ "${GIT_NO_REPLACE_OBJECTS:-}" = 1 ] && [ "${1:-}" = -C ]; then
+  case "${3:-} ${4:-}" in
+    'cat-file -e') exit 0 ;;
+    'rev-parse --verify')
+      case "${5:-}" in *'^{commit}') printf '%040d\n' 0; exit 0 ;; esac ;;
+    'merge-base '*)
+      if [ "${5:-}" = 0000000000000000000000000000000000000000 ]; then printf '%040d\n' 0; exit 0; fi ;;
+    'log --format=%H%x00%s') printf '%s\000ship fixture implementation\n' "${5##*..}"; exit 0 ;;
+  esac
+fi
+exec "$REAL_GIT" "$@"
+SH
+  chmod +x "$fakebin/git"
+}
+
 # --- state/<id>.meta writers ------------------------------------------------
 
 # fm_write_meta <file> <key=val> ...: write the given key=val lines to a meta
