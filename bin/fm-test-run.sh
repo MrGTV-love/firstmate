@@ -302,10 +302,15 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # 779131 ms, each about 1.7 percent under. So 1200000 ms bounds a real lane near
 # 20.4 minutes, and a new member or a slow path fails the coverage guard instead
 # of quietly stretching the workflow. The lane 1 membership that ran modeled at
-# 1209767 ms, just above this budget, so two scripts moved to lane 2; the
-# rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone. Like the
-# serial target this is packing arithmetic, not an execution timeout.
-# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone)
+# 1209767 ms, just above this budget, so two scripts moved to lane 2; that
+# rebalanced lane 1 modeled at 1117958 ms, set by fm-pr-merge alone. After the
+# fm-pr-merge split, only tests/fm-pr-merge.test.sh stays parallel, on an
+# apportioned hint (one of the 29 parallel hints; the other 28 are measured),
+# and fm-captain-hold-cleanup moved to lane 1 to restore the balance; lane 1
+# models at 941010 ms, set by fm-test-run alone, and that is the reported
+# parallel_makespan_ms. Like the serial target this is packing arithmetic, not
+# an execution timeout.
+# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 then modeled at 1117958 ms, set by fm-pr-merge alone)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
 # Conservative balance hint for a portable-serial script with no measurement.
@@ -534,7 +539,8 @@ family_for_basename() {
       printf '%s\n' backend-dispatch
       ;;
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|\
-    fm-pr-merge.test.sh|fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
+    fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
+    fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
     fm-review-diff.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
     fm-teardown-cleanup.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
@@ -682,7 +688,7 @@ tests/fm-grok-harness.test.sh 10027
 tests/fm-herdr-lab.test.sh 29438
 tests/fm-lint.test.sh 713491
 tests/fm-pi-primary-types.test.sh 3677
-tests/fm-pr-merge.test.sh 1117958
+tests/fm-pr-merge.test.sh 370000
 tests/fm-review-diff.test.sh 12861
 tests/fm-send-popup-settle.test.sh 10405
 tests/fm-send-settle.test.sh 3052
@@ -715,9 +721,10 @@ portable_parallel_lane_weight() {
 # compiler it typechecks with; moving it needs that workflow step moved with it.
 list_portable_parallel_1() {
   cat <<'EOF'
-tests/fm-pr-merge.test.sh
 tests/fm-test-run.test.sh
 tests/fm-captain-hold-reconcile.test.sh
+tests/fm-pr-merge.test.sh
+tests/fm-captain-hold-cleanup.test.sh
 tests/fm-crew-state.test.sh
 tests/fm-cd-pretool-check.test.sh
 tests/fm-tmux-submit-busy.test.sh
@@ -734,7 +741,6 @@ list_portable_parallel_2() {
   cat <<'EOF'
 tests/fm-lint.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
-tests/fm-captain-hold-cleanup.test.sh
 tests/fm-captain-hold-sweep.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-keyed-answers.test.sh
@@ -1013,6 +1019,8 @@ tests/fm-pi-watch-loader-live.test.sh 1032
 tests/fm-pi-windows-shell-invocation.test.sh 5121
 tests/fm-pipeline-spend.test.sh 2576
 tests/fm-pr-check-security.test.sh 452157
+tests/fm-pr-merge-checks.test.sh 191000
+tests/fm-pr-merge-forges.test.sh 153000
 tests/fm-pr-reviewers.test.sh 742
 tests/fm-pr-state-live-e2e.test.sh 926
 tests/fm-pr-state.test.sh 1682
