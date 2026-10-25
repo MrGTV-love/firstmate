@@ -465,6 +465,8 @@ def fixture(repo, base, harness, user_home, other):
     write(home / "config/crew-harness")
     write(home / "config/fleet-ledger", "")
     write(home / ".env")
+    for name in ("secondmates.md", "captain.md", "backlog.md"):
+        write(data / name)
     write(base / "other-home/state/x.status")
     protected = {
         "project-primary": project / "README", "primary-index": project / ".git/index", "home-primary": home / "README",
@@ -476,7 +478,12 @@ def fixture(repo, base, harness, user_home, other):
         "shared-legacy-audit": state / "jev-guard.jsonl",
         "main-meta": state / "task.meta", "main-control-relaunch": state / "task.control-relaunch",
         "main-git-hooks": state / "task.git-hooks/pre-commit",
+        "data-secondmates": data / "secondmates.md", "data-captain": data / "captain.md", "data-backlog": data / "backlog.md",
     }
+    # A task created after the profile was built: its records are written
+    # only after the build, so no launch-time task list can name it.
+    late = {"late-task-meta": state / "late.meta", "late-task-control-relaunch": state / "late.control-relaunch"}
+    protected.update(late)
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
                "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
                "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees"}
@@ -496,7 +503,8 @@ def fixture(repo, base, harness, user_home, other):
         write(user_home / name)
     protected.update({"codex-home": user_home / ".codex/config.toml", "dsh-home": user_home / ".dsh/config"})
     protected.update({"harness" + name.replace(slug, "own-project").replace("/", "-"): user_home / name for name in claude_code + omp_code})
-    writable_paths = {"tool-cache": user_home / ".cache/fm-test-slots/probe", "own-home-tmp": user_tmp / "fm-task-probe/file"}
+    writable_paths = {"tool-cache": user_home / ".cache/fm-test-slots/probe", "own-home-tmp": user_tmp / "fm-task-probe/file",
+                      "own-data": data / "task/probe"}
     if harness == "claude":
         writable_paths.update({"claude-transcript": user_home / f".claude/projects/{slug}/{OWN_SESSION}.jsonl",
                                "claude-transcript-sidecar": user_home / f".claude/projects/{slug}/{OWN_SESSION}/subagents/agent.jsonl",
@@ -505,6 +513,7 @@ def fixture(repo, base, harness, user_home, other):
                                "claude-file-history": user_home / f".claude/file-history/{OWN_SESSION}/backup",
                                "claude-tasks": user_home / f".claude/tasks/{OWN_SESSION}/1.json",
                                "claude-history": user_home / ".claude/history.jsonl",
+                               "claude-history-lock": user_home / ".claude/history.jsonl.lock/lock",
                                "claude-statsig": user_home / ".claude/statsig/cache", "claude-debug": user_home / ".claude/debug/session.txt"})
     else:
         writable_paths.update({"omp-agent-db": user_home / ".omp/agent/agent.db", "omp-agent-db-wal": user_home / ".omp/agent/agent.db-wal",
@@ -513,7 +522,7 @@ def fixture(repo, base, harness, user_home, other):
                                "omp-daemon-scope": user_home / ".omp/run/daemons" / scope_key(worktree) / "broker.pid"})
     return {"repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
             "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
-            "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp),
+            "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp), "late": [str(path) for path in late.values()],
             "protected": {name: str(path) for name, path in protected.items()},
             "writable": {name: str(path) for name, path in writable_paths.items()},
             "renamed": {name: str(path) for name, path in renamed.items()}}
@@ -550,6 +559,8 @@ for harness in ("claude", "omp"):
             (base / "temp").mkdir()
             profile = base / "profile.sb"
             build_profile(repo, manifest, harness, profile, env)
+            for path in manifest["late"]:
+                write(path, "window=fmtest:fm-late\nkind=ship\n")
             command = [sys.executable, __file__, "--child", json.dumps(manifest)]
             invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
             result = subprocess.run(invocation, capture_output=True, text=True, env=env)

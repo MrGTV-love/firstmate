@@ -10,7 +10,9 @@
     "omp-worker-url-reads-off",
     "spawn-brief-out-of-scope",
     "git-commit-credential-shapes",
-    "git-push-credential-shapes"
+    "git-push-credential-shapes",
+    "spawn-confinement-coverage",
+    "spawn-write-confinement"
   ],
   "guards": [
     {

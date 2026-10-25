@@ -9,8 +9,10 @@ Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
 
 Writes are allowed by default; the profile denies writes to named protected
 assets: project primary checkouts, other task worktrees, other tasks' state
-records, data and temp roots, Main-owned records of this task, the shared
-legacy Jev audit, this home's config and .env, harness config homes apart from
+records, every task's metadata and relaunch records, the home data root apart
+from this task's directory and the duration ledger, temp roots, Main-owned
+records of this task, the shared legacy Jev audit, this home's config and .env,
+harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
 every folder above it also refuses rename and deletion. --data is this task's
@@ -104,7 +106,7 @@ def build(args):
     state = canonical(args.state)
     protect = [canonical(path) for path in args.protect]
     deny = [canonical(Path(home) / name) for name in HARNESS_HOMES]
-    deny += [canonical(args.home), canonical(args.config)] + protect
+    deny += [canonical(args.home), canonical(args.config), data_root] + protect
     primaries = [canonical(path) for path in Path(args.projects).iterdir() if path.is_dir()] if Path(args.projects).is_dir() else []
     if Path(common).name == ".git":
         primaries.append(str(Path(common).parent))
@@ -158,7 +160,7 @@ def build(args):
         session = args.claude_session or ""
         if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", session):
             raise ValueError("a confined Claude worker needs its lowercase --claude-session UUID")
-        runtime += [under(claude, r"\.claude\.json(\..+)?"), under(claude, r"history\.jsonl")]
+        runtime += [under(claude, r"\.claude\.json(\..+)?"), under(claude, r"history\.jsonl(\.lock(/.*)?)?")]
         runtime += [f"(subpath {quoted(claude + '/' + name)})"
                     for name in ("backups", "statsig", "debug", "session-env/" + session, "file-history/" + session, "tasks/" + session)]
         for slug in slugs(worktree, args.worktree):
@@ -174,13 +176,14 @@ def build(args):
     lines = ["(version 1)", "(allow default)"]
     lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in deny]
     # Shared roots inside protected assets that the worker's ordinary tools
-    # write: the home data root (duration ledger), the home state directory
-    # (procevent, friction and fleet ledgers) and its own repository's shared
-    # Git directory (objects, remote-tracking refs, stash, config).
-    for root in (data_root, state, common):
+    # write: the home state directory (procevent, friction and fleet ledgers)
+    # and its own repository's shared Git directory (objects, remote-tracking
+    # refs, stash, config).
+    for root in (state, common):
         lines.append(f"(allow file-write* (subpath {quoted(root)}))")
-    data_children = child_dirs(data_root, {data})
-    lines.append("(deny file-write* " + under(data_root, "[^/]+/.*") + ")")
+    # Every task's metadata and relaunch records decide its next launch's
+    # confinement, so they stay protected whenever the task was created.
+    lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
     git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads")]
@@ -208,6 +211,9 @@ def build(args):
     lines += [rule for task, rule in home_tmp.items() if task not in args.task]
     for root in (worktree, gitdir, data, *sorted(own_slugs)):
         lines.append(f"(allow file-write* (subpath {quoted(root)}))")
+    # The home duration ledger, its lock and its compaction scratch file.
+    for name in ("", ".lock", ".compact"):
+        lines.append(f"(allow file-write* (literal {quoted(data_root + '/command-durations.jsonl' + name)}))")
     for record in WORKER_RECORDS:
         lines.append("(allow file-write* " + under(state, re.escape(args.task + ".") + record) + ")")
     # A task's declared branch and its atomic lock/reflog are separate from
@@ -226,7 +232,7 @@ def build(args):
     lines += [f"(deny file-write* {item})" for item in harness_protected]
     # A protected folder, a folder holding protected entries, and every folder
     # above them refuse rename and deletion; creating children stays allowed.
-    anchors = deny + git_shared + data_children + claude_children + [data_root, state, common, str(gates), home + "/tmp", claude_tmp]
+    anchors = deny + git_shared + claude_children + [state, common, str(gates), home + "/tmp", claude_tmp]
     fixed = []
     for anchor in anchors:
         path = Path(anchor)
