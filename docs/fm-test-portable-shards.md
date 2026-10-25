@@ -247,14 +247,14 @@ That factor is a local estimate, not a CI measurement, and it predates the other
 
 `tests/fm-pr-merge.test.sh` was the parallel lane's longest single script (1117958 ms in run 40121241146), so it set that lane's wall no matter how the rest packed.
 It is now a shared helpers module plus three groups cut as contiguous slices of the former registration order, so the themes below are approximate at the slice edges.
-The first group (49) is the review and captain-word authority with the GitHub outcome cases.
+The first group (50) is the review and captain-word authority with the GitHub outcome cases.
 The second group (49) is the GitLab, Forgejo, reporting, and backlog cases, plus the argument/URL and multi-PR edge cases that fell in that slice.
 The third group (50) is the check-run, rollup, waiver, and away-authority matrix.
-Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` pins the 148-case cover.
+Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` pins the 149-case cover.
 Only `tests/fm-pr-merge.test.sh` stays in the proven-isolated parallel set, with its hint apportioned from the former hint by case share (370000 ms) pending the first measured artifact for it.
 `tests/fm-pr-merge-forges.test.sh` and `tests/fm-pr-merge-checks.test.sh` stay in the `pr-forge` family but run in the portable serial remainder, because the 2026-10-24 portable-pool proof that would admit them did not pass cleanly ([isolation proof](fm-test-isolation-proof.md#fm-pr-merge-split-re-check)); their serial hints are apportioned estimates pending measurement, so the packer does not model them at the 45000 ms default.
 Both derive from 461903 ms, the former file's serial-era measurement in [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843), where the parallel jobs ran their scripts serially: `fm-pr-merge-forges` takes its 49-of-148 case share (152927 ms, rounded to 153000), and `fm-pr-merge-checks` takes its share of the three groups' 2026-10-24 portable-proof time, 302702 of 730151 ms (191493 ms, rounded to 191000), because its cases run longer than the case count suggests.
-With those hints the serial corpus has 314 members whose hints sum to 23811593 ms, and the unchanged twenty-one serial shards pass `--check-coverage` at `serial_max_ms` 1134150 with `serial_unhinted=0`.
+With those hints the serial corpus has 318 members, 313 of them hinted with hints that sum to 23810727 ms, and the unchanged twenty-one serial shards pass `--check-coverage` at `serial_max_ms` 1144838 with `serial_unhinted=5`, the five result-delivery retirement tests at the default weight.
 With the two groups out of the parallel set, the lanes summed 2123043 ms and 2894605 ms, 26.7 percent apart, so `tests/fm-captain-hold-cleanup.test.sh` (366226 ms) moved from lane 2 to lane 1.
 The lanes now sum 2489269 ms and 2528379 ms, a 1.5 percent imbalance, and `--check-coverage` reports `parallel_makespan_ms` 941010, set by `tests/fm-test-run.test.sh` alone in lane 1.
 The four lint partition hints in `bin/fm-lint.sh` for the split files (1280, 1250, 240, and 1250 ms) are estimates sized from the former 3825 ms lint hint, not measurements, pending the first measured lint runs; they affect lint shard assignment only.
