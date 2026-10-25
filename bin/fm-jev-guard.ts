@@ -141,7 +141,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 type DeviceInput = { path?: unknown; content?: unknown };
 type DeviceRule = { effect: "local"; prove: (input: DeviceInput, ctx: GuardRuntimeContext, worktree: string) => boolean; remedy: string }
-  | { effect: "refused"; reason: string }
+  | { effect: "refused"; reason: string; alternative?: (input: DeviceInput) => string | undefined }
   | { effect: "unknown"; reason: string };
 
 function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: string): boolean {
@@ -162,6 +162,11 @@ function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: strin
   return statSync(file).isFile() && insideRepo(file, root);
 }
 
+function githubReadAlternative(input: DeviceInput): string | undefined {
+  const args: unknown = typeof input.content === "string" ? JSON.parse(input.content) : undefined;
+  if (object(args) && (args.op === "repo_view" || args.op === "file_read")) return "For this read, use gh-axi through the shell instead.";
+}
+
 function ownJob(input: DeviceInput, ctx: GuardRuntimeContext): boolean {
   const job = typeof input.path === "string" ? /^proc:\/\/([A-Za-z0-9][A-Za-z0-9._-]*)\/kill$/.exec(input.path) : null;
   if (!job || typeof ctx.getAsyncJobSnapshot !== "function") return false;
@@ -179,7 +184,7 @@ const deviceEffects: Readonly<Record<string, DeviceRule>> = {
   "proc://<job>/kill": { effect: "local", prove: ownJob,
     remedy: "Read proc:// to identify a running job owned by this session, then use its exact proc://<job>/kill path. Ask Firstmate to handle other tasks or shared services." },
   "xd://report_issue": { effect: "refused", reason: "Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead" },
-  "xd://github": { effect: "refused", reason: "its results return as write-tool output, which this guard never screens for injected instructions. Use gh through the shell instead, where the result is screened" },
+  "xd://github": { effect: "refused", reason: "its results return as write-tool output, which this guard never screens for injected instructions", alternative: githubReadAlternative },
   "xd://propose": { effect: "unknown", reason: "the plan handler's downstream effects are not available to this guard" },
   "xd://resolve": { effect: "unknown", reason: "the pending apply callback's targets and downstream effects are not available to this guard" },
   "xd://reject": { effect: "unknown", reason: "the pending discard callback's targets and downstream effects are not available to this guard" },
@@ -394,14 +399,14 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     }
   }
 
-  function finishCall(terminal: GuardTerminal, reason?: string): GuardCallPatch | undefined {
+  function finishCall(terminal: GuardTerminal, reason?: string, alternative?: string): GuardCallPatch | undefined {
     const final = record(terminal);
     if (final.decision !== "block" && final.decision !== "review") return;
     const why = final.audit_error_type
       ? `Review required: AuditUnavailableError; judgment error_type=${final.error_type ?? "null"}.`
-      : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : reason;
+      : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : alternative ? `${reason} ${alternative}` : reason;
     const path = final.refused_path === undefined ? "" : ` Refused path: ${JSON.stringify(final.refused_path)}.`;
-    const next = `${final.branch === "device" ? "Apart from the next step this refusal names, do" : "Do"} not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.`;
+    const next = `${alternative && !final.audit_error_type ? "Apart from the alternative this refusal names, do" : "Do"} not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.`;
     const guidance = final.error_type === "RequestTooLargeError" && !final.audit_error_type
       ? SIZE_REFUSAL_NOTICE : terminal.decision === "review" ? OUTAGE_NOTICE : next;
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };
@@ -445,10 +450,14 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         const device = deviceRule(path);
         if (device) {
           terminal.branch = "device";
-          const deny = (reason: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`);
+          const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
           if (tool !== "write" || service.host !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
           if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
-          if (device.effect === "refused") return deny(`${device.reason}.`);
+          if (device.effect === "refused") {
+            let alternative: string | undefined;
+            try { alternative = device.alternative?.(input); } catch { /* Unparsed arguments name no alternative. */ }
+            return deny(`${device.reason}.`, alternative);
+          }
           let admitted = false;
           try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
           return admitted ? finishCall(terminal) : deny(device.remedy);

@@ -2545,7 +2545,7 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | `xd://lsp` | Proved task-local reads, previews and file-scoped server state changes skip Jev under the scope proofs below. |
 | `proc://<id>/kill` | Cancels a job without Jev only when that exact id is in the current session's owner-filtered running-job snapshot. |
 | `xd://report_issue` | Refused: native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so omp's worker tool prompt never offers the device; the refusal says Auto QA is off for firstmate workers. |
-| `xd://github` | Refused: its native results return as `write` tool output, which the result screen never inspects, so remote content would reach the worker unscreened. The refusal points to `gh` through the shell, whose result is screened. |
+| `xd://github` | Refused: its native results return as `write` tool output, which the result screen never inspects, so remote content would reach the worker unscreened. Only for the read ops `repo_view` and `file_read` does the refusal name an alternative, `gh-axi` through the shell; every write op (such as `pr_create`, `pr_push` or `pr_checkout`) and unknown op names none and keeps the full report-to-Firstmate rule. |
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
@@ -2571,7 +2571,7 @@ omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
 A policy block (write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
-A device refusal that names a next step, such as `gh` through the shell for `xd://github`, exempts only that named step from this rule.
+Only the `xd://github` read-op refusal names an alternative, `gh-axi` through the shell, and it exempts only that named alternative from this rule.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.

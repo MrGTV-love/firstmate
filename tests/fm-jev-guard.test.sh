@@ -661,16 +661,23 @@ for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
   const handler = install(scope);
   for (const [path, content, reason] of [
     ['xd://report_issue', 'write: refused Auto QA grievance report', /Auto QA is off for firstmate workers/],
-    ...['repo_view', 'file_read', 'pr_push', 'pr_create', 'pr_checkout', 'future_op'].map(op => ['xd://github', JSON.stringify({ op, repo: 'fixture/repo', path: 'README.md' }), /gh through the shell/]),
-    ...['not-json', '{}'].map(content => ['xd://github', content, /gh through the shell/]),
+    ...['repo_view', 'file_read'].map(op => ['xd://github', JSON.stringify({ op, repo: 'fixture/repo', path: 'README.md' }), /For this read, use gh-axi through the shell instead\..* Apart from the alternative this refusal names, do not retry an equivalent action/]),
   ]) {
     const before = sent().length;
     const refused = await call(handler, path, content);
     assert.equal(refused?.block, true);
     assert.ok(refused.reason.includes(path));
     assert.match(refused.reason, reason);
-    assert.match(refused.reason, /Apart from the next step this refusal names, do not retry an equivalent action/);
-    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
+    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path|result is screened/);
+    assert.equal(sent().length, before, 'refused devices stop before any screening request');
+  }
+  for (const content of [...['pr_push', 'pr_create', 'pr_checkout', 'future_op'].map(op => JSON.stringify({ op, repo: 'fixture/repo', path: 'README.md' })), 'not-json', '{}']) {
+    const before = sent().length;
+    const refused = await call(handler, 'xd://github', content);
+    assert.equal(refused?.block, true);
+    assert.ok(refused.reason.includes('xd://github'));
+    assert.doesNotMatch(refused.reason, /gh-axi|\bgh\b|shell|Apart from/);
+    assert.match(refused.reason, /Do not retry an equivalent action through another command, tool, path or encoding\. Report the refused action and reason to Firstmate/);
     assert.equal(sent().length, before, 'refused devices stop before any screening request');
   }
 }
@@ -678,7 +685,7 @@ for (const path of ['~/a', '/etc/hosts']) {
   const refused = await call(active, path, 'fixture');
   assert.equal(refused?.block, true);
   assert.match(refused.reason, /Do not retry an equivalent action through another command, tool, path or encoding/);
-  assert.doesNotMatch(refused.reason, /Apart from the next step/);
+  assert.doesNotMatch(refused.reason, /Apart from the alternative/);
 }
 for (const handler of [install({ host: 'claude' }), active]) {
   const before = sent().length;
